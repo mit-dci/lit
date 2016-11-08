@@ -1,0 +1,85 @@
+package lnutil
+
+import (
+	"bytes"
+	"encoding/binary"
+	"fmt"
+)
+
+// I shouldn't even have to write these...
+
+// int32 to 4 bytes.  Always works.
+func I32tB(i int32) []byte {
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, i)
+	return buf.Bytes()
+}
+
+// uint32 to 4 bytes.  Always works.
+func U32tB(i uint32) []byte {
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, i)
+	return buf.Bytes()
+}
+
+// 4 byte slice to uint32.  Returns ffffffff if something doesn't work.
+func BtU32(b []byte) uint32 {
+	if len(b) != 4 {
+		fmt.Printf("Got %x to BtU32\n", b)
+		return 0xffffffff
+	}
+	var i uint32
+	buf := bytes.NewBuffer(b)
+	binary.Read(buf, binary.BigEndian, &i)
+	return i
+}
+
+// 4 byte slice to int32.  Returns 7fffffff if something doesn't work.
+func BtI32(b []byte) int32 {
+	if len(b) != 4 {
+		fmt.Printf("Got %x to BtI32\n", b)
+		return 0x7fffffff
+	}
+	var i int32
+	buf := bytes.NewBuffer(b)
+	binary.Read(buf, binary.BigEndian, &i)
+	return i
+}
+
+// uint64 to 8 bytes.  Always works.
+func U64tB(i uint64) []byte {
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, i)
+	return buf.Bytes()
+}
+
+// int64 to 8 bytes.  Always works.
+func I64tB(i int64) []byte {
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, i)
+	return buf.Bytes()
+}
+
+// 8 bytes to int64 (bitcoin amounts).  returns 7fff... if it doesn't work.
+func BtI64(b []byte) int64 {
+	if len(b) != 8 {
+		fmt.Printf("Got %x to BtI64\n", b)
+		return 0x7fffffffffffffff
+	}
+	var i int64
+	buf := bytes.NewBuffer(b)
+	binary.Read(buf, binary.BigEndian, &i)
+	return i
+}
+
+// 8 bytes to uint64.  returns ffff. if it doesn't work.
+func BtU64(b []byte) uint64 {
+	if len(b) != 8 {
+		fmt.Printf("Got %x to BtI64\n", b)
+		return 0xffffffffffffffff
+	}
+	var i uint64
+	buf := bytes.NewBuffer(b)
+	binary.Read(buf, binary.BigEndian, &i)
+	return i
+}
