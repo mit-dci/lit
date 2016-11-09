@@ -5,13 +5,13 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/boltdb/bolt"
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
-	"li.lan/tx/lit/elkrem"
-	"li.lan/tx/lit/lndc"
-	"li.lan/tx/lit/lnutil"
+	"github.com/boltdb/bolt"
+	"github.com/mit-dci/lit/elkrem"
+	"github.com/mit-dci/lit/lndc"
+	"github.com/mit-dci/lit/lnutil"
 )
 
 /*

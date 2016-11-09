@@ -11,7 +11,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/txsort"
-	"li.lan/tx/lit/portxo"
+	"github.com/mit-dci/lit/portxo"
 )
 
 // Build a tx, kindof like with SendCoins, but don't sign or broadcast.

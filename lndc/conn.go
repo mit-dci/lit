@@ -218,8 +218,6 @@ func (c *LNDConn) authPKH(
 
 	// Wait for their response.
 	// TODO(tadge): add timeout here
-	//  * NOTE(roasbeef): read timeout should be set on the underlying
-	//    net.Conn.
 	resp := make([]byte, 53)
 	if _, err := c.Conn.Read(resp); err != nil {
 		return err

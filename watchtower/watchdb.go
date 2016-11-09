@@ -3,11 +3,11 @@ package watchtower
 import (
 	"fmt"
 
-	"li.lan/tx/lit/elkrem"
-	"li.lan/tx/lit/lnutil"
+	"github.com/mit-dci/lit/elkrem"
+	"github.com/mit-dci/lit/lnutil"
 
+	"github.com/btcsuite/btcd/wire"
 	"github.com/boltdb/bolt"
-	"github.com/roasbeef/btcd/wire"
 )
 
 /*

@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"time"
 
-	"li.lan/tx/lit/lnutil"
-	"li.lan/tx/lit/qln"
+	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/qln"
 )
 
 func FundChannel(args []string) error {

@@ -9,8 +9,8 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg"
 
-	"li.lan/tx/lit/qln"
-	"li.lan/tx/lit/uspv"
+	"github.com/mit-dci/lit/qln"
+	"github.com/mit-dci/lit/uspv"
 )
 
 const (
@@ -22,7 +22,7 @@ const (
 	// this is my local testnet node, replace it with your own close by.
 	// Random internet testnet nodes usually work but sometimes don't, so
 	// maybe I should test against different versions out there.
-	SPVHostAdr = "slab.lan:18333" // for testnet3
+	SPVHostAdr = "lit3.co:18333" // for testnet3
 //	SPVHostAdr = "slab.lan:18444" // for regtest
 )
 

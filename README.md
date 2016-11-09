@@ -2,6 +2,30 @@
 
 Under development, not for use with real money.
 
+currently go-get will fail to compile.  Lit uses btcd libraries, and btcd does not yet have segwit support in master.  This will hopefully be merged soon, before segwit activates on mainnet.  
+
+I have a fork of btcd from roasbeef/segwit, and could make it go-gettable by changing all the imports, but hopefully it will be merged in soon.
+
+To build, after go-getting, try this:
+```
+# github.com/mit-dci/lit/uspv
+uspv/eight333.go:406: undefined: wire.InvTypeWitnessBlock
+... other errors.
+
+user@host:~/go/src/github.com/mit-dci/lit$ cd ../../btcsuite/btcd/
+
+user@host:~/go/src/github.com/btcsuite/btcd$ git remote add adiabat https://github.com/adiabat/btcd
+user@host:~/go/src/github.com/btcsuite/btcd$ git fetch adiabat
+user@host:~/go/src/github.com/btcsuite/btcd$ git checkout adiabat/master
+
+user@host:~/go/src/github.com/btcsuite/btcd$ cd ../btcutil
+
+user@host:~/go/src/github.com/btcsuite/btcutil$ git remote add adiabat https://github.com/adiabat/btcutil
+user@host:~/go/src/github.com/btcsuite/btcutil$ git fetch adiabat
+user@host:~/go/src/github.com/btcsuite/btcutil$ git checkout adiabat/master
+```
+it should build after switching to the adiabat/btcd libraries.  
+
 folders:
 
 ### cmd

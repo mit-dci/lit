@@ -119,7 +119,6 @@ func (l *Listener) authenticateConnection(
 	lnConn *LNDConn, localEphPubBytes []byte) error {
 	var err error
 
-	// TODO(roasbeef): should be using read/write clear here?
 	slice := make([]byte, 73)
 	n, err := lnConn.Conn.Read(slice)
 	if err != nil {

@@ -11,10 +11,10 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 
-	"li.lan/tx/lit/lndc"
-	"li.lan/tx/lit/portxo"
-	"li.lan/tx/lit/qln"
-	"li.lan/tx/lit/uspv"
+	"github.com/mit-dci/lit/lndc"
+	"github.com/mit-dci/lit/portxo"
+	"github.com/mit-dci/lit/qln"
+	"github.com/mit-dci/lit/uspv"
 )
 
 /* lit shell cooked in.  Switch to rpc shell soon */

@@ -7,16 +7,16 @@ import (
 	"log"
 	"sync"
 
-	"github.com/boltdb/bolt"
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/boltdb/bolt"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/bloom"
 	"github.com/btcsuite/btcutil/hdkeychain"
-	"li.lan/tx/lit/lnutil"
-	"li.lan/tx/lit/portxo"
+	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/portxo"
 )
 
 type TxStore struct {

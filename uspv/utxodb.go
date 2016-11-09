@@ -10,8 +10,8 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
-	"li.lan/tx/lit/lnutil"
-	"li.lan/tx/lit/portxo"
+	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/portxo"
 
 	"github.com/boltdb/bolt"
 )

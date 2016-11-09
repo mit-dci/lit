@@ -6,8 +6,8 @@ import (
 	"fmt"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"li.lan/tx/lit/lnutil"
-	"li.lan/tx/lit/portxo"
+	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/portxo"
 )
 
 /*----- serialization for StatCom ------- */

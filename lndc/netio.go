@@ -69,8 +69,6 @@ func readClear(c net.Conn) ([]byte, error) {
 	return msg, nil
 }
 
-// TODO(roasbeef): incorporate buffer pool
-
 // writeClear writes the passed message with a prefixed 2-byte length header.
 func writeClear(conn net.Conn, msg []byte) (int, error) {
 	if len(msg) > 65530 {

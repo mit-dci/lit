@@ -8,8 +8,8 @@ import (
 	"net/rpc/jsonrpc"
 	"sort"
 
-	"li.lan/tx/lit/lndc"
-	"li.lan/tx/lit/portxo"
+	"github.com/mit-dci/lit/lndc"
+	"github.com/mit-dci/lit/portxo"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcutil"

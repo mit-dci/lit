@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/roasbeef/btcd/btcec"
+	"github.com/btcsuite/btcd/btcec"
 )
 
 func TestConnectionCorrectness(t *testing.T) {

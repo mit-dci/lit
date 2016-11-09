@@ -3,7 +3,7 @@ package qln
 import (
 	"fmt"
 
-	"li.lan/tx/lit/lnutil"
+	"github.com/mit-dci/lit/lnutil"
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"

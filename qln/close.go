@@ -3,7 +3,7 @@ package qln
 import (
 	"fmt"
 
-	"li.lan/tx/lit/uspv"
+	"github.com/mit-dci/lit/uspv"
 )
 
 /* CloseChannel --- cooperative close

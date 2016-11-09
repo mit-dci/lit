@@ -6,9 +6,9 @@ import (
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
-	"li.lan/tx/lit/elkrem"
-	"li.lan/tx/lit/lnutil"
-	"li.lan/tx/lit/portxo"
+	"github.com/mit-dci/lit/elkrem"
+	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/portxo"
 )
 
 /*

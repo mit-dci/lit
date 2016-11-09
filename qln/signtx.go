@@ -6,7 +6,7 @@ import (
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"li.lan/tx/lit/sig64"
+	"github.com/mit-dci/lit/sig64"
 )
 
 // SignBreak signs YOUR tx, which you already have a sig for

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
-	"li.lan/tx/lit/lnutil"
+	"github.com/mit-dci/lit/lnutil"
 
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"

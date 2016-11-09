@@ -5,7 +5,7 @@ import (
 	"log"
 	"net"
 
-	"li.lan/tx/lit/lnutil"
+	"github.com/mit-dci/lit/lnutil"
 )
 
 // handles stuff that comes in over the wire.  Not user-initiated.
