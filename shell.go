@@ -120,6 +120,22 @@ func Shellparse(cmdslice []string) error {
 		}
 		return nil
 	}
+	if cmd == "wcon" { // connect to watch tower
+		err = WCon(args)
+		if err != nil {
+			fmt.Printf("wcon error: %s\n", err)
+		}
+		return nil
+	}
+
+	if cmd == "watch" { // connect to watch tower
+		err = Watch(args)
+		if err != nil {
+			fmt.Printf("watch error: %s\n", err)
+		}
+		return nil
+	}
+
 	if cmd == "lis" { // listen for lnd peers
 		err = Lis(args)
 		if err != nil {
@@ -127,6 +143,7 @@ func Shellparse(cmdslice []string) error {
 		}
 		return nil
 	}
+
 	// Peer to peer actions
 	// send text message
 	if cmd == "say" {
@@ -180,9 +197,14 @@ func Shellparse(cmdslice []string) error {
 	return nil
 }
 
-// Lis starts listening.  Takes no args for now.
+// Lis starts listening.  Takes args of port to listen on.
 func Lis(args []string) error {
-	go TCPListener(":2448")
+	portstring := ":2448"
+	if len(args) > 0 {
+		portstring = args[0]
+		portstring = ":" + portstring
+	}
+	go TCPListener(portstring)
 	return nil
 }
 
@@ -223,6 +245,32 @@ func TCPListener(lisIpPort string) error {
 			LNode.RemoteCon = newConn
 		}
 	}()
+	return nil
+}
+
+// connects to the watchtower
+func WCon(args []string) error {
+	var err error
+
+	if len(args) == 0 {
+		return fmt.Errorf("need: watch pubkeyhash@hostname:port")
+	}
+
+	newWatch, err := lndc.LnAddrFromString(args[0])
+	if err != nil {
+		return err
+	}
+
+	idPriv := SCon.TS.IdKey()
+	LNode.WatchCon = new(lndc.LNDConn)
+
+	err = LNode.WatchCon.Dial(
+		idPriv, newWatch.NetAddr.String(), newWatch.Base58Adr.ScriptAddress())
+	if err != nil {
+		return err
+	}
+
+	// no receiver yet.  watcher doesn't send messages unprompted. or at all.
 	return nil
 }
 

@@ -5,13 +5,15 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	"github.com/boltdb/bolt"
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/boltdb/bolt"
+	"github.com/btcsuite/btcutil"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/watchtower"
 )
 
 /*
@@ -44,11 +46,17 @@ Later on we can chop it up so that each channel gets it's own db file.
 type LnNode struct {
 	LnDB *bolt.DB // place to write all this down
 
+	// all nodes have a watchtower.  but could have a tower without a node
+	Tower watchtower.WatchTower
+
 	// BaseWallet is the underlying wallet which keeps track of utxos, secrets,
 	// and network i/o
 	BaseWallet UWallet
 
 	RemoteCon *lndc.LNDConn // make a bunch of em later
+
+	// WatchCon is currently just for the watchtower
+	WatchCon *lndc.LNDConn // merge these later
 
 	// OmniChan is the channel for the OmniHandler
 	OmniChan chan []byte
@@ -59,7 +67,6 @@ type LnNode struct {
 
 	// Params live here... AND SCon
 	Param *chaincfg.Params // network parameters (testnet3, segnet, etc)
-
 }
 
 // InFlightFund is a funding transaction that has not yet been broadcast
@@ -94,6 +101,7 @@ func CountKeysInBucket(bkt *bolt.Bucket) uint32 {
 	return i
 }
 
+//func (nd *LnNode) NewWatcher( )
 // NewPeer saves a pubkey in the DB and assigns a peer index.  Call this
 // the first time you connect to someone.  Returns false if already known,
 // true if it added a new peer.  Errors for real errors.
@@ -585,6 +593,12 @@ func (nd *LnNode) RestoreQchanFromBucket(
 	// derive my refund / base point from index
 	qc.MyRefundPub = nd.GetUsePub(qc.KeyGen, UseChannelRefund)
 	qc.MyHAKDBase = nd.GetUsePub(qc.KeyGen, UseChannelHAKDBase)
+
+	// derive my watchtower refund PKH
+	watchRefundPub := nd.GetUsePub(qc.KeyGen, UseChannelElkrem)
+	watchRefundPKHslice := btcutil.Hash160(watchRefundPub[:])
+	copy(qc.WatchRefundAdr[:], watchRefundPKHslice)
+
 	qc.State = new(StatCom)
 
 	// load state.  If it exists.

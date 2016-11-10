@@ -3,10 +3,10 @@ package watchtower
 import (
 	"fmt"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
 
-	"github.com/btcsuite/btcd/wire"
 	"github.com/boltdb/bolt"
 )
 
@@ -67,8 +67,38 @@ var (
 	KEYIdx    = []byte("idx") // index mapping
 )
 
-func (s *WatchTower) AddNewChannel(wd WatchannelDescriptor) error {
-	return s.WatchDB.Update(func(btx *bolt.Tx) error {
+// Opens the DB file for the LnNode
+func (w *WatchTower) OpenDB(filename string) error {
+	var err error
+
+	w.WatchDB, err = bolt.Open(filename, 0644, nil)
+	if err != nil {
+		return err
+	}
+	// create buckets if they're not already there
+	err = w.WatchDB.Update(func(btx *bolt.Tx) error {
+		_, err := btx.CreateBucketIfNotExists(BUCKETPKHMap)
+		if err != nil {
+			return err
+		}
+		_, err = btx.CreateBucketIfNotExists(BUCKETChandata)
+		if err != nil {
+			return err
+		}
+		_, err = btx.CreateBucketIfNotExists(BUCKETTxid)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (w *WatchTower) AddNewChannel(wd WatchannelDescriptor) error {
+	return w.WatchDB.Update(func(btx *bolt.Tx) error {
 		// open index : pkh mapping bucket
 		mbkt := btx.Bucket(BUCKETPKHMap)
 		if mbkt == nil {
@@ -117,8 +147,8 @@ func (s *WatchTower) AddNewChannel(wd WatchannelDescriptor) error {
 
 // AddMsg adds a new message describing a penalty tx to the db.
 // A later optimization would be to add a bunch of messages at once.
-func (s *WatchTower) AddMsg(cm ComMsg) error {
-	return s.WatchDB.Update(func(btx *bolt.Tx) error {
+func (w *WatchTower) AddMsg(cm ComMsg) error {
+	return w.WatchDB.Update(func(btx *bolt.Tx) error {
 
 		// first get the channel bucket, update the elkrem and read the idx
 		allChanbkt := btx.Bucket(BUCKETChandata)
@@ -185,9 +215,9 @@ func (s *WatchTower) AddMsg(cm ComMsg) error {
 // DB.  If there is, ComMsg are returned which can then be turned into txs.
 // can take the txid slice direct from a msgBlock after block has been
 // merkle-checked.
-func (s *WatchTower) CheckTxids(inTxids []wire.ShaHash) ([]ComMsg, error) {
+func (w *WatchTower) CheckTxids(inTxids []chainhash.Hash) ([]ComMsg, error) {
 	var hitTxids []ComMsg
-	err := s.WatchDB.View(func(btx *bolt.Tx) error {
+	err := w.WatchDB.View(func(btx *bolt.Tx) error {
 		bkt := btx.Bucket(BUCKETTxid)
 		for _, txid := range inTxids {
 			idxsig := bkt.Get(txid[:8])

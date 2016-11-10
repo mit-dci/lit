@@ -14,15 +14,16 @@ import (
 )
 
 const (
-	keyFileName    = "testkey.hex"
-	headerFileName = "headers.bin"
-	utxodbFileName = "utxo.db"
-	lndbFileName   = "ln.db"
-	sorcFileName   = "sorc.db"
+	keyFileName     = "testkey.hex"
+	headerFileName  = "headers.bin"
+	utxodbFileName  = "utxo.db"
+	lndbFileName    = "ln.db"
+	watchdbFileName = "watch.db"
+	sorcFileName    = "sorc.db"
 	// this is my local testnet node, replace it with your own close by.
 	// Random internet testnet nodes usually work but sometimes don't, so
 	// maybe I should test against different versions out there.
-	SPVHostAdr = "lit3.co:18333" // for testnet3
+	SPVHostAdr = "na:18333" // for testnet3
 //	SPVHostAdr = "slab.lan:18444" // for regtest
 )
 
@@ -59,14 +60,14 @@ func main() {
 	}
 	if tip == 0 { // DB has never been used, set to birthday
 		//		tip = 10 // for regtest
-		tip = 1013500 // for testnet3. hardcoded; later base on keyfile date?
+		tip = 1032500 // for testnet3. hardcoded; later base on keyfile date?
 		err = SCon.TS.SetDBSyncHeight(tip)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
 
-	err = LNode.Init(lndbFileName, &SCon)
+	err = LNode.Init(lndbFileName, watchdbFileName, &SCon)
 	if err != nil {
 		log.Fatal(err)
 	}

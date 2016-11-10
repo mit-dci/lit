@@ -40,13 +40,18 @@ type Qchan struct {
 
 	TimeOut uint16 // blocks for timeout (default 5 for testing)
 
-	State *StatCom // S state of channel
+	State *StatCom // S current state of channel
+
+	// PKH for penalty tx.  Derived
+	WatchRefundAdr [20]byte
 }
 
 // StatComs are State Commitments.
 // all elements are saved to the db.
 type StatCom struct {
 	StateIdx uint64 // this is the n'th state commitment
+
+	WatchUpTo uint64 // have sent out to watchtowers up to this state  ( <= stateidx)
 
 	MyAmt int64 // my channel allocation
 	// their Amt is the utxo.Value minus this

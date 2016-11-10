@@ -2,12 +2,18 @@ package qln
 
 import "github.com/boltdb/bolt"
 
-func (nd *LnNode) Init(dbfilename string, basewal UWallet) error {
+func (nd *LnNode) Init(dbfilename, watchname string, basewal UWallet) error {
 
 	err := nd.OpenDB(dbfilename)
 	if err != nil {
 		return err
 	}
+
+	err = nd.Tower.OpenDB(watchname)
+	if err != nil {
+		return err
+	}
+
 	nd.OmniChan = make(chan []byte, 10)
 	go nd.OmniHandler()
 

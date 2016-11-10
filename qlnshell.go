@@ -180,6 +180,14 @@ func Push(args []string) error {
 	return nil
 }
 
+// Watch is the command to set a channel as watched.
+// Watched channels get exported to the watchtower.
+func Watch(args []string) error {
+
+	// not yet implemented
+	return nil
+}
+
 // CloseChannel is a cooperative closing of a channel to a specified address.
 func CloseChannel(args []string) error {
 	if LNode.RemoteCon == nil || LNode.RemoteCon.RemotePub == nil {

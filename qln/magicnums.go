@@ -26,19 +26,22 @@ const (
 	MSGID_FWDMSG     = 0x20
 	MSGID_FWDAUTHREQ = 0x21
 
-	MSGID_
+	// desc describes a new channel
+	MSGID_WATCH_DESC = 0xA0
+	// commsg is a single state in the channel
+	MSGID_WATCH_COMMSG = 0xA1
 )
 
 const (
-	UseWallet          = 0 | hdkeychain.HardenedKeyStart
-	UseChannelFund     = 20 | hdkeychain.HardenedKeyStart
-	UseChannelRefund   = 30 | hdkeychain.HardenedKeyStart
-	UseChannelHAKDBase = 40 | hdkeychain.HardenedKeyStart
-	UseChannelElkrem   = 8888 | hdkeychain.HardenedKeyStart
+	UseWallet             = 0 | hdkeychain.HardenedKeyStart
+	UseChannelFund        = 20 | hdkeychain.HardenedKeyStart
+	UseChannelRefund      = 30 | hdkeychain.HardenedKeyStart
+	UseChannelWatchRefund = 31 | hdkeychain.HardenedKeyStart
+	UseChannelHAKDBase    = 40 | hdkeychain.HardenedKeyStart
+	UseChannelElkrem      = 8888 | hdkeychain.HardenedKeyStart
 	// links Id and channel. replaces UseChannelFund
-	UseChannelNonce = 100 | hdkeychain.HardenedKeyStart
 
-	UseIdKey = 111 + hdkeychain.HardenedKeyStart
+	UseIdKey = 111 | hdkeychain.HardenedKeyStart
 )
 
 var (

@@ -73,3 +73,10 @@ func DirectWPKHScript(pub [33]byte) []byte {
 	b, _ := builder.Script()
 	return b
 }
+
+func DirectWPKHScriptFromPKH(pkh [20]byte) []byte {
+	builder := txscript.NewScriptBuilder()
+	builder.AddOp(txscript.OP_0).AddData(pkh[:])
+	b, _ := builder.Script()
+	return b
+}

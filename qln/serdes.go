@@ -28,7 +28,7 @@ and the stateidx.  hash160(elkremsend(sIdx)[:16])
 
 */
 
-// ToBytes turns a StatCom into 106ish bytes
+// ToBytes turns a StatCom into 224ish bytes
 func (s *StatCom) ToBytes() ([]byte, error) {
 	var buf bytes.Buffer
 	var err error
@@ -38,6 +38,12 @@ func (s *StatCom) ToBytes() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	// write 8 byte watch up to state index
+	err = binary.Write(&buf, binary.BigEndian, s.WatchUpTo)
+	if err != nil {
+		return nil, err
+	}
+
 	// write 8 byte amount of my allocation in the channel
 	err = binary.Write(&buf, binary.BigEndian, s.MyAmt)
 	if err != nil {
@@ -80,10 +86,10 @@ func (s *StatCom) ToBytes() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// StatComFromBytes turns 216 bytes into a StatCom
+// StatComFromBytes turns 224 bytes into a StatCom
 func StatComFromBytes(b []byte) (*StatCom, error) {
 	var s StatCom
-	if len(b) < 216 || len(b) > 216 {
+	if len(b) < 224 || len(b) > 224 {
 		return nil, fmt.Errorf("StatComFromBytes got %d bytes, expect 150\n",
 			len(b))
 	}
@@ -93,6 +99,12 @@ func StatComFromBytes(b []byte) (*StatCom, error) {
 	if err != nil {
 		return nil, err
 	}
+	// read 8 byte WatchUpTo index
+	err = binary.Read(buf, binary.BigEndian, &s.WatchUpTo)
+	if err != nil {
+		return nil, err
+	}
+
 	// read 8 byte amount of my allocation in the channel
 	err = binary.Read(buf, binary.BigEndian, &s.MyAmt)
 	if err != nil {
