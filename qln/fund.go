@@ -333,6 +333,11 @@ func (nd *LnNode) QChanDescHandler(from [16]byte, descbytes []byte) {
 	qc.MyRefundPub = nd.GetUsePub(qc.KeyGen, UseChannelRefund)
 	qc.MyHAKDBase = nd.GetUsePub(qc.KeyGen, UseChannelHAKDBase)
 
+	qc.DHmask = nd.GetDHMask(qc)
+	if qc.DHmask&1<<63 != 0 { // crash if high bits set
+		return fmt.Errorf("GetDHMask error")
+	}
+
 	// it should go into the next bucket and get the right key index.
 	// but we can't actually check that.
 	//	qc, err := nd.SaveFundTx(
