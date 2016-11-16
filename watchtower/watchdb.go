@@ -155,9 +155,9 @@ func (w *WatchTower) AddMsg(cm ComMsg) error {
 		if allChanbkt == nil {
 			return fmt.Errorf("no Chandata bucket")
 		}
-		cbkt := allChanbkt.Bucket(cm.DestPKHScript[:])
+		cbkt := allChanbkt.Bucket(cm.DestPKH[:])
 		if cbkt == nil {
-			return fmt.Errorf("no bucket for channel %x", cm.DestPKHScript)
+			return fmt.Errorf("no bucket for channel %x", cm.DestPKH)
 		}
 
 		// deserialize elkrems.  Future optimization: could keep
@@ -188,7 +188,7 @@ func (w *WatchTower) AddMsg(cm ComMsg) error {
 		// get local index of this channel
 		cIdxBytes := cbkt.Get(KEYIdx)
 		if cIdxBytes == nil {
-			return fmt.Errorf("channel %x has no index", cm.DestPKHScript)
+			return fmt.Errorf("channel %x has no index", cm.DestPKH)
 		}
 
 		// we've updated the elkrem and saved it, so done with channel bucket.

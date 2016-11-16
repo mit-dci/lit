@@ -392,6 +392,10 @@ func (nd *LnNode) SIGREVHandler(from [16]byte, SIGREVBytes []byte) {
 			"in case the code changes later and we forget.\n")
 		return
 	}
+
+	// stash previous amount here for watchtower sig creation
+	prevAmt := qc.State.MyAmt
+
 	qc.State.StateIdx++
 	qc.State.MyAmt += int64(qc.State.Delta)
 	qc.State.Delta = 0
@@ -413,7 +417,11 @@ func (nd *LnNode) SIGREVHandler(from [16]byte, SIGREVBytes []byte) {
 	}
 	// if the elkrem failed but sig didn't... we should update the DB to reflect
 	// that and try to close with the incremented amount, why not.
-	// Implement that later though.
+	// TODO Implement that later though.
+
+	// Generate txid/sig pair for watchtower
+
+	qc.BuildWatchTxidSig(prevAmt)
 
 	// all verified; Save finished state to DB, puller is pretty much done.
 	err = nd.SaveQchanState(qc)

@@ -46,6 +46,7 @@ const (
 
 var (
 	BKTPeers   = []byte("pir") // all peer data is in this bucket.
+	BKTWatch   = []byte("wch") // txids & signatures for export to watchtowers
 	KEYIdx     = []byte("idx") // index for key derivation
 	KEYutxo    = []byte("utx") // serialized utxo for the channel
 	KEYUnsig   = []byte("usg") // unsigned fund tx

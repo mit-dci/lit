@@ -1,9 +1,9 @@
 package watchtower
 
 import (
+	"github.com/boltdb/bolt"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/boltdb/bolt"
 )
 
 const (
@@ -36,10 +36,10 @@ type WatchannelDescriptor struct {
 
 // the message describing the next commitment tx, sent from the client to the watchtower
 type ComMsg struct {
-	DestPKHScript [20]byte       // identifier for channel; could be optimized away
-	Txid          [16]byte       // first half of txid of close tx
-	Elk           chainhash.Hash // elkrem for this state index
-	Sig           [64]byte       // sig for the grab tx
+	DestPKH [20]byte       // identifier for channel; could be optimized away
+	Elk     chainhash.Hash // elkrem for this state index
+	Txid    [16]byte       // first half of txid of close tx
+	Sig     [64]byte       // sig for the grab tx
 }
 
 // HtlcEncMsg is an encrypted, stored message describing HTLC recovery
@@ -48,16 +48,6 @@ type HtlcMsg struct {
 	StateIdx      uint64   // state index (really uint48)
 	sig           [64]byte
 	EncData       [104]byte
-}
-
-// HtlcMsg is the decrypted message, which may decrypt previous htlc messages
-type HtlcSig struct {
-	PeerIdx  uint32 // channel Identifier
-	StateIdx uint64 // state index remaining from encrypted message
-	sig      [64]byte
-	LockTime uint32
-	Hash     [20]byte
-	DecKey   [16]byte
 }
 
 // 2 structs used in the DB: IdxSigs and ChanStatic

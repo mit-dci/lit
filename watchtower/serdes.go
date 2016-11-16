@@ -67,7 +67,7 @@ func WatchannelDescriptorFromBytes(b []byte) (WatchannelDescriptor, error) {
 // ToBytes turns a ComMsg into 132 bytes
 func (sm *ComMsg) ToBytes() (b [132]byte) {
 	var buf bytes.Buffer
-	buf.Write(sm.DestPKHScript[:])
+	buf.Write(sm.DestPKH[:])
 	buf.Write(sm.Txid[:])
 	buf.Write(sm.Elk.CloneBytes())
 	buf.Write(sm.Sig[:])

@@ -195,14 +195,9 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
 	// add unsigned txin
 	tx.AddTxIn(wire.NewTxIn(&q.Op, nil, nil))
 	// set index hints
-	var x uint64
-	if s.StateIdx > 0 { // state 0 and 1 can't use xor'd elkrem... fix this?
-		x = q.GetElkZeroOffset()
-		if x >= 1<<48 {
-			return nil, fmt.Errorf("BuildStateTx elkrem error, x= %x", x)
-		}
-	}
-	SetStateIdxBits(tx, s.StateIdx, x)
+
+	// state 0 and 1 can't use mask?  Think they can now.
+	SetStateIdxBits(tx, s.StateIdx, q.DHmask)
 
 	// sort outputs
 	txsort.InPlaceSort(tx)

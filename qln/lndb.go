@@ -33,6 +33,10 @@ Peers
 		|-idx: uint32 - assign a 32 bit number for each channel w/ peer
 		|
 		|-channel state data
+		|
+		|-watchtower bucket
+			|
+			|-state number: txid, sig
 
 
 Right now these buckets are all in one boltDB.  This limits it to one db write
