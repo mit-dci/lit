@@ -136,14 +136,10 @@ func (s *SPVCon) Refilter(f *bloom.Filter) {
 // different enough that it's better to have 2 separate functions
 func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
 	var err error
-	//	var buf bytes.Buffer
-	//	m.SerializeWitness(&buf)
-	//	fmt.Printf("block hex %x\n", buf.Bytes())
-	//	for _, tx := range m.Transactions {
-	//		fmt.Printf("wtxid: %s\n", tx.WTxSha())
-	//		fmt.Printf(" txid: %s\n", tx.TxSha())
-	//		fmt.Printf("%d %s", i, TxToString(tx))
-	//	}
+
+	// Hand block off to block processing code
+	s.BlockQueue <- *m
+
 	ok := BlockOK(*m) // check block self-consistency
 	if !ok {
 		fmt.Printf("block %s not OK!!11\n", m.BlockHash().String())

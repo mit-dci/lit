@@ -121,6 +121,8 @@ func OpenSPV(remoteNode string, hfn, dbfn string,
 	}
 	s.WBytes += uint64(n)
 
+	s.BlockQueue = make(chan wire.MsgBlock, 8)
+
 	s.inMsgQueue = make(chan wire.Message)
 	go s.incomingMessageHandler()
 	s.outMsgQueue = make(chan wire.Message)

@@ -34,6 +34,7 @@ func (s *SPVCon) incomingMessageHandler() {
 		case *wire.MsgPong:
 			log.Printf("Got a pong response. OK.\n")
 		case *wire.MsgBlock:
+			// add a "go" here to get blocks faster / out of order!
 			s.IngestBlock(m)
 		case *wire.MsgMerkleBlock:
 			s.IngestMerkleBlock(m)

@@ -335,7 +335,8 @@ func (nd *LnNode) QChanDescHandler(from [16]byte, descbytes []byte) {
 
 	qc.DHmask = nd.GetDHMask(qc)
 	if qc.DHmask&1<<63 != 0 { // crash if high bits set
-		return fmt.Errorf("GetDHMask error")
+		fmt.Printf("GetDHMask error")
+		return
 	}
 
 	// it should go into the next bucket and get the right key index.

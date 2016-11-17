@@ -48,7 +48,7 @@ func main() {
 	// setup spvCon
 
 	SCon, err = uspv.OpenSPV(
-		SPVHostAdr, headerFileName, utxodbFileName, &Store, false, false, Params)
+		SPVHostAdr, headerFileName, utxodbFileName, &Store, true, false, Params)
 	if err != nil {
 		log.Printf("can't connect: %s", err.Error())
 		log.Fatal(err) // back to fatal when can't connect
@@ -58,9 +58,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	if tip == 0 { // DB has never been used, set to birthday
 		//		tip = 10 // for regtest
-		tip = 1034000 // for testnet3. hardcoded; later base on keyfile date?
+		tip = 0 // start at the beginning
 		err = SCon.TS.SetDBSyncHeight(tip)
 		if err != nil {
 			log.Fatal(err)
@@ -82,6 +83,9 @@ func main() {
 	if err != nil {
 		log.Printf(err.Error())
 	}
+
+	go BlockHandler(SCon.BlockQueue)
+
 	// main shell loop
 	for {
 		// setup reader with max 4K input chars

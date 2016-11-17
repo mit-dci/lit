@@ -48,6 +48,9 @@ type SPVCon struct {
 	inMsgQueue  chan wire.Message // Messages coming in from remote node
 	outMsgQueue chan wire.Message // Messages going out to remote node
 
+	// for getting all tx data.  Blocks come out of here.
+	BlockQueue chan wire.MsgBlock
+
 	WBytes uint64 // total bytes written
 	RBytes uint64 // total bytes read
 
