@@ -165,11 +165,6 @@ func (q *Qchan) ToBytes() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	// write the DHmask (8 bytes, first 2 bytes empty)
-	err = binary.Write(&buf, binary.BigEndian, q.DHmask)
-	if err != nil {
-		return nil, err
-	}
 
 	// then serialize the utxo part
 	uBytes, err := q.PorTxo.Bytes()
@@ -193,15 +188,14 @@ func (q *Qchan) ToBytes() ([]byte, error) {
 func QchanFromBytes(b []byte) (Qchan, error) {
 	var q Qchan
 
-	if len(b) < 213 {
+	if len(b) < 205 {
 		return q, fmt.Errorf("Got %d bytes for qchan, expect 205+", len(b))
 	}
 
 	copy(q.TheirPub[:], b[:33])
 	copy(q.TheirRefundPub[:], b[33:66])
 	copy(q.TheirHAKDBase[:], b[66:99])
-	q.DHmask = lnutil.BtU64(b[99:107])
-	u, err := portxo.PorTxoFromBytes(b[107:])
+	u, err := portxo.PorTxoFromBytes(b[99:])
 	if err != nil {
 		return q, err
 	}

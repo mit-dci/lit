@@ -35,8 +35,6 @@ type Qchan struct {
 	MyHAKDBase    [33]byte // D my base point for HAKD and timeout keys
 	TheirHAKDBase [33]byte // S their base point for HAKD and timeout keys
 
-	DHmask uint64 // S commit number mask, derived from DH of pubkeys
-
 	// Elkrem is used for revoking state commitments
 	ElkSnd *elkrem.ElkremSender   // D derived from channel specific key
 	ElkRcv *elkrem.ElkremReceiver // S stored in db
@@ -107,8 +105,8 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 	// hardcode here now... need to save to qchan struct I guess
 	q.TimeOut = 5
 
-	// first, check if cooperative
-	txIdx := GetStateIdxFromTx(tx, q.DHmask)
+	// get state index; assume incoming tx uses my hint (broacast by them)
+	txIdx := GetStateIdxFromTx(tx, q.GetChanHint(false))
 	if txIdx > q.State.StateIdx { // future state, uhoh.  Crash for now.
 		return nil, fmt.Errorf("indicated state %d but we know up to %d",
 			txIdx, q.State.StateIdx)
@@ -393,28 +391,33 @@ func (nd *LnNode) QchanInfo(q *Qchan) error {
 	return nil
 }
 
-// GetDHHint gives the 6 byte hint mask.  It's derived from the Diffie-Helman
-// point of the channel.  If it returns 1<<63, that means there was an error.
+// GetChanHint gives the 6 byte hint mask of the channel.  It's derived from the
+// hash of the PKH output pubkeys.  "Mine" means the hint is in the tx I store.
+// So it's actually a hint for them to decode... which is confusing, but consistent
+// with the "mine" bool for transactions, so "my" tx has "my" hint.
 // (1<<48 - 1 is the max valid value)
-func (nd *LnNode) GetDHMask(q *Qchan) uint64 {
+func (q *Qchan) GetChanHint(mine bool) uint64 {
+	// could cache these in memory for a slight speedup
+	var h []byte
+	if mine {
+		h = chainhash.DoubleHashB(append(q.MyRefundPub[:], q.TheirRefundPub[:]...))
+	} else {
+		h = chainhash.DoubleHashB(append(q.TheirRefundPub[:], q.MyRefundPub[:]...))
+	}
 
-	// get diffie helman X coordinate
-	dhsecret, err := nd.GetDHSecret(q)
-	if err != nil {
-		fmt.Printf(err.Error())
+	if len(h) != 32 {
 		return 1 << 63
 	}
-	// double hash the x coordinate just for fun
-	dhhash := chainhash.DoubleHashH(dhsecret)
-
 	// get 6 bytes from that hash (leave top 2 bytes of return value empty)
 	x := make([]byte, 8)
 
-	copy(x[2:8], dhhash[2:8])
+	copy(x[2:8], h[2:8])
 
 	return lnutil.BtU64(x)
 }
 
+// GetDHSecret gets a per-channel shared secret from the Diffie-Helman of the
+// two pubkeys in the fund tx.
 func (nd *LnNode) GetDHSecret(q *Qchan) ([]byte, error) {
 
 	if nd == nil || q == nil {
@@ -429,5 +432,4 @@ func (nd *LnNode) GetDHSecret(q *Qchan) ([]byte, error) {
 	// not sure what happens if this breaks.  Maybe it always works.
 
 	return btcec.GenerateSharedSecret(priv, theirPub), nil
-
 }

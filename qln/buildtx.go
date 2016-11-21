@@ -197,7 +197,7 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
 	// set index hints
 
 	// state 0 and 1 can't use mask?  Think they can now.
-	SetStateIdxBits(tx, s.StateIdx, q.DHmask)
+	SetStateIdxBits(tx, s.StateIdx, q.GetChanHint(mine))
 
 	// sort outputs
 	txsort.InPlaceSort(tx)

@@ -186,12 +186,6 @@ func (nd LnNode) PointRespHandler(from [16]byte, pointRespBytes []byte) error {
 	copy(qc.TheirRefundPub[:], pointRespBytes[33:66])
 	copy(qc.TheirHAKDBase[:], pointRespBytes[66:])
 
-	// We have their & our pubkeys; can make DHmask
-	qc.DHmask = nd.GetDHMask(qc)
-	if qc.DHmask&1<<63 != 0 { // crash if high bits set
-		return fmt.Errorf("GetDHMask error")
-	}
-
 	// make sure their pubkeys are real pubkeys
 	_, err = btcec.ParsePubKey(qc.TheirPub[:], btcec.S256())
 	if err != nil {
@@ -332,11 +326,6 @@ func (nd *LnNode) QChanDescHandler(from [16]byte, descbytes []byte) {
 	qc.TheirHAKDBase = theirHAKDbase
 	qc.MyRefundPub = nd.GetUsePub(qc.KeyGen, UseChannelRefund)
 	qc.MyHAKDBase = nd.GetUsePub(qc.KeyGen, UseChannelHAKDBase)
-
-	qc.DHmask = nd.GetDHMask(qc)
-	if qc.DHmask&1<<63 != 0 { // crash if high bits set
-		return fmt.Errorf("GetDHMask error")
-	}
 
 	// it should go into the next bucket and get the right key index.
 	// but we can't actually check that.
