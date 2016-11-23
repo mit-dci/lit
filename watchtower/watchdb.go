@@ -280,18 +280,35 @@ func (w *WatchTower) BuildJusticeTx(
 			return fmt.Errorf("No bucket for pkh %x", pkh)
 		}
 
+		// get the elkrem receiver
+		elkBytes := pkhBucket.Get(KEYElkRcv)
+		if elkBytes == nil {
+			return fmt.Errorf("No elkrem receiver for pkh %x", pkh)
+		}
+		// deserialize it
+		elkRcv, err := elkrem.ElkremReceiverFromBytes(elkBytes)
+		if err != nil {
+			return err
+		}
+		// check that we have enough elkrem
+		if elkRcv.UpTo() < isig.StateIdx {
+			return fmt.Errorf("Elkrem Receiver goes up to %d, need state %d",
+				elkRcv.UpTo(), isig.StateIdx)
+		}
 		static := pkhBucket.Get(KEYStatic)
 		if static == nil {
 			return fmt.Errorf("No static data for pkh %x", pkh)
 		}
 		// deserialize static watchDescriptor struct
-		//		wd, err := WatchannelDescriptorFromBytes(static)
-		//		if err != nil {
-		//			return err
-		//		}
+		wd, err := WatchannelDescriptorFromBytes(static)
+		if err != nil {
+			return err
+		}
 
 		// first, build the script so we can match it with a txout
-		//		lnutil.CommitScript()
+		// to do so, generate RevPub and TimeoutPub
+
+		//		lnutil.CommitScript(wd.HAKDBasePoint)
 
 		return nil
 	})

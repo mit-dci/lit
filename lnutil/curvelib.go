@@ -1,7 +1,9 @@
 package lnutil
 
 import (
+	"bytes"
 	"math/big"
+	"sort"
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -50,6 +52,49 @@ func PubKeyArrAddBytes(p *[33]byte, b []byte) error {
 	pub.X, pub.Y = btcec.S256().Add(bx, by, pub.X, pub.Y)
 	copy(p[:], pub.SerializeCompressed())
 	return nil
+}
+
+/* Key Aggregation
+
+Note that this is not for signature aggregation in schnorr sigs; that's not here yet.
+But we use the same construction.
+
+If you want to put two pubkeys A, B together into composite pubkey C, you can't
+just say C = A+B.  Because B might really be X-A, in which case C=X and the A
+key is irrelevant.  C = A*h(A) + B*h(B) works but gets dangerous with lots of keys
+due to generalized birthday attacks.  In the LN case that probably isn't relevant,
+but we'll stick to the same constrction anyway.
+
+First, concatenate all the keys together and hash that.
+z = h(A, B...)
+for generation of z, you need some ordering; everything else is commutative.
+Here it does byte sorting.
+Then add all the keys times the hash of z and themselves.
+C = A*h(z, A) + B*(z, B) + ...
+this works for lots of keys.  And is overkill for 2 but that's OK.
+*/
+
+// PubKeySlice are slices of serialized compressed pubkeys, which can be sorted.
+type PubKeySlice []*[33]byte
+
+// Make PubKeySlices sortable
+func (p PubKeySlice) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
+func (p PubKeySlice) Len() int      { return len(p) }
+func (p PubKeySlice) Less(i, j int) bool {
+	return bytes.Compare(p[i][:], p[j][:]) == -1
+}
+
+// ComboCommit
+func ComboCommit(pubKeys PubKeySlice) chainhash.Hash {
+	// sort the pubkeys, smallest first
+	sort.Sort(pubKeys)
+	// feed em into the hash
+	combo := make([]byte, len(pubKeys)*33)
+	for i, k := range pubKeys {
+		copy(combo[i*33:(i+1*33)], k[:])
+	}
+	return chainhash.HashH(combo)
+
 }
 
 // ###########################
