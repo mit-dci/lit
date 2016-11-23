@@ -1,12 +1,10 @@
 package qln
 
 import (
-	"bytes"
 	"fmt"
 
 	"github.com/mit-dci/lit/lnutil"
 
-	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil/txsort"
 )
@@ -170,7 +168,7 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
 	}
 
 	// now that everything is chosen, build fancy script and pkh script
-	fancyScript := CommitScript(revPub, timePub, delay)
+	fancyScript := lnutil.CommitScript(revPub, timePub, delay)
 	pkhScript := lnutil.DirectWPKHScript(pkhPub) // p2wpkh-ify
 
 	fmt.Printf("> made SH script, state %d\n", s.StateIdx)
@@ -202,104 +200,6 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
 	// sort outputs
 	txsort.InPlaceSort(tx)
 	return tx, nil
-}
-
-// CommitScript2 doesn't use hashes, but a modified pubkey.
-// To spend from it, push your sig.  If it's time-based,
-// you have to set the txin's sequence.
-func CommitScript2(RKey, TKey [33]byte, delay uint16) ([]byte, error) {
-	builder := txscript.NewScriptBuilder()
-
-	builder.AddOp(txscript.OP_DUP)
-	builder.AddData(RKey[:])
-	builder.AddOp(txscript.OP_CHECKSIG)
-
-	builder.AddOp(txscript.OP_NOTIF)
-
-	builder.AddData(TKey[:])
-	builder.AddOp(txscript.OP_CHECKSIGVERIFY)
-	builder.AddInt64(int64(delay))
-	builder.AddOp(txscript.OP_NOP3) // really OP_CHECKSEQUENCEVERIFY
-
-	builder.AddOp(txscript.OP_ENDIF)
-
-	return builder.Script()
-}
-
-// CommitScript builds the new (0.13.1) commit script.  OP_CHECKSIG turned
-// into OP_CHECKSIGVERIFY so we have to put an annoying 1 or 0 on the stack.
-
-func CommitScript(RKey, TKey [33]byte, delay uint16) []byte {
-	builder := txscript.NewScriptBuilder()
-
-	// 1 for penalty / revoked, 0 for timeout
-	// 1, so timeout
-	builder.AddOp(txscript.OP_IF)
-
-	// Just push revokable key
-	builder.AddData(RKey[:])
-
-	// 0, so revoked
-	builder.AddOp(txscript.OP_ELSE)
-
-	// CSV delay
-	builder.AddInt64(int64(delay))
-	// CSV check, fails here if too early
-	builder.AddOp(txscript.OP_NOP3) // really OP_CHECKSEQUENCEVERIFY
-	// Drop delay value
-	builder.AddOp(txscript.OP_DROP)
-	// push timeout key
-	builder.AddData(TKey[:])
-
-	builder.AddOp(txscript.OP_ENDIF)
-
-	// check whatever pubkey is left on the stack
-	builder.AddOp(txscript.OP_CHECKSIG)
-
-	// never any errors we care about here.
-	s, _ := builder.Script()
-	return s
-}
-
-// FundMultiOut creates a TxOut for the funding transaction.
-// Give it the two pubkeys and it'll give you the p2sh'd txout.
-// You don't have to remember the p2sh preimage, as long as you remember the
-// pubkeys involved.
-func FundTxOut(pubA, puB [33]byte, amt int64) (*wire.TxOut, error) {
-	if amt < 0 {
-		return nil, fmt.Errorf("Can't create FundTx script with negative coins")
-	}
-	scriptBytes, _, err := FundTxScript(pubA, puB)
-	if err != nil {
-		return nil, err
-	}
-	scriptBytes = lnutil.P2WSHify(scriptBytes)
-
-	return wire.NewTxOut(amt, scriptBytes), nil
-}
-
-// FundMultiPre generates the non-p2sh'd multisig script for 2 of 2 pubkeys.
-// useful for making transactions spending the fundtx.
-// returns a bool which is true if swapping occurs.
-func FundTxScript(aPub, bPub [33]byte) ([]byte, bool, error) {
-	var swapped bool
-	if bytes.Compare(aPub[:], bPub[:]) == -1 { // swap to sort pubkeys if needed
-		aPub, bPub = bPub, aPub
-		swapped = true
-	}
-	bldr := txscript.NewScriptBuilder()
-	// Require 1 signatures, either key// so from both of the pubkeys
-	bldr.AddOp(txscript.OP_2)
-	// add both pubkeys (sorted)
-	bldr.AddData(aPub[:])
-	bldr.AddData(bPub[:])
-	// 2 keys total.  In case that wasn't obvious.
-	bldr.AddOp(txscript.OP_2)
-	// Good ol OP_CHECKMULTISIG.  Don't forget the zero!
-	bldr.AddOp(txscript.OP_CHECKMULTISIG)
-	// get byte slice
-	pre, err := bldr.Script()
-	return pre, swapped, err
 }
 
 // the scriptsig to put on a P2SH input.  Sigs need to be in order!

@@ -6,6 +6,7 @@ import (
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/sig64"
 )
 
@@ -20,7 +21,7 @@ func (nd *LnNode) SignBreakTx(q *Qchan) (*wire.MsgTx, error) {
 	hCache := txscript.NewTxSigHashes(tx)
 
 	// generate script preimage (keep track of key order)
-	pre, swap, err := FundTxScript(q.MyPub, q.TheirPub)
+	pre, swap, err := lnutil.FundTxScript(q.MyPub, q.TheirPub)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +53,7 @@ func (nd *LnNode) SignSimpleClose(q *Qchan, tx *wire.MsgTx) ([]byte, error) {
 	hCache := txscript.NewTxSigHashes(tx)
 
 	// generate script preimage for signing (ignore key order)
-	pre, _, err := FundTxScript(q.MyPub, q.TheirPub)
+	pre, _, err := lnutil.FundTxScript(q.MyPub, q.TheirPub)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +82,7 @@ func (nd *LnNode) SignState(q *Qchan) ([64]byte, error) {
 	hCache := txscript.NewTxSigHashes(tx)
 
 	// generate script preimage (ignore key order)
-	pre, _, err := FundTxScript(q.MyPub, q.TheirPub)
+	pre, _, err := lnutil.FundTxScript(q.MyPub, q.TheirPub)
 	if err != nil {
 		return sig, err
 	}
@@ -124,7 +125,7 @@ func (q *Qchan) VerifySig(sig [64]byte) error {
 	}
 
 	// generate fund output script preimage (ignore key order)
-	pre, _, err := FundTxScript(q.MyPub, q.TheirPub)
+	pre, _, err := lnutil.FundTxScript(q.MyPub, q.TheirPub)
 	if err != nil {
 		return err
 	}

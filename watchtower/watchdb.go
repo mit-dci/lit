@@ -3,8 +3,8 @@ package watchtower
 import (
 	"fmt"
 
-	"github.com/adiabat/btcd/wire"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
 
@@ -13,6 +13,7 @@ import (
 
 /*
 WatchDB has 3 top level buckets -- 2 small ones and one big one.
+(also could write it so that the big one is a different file or different machine)
 
 PKHMapBucket is k:v
 localChannelId : PKH
@@ -223,7 +224,7 @@ func (w *WatchTower) AddMsg(cm ComMsg) error {
 
 // IngestTx takes in a tx, checks against the DB, and sometimes returns a
 // IdxSig with which to make a JusticeTx.
-func (w *WatchTower) IngestTx(tx *wire.MsgTx) (*IdxSig, error) {
+func (w *WatchTower) IngestTx(txid *chainhash.Hash) (*IdxSig, error) {
 	var err error
 	var hitsig *IdxSig
 	err = w.WatchDB.View(func(btx *bolt.Tx) error {
@@ -232,9 +233,8 @@ func (w *WatchTower) IngestTx(tx *wire.MsgTx) (*IdxSig, error) {
 		if txidbkt == nil {
 			return fmt.Errorf("no txid bucket")
 		}
-		incomingFullTxid := tx.TxHash()
 
-		b := txidbkt.Get(incomingFullTxid[:16])
+		b := txidbkt.Get(txid[:16])
 
 		if b == nil { // no hit, finish here.
 			return nil
@@ -270,6 +270,29 @@ func (w *WatchTower) BuildJusticeTx(
 			return fmt.Errorf("No pkh found for index %d", isig.PKHIdx)
 		}
 
+		channelBucket := btx.Bucket(BUCKETChandata)
+		if channelBucket == nil {
+			return fmt.Errorf("No channel bucket")
+		}
+
+		pkhBucket := channelBucket.Bucket(pkh)
+		if pkhBucket == nil {
+			return fmt.Errorf("No bucket for pkh %x", pkh)
+		}
+
+		static := pkhBucket.Get(KEYStatic)
+		if static == nil {
+			return fmt.Errorf("No static data for pkh %x", pkh)
+		}
+		// deserialize static watchDescriptor struct
+		//		wd, err := WatchannelDescriptorFromBytes(static)
+		//		if err != nil {
+		//			return err
+		//		}
+
+		// first, build the script so we can match it with a txout
+		//		lnutil.CommitScript()
+
 		return nil
 	})
 
@@ -287,33 +310,4 @@ func BuildIdxSig(who uint32, when uint64, sig [64]byte) IdxSig {
 	x.StateIdx = when
 	x.Sig = sig
 	return x
-}
-
-// CheckTxids takes a slice of txids and sees if any are in the
-// DB.  If there is, ComMsg are returned which can then be turned into txs.
-// can take the txid slice direct from a msgBlock after block has been
-// merkle-checked.
-func (w *WatchTower) CheckTxids(inTxids []chainhash.Hash) ([]ComMsg, error) {
-	var hitTxids []ComMsg
-	err := w.WatchDB.View(func(btx *bolt.Tx) error {
-		bkt := btx.Bucket(BUCKETTxid)
-		for _, txid := range inTxids {
-			idxsig := bkt.Get(txid[:8])
-			if idxsig != nil { // hit!!!!1 whoa!
-				// Call WatchMsg construction function here
-				var sm ComMsg
-				copy(sm.ParTxid[:], txid[:16])
-				// that wasn't it.  make a real function
-
-				hitTxids = append(hitTxids, sm)
-			}
-		}
-		return nil
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	return hitTxids, nil
 }

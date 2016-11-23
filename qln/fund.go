@@ -204,7 +204,7 @@ func (nd LnNode) PointRespHandler(from [16]byte, pointRespBytes []byte) error {
 	qc.ElkSnd = elkrem.NewElkremSender(nd.GetElkremRoot(qc.KeyGen))
 
 	// get txo for channel
-	txo, err := FundTxOut(qc.MyPub, qc.TheirPub, nd.InProg.Amt)
+	txo, err := lnutil.FundTxOut(qc.MyPub, qc.TheirPub, nd.InProg.Amt)
 	if err != nil {
 		return err
 	}

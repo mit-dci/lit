@@ -49,14 +49,3 @@ type IdxSig struct {
 	StateIdx uint64   // When
 	Sig      [64]byte // What
 }
-
-// ChanStatic is stored data that doesn't change
-type ChanStatic struct {
-	Delay uint16 // timeout in blocks
-	Fee   int64  // fee to use for grab tx. could make variable but annoying...
-
-	HAKDBasePoint [33]byte // client's HAKD key base point
-	TimeBasePoint [33]byte // potential attacker's timeout basepoint
-
-	PeerIdx uint32 // can save the user you're watching this for.  Optional
-}

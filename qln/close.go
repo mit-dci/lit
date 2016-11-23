@@ -3,6 +3,7 @@ package qln
 import (
 	"fmt"
 
+	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/uspv"
 )
 
@@ -58,7 +59,7 @@ func (nd *LnNode) CloseReqHandler(from [16]byte, reqbytes []byte) {
 		fmt.Printf("CloseReqHandler SignSimpleClose err %s", err.Error())
 		return
 	}
-	pre, swap, err := FundTxScript(qc.MyPub, qc.TheirPub)
+	pre, swap, err := lnutil.FundTxScript(qc.MyPub, qc.TheirPub)
 	if err != nil {
 		fmt.Printf("CloseReqHandler FundTxScript err %s", err.Error())
 		return

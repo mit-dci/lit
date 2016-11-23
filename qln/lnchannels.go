@@ -203,7 +203,7 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 		timeoutPub := lnutil.AddPubs(q.MyHAKDBase, theirElkPointT)
 		revokePub := lnutil.AddPubs(q.TheirHAKDBase, theirElkPointR)
 
-		script := CommitScript(revokePub, timeoutPub, q.TimeOut)
+		script := lnutil.CommitScript(revokePub, timeoutPub, q.TimeOut)
 
 		// create the ScriptHash, timeout portxo.
 		var shTxo portxo.PorTxo // create new utxo and copy into it
@@ -296,7 +296,7 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 		}
 		timeoutPub := lnutil.AddPubs(q.TheirHAKDBase, myElkPointT)
 		revokePub := lnutil.AddPubs(q.MyHAKDBase, myElkPointR)
-		script := CommitScript(revokePub, timeoutPub, q.TimeOut)
+		script := lnutil.CommitScript(revokePub, timeoutPub, q.TimeOut)
 
 		// script check
 		genSH := fastsha256.Sum256(script)

@@ -39,7 +39,8 @@ func (sd *WatchannelDescriptor) ToBytes() []byte {
 func WatchannelDescriptorFromBytes(b []byte) (WatchannelDescriptor, error) {
 	var sd WatchannelDescriptor
 	if len(b) != 128 && len(b) != 96 {
-		return sd, fmt.Errorf("WatchannelDescriptor %d bytes, expect 128", len(b))
+		return sd, fmt.Errorf(
+			"WatchannelDescriptor %d bytes, expect 128 or 96", len(b))
 	}
 	buf := bytes.NewBuffer(b)
 
