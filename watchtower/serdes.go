@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+
+	"github.com/mit-dci/lit/lnutil"
 )
 
 const (
@@ -68,7 +70,7 @@ func WatchannelDescriptorFromBytes(b []byte) (WatchannelDescriptor, error) {
 func (sm *ComMsg) ToBytes() (b [132]byte) {
 	var buf bytes.Buffer
 	buf.Write(sm.DestPKH[:])
-	buf.Write(sm.Txid[:])
+	buf.Write(sm.ParTxid[:])
 	buf.Write(sm.Elk.CloneBytes())
 	buf.Write(sm.Sig[:])
 	copy(b[:], buf.Bytes())
@@ -78,7 +80,7 @@ func (sm *ComMsg) ToBytes() (b [132]byte) {
 // ComMsgFromBytes turns 112 bytes into a SorceMsg
 func ComMsgFromBytes(b [128]byte) ComMsg {
 	var sm ComMsg
-	copy(sm.Txid[:], b[:16])
+	copy(sm.ParTxid[:], b[:16])
 	copy(sm.Elk[:], b[16:48])
 	copy(sm.Sig[:], b[48:])
 	return sm
@@ -90,6 +92,17 @@ func ComMsgFromBytes(b [128]byte) ComMsg {
 // Sig 64
 
 // no idxSig to bytes function -- done inline in the addMsg db call
+
+func IdxSigFromBytes(b []byte) (*IdxSig, error) {
+	var s IdxSig
+	if len(b) != 74 {
+		return nil, fmt.Errorf("IdxSigFromBytes got %d bytes, expect 74", len(b))
+	}
+	s.PKHIdx = lnutil.BtU32(b[:4])
+	s.StateIdx = uint64(lnutil.BtI64(b[4:12]))
+	copy(s.Sig[:], b[12:])
+	return &s, nil
+}
 
 //type IdxSig struct {
 //	PKHIdx   uint32

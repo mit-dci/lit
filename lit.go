@@ -60,7 +60,7 @@ func main() {
 	}
 	if tip == 0 { // DB has never been used, set to birthday
 		//		tip = 10 // for regtest
-		tip = 1034000 // for testnet3. hardcoded; later base on keyfile date?
+		tip = 1034500 // for testnet3. hardcoded; later base on keyfile date?
 		err = SCon.TS.SetDBSyncHeight(tip)
 		if err != nil {
 			log.Fatal(err)

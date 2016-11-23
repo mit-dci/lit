@@ -3,6 +3,7 @@ package watchtower
 import (
 	"fmt"
 
+	"github.com/adiabat/btcd/wire"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
@@ -24,10 +25,6 @@ PKH (lots)
   |-KEYIdx : channelIdx (4 bytes)
   |
   |-KEYStatic : ChanStatic (~100 bytes)
-  |
-  |-HTLC bucket // implement later
-	  |
-	  |- StateIdx : EncData (104 bytes)
 
 
 (could also add some metrics, like last write timestamp)
@@ -36,6 +33,14 @@ the big one:
 
 TxidBucket is k:v
 Txid[:16] : IdxSig (74 bytes)
+
+TODO: both ComMsgs and IdxSigs need to support multiple signatures for HTLCs.
+What's nice is that this is the *only* thing needed to support HTLCs.
+
+
+Potential optimizations to try:
+Store less than 16 bytes of the txid
+Store
 
 Leave as is for now, but could modify the txid to make it smaller.  Could
 HMAC it with a local key to prevent collision attacks and get the txid size down
@@ -100,18 +105,24 @@ func (w *WatchTower) OpenDB(filename string) error {
 func (w *WatchTower) AddNewChannel(wd WatchannelDescriptor) error {
 	return w.WatchDB.Update(func(btx *bolt.Tx) error {
 		// open index : pkh mapping bucket
-		mbkt := btx.Bucket(BUCKETPKHMap)
-		if mbkt == nil {
+		mapBucket := btx.Bucket(BUCKETPKHMap)
+		if mapBucket == nil {
 			return fmt.Errorf("no PKHmap bucket")
 		}
 		// figure out this new channel's index
-		cIdxBytes := lnutil.U32tB(uint32(mbkt.Stats().KeyN)) // this breaks if >4B chans
+		// 4B channels forever... could fix, but probably enough.
+		cur := mapBucket.Cursor()
+		k, _ := cur.Last()            // go to the end
+		newIdx := lnutil.BtU32(k) + 1 // and add 1
+
+		newIdxBytes := lnutil.U32tB(newIdx)
+
 		allChanbkt := btx.Bucket(BUCKETChandata)
 		if allChanbkt == nil {
 			return fmt.Errorf("no Chandata bucket")
 		}
 		// make new channel bucket
-		cbkt, err := allChanbkt.CreateBucket(wd.DestPKHScript[:])
+		chanBucket, err := allChanbkt.CreateBucket(wd.DestPKHScript[:])
 		if err != nil {
 			return err
 		}
@@ -120,7 +131,7 @@ func (w *WatchTower) AddNewChannel(wd WatchannelDescriptor) error {
 		if len(wdBytes) < 96 {
 			return fmt.Errorf("watchdescriptor %d bytes, expect 96")
 		}
-		cbkt.Put(KEYStatic, wdBytes[:96])
+		chanBucket.Put(KEYStatic, wdBytes[:96])
 
 		var elkr elkrem.ElkremReceiver
 		_ = elkr.AddNext(&wd.ElkZero) // first add; can't fail
@@ -128,25 +139,25 @@ func (w *WatchTower) AddNewChannel(wd WatchannelDescriptor) error {
 		if err != nil {
 			return err
 		}
-		// save the (first) elkrem
-		err = cbkt.Put(KEYElkRcv, elkBytes)
+		// save the (first) elkrem receiver
+		err = chanBucket.Put(KEYElkRcv, elkBytes)
 		if err != nil {
 			return err
 		}
 		// save index
-		err = cbkt.Put(KEYIdx, cIdxBytes)
+		err = chanBucket.Put(KEYIdx, newIdxBytes)
 		if err != nil {
 			return err
 		}
 		// save into index mapping
-		return mbkt.Put(cIdxBytes, wd.DestPKHScript[:])
+		return mapBucket.Put(newIdxBytes, wd.DestPKHScript[:])
 
 		// done
 	})
 }
 
 // AddMsg adds a new message describing a penalty tx to the db.
-// A later optimization would be to add a bunch of messages at once.
+// optimization would be to add a bunch of messages at once.  Not a huge speedup though.
 func (w *WatchTower) AddMsg(cm ComMsg) error {
 	return w.WatchDB.Update(func(btx *bolt.Tx) error {
 
@@ -155,15 +166,15 @@ func (w *WatchTower) AddMsg(cm ComMsg) error {
 		if allChanbkt == nil {
 			return fmt.Errorf("no Chandata bucket")
 		}
-		cbkt := allChanbkt.Bucket(cm.DestPKH[:])
-		if cbkt == nil {
+		chanBucket := allChanbkt.Bucket(cm.DestPKH[:])
+		if chanBucket == nil {
 			return fmt.Errorf("no bucket for channel %x", cm.DestPKH)
 		}
 
 		// deserialize elkrems.  Future optimization: could keep
 		// all elkrem receivers in RAM for every channel, only writing here
 		// each time instead of reading then writing back.
-		elkr, err := elkrem.ElkremReceiverFromBytes(cbkt.Get(KEYElkRcv))
+		elkr, err := elkrem.ElkremReceiverFromBytes(chanBucket.Get(KEYElkRcv))
 		if err != nil {
 			return err
 		}
@@ -181,12 +192,12 @@ func (w *WatchTower) AddMsg(cm ComMsg) error {
 			return err
 		}
 		// then write back to DB.
-		err = cbkt.Put(KEYElkRcv, elkBytes)
+		err = chanBucket.Put(KEYElkRcv, elkBytes)
 		if err != nil {
 			return err
 		}
 		// get local index of this channel
-		cIdxBytes := cbkt.Get(KEYIdx)
+		cIdxBytes := chanBucket.Get(KEYIdx)
 		if cIdxBytes == nil {
 			return fmt.Errorf("channel %x has no index", cm.DestPKH)
 		}
@@ -200,15 +211,82 @@ func (w *WatchTower) AddMsg(cm ComMsg) error {
 		}
 		// create the sigIdx 74 bytes.  A little ugly but only called here and
 		// pretty quick.  Maybe make a function for this.
-
 		sigIdxBytes := make([]byte, 74)
-		copy(sigIdxBytes[:4], cIdxBytes)
-		copy(sigIdxBytes[4:10], stateNumBytes[2:])
-		copy(sigIdxBytes[10:], cm.Sig[:])
+		copy(sigIdxBytes[:4], cIdxBytes)           // first 4 bytes is the PKH index
+		copy(sigIdxBytes[4:10], stateNumBytes[2:]) // next 8 is state number
+		copy(sigIdxBytes[10:], cm.Sig[:])          // the rest is signature
 
 		// save sigIdx into the txid bucket.
-		return txidbkt.Put(cm.Txid[:8], sigIdxBytes)
+		return txidbkt.Put(cm.ParTxid[:8], sigIdxBytes)
 	})
+}
+
+// IngestTx takes in a tx, checks against the DB, and sometimes returns a
+// IdxSig with which to make a JusticeTx.
+func (w *WatchTower) IngestTx(tx *wire.MsgTx) (*IdxSig, error) {
+	var err error
+	var hitsig *IdxSig
+	err = w.WatchDB.View(func(btx *bolt.Tx) error {
+		// open the big bucket
+		txidbkt := btx.Bucket(BUCKETTxid)
+		if txidbkt == nil {
+			return fmt.Errorf("no txid bucket")
+		}
+		incomingFullTxid := tx.TxHash()
+
+		b := txidbkt.Get(incomingFullTxid[:16])
+
+		if b == nil { // no hit, finish here.
+			return nil
+		}
+		// Whoa! hit!  Deserialize
+		hitsig, err = IdxSigFromBytes(b)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	return hitsig, err
+}
+
+// BuildJusticeTx takes the badTx and IdxSig found by IngestTx, and returns a
+// Justice transaction moving funds with great vengance & furious anger.
+// Re-opens the DB which just was closed by IngestTx, but since this almost never
+// happens, we need to end IngestTx as quickly as possible.
+// Note that you should flag the channel for deletion after the JusticeTx is broadcast.
+func (w *WatchTower) BuildJusticeTx(
+	badTx *wire.MsgTx, isig *IdxSig) (*wire.MsgTx, error) {
+
+	// open DB and get static channel info
+	err := w.WatchDB.View(func(btx *bolt.Tx) error {
+
+		mapBucket := btx.Bucket(BUCKETPKHMap)
+		if mapBucket == nil {
+			return fmt.Errorf("no PKHmap bucket")
+		}
+		// figure out who this Justice belongs to
+		pkh := mapBucket.Get(lnutil.U32tB(isig.PKHIdx))
+		if pkh == nil {
+			return fmt.Errorf("No pkh found for index %d", isig.PKHIdx)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return nil, nil
+
+}
+
+// don't use this?  inline is OK...
+func BuildIdxSig(who uint32, when uint64, sig [64]byte) IdxSig {
+	var x IdxSig
+	x.PKHIdx = who
+	x.StateIdx = when
+	x.Sig = sig
+	return x
 }
 
 // CheckTxids takes a slice of txids and sees if any are in the
@@ -224,7 +302,7 @@ func (w *WatchTower) CheckTxids(inTxids []chainhash.Hash) ([]ComMsg, error) {
 			if idxsig != nil { // hit!!!!1 whoa!
 				// Call WatchMsg construction function here
 				var sm ComMsg
-				copy(sm.Txid[:], txid[:16])
+				copy(sm.ParTxid[:], txid[:16])
 				// that wasn't it.  make a real function
 
 				hitTxids = append(hitTxids, sm)
