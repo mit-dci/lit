@@ -73,23 +73,11 @@ func (q *Qchan) SimpleCloseTx() (*wire.MsgTx, error) {
 	}
 	fee := int64(5000) // fixed fee for now (on both sides)
 
-	// get final elkrem points; both R, theirs and mine
-	theirElkPointR, err := q.ElkPoint(false, false, q.State.StateIdx)
-	if err != nil {
-		fmt.Printf("SimpleCloseTx: can't generate elkpoint.")
-		return nil, err
-	}
-
-	// my pub is my base and "their" elk point which I have the scalar for
-	myRefundPub := lnutil.AddPubs(q.MyRefundPub, theirElkPointR)
-	// their pub is their base and "my" elk point (which they gave me)
-	theirRefundPub := lnutil.AddPubs(q.TheirRefundPub, q.State.ElkPointR)
-
 	// make my output
-	myScript := lnutil.DirectWPKHScript(myRefundPub)
+	myScript := lnutil.DirectWPKHScript(q.MyRefundPub)
 	myOutput := wire.NewTxOut(q.State.MyAmt-fee, myScript)
 	// make their output
-	theirScript := lnutil.DirectWPKHScript(theirRefundPub)
+	theirScript := lnutil.DirectWPKHScript(q.TheirRefundPub)
 	theirOutput := wire.NewTxOut((q.Value-q.State.MyAmt)-fee, theirScript)
 
 	// make tx with these outputs
@@ -135,36 +123,40 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
 	// delay is super short for testing.
 
 	// Both received and self-generated elkpoints are needed
-	// Here generate the elk point we give them (we know the scalar; they don't)
-	theirElkPointR, theirElkPointT, err := q.MakeTheirCurElkPoints()
+
+	// Create latest elkrem point (the one I create)
+	curElk, err := q.ElkPoint(false, q.State.StateIdx)
 	if err != nil {
 		return nil, err
 	}
+
 	// the PKH clear refund also has elkrem points added to mask the PKH.
 	// this changes the txouts at each state to blind sorceror better.
 	if mine { // build MY tx (to verify) (unless breaking)
-		// My tx that I store.  They get funds unencumbered.
-		// SH pubkeys are our base points plus the elk point we give them
-		revPub = lnutil.AddPubs(q.TheirHAKDBase, theirElkPointR)
-		timePub = lnutil.AddPubs(q.MyHAKDBase, theirElkPointT)
+		// My tx that I store.  They get funds unencumbered. SH is mine eventually
+		// SH pubkeys are base points combined with the elk point we give them
 
-		pkhPub = lnutil.AddPubs(q.TheirRefundPub, s.ElkPointR) // my received elkpoint
+		revPub = lnutil.CombinePubs(q.TheirHAKDBase, curElk)
+		timePub = lnutil.CombinePubs(q.MyHAKDBase, curElk)
+
+		pkhPub = q.TheirRefundPub
 		pkhAmt = (q.Value - s.MyAmt) - fee
 		fancyAmt = s.MyAmt - fee
 
 		fmt.Printf("\t refund base %x, elkpointR %x\n", q.TheirRefundPub, s.ElkPointR)
 	} else { // build THEIR tx (to sign)
-		// Their tx that they store.  I get funds unencumbered.
+		// Their tx that they store.  I get funds PKH.  SH is theirs eventually.
 
 		// SH pubkeys are our base points plus the received elk point
-		revPub = lnutil.AddPubs(q.MyHAKDBase, s.ElkPointR)
-		timePub = lnutil.AddPubs(q.TheirHAKDBase, s.ElkPointT)
+		revPub = lnutil.CombinePubs(q.MyHAKDBase, s.ElkPointR)
+		timePub = lnutil.CombinePubs(q.TheirHAKDBase, s.ElkPointR)
+
 		fancyAmt = (q.Value - s.MyAmt) - fee
 
 		// PKH output
-		pkhPub = lnutil.AddPubs(q.MyRefundPub, theirElkPointR) // their (sent) elk point
+		pkhPub = q.MyRefundPub
 		pkhAmt = s.MyAmt - fee
-		fmt.Printf("\trefund base %x, elkpointR %x\n", q.MyRefundPub, theirElkPointR)
+		fmt.Printf("\trefund base %x, elkpoint %x\n", q.MyRefundPub, curElk)
 	}
 
 	// now that everything is chosen, build fancy script and pkh script

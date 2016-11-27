@@ -26,8 +26,8 @@ type WatchannelDescriptor struct {
 	Delay uint16 // timeout in blocks
 	Fee   int64  // fee to use for grab tx.  Or fee rate...?
 
-	HAKDBasePoint [33]byte // client's HAKD key base point
-	TimeBasePoint [33]byte // potential attacker's timeout basepoint
+	CustomerBasePoint  [33]byte // client's HAKD key base point
+	AdversaryBasePoint [33]byte // potential attacker's timeout basepoint
 
 	// elk 0 here?  Because they won't send a sig for elk0...
 	ElkZero chainhash.Hash

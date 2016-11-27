@@ -58,6 +58,7 @@ func OutPointFromBytes(b [36]byte) *wire.OutPoint {
 	return op
 }
 
+// P2WSHify takes a script and turns it into a 34 byte long P2WSH PkScript
 func P2WSHify(scriptBytes []byte) []byte {
 	bldr := txscript.NewScriptBuilder()
 	bldr.AddOp(txscript.OP_0)

@@ -29,8 +29,8 @@ func (sd *WatchannelDescriptor) ToBytes() []byte {
 	buf.Write(sd.DestPKHScript[:])
 	binary.Write(&buf, binary.BigEndian, sd.Delay)
 	binary.Write(&buf, binary.BigEndian, sd.Fee)
-	buf.Write(sd.HAKDBasePoint[:])
-	buf.Write(sd.TimeBasePoint[:])
+	buf.Write(sd.CustomerBasePoint[:])
+	buf.Write(sd.AdversaryBasePoint[:])
 	buf.Write(sd.ElkZero.CloneBytes())
 	return buf.Bytes()
 }
@@ -54,8 +54,8 @@ func WatchannelDescriptorFromBytes(b []byte) (WatchannelDescriptor, error) {
 		return sd, err
 	}
 
-	copy(sd.HAKDBasePoint[:], buf.Next(33))
-	copy(sd.TimeBasePoint[:], buf.Next(33))
+	copy(sd.CustomerBasePoint[:], buf.Next(33))
+	copy(sd.AdversaryBasePoint[:], buf.Next(33))
 	// might not be anything left, which is OK, elk0 will just be blank
 	copy(sd.ElkZero[:], buf.Next(32))
 

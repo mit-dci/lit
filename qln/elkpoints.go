@@ -14,12 +14,12 @@ functions dealing with elkrem points and the elkrem structure
 // MakeTheirCurElkPoint makes the current state elkrem points to send out
 func (q *Qchan) MakeTheirCurElkPoints() (r, t [33]byte, err error) {
 	// generate revocable elkrem point
-	r, err = q.ElkPoint(false, false, q.State.StateIdx)
+	r, err = q.ElkPoint(false, q.State.StateIdx)
 	if err != nil {
 		return
 	}
 	// generate timeout elkrem point
-	t, err = q.ElkPoint(false, true, q.State.StateIdx)
+	t, err = q.ElkPoint(false, q.State.StateIdx)
 	return
 }
 
@@ -27,12 +27,9 @@ func (q *Qchan) MakeTheirCurElkPoints() (r, t [33]byte, err error) {
 // I receive from the counter party, and can create after the state has
 // been revoked.  "Their" elkrem point (mine=false) is generated from my elkrem
 // sender at any index.
-// Elkrem points are sub-hashes of the hash coming from the elkrem tree.
-// There are "time" and "revoke" elkrem points, which are just sha2d(elk, "t")
-// and sha2d(elk, "r") of the hash from the elkrem tree.
-// Having different points prevents observers from distinguishing the channel
-// when they have the HAKD base points but not the elkrem point.
-func (q *Qchan) ElkPoint(mine, time bool, idx uint64) (p [33]byte, err error) {
+// Elkrem points pubkeys where the scalar is a hash coming from the elkrem tree.
+// With delinearized aggregation, only one point is needed.  I'm pretty sure.
+func (q *Qchan) ElkPoint(mine bool, idx uint64) (p [33]byte, err error) {
 	// sanity check
 	if q == nil || q.ElkSnd == nil { // no sender
 		err = fmt.Errorf("can't access elkrem sender")
@@ -54,12 +51,8 @@ func (q *Qchan) ElkPoint(mine, time bool, idx uint64) (p [33]byte, err error) {
 	if err != nil {
 		return
 	}
-
-	if time {
-		*elk = chainhash.DoubleHashH(append(elk.CloneBytes(), 0x74)) // ascii "t"
-	} else {
-		*elk = chainhash.DoubleHashH(append(elk.CloneBytes(), 0x72)) // ascii "r"
-	}
+	// hash with suffix "POINT" just for fun
+	*elk = chainhash.DoubleHashH(append(elk[:], []byte("POINT")...))
 
 	// turn the hash into a point
 	p = lnutil.PubFromHash(*elk)
