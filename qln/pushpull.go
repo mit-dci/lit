@@ -53,7 +53,7 @@ func (nd *LnNode) SendNextMsg(qc *Qchan) error {
 
 	// RTS
 	if qc.State.Delta < 0 {
-		if qc.State.PrevElkPointR != empty {
+		if qc.State.PrevElkPoint != empty {
 			return fmt.Errorf("delta is %d but prevHAKD full!", qc.State.Delta)
 		}
 		return nd.SendRTS(qc)
@@ -61,14 +61,14 @@ func (nd *LnNode) SendNextMsg(qc *Qchan) error {
 
 	// ACKSIG
 	if qc.State.Delta > 0 {
-		if qc.State.PrevElkPointR == empty {
+		if qc.State.PrevElkPoint == empty {
 			return fmt.Errorf("delta is %d but prevHAKD empty!", qc.State.Delta)
 		}
 		return nd.SendACKSIG(qc)
 	}
 
 	//SIGREV (delta must be 0 by now)
-	if qc.State.PrevElkPointR != empty {
+	if qc.State.PrevElkPoint != empty {
 		return nd.SendSIGREV(qc)
 	}
 
@@ -83,7 +83,7 @@ func (nd LnNode) PushChannel(qc *Qchan, amt uint32) error {
 
 	// don't try to update state until all prior updates have cleared
 	// may want to change this later, but requires other changes.
-	if qc.State.Delta != 0 || qc.State.PrevElkPointR != empty {
+	if qc.State.Delta != 0 || qc.State.PrevElkPoint != empty {
 		return fmt.Errorf("channel update in progress, cannot push")
 	}
 	// check if this push would lower my balance below minBal
@@ -112,13 +112,13 @@ func (nd LnNode) PushChannel(qc *Qchan, amt uint32) error {
 func (nd *LnNode) SendRTS(qc *Qchan) error {
 	qc.State.StateIdx++
 
-	elkPointR, elkPointT, err := qc.MakeTheirCurElkPoints()
+	elkPoint, err := qc.CurElkPointForThem()
 	if err != nil {
 		return err
 	}
 
 	fmt.Printf("will send RTS with delta:%d elkPR %x\n",
-		qc.State.Delta, elkPointR[:4])
+		qc.State.Delta, elkPoint[:4])
 
 	opArr := lnutil.OutPointToBytes(qc.Op)
 	// RTS is op (36), delta (4), ElkPointR (33), ElkPointT (33)
@@ -127,8 +127,7 @@ func (nd *LnNode) SendRTS(qc *Qchan) error {
 	msg := []byte{MSGID_RTS}
 	msg = append(msg, opArr[:]...)
 	msg = append(msg, lnutil.U32tB(uint32(-qc.State.Delta))...)
-	msg = append(msg, elkPointR[:]...)
-	msg = append(msg, elkPointT[:]...)
+	msg = append(msg, elkPoint[:]...)
 	_, err = nd.RemoteCon.Write(msg)
 	if err != nil {
 		return err
@@ -139,28 +138,22 @@ func (nd *LnNode) SendRTS(qc *Qchan) error {
 // RTSHandler takes in an RTS and responds with an ACKSIG (if everything goes OK)
 func (nd *LnNode) RTSHandler(from [16]byte, RTSBytes []byte) {
 
-	if len(RTSBytes) < 106 || len(RTSBytes) > 106 {
-		fmt.Printf("got %d byte RTS, expect 106", len(RTSBytes))
+	if len(RTSBytes) < 73 || len(RTSBytes) > 73 {
+		fmt.Printf("got %d byte RTS, expect 73", len(RTSBytes))
 		return
 	}
 
 	var opArr [36]byte
 	var RTSDelta uint32
-	var RTSElkPointR, RTSElkPointT [33]byte
+	var RTSElkPoint [33]byte
 
 	// deserialize RTS
 	copy(opArr[:], RTSBytes[:36])
 	RTSDelta = lnutil.BtU32(RTSBytes[36:40])
-	copy(RTSElkPointR[:], RTSBytes[40:73])
-	copy(RTSElkPointT[:], RTSBytes[73:])
+	copy(RTSElkPoint[:], RTSBytes[40:])
 
 	// make sure the ElkPoint is a point (basically starts with a 02/03)
-	_, err := btcec.ParsePubKey(RTSElkPointR[:], btcec.S256())
-	if err != nil {
-		fmt.Printf("RTSHandler err %s", err.Error())
-		return
-	}
-	_, err = btcec.ParsePubKey(RTSElkPointT[:], btcec.S256())
+	_, err := btcec.ParsePubKey(RTSElkPoint[:], btcec.S256())
 	if err != nil {
 		fmt.Printf("RTSHandler err %s", err.Error())
 		return
@@ -206,11 +199,10 @@ func (nd *LnNode) RTSHandler(from [16]byte, RTSBytes []byte) {
 			"in case the code changes later and we forget.\n")
 		return
 	}
-	qc.State.Delta = int32(RTSDelta)            // assign delta
-	qc.State.PrevElkPointR = qc.State.ElkPointR // copy previous ElkPoints
-	qc.State.PrevElkPointT = qc.State.ElkPointT // copy previous ElkPoints
-	qc.State.ElkPointR = RTSElkPointR           // assign ElkPoints
-	qc.State.ElkPointT = RTSElkPointT           // assign ElkPoints
+	qc.State.Delta = int32(RTSDelta)          // assign delta
+	qc.State.PrevElkPoint = qc.State.ElkPoint // copy previous ElkPoint
+	qc.State.ElkPoint = RTSElkPoint           // assign ElkPoint
+
 	// save delta, ElkPoint to db
 	err = nd.SaveQchanState(qc)
 	if err != nil {
@@ -236,18 +228,18 @@ func (nd *LnNode) SendACKSIG(qc *Qchan) error {
 	if err != nil {
 		return err
 	}
-	theirElkPointR, theirElkPointT, err := qc.MakeTheirCurElkPoints()
+	theirElkPoint, err := qc.CurElkPointForThem()
 	if err != nil {
 		return err
 	}
 
 	opArr := lnutil.OutPointToBytes(qc.Op)
-	// ACKSIG is op (36), ElkPointR (33), ElkPointT (33), sig (64)
-	// total length 166
+	// ACKSIG is op (36), ElkPointR (33),  sig (64)
+	// total length 133
 	msg := []byte{MSGID_ACKSIG}
 	msg = append(msg, opArr[:]...)
-	msg = append(msg, theirElkPointR[:]...)
-	msg = append(msg, theirElkPointT[:]...)
+	msg = append(msg, theirElkPoint[:]...)
+
 	msg = append(msg, sig[:]...)
 	_, err = nd.RemoteCon.Write(msg)
 	return err
@@ -255,29 +247,22 @@ func (nd *LnNode) SendACKSIG(qc *Qchan) error {
 
 // ACKSIGHandler takes in an ACKSIG and responds with an SIGREV (if everything goes OK)
 func (nd *LnNode) ACKSIGHandler(from [16]byte, ACKSIGBytes []byte) {
-	if len(ACKSIGBytes) < 166 || len(ACKSIGBytes) > 166 {
-		fmt.Printf("got %d byte ACKSIG, expect 166", len(ACKSIGBytes))
+	if len(ACKSIGBytes) < 133 || len(ACKSIGBytes) > 133 {
+		fmt.Printf("got %d byte ACKSIG, expect 133", len(ACKSIGBytes))
 		return
 	}
 
 	var opArr [36]byte
-	var ACKSIGElkPointR, ACKSIGElkPointT [33]byte
+	var ACKSIGElkPoint [33]byte
 	var sig [64]byte
 
 	// deserialize ACKSIG
 	copy(opArr[:], ACKSIGBytes[:36])
-	copy(ACKSIGElkPointR[:], ACKSIGBytes[36:69])
-	copy(ACKSIGElkPointT[:], ACKSIGBytes[69:102])
-	copy(sig[:], ACKSIGBytes[102:])
+	copy(ACKSIGElkPoint[:], ACKSIGBytes[36:69])
+	copy(sig[:], ACKSIGBytes[69:])
 
 	// make sure the ElkPoint is a point
-	_, err := btcec.ParsePubKey(ACKSIGElkPointR[:], btcec.S256())
-	if err != nil {
-		fmt.Printf("ACKSIGHandler err %s", err.Error())
-		return
-	}
-	// make sure the ElkPoint is a point
-	_, err = btcec.ParsePubKey(ACKSIGElkPointT[:], btcec.S256())
+	_, err := btcec.ParsePubKey(ACKSIGElkPoint[:], btcec.S256())
 	if err != nil {
 		fmt.Printf("ACKSIGHandler err %s", err.Error())
 		return
@@ -303,11 +288,10 @@ func (nd *LnNode) ACKSIGHandler(from [16]byte, ACKSIGBytes []byte) {
 	// increment state
 	qc.State.StateIdx++
 	// copy current ElkPoints to previous as state has been incremented
-	qc.State.PrevElkPointR = qc.State.ElkPointR
-	qc.State.PrevElkPointT = qc.State.ElkPointT
+	qc.State.PrevElkPoint = qc.State.ElkPoint
+
 	// get new ElkPoint for signing
-	qc.State.ElkPointR = ACKSIGElkPointR
-	qc.State.ElkPointT = ACKSIGElkPointT
+	qc.State.ElkPoint = ACKSIGElkPoint
 
 	// construct tx and verify signature
 	qc.State.MyAmt += int64(qc.State.Delta) // delta should be negative
@@ -492,7 +476,7 @@ func (nd *LnNode) REVHandler(from [16]byte, REVBytes []byte) {
 
 	// check if there's nothing for them to revoke
 	var empty [33]byte
-	if qc.State.StateIdx > 1 && qc.State.PrevElkPointR == empty {
+	if qc.State.StateIdx > 1 && qc.State.PrevElkPoint == empty {
 		fmt.Printf("got REV message with hash %s, but nothing to revoke\n",
 			revElk.String())
 		return

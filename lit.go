@@ -23,14 +23,14 @@ const (
 	// this is my local testnet node, replace it with your own close by.
 	// Random internet testnet nodes usually work but sometimes don't, so
 	// maybe I should test against different versions out there.
-	SPVHostAdr = "slab.lan:18333" // for testnet3
-//	SPVHostAdr = "slab.lan:18444" // for regtest
+	//	SPVHostAdr = "slab.lan:18333" // for testnet3
+	SPVHostAdr = "slab.lan:18444" // for regtest
 )
 
 var (
-	Params = &chaincfg.TestNet3Params
-	//	Params = &chaincfg.RegressionNetParams
-	SCon uspv.SPVCon // global here for now
+	//	Params = &chaincfg.TestNet3Params
+	Params = &chaincfg.RegressionNetParams
+	SCon   uspv.SPVCon // global here for now
 
 	LNode qln.LnNode
 )
@@ -59,8 +59,8 @@ func main() {
 		log.Fatal(err)
 	}
 	if tip == 0 { // DB has never been used, set to birthday
-		//		tip = 10 // for regtest
-		tip = 1034500 // for testnet3. hardcoded; later base on keyfile date?
+		tip = 10 // for regtest
+		//		tip = 1034500 // for testnet3. hardcoded; later base on keyfile date?
 		err = SCon.TS.SetDBSyncHeight(tip)
 		if err != nil {
 			log.Fatal(err)

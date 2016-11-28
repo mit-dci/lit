@@ -11,16 +11,24 @@ import (
 functions dealing with elkrem points and the elkrem structure
 */
 
-// MakeTheirCurElkPoint makes the current state elkrem points to send out
-func (q *Qchan) MakeTheirCurElkPoints() (r, t [33]byte, err error) {
+// ElkScalar returns the private key (scalar) which comes from a node in the elkrem
+// tree (elkrem hash)
+func ElkScalar(in *chainhash.Hash) chainhash.Hash {
+	return chainhash.DoubleHashH(
+		append(in[:], []byte("ELKSCALAR")...))
+}
+
+// ElkPoint returns the public key (point) which comes from a node in the elkrem
+// tree (elkrem hash)
+func ElkPointFromHash(in *chainhash.Hash) [33]byte {
+	scalar := ElkScalar(in)
+	return lnutil.PubFromHash(scalar)
+}
+
+// CurElkPointForThem makes the current state elkrem point to send out
+func (q *Qchan) CurElkPointForThem() (p [33]byte, err error) {
 	// generate revocable elkrem point
-	r, err = q.ElkPoint(false, q.State.StateIdx)
-	if err != nil {
-		return
-	}
-	// generate timeout elkrem point
-	t, err = q.ElkPoint(false, q.State.StateIdx)
-	return
+	return q.ElkPoint(false, q.State.StateIdx)
 }
 
 // ElkPoint generates an elkrem Point.  "My" elkrem point is the point
@@ -51,11 +59,8 @@ func (q *Qchan) ElkPoint(mine bool, idx uint64) (p [33]byte, err error) {
 	if err != nil {
 		return
 	}
-	// hash with suffix "POINT" just for fun
-	*elk = chainhash.DoubleHashH(append(elk[:], []byte("POINT")...))
+	p = ElkPointFromHash(elk)
 
-	// turn the hash into a point
-	p = lnutil.PubFromHash(*elk)
 	return
 }
 
@@ -89,21 +94,19 @@ func (q *Qchan) IngestElkrem(elk *chainhash.Hash) error {
 	// in the mysterious power of abelian group homomorphisms that the private
 	// key modification will also work.
 
-	// Make r and t points from received elk hash
-	CheckR := lnutil.PubFromHash(chainhash.DoubleHashH(append(elk.CloneBytes(), 0x72))) // r
-	CheckT := lnutil.PubFromHash(chainhash.DoubleHashH(append(elk.CloneBytes(), 0x74))) // t
+	// Make point from received elk hash
+	point := ElkPointFromHash(elk)
 
 	// see if it matches previous elk point
-	if CheckR != q.State.PrevElkPointR || CheckT != q.State.PrevElkPointT {
+	if point != q.State.PrevElkPoint {
 		// didn't match, the whole channel is borked.
 		return fmt.Errorf("hash %x (index %d) fits tree but creates wrong elkpoint!",
-			elk[:8], q.State.PrevElkPointR, q.State.PrevElkPointT)
+			elk[:8], q.State.PrevElkPoint)
 	}
 
 	// it did match, so we can clear the previous HAKD pub
 	var empty [33]byte
-	q.State.PrevElkPointR = empty
-	q.State.PrevElkPointT = empty
+	q.State.PrevElkPoint = empty
 
 	return nil
 }

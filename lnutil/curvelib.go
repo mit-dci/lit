@@ -219,26 +219,6 @@ func CombinePubs(a, b [33]byte) [33]byte {
 	return c
 }
 
-// AddPointArrs takes two 33 byte serialized points, adds them, and
-// returns the sum as a 33 byte array.
-// Silently returns a zero array if there's an input error
-func AddPubsx(a, b [33]byte) [33]byte {
-	var c [33]byte
-	apoint, err := btcec.ParsePubKey(a[:], btcec.S256())
-	if err != nil {
-		return c
-	}
-	bpoint, err := btcec.ParsePubKey(b[:], btcec.S256())
-	if err != nil {
-		return c
-	}
-
-	apoint.X, apoint.Y = btcec.S256().Add(apoint.X, apoint.Y, bpoint.X, bpoint.Y)
-	copy(c[:], apoint.SerializeCompressed())
-
-	return c
-}
-
 // HashToPub turns a 32 byte hash into a 33 byte serialized pubkey
 func PubFromHash(h chainhash.Hash) (p [33]byte) {
 	_, pub := btcec.PrivKeyFromBytes(btcec.S256(), h[:])

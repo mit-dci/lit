@@ -56,11 +56,11 @@ type StatCom struct {
 
 	// Elkrem point from counterparty, used to make
 	// Homomorphic Adversarial Key Derivation public keys (HAKD)
-	ElkPointR     [33]byte // saved to disk, revealable point
-	PrevElkPointR [33]byte // When you haven't gotten their revocation elkrem yet.
+	ElkPoint     [33]byte // saved to disk, revealable point
+	PrevElkPoint [33]byte // When you haven't gotten their revocation elkrem yet.
 
-	ElkPointT     [33]byte // their timeout elk point; needed for script
-	PrevElkPointT [33]byte // When you haven't gotten their revocation elkrem yet.
+	ElkPointTx     [33]byte // their timeout elk point; needed for script
+	PrevElkPointTx [33]byte // When you haven't gotten their revocation elkrem yet.
 
 	sig [64]byte // Counterparty's signature (for StatCom tx)
 	// don't write to sig directly; only overwrite via fn() call
@@ -101,12 +101,12 @@ func (nd *LnNode) QchanInfo(q *Qchan) error {
 			q.State.MyAmt, q.Value-q.State.MyAmt, q.State.StateIdx)
 
 		fmt.Printf("\tdelta:%d HAKD:%x prevHAKD:%x elk@ %d\n",
-			q.State.Delta, q.State.ElkPointR[:4], q.State.PrevElkPointR[:4],
+			q.State.Delta, q.State.ElkPoint[:4], q.State.PrevElkPoint[:4],
 			q.ElkRcv.UpTo())
 		elkp, _ := q.ElkPoint(false, q.State.StateIdx)
 		myRefPub := lnutil.CombinePubs(q.MyRefundPub, elkp)
 
-		theirRefPub := lnutil.CombinePubs(q.TheirRefundPub, q.State.ElkPointR)
+		theirRefPub := lnutil.CombinePubs(q.TheirRefundPub, q.State.ElkPoint)
 		fmt.Printf("\tMy Refund: %x Their Refund %x\n", myRefPub[:4], theirRefPub[:4])
 	}
 

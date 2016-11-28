@@ -41,7 +41,8 @@ func (kg *KeyGen) DerivePrivateKey(
 		return nil, err
 	}
 
-	// if porTxo's private key has something in it, add that to the derived key
+	// if porTxo's private key has something in it, combine that with derived key
+	// using the delinearization scheme
 	if kg.PrivKey != empty { // actually could work without this line :)
 		privKeyAddArrayInPlace(derivedPrivKey, kg.PrivKey)
 	}

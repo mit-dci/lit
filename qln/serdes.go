@@ -28,7 +28,7 @@ and the stateidx.  hash160(elkremsend(sIdx)[:16])
 
 */
 
-// ToBytes turns a StatCom into 224ish bytes
+// ToBytes turns a StatCom into 158ish bytes
 func (s *StatCom) ToBytes() ([]byte, error) {
 	var buf bytes.Buffer
 	var err error
@@ -55,25 +55,13 @@ func (s *StatCom) ToBytes() ([]byte, error) {
 		return nil, err
 	}
 	// write 33 byte my elk point R
-	_, err = buf.Write(s.ElkPointR[:])
+	_, err = buf.Write(s.ElkPoint[:])
 	if err != nil {
 		return nil, err
 	}
 	// write 33 byte my previous elk point R
 	// at steady state it's 0s.
-	_, err = buf.Write(s.PrevElkPointR[:])
-	if err != nil {
-		return nil, err
-	}
-
-	// write 33 byte elk point T
-	_, err = buf.Write(s.ElkPointT[:])
-	if err != nil {
-		return nil, err
-	}
-	// write 33 byte previous elk point T
-	// at steady state it's 0s.
-	_, err = buf.Write(s.PrevElkPointT[:])
+	_, err = buf.Write(s.PrevElkPoint[:])
 	if err != nil {
 		return nil, err
 	}
@@ -86,11 +74,11 @@ func (s *StatCom) ToBytes() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// StatComFromBytes turns 224 bytes into a StatCom
+// StatComFromBytes turns 158 bytes into a StatCom
 func StatComFromBytes(b []byte) (*StatCom, error) {
 	var s StatCom
-	if len(b) < 224 || len(b) > 224 {
-		return nil, fmt.Errorf("StatComFromBytes got %d bytes, expect 150\n",
+	if len(b) < 158 || len(b) > 158 {
+		return nil, fmt.Errorf("StatComFromBytes got %d bytes, expect 158",
 			len(b))
 	}
 	buf := bytes.NewBuffer(b)
@@ -116,13 +104,9 @@ func StatComFromBytes(b []byte) (*StatCom, error) {
 		return nil, err
 	}
 	// read 33 byte elk point R
-	copy(s.ElkPointR[:], buf.Next(33))
+	copy(s.ElkPoint[:], buf.Next(33))
 	// read 33 byte previous elk point R
-	copy(s.PrevElkPointR[:], buf.Next(33))
-	// read 33 byte elk point T
-	copy(s.ElkPointT[:], buf.Next(33))
-	// read 33 byte previous elk point T
-	copy(s.PrevElkPointT[:], buf.Next(33))
+	copy(s.PrevElkPoint[:], buf.Next(33))
 
 	// the rest is their sig
 	copy(s.sig[:], buf.Next(64))

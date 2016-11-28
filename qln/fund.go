@@ -240,7 +240,7 @@ func (nd LnNode) PointRespHandler(from [16]byte, pointRespBytes []byte) error {
 		return fmt.Errorf("PointRespHandler SaveQchanState err %s", err.Error())
 	}
 
-	theirElkPointR, theirElkPointT, err := qc.MakeTheirCurElkPoints()
+	theirElkPoint, err := qc.CurElkPointForThem()
 	if err != nil {
 		return err
 	}
@@ -264,8 +264,7 @@ func (nd LnNode) PointRespHandler(from [16]byte, pointRespBytes []byte) error {
 	msg = append(msg, qc.MyHAKDBase[:]...)
 	msg = append(msg, capBytes...)
 	msg = append(msg, initPayBytes...)
-	msg = append(msg, theirElkPointR[:]...)
-	msg = append(msg, theirElkPointT[:]...)
+	msg = append(msg, theirElkPoint[:]...)
 	msg = append(msg, elk.CloneBytes()...)
 	_, err = nd.RemoteCon.Write(msg)
 
@@ -276,11 +275,11 @@ func (nd LnNode) PointRespHandler(from [16]byte, pointRespBytes []byte) error {
 // QChanDescHandler takes in a description of a channel output.  It then
 // saves it to the local db, and returns a channel acknowledgement
 func (nd *LnNode) QChanDescHandler(from [16]byte, descbytes []byte) {
-	if len(descbytes) < 249 || len(descbytes) > 249 {
-		fmt.Printf("got %d byte channel description, expect 249", len(descbytes))
+	if len(descbytes) < 216 || len(descbytes) > 216 {
+		fmt.Printf("got %d byte channel description, expect 216", len(descbytes))
 		return
 	}
-	var peerArr, myFirstElkPointR, myFirstElkPointT, theirPub, theirRefundPub, theirHAKDbase [33]byte
+	var peerArr, myFirstElkPoint, theirPub, theirRefundPub, theirHAKDbase [33]byte
 	var opArr [36]byte
 	copy(peerArr[:], nd.RemoteCon.RemotePub.SerializeCompressed())
 
@@ -292,9 +291,8 @@ func (nd *LnNode) QChanDescHandler(from [16]byte, descbytes []byte) {
 	copy(theirHAKDbase[:], descbytes[102:135])
 	amt := lnutil.BtI64(descbytes[135:143])
 	initPay := lnutil.BtI64(descbytes[143:151])
-	copy(myFirstElkPointR[:], descbytes[151:184])
-	copy(myFirstElkPointT[:], descbytes[184:217])
-	revElk, err := chainhash.NewHash(descbytes[217:])
+	copy(myFirstElkPoint[:], descbytes[151:184])
+	revElk, err := chainhash.NewHash(descbytes[184:])
 	if err != nil {
 		fmt.Printf("QChanDescHandler SaveFundTx err %s", err.Error())
 		return
@@ -343,8 +341,7 @@ func (nd *LnNode) QChanDescHandler(from [16]byte, descbytes []byte) {
 	qc.State.MyAmt = initPay
 	qc.State.StateIdx = 1
 	// use new ElkPoint for signing
-	qc.State.ElkPointR = myFirstElkPointR
-	qc.State.ElkPointT = myFirstElkPointT
+	qc.State.ElkPoint = myFirstElkPoint
 
 	// create empty elkrem receiver to save
 	qc.ElkRcv = new(elkrem.ElkremReceiver)
@@ -373,7 +370,7 @@ func (nd *LnNode) QChanDescHandler(from [16]byte, descbytes []byte) {
 		return
 	}
 
-	theirElkPointR, theirElkPointT, err := qc.MakeTheirCurElkPoints()
+	theirElkPoint, err := qc.CurElkPointForThem()
 	if err != nil {
 		fmt.Printf("QChanDescHandler MakeTheirCurElkPoint err %s", err.Error())
 		return
@@ -391,11 +388,10 @@ func (nd *LnNode) QChanDescHandler(from [16]byte, descbytes []byte) {
 		return
 	}
 	// ACK the channel address, which causes the funder to sign / broadcast
-	// ACK is outpoint (36), ElkPointR (33), ElkPointT (33), elk (32) and signature (64)
+	// ACK is outpoint (36), ElkPointR (33), elk (32), and signature (64)
 	msg := []byte{MSGID_CHANACK}
 	msg = append(msg, opArr[:]...)
-	msg = append(msg, theirElkPointR[:]...)
-	msg = append(msg, theirElkPointT[:]...)
+	msg = append(msg, theirElkPoint[:]...)
 	msg = append(msg, elk.CloneBytes()...)
 	msg = append(msg, sig[:]...)
 	_, err = nd.RemoteCon.Write(msg)
@@ -406,22 +402,21 @@ func (nd *LnNode) QChanDescHandler(from [16]byte, descbytes []byte) {
 // QChanAckHandler takes in an acknowledgement multisig description.
 // when a multisig outpoint is ackd, that causes the funder to sign and broadcast.
 func (nd *LnNode) QChanAckHandler(from [16]byte, ackbytes []byte) {
-	if len(ackbytes) < 198 || len(ackbytes) > 198 {
-		fmt.Printf("got %d byte multiAck, expect 198", len(ackbytes))
+	if len(ackbytes) < 165 || len(ackbytes) > 165 {
+		fmt.Printf("got %d byte multiAck, expect 165", len(ackbytes))
 		return
 	}
 	var opArr [36]byte
-	var peerArr, myFirstElkPointR, myFirstElkPointT [33]byte
+	var peerArr, myFirstElkPoint [33]byte
 	var sig [64]byte
 
 	copy(peerArr[:], nd.RemoteCon.RemotePub.SerializeCompressed())
 	// deserialize chanACK
 	copy(opArr[:], ackbytes[:36])
-	copy(myFirstElkPointR[:], ackbytes[36:69])
-	copy(myFirstElkPointT[:], ackbytes[69:102])
+	copy(myFirstElkPoint[:], ackbytes[36:69])
 	// don't think this can error as length is specified
-	revElk, _ := chainhash.NewHash(ackbytes[102:134])
-	copy(sig[:], ackbytes[134:])
+	revElk, _ := chainhash.NewHash(ackbytes[69:101])
+	copy(sig[:], ackbytes[101:])
 
 	//	op := lnutil.OutPointFromBytes(opArr)
 
@@ -437,8 +432,7 @@ func (nd *LnNode) QChanAckHandler(from [16]byte, ackbytes []byte) {
 		fmt.Printf("QChanAckHandler IngestElkrem err %s", err.Error())
 		return
 	}
-	qc.State.ElkPointR = myFirstElkPointR
-	qc.State.ElkPointT = myFirstElkPointT
+	qc.State.ElkPoint = myFirstElkPoint
 
 	err = qc.VerifySig(sig)
 	if err != nil {

@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/fastsha256"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
@@ -103,104 +101,81 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 	}
 	// hardcode here now... need to save to qchan struct I guess
 	q.TimeOut = 5
-
-	// get state index; assume incoming tx uses my hint (broacast by them)
-	txIdx := GetStateIdxFromTx(tx, q.GetChanHint(false))
-	if txIdx > q.State.StateIdx { // future state, uhoh.  Crash for now.
-		return nil, fmt.Errorf("indicated state %d but we know up to %d",
-			txIdx, q.State.StateIdx)
+	var shIdx, pkhIdx uint32
+	var pkhIsMine bool
+	cTxos := make([]portxo.PorTxo, 1)
+	myPKHPkSript := lnutil.DirectWPKHScript(q.MyRefundPub)
+	shIdx = 999 // set high here to detect if there's no SH output
+	// Classify outputs.  Assumes only 1 SH output.  Later recognize HTLC outputs
+	for i, out := range tx.TxOut {
+		if len(out.PkScript) == 34 {
+			shIdx = uint32(i)
+		}
+		if bytes.Equal(myPKHPkSript, out.PkScript) {
+			pkhIdx = uint32(i)
+			pkhIsMine = true
+		}
 	}
 
-	if txIdx == 0 || len(tx.TxOut) != 2 {
-		// must have been cooperative, or something else we don't recognize
-		// if simple close, still have a PKH output, find it.
-		// so far, assume 1 txo
+	// if pkh is mine, grab it.
+	if pkhIsMine {
+		fmt.Printf("got PKH output from channel close")
+		var pkhTxo portxo.PorTxo // create new utxo and copy into it
 
-		// no txindx hint, so it's probably cooperative, so most recent
-		elk, err := q.ElkSnd.AtIndex(q.State.StateIdx)
+		pkhTxo.Op.Hash = txid
+		pkhTxo.Op.Index = pkhIdx
+		pkhTxo.Height = q.CloseData.CloseHeight
+		// keypath same, use different
+		pkhTxo.KeyGen = q.KeyGen
+		// same keygen as underlying channel, but use is refund
+		pkhTxo.KeyGen.Step[2] = UseChannelRefund
+
+		pkhTxo.Mode = portxo.TxoP2WPKHComp
+		pkhTxo.Value = tx.TxOut[pkhIdx].Value
+		// PKH, could omit this
+		pkhTxo.PkScript = tx.TxOut[pkhIdx].PkScript
+		cTxos[0] = pkhTxo
+	}
+
+	// get state hint based on pkh match.  If pkh is mine, that's their TX & hint.
+	// if there's no PKH output for me, the TX is mine, so use my hint.
+	var comNum uint64
+	if pkhIsMine {
+		comNum = GetStateIdxFromTx(tx, q.GetChanHint(false))
+	} else {
+		comNum = GetStateIdxFromTx(tx, q.GetChanHint(true))
+	}
+	if comNum > q.State.StateIdx { // future state, uhoh.  Crash for now.
+		return nil, fmt.Errorf("indicated state %d but we know up to %d",
+			comNum, q.State.StateIdx)
+	}
+
+	// if we didn't get the pkh, and the comNum is current, we get the SH output.
+	// also we probably closed ourselves.  Regular timeout
+	if !pkhIsMine && shIdx < 999 && comNum != 0 && comNum == q.State.StateIdx {
+		theirElkPoint, err := q.ElkPoint(false, comNum)
 		if err != nil {
 			return nil, err
 		}
-		// hash elkrem into elkrem scalar
-		elkScalar := chainhash.DoubleHashH(append(elk[:], []byte("POINT")...))
 
-		myPKH := btcutil.Hash160(q.MyRefundPub[:])
-
-		for i, out := range tx.TxOut {
-			if len(out.PkScript) < 22 {
-				continue // skip to prevent crash
-			}
-			if bytes.Equal(out.PkScript[2:22], myPKH) { // detected my refund
-				var pkhTxo portxo.PorTxo
-
-				pkhTxo.Op.Hash = txid
-				pkhTxo.Op.Index = uint32(i)
-				pkhTxo.Height = q.CloseData.CloseHeight
-
-				pkhTxo.KeyGen = q.KeyGen
-
-				pkhTxo.PrivKey = elkScalar
-
-				// keypath is the same other than use
-				pkhTxo.KeyGen.Step[2] = UseChannelRefund
-
-				pkhTxo.Value = tx.TxOut[i].Value
-				pkhTxo.Mode = portxo.TxoP2WPKHComp // witness, normal PKH
-				pkhTxo.PkScript = tx.TxOut[i].PkScript
-
-				return []portxo.PorTxo{pkhTxo}, nil
-			}
-		}
-		// couldn't find anything... shouldn't happen
-		return nil, fmt.Errorf("channel closed but we got nothing!")
-	}
-
-	// non-cooperative / break.
-
-	var shIdx, pkhIdx uint32
-	cTxos := make([]portxo.PorTxo, 1)
-	// sort outputs into PKH and SH
-	if len(tx.TxOut[0].PkScript) == 34 {
-		shIdx = 0
-		pkhIdx = 1
-	} else {
-		pkhIdx = 0
-		shIdx = 1
-	}
-	// make sure SH output is actually SH
-	if len(tx.TxOut[shIdx].PkScript) != 34 {
-		return nil, fmt.Errorf("non-p2sh output is length %d, expect 34",
-			len(tx.TxOut[shIdx].PkScript))
-	}
-	// make sure PKH output is actually PKH
-	if len(tx.TxOut[pkhIdx].PkScript) != 22 {
-		return nil, fmt.Errorf("non-p2wsh output is length %d, expect 22",
-			len(tx.TxOut[pkhIdx].PkScript))
-	}
-
-	// use the indicated state to generate refund pkh (it may be old)
-
-	// refund PKHs come from the refund base plus their elkrem point.
-	theirElkPoint, err := q.ElkPoint(false, txIdx)
-	if err != nil {
-		return nil, err
-	}
-
-	myPKH := btcutil.Hash160(q.MyRefundPub[:])
-
-	// indirectly check if SH is mine
-	if !bytes.Equal(tx.TxOut[pkhIdx].PkScript[2:22], myPKH) {
-		// ------------pkh not mine; assume SH is mine
-		// build script to store in porTxo
+		// build script to store in porTxo, make pubkeys
 		timeoutPub := lnutil.CombinePubs(q.MyHAKDBase, theirElkPoint)
 		revokePub := lnutil.CombinePubs(q.TheirHAKDBase, theirElkPoint)
 
 		script := lnutil.CommitScript(revokePub, timeoutPub, q.TimeOut)
+		// script check.  redundant / just in case
+		genSH := fastsha256.Sum256(script)
+		if !bytes.Equal(genSH[:], tx.TxOut[shIdx].PkScript[2:34]) {
+			fmt.Printf("got different observed and generated SH scripts.\n")
+			fmt.Printf("in %s:%d, see %x\n", txid, shIdx, tx.TxOut[shIdx].PkScript)
+			fmt.Printf("generated %x \n", genSH)
+			fmt.Printf("revokable pub %x\ntimeout pub %x\n", revokePub, timeoutPub)
+		}
 
 		// create the ScriptHash, timeout portxo.
 		var shTxo portxo.PorTxo // create new utxo and copy into it
 		// use txidx's elkrem as it may not be most recent
-		elk, err := q.ElkSnd.AtIndex(txIdx)
+		elk, err := q.ElkSnd.AtIndex(comNum)
 		if err != nil {
 			return nil, err
 		}
@@ -210,74 +185,26 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 		shTxo.Op.Hash = txid
 		shTxo.Op.Index = shIdx
 		shTxo.Height = q.CloseData.CloseHeight
+
 		shTxo.KeyGen.Step[2] = UseChannelHAKDBase
-		// hash elkrem into elkrem T scalar (0x74 == 't')
-		shTxo.PrivKey = chainhash.DoubleHashH(append(elk.CloneBytes(), 0x74))
+		shTxo.PrivKey = ElkScalar(elk)
 
 		shTxo.Mode = portxo.TxoP2WSHComp
-
 		shTxo.Value = tx.TxOut[shIdx].Value
 		shTxo.Seq = uint32(q.TimeOut)
 		shTxo.PreSigStack = make([][]byte, 1) // revoke SH has one presig item
 		shTxo.PreSigStack[0] = nil            // and that item is a nil (timeout)
 
-		// script check
-		genSH := fastsha256.Sum256(script)
-		if !bytes.Equal(genSH[:], tx.TxOut[shIdx].PkScript[2:34]) {
-			fmt.Printf("got different observed and generated SH scripts.\n")
-			fmt.Printf("in %s:%d, see %x\n", txid, shIdx, tx.TxOut[shIdx].PkScript)
-			fmt.Printf("generated %x \n", genSH)
-			fmt.Printf("revokable pub %x\ntimeout pub %x\n", revokePub, timeoutPub)
-		}
 		shTxo.PkScript = script
-
 		cTxos[0] = shTxo
-		// if SH is mine we're done
-		return cTxos, nil
 	}
 
-	// ---------- pkh is mine
-	var pkhTxo portxo.PorTxo // create new utxo and copy into it
-
-	// use txidx's elkrem as it may not be most recent
-	elk, err := q.ElkSnd.AtIndex(txIdx)
-	if err != nil {
-		return nil, err
-	}
-	elkScalar := chainhash.DoubleHashH(append(elk[:], []byte("POINT")...))
-
-	pkhScript := lnutil.DirectWPKHScript(q.MyRefundPub)
-
-	// check if re-created script matches observed script (hash)
-	if !bytes.Equal(tx.TxOut[pkhIdx].PkScript, pkhScript) {
-		// probably should error out here
-		fmt.Printf("got different observed and generated pkh scripts.\n")
-		fmt.Printf("in %s : %d see %x\n", txid, pkhIdx, tx.TxOut[pkhIdx].PkScript)
-		fmt.Printf("generated %x from sender (/ their) elkR %d\n", pkhScript, txIdx)
-		fmt.Printf("base refund pub %x\n", q.MyRefundPub)
-	}
-
-	pkhTxo.Op.Hash = txid
-	pkhTxo.Op.Index = pkhIdx
-	pkhTxo.Height = q.CloseData.CloseHeight
-	// keypath same, use different
-	pkhTxo.KeyGen = q.KeyGen
-	// same keygen as underlying channel, but use is refund
-	pkhTxo.KeyGen.Step[2] = UseChannelRefund
-	// hash elkrem into elkrem R scalar (0x72 == 'r')
-	pkhTxo.PrivKey = elkScalar
-	pkhTxo.Mode = portxo.TxoP2WPKHComp
-	pkhTxo.Value = tx.TxOut[pkhIdx].Value
-	// PKH, so script is easy
-	pkhTxo.PkScript = tx.TxOut[pkhIdx].PkScript
-	cTxos[0] = pkhTxo
-
-	// OK, it's my PKH, but can I ALSO grab the SH??? (revoked)
-	if txIdx < q.State.StateIdx {
+	// if we got the pkh, and the comNum is too old, we can get the SH.  Justice.
+	if pkhIsMine && comNum != 0 && comNum < q.State.StateIdx {
 		// ---------- revoked SH is mine
 		// invalid previous state, can be grabbed!
 		// make MY elk points
-		myElkPoint, err := q.ElkPoint(true, txIdx)
+		myElkPoint, err := q.ElkPoint(true, comNum)
 		if err != nil {
 			return nil, err
 		}
@@ -296,7 +223,7 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 		}
 
 		// myElkHashR added to HAKD private key
-		elk, err := q.ElkRcv.AtIndex(txIdx)
+		elk, err := q.ElkRcv.AtIndex(comNum)
 		if err != nil {
 			return nil, err
 		}
@@ -308,11 +235,9 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 		shTxo.Height = q.CloseData.CloseHeight
 
 		shTxo.KeyGen.Step[2] = UseChannelHAKDBase
-
-		shTxo.PrivKey = chainhash.DoubleHashH(append(elk.CloneBytes(), 0x72)) // 'r'
+		shTxo.PrivKey = ElkScalar(elk)
 
 		shTxo.PkScript = script
-
 		shTxo.Value = tx.TxOut[shIdx].Value
 		shTxo.Mode = portxo.TxoP2WSHComp
 		shTxo.Seq = 1                         // 1 means grab immediately

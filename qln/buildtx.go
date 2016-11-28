@@ -21,10 +21,11 @@ func GetStateIdxFromTx(tx *wire.MsgTx, x uint64) uint64 {
 	if len(tx.TxIn) != 1 {
 		return 0
 	}
-	if x >= 1<<48 {
+	// mask need two high bytes of 0s
+	if x > 1<<48 {
 		return 0
 	}
-	// check that indicating high bytes are correct
+	// check that indicating high bytes are correct.  If not, return 0
 	if tx.TxIn[0].Sequence>>24 != 0xff || tx.LockTime>>24 != 0x21 {
 		//		fmt.Printf("sequence byte %x, locktime byte %x\n",
 		//			tx.TxIn[0].Sequence>>24, tx.LockTime>>24 != 0x21)
@@ -143,13 +144,13 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
 		pkhAmt = (q.Value - s.MyAmt) - fee
 		fancyAmt = s.MyAmt - fee
 
-		fmt.Printf("\t refund base %x, elkpointR %x\n", q.TheirRefundPub, s.ElkPointR)
+		fmt.Printf("\t refund base %x, elkpointR %x\n", q.TheirRefundPub, s.ElkPoint)
 	} else { // build THEIR tx (to sign)
 		// Their tx that they store.  I get funds PKH.  SH is theirs eventually.
 
 		// SH pubkeys are our base points plus the received elk point
-		revPub = lnutil.CombinePubs(q.MyHAKDBase, s.ElkPointR)
-		timePub = lnutil.CombinePubs(q.TheirHAKDBase, s.ElkPointR)
+		revPub = lnutil.CombinePubs(q.MyHAKDBase, s.ElkPoint)
+		timePub = lnutil.CombinePubs(q.TheirHAKDBase, s.ElkPoint)
 
 		fancyAmt = (q.Value - s.MyAmt) - fee
 
