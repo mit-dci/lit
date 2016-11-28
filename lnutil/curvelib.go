@@ -111,13 +111,13 @@ func PubsFromArrs(arrSlice ...[33]byte) (CombinablePubKeySlice, error) {
 
 // ComboCommit generates the "combination commitment" which contributes to the
 // hash-coefficient for every key being combined.
-func ComboCommit(pubKeys CombinablePubKeySlice) chainhash.Hash {
+func (p CombinablePubKeySlice) ComboCommit() chainhash.Hash {
 	// sort the pubkeys, smallest first
-	sort.Sort(pubKeys)
+	sort.Sort(p)
 	// feed em into the hash
-	combo := make([]byte, len(pubKeys)*33)
-	for i, k := range pubKeys {
-		copy(combo[i*33:(i+1*33)], k.SerializeCompressed())
+	combo := make([]byte, len(p)*33)
+	for i, k := range p {
+		copy(combo[i*33:(i+1)*33], k.SerializeCompressed())
 	}
 	return chainhash.HashH(combo)
 }
@@ -133,12 +133,14 @@ func (p CombinablePubKeySlice) Combine() *btcec.PublicKey {
 	}
 
 	// make the combo commit.  call it z.
-	z := ComboCommit(p)
+	z := p.ComboCommit()
 
 	// for each pubkey, multiply it by sha256d(z, A)
 	// where A is the 33 byte serialized pubkey
 
+	fmt.Printf("combining pubkeys")
 	for _, k := range p {
+		fmt.Printf(" %x", k.SerializeCompressed())
 		h := chainhash.HashH(append(z[:], k.SerializeCompressed()...))
 		MultiplyPointByHash(k, h)
 	}
@@ -155,6 +157,9 @@ func (p CombinablePubKeySlice) Combine() *btcec.PublicKey {
 			q.X, q.Y = btcec.S256().Add(q.X, q.Y, k.X, k.Y)
 		}
 	}
+
+	fmt.Printf("\n z = %x\nq= %x\n", z[:], q.SerializeCompressed())
+
 	return q
 }
 
@@ -162,7 +167,7 @@ func (p CombinablePubKeySlice) Combine() *btcec.PublicKey {
 // as done for public keys.  This only works if you know *all* of the private keys.
 // If you don't, we'll do something with returning a scalar coefficient...
 // I don't know how that's going to work.  Schnorr stuff isn't decided yet.
-func CombinePrivateKeys(keys []*btcec.PrivateKey) *btcec.PrivateKey {
+func CombinePrivateKeys(keys ...*btcec.PrivateKey) *btcec.PrivateKey {
 
 	if keys == nil || len(keys) == 0 {
 		return nil
@@ -175,11 +180,12 @@ func CombinePrivateKeys(keys []*btcec.PrivateKey) *btcec.PrivateKey {
 	for _, k := range keys {
 		pubs = append(pubs, k.PubKey())
 	}
-	z := ComboCommit(pubs)
-
+	z := pubs.ComboCommit()
+	fmt.Printf("Combining privkeys")
 	sum := new(big.Int)
 
 	for _, k := range keys {
+		fmt.Printf(" %x", k.PubKey().SerializeCompressed())
 		h := chainhash.HashH(append(z[:], k.PubKey().SerializeCompressed()...))
 		// turn coefficient hash h into a bigint
 		hashInt := new(big.Int).SetBytes(h[:])
@@ -187,13 +193,15 @@ func CombinePrivateKeys(keys []*btcec.PrivateKey) *btcec.PrivateKey {
 		hashInt.Mul(hashInt, k.D)
 		// reduce mod curve N
 		hashInt.Mod(hashInt, btcec.S256().N)
-		// add this scalar to the aggregate and reduce mod N again
-		sum.Add(sum, k.D)
+		// add this scalar to the aggregate and reduce the sum mod N again
+		sum.Add(sum, hashInt)
 		sum.Mod(sum, btcec.S256().N)
 	}
 
 	// kindof ugly that it's converting the bigint to bytes and back but whatever
 	priv, _ := btcec.PrivKeyFromBytes(btcec.S256(), sum.Bytes())
+
+	fmt.Printf("\n z = %x\nq= %x\n", z[:], priv.PubKey().SerializeCompressed())
 
 	return priv
 }
@@ -224,4 +232,10 @@ func PubFromHash(h chainhash.Hash) (p [33]byte) {
 	_, pub := btcec.PrivKeyFromBytes(btcec.S256(), h[:])
 	copy(p[:], pub.SerializeCompressed())
 	return
+}
+
+// PrivKeyCombineBytes combiness a private key with a byte slice
+func PrivKeyCombineBytes(k *btcec.PrivateKey, b []byte) *btcec.PrivateKey {
+	bytePriv, _ := btcec.PrivKeyFromBytes(btcec.S256(), b)
+	return CombinePrivateKeys(k, bytePriv)
 }

@@ -562,6 +562,7 @@ func (ts *TxStore) BuildAndSign(
 	for i, _ := range tx.TxIn {
 		// get key
 		priv := ts.PathPrivkey(utxos[i].KeyGen)
+		fmt.Printf("signing with privkey pub %x\n", priv.PubKey().SerializeCompressed())
 
 		if priv == nil {
 			return nil, fmt.Errorf("SendCoins: nil privkey")
