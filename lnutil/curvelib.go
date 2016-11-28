@@ -138,9 +138,7 @@ func (p CombinablePubKeySlice) Combine() *btcec.PublicKey {
 	// for each pubkey, multiply it by sha256d(z, A)
 	// where A is the 33 byte serialized pubkey
 
-	fmt.Printf("combining pubkeys")
 	for _, k := range p {
-		fmt.Printf(" %x", k.SerializeCompressed())
 		h := chainhash.HashH(append(z[:], k.SerializeCompressed()...))
 		MultiplyPointByHash(k, h)
 	}
@@ -157,8 +155,6 @@ func (p CombinablePubKeySlice) Combine() *btcec.PublicKey {
 			q.X, q.Y = btcec.S256().Add(q.X, q.Y, k.X, k.Y)
 		}
 	}
-
-	fmt.Printf("\n z = %x\nq= %x\n", z[:], q.SerializeCompressed())
 
 	return q
 }
@@ -181,11 +177,9 @@ func CombinePrivateKeys(keys ...*btcec.PrivateKey) *btcec.PrivateKey {
 		pubs = append(pubs, k.PubKey())
 	}
 	z := pubs.ComboCommit()
-	fmt.Printf("Combining privkeys")
 	sum := new(big.Int)
 
 	for _, k := range keys {
-		fmt.Printf(" %x", k.PubKey().SerializeCompressed())
 		h := chainhash.HashH(append(z[:], k.PubKey().SerializeCompressed()...))
 		// turn coefficient hash h into a bigint
 		hashInt := new(big.Int).SetBytes(h[:])
@@ -200,8 +194,6 @@ func CombinePrivateKeys(keys ...*btcec.PrivateKey) *btcec.PrivateKey {
 
 	// kindof ugly that it's converting the bigint to bytes and back but whatever
 	priv, _ := btcec.PrivKeyFromBytes(btcec.S256(), sum.Bytes())
-
-	fmt.Printf("\n z = %x\nq= %x\n", z[:], priv.PubKey().SerializeCompressed())
 
 	return priv
 }

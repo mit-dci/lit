@@ -59,9 +59,6 @@ type StatCom struct {
 	ElkPoint     [33]byte // saved to disk, revealable point
 	PrevElkPoint [33]byte // When you haven't gotten their revocation elkrem yet.
 
-	ElkPointTx     [33]byte // their timeout elk point; needed for script
-	PrevElkPointTx [33]byte // When you haven't gotten their revocation elkrem yet.
-
 	sig [64]byte // Counterparty's signature (for StatCom tx)
 	// don't write to sig directly; only overwrite via fn() call
 
