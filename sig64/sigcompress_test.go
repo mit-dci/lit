@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
 var (
@@ -19,7 +19,7 @@ var (
 func TestRandom(t *testing.T) {
 	for i := 0; i < 1000; i++ {
 		priv, _ := btcec.NewPrivateKey(btcec.S256())
-		sig, err := priv.Sign(wire.DoubleSha256([]byte{byte(i)}))
+		sig, err := priv.Sign(chainhash.DoubleHashB([]byte{byte(i)}))
 		if err != nil {
 			t.Fatal(err)
 		}
