@@ -285,7 +285,7 @@ func (s *SPVCon) InvHandler(m *wire.MsgInv) {
 				}
 			default:
 				// drop it as if its component particles had high thermal energies
-				fmt.Printf("inv block but ignoring; not synched\n")
+				fmt.Printf("inv block but ignoring; not synced\n")
 			}
 		}
 	}
