@@ -1,1 +1,6 @@
 lit
+headers.bin
+ln.db
+testkey.hex
+utxo.db
+watch.db
