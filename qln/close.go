@@ -146,8 +146,9 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 		comNum = GetStateIdxFromTx(tx, q.GetChanHint(true))
 	}
 	if comNum > q.State.StateIdx { // future state, uhoh.  Crash for now.
-		return nil, fmt.Errorf("indicated state %d but we know up to %d",
+		fmt.Printf("indicated state %d but we know up to %d",
 			comNum, q.State.StateIdx)
+		return cTxos, nil
 	}
 
 	// if we didn't get the pkh, and the comNum is current, we get the SH output.

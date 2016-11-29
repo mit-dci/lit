@@ -459,7 +459,6 @@ func (ts *TxStore) SendDrop(
 	return tx, tx2, nil
 }
 */
-
 // SendOne is for the sweep function, and doesn't do change.
 // Probably can get rid of this for real txs.
 func (ts *TxStore) SendOne(u portxo.PorTxo, adr btcutil.Address) (*wire.MsgTx, error) {
