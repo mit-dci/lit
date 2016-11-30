@@ -283,10 +283,10 @@ func (ts *TxStore) NewAdr160() ([]byte, error) {
 
 // NewAdr creates a new, never before seen address, and increments the
 // DB counter, and returns the hash160 of the pubkey.
-func (ts *TxStore) RecoverAdrs() ([]byte, error) {
+func (ts *TxStore) RecoverAdrs() error {
 	var err error
 	if ts.Param == nil {
-		return nil, fmt.Errorf("NewAdr error: nil param")
+		return fmt.Errorf("NewAdr error: nil param")
 	}
 
 	// ########### make loop here with lots of keygens
@@ -296,7 +296,7 @@ func (ts *TxStore) RecoverAdrs() ([]byte, error) {
 	nKg.Step[4] = 2
 	nAdr160 := ts.PathPubHash160(nKg)
 	if nAdr160 == nil {
-		return nil, fmt.Errorf("NewAdr error: got nil h160")
+		return fmt.Errorf("NewAdr error: got nil h160")
 	}
 	fmt.Printf("adr %d hash is %x\n", 5, nAdr160)
 
@@ -320,10 +320,10 @@ func (ts *TxStore) RecoverAdrs() ([]byte, error) {
 
 	})
 	if err != nil {
-		return nil, err
+		return nil
 	}
 
-	return nAdr160, nil
+	return nil
 }
 
 // SetDBSyncHeight sets sync height of the db, indicated the latest block
