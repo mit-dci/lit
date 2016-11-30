@@ -281,6 +281,51 @@ func (ts *TxStore) NewAdr160() ([]byte, error) {
 	return nAdr160, nil
 }
 
+// NewAdr creates a new, never before seen address, and increments the
+// DB counter, and returns the hash160 of the pubkey.
+func (ts *TxStore) RecoverAdrs() ([]byte, error) {
+	var err error
+	if ts.Param == nil {
+		return nil, fmt.Errorf("NewAdr error: nil param")
+	}
+
+	// ########### make loop here with lots of keygens
+	nKg := GetWalletKeygen(0)
+	nKg.Step[2] = 30
+	nKg.Step[3] = 1
+	nKg.Step[4] = 2
+	nAdr160 := ts.PathPubHash160(nKg)
+	if nAdr160 == nil {
+		return nil, fmt.Errorf("NewAdr error: got nil h160")
+	}
+	fmt.Printf("adr %d hash is %x\n", 5, nAdr160)
+
+	kgBytes := nKg.Bytes()
+
+	// write to db file
+	err = ts.StateDB.Update(func(btx *bolt.Tx) error {
+		adrb := btx.Bucket(BKTadr)
+		if adrb == nil {
+			return fmt.Errorf("no adr bucket")
+		}
+		sta := btx.Bucket(BKTState)
+		if sta == nil {
+			return fmt.Errorf("no state bucket")
+		}
+
+		// ########## can't return here; make loop with lots of puts
+
+		// add the 20-byte key-hash into the db
+		return adrb.Put(nAdr160, kgBytes)
+
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return nAdr160, nil
+}
+
 // SetDBSyncHeight sets sync height of the db, indicated the latest block
 // of which it has ingested all the transactions.
 func (ts *TxStore) SetDBSyncHeight(n int32) error {

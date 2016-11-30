@@ -492,6 +492,12 @@ func Adr(args []string) error {
 
 	// if there's an arg, make 10 adrs
 	if len(args) > 0 {
+		if args[0] == "recover" {
+			err := SCon.TS.RecoverAdrs()
+			if err != nil {
+				return err
+			}
+		}
 		for i := 0; i < 10; i++ {
 			_, err := SCon.TS.NewAdr160()
 			if err != nil {
@@ -499,6 +505,7 @@ func Adr(args []string) error {
 			}
 		}
 	}
+
 	if len(args) > 1 {
 		for i := 0; i < 1000; i++ {
 			_, err := SCon.TS.NewAdr160()
