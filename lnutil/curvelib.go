@@ -270,6 +270,13 @@ func CombinePrivKeyWithBytes(k *btcec.PrivateKey, b []byte) *btcec.PrivateKey {
 // original base key.  It's weird, but it allows the porTxo standard to always add
 // private keys and not need to be aware of different derivation methods.
 func CombinePrivKeyAndSubtract(k *btcec.PrivateKey, b []byte) [32]byte {
-	var empty [32]byte
-	return empty
+	// create empty array to copy into
+	var diffKey [32]byte
+	// delinearization step combining base private key with elk scalar
+	combinedKey := CombinePrivKeyWithBytes(k, b)
+	// subtract the original k base key from the combined key
+	combinedKey.D.Sub(combinedKey.D, k.D)
+	// copy this "difference key" and return it.
+	copy(diffKey[:], combinedKey.D.Bytes())
+	return diffKey
 }

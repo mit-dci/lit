@@ -182,8 +182,16 @@ func (nd *LnNode) OPEventHandler() {
 			}
 			// if you have seq=1 txos, modify the privkey...
 			// pretty ugly as we need the private key to do that.
-			// maybe make a separate function because it'll me long...
 			for _, portxo := range txos {
+				if portxo.Seq == 1 { // revoked key
+					// GetCloseTxos returns a porTxo with the elk scalar in the
+					// privkey field.  It isn't just added though; it needs to
+					// be combined with the private key in a way porTxo isn't
+					// aware of, so derive and subtract that here.
+					privBase := nd.BaseWallet.GetPriv(portxo.KeyGen)
+					portxo.PrivKey = lnutil.CombinePrivKeyAndSubtract(
+						privBase, portxo.KeyGen.PrivKey[:])
+				}
 				err = nd.BaseWallet.ExportUtxo(&portxo)
 				if err != nil {
 					fmt.Printf("ExportUtxo error: %s", err.Error())
