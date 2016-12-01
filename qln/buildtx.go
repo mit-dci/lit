@@ -138,7 +138,7 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
 		// SH pubkeys are base points combined with the elk point we give them
 
 		revPub = lnutil.CombinePubs(q.TheirHAKDBase, curElk)
-		timePub = lnutil.CombinePubs(q.MyHAKDBase, curElk)
+		timePub = lnutil.AddPubsEZ(q.MyHAKDBase, curElk)
 
 		pkhPub = q.TheirRefundPub
 		pkhAmt = (q.Value - s.MyAmt) - fee
@@ -150,7 +150,7 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
 
 		// SH pubkeys are our base points plus the received elk point
 		revPub = lnutil.CombinePubs(q.MyHAKDBase, s.ElkPoint)
-		timePub = lnutil.CombinePubs(q.TheirHAKDBase, s.ElkPoint)
+		timePub = lnutil.AddPubsEZ(q.TheirHAKDBase, s.ElkPoint)
 
 		fancyAmt = (q.Value - s.MyAmt) - fee
 
