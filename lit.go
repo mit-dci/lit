@@ -48,7 +48,7 @@ func main() {
 	// setup spvCon
 
 	SCon, err = uspv.OpenSPV(
-		SPVHostAdr, headerFileName, utxodbFileName, &Store, false, false, Params)
+		SPVHostAdr, headerFileName, utxodbFileName, &Store, true, true, Params)
 	if err != nil {
 		log.Printf("can't connect: %s", err.Error())
 		log.Fatal(err) // back to fatal when can't connect
@@ -60,7 +60,7 @@ func main() {
 	}
 	if tip == 0 { // DB has never been used, set to birthday
 		//		tip = 10 // for regtest
-		tip = 1034500 // for testnet3. hardcoded; later base on keyfile date?
+		tip = 1037000 // for testnet3. hardcoded; later base on keyfile date?
 		err = SCon.TS.SetDBSyncHeight(tip)
 		if err != nil {
 			log.Fatal(err)
