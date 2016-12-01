@@ -101,9 +101,8 @@ func (nd *LnNode) QchanInfo(q *Qchan) error {
 			q.State.Delta, q.State.ElkPoint[:4], q.State.PrevElkPoint[:4],
 			q.ElkRcv.UpTo())
 		elkp, _ := q.ElkPoint(false, q.State.StateIdx)
-		myRefPub := lnutil.CombinePubs(q.MyRefundPub, elkp)
-
-		theirRefPub := lnutil.CombinePubs(q.TheirRefundPub, q.State.ElkPoint)
+		myRefPub := lnutil.AddPubsEZ(q.MyRefundPub, elkp)
+		theirRefPub := lnutil.AddPubsEZ(q.TheirRefundPub, q.State.ElkPoint)
 		fmt.Printf("\tMy Refund: %x Their Refund %x\n", myRefPub[:4], theirRefPub[:4])
 	}
 
