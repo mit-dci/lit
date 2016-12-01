@@ -2,10 +2,10 @@ package portxo
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcutil/hdkeychain"
-	"github.com/mit-dci/lit/lnutil"
 )
 
 // DerivePrivateKey returns the private key for a utxo based on a master key
@@ -44,9 +44,28 @@ func (kg *KeyGen) DerivePrivateKey(
 	// if porTxo's private key has something in it, combine that with derived key
 	// using the delinearization scheme
 	if kg.PrivKey != empty {
-		derivedPrivKey = lnutil.PrivKeyCombineBytes(derivedPrivKey, kg.PrivKey[:])
+		PrivKeyAddBytes(derivedPrivKey, kg.PrivKey[:])
 	}
 
 	// done, return derived sum
 	return derivedPrivKey, nil
+}
+
+// PrivKeyAddBytes adds bytes to a private key.
+// NOTE that this modifies the key in place, overwriting it!!!!1
+// If k is nil, does nothing and doesn't error (k stays nil)
+func PrivKeyAddBytes(k *btcec.PrivateKey, b []byte) {
+	if k == nil {
+		return
+	}
+	// turn arg bytes into a bigint
+	arg := new(big.Int).SetBytes(b)
+	// add private key to arg
+	k.D.Add(k.D, arg)
+	// mod 2^256ish
+	k.D.Mod(k.D, btcec.S256().N)
+	// new key derived from this sum
+	// D is already modified, need to update the pubkey x and y
+	k.X, k.Y = btcec.S256().ScalarBaseMult(k.D.Bytes())
+	return
 }

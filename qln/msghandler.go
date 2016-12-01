@@ -180,6 +180,9 @@ func (nd *LnNode) OPEventHandler() {
 				fmt.Printf("GetCloseTxos error: %s", err.Error())
 				continue
 			}
+			// if you have seq=1 txos, modify the privkey...
+			// pretty ugly as we need the private key to do that.
+			// maybe make a separate function because it'll me long...
 			for _, portxo := range txos {
 				err = nd.BaseWallet.ExportUtxo(&portxo)
 				if err != nil {

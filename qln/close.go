@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/adiabat/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/fastsha256"
 	"github.com/mit-dci/lit/lnutil"
@@ -160,7 +161,7 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 		}
 
 		// build script to store in porTxo, make pubkeys
-		timeoutPub := lnutil.CombinePubs(q.MyHAKDBase, theirElkPoint)
+		timeoutPub := lnutil.AddPubsEZ(q.MyHAKDBase, theirElkPoint)
 		revokePub := lnutil.CombinePubs(q.TheirHAKDBase, theirElkPoint)
 
 		script := lnutil.CommitScript(revokePub, timeoutPub, q.TimeOut)
@@ -188,7 +189,11 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 		shTxo.Height = q.CloseData.CloseHeight
 
 		shTxo.KeyGen.Step[2] = UseChannelHAKDBase
-		shTxo.PrivKey = ElkScalar(elk)
+
+		elkpoint := ElkPointFromHash(elk)
+		addhash := chainhash.DoubleHashH(append(elkpoint[:], q.MyHAKDBase[:]...))
+
+		shTxo.PrivKey = addhash
 
 		shTxo.Mode = portxo.TxoP2WSHComp
 		shTxo.Value = tx.TxOut[shIdx].Value
@@ -210,7 +215,7 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 			return nil, err
 		}
 
-		timeoutPub := lnutil.CombinePubs(q.TheirHAKDBase, myElkPoint)
+		timeoutPub := lnutil.AddPubsEZ(q.TheirHAKDBase, myElkPoint)
 		revokePub := lnutil.CombinePubs(q.MyHAKDBase, myElkPoint)
 		script := lnutil.CommitScript(revokePub, timeoutPub, q.TimeOut)
 
@@ -236,7 +241,11 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 		shTxo.Height = q.CloseData.CloseHeight
 
 		shTxo.KeyGen.Step[2] = UseChannelHAKDBase
+
 		shTxo.PrivKey = ElkScalar(elk)
+
+		// just return the elkScalar and let
+		// something modify it before export due to the seq=1 flag.
 
 		shTxo.PkScript = script
 		shTxo.Value = tx.TxOut[shIdx].Value

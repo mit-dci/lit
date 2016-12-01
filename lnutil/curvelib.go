@@ -201,6 +201,39 @@ func CombinePrivateKeys(keys ...*btcec.PrivateKey) *btcec.PrivateKey {
 // ###########################
 // HAKD/Elkrem point functions
 
+// AddPubsEZ is the easy derivation; A + sha(B, A)*G
+// in LN this is used for everything but the revocable pubkey
+// order matters.  the first key is the base, the second is the elkpoint.
+func AddPubsEZ(a, b [33]byte) [33]byte {
+	apoint, err := btcec.ParsePubKey(a[:], btcec.S256())
+	if err != nil {
+		return a
+	}
+
+	// get hash of both points
+	sha := chainhash.DoubleHashH(append(b[:], a[:]...))
+
+	// turn sha into a point on the curve
+	shax, shay := btcec.S256().ScalarBaseMult(sha[:])
+	// add arg point to pubkey point
+	apoint.X, apoint.Y = btcec.S256().Add(shax, shay, apoint.X, apoint.Y)
+	copy(a[:], apoint.SerializeCompressed())
+	return a
+}
+
+// AddPrivEZ adds the non-secret scalar to a private key
+func AddPrivEZ(k *btcec.PrivateKey, b []byte) {
+	// get hash of both pubkeys
+	sha := chainhash.DoubleHashH(append(k.PubKey().SerializeCompressed(), b...))
+	// convert to bigint
+	shaScalar := new(big.Int).SetBytes(sha[:])
+	// add private key to hash bigint
+	k.D.Add(k.D, shaScalar)
+	// mod 2^256ish
+	k.D.Mod(k.D, btcec.S256().N)
+	return
+}
+
 // CombinePubs takes two 33 byte serialized points, and combines them with
 // the deliniearized combination process.  Returns empty array if there's an error.
 func CombinePubs(a, b [33]byte) [33]byte {
@@ -226,8 +259,17 @@ func PubFromHash(h chainhash.Hash) (p [33]byte) {
 	return
 }
 
-// PrivKeyCombineBytes combiness a private key with a byte slice
-func PrivKeyCombineBytes(k *btcec.PrivateKey, b []byte) *btcec.PrivateKey {
+// PrivKeyCombineBytes combines a private key with a byte slice
+func CombinePrivKeyWithBytes(k *btcec.PrivateKey, b []byte) *btcec.PrivateKey {
 	bytePriv, _ := btcec.PrivKeyFromBytes(btcec.S256(), b)
 	return CombinePrivateKeys(k, bytePriv)
+}
+
+// CombinePrivKeyAndSubtract uses the same delinearization scheme as
+// CombinePrivateKeys, but once it gets the combined private key, it subtracts the
+// original base key.  It's weird, but it allows the porTxo standard to always add
+// private keys and not need to be aware of different derivation methods.
+func CombinePrivKeyAndSubtract(k *btcec.PrivateKey, b []byte) [32]byte {
+	var empty [32]byte
+	return empty
 }

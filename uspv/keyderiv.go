@@ -2,11 +2,9 @@ package uspv
 
 import (
 	"fmt"
-	"math/big"
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcutil"
-	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 )
 
@@ -17,66 +15,6 @@ The identity key is use 11, peer 0, index 0.
 Channel multisig keys are use 2, peer and index per peer and channel.
 Channel refund keys are use 3, peer and index per peer / channel.
 */
-
-// PrivKeyAddBytes adds bytes to a private key.
-// NOTE that this modifies the key in place, overwriting it!!!!1
-// If k is nil, does nothing and doesn't error (k stays nil)
-func PrivKeyAddBytes(k *btcec.PrivateKey, b []byte) {
-	if k == nil {
-		return
-	}
-	// turn arg bytes into a bigint
-	arg := new(big.Int).SetBytes(b)
-	// add private key to arg
-	k.D.Add(k.D, arg)
-	// mod 2^256ish
-	k.D.Mod(k.D, btcec.S256().N)
-	// new key derived from this sum
-	// D is already modified, need to update the pubkey x and y
-	k.X, k.Y = btcec.S256().ScalarBaseMult(k.D.Bytes())
-	return
-}
-
-// PubKeyAddBytes adds bytes to a public key.
-// NOTE that this modifies the key in place, overwriting it!!!!1
-func PubKeyAddBytes(k *btcec.PublicKey, b []byte) {
-	// turn b into a point on the curve
-	bx, by := btcec.S256().ScalarBaseMult(b)
-	// add arg point to pubkey point
-	k.X, k.Y = btcec.S256().Add(bx, by, k.X, k.Y)
-	return
-}
-
-// multiplies a pubkey point by a scalar
-func PubKeyMultBytes(k *btcec.PublicKey, n uint32) {
-	b := lnutil.U32tB(n)
-	k.X, k.Y = btcec.S256().ScalarMult(k.X, k.Y, b)
-}
-
-// multiply the private key by a coefficient
-func PrivKeyMult(k *btcec.PrivateKey, n uint32) {
-	bigN := new(big.Int).SetUint64(uint64(n))
-	k.D.Mul(k.D, bigN)
-	k.D.Mod(k.D, btcec.S256().N)
-	k.X, k.Y = btcec.S256().ScalarBaseMult(k.D.Bytes())
-}
-
-// IDPrivAdd returns a channel pubkey from the sum of two scalars
-func IDPrivAdd(idPriv, ds *btcec.PrivateKey) *btcec.PrivateKey {
-	cPriv := new(btcec.PrivateKey)
-	cPriv.Curve = btcec.S256()
-
-	cPriv.D.Add(idPriv.D, ds.D)
-	cPriv.D.Mod(cPriv.D, btcec.S256().N)
-
-	cPriv.X, cPriv.Y = btcec.S256().ScalarBaseMult(cPriv.D.Bytes())
-	return cPriv
-}
-
-func IdToPub(idArr [32]byte) (*btcec.PublicKey, error) {
-	// IDs always start with 02
-	return btcec.ParsePubKey(append([]byte{0x02}, idArr[:]...), btcec.S256())
-}
 
 // =====================================================================
 // OK only use these now
