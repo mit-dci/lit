@@ -74,12 +74,12 @@ func (s *SPVCon) MaybeSend(txos []*wire.TxOut) ([]*wire.OutPoint, error) {
 	}
 
 	// BuildDontSign gets the txid.  Also sorts txin, txout slices in place
-	txid, err := s.TS.BuildDontSign(utxos, txos)
+	tx, err := s.TS.BuildDontSign(utxos, txos)
 	if err != nil {
 		return nil, err
 	}
 
-	fTx.Txid = txid
+	fTx.Txid = tx.TxHash()
 
 	for _, utxo := range utxos {
 		s.TS.FreezeSet[utxo.Op] = fTx
@@ -87,12 +87,12 @@ func (s *SPVCon) MaybeSend(txos []*wire.TxOut) ([]*wire.OutPoint, error) {
 
 	// figure out where outputs ended up after adding the change output and sorting
 	for i, initTxo := range initTxos {
-		for j, finalTxo := range txos {
+		for j, finalTxo := range tx.TxOut {
 			// If pkscripts match, this is where it ended up.
 			// if you're sending different amounts to the same address, this
 			// might not work!  Don't re-use addresses!
 			if bytes.Equal(initTxo.PkScript, finalTxo.PkScript) {
-				finalOutPoints[i] = wire.NewOutPoint(&txid, uint32(j))
+				finalOutPoints[i] = wire.NewOutPoint(&fTx.Txid, uint32(j))
 			}
 		}
 	}
@@ -496,9 +496,9 @@ func (ts *TxStore) SendOne(u portxo.PorTxo, adr btcutil.Address) (*wire.MsgTx, e
 	return ts.BuildAndSign([]*portxo.PorTxo{&u}, []*wire.TxOut{txout})
 }
 
-// Builds tx from inputs and outputs, returns txid.  Sorts.  Doesn't sign.
+// Builds tx from inputs and outputs, returns tx.  Sorts.  Doesn't sign.
 func (ts *TxStore) BuildDontSign(
-	utxos []*portxo.PorTxo, txos []*wire.TxOut) (chainhash.Hash, error) {
+	utxos []*portxo.PorTxo, txos []*wire.TxOut) (*wire.MsgTx, error) {
 
 	// make the tx
 	tx := wire.NewMsgTx()
@@ -517,7 +517,7 @@ func (ts *TxStore) BuildDontSign(
 	}
 	// sort in place before signing
 	txsort.InPlaceSort(tx)
-	return tx.TxHash(), nil
+	return tx, nil
 }
 
 // Build and sign builds a tx from a slice of utxos and txOuts.

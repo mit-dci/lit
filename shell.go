@@ -537,25 +537,25 @@ func Adr(args []string) error {
 		wa.String())
 
 	/*
-	if args[0] == "recover" {
-		tip, err := SCon.TS.GetDBSyncHeight()
-		if err != nil {
-			log.Fatal(err)
-		}
-		// copying hardcoded checkpoint from lit.go
-		if tip == 0 {
-			tip = 1036000
-			err = SCon.TS.SetDBSyncHeight(tip)
+		if args[0] == "recover" {
+			tip, err := SCon.TS.GetDBSyncHeight()
 			if err != nil {
 				log.Fatal(err)
 			}
+			// copying hardcoded checkpoint from lit.go
+			if tip == 0 {
+				tip = 1036000
+				err = SCon.TS.SetDBSyncHeight(tip)
+				if err != nil {
+					log.Fatal(err)
+				}
+			}
+			err = SCon.AskForHeaders()
+			if err != nil {
+				log.Fatal(err)
+			}
+			err = rpcShellListen()
 		}
-		err = SCon.AskForHeaders()
-		if err != nil {
-			log.Fatal(err)
-		}
-		err = rpcShellListen()
-	}
 	*/
 
 	return nil
