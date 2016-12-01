@@ -300,9 +300,9 @@ func (ts *TxStore) RecoverAdrs() error {
 	for i := 0; i < Lvl1; i++ {
 		// off by 2 b/c channel id with a given peer starts from 2
 		for j := 2; j < Lvl2+2; j++ {
-			ind := Lvl1*i+j-2
-			nKg.Step[3] = uint32(i)
-			nKg.Step[4] = uint32(j)
+			ind := Lvl1*i + j - 2
+			nKg.Step[3] = uint32(i) | 1<<31
+			nKg.Step[4] = uint32(j) | 1<<31
 			nAdr160 := ts.PathPubHash160(nKg)
 			if nAdr160 == nil {
 				return fmt.Errorf("NewAdr error: got nil h160")
@@ -338,10 +338,10 @@ func (ts *TxStore) RecoverAdrs() error {
 		}
 		fmt.Println("DB populated with recov adrs!")
 		/*
-		err := ts.SetDBSyncHeight(int32(0))
-		if err != nil {
-			return err
-		}
+			err := ts.SetDBSyncHeight(int32(0))
+			if err != nil {
+				return err
+			}
 		*/
 		fmt.Println("Reset DB height to trigger rescan!")
 		return nil
