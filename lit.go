@@ -24,7 +24,7 @@ const (
 	// Random internet testnet nodes usually work but sometimes don't, so
 	// maybe I should test against different versions out there.
 	SPVHostAdr = "lit3.co:18333" // for testnet3
-//	SPVHostAdr = "slab.lan:18444" // for regtest
+//	SPVHostAdr = "na:18444" // for regtest
 )
 
 var (
