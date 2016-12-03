@@ -281,8 +281,8 @@ func (ts *TxStore) NewAdr160() ([]byte, error) {
 	return nAdr160, nil
 }
 
-// NewAdr creates a new, never before seen address, and increments the
-// DB counter, and returns the hash160 of the pubkey.
+// RecoverAdrs regenerates a fixed number of refund addresses for payment
+// channels, adds them to the DB, and then resets the DB sync height.
 func (ts *TxStore) RecoverAdrs() error {
 	var err error
 	if ts.Param == nil {
@@ -291,17 +291,31 @@ func (ts *TxStore) RecoverAdrs() error {
 
 	// ########### make loop here with lots of keygens
 	nKg := GetWalletKeygen(0)
+	// 30 is parameter for refund addresses
 	nKg.Step[2] = 30
-	nKg.Step[3] = 1
-	nKg.Step[4] = 2
-	nAdr160 := ts.PathPubHash160(nKg)
-	if nAdr160 == nil {
-		return fmt.Errorf("NewAdr error: got nil h160")
+	Lvl1 := 10
+	Lvl2 := 10
+	nAdr160Store := make([][]byte, Lvl1*Lvl2)
+	kgBytesStore := make([][]byte, Lvl1*Lvl2)
+	for i := 0; i < Lvl1; i++ {
+		// off by 2 b/c channel id with a given peer starts from 2
+		for j := 2; j < Lvl2+2; j++ {
+			ind := Lvl1*i + j - 2
+			nKg.Step[3] = uint32(i) | 1<<31
+			nKg.Step[4] = uint32(j) | 1<<31
+			nAdr160 := ts.PathPubHash160(nKg)
+			if nAdr160 == nil {
+				return fmt.Errorf("NewAdr error: got nil h160")
+			}
+			fmt.Printf("recov adr %d hash is %x\n", ind, nAdr160)
+			nAdr160Store[ind] = nAdr160
+			kgBytes := nKg.Bytes()
+			kgBytesStore[ind] = kgBytes
+		}
 	}
-	fmt.Printf("adr %d hash is %x\n", 5, nAdr160)
-
-	kgBytes := nKg.Bytes()
-
+	if len(nAdr160Store) == len(kgBytesStore) {
+		fmt.Println("Recov adr stores populated!")
+	}
 	// write to db file
 	err = ts.StateDB.Update(func(btx *bolt.Tx) error {
 		adrb := btx.Bucket(BKTadr)
@@ -315,8 +329,22 @@ func (ts *TxStore) RecoverAdrs() error {
 
 		// ########## can't return here; make loop with lots of puts
 
-		// add the 20-byte key-hash into the db
-		return adrb.Put(nAdr160, kgBytes)
+		for k := 0; k < Lvl1*Lvl2; k++ {
+			// add the 20-byte key-hash into the db
+			err := adrb.Put(nAdr160Store[k], kgBytesStore[k])
+			if err != nil {
+				return err
+			}
+		}
+		fmt.Println("DB populated with recov adrs!")
+		/*
+			err := ts.SetDBSyncHeight(int32(0))
+			if err != nil {
+				return err
+			}
+		*/
+		fmt.Println("Reset DB height to trigger rescan!")
+		return nil
 
 	})
 	if err != nil {

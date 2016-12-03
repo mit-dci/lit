@@ -194,7 +194,6 @@ func CombinePrivateKeys(keys ...*btcec.PrivateKey) *btcec.PrivateKey {
 
 	// kindof ugly that it's converting the bigint to bytes and back but whatever
 	priv, _ := btcec.PrivKeyFromBytes(btcec.S256(), sum.Bytes())
-
 	return priv
 }
 
@@ -276,6 +275,8 @@ func CombinePrivKeyAndSubtract(k *btcec.PrivateKey, b []byte) [32]byte {
 	combinedKey := CombinePrivKeyWithBytes(k, b)
 	// subtract the original k base key from the combined key
 	combinedKey.D.Sub(combinedKey.D, k.D)
+	// not quite sure how this step works, but it indeed seems to.
+	combinedKey.D.Mod(combinedKey.D, btcec.S256().N)
 	// copy this "difference key" and return it.
 	copy(diffKey[:], combinedKey.D.Bytes())
 	return diffKey

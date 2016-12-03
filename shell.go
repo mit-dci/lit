@@ -390,6 +390,7 @@ func Bal(args []string) error {
 		return fmt.Errorf("Can't get balance, spv connection broken")
 	}
 
+	// new flag for which set of addresses to get info for
 	if len(args) > 1 {
 		peerIdx, err := strconv.ParseInt(args[0], 10, 32)
 		if err != nil {
@@ -461,7 +462,6 @@ func Bal(args []string) error {
 	if err != nil {
 		return err
 	}
-
 	adrs, err := SCon.TS.GetAllAddresses()
 	if err != nil {
 		return err
@@ -497,11 +497,12 @@ func Adr(args []string) error {
 			if err != nil {
 				return err
 			}
-		}
-		for i := 0; i < 10; i++ {
-			_, err := SCon.TS.NewAdr160()
-			if err != nil {
-				return err
+		} else {
+			for i := 0; i < 10; i++ {
+				_, err := SCon.TS.NewAdr160()
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -534,6 +535,28 @@ func Adr(args []string) error {
 	}
 	fmt.Printf("made new address %s\n",
 		wa.String())
+
+	/*
+		if args[0] == "recover" {
+			tip, err := SCon.TS.GetDBSyncHeight()
+			if err != nil {
+				log.Fatal(err)
+			}
+			// copying hardcoded checkpoint from lit.go
+			if tip == 0 {
+				tip = 1036000
+				err = SCon.TS.SetDBSyncHeight(tip)
+				if err != nil {
+					log.Fatal(err)
+				}
+			}
+			err = SCon.AskForHeaders()
+			if err != nil {
+				log.Fatal(err)
+			}
+			err = rpcShellListen()
+		}
+	*/
 
 	return nil
 }

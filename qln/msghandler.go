@@ -188,9 +188,12 @@ func (nd *LnNode) OPEventHandler() {
 					// privkey field.  It isn't just added though; it needs to
 					// be combined with the private key in a way porTxo isn't
 					// aware of, so derive and subtract that here.
+					var elkScalar [32]byte
+					// swap out elkscalar, leaving privkey empty
+					elkScalar, portxo.KeyGen.PrivKey = portxo.KeyGen.PrivKey, elkScalar
 					privBase := nd.BaseWallet.GetPriv(portxo.KeyGen)
 					portxo.PrivKey = lnutil.CombinePrivKeyAndSubtract(
-						privBase, portxo.KeyGen.PrivKey[:])
+						privBase, elkScalar[:])
 				}
 				err = nd.BaseWallet.ExportUtxo(&portxo)
 				if err != nil {
