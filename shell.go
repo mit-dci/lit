@@ -217,7 +217,7 @@ func TCPListener(lisIpPort string) error {
 	}
 
 	myId := btcutil.Hash160(idPriv.PubKey().SerializeCompressed())
-	lisAdr, err := btcutil.NewAddressPubKeyHash(myId, Params)
+	lisAdr, err := btcutil.NewAddressPubKeyHash(myId, SCon.Param)
 	fmt.Printf("Listening on %s\n", listener.Addr().String())
 	fmt.Printf("Listening with base58 address: %s lnid: %x\n",
 		lisAdr.String(), myId[:16])
@@ -469,7 +469,7 @@ func Bal(args []string) error {
 
 	for i, a := range adrs {
 
-		oa, err := btcutil.NewAddressPubKeyHash(a.ScriptAddress(), Params)
+		oa, err := btcutil.NewAddressPubKeyHash(a.ScriptAddress(), SCon.Param)
 		if err != nil {
 			return err
 		}
@@ -529,7 +529,7 @@ func Adr(args []string) error {
 
 	SCon.Refilter(filt)
 
-	wa, err := btcutil.NewAddressWitnessPubKeyHash(a160, Params)
+	wa, err := btcutil.NewAddressWitnessPubKeyHash(a160, SCon.Param)
 	if err != nil {
 		return err
 	}

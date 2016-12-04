@@ -55,7 +55,7 @@ func (r *LNRpc) Address(args *AdrArgs, reply *AdrReply) error {
 			return err
 		}
 
-		wa, err := btcutil.NewAddressWitnessPubKeyHash(a160, Params)
+		wa, err := btcutil.NewAddressWitnessPubKeyHash(a160, SCon.Param)
 		if err != nil {
 			return err
 		}
