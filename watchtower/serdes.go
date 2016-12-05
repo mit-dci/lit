@@ -65,15 +65,15 @@ func WatchannelDescriptorFromBytes(b []byte) (WatchannelDescriptor, error) {
 // ComMsg are 132 bytes.
 // PKH 20
 // txid 16
-// elk 32
 // sig 64
+// elk 32
 // ToBytes turns a ComMsg into 132 bytes
 func (sm *ComMsg) ToBytes() (b [132]byte) {
 	var buf bytes.Buffer
 	buf.Write(sm.DestPKH[:])
 	buf.Write(sm.ParTxid[:])
-	buf.Write(sm.Elk.CloneBytes())
 	buf.Write(sm.Sig[:])
+	buf.Write(sm.Elk.CloneBytes())
 	copy(b[:], buf.Bytes())
 	return
 }
@@ -81,9 +81,10 @@ func (sm *ComMsg) ToBytes() (b [132]byte) {
 // ComMsgFromBytes turns 112 bytes into a SorceMsg
 func ComMsgFromBytes(b [128]byte) ComMsg {
 	var sm ComMsg
-	copy(sm.ParTxid[:], b[:16])
-	copy(sm.Elk[:], b[16:48])
-	copy(sm.Sig[:], b[48:])
+	copy(sm.DestPKH[:], b[:20])
+	copy(sm.ParTxid[:], b[20:36])
+	copy(sm.Sig[:], b[36:100])
+	copy(sm.Elk[:], b[100:])
 	return sm
 }
 

@@ -403,10 +403,6 @@ func (nd *LnNode) SIGREVHandler(from [16]byte, SIGREVBytes []byte) {
 	// that and try to close with the incremented amount, why not.
 	// TODO Implement that later though.
 
-	// Generate txid/sig pair for watchtower
-
-	qc.BuildWatchTxidSig(prevAmt)
-
 	// all verified; Save finished state to DB, puller is pretty much done.
 	err = nd.SaveQchanState(qc)
 	if err != nil {
@@ -420,6 +416,20 @@ func (nd *LnNode) SIGREVHandler(from [16]byte, SIGREVBytes []byte) {
 		fmt.Printf("SIGREVHandler err %s", err.Error())
 		return
 	}
+
+	// now that we've saved & sent everything, before ending the function, we
+	// go BACK to create a txid/sig pair for watchtower.  This feels like a kindof
+	// weird way to do it.  Maybe there's a better way.
+
+	qc.State.StateIdx--
+	qc.State.MyAmt = prevAmt
+
+	_, err = nd.BuildWatchTxidSig(qc)
+	if err != nil {
+		fmt.Printf("SIGREVHandler err %s", err.Error())
+		return
+	}
+
 	return
 }
 

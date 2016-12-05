@@ -93,7 +93,7 @@ func TestFixed(t *testing.T) {
 			t.Fatalf("Elk %d expected %s, got %s", n, zero.String(), sha.String())
 		}
 		if n == 1000 && !sha.IsEqual(thousand) {
-			t.Fatalf("Elk %d expected %s, got %s", n, zero.String(), sha.String())
+			t.Fatalf("Elk %d expected %s, got %s", n, thousand.String(), sha.String())
 		}
 
 	}

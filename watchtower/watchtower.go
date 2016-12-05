@@ -37,8 +37,8 @@ type WatchannelDescriptor struct {
 type ComMsg struct {
 	DestPKH [20]byte       // identifier for channel; could be optimized away
 	Elk     chainhash.Hash // elkrem for this state index
-	ParTxid [16]byte       // first half of txid of close tx
-	Sig     [64]byte       // sig for the grab tx
+	ParTxid [16]byte       // 16 bytes of txid
+	Sig     [64]byte       // 64 bytes of sig
 }
 
 // 2 structs used in the DB: IdxSigs and ChanStatic
