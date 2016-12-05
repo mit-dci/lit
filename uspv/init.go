@@ -7,35 +7,10 @@ import (
 	"net"
 	"os"
 
-	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/mit-dci/lit/lnutil"
-	"github.com/mit-dci/lit/portxo"
 )
-
-// --- Uwallet interface ----
-
-func (s *SPVCon) GetPriv(k portxo.KeyGen) *btcec.PrivateKey {
-	return s.TS.PathPrivkey(k)
-}
-
-func (s *SPVCon) GetPub(k portxo.KeyGen) *btcec.PublicKey {
-	return s.TS.PathPubkey(k)
-}
-
-func (s *SPVCon) Params() *chaincfg.Params {
-	return s.Param
-}
-
-func (s *SPVCon) PushTx(tx *wire.MsgTx) error {
-	return s.NewOutgoingTx(tx)
-}
-
-func (s *SPVCon) LetMeKnow() chan lnutil.OutPointEvent {
-	return s.TS.OPEventChan
-}
 
 // OpenSPV starts a
 func OpenSPV(remoteNode string, hfn, dbfn string,

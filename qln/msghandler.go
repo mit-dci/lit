@@ -195,10 +195,8 @@ func (nd *LnNode) OPEventHandler() {
 					portxo.PrivKey = lnutil.CombinePrivKeyAndSubtract(
 						privBase, elkScalar[:])
 				}
-				err = nd.BaseWallet.ExportUtxo(&portxo)
-				if err != nil {
-					fmt.Printf("ExportUtxo error: %s", err.Error())
-				}
+				// make this concurrent to avoid circular locking
+				go nd.BaseWallet.ExportUtxo(&portxo)
 			}
 		}
 	}
