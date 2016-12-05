@@ -32,29 +32,32 @@ var (
 	SCon uspv.SPVCon // global here for now
 
 	LNode qln.LnNode
-
-	GlobalConf LitConfig
 )
 
 // variables for a goodelivery session
 type LitConfig struct {
-	spvHost    string
-	regTest    bool // flag to set mainnet
-	birthblock int32
+	spvHost         string
+	regTest, reSync bool // flag to set mainnet
+	birthblock      int32
 
 	Params *chaincfg.Params
 }
 
 func setConfig(lc *LitConfig) {
 	spvhostptr := flag.String("spv", "", "full node to connect to")
-	regtestptr := flag.Bool("reg", false, "use regtest (not testnet3)")
+
 	birthptr := flag.Int("tip", hardHeight, "height to begin db sync")
+
+	regtestptr := flag.Bool("reg", false, "use regtest (not testnet3)")
+	resyncprt := flag.Bool("resync", false, "force resync from given tip")
 
 	flag.Parse()
 
 	lc.spvHost = *spvhostptr
-	lc.regTest = *regtestptr
 	lc.birthblock = int32(*birthptr)
+
+	lc.regTest = *regtestptr
+	lc.reSync = *resyncprt
 
 	if lc.spvHost == "" {
 		lc.spvHost = "lit3.co"
@@ -70,6 +73,10 @@ func setConfig(lc *LitConfig) {
 		if !strings.Contains(lc.spvHost, ":") {
 			lc.spvHost = lc.spvHost + ":18333"
 		}
+	}
+
+	if lc.reSync && lc.birthblock == hardHeight {
+		log.Fatal("-resync requires -tip")
 	}
 }
 
@@ -102,7 +109,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if tip == 0 || conf.birthblock != hardHeight { // DB has never been used, set to birthday
+	if tip == 0 || conf.reSync { // DB has never been used, set to birthday
 		if conf.regTest {
 			tip = 10 // for regtest
 		} else {

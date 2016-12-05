@@ -125,19 +125,22 @@ func (s *SPVCon) ReallySend(txid *chainhash.Hash) error {
 		return err
 	}
 
-	// All non-change outputs of the frozenTx are registered as watch-outpoints
-	for i, txout := range tx.TxOut {
-		if !bytes.Equal(frozenTx.ChangeOut.PkScript, txout.PkScript) {
-			// not the change output, so register it as a watched OP
-			var op wire.OutPoint
-			op.Hash = tx.TxHash()
-			op.Index = uint32(i)
-			err = s.TS.RegisterWatchOP(op)
-			if err != nil {
-				return err
+	// actually, don't do this, it's up to the top layer to tell us what to watch.
+	/*
+		// All non-change outputs of the frozenTx are registered as watch-outpoints
+		for i, txout := range tx.TxOut {
+			if !bytes.Equal(frozenTx.ChangeOut.PkScript, txout.PkScript) {
+				// not the change output, so register it as a watched OP
+				var op wire.OutPoint
+				op.Hash = tx.TxHash()
+				op.Index = uint32(i)
+				err = s.TS.RegisterWatchOP(op)
+				if err != nil {
+					return err
+				}
 			}
 		}
-	}
+	*/
 
 	return s.NewOutgoingTx(tx)
 }
@@ -159,21 +162,6 @@ func (s *SPVCon) NahDontSend(txid *chainhash.Hash) error {
 		fmt.Printf("\t remove %s from frozen outpoints\n", txin.Op.String())
 		delete(s.TS.FreezeSet, txin.Op)
 	}
-	return nil
-}
-
-func (s *SPVCon) WatchThis(op wire.OutPoint) error {
-	err := s.TS.RegisterWatchOP(op)
-	if err != nil {
-		return err
-	}
-	// make new filter
-	filt, err := s.TS.GimmeFilter()
-	if err != nil {
-		return err
-	}
-	// send filter
-	s.Refilter(filt)
 	return nil
 }
 

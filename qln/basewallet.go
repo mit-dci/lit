@@ -24,8 +24,9 @@ type UWallet interface {
 	PushTx(tx *wire.MsgTx) error
 
 	// ExportUtxo gives a utxo to the underlying wallet; that wallet saves it
-	// and can spend it later.
-	ExportUtxo(txo *portxo.PorTxo) error
+	// and can spend it later.  Doesn't return errors; error will exist only in
+	// base wallet.
+	ExportUtxo(txo *portxo.PorTxo)
 
 	// MaybeSend makes an unsigned tx, populated with inputs and outputs.
 	// The specified txouts are in there somewhere.

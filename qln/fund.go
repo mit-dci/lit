@@ -358,11 +358,6 @@ func (nd *LnNode) QChanDescHandler(from [16]byte, descbytes []byte) {
 		return
 	}
 
-	//	err = nd.SaveQchanState(qc)
-	//	if err != nil {
-	//		fmt.Printf("QChanDescHandler SaveQchanState err %s", err.Error())
-	//		return
-	//	}
 	// load ... the thing I just saved.  why?
 	qc, err = nd.GetQchan(peerArr, opArr)
 	if err != nil {
@@ -467,6 +462,11 @@ func (nd *LnNode) QChanAckHandler(from [16]byte, ackbytes []byte) {
 		return
 	}
 
+	err = nd.BaseWallet.WatchThis(qc.Op)
+	if err != nil {
+		fmt.Printf("QChanAckHandler WatchThis err %s", err.Error())
+		return
+	}
 	// sig proof should be sent later once there are confirmations.
 	// it'll have an spv proof of the fund tx.
 	// but for now just send the sig.

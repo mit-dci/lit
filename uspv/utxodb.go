@@ -631,28 +631,10 @@ func (ts *TxStore) GetPendingInv() (*wire.MsgInv, error) {
 	return invMsg, nil
 }
 
-// ExportUtxo is really *IM*port utxo on this side.
-// Not implemented yet.  Fix "ingest many" at the same time eh?
-func (s *SPVCon) ExportUtxo(u *portxo.PorTxo) error {
-	err := s.TS.GainUtxo(*u)
-	if err != nil {
-		return err
-	}
-
-	// make new filter
-	filt, err := s.TS.GimmeFilter()
-	if err != nil {
-		return err
-	}
-	// send filter
-	s.Refilter(filt)
-	return nil
-}
-
 // GainUtxo registers the utxo in the duffel bag
 // don't register address; they shouldn't be re-used ever anyway.
 func (ts *TxStore) GainUtxo(u portxo.PorTxo) error {
-	fmt.Printf("gaining exported utxo %s at height %d'n",
+	fmt.Printf("gaining exported utxo %s at height %d\n",
 		u.Op.String(), u.Height)
 	// serialize porTxo
 	utxoBytes, err := u.Bytes()
@@ -796,7 +778,7 @@ func (ts *TxStore) IngestMany(txs []*wire.MsgTx, height int32) (uint32, error) {
 				// Don't try to Get() a nil.  I think? works ok though?
 				keygenBytes := adrb.Get(KeyHashFromPkScript(out.PkScript))
 				if keygenBytes != nil {
-					fmt.Printf("txout script:%x matched kg: %x\n", out.PkScript, keygenBytes)
+					// fmt.Printf("txout script:%x matched kg: %x\n", out.PkScript, keygenBytes)
 					// build new portxo
 
 					txob, err := NewPorTxoBytesFromKGBytes(tx, uint32(j), height, keygenBytes)
@@ -830,7 +812,7 @@ func (ts *TxStore) IngestMany(txs []*wire.MsgTx, height int32) (uint32, error) {
 				if len(v) == 0 {
 					// confirmation of unknown / watch only outpoint, send up to ln
 					// confirmation match detected; return OP event with nil tx
-					fmt.Printf("|||| zomg match  ")
+					// fmt.Printf("|||| zomg match  ")
 					hitTxs[i] = true // flag to save tx in db
 
 					var opArr [36]byte
@@ -853,7 +835,7 @@ func (ts *TxStore) IngestMany(txs []*wire.MsgTx, height int32) (uint32, error) {
 		for i, curOP := range spentOPs {
 			v := dufb.Get(curOP[:])
 			if v != nil && len(v) == 0 {
-				fmt.Printf("|||watch only here zomg\n")
+				// fmt.Printf("|||watch only here zomg\n")
 				hitTxs[spentTxIdx[i]] = true // just save everything
 				op := lnutil.OutPointFromBytes(curOP)
 				// build new outpoint event
