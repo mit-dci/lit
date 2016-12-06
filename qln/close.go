@@ -100,8 +100,6 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 		return nil, fmt.Errorf("tx %s doesn't spend channel outpoint %s",
 			txid.String(), q.Op.String())
 	}
-	// hardcode here now... need to save to qchan struct I guess
-	q.TimeOut = 5
 	var shIdx, pkhIdx uint32
 	var pkhIsMine bool
 	cTxos := make([]portxo.PorTxo, 1)

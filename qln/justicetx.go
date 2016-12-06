@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/boltdb/bolt"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/mit-dci/lit/lnutil"
@@ -21,7 +22,7 @@ anymore.  We can hand over 1 point per commit & figure everything out from that.
 // BuildWatchTxidSig builds the partial txid and signature pair which can
 // be exported to the watchtower.
 // This get a channel that is 1 state old.  So we can produce a signature.
-func (nd *LnNode) BuildWatchTxidSig(q *Qchan) ([80]byte, error) {
+func (nd *LnNode) BuildWatchTxidSig(q *Qchan) error {
 	var parTxidSig [80]byte // 16 byte txid and 64 byte signature stuck together
 
 	// in this function, "bad" refers to the hypothetical transaction spending the
@@ -29,42 +30,45 @@ func (nd *LnNode) BuildWatchTxidSig(q *Qchan) ([80]byte, error) {
 
 	fee := int64(5000) // fixed fee for now
 
-	// build the bad tx
-	badTx, err := q.BuildStateTx(false)
-
-	// re-build the script.  redundant as we just did this in BuildStateTx, but
-	// we need the preimage.
-
 	// first we need the keys in the bad script.  Start by getting the elk-scalar
 	// we should have it at the "current" state number
 	elk, err := q.ElkRcv.AtIndex(q.State.StateIdx)
 	if err != nil {
-		return parTxidSig, err
+		return err
 	}
+	// build elkpoint, and rewind the channel's remote elkpoint by one state
 	// get elk scalar
 	elkScalar := ElkScalar(elk)
 	// get elk point
-	elkPoint := ElkPointFromHash(&elkScalar)
+	elkPoint := ElkPointFromHash(elk)
+	// overwrite remote elkpoint in channel state
+	q.State.ElkPoint = elkPoint
 
-	// build script to store in porTxo, make pubkeys
-	badTimeoutPub := lnutil.AddPubsEZ(q.MyHAKDBase, elkPoint)
-	badRevokePub := lnutil.CombinePubs(q.TheirHAKDBase, elkPoint)
-	script := lnutil.P2WSHify(
-		lnutil.CommitScript(badRevokePub, badTimeoutPub, q.TimeOut))
+	// make pubkeys, build script
+	badRevokePub := lnutil.CombinePubs(q.MyHAKDBase, elkPoint)
+	badTimeoutPub := lnutil.AddPubsEZ(q.TheirHAKDBase, elkPoint)
+	script := lnutil.CommitScript(badRevokePub, badTimeoutPub, q.TimeOut)
+	scriptHashOutScript := lnutil.P2WSHify(script)
+
+	// build the bad tx (redundant as we just build most of it...
+	badTx, err := q.BuildStateTx(false)
 
 	var badAmt int64
 	badIdx := uint32(len(badTx.TxOut) + 1)
 
+	fmt.Printf("made revpub %x timeout pub %x\nscript:%x\nhash %x\n",
+		badRevokePub[:], badTimeoutPub[:], script, scriptHashOutScript)
 	// figure out which output to bring justice to
 	for i, out := range badTx.TxOut {
-		if bytes.Equal(out.PkScript, script) {
+		fmt.Printf("txout %d pkscript %x\n", i, out.PkScript)
+		if bytes.Equal(out.PkScript, scriptHashOutScript) {
 			badIdx = uint32(i)
 			badAmt = out.Value
 			break
 		}
 	}
 	if badIdx > uint32(len(badTx.TxOut)) {
-		return parTxidSig, fmt.Errorf("BuildWatchTxidSig couldn't find revocable SH output")
+		return fmt.Errorf("BuildWatchTxidSig couldn't find revocable SH output")
 	}
 
 	// make a keygen to get the private HAKD base scalar
@@ -105,11 +109,54 @@ func (nd *LnNode) BuildWatchTxidSig(q *Qchan) ([80]byte, error) {
 
 	sig, err := sig64.SigCompress(bigSig)
 	if err != nil {
-		return parTxidSig, err
+		return err
 	}
 
 	copy(parTxidSig[:16], badTxid[:16])
 	copy(parTxidSig[16:], sig[:])
 
-	return parTxidSig, nil
+	return nd.SaveJusticeSig(q.State.StateIdx, q.WatchRefundAdr, parTxidSig)
+}
+
+// SaveJusticeSig save the txid/sig of a justice transaction to the db.  Pretty
+// straightforward
+func (nd *LnNode) SaveJusticeSig(comnum uint64, pkh [20]byte, txidsig [80]byte) error {
+	return nd.LnDB.Update(func(btx *bolt.Tx) error {
+		sigs := btx.Bucket(BKTWatch)
+		if sigs == nil {
+			return fmt.Errorf("no justice bucket")
+		}
+		// one bucket per refund PKH
+		justBkt, err := sigs.CreateBucketIfNotExists(pkh[:])
+		if err != nil {
+			return err
+		}
+
+		return justBkt.Put(lnutil.U64tB(comnum), txidsig[:])
+	})
+}
+
+func (nd *LnNode) ShowJusticeDB() (string, error) {
+	var s string
+
+	err := nd.LnDB.View(func(btx *bolt.Tx) error {
+		sigs := btx.Bucket(BKTWatch)
+		if sigs == nil {
+			return fmt.Errorf("no justice bucket")
+		}
+
+		// go through all pkh buckets
+		return sigs.ForEach(func(k, _ []byte) error {
+			s += fmt.Sprintf("Channel refunding to pkh %x\n", k)
+			pkhBucket := sigs.Bucket(k)
+			if pkhBucket == nil {
+				return fmt.Errorf("%x not a bucket", k)
+			}
+			return pkhBucket.ForEach(func(idx, txidsig []byte) error {
+				s += fmt.Sprintf("\tidx %x\t txidsig: %x\n", idx, txidsig)
+				return nil
+			})
+		})
+	})
+	return s, err
 }

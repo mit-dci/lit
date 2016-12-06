@@ -39,6 +39,12 @@ func (nd *LnNode) OpenDB(filename string) error {
 		if err != nil {
 			return err
 		}
+
+		_, err = btx.CreateBucketIfNotExists(BKTWatch)
+		if err != nil {
+			return err
+		}
+
 		return nil
 	})
 	if err != nil {

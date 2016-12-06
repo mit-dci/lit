@@ -294,6 +294,10 @@ func (nd *LnNode) ACKSIGHandler(from [16]byte, ACKSIGBytes []byte) {
 	qc.State.ElkPoint = ACKSIGElkPoint
 
 	// construct tx and verify signature
+
+	// stash amount for justice sig at the end
+	prevAmt := qc.State.MyAmt
+
 	qc.State.MyAmt += int64(qc.State.Delta) // delta should be negative
 	qc.State.Delta = 0
 	err = qc.VerifySig(sig)
@@ -301,6 +305,7 @@ func (nd *LnNode) ACKSIGHandler(from [16]byte, ACKSIGBytes []byte) {
 		fmt.Printf("ACKSIGHandler err %s", err.Error())
 		return
 	}
+
 	// verify worked; Save to incremented state to DB with new & old myHAKDpubs
 	err = nd.SaveQchanState(qc)
 	if err != nil {
@@ -312,6 +317,16 @@ func (nd *LnNode) ACKSIGHandler(from [16]byte, ACKSIGBytes []byte) {
 		fmt.Printf("ACKSIGHandler err %s", err.Error())
 		return
 	}
+
+	// after saving & sending, go back a state to save the justice sig
+	qc.State.StateIdx--
+	qc.State.MyAmt = prevAmt
+	err = nd.BuildWatchTxidSig(qc)
+	if err != nil {
+		fmt.Printf("ACKSIGHandler err %s", err.Error())
+		return
+	}
+
 	return
 }
 
@@ -424,7 +439,7 @@ func (nd *LnNode) SIGREVHandler(from [16]byte, SIGREVBytes []byte) {
 	qc.State.StateIdx--
 	qc.State.MyAmt = prevAmt
 
-	_, err = nd.BuildWatchTxidSig(qc)
+	err = nd.BuildWatchTxidSig(qc)
 	if err != nil {
 		fmt.Printf("SIGREVHandler err %s", err.Error())
 		return

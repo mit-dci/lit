@@ -184,7 +184,12 @@ func Push(args []string) error {
 // Watched channels get exported to the watchtower.
 func Watch(args []string) error {
 
-	// not yet implemented
+	// show contents of the local justice db
+	s, err := LNode.ShowJusticeDB()
+	if err != nil {
+		return err
+	}
+	fmt.Printf(s)
 	return nil
 }
 

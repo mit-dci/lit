@@ -94,14 +94,6 @@ func (q *Qchan) SimpleCloseTx() (*wire.MsgTx, error) {
 
 // BuildStateTx constructs and returns a state tx.  As simple as I can make it.
 // This func just makes the tx with data from State in ram, and HAKD key arg
-// Delta should always be 0 when making this tx.
-// It decides whether to make THEIR tx or YOUR tx based on the HAKD pubkey given --
-// if it's zero, then it makes their transaction (for signing onlu)
-// If it's full, it makes your transaction (for verification in most cases,
-// but also for signing when breaking the channel)
-// Index is used to set nlocktime for state hints.
-// fee and op_csv timeout are currently hardcoded, make those parameters later.
-// also returns the script preimage for later spending.
 func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
 	if q == nil {
 		return nil, fmt.Errorf("BuildStateTx: nil chan")
@@ -112,31 +104,26 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
 		return nil, fmt.Errorf("channel (%d,%d) has no state", q.KeyGen.Step[3], q.KeyGen.Step[4])
 	}
 	// if delta is non-zero, something is wrong.
-	if s.Delta != 0 {
+	// this is old? remove...
+	/*	if s.Delta != 0 {
 		return nil, fmt.Errorf(
 			"BuildStateTx: delta is %d (expect 0)", s.Delta)
-	}
+	}*/
 	var fancyAmt, pkhAmt int64   // output amounts
 	var revPub, timePub [33]byte // pubkeys
 	var pkhPub [33]byte          // the simple output's pub key hash
 	fee := int64(5000)           // fixed fee for now
-	delay := uint16(5)           // fixed CSV delay for now
-	// delay is super short for testing.
-
-	// Both received and self-generated elkpoints are needed
-
-	// Create latest elkrem point (the one I create)
-	curElk, err := q.ElkPoint(false, q.State.StateIdx)
-	if err != nil {
-		return nil, err
-	}
 
 	// the PKH clear refund also has elkrem points added to mask the PKH.
 	// this changes the txouts at each state to blind sorceror better.
 	if mine { // build MY tx (to verify) (unless breaking)
 		// My tx that I store.  They get funds unencumbered. SH is mine eventually
 		// SH pubkeys are base points combined with the elk point we give them
-
+		// Create latest elkrem point (the one I create)
+		curElk, err := q.ElkPoint(false, q.State.StateIdx)
+		if err != nil {
+			return nil, err
+		}
 		revPub = lnutil.CombinePubs(q.TheirHAKDBase, curElk)
 		timePub = lnutil.AddPubsEZ(q.MyHAKDBase, curElk)
 
@@ -144,10 +131,9 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
 		pkhAmt = (q.Value - s.MyAmt) - fee
 		fancyAmt = s.MyAmt - fee
 
-		fmt.Printf("\t refund base %x, elkpointR %x\n", q.TheirRefundPub, s.ElkPoint)
 	} else { // build THEIR tx (to sign)
 		// Their tx that they store.  I get funds PKH.  SH is theirs eventually.
-
+		fmt.Printf("using elkpoint %x\n", s.ElkPoint)
 		// SH pubkeys are our base points plus the received elk point
 		revPub = lnutil.CombinePubs(q.MyHAKDBase, s.ElkPoint)
 		timePub = lnutil.AddPubsEZ(q.TheirHAKDBase, s.ElkPoint)
@@ -157,11 +143,10 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
 		// PKH output
 		pkhPub = q.MyRefundPub
 		pkhAmt = s.MyAmt - fee
-		fmt.Printf("\trefund base %x, elkpoint %x\n", q.MyRefundPub, curElk)
 	}
 
 	// now that everything is chosen, build fancy script and pkh script
-	fancyScript := lnutil.CommitScript(revPub, timePub, delay)
+	fancyScript := lnutil.CommitScript(revPub, timePub, q.TimeOut)
 	pkhScript := lnutil.DirectWPKHScript(pkhPub) // p2wpkh-ify
 
 	fmt.Printf("> made SH script, state %d\n", s.StateIdx)
