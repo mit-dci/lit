@@ -18,10 +18,10 @@ const (
 
 	MSGID_TEXTCHAT = 0x70 // send a text message
 
-	MSGID_RTS    = 0x80 // pushing funds in channel; request to send
-	MSGID_ACKSIG = 0x81 // pulling funds in channel; acknowledge update and sign
-	MSGID_SIGREV = 0x82 // pushing funds; signing new state and revoking old
-	MSGID_REVOKE = 0x83 // pulling funds; revoking previous channel state
+	MSGID_DELTASIG = 0x80 // pushing funds in channel; request to send
+	//	MSGID_ACKSIG = 0x81 // pulling funds in channel; acknowledge update and sign
+	MSGID_SIGREV = 0x81 // pulling funds; signing new state and revoking old
+	MSGID_REV    = 0x82 // pushing funds; revoking previous channel state
 
 	MSGID_FWDMSG     = 0x20
 	MSGID_FWDAUTHREQ = 0x21

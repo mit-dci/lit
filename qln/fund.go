@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
@@ -231,7 +230,7 @@ func (nd LnNode) PointRespHandler(from [16]byte, pointRespBytes []byte) error {
 
 	// create initial state for elkrem points
 	qc.State = new(StatCom)
-	qc.State.StateIdx = 1
+	qc.State.StateIdx = 0
 	qc.State.MyAmt = nd.InProg.Amt - nd.InProg.InitSend
 
 	// save channel to db
@@ -240,12 +239,12 @@ func (nd LnNode) PointRespHandler(from [16]byte, pointRespBytes []byte) error {
 		return fmt.Errorf("PointRespHandler SaveQchanState err %s", err.Error())
 	}
 
-	theirElkPoint, err := qc.CurElkPointForThem()
+	// when funding a channel, give them the first *2* elkpoints.
+	elkPointZero, err := qc.ElkPoint(false, 0)
 	if err != nil {
 		return err
 	}
-
-	elk, err := qc.ElkSnd.AtIndex(0)
+	elkPointOne, err := qc.NextElkPointForThem()
 	if err != nil {
 		return err
 	}
@@ -255,8 +254,8 @@ func (nd LnNode) PointRespHandler(from [16]byte, pointRespBytes []byte) error {
 
 	// description is outpoint (36), mypub(33), myrefund(33),
 	// myHAKDbase(33), capacity (8),
-	// initial payment (8), ElkPointR (33), ElkPointT (33), elk0 (32)
-	// total length 249
+	// initial payment (8), ElkPoint0 (33), ElkPoint1 (33)
+	// total length 217
 	msg := []byte{MSGID_CHANDESC}
 	msg = append(msg, opArr[:]...)
 	msg = append(msg, qc.MyPub[:]...)
@@ -264,8 +263,8 @@ func (nd LnNode) PointRespHandler(from [16]byte, pointRespBytes []byte) error {
 	msg = append(msg, qc.MyHAKDBase[:]...)
 	msg = append(msg, capBytes...)
 	msg = append(msg, initPayBytes...)
-	msg = append(msg, theirElkPoint[:]...)
-	msg = append(msg, elk.CloneBytes()...)
+	msg = append(msg, elkPointZero[:]...)
+	msg = append(msg, elkPointOne[:]...)
 	_, err = nd.RemoteCon.Write(msg)
 
 	return nil
@@ -275,11 +274,11 @@ func (nd LnNode) PointRespHandler(from [16]byte, pointRespBytes []byte) error {
 // QChanDescHandler takes in a description of a channel output.  It then
 // saves it to the local db, and returns a channel acknowledgement
 func (nd *LnNode) QChanDescHandler(from [16]byte, descbytes []byte) {
-	if len(descbytes) < 216 || len(descbytes) > 216 {
-		fmt.Printf("got %d byte channel description, expect 216", len(descbytes))
+	if len(descbytes) < 217 || len(descbytes) > 217 {
+		fmt.Printf("got %d byte channel description, expect 217", len(descbytes))
 		return
 	}
-	var peerArr, myFirstElkPoint, theirPub, theirRefundPub, theirHAKDbase [33]byte
+	var peerArr, elkPointZero, elkPointOne, theirPub, theirRefundPub, theirHAKDbase [33]byte
 	var opArr [36]byte
 	copy(peerArr[:], nd.RemoteCon.RemotePub.SerializeCompressed())
 
@@ -291,12 +290,8 @@ func (nd *LnNode) QChanDescHandler(from [16]byte, descbytes []byte) {
 	copy(theirHAKDbase[:], descbytes[102:135])
 	amt := lnutil.BtI64(descbytes[135:143])
 	initPay := lnutil.BtI64(descbytes[143:151])
-	copy(myFirstElkPoint[:], descbytes[151:184])
-	revElk, err := chainhash.NewHash(descbytes[184:])
-	if err != nil {
-		fmt.Printf("QChanDescHandler SaveFundTx err %s", err.Error())
-		return
-	}
+	copy(elkPointZero[:], descbytes[151:184])
+	copy(elkPointOne[:], descbytes[184:])
 
 	peerIdx, cIdx, err := nd.NextIdxForPeer(peerArr)
 	if err != nil {
@@ -339,17 +334,18 @@ func (nd *LnNode) QChanDescHandler(from [16]byte, descbytes []byte) {
 	qc.State = new(StatCom)
 	// similar to SIGREV in pushpull
 	qc.State.MyAmt = initPay
-	qc.State.StateIdx = 1
+	qc.State.StateIdx = 0
 	// use new ElkPoint for signing
-	qc.State.ElkPoint = myFirstElkPoint
+	qc.State.ElkPoint = elkPointZero
+	qc.State.NextElkPoint = elkPointOne
 
 	// create empty elkrem receiver to save
-	qc.ElkRcv = new(elkrem.ElkremReceiver)
-	err = qc.IngestElkrem(revElk)
-	if err != nil { // this can't happen because it's the first elk... remove?
-		fmt.Printf("QChanDescHandler err %s", err.Error())
-		return
-	}
+	//	qc.ElkRcv = new(elkrem.ElkremReceiver)
+	//	err = qc.IngestElkrem(revElk)
+	//	if err != nil { // this can't happen because it's the first elk... remove?
+	//		fmt.Printf("QChanDescHandler err %s", err.Error())
+	//		return
+	//	}
 
 	// save new channel to db
 	err = nd.SaveQChan(qc)
@@ -365,9 +361,15 @@ func (nd *LnNode) QChanDescHandler(from [16]byte, descbytes []byte) {
 		return
 	}
 
-	theirElkPoint, err := qc.CurElkPointForThem()
+	// when funding a channel, give them the first *2* elkpoints.
+	theirElkPointZero, err := qc.ElkPoint(false, qc.State.StateIdx)
 	if err != nil {
-		fmt.Printf("QChanDescHandler MakeTheirCurElkPoint err %s", err.Error())
+		fmt.Printf("QChanDescHandler err %s", err.Error())
+		return
+	}
+	theirElkPointOne, err := qc.NextElkPointForThem()
+	if err != nil {
+		fmt.Printf("QChanDescHandler err %s", err.Error())
 		return
 	}
 
@@ -377,17 +379,17 @@ func (nd *LnNode) QChanDescHandler(from [16]byte, descbytes []byte) {
 		return
 	}
 
-	elk, err := qc.ElkSnd.AtIndex(qc.State.StateIdx - 1) // which is 0
-	if err != nil {
-		fmt.Printf("QChanDescHandler ElkSnd err %s", err.Error())
-		return
-	}
+	//	elk, err := qc.ElkSnd.AtIndex(qc.State.StateIdx - 1) // which is 0
+	//	if err != nil {
+	//		fmt.Printf("QChanDescHandler ElkSnd err %s", err.Error())
+	//		return
+	//	}
 	// ACK the channel address, which causes the funder to sign / broadcast
-	// ACK is outpoint (36), ElkPointR (33), elk (32), and signature (64)
+	// ACK is outpoint (36), ElkPointZero (33), ElkPointOne (33), and signature (64)
 	msg := []byte{MSGID_CHANACK}
 	msg = append(msg, opArr[:]...)
-	msg = append(msg, theirElkPoint[:]...)
-	msg = append(msg, elk.CloneBytes()...)
+	msg = append(msg, theirElkPointZero[:]...)
+	msg = append(msg, theirElkPointOne[:]...)
 	msg = append(msg, sig[:]...)
 	_, err = nd.RemoteCon.Write(msg)
 	return
@@ -397,21 +399,20 @@ func (nd *LnNode) QChanDescHandler(from [16]byte, descbytes []byte) {
 // QChanAckHandler takes in an acknowledgement multisig description.
 // when a multisig outpoint is ackd, that causes the funder to sign and broadcast.
 func (nd *LnNode) QChanAckHandler(from [16]byte, ackbytes []byte) {
-	if len(ackbytes) < 165 || len(ackbytes) > 165 {
-		fmt.Printf("got %d byte multiAck, expect 165", len(ackbytes))
+	if len(ackbytes) < 166 || len(ackbytes) > 166 {
+		fmt.Printf("got %d byte multiAck, expect 166", len(ackbytes))
 		return
 	}
 	var opArr [36]byte
-	var peerArr, myFirstElkPoint [33]byte
+	var peerArr, elkPointZero, elkPointOne [33]byte
 	var sig [64]byte
 
 	copy(peerArr[:], nd.RemoteCon.RemotePub.SerializeCompressed())
 	// deserialize chanACK
 	copy(opArr[:], ackbytes[:36])
-	copy(myFirstElkPoint[:], ackbytes[36:69])
-	// don't think this can error as length is specified
-	revElk, _ := chainhash.NewHash(ackbytes[69:101])
-	copy(sig[:], ackbytes[101:])
+	copy(elkPointZero[:], ackbytes[36:69])
+	copy(elkPointOne[:], ackbytes[69:102])
+	copy(sig[:], ackbytes[102:])
 
 	//	op := lnutil.OutPointFromBytes(opArr)
 
@@ -422,12 +423,13 @@ func (nd *LnNode) QChanAckHandler(from [16]byte, ackbytes []byte) {
 		return
 	}
 
-	err = qc.IngestElkrem(revElk)
-	if err != nil { // this can't happen because it's the first elk... remove?
-		fmt.Printf("QChanAckHandler IngestElkrem err %s", err.Error())
-		return
-	}
-	qc.State.ElkPoint = myFirstElkPoint
+	//	err = qc.IngestElkrem(revElk)
+	//	if err != nil { // this can't happen because it's the first elk... remove?
+	//		fmt.Printf("QChanAckHandler IngestElkrem err %s", err.Error())
+	//		return
+	//	}
+	qc.State.ElkPoint = elkPointZero
+	qc.State.NextElkPoint = elkPointOne
 
 	err = qc.VerifySig(sig)
 	if err != nil {

@@ -56,10 +56,11 @@ type StatCom struct {
 
 	// Elkrem point from counterparty, used to make
 	// Homomorphic Adversarial Key Derivation public keys (HAKD)
-	ElkPoint     [33]byte // saved to disk, revealable point
-	PrevElkPoint [33]byte // When you haven't gotten their revocation elkrem yet.
+	ElkPoint     [33]byte // saved to disk, current revealable point
+	NextElkPoint [33]byte // Point stored for next state
 
-	sig [64]byte // Counterparty's signature (for StatCom tx)
+	sig [64]byte // Counterparty's signature for current state
+
 	// don't write to sig directly; only overwrite via fn() call
 
 	// note sig can be nil during channel creation. if stateIdx isn't 0,
@@ -96,9 +97,8 @@ func (nd *LnNode) QchanInfo(q *Qchan) error {
 		fmt.Printf("\ta %d (them %d) state index %d\n",
 			q.State.MyAmt, q.Value-q.State.MyAmt, q.State.StateIdx)
 
-		fmt.Printf("\tdelta:%d HAKD:%x prevHAKD:%x elk@ %d\n",
-			q.State.Delta, q.State.ElkPoint[:4], q.State.PrevElkPoint[:4],
-			q.ElkRcv.UpTo())
+		fmt.Printf("\tdelta:%d HAKD:%x elk@ %d\n",
+			q.State.Delta, q.State.ElkPoint[:4], q.ElkRcv.UpTo())
 		elkp, _ := q.ElkPoint(false, q.State.StateIdx)
 		myRefPub := lnutil.AddPubsEZ(q.MyRefundPub, elkp)
 		theirRefPub := lnutil.AddPubsEZ(q.TheirRefundPub, q.State.ElkPoint)

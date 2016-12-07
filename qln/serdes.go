@@ -59,9 +59,8 @@ func (s *StatCom) ToBytes() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	// write 33 byte my previous elk point R
-	// at steady state it's 0s.
-	_, err = buf.Write(s.PrevElkPoint[:])
+	// write 33 byte Next elk point
+	_, err = buf.Write(s.NextElkPoint[:])
 	if err != nil {
 		return nil, err
 	}
@@ -103,10 +102,10 @@ func StatComFromBytes(b []byte) (*StatCom, error) {
 	if err != nil {
 		return nil, err
 	}
-	// read 33 byte elk point R
+	// read 33 byte elk point
 	copy(s.ElkPoint[:], buf.Next(33))
-	// read 33 byte previous elk point R
-	copy(s.PrevElkPoint[:], buf.Next(33))
+	// read 33 byte next elk point
+	copy(s.NextElkPoint[:], buf.Next(33))
 
 	// the rest is their sig
 	copy(s.sig[:], buf.Next(64))

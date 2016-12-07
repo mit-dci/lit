@@ -71,27 +71,21 @@ func (nd *LnNode) OmniHandler() {
 		//			CloseRespHandler(from, msg[1:])
 		//			continue
 		//		}
-		// REQUEST TO SEND
-		if msgid == MSGID_RTS {
-			fmt.Printf("Got RTS from %x\n", from)
-			nd.RTSHandler(from, msg[1:])
-			continue
-		}
-		// CHANNEL UPDATE ACKNOWLEDGE AND SIGNATURE
-		if msgid == MSGID_ACKSIG {
-			fmt.Printf("Got ACKSIG from %x\n", from)
-			nd.ACKSIGHandler(from, msg[1:])
+		// PUSH
+		if msgid == MSGID_DELTASIG {
+			fmt.Printf("Got DELTASIG from %x\n", from)
+			nd.DeltaSigHandler(from, msg[1:])
 			continue
 		}
 		// SIGNATURE AND REVOCATION
 		if msgid == MSGID_SIGREV {
 			fmt.Printf("Got SIGREV from %x\n", from)
-			nd.SIGREVHandler(from, msg[1:])
+			nd.SigRevHandler(from, msg[1:])
 			continue
 		}
 		// REVOCATION
-		if msgid == MSGID_REVOKE {
-			fmt.Printf("Got REVOKE from %x\n", from)
+		if msgid == MSGID_REV {
+			fmt.Printf("Got REV from %x\n", from)
 			nd.REVHandler(from, msg[1:])
 			continue
 		}

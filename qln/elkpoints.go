@@ -26,9 +26,9 @@ func ElkPointFromHash(in *chainhash.Hash) [33]byte {
 }
 
 // CurElkPointForThem makes the current state elkrem point to send out
-func (q *Qchan) CurElkPointForThem() (p [33]byte, err error) {
+func (q *Qchan) NextElkPointForThem() (p [33]byte, err error) {
 	// generate revocable elkrem point
-	return q.ElkPoint(false, q.State.StateIdx)
+	return q.ElkPoint(false, q.State.StateIdx+1)
 }
 
 // ElkPoint generates an elkrem Point.  "My" elkrem point is the point
@@ -64,10 +64,23 @@ func (q *Qchan) ElkPoint(mine bool, idx uint64) (p [33]byte, err error) {
 	return
 }
 
+func (q *Qchan) AdvanceElkrem(elk *chainhash.Hash, nextElk [33]byte) error {
+	// check that the revocation works
+	err := q.IngestElkrem(elk)
+	if err != nil {
+		return err
+	}
+	// if ingest was succesful, update the stored elk points
+	// the already stored "next" point becomes the current point
+	q.State.ElkPoint = q.State.NextElkPoint
+	// and the newly received point is stored as the next point
+	q.State.NextElkPoint = nextElk
+	return nil
+}
+
 // IngestElkrem takes in an elkrem hash, performing 2 checks:
 // that it produces the proper elk point, and that it fits into the elkrem tree.
-// if both of these are the case it updates the channel state, removing the
-// revoked point. If either of these checks fail, and definitely the second one
+// If either of these checks fail, and definitely the second one
 // fails, I'm pretty sure the channel is not recoverable and needs to be closed.
 func (q *Qchan) IngestElkrem(elk *chainhash.Hash) error {
 	if elk == nil {
@@ -84,7 +97,7 @@ func (q *Qchan) IngestElkrem(elk *chainhash.Hash) error {
 
 	// if this is state 1, then we have elkrem 0 and we can stop here.
 	// there's nothing to revoke.
-	if q.State.StateIdx == 1 {
+	if q.State.StateIdx == 0 {
 		return nil
 	}
 
@@ -98,15 +111,15 @@ func (q *Qchan) IngestElkrem(elk *chainhash.Hash) error {
 	point := ElkPointFromHash(elk)
 
 	// see if it matches previous elk point
-	if point != q.State.PrevElkPoint {
+	if point != q.State.ElkPoint {
 		// didn't match, the whole channel is borked.
 		return fmt.Errorf("hash %x (index %d) fits tree but creates wrong elkpoint!",
-			elk[:8], q.State.PrevElkPoint)
+			elk[:8], q.State.ElkPoint)
 	}
 
 	// it did match, so we can clear the previous HAKD pub
-	var empty [33]byte
-	q.State.PrevElkPoint = empty
+	//	var empty [33]byte
+	//	q.State.PrevElkPoint = empty
 
 	return nil
 }

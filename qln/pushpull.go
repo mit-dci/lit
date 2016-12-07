@@ -5,7 +5,6 @@ import (
 
 	"github.com/mit-dci/lit/lnutil"
 
-	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
@@ -18,25 +17,38 @@ const minBal = 10000 // channels have to have 10K sat in them; can make variable
 //}
 
 /*
+
+3 messages
+
+pusher -> puller
+DeltaSig: how much is being sent, and a signature for that state
+
+puller -> pusher
+SigRev: A signature and revocation of previous state
+
+pusher -> puller
+Rev: A revocation
+
+Every revocation contains the elkrem hash being revoked, and the next elkpoint.
+
 SendNextMsg logic:
 
 Message to send: channel state (sanity check)
 
-RTS:
+DeltaSig:
 delta < 0
-(prevHAKD == 0)
+you must be pushing.
 
-ACKSIG:
+SigRev:
 delta > 0
-(prevHAKD != 0)
+you must be pulling.
 
-SIGREV:
+Rev:
 delta == 0
-prevHAKD != 0
+you must be done.
 
-REV:
-delta == 0
-prevHAKD == 0
+(note that puller also sends a (useless) rev once they've received the rev and
+have their delta set to 0)
 
 Note that when there's nothing to send, it'll send a REV message,
 revoking the previous state which has already been revoked.
@@ -49,41 +61,27 @@ we might have to send it again anyway.
 // SendNextMsg determines what message needs to be sent next
 // based on the channel state.  It then calls the appropriate function.
 func (nd *LnNode) SendNextMsg(qc *Qchan) error {
-	var empty [33]byte
 
-	// RTS
+	// DeltaSig
 	if qc.State.Delta < 0 {
-		if qc.State.PrevElkPoint != empty {
-			return fmt.Errorf("delta is %d but prevHAKD full!", qc.State.Delta)
-		}
-		return nd.SendRTS(qc)
+		return nd.SendDeltaSig(qc)
 	}
 
-	// ACKSIG
+	// SigRev
 	if qc.State.Delta > 0 {
-		if qc.State.PrevElkPoint == empty {
-			return fmt.Errorf("delta is %d but prevHAKD empty!", qc.State.Delta)
-		}
-		return nd.SendACKSIG(qc)
+		return nd.SendSigRev(qc)
 	}
 
-	//SIGREV (delta must be 0 by now)
-	if qc.State.PrevElkPoint != empty {
-		return nd.SendSIGREV(qc)
-	}
-
-	// REV
+	// Rev
 	return nd.SendREV(qc)
 }
 
 // PushChannel initiates a state update by sending an RTS
 func (nd LnNode) PushChannel(qc *Qchan, amt uint32) error {
 
-	var empty [33]byte
-
 	// don't try to update state until all prior updates have cleared
 	// may want to change this later, but requires other changes.
-	if qc.State.Delta != 0 || qc.State.PrevElkPoint != empty {
+	if qc.State.Delta != 0 {
 		return fmt.Errorf("channel update in progress, cannot push")
 	}
 	// check if this push would lower my balance below minBal
@@ -105,168 +103,47 @@ func (nd LnNode) PushChannel(qc *Qchan, amt uint32) error {
 	if err != nil {
 		return err
 	}
-	return nd.SendRTS(qc)
+	return nd.SendDeltaSig(qc)
 }
 
-// SendRTS based on channel info
-func (nd *LnNode) SendRTS(qc *Qchan) error {
-	qc.State.StateIdx++
+// SendDeltaSig initiates a push, sending the amount to be pushed and the new sig.
+func (nd *LnNode) SendDeltaSig(q *Qchan) error {
+	// increment state number, update balance, go to next elkpoint
+	q.State.StateIdx++
+	q.State.MyAmt += int64(q.State.Delta)
+	q.State.ElkPoint = q.State.NextElkPoint
 
-	elkPoint, err := qc.CurElkPointForThem()
+	// make the signature to send over
+	sig, err := nd.SignState(q)
 	if err != nil {
 		return err
 	}
-
-	fmt.Printf("will send RTS with delta:%d elkPR %x\n",
-		qc.State.Delta, elkPoint[:4])
-
-	opArr := lnutil.OutPointToBytes(qc.Op)
-	// RTS is op (36), delta (4), ElkPointR (33), ElkPointT (33)
-	// total length 106
-	// could put index as well here but for now index just goes ++ each time.
-	msg := []byte{MSGID_RTS}
+	opArr := lnutil.OutPointToBytes(q.Op)
+	// DeltaSig is op (36), Delta (4),  sig (64)
+	// total length 104
+	msg := []byte{MSGID_DELTASIG}
 	msg = append(msg, opArr[:]...)
-	msg = append(msg, lnutil.U32tB(uint32(-qc.State.Delta))...)
-	msg = append(msg, elkPoint[:]...)
-	_, err = nd.RemoteCon.Write(msg)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// RTSHandler takes in an RTS and responds with an ACKSIG (if everything goes OK)
-func (nd *LnNode) RTSHandler(from [16]byte, RTSBytes []byte) {
-
-	if len(RTSBytes) < 73 || len(RTSBytes) > 73 {
-		fmt.Printf("got %d byte RTS, expect 73", len(RTSBytes))
-		return
-	}
-
-	var opArr [36]byte
-	var RTSDelta uint32
-	var RTSElkPoint [33]byte
-
-	// deserialize RTS
-	copy(opArr[:], RTSBytes[:36])
-	RTSDelta = lnutil.BtU32(RTSBytes[36:40])
-	copy(RTSElkPoint[:], RTSBytes[40:])
-
-	// make sure the ElkPoint is a point (basically starts with a 02/03)
-	_, err := btcec.ParsePubKey(RTSElkPoint[:], btcec.S256())
-	if err != nil {
-		fmt.Printf("RTSHandler err %s", err.Error())
-		return
-	}
-
-	// find who we're talkikng to
-	var peerArr [33]byte
-	copy(peerArr[:], nd.RemoteCon.RemotePub.SerializeCompressed())
-	// load qchan & state from DB
-	qc, err := nd.GetQchan(peerArr, opArr)
-	if err != nil {
-		fmt.Printf("RTSHandler GetQchan err %s", err.Error())
-		return
-	}
-	if qc.CloseData.Closed {
-		fmt.Printf("RTSHandler err: %d, %d is closed.",
-			qc.KeyGen.Step[3], qc.KeyGen.Step[4])
-		return
-	}
-	if RTSDelta < 1 {
-		fmt.Printf("RTSHandler err: RTS delta %d", RTSDelta)
-		return
-	}
-	// check if this push would lower counterparty balance below minBal
-	if int64(RTSDelta) > (qc.Value-qc.State.MyAmt)+minBal {
-		fmt.Printf("RTSHandler err: RTS delta %d but they have %d, minBal %d",
-			RTSDelta, qc.Value-qc.State.MyAmt, minBal)
-		return
-	}
-	// check if this push is sufficient to get us above minBal (only needed at
-	// state 1)
-	//if qc.State.StateIdx < 2 && int64(RTSDelta)+qc.State.MyAmt < minBal {
-	if int64(RTSDelta)+qc.State.MyAmt < minBal {
-		fmt.Printf("RTSHandler err: current %d, incoming delta %d, minBal %d",
-			qc.State.MyAmt, RTSDelta, minBal)
-		return
-	}
-
-	if peerArr != qc.PeerId {
-		fmt.Printf("RTSHandler err: peer %x trying to modify peer %x's channel\n",
-			peerArr, qc.PeerId)
-		fmt.Printf("This can't happen now, but joseph wants this check here ",
-			"in case the code changes later and we forget.\n")
-		return
-	}
-	qc.State.Delta = int32(RTSDelta)          // assign delta
-	qc.State.PrevElkPoint = qc.State.ElkPoint // copy previous ElkPoint
-	qc.State.ElkPoint = RTSElkPoint           // assign ElkPoint
-
-	// save delta, ElkPoint to db
-	err = nd.SaveQchanState(qc)
-	if err != nil {
-		fmt.Printf("RTSHandler SaveQchanState err %s", err.Error())
-		return
-	}
-	// saved to db, now proceed to create & sign their tx, and generate their
-	// HAKD pub for them to sign
-	err = nd.SendACKSIG(qc)
-	if err != nil {
-		fmt.Printf("RTSHandler SendACKSIG err %s", err.Error())
-		return
-	}
-	return
-}
-
-// SendACKSIG sends an ACKSIG message based on channel info
-func (nd *LnNode) SendACKSIG(qc *Qchan) error {
-	qc.State.StateIdx++
-	qc.State.MyAmt += int64(qc.State.Delta)
-	qc.State.Delta = 0
-	sig, err := nd.SignState(qc)
-	if err != nil {
-		return err
-	}
-	theirElkPoint, err := qc.CurElkPointForThem()
-	if err != nil {
-		return err
-	}
-
-	opArr := lnutil.OutPointToBytes(qc.Op)
-	// ACKSIG is op (36), ElkPointR (33),  sig (64)
-	// total length 133
-	msg := []byte{MSGID_ACKSIG}
-	msg = append(msg, opArr[:]...)
-	msg = append(msg, theirElkPoint[:]...)
-
+	msg = append(msg, lnutil.I32tB(-q.State.Delta)...)
 	msg = append(msg, sig[:]...)
 	_, err = nd.RemoteCon.Write(msg)
 	return err
 }
 
-// ACKSIGHandler takes in an ACKSIG and responds with an SIGREV (if everything goes OK)
-func (nd *LnNode) ACKSIGHandler(from [16]byte, ACKSIGBytes []byte) {
-	if len(ACKSIGBytes) < 133 || len(ACKSIGBytes) > 133 {
-		fmt.Printf("got %d byte ACKSIG, expect 133", len(ACKSIGBytes))
+// DeltaSigHandler takes in a DeltaSig and responds with an SigRev (if everything goes OK)
+func (nd *LnNode) DeltaSigHandler(from [16]byte, DeltaSigBytes []byte) {
+
+	if len(DeltaSigBytes) < 104 || len(DeltaSigBytes) > 104 {
+		fmt.Printf("got %d byte DeltaSig, expect 104", len(DeltaSigBytes))
 		return
 	}
 
 	var opArr [36]byte
-	var ACKSIGElkPoint [33]byte
-	var sig [64]byte
-
-	// deserialize ACKSIG
-	copy(opArr[:], ACKSIGBytes[:36])
-	copy(ACKSIGElkPoint[:], ACKSIGBytes[36:69])
-	copy(sig[:], ACKSIGBytes[69:])
-
-	// make sure the ElkPoint is a point
-	_, err := btcec.ParsePubKey(ACKSIGElkPoint[:], btcec.S256())
-	if err != nil {
-		fmt.Printf("ACKSIGHandler err %s", err.Error())
-		return
-	}
+	var incomingDelta uint32
+	var incomingSig [64]byte
+	// deserialize DeltaSig
+	copy(opArr[:], DeltaSigBytes[:36])
+	incomingDelta = lnutil.BtU32(DeltaSigBytes[36:40])
+	copy(incomingSig[:], DeltaSigBytes[40:])
 
 	// find who we're talkikng to
 	var peerArr [33]byte
@@ -274,106 +151,116 @@ func (nd *LnNode) ACKSIGHandler(from [16]byte, ACKSIGBytes []byte) {
 	// load qchan & state from DB
 	qc, err := nd.GetQchan(peerArr, opArr)
 	if err != nil {
-		fmt.Printf("ACKSIGHandler err %s", err.Error())
+		fmt.Printf("DeltaSigHandler GetQchan err %s", err.Error())
 		return
 	}
+	if qc.CloseData.Closed {
+		fmt.Printf("DeltaSigHandler err: %d, %d is closed.",
+			qc.KeyGen.Step[3], qc.KeyGen.Step[4])
+		return
+	}
+	if qc.State.Delta != 0 {
+		fmt.Printf("DeltaSigHandler err: %d, %d is in progress, delta %d",
+			qc.KeyGen.Step[3], qc.KeyGen.Step[4], qc.State.Delta)
+	}
+
+	// they have to actually send you money
+	if incomingDelta < 1 {
+		fmt.Printf("DeltaSigHandler err: delta %d", incomingDelta)
+		return
+	}
+
+	// check if this push would lower counterparty balance below minBal
+	if int64(incomingDelta) > (qc.Value-qc.State.MyAmt)+minBal {
+		fmt.Printf("DeltaSigHandler err: RTS delta %d but they have %d, minBal %d",
+			incomingDelta, qc.Value-qc.State.MyAmt, minBal)
+		return
+	}
+
 	if peerArr != qc.PeerId {
-		fmt.Printf("ACKSIGHandler err: peer %x trying to modify peer %x's channel\n",
+		fmt.Printf("DeltaSigHandler err: peer %x trying to modify peer %x's channel\n",
 			peerArr, qc.PeerId)
-		fmt.Printf("This can't happen now, but joseph wants this check here ",
-			"in case the code changes later and we forget.\n")
 		return
 	}
 
-	// increment state
+	// update to the next state to verify
+	qc.State.Delta = int32(incomingDelta)
 	qc.State.StateIdx++
-	// copy current ElkPoints to previous as state has been incremented
-	qc.State.PrevElkPoint = qc.State.ElkPoint
+	qc.State.MyAmt += int64(incomingDelta)
 
-	// get new ElkPoint for signing
-	qc.State.ElkPoint = ACKSIGElkPoint
-
-	// construct tx and verify signature
-
-	// stash amount for justice sig at the end
-	prevAmt := qc.State.MyAmt
-
-	qc.State.MyAmt += int64(qc.State.Delta) // delta should be negative
-	qc.State.Delta = 0
-	err = qc.VerifySig(sig)
+	// verify sig for the next state. only save if this works
+	err = qc.VerifySig(incomingSig)
 	if err != nil {
-		fmt.Printf("ACKSIGHandler err %s", err.Error())
+		fmt.Printf("DeltaSigHandler err %s", err.Error())
 		return
 	}
 
-	// verify worked; Save to incremented state to DB with new & old myHAKDpubs
+	// save channel with new state, new sig, and positive delta set
 	err = nd.SaveQchanState(qc)
 	if err != nil {
-		fmt.Printf("ACKSIGHandler err %s", err.Error())
+		fmt.Printf("DeltaSigHandler SaveQchanState err %s", err.Error())
 		return
 	}
-	err = nd.SendSIGREV(qc)
+	// saved to db, now proceed to create & sign their tx
+	err = nd.SendSigRev(qc)
 	if err != nil {
-		fmt.Printf("ACKSIGHandler err %s", err.Error())
+		fmt.Printf("DeltaSigHandler SendACKSIG err %s", err.Error())
 		return
 	}
 
-	// after saving & sending, go back a state to save the justice sig
-	qc.State.StateIdx--
-	qc.State.MyAmt = prevAmt
-	err = nd.BuildWatchTxidSig(qc)
-	if err != nil {
-		fmt.Printf("ACKSIGHandler err %s", err.Error())
-		return
-	}
-
-	return
 }
 
-// SendSIGREV sends a SIGREV message based on channel info
-func (nd *LnNode) SendSIGREV(qc *Qchan) error {
-	// sign their tx with my new HAKD pubkey I just got.
-	sig, err := nd.SignState(qc)
-	if err != nil {
-		return err
-	}
-	// get elkrem for revoking *previous* state, so elkrem at index - 1.
-	elk, err := qc.ElkSnd.AtIndex(qc.State.StateIdx - 1)
+// SendSigRev sends an SigRev message based on channel info
+func (nd *LnNode) SendSigRev(q *Qchan) error {
+	// state number and balance has already been updated if the incoming sig worked.
+	// go to next elkpoint for signing
+	q.State.ElkPoint = q.State.NextElkPoint
+
+	sig, err := nd.SignState(q)
 	if err != nil {
 		return err
 	}
 
-	opArr := lnutil.OutPointToBytes(qc.Op)
+	// revoke previous already built state
+	elk, err := q.ElkSnd.AtIndex(q.State.StateIdx - 1)
+	if err != nil {
+		return err
+	}
+	// send commitment elkrem point for next round of messages
+	NextElkPoint, err := q.NextElkPointForThem()
+	if err != nil {
+		return err
+	}
 
-	// SIGREV is op (36), elk (32), sig (64)
-	// total length ~132
+	opArr := lnutil.OutPointToBytes(q.Op)
+	// SigRev is op (36), sig (64), ElkHash (32), NextElkPoint (33)
+	// total length 165
 	msg := []byte{MSGID_SIGREV}
 	msg = append(msg, opArr[:]...)
-	msg = append(msg, elk.CloneBytes()...)
 	msg = append(msg, sig[:]...)
+	msg = append(msg, elk[:]...)
+	msg = append(msg, NextElkPoint[:]...)
+
 	_, err = nd.RemoteCon.Write(msg)
 	return err
 }
 
 // SIGREVHandler takes in an SIGREV and responds with a REV (if everything goes OK)
-func (nd *LnNode) SIGREVHandler(from [16]byte, SIGREVBytes []byte) {
+func (nd *LnNode) SigRevHandler(from [16]byte, SigRevBytes []byte) {
 
-	if len(SIGREVBytes) < 132 || len(SIGREVBytes) > 132 {
-		fmt.Printf("got %d byte SIGREV, expect 132", len(SIGREVBytes))
+	if len(SigRevBytes) < 165 || len(SigRevBytes) > 165 {
+		fmt.Printf("got %d byte SIGREV, expect 165", len(SigRevBytes))
 		return
 	}
 
 	var opArr [36]byte
 	var sig [64]byte
+	var nextElkPoint [33]byte
 	// deserialize SIGREV
-	copy(opArr[:], SIGREVBytes[:36])
-	copy(sig[:], SIGREVBytes[68:])
-
-	revElk, err := chainhash.NewHash(SIGREVBytes[36:68])
-	if err != nil {
-		fmt.Printf("SIGREVHandler err %s", err.Error())
-		return
-	}
+	copy(opArr[:], SigRevBytes[:36])
+	copy(sig[:], SigRevBytes[36:100])
+	revElk, _ := chainhash.NewHash(SigRevBytes[100:132])
+	copy(nextElkPoint[:], SigRevBytes[132:])
 
 	// find who we're talkikng to
 	var peerArr [33]byte
@@ -398,6 +285,9 @@ func (nd *LnNode) SIGREVHandler(from [16]byte, SIGREVBytes []byte) {
 	qc.State.StateIdx++
 	qc.State.MyAmt += int64(qc.State.Delta)
 	qc.State.Delta = 0
+	// go to next elkpoint for sig verification.  If it doesn't work we'll crash
+	// without overwriting the old elkpoint
+	//	qc.State.ElkPoint = qc.State.NextElkPoint
 
 	// first verify sig.
 	// (if elkrem ingest fails later, at least we close out with a bit more money)
@@ -408,7 +298,7 @@ func (nd *LnNode) SIGREVHandler(from [16]byte, SIGREVBytes []byte) {
 	}
 
 	// verify elkrem and save it in ram
-	err = qc.IngestElkrem(revElk)
+	err = qc.AdvanceElkrem(revElk, nextElkPoint)
 	if err != nil {
 		fmt.Printf("SIGREVHandler err %s", err.Error())
 		fmt.Printf(" ! non-recoverable error, need to close the channel here.\n")
@@ -449,38 +339,43 @@ func (nd *LnNode) SIGREVHandler(from [16]byte, SIGREVBytes []byte) {
 }
 
 // SendREV sends a REV message based on channel info
-func (nd *LnNode) SendREV(qc *Qchan) error {
-	// get elkrem for revoking *previous* state, so elkrem at index - 1.
-	elk, err := qc.ElkSnd.AtIndex(qc.State.StateIdx - 1)
+func (nd *LnNode) SendREV(q *Qchan) error {
+	// revoke previous already built state
+	elk, err := q.ElkSnd.AtIndex(q.State.StateIdx - 1)
+	if err != nil {
+		return err
+	}
+	// send commitment elkrem point for next round of messages
+	nextElkPoint, err := q.NextElkPointForThem()
 	if err != nil {
 		return err
 	}
 
-	opArr := lnutil.OutPointToBytes(qc.Op)
-	// REV is just op (36), elk (32)
-	// total length 68
-	msg := []byte{MSGID_REVOKE}
+	opArr := lnutil.OutPointToBytes(q.Op)
+	// REV is op (36), elk hash (32), next elk point (33)
+	// total length 101
+	msg := []byte{MSGID_REV}
 	msg = append(msg, opArr[:]...)
-	msg = append(msg, elk.CloneBytes()...)
+	msg = append(msg, elk[:]...)
+	msg = append(msg, nextElkPoint[:]...)
+
 	_, err = nd.RemoteCon.Write(msg)
 	return err
 }
 
 // REVHandler takes in an REV and clears the state's prev HAKD.  This is the
 // final message in the state update process and there is no response.
-func (nd *LnNode) REVHandler(from [16]byte, REVBytes []byte) {
-	if len(REVBytes) != 68 {
-		fmt.Printf("got %d byte REV, expect 68", len(REVBytes))
+func (nd *LnNode) REVHandler(from [16]byte, revBytes []byte) {
+	if len(revBytes) != 101 {
+		fmt.Printf("got %d byte REV, expect 101", len(revBytes))
 		return
 	}
 	var opArr [36]byte
-	// deserialize SIGREV
-	copy(opArr[:], REVBytes[:36])
-	revElk, err := chainhash.NewHash(REVBytes[36:])
-	if err != nil {
-		fmt.Printf("REVHandler err %s", err.Error())
-		return
-	}
+	var nextElkPoint [33]byte
+	// deserialize SigRev
+	copy(opArr[:], revBytes[:36])
+	revElk, _ := chainhash.NewHash(revBytes[36:68])
+	copy(nextElkPoint[:], revBytes[68:])
 
 	// find who we're talkikng to
 	var peerArr [33]byte
@@ -500,21 +395,21 @@ func (nd *LnNode) REVHandler(from [16]byte, REVBytes []byte) {
 	}
 
 	// check if there's nothing for them to revoke
-	var empty [33]byte
-	if qc.State.StateIdx > 1 && qc.State.PrevElkPoint == empty {
+	if qc.State.Delta == 0 {
 		fmt.Printf("got REV message with hash %s, but nothing to revoke\n",
 			revElk.String())
-		return
 	}
 
 	// verify elkrem
-	err = qc.IngestElkrem(revElk)
+	err = qc.AdvanceElkrem(revElk, nextElkPoint)
 	if err != nil {
 		fmt.Printf("REVHandler err %s", err.Error())
 		fmt.Printf(" ! non-recoverable error, need to close the channel here.\n")
 		return
 	}
-	// save to DB (only new elkrem)
+	qc.State.Delta = 0
+
+	// save to DB (new elkrem & point, delta zeroed)
 	err = nd.SaveQchanState(qc)
 	if err != nil {
 		fmt.Printf("REVHandler err %s", err.Error())
