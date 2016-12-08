@@ -23,11 +23,11 @@ const minBal = 10000 // channels have to have 10K sat in them; can make variable
 pusher -> puller
 DeltaSig: how much is being sent, and a signature for that state
 
-puller -> pusher
+pusher <- puller
 SigRev: A signature and revocation of previous state
 
 pusher -> puller
-Rev: A revocation
+Rev: revocation
 
 Every revocation contains the elkrem hash being revoked, and the next elkpoint.
 
@@ -274,8 +274,6 @@ func (nd *LnNode) SigRevHandler(from [16]byte, SigRevBytes []byte) {
 	if peerArr != qc.PeerId {
 		fmt.Printf("SIGREVHandler err: peer %x trying to modify peer %x's channel\n",
 			peerArr, qc.PeerId)
-		fmt.Printf("This can't happen now, but joseph wants this check here ",
-			"in case the code changes later and we forget.\n")
 		return
 	}
 
@@ -389,8 +387,6 @@ func (nd *LnNode) REVHandler(from [16]byte, revBytes []byte) {
 	if peerArr != qc.PeerId {
 		fmt.Printf("REVHandler err: peer %x trying to modify peer %x's channel\n",
 			peerArr, qc.PeerId)
-		fmt.Printf("This can't happen now, but joseph wants this check here ",
-			"in case the code changes later and we forget.\n")
 		return
 	}
 
@@ -407,6 +403,7 @@ func (nd *LnNode) REVHandler(from [16]byte, revBytes []byte) {
 		fmt.Printf(" ! non-recoverable error, need to close the channel here.\n")
 		return
 	}
+	prevAmt := qc.State.MyAmt - int64(qc.State.Delta)
 	qc.State.Delta = 0
 
 	// save to DB (new elkrem & point, delta zeroed)
@@ -415,6 +412,17 @@ func (nd *LnNode) REVHandler(from [16]byte, revBytes []byte) {
 		fmt.Printf("REVHandler err %s", err.Error())
 		return
 	}
+
+	// after saving cleared updated state, go back to previous state and build
+	// the justice signature
+	qc.State.StateIdx--      // back one state
+	qc.State.MyAmt = prevAmt // use stashed previous state amount
+	err = nd.BuildWatchTxidSig(qc)
+	if err != nil {
+		fmt.Printf("REVHandler err %s", err.Error())
+		return
+	}
+
 	fmt.Printf("REV OK, state %d all clear.\n", qc.State.StateIdx)
 	return
 }

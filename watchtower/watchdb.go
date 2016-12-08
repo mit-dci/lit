@@ -158,7 +158,7 @@ func (w *WatchTower) AddNewChannel(wd WatchannelDescriptor) error {
 
 // AddMsg adds a new message describing a penalty tx to the db.
 // optimization would be to add a bunch of messages at once.  Not a huge speedup though.
-func (w *WatchTower) AddMsg(cm ComMsg) error {
+func (w *WatchTower) AddState(cm ComMsg) error {
 	return w.WatchDB.Update(func(btx *bolt.Tx) error {
 
 		// first get the channel bucket, update the elkrem and read the idx
@@ -246,4 +246,25 @@ func (w *WatchTower) IngestTx(txid *chainhash.Hash) (*IdxSig, error) {
 		return nil
 	})
 	return hitsig, err
+}
+
+// Status returns a string describing what's in the watchtower.
+func (w *WatchTower) Status() (string, error) {
+	var err error
+	var s string
+
+	err = w.WatchDB.View(func(btx *bolt.Tx) error {
+		// open the big bucket
+		txidbkt := btx.Bucket(BUCKETTxid)
+		if txidbkt == nil {
+			return fmt.Errorf("no txid bucket")
+		}
+
+		return txidbkt.ForEach(func(txid, idxsig []byte) error {
+			s += fmt.Sprintf("\txid %x\t idxsig: %x\n", txid, idxsig)
+			return nil
+		})
+		return nil
+	})
+	return s, err
 }

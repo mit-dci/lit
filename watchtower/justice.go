@@ -53,10 +53,7 @@ func (w *WatchTower) BuildJusticeTx(
 			return fmt.Errorf("No static data for pkh %x", pkh)
 		}
 		// deserialize static watchDescriptor struct
-		wd, err = WatchannelDescriptorFromBytes(static)
-		if err != nil {
-			return err
-		}
+		wd = WatchannelDescriptorFromBytes(static)
 
 		// get the elkrem receiver
 		elkBytes := pkhBucket.Get(KEYElkRcv)

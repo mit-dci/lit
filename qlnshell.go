@@ -183,9 +183,40 @@ func Push(args []string) error {
 // Watch is the command to set a channel as watched.
 // Watched channels get exported to the watchtower.
 func Watch(args []string) error {
-
-	// show contents of the local justice db
+	if len(args) > 1 {
+		// send updated state to connected watch tower
+		if LNode.WatchCon == nil {
+			return fmt.Errorf("can't connect; no watch tower connected")
+		}
+		peerIdx64, err := strconv.ParseInt(args[0], 10, 32)
+		if err != nil {
+			return err
+		}
+		cIdx64, err := strconv.ParseInt(args[1], 10, 32)
+		if err != nil {
+			return err
+		}
+		qc, err := LNode.GetQchanByIdx(uint32(peerIdx64), uint32(cIdx64))
+		if err != nil {
+			return err
+		}
+		if qc.CloseData.Closed {
+			return fmt.Errorf("channel %d, %d is closed.", peerIdx64, peerIdx64)
+		}
+		err = LNode.SendWatchDesc(qc)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	// show contents of the local stash
 	s, err := LNode.ShowJusticeDB()
+	if err != nil {
+		return err
+	}
+	fmt.Printf(s)
+	// show contents of watchtower db
+	s, err = LNode.Tower.Status()
 	if err != nil {
 		return err
 	}

@@ -26,10 +26,7 @@ const (
 	MSGID_FWDMSG     = 0x20
 	MSGID_FWDAUTHREQ = 0x21
 
-	// desc describes a new channel
-	MSGID_WATCH_DESC = 0xA0
-	// commsg is a single state in the channel
-	MSGID_WATCH_COMMSG = 0xA1
+
 )
 
 const (

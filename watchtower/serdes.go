@@ -8,13 +8,6 @@ import (
 	"github.com/mit-dci/lit/lnutil"
 )
 
-const (
-	// desc describes a new channel
-	MSGID_WATCH_DESC = 0xA0
-	// commsg is a single state in the channel
-	MSGID_WATCH_COMMSG = 0xA1
-)
-
 // Descriptors are 128 bytes
 // PKH 20
 // Delay 2
@@ -31,35 +24,29 @@ func (sd *WatchannelDescriptor) ToBytes() []byte {
 	binary.Write(&buf, binary.BigEndian, sd.Fee)
 	buf.Write(sd.CustomerBasePoint[:])
 	buf.Write(sd.AdversaryBasePoint[:])
-	buf.Write(sd.ElkZero.CloneBytes())
 	return buf.Bytes()
 }
 
-// WatchannelDescriptorFromBytes turns 96 or 128 bytes into a WatchannelDescriptor
-func WatchannelDescriptorFromBytes(b []byte) (WatchannelDescriptor, error) {
+// WatchannelDescriptorFromBytes turns 96 bytes into a WatchannelDescriptor
+// Silently fails with incorrect size input, watch out.
+func WatchannelDescriptorFromBytes(b []byte) WatchannelDescriptor {
 	var sd WatchannelDescriptor
-	if len(b) != 128 && len(b) != 96 {
-		return sd, fmt.Errorf(
-			"WatchannelDescriptor %d bytes, expect 128 or 96", len(b))
+	if len(b) != 96 {
+		return sd
+		//		return sd, fmt.Errorf(
+		//			"WatchannelDescriptor %d bytes, expect 128 or 96", len(b))
 	}
 	buf := bytes.NewBuffer(b)
 
 	copy(sd.DestPKHScript[:], buf.Next(20))
-	err := binary.Read(buf, binary.BigEndian, &sd.Delay)
-	if err != nil {
-		return sd, err
-	}
-	err = binary.Read(buf, binary.BigEndian, &sd.Fee)
-	if err != nil {
-		return sd, err
-	}
+	_ = binary.Read(buf, binary.BigEndian, &sd.Delay)
+
+	_ = binary.Read(buf, binary.BigEndian, &sd.Fee)
 
 	copy(sd.CustomerBasePoint[:], buf.Next(33))
 	copy(sd.AdversaryBasePoint[:], buf.Next(33))
-	// might not be anything left, which is OK, elk0 will just be blank
-	copy(sd.ElkZero[:], buf.Next(32))
 
-	return sd, nil
+	return sd
 }
 
 // ComMsg are 132 bytes.
@@ -67,6 +54,7 @@ func WatchannelDescriptorFromBytes(b []byte) (WatchannelDescriptor, error) {
 // txid 16
 // sig 64
 // elk 32
+
 // ToBytes turns a ComMsg into 132 bytes
 func (sm *ComMsg) ToBytes() (b [132]byte) {
 	var buf bytes.Buffer
@@ -78,9 +66,13 @@ func (sm *ComMsg) ToBytes() (b [132]byte) {
 	return
 }
 
-// ComMsgFromBytes turns 112 bytes into a SorceMsg
-func ComMsgFromBytes(b [128]byte) ComMsg {
+// ComMsgFromBytes turns 132 bytes into a SorceMsg
+// Silently fails with wrong size input.
+func ComMsgFromBytes(b []byte) ComMsg {
 	var sm ComMsg
+	if len(b) != 132 {
+		return sm
+	}
 	copy(sm.DestPKH[:], b[:20])
 	copy(sm.ParTxid[:], b[20:36])
 	copy(sm.Sig[:], b[36:100])

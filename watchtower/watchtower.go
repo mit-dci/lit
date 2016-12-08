@@ -1,13 +1,19 @@
 package watchtower
 
 import (
+	"fmt"
+
 	"github.com/boltdb/bolt"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
 const (
-	defaultpath = "."
-	dbname      = "watchtower.db"
+	// desc describes a new channel
+	MSGID_WATCH_DESC = 0xA0
+	// commsg is a single state in the channel
+	MSGID_WATCH_COMMSG = 0xA1
+	// Watch_clear marks a channel as ok to delete.  No further updates possible.
+	MSGID_WATCH_DELETE = 0xA2
 )
 
 // The main watchtower struct
@@ -48,4 +54,27 @@ type IdxSig struct {
 	PKHIdx   uint32   // Who
 	StateIdx uint64   // When
 	Sig      [64]byte // What
+}
+
+func (w *WatchTower) HandleMessage(from [16]byte, msg []byte) error {
+	fmt.Printf("got message from %x\n", from)
+
+	switch msg[0] {
+	case MSGID_WATCH_DESC:
+		fmt.Printf("new channel to watch\n")
+		desc := WatchannelDescriptorFromBytes(msg[1:])
+		return w.AddNewChannel(desc)
+
+	case MSGID_WATCH_COMMSG:
+		fmt.Printf("new commsg\n")
+		commsg := ComMsgFromBytes(msg[1:])
+		return w.AddState(commsg)
+
+	case MSGID_WATCH_DELETE:
+		fmt.Printf("delete message\n")
+		// delete not yet implemented
+	default:
+		fmt.Printf("unknown message type %x\n", msg[0])
+	}
+	return nil
 }
