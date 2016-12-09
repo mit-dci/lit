@@ -136,6 +136,20 @@ func (s *SPVCon) Refilter(f *bloom.Filter) {
 // different enough that it's better to have 2 separate functions
 func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
 	var err error
+
+	// hand block over to the watchtower via the RawBlockSender chan
+	// omit this if qln not connected
+
+	fmt.Printf("RawBlockSender cap %d\n", cap(s.RawBlockSender))
+
+	fmt.Printf("OPEventChan cap %d\n", cap(s.TS.OPEventChan))
+
+	if cap(s.RawBlockSender) != 0 {
+		s.RawBlockSender <- m
+	} else {
+		fmt.Printf("Watchtower not initialized\n")
+	}
+
 	//	var buf bytes.Buffer
 	//	m.SerializeWitness(&buf)
 	//	fmt.Printf("block hex %x\n", buf.Bytes())

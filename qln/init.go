@@ -9,11 +9,6 @@ func (nd *LnNode) Init(dbfilename, watchname string, basewal UWallet) error {
 		return err
 	}
 
-	err = nd.Tower.OpenDB(watchname)
-	if err != nil {
-		return err
-	}
-
 	nd.OmniChan = make(chan []byte, 10)
 	go nd.OmniHandler()
 
@@ -21,6 +16,13 @@ func (nd *LnNode) Init(dbfilename, watchname string, basewal UWallet) error {
 	nd.BaseWallet = basewal
 	// ask basewallet for outpoint event messages
 	go nd.OPEventHandler()
+
+	err = nd.Tower.OpenDB(watchname)
+	if err != nil {
+		return err
+	}
+	bc := nd.BaseWallet.BlockMonitor()
+	go nd.Tower.BlockHandler(bc)
 
 	return nil
 }

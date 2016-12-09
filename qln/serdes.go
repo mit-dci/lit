@@ -185,7 +185,7 @@ func QchanFromBytes(b []byte) (Qchan, error) {
 
 	q.PorTxo = *u // assign the utxo
 	// hard-coded.  save this soon, it's easy
-	q.TimeOut = 5
+	q.Delay = 5
 
 	return q, nil
 }

@@ -100,6 +100,7 @@ func OpenSPV(remoteNode string, hfn, dbfn string,
 	go s.incomingMessageHandler()
 	s.outMsgQueue = make(chan wire.Message)
 	go s.outgoingMessageHandler()
+
 	if s.HardMode {
 		s.blockQueue = make(chan HashAndHeight, 32) // queue depth 32 for hardmode.
 	} else {

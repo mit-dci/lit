@@ -203,7 +203,7 @@ func Watch(args []string) error {
 		if qc.CloseData.Closed {
 			return fmt.Errorf("channel %d, %d is closed.", peerIdx64, peerIdx64)
 		}
-		err = LNode.SendWatchDesc(qc)
+		err = LNode.SyncWatch(qc)
 		if err != nil {
 			return err
 		}

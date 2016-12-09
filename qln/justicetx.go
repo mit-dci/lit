@@ -23,7 +23,7 @@ anymore.  We can hand over 1 point per commit & figure everything out from that.
 // BuildWatchTxidSig builds the partial txid and signature pair which can
 // be exported to the watchtower.
 // This get a channel that is 1 state old.  So we can produce a signature.
-func (nd *LnNode) BuildWatchTxidSig(q *Qchan) error {
+func (nd *LnNode) BuildJusticeSig(q *Qchan) error {
 	var parTxidSig [80]byte // 16 byte txid and 64 byte signature stuck together
 
 	// in this function, "bad" refers to the hypothetical transaction spending the
@@ -48,7 +48,7 @@ func (nd *LnNode) BuildWatchTxidSig(q *Qchan) error {
 	// make pubkeys, build script
 	badRevokePub := lnutil.CombinePubs(q.MyHAKDBase, elkPoint)
 	badTimeoutPub := lnutil.AddPubsEZ(q.TheirHAKDBase, elkPoint)
-	script := lnutil.CommitScript(badRevokePub, badTimeoutPub, q.TimeOut)
+	script := lnutil.CommitScript(badRevokePub, badTimeoutPub, q.Delay)
 	scriptHashOutScript := lnutil.P2WSHify(script)
 
 	// build the bad tx (redundant as we just build most of it...
@@ -185,50 +185,77 @@ func (nd *LnNode) ShowJusticeDB() (string, error) {
 	return s, err
 }
 
-//
-func (nd *LnNode) SendWatchDesc(qc *Qchan) error {
+// SendWatch syncs up the remote watchtower with all justice signatures
+func (nd *LnNode) SyncWatch(qc *Qchan) error {
 
 	// if watchUpTo isn't 2 behind the state number, there's nothing to send
 	// kindof confusing inequality: can't send state 0 info to watcher when at
-	// state 1, but otherwise makes sense.
-	if qc.State.WatchUpTo+2 > qc.State.StateIdx {
+	// state 1.  State 0 needs special handling.
+	if qc.State.WatchUpTo+2 > qc.State.StateIdx || qc.State.StateIdx < 2 {
 		return fmt.Errorf("Channel at state %d, up to %d exported, nothing to do",
 			qc.State.StateIdx, qc.State.WatchUpTo)
 	}
 	// send initial description if we haven't sent anything yet
 	if qc.State.WatchUpTo == 0 {
-
+		desc := new(watchtower.WatchannelDescriptor)
+		desc.DestPKHScript = qc.WatchRefundAdr
+		desc.Delay = qc.Delay
+		desc.Fee = 5000 // fixed 5000 sat fee; make variable later
+		desc.AdversaryBasePoint = qc.TheirHAKDBase
+		desc.CustomerBasePoint = qc.MyHAKDBase
+		descBytes := desc.ToBytes()
+		_, err := nd.WatchCon.Write(
+			append([]byte{watchtower.MSGID_WATCH_DESC}, descBytes[:]...))
+		if err != nil {
+			return err
+		}
+		// after sending description, must send at least states 0 and 1.
+		err = nd.SendWatchComMsg(qc, 0)
+		if err != nil {
+			return err
+		}
+		err = nd.SendWatchComMsg(qc, 1)
+		if err != nil {
+			return err
+		}
+		qc.State.WatchUpTo = 1
 	}
 	// send messages to get up to 1 less than current state
 	for qc.State.WatchUpTo < qc.State.StateIdx-1 {
 		// increment watchupto number
 		qc.State.WatchUpTo++
-		// retreive the sig data from db
-		txidsig, err := nd.LoadJusticeSig(qc.State.WatchUpTo, qc.WatchRefundAdr)
-		if err != nil {
-			return err
-		}
-		// get the elkrem
-		elk, err := qc.ElkRcv.AtIndex(qc.State.WatchUpTo)
-		if err != nil {
-			return err
-		}
-		commsg := new(watchtower.ComMsg)
-		commsg.DestPKH = qc.WatchRefundAdr
-		commsg.Elk = *elk
-		copy(commsg.ParTxid[:], txidsig[:16])
-		copy(commsg.Sig[:], txidsig[16:])
-		serializedComMsg := commsg.ToBytes()
-
-		// stash to send all?  or just send here
-
-		_, err = nd.WatchCon.Write(
-			append([]byte{watchtower.MSGID_WATCH_COMMSG}, serializedComMsg[:]...))
+		err := nd.SendWatchComMsg(qc, qc.State.WatchUpTo)
 		if err != nil {
 			return err
 		}
 	}
+	// save updated WatchUpTo number
+	return nd.SaveQchanState(qc)
+}
 
-	return nil
+// send WatchComMsg generates and sends the ComMsg to a watchtower
+func (nd *LnNode) SendWatchComMsg(qc *Qchan, idx uint64) error {
+	// retreive the sig data from db
+	txidsig, err := nd.LoadJusticeSig(idx, qc.WatchRefundAdr)
+	if err != nil {
+		return err
+	}
+	// get the elkrem
+	elk, err := qc.ElkRcv.AtIndex(idx)
+	if err != nil {
+		return err
+	}
+	commsg := new(watchtower.ComMsg)
+	commsg.DestPKH = qc.WatchRefundAdr
+	commsg.Elk = *elk
+	copy(commsg.ParTxid[:], txidsig[:16])
+	copy(commsg.Sig[:], txidsig[16:])
+	comBytes := commsg.ToBytes()
 
+	// stash to send all?  or just send once each time?  probably should
+	// set up some output buffering
+
+	_, err = nd.WatchCon.Write(
+		append([]byte{watchtower.MSGID_WATCH_COMMSG}, comBytes[:]...))
+	return err
 }

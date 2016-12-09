@@ -35,7 +35,7 @@ type Qchan struct {
 	ElkSnd *elkrem.ElkremSender   // D derived from channel specific key
 	ElkRcv *elkrem.ElkremReceiver // S stored in db
 
-	TimeOut uint16 // blocks for timeout (default 5 for testing)
+	Delay uint16 // blocks for timeout (default 5 for testing)
 
 	State *StatCom // S current state of channel
 
@@ -48,7 +48,7 @@ type Qchan struct {
 type StatCom struct {
 	StateIdx uint64 // this is the n'th state commitment
 
-	WatchUpTo uint64 // have sent out to watchtowers up to this state  ( <= stateidx)
+	WatchUpTo uint64 // have sent out to watchtowers up to this state  ( < stateidx)
 
 	MyAmt int64 // my channel allocation
 	// their Amt is the utxo.Value minus this

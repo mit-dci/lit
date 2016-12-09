@@ -36,17 +36,19 @@ var (
 
 // variables for a goodelivery session
 type LitConfig struct {
-	spvHost         string
-	regTest, reSync bool // flag to set mainnet
-	birthblock      int32
+	spvHost               string
+	regTest, reSync, hard bool // flag to set mainnet
+	birthblock            int32
 
 	Params *chaincfg.Params
 }
 
 func setConfig(lc *LitConfig) {
-	spvhostptr := flag.String("spv", "", "full node to connect to")
+	spvhostptr := flag.String("spv", "lit3.co", "full node to connect to")
 
 	birthptr := flag.Int("tip", hardHeight, "height to begin db sync")
+
+	easyptr := flag.Bool("ez", false, "use easy mode (bloom filters)")
 
 	regtestptr := flag.Bool("reg", false, "use regtest (not testnet3)")
 	resyncprt := flag.Bool("resync", false, "force resync from given tip")
@@ -58,10 +60,11 @@ func setConfig(lc *LitConfig) {
 
 	lc.regTest = *regtestptr
 	lc.reSync = *resyncprt
+	lc.hard = !*easyptr
 
-	if lc.spvHost == "" {
-		lc.spvHost = "lit3.co"
-	}
+	//	if lc.spvHost == "" {
+	//		lc.spvHost = "lit3.co"
+	//	}
 
 	if lc.regTest {
 		lc.Params = &chaincfg.RegressionNetParams
@@ -98,8 +101,8 @@ func main() {
 	Store := uspv.NewTxStore(rootPriv, conf.Params)
 	// setup spvCon
 
-	SCon, err = uspv.OpenSPV(
-		conf.spvHost, headerFileName, utxodbFileName, &Store, true, false, conf.Params)
+	SCon, err = uspv.OpenSPV(conf.spvHost, headerFileName, utxodbFileName,
+		&Store, conf.hard, false, conf.Params)
 	if err != nil {
 		log.Printf("can't connect: %s", err.Error())
 		log.Fatal(err) // back to fatal when can't connect

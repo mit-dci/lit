@@ -270,7 +270,8 @@ func WCon(args []string) error {
 		return err
 	}
 
-	// no receiver yet.  watcher doesn't send messages unprompted. or at all.
+	// receiver is just the regular lndc.  Really they should be the same, just flag
+	// some lndcs as watchers
 	return nil
 }
 

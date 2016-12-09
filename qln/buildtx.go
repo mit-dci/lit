@@ -146,7 +146,7 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
 	}
 
 	// now that everything is chosen, build fancy script and pkh script
-	fancyScript := lnutil.CommitScript(revPub, timePub, q.TimeOut)
+	fancyScript := lnutil.CommitScript(revPub, timePub, q.Delay)
 	pkhScript := lnutil.DirectWPKHScript(pkhPub) // p2wpkh-ify
 
 	fmt.Printf("> made SH script, state %d\n", s.StateIdx)

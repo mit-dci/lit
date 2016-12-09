@@ -809,7 +809,8 @@ func (ts *TxStore) IngestMany(txs []*wire.MsgTx, height int32) (uint32, error) {
 			for k, v := cur.Seek(pre); bytes.HasPrefix(k, pre); k, v = cur.Next() {
 				// note if v is not empty, we'll get back the exported portxo
 				// a second time, so we don't need to do the detection here.
-				if len(v) == 0 {
+				// only do this if OPEventChan has been initialized
+				if len(v) == 0 && cap(ts.OPEventChan) != 0 {
 					// confirmation of unknown / watch only outpoint, send up to ln
 					// confirmation match detected; return OP event with nil tx
 					// fmt.Printf("|||| zomg match  ")
@@ -834,7 +835,7 @@ func (ts *TxStore) IngestMany(txs []*wire.MsgTx, height int32) (uint32, error) {
 		// could lose stuff we just gained, that's OK.
 		for i, curOP := range spentOPs {
 			v := dufb.Get(curOP[:])
-			if v != nil && len(v) == 0 {
+			if v != nil && len(v) == 0 && cap(ts.OPEventChan) != 0 {
 				// fmt.Printf("|||watch only here zomg\n")
 				hitTxs[spentTxIdx[i]] = true // just save everything
 				op := lnutil.OutPointFromBytes(curOP)

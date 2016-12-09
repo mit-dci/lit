@@ -17,25 +17,40 @@ import (
 // Re-opens the DB which just was closed by IngestTx, but since this almost never
 // happens, we need to end IngestTx as quickly as possible.
 // Note that you should flag the channel for deletion after the JusticeTx is broadcast.
-func (w *WatchTower) BuildJusticeTx(
-	badTx *wire.MsgTx, isig *IdxSig) (*wire.MsgTx, error) {
+func (w *WatchTower) BuildJusticeTx(badTx *wire.MsgTx) (*wire.MsgTx, error) {
 	var err error
 
 	// wd and elkRcv are the two things we need to get out of the db
 	var wd WatchannelDescriptor
 	var elkRcv *elkrem.ElkremReceiver
+	var iSig *IdxSig
 
 	// open DB and get static channel info
 	err = w.WatchDB.View(func(btx *bolt.Tx) error {
+		// get
+		// open the big bucket
+		txidbkt := btx.Bucket(BUCKETTxid)
+		if txidbkt == nil {
+			return fmt.Errorf("no txid bucket")
+		}
+		txid := badTx.TxHash()
+		idxSigBytes := txidbkt.Get(txid[:16])
+		if idxSigBytes == nil {
+			return fmt.Errorf("couldn't get txid %x")
+		}
+		iSig, err = IdxSigFromBytes(idxSigBytes)
+		if err != nil {
+			return err
+		}
 
 		mapBucket := btx.Bucket(BUCKETPKHMap)
 		if mapBucket == nil {
 			return fmt.Errorf("no PKHmap bucket")
 		}
 		// figure out who this Justice belongs to
-		pkh := mapBucket.Get(lnutil.U32tB(isig.PKHIdx))
+		pkh := mapBucket.Get(lnutil.U32tB(iSig.PKHIdx))
 		if pkh == nil {
-			return fmt.Errorf("No pkh found for index %d", isig.PKHIdx)
+			return fmt.Errorf("No pkh found for index %d", iSig.PKHIdx)
 		}
 
 		channelBucket := btx.Bucket(BUCKETChandata)
@@ -75,7 +90,7 @@ func (w *WatchTower) BuildJusticeTx(
 	// done with DB, could do this in separate func?  or leave here.
 
 	// get the elkrem we need.  above check is redundant huh.
-	elkScalarHash, err := elkRcv.AtIndex(isig.StateIdx)
+	elkScalarHash, err := elkRcv.AtIndex(iSig.StateIdx)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +157,7 @@ func (w *WatchTower) BuildJusticeTx(
 	badOP := wire.NewOutPoint(&badtxid, uint32(txoutNum))
 	justiceIn := wire.NewTxIn(badOP, nil, nil)
 	// expand the sig back to 71 bytes
-	bigSig := sig64.SigDecompress(isig.Sig)
+	bigSig := sig64.SigDecompress(iSig.Sig)
 	// witness stack is (1, sig) -- 1 means revoked path
 
 	justiceIn.Sequence = 1                // sequence 1 means grab immediately

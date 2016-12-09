@@ -7,11 +7,11 @@ import (
 	"log"
 	"sync"
 
+	"github.com/boltdb/bolt"
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/boltdb/bolt"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/bloom"
 	"github.com/btcsuite/btcutil/hdkeychain"
@@ -28,12 +28,7 @@ type TxStore struct {
 	FreezeMutex sync.Mutex
 
 	// OPEventChan sends events to the LN wallet.
-	// Note that in the current code, this is REQUIRED, and it'll freeze up
-	// if the LN side doesn't deal with the event messages.
-	// It also means the LN side and wallet side *must* always be sync'd up.
-	// Later I could make it so this is written to a DB for the LN side, but
-	// that's kindof ugly as you're kindof duplicating stuff; the whole
-	// 2-wallet problem
+	// Gets initialized and activates when called by qln
 	OPEventChan chan lnutil.OutPointEvent
 
 	// Params live here... AND SCon
@@ -62,7 +57,6 @@ func NewTxStore(rootkey *hdkeychain.ExtendedKey, p *chaincfg.Params) TxStore {
 	txs.rootPrivKey = rootkey
 	txs.Param = p
 	txs.FreezeSet = make(map[wire.OutPoint]*FrozenTx)
-	txs.OPEventChan = make(chan lnutil.OutPointEvent, 1)
 	return txs
 }
 

@@ -34,9 +34,6 @@ type WatchannelDescriptor struct {
 
 	CustomerBasePoint  [33]byte // client's HAKD key base point
 	AdversaryBasePoint [33]byte // potential attacker's timeout basepoint
-
-	// elk 0 here?  Because they won't send a sig for elk0...
-	ElkZero chainhash.Hash
 }
 
 // the message describing the next commitment tx, sent from the client to the watchtower

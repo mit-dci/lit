@@ -54,6 +54,10 @@ type SPVCon struct {
 	Param *chaincfg.Params // network parameters (testnet3, segnet, etc)
 	TS    *TxStore         // transaction store to write to
 
+	// RawBlockSender is a channel to send full blocks up to the qln / watchtower
+	// only kicks in when requested from upper layer
+	RawBlockSender chan *wire.MsgBlock
+
 	// mBlockQueue is for keeping track of what height we've requested.
 	blockQueue chan HashAndHeight
 	// fPositives is a channel to keep track of bloom filter false positives.

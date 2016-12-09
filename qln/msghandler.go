@@ -92,7 +92,7 @@ func (nd *LnNode) OmniHandler() {
 
 		// messages to hand to the watchtower all start with 0xa_
 		// don't strip the first byte before handing it over
-		if msgid&0xa0 == 0xa0 {
+		if msgid&0xf0 == 0xa0 {
 			err := nd.Tower.HandleMessage(from, msg)
 			if err != nil {
 				fmt.Printf(err.Error())
@@ -100,7 +100,7 @@ func (nd *LnNode) OmniHandler() {
 			continue
 		}
 
-		fmt.Printf("Unknown message id byte %x", msgid)
+		fmt.Printf("Unknown message id byte %x &f0", msgid)
 		continue
 	}
 }

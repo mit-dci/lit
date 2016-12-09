@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
 
@@ -102,6 +103,8 @@ func (w *WatchTower) OpenDB(filename string) error {
 	return nil
 }
 
+// AddNewChannel puts a new channel into the watchtower db.
+// Probably need some way to prevent overwrites.
 func (w *WatchTower) AddNewChannel(wd WatchannelDescriptor) error {
 	return w.WatchDB.Update(func(btx *bolt.Tx) error {
 		// open index : pkh mapping bucket
@@ -111,10 +114,13 @@ func (w *WatchTower) AddNewChannel(wd WatchannelDescriptor) error {
 		}
 		// figure out this new channel's index
 		// 4B channels forever... could fix, but probably enough.
+		var newIdx uint32
 		cur := mapBucket.Cursor()
-		k, _ := cur.Last()            // go to the end
-		newIdx := lnutil.BtU32(k) + 1 // and add 1
-
+		k, _ := cur.Last() // go to the end
+		if k != nil {
+			newIdx = lnutil.BtU32(k) + 1 // and add 1
+		}
+		fmt.Printf("assigning new channel index %d\n", newIdx)
 		newIdxBytes := lnutil.U32tB(newIdx)
 
 		allChanbkt := btx.Bucket(BUCKETChandata)
@@ -132,18 +138,7 @@ func (w *WatchTower) AddNewChannel(wd WatchannelDescriptor) error {
 			return fmt.Errorf("watchdescriptor %d bytes, expect 96")
 		}
 		chanBucket.Put(KEYStatic, wdBytes[:96])
-
-		var elkr elkrem.ElkremReceiver
-		_ = elkr.AddNext(&wd.ElkZero) // first add; can't fail
-		elkBytes, err := elkr.ToBytes()
-		if err != nil {
-			return err
-		}
-		// save the (first) elkrem receiver
-		err = chanBucket.Put(KEYElkRcv, elkBytes)
-		if err != nil {
-			return err
-		}
+		fmt.Printf("saved new channel to pkh %x\n", wd.DestPKHScript)
 		// save index
 		err = chanBucket.Put(KEYIdx, newIdxBytes)
 		if err != nil {
@@ -151,7 +146,6 @@ func (w *WatchTower) AddNewChannel(wd WatchannelDescriptor) error {
 		}
 		// save into index mapping
 		return mapBucket.Put(newIdxBytes, wd.DestPKHScript[:])
-
 		// done
 	})
 }
@@ -183,6 +177,7 @@ func (w *WatchTower) AddState(cm ComMsg) error {
 		if err != nil {
 			return err
 		}
+		// fmt.Printf("added elkrem %x at index %d OK\n", cm.Elk[:], elkr.UpTo())
 
 		// get state number, after elk insertion.  also convert to 8 bytes.
 		stateNumBytes := lnutil.U64tB(elkr.UpTo())
@@ -216,16 +211,18 @@ func (w *WatchTower) AddState(cm ComMsg) error {
 		copy(sigIdxBytes[4:10], stateNumBytes[2:]) // next 8 is state number
 		copy(sigIdxBytes[10:], cm.Sig[:])          // the rest is signature
 
+		fmt.Printf("chan %x (pkh %x) up to state %x\n",
+			cIdxBytes, cm.DestPKH, stateNumBytes)
 		// save sigIdx into the txid bucket.
 		return txidbkt.Put(cm.ParTxid[:8], sigIdxBytes)
 	})
 }
 
-// IngestTx takes in a tx, checks against the DB, and sometimes returns a
-// IdxSig with which to make a JusticeTx.
-func (w *WatchTower) IngestTx(txid *chainhash.Hash) (*IdxSig, error) {
+// MatchTxid takes in a txid, checks against the DB, and if there's a hit, returns a
+// IdxSig with which to make a JusticeTx.  Hits should be rare.
+func (w *WatchTower) MatchTxids(txids []chainhash.Hash) ([]chainhash.Hash, error) {
 	var err error
-	var hitsig *IdxSig
+	var hits []chainhash.Hash
 	err = w.WatchDB.View(func(btx *bolt.Tx) error {
 		// open the big bucket
 		txidbkt := btx.Bucket(BUCKETTxid)
@@ -233,19 +230,59 @@ func (w *WatchTower) IngestTx(txid *chainhash.Hash) (*IdxSig, error) {
 			return fmt.Errorf("no txid bucket")
 		}
 
-		b := txidbkt.Get(txid[:16])
-
-		if b == nil { // no hit, finish here.
-			return nil
-		}
-		// Whoa! hit!  Deserialize
-		hitsig, err = IdxSigFromBytes(b)
-		if err != nil {
-			return err
+		for _, txid := range txids {
+			b := txidbkt.Get(txid[:16])
+			if b != nil {
+				hits = append(hits, txid)
+			}
 		}
 		return nil
 	})
-	return hitsig, err
+	return hits, err
+}
+
+func (w *WatchTower) BlockHandler(bchan chan *wire.MsgBlock) {
+	fmt.Printf("-- started BlockHandler, cap %d\n", cap(bchan))
+	for {
+		err := w.IngestBlock(<-bchan)
+		if err != nil {
+			fmt.Printf(err.Error())
+		}
+	}
+}
+
+func (w *WatchTower) IngestBlock(block *wire.MsgBlock) error {
+	if block == nil || len(block.Transactions) < 2 {
+		return fmt.Errorf("nil / empty block")
+	}
+
+	fmt.Printf("checking block %x, %d txs\n")
+
+	txids, err := block.TxHashes()
+	if err != nil {
+		return err
+	}
+
+	hits, err := w.MatchTxids(txids)
+	if err != nil {
+		return err
+	}
+	if len(hits) > 0 {
+		for _, hitTxid := range hits {
+			fmt.Printf("zomg tx %s matched db\n", hitTxid.String())
+			for _, tx := range block.Transactions { // inefficient here
+				curTxid := tx.TxHash()
+				if curTxid.IsEqual(&hitTxid) {
+					justice, err := w.BuildJusticeTx(tx)
+					if err != nil {
+						return err
+					}
+					fmt.Printf("made justice tx %x\n", justice.TxHash())
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // Status returns a string describing what's in the watchtower.

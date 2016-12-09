@@ -53,6 +53,8 @@ type UWallet interface {
 	// wallet up to the LN module.
 	LetMeKnow() chan lnutil.OutPointEvent
 
+	BlockMonitor() chan *wire.MsgBlock
+
 	// Ask for network parameters
 	Params() *chaincfg.Params
 }

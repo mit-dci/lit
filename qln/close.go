@@ -162,7 +162,7 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 		timeoutPub := lnutil.AddPubsEZ(q.MyHAKDBase, theirElkPoint)
 		revokePub := lnutil.CombinePubs(q.TheirHAKDBase, theirElkPoint)
 
-		script := lnutil.CommitScript(revokePub, timeoutPub, q.TimeOut)
+		script := lnutil.CommitScript(revokePub, timeoutPub, q.Delay)
 		// script check.  redundant / just in case
 		genSH := fastsha256.Sum256(script)
 		if !bytes.Equal(genSH[:], tx.TxOut[shIdx].PkScript[2:34]) {
@@ -195,7 +195,7 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 
 		shTxo.Mode = portxo.TxoP2WSHComp
 		shTxo.Value = tx.TxOut[shIdx].Value
-		shTxo.Seq = uint32(q.TimeOut)
+		shTxo.Seq = uint32(q.Delay)
 		shTxo.PreSigStack = make([][]byte, 1) // revoke SH has one presig item
 		shTxo.PreSigStack[0] = nil            // and that item is a nil (timeout)
 
@@ -215,7 +215,7 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 
 		timeoutPub := lnutil.AddPubsEZ(q.TheirHAKDBase, myElkPoint)
 		revokePub := lnutil.CombinePubs(q.MyHAKDBase, myElkPoint)
-		script := lnutil.CommitScript(revokePub, timeoutPub, q.TimeOut)
+		script := lnutil.CommitScript(revokePub, timeoutPub, q.Delay)
 
 		// script check
 		wshScript := lnutil.P2WSHify(script)
