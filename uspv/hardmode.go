@@ -140,24 +140,12 @@ func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
 	// hand block over to the watchtower via the RawBlockSender chan
 	// omit this if qln not connected
 
-	fmt.Printf("RawBlockSender cap %d\n", cap(s.RawBlockSender))
-
-	fmt.Printf("OPEventChan cap %d\n", cap(s.TS.OPEventChan))
-
 	if cap(s.RawBlockSender) != 0 {
 		s.RawBlockSender <- m
 	} else {
 		fmt.Printf("Watchtower not initialized\n")
 	}
 
-	//	var buf bytes.Buffer
-	//	m.SerializeWitness(&buf)
-	//	fmt.Printf("block hex %x\n", buf.Bytes())
-	//	for _, tx := range m.Transactions {
-	//		fmt.Printf("wtxid: %s\n", tx.WTxSha())
-	//		fmt.Printf(" txid: %s\n", tx.TxSha())
-	//		fmt.Printf("%d %s", i, TxToString(tx))
-	//	}
 	ok := BlockOK(*m) // check block self-consistency
 	if !ok {
 		fmt.Printf("block %s not OK!!11\n", m.BlockHash().String())

@@ -188,7 +188,7 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 
 		shTxo.KeyGen.Step[2] = UseChannelHAKDBase
 
-		elkpoint := ElkPointFromHash(elk)
+		elkpoint := lnutil.ElkPointFromHash(elk)
 		addhash := chainhash.DoubleHashH(append(elkpoint[:], q.MyHAKDBase[:]...))
 
 		shTxo.PrivKey = addhash
@@ -240,7 +240,7 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 
 		shTxo.KeyGen.Step[2] = UseChannelHAKDBase
 
-		shTxo.PrivKey = ElkScalar(elk)
+		shTxo.PrivKey = lnutil.ElkScalar(elk)
 
 		// just return the elkScalar and let
 		// something modify it before export due to the seq=1 flag.

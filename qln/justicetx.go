@@ -39,9 +39,9 @@ func (nd *LnNode) BuildJusticeSig(q *Qchan) error {
 	}
 	// build elkpoint, and rewind the channel's remote elkpoint by one state
 	// get elk scalar
-	elkScalar := ElkScalar(elk)
+	elkScalar := lnutil.ElkScalar(elk)
 	// get elk point
-	elkPoint := ElkPointFromHash(elk)
+	elkPoint := lnutil.ElkPointFromHash(elk)
 	// overwrite remote elkpoint in channel state
 	q.State.ElkPoint = elkPoint
 

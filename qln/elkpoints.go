@@ -11,20 +11,6 @@ import (
 functions dealing with elkrem points and the elkrem structure
 */
 
-// ElkScalar returns the private key (scalar) which comes from a node in the elkrem
-// tree (elkrem hash)
-func ElkScalar(in *chainhash.Hash) chainhash.Hash {
-	return chainhash.DoubleHashH(
-		append(in[:], []byte("ELKSCALAR")...))
-}
-
-// ElkPoint returns the public key (point) which comes from a node in the elkrem
-// tree (elkrem hash)
-func ElkPointFromHash(in *chainhash.Hash) [33]byte {
-	scalar := ElkScalar(in)
-	return lnutil.PubFromHash(scalar)
-}
-
 // CurElkPointForThem makes the current state elkrem point to send out
 func (q *Qchan) NextElkPointForThem() (p [33]byte, err error) {
 	// generate revocable elkrem point
@@ -59,7 +45,7 @@ func (q *Qchan) ElkPoint(mine bool, idx uint64) (p [33]byte, err error) {
 	if err != nil {
 		return
 	}
-	p = ElkPointFromHash(elk)
+	p = lnutil.ElkPointFromHash(elk)
 
 	return
 }
@@ -108,7 +94,7 @@ func (q *Qchan) IngestElkrem(elk *chainhash.Hash) error {
 	// key modification will also work.
 
 	// Make point from received elk hash
-	point := ElkPointFromHash(elk)
+	point := lnutil.ElkPointFromHash(elk)
 
 	// see if it matches previous elk point
 	if point != q.State.ElkPoint {

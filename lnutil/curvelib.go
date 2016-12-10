@@ -281,3 +281,17 @@ func CombinePrivKeyAndSubtract(k *btcec.PrivateKey, b []byte) [32]byte {
 	copy(diffKey[:], combinedKey.D.Bytes())
 	return diffKey
 }
+
+// ElkScalar returns the private key (scalar) which comes from a node in the elkrem
+// tree (elkrem hash)
+func ElkScalar(in *chainhash.Hash) chainhash.Hash {
+	return chainhash.DoubleHashH(
+		append(in[:], []byte("ELKSCALAR")...))
+}
+
+// ElkPoint returns the public key (point) which comes from a node in the elkrem
+// tree (elkrem hash)
+func ElkPointFromHash(in *chainhash.Hash) [33]byte {
+	scalar := ElkScalar(in)
+	return PubFromHash(scalar)
+}

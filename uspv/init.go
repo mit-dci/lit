@@ -12,8 +12,8 @@ import (
 	"github.com/btcsuite/btcd/wire"
 )
 
-// OpenSPV starts a
-func OpenSPV(remoteNode string, hfn, dbfn string,
+// OpenSPV starts the SPV connector.  Doesn't actually dial out though.
+func OpenSPV(headerFileName, dbFileName string,
 	inTs *TxStore, hard bool, iron bool, p *chaincfg.Params) (SPVCon, error) {
 	// create new SPVCon
 	var s SPVCon
@@ -26,12 +26,12 @@ func OpenSPV(remoteNode string, hfn, dbfn string,
 	s.TS = inTs // copy pointer of txstore into spvcon
 
 	// open header file
-	err := s.openHeaderFile(hfn)
+	err := s.openHeaderFile(headerFileName)
 	if err != nil {
 		return s, err
 	}
 	// open db file
-	err = inTs.OpenDB(dbfn)
+	err = inTs.OpenDB(dbFileName)
 	if err != nil {
 		return s, err
 	}
@@ -45,21 +45,26 @@ func OpenSPV(remoteNode string, hfn, dbfn string,
 	//		s.OKTxids[*txid] = 0
 	//	}
 	//	s.OKMutex.Unlock()
+	return s, nil
+}
 
+// Connect dials out and connects to full nodes.
+func (s *SPVCon) Connect(remoteNode string) error {
+	var err error
 	// open TCP connection
 	s.con, err = net.Dial("tcp", remoteNode)
 	if err != nil {
-		return s, err
+		return err
 	}
 	// assign version bits for local node
 	s.localVersion = VERSION
 	myMsgVer, err := wire.NewMsgVersionFromConn(s.con, 0, 0)
 	if err != nil {
-		return s, err
+		return err
 	}
 	err = myMsgVer.AddUserAgent("test", "zero")
 	if err != nil {
-		return s, err
+		return err
 	}
 	// must set this to enable SPV stuff
 	myMsgVer.AddService(wire.SFNodeBloom)
@@ -68,14 +73,14 @@ func OpenSPV(remoteNode string, hfn, dbfn string,
 	// this actually sends
 	n, err := wire.WriteMessageWithEncodingN(s.con, myMsgVer, s.localVersion, s.Param.Net, wire.LatestEncoding)
 	if err != nil {
-		return s, err
+		return err
 	}
 	s.WBytes += uint64(n)
 	log.Printf("wrote %d byte version message to %s\n",
 		n, s.con.RemoteAddr().String())
 	n, m, b, err := wire.ReadMessageWithEncodingN(s.con, s.localVersion, s.Param.Net, wire.LatestEncoding)
 	if err != nil {
-		return s, err
+		return err
 	}
 	s.RBytes += uint64(n)
 	log.Printf("got %d byte response %x\n command: %s\n", n, b, m.Command())
@@ -92,7 +97,7 @@ func OpenSPV(remoteNode string, hfn, dbfn string,
 	mva := wire.NewMsgVerAck()
 	n, err = wire.WriteMessageWithEncodingN(s.con, mva, s.localVersion, s.Param.Net, wire.LatestEncoding)
 	if err != nil {
-		return s, err
+		return err
 	}
 	s.WBytes += uint64(n)
 
@@ -115,16 +120,16 @@ func OpenSPV(remoteNode string, hfn, dbfn string,
 	s.inWaitState = make(chan bool, 1)
 	go s.fPositiveHandler()
 
-	if hard { // what about for non-hard?  send filter?
+	if s.HardMode { // what about for non-hard?  send filter?
 		filt, err := s.TS.GimmeFilter()
 		if err != nil {
-			return s, err
+			return err
 		}
 		s.localFilter = filt
 		//		s.Refilter(filt)
 	}
 
-	return s, nil
+	return nil
 }
 
 func (s *SPVCon) openHeaderFile(hfn string) error {

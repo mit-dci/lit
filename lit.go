@@ -101,20 +101,32 @@ func main() {
 	Store := uspv.NewTxStore(rootPriv, conf.Params)
 	// setup spvCon
 
-	SCon, err = uspv.OpenSPV(conf.spvHost, headerFileName, utxodbFileName,
-		&Store, conf.hard, false, conf.Params)
+	// setup SPVCon
+	SCon, err = uspv.OpenSPV(headerFileName, utxodbFileName, &Store,
+		conf.hard, false, conf.Params)
 	if err != nil {
 		log.Printf("can't connect: %s", err.Error())
 		log.Fatal(err) // back to fatal when can't connect
+	}
+
+	// Setup LN node.  Activate Tower if in hard mode.
+	err = LNode.Init(lndbFileName, watchdbFileName, &SCon, SCon.HardMode)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	tip, err := SCon.TS.GetDBSyncHeight() // ask for sync height
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	if tip == 0 || conf.reSync { // DB has never been used, set to birthday
 		if conf.regTest {
-			tip = 10 // for regtest
+			if conf.birthblock < 100000 {
+				tip = conf.birthblock
+			} else {
+				tip = 10 // for regtest
+			}
 		} else {
 			tip = conf.birthblock // for testnet3. should base on keyfile date?
 		}
@@ -124,7 +136,8 @@ func main() {
 		}
 	}
 
-	err = LNode.Init(lndbFileName, watchdbFileName, &SCon)
+	// Connect to full node
+	err = SCon.Connect(conf.spvHost)
 	if err != nil {
 		log.Fatal(err)
 	}

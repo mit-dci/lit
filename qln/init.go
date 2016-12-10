@@ -2,7 +2,8 @@ package qln
 
 import "github.com/boltdb/bolt"
 
-func (nd *LnNode) Init(dbfilename, watchname string, basewal UWallet) error {
+func (nd *LnNode) Init(
+	dbfilename, watchname string, basewal UWallet, tower bool) error {
 
 	err := nd.OpenDB(dbfilename)
 	if err != nil {
@@ -15,15 +16,17 @@ func (nd *LnNode) Init(dbfilename, watchname string, basewal UWallet) error {
 	// connect to base wallet
 	nd.BaseWallet = basewal
 	// ask basewallet for outpoint event messages
-	go nd.OPEventHandler()
-
-	err = nd.Tower.OpenDB(watchname)
-	if err != nil {
-		return err
+	go nd.OPEventHandler(nd.BaseWallet.LetMeKnow())
+	// optional tower activation
+	if tower {
+		err = nd.Tower.OpenDB(watchname)
+		if err != nil {
+			return err
+		}
+		nd.Tower.Accepting = true
+		// call base wallet blockmonitor and hand this channel to the tower
+		go nd.Tower.BlockHandler(nd.BaseWallet.BlockMonitor())
 	}
-	bc := nd.BaseWallet.BlockMonitor()
-	go nd.Tower.BlockHandler(bc)
-
 	return nil
 }
 

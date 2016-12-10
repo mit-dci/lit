@@ -91,9 +91,13 @@ func (w *WatchTower) OpenDB(filename string) error {
 		if err != nil {
 			return err
 		}
-		_, err = btx.CreateBucketIfNotExists(BUCKETTxid)
+		txidBkt, err := btx.CreateBucketIfNotExists(BUCKETTxid)
 		if err != nil {
 			return err
+		}
+		// if there are txids in the bucket, set watching to true
+		if txidBkt.Stats().KeyN != 0 {
+			w.Watching = true
 		}
 		return nil
 	})
@@ -144,6 +148,11 @@ func (w *WatchTower) AddNewChannel(wd WatchannelDescriptor) error {
 		if err != nil {
 			return err
 		}
+		// even though we haven't actually added anything to watch for,
+		// we're pretty sure there will be soon; the watch tower is "on" at this
+		// point so assert "watching".
+		w.Watching = true
+
 		// save into index mapping
 		return mapBucket.Put(newIdxBytes, wd.DestPKHScript[:])
 		// done
@@ -208,13 +217,14 @@ func (w *WatchTower) AddState(cm ComMsg) error {
 		// pretty quick.  Maybe make a function for this.
 		sigIdxBytes := make([]byte, 74)
 		copy(sigIdxBytes[:4], cIdxBytes)           // first 4 bytes is the PKH index
-		copy(sigIdxBytes[4:10], stateNumBytes[2:]) // next 8 is state number
+		copy(sigIdxBytes[4:10], stateNumBytes[2:]) // next 6 is state number
 		copy(sigIdxBytes[10:], cm.Sig[:])          // the rest is signature
 
 		fmt.Printf("chan %x (pkh %x) up to state %x\n",
 			cIdxBytes, cm.DestPKH, stateNumBytes)
 		// save sigIdx into the txid bucket.
-		return txidbkt.Put(cm.ParTxid[:8], sigIdxBytes)
+		// TODO truncate txid, and deal with collisions.
+		return txidbkt.Put(cm.ParTxid[:16], sigIdxBytes)
 	})
 }
 
@@ -230,9 +240,14 @@ func (w *WatchTower) MatchTxids(txids []chainhash.Hash) ([]chainhash.Hash, error
 			return fmt.Errorf("no txid bucket")
 		}
 
-		for _, txid := range txids {
+		for i, txid := range txids {
+			if i == 0 {
+				// coinbase tx cannot be a bad tx
+				continue
+			}
 			b := txidbkt.Get(txid[:16])
 			if b != nil {
+				fmt.Printf("zomg hit %s\n", txid.String())
 				hits = append(hits, txid)
 			}
 		}
@@ -252,11 +267,16 @@ func (w *WatchTower) BlockHandler(bchan chan *wire.MsgBlock) {
 }
 
 func (w *WatchTower) IngestBlock(block *wire.MsgBlock) error {
-	if block == nil || len(block.Transactions) < 2 {
-		return fmt.Errorf("nil / empty block")
+	if !w.Watching {
+		// we're not actually watching anything, ignore blocks
+		return nil
 	}
-
-	fmt.Printf("checking block %x, %d txs\n")
+	if block == nil || len(block.Transactions) < 2 {
+		fmt.Printf("nil / empty block")
+		return nil
+	}
+	fmt.Printf("checking block %s, %d txs\n",
+		block.BlockHash().String(), len(block.Transactions))
 
 	txids, err := block.TxHashes()
 	if err != nil {
@@ -277,7 +297,8 @@ func (w *WatchTower) IngestBlock(block *wire.MsgBlock) error {
 					if err != nil {
 						return err
 					}
-					fmt.Printf("made justice tx %x\n", justice.TxHash())
+					fmt.Printf("made justice tx %s", justice.TxHash().String())
+					// add some way to broadcast it.
 				}
 			}
 		}

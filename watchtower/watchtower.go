@@ -18,9 +18,13 @@ const (
 
 // The main watchtower struct
 type WatchTower struct {
-	Path       string   // where the DB goes?  needed?
-	WatchDB    *bolt.DB // DB with everything in it
-	SyncHeight int32    // last block we've sync'd to.  Needed?
+	Path    string   // where the DB goes?  needed?
+	WatchDB *bolt.DB // DB with everything in it
+
+	Accepting bool // true if new channels and sigs are allowed in
+	Watching  bool // true if there are txids to watch for
+
+	SyncHeight int32 // last block we've sync'd to.  Needed?
 }
 
 // 2 structs that the watchtower gets from clients: Descriptors and Msgs

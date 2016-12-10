@@ -1,7 +1,6 @@
 package uspv
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/btcsuite/btcd/btcec"
@@ -31,7 +30,6 @@ func (s *SPVCon) Params() *chaincfg.Params {
 
 func (s *SPVCon) BlockMonitor() chan *wire.MsgBlock {
 	s.RawBlockSender = make(chan *wire.MsgBlock, 1)
-	fmt.Printf("initialized RawBlockSender to cap %d\n", cap(s.RawBlockSender))
 	return s.RawBlockSender
 }
 

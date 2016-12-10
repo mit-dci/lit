@@ -93,6 +93,10 @@ func (nd *LnNode) OmniHandler() {
 		// messages to hand to the watchtower all start with 0xa_
 		// don't strip the first byte before handing it over
 		if msgid&0xf0 == 0xa0 {
+			if !nd.Tower.Accepting {
+				fmt.Printf("Error: Got tower msg from %x but tower disabled\n", from)
+				continue
+			}
 			err := nd.Tower.HandleMessage(from, msg)
 			if err != nil {
 				fmt.Printf(err.Error())
@@ -134,8 +138,7 @@ func (nd *LnNode) LNDCReceiver(l net.Conn, id [16]byte) error {
 // OPEventHandler gets outpoint events from the base wallet,
 // and modifies the ln node db to reflect confirmations.  Can also respond
 // with exporting txos to the base wallet, or penalty txs.
-func (nd *LnNode) OPEventHandler() {
-	OPEventChan := nd.BaseWallet.LetMeKnow()
+func (nd *LnNode) OPEventHandler(OPEventChan chan lnutil.OutPointEvent) {
 	for {
 		curOPEvent := <-OPEventChan
 		// get all channels each time.  This is very inefficient!

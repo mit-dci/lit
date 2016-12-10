@@ -93,8 +93,11 @@ func IdxSigFromBytes(b []byte) (*IdxSig, error) {
 		return nil, fmt.Errorf("IdxSigFromBytes got %d bytes, expect 74", len(b))
 	}
 	s.PKHIdx = lnutil.BtU32(b[:4])
-	s.StateIdx = uint64(lnutil.BtI64(b[4:12]))
-	copy(s.Sig[:], b[12:])
+	// kindof ugly but fast; need 8 bytes, so give invalid high 2 bytes
+	// then set them to 0 after we've cast to uint64
+	s.StateIdx = lnutil.BtU64(b[2:10])
+	s.StateIdx &= 0x0000ffffffffffff
+	copy(s.Sig[:], b[10:])
 	return &s, nil
 }
 

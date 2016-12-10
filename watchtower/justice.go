@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/boltdb/bolt"
-	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
@@ -90,46 +89,29 @@ func (w *WatchTower) BuildJusticeTx(badTx *wire.MsgTx) (*wire.MsgTx, error) {
 	// done with DB, could do this in separate func?  or leave here.
 
 	// get the elkrem we need.  above check is redundant huh.
-	elkScalarHash, err := elkRcv.AtIndex(iSig.StateIdx)
+	elkHash, err := elkRcv.AtIndex(iSig.StateIdx)
 	if err != nil {
 		return nil, err
 	}
 
-	_, elkPoint := btcec.PrivKeyFromBytes(btcec.S256(), elkScalarHash[:])
+	elkPoint := lnutil.ElkPointFromHash(elkHash)
 
 	// build the script so we can match it with a txout
 	// to do so, generate Pubkeys for the script
 
-	// get the attacker's base point, cast to a pubkey
-	AttackerBase, err := btcec.ParsePubKey(wd.AdversaryBasePoint[:], btcec.S256())
-	if err != nil {
-		return nil, err
-	}
+	// timeout key is the attacker's base point ez-added with the elk-point
+	TimeoutKey := lnutil.AddPubsEZ(wd.AdversaryBasePoint, elkPoint)
 
-	// get the customer's base point as well
-	CustomerBase, err := btcec.ParsePubKey(wd.CustomerBasePoint[:], btcec.S256())
-	if err != nil {
-		return nil, err
-	}
+	// revocable key is the customer's base point combined with same elk-point
+	Revkey := lnutil.CombinePubs(wd.CustomerBasePoint, elkPoint)
 
-	// timeout key is the attacker's base point combined with the elk-point
-	keysForTimeout := lnutil.CombinablePubKeySlice{AttackerBase, elkPoint}
-	TimeoutKey := keysForTimeout.Combine()
-
-	// revocable key is the customer's base point combined with the same elk-point
-	keysForRev := lnutil.CombinablePubKeySlice{CustomerBase, elkPoint}
-	Revkey := keysForRev.Combine()
-
-	// get byte arrays for the combined pubkeys
-	var RevArr, TimeoutArr [33]byte
-	copy(RevArr[:], Revkey.SerializeCompressed())
-	copy(TimeoutArr[:], TimeoutKey.SerializeCompressed())
-
+	fmt.Printf("tower build revpub %x \ntimeoutpub %x\n", Revkey, TimeoutKey)
 	// build script from the two combined pubkeys and the channel delay
-	script := lnutil.CommitScript(RevArr, TimeoutArr, wd.Delay)
+	script := lnutil.CommitScript(Revkey, TimeoutKey, wd.Delay)
 
 	// get P2WSH output script
 	shOutputScript := lnutil.P2WSHify(script)
+	fmt.Printf("built script %xpkscript %x\n", script, shOutputScript)
 
 	// try to match WSH with output from tx
 	txoutNum := 999
