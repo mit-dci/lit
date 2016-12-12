@@ -5,6 +5,7 @@ import (
 
 	"github.com/boltdb/bolt"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/wire"
 )
 
 const (
@@ -24,7 +25,9 @@ type WatchTower struct {
 	Accepting bool // true if new channels and sigs are allowed in
 	Watching  bool // true if there are txids to watch for
 
-	SyncHeight int32 // last block we've sync'd to.  Needed?
+	SyncHeight int32 // last block we've sync'd to.  Not needed?
+
+	OutBox chan *wire.MsgTx // where the tower sends its justice txs
 }
 
 // 2 structs that the watchtower gets from clients: Descriptors and Msgs
@@ -78,4 +81,8 @@ func (w *WatchTower) HandleMessage(from [16]byte, msg []byte) error {
 		fmt.Printf("unknown message type %x\n", msg[0])
 	}
 	return nil
+}
+
+func (w *WatchTower) JusticeOutbox() chan *wire.MsgTx {
+	return w.OutBox
 }

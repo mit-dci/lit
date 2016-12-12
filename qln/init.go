@@ -1,6 +1,11 @@
 package qln
 
-import "github.com/boltdb/bolt"
+import (
+	"fmt"
+
+	"github.com/boltdb/bolt"
+	"github.com/btcsuite/btcd/wire"
+)
 
 func (nd *LnNode) Init(
 	dbfilename, watchname string, basewal UWallet, tower bool) error {
@@ -26,8 +31,21 @@ func (nd *LnNode) Init(
 		nd.Tower.Accepting = true
 		// call base wallet blockmonitor and hand this channel to the tower
 		go nd.Tower.BlockHandler(nd.BaseWallet.BlockMonitor())
+		go nd.Relay(nd.Tower.JusticeOutbox())
 	}
+
 	return nil
+}
+
+// relay txs from the watchtower to the underlying wallet...
+// small, but a little ugly; maybe there's a cleaner way
+func (nd *LnNode) Relay(outbox chan *wire.MsgTx) {
+	for {
+		err := nd.BaseWallet.PushTx(<-outbox)
+		if err != nil {
+			fmt.Printf("PushTx error: %s", err.Error())
+		}
+	}
 }
 
 // Opens the DB file for the LnNode

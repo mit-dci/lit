@@ -77,6 +77,9 @@ var (
 func (w *WatchTower) OpenDB(filename string) error {
 	var err error
 
+	// also make the channel for output
+	w.OutBox = make(chan *wire.MsgTx, 1)
+
 	w.WatchDB, err = bolt.Open(filename, 0644, nil)
 	if err != nil {
 		return err
@@ -297,8 +300,8 @@ func (w *WatchTower) IngestBlock(block *wire.MsgBlock) error {
 					if err != nil {
 						return err
 					}
-					fmt.Printf("made justice tx %s", justice.TxHash().String())
-					// add some way to broadcast it.
+					fmt.Printf("made & sent out justice tx %s", justice.TxHash().String())
+					w.OutBox <- justice
 				}
 			}
 		}
