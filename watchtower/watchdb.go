@@ -300,7 +300,7 @@ func (w *WatchTower) IngestBlock(block *wire.MsgBlock) error {
 					if err != nil {
 						return err
 					}
-					fmt.Printf("made & sent out justice tx %s", justice.TxHash().String())
+					fmt.Printf("made & sent out justice tx %s\n", justice.TxHash().String())
 					w.OutBox <- justice
 				}
 			}

@@ -21,7 +21,7 @@ func (s *SPVCon) GetPub(k portxo.KeyGen) *btcec.PublicKey {
 }
 
 func (s *SPVCon) PushTx(tx *wire.MsgTx) error {
-	return s.NewOutgoingTx(tx)
+	return s.DirectSendTx(tx)
 }
 
 func (s *SPVCon) Params() *chaincfg.Params {

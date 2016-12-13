@@ -86,6 +86,7 @@ func (nd *LnNode) BuildJusticeSig(q *Qchan) error {
 	badOP := wire.NewOutPoint(&badTxid, badIdx)
 	// make the justice txin, empty sig / witness
 	justiceIn := wire.NewTxIn(badOP, nil, nil)
+	justiceIn.Sequence = 1
 	// make justice output script
 	justiceScript := lnutil.DirectWPKHScriptFromPKH(q.WatchRefundAdr)
 	// make justice txout
@@ -99,12 +100,14 @@ func (nd *LnNode) BuildJusticeSig(q *Qchan) error {
 	justiceTx.AddTxIn(justiceIn)
 	justiceTx.AddTxOut(justiceOut)
 
+	jtxid := justiceTx.TxHash()
+	fmt.Printf("made justice tx %s\n", jtxid.String())
 	// get hashcache for signing
 	hCache := txscript.NewTxSigHashes(justiceTx)
 
 	// sign with combined key.  Justice txs always have only 1 input, so txin is 0
 	bigSig, err := txscript.RawTxInWitnessSignature(
-		justiceTx, hCache, 0, q.Value, script, txscript.SigHashAll, combinedPrivKey)
+		justiceTx, hCache, 0, badAmt, script, txscript.SigHashAll, combinedPrivKey)
 	// truncate sig (last byte is sighash type, always sighashAll)
 	bigSig = bigSig[:len(bigSig)-1]
 

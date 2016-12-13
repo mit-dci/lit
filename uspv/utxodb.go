@@ -464,6 +464,22 @@ func (ts *TxStore) GetAllStxos() ([]*Stxo, error) {
 	return stxos, nil
 }
 
+// SaveTx unconditionally saves a tx in the DB, usually for sending out to nodes
+func (ts *TxStore) SaveTx(tx *wire.MsgTx) error {
+	// open db
+	return ts.StateDB.Update(func(btx *bolt.Tx) error {
+		// get the outpoint watch bucket
+		txbkt := btx.Bucket(BKTTxns)
+		if txbkt == nil {
+			return fmt.Errorf("tx bucket not in db")
+		}
+		var buf bytes.Buffer
+		tx.Serialize(&buf)
+		txid := tx.TxHash()
+		return txbkt.Put(txid[:], buf.Bytes())
+	})
+}
+
 // GetTx takes a txid and returns the transaction.  If we have it.
 func (ts *TxStore) GetTx(txid *chainhash.Hash) (*wire.MsgTx, error) {
 	rtx := wire.NewMsgTx()
