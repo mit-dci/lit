@@ -215,12 +215,15 @@ func Watch(args []string) error {
 		return err
 	}
 	fmt.Printf(s)
-	// show contents of watchtower db
-	s, err = LNode.Tower.Status()
-	if err != nil {
-		return err
+	// Only query Tower if in hard mode and tower is active
+	if SCon.HardMode {
+		// show contents of watchtower db
+		s, err = LNode.Tower.Status()
+		if err != nil {
+			return err
+		}
+		fmt.Printf(s)
 	}
-	fmt.Printf(s)
 	return nil
 }
 
