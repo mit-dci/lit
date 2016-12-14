@@ -469,6 +469,14 @@ func (nd *LnNode) QChanAckHandler(from [16]byte, ackbytes []byte) {
 		fmt.Printf("QChanAckHandler WatchThis err %s", err.Error())
 		return
 	}
+
+	// tell base wallet about watcher refund address in case that happens
+	nullTxo := new(portxo.PorTxo)
+	nullTxo.Value = 0 // redundant, but explicitly show that this is just for adr
+	nullTxo.KeyGen = qc.KeyGen
+	nullTxo.KeyGen.Step[2] = UseChannelWatchRefund
+	nd.BaseWallet.ExportUtxo(nullTxo)
+
 	// sig proof should be sent later once there are confirmations.
 	// it'll have an spv proof of the fund tx.
 	// but for now just send the sig.
@@ -518,13 +526,13 @@ func (nd *LnNode) SigProofHandler(from [16]byte, sigproofbytes []byte) {
 		fmt.Printf("SigProofHandler err %s", err.Error())
 		return
 	}
-	// add to bloom filter here; later should instead receive spv proof
-	//	filt, err := SCon.TS.GimmeFilter()
-	//	if err != nil {
-	//		fmt.Printf("QChanDescHandler RefilterLocal err %s", err.Error())
-	//		return
-	//	}
-	//	SCon.Refilter(filt)
+
+	// tell base wallet about watcher refund address in case that happens
+	nullTxo := new(portxo.PorTxo)
+	nullTxo.Value = 0 // redundant, but explicitly show that this is just for adr
+	nullTxo.KeyGen = qc.KeyGen
+	nullTxo.KeyGen.Step[2] = UseChannelWatchRefund
+	nd.BaseWallet.ExportUtxo(nullTxo)
 
 	// sig OK; in terms of UI here's where you can say "payment received"
 	// "channel online" etc

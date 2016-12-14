@@ -599,7 +599,7 @@ func (nd *LnNode) RestoreQchanFromBucket(
 	qc.MyHAKDBase = nd.GetUsePub(qc.KeyGen, UseChannelHAKDBase)
 
 	// derive my watchtower refund PKH
-	watchRefundPub := nd.GetUsePub(qc.KeyGen, UseChannelElkrem)
+	watchRefundPub := nd.GetUsePub(qc.KeyGen, UseChannelWatchRefund)
 	watchRefundPKHslice := btcutil.Hash160(watchRefundPub[:])
 	copy(qc.WatchRefundAdr[:], watchRefundPKHslice)
 

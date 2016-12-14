@@ -281,6 +281,23 @@ func (ts *TxStore) NewAdr160() ([]byte, error) {
 	return nAdr160, nil
 }
 
+// AddPorTxoAdr adds an externally sourced address to the db.  Looks at the keygen
+// to derive hash160.
+func (ts *TxStore) AddPorTxoAdr(kg portxo.KeyGen) error {
+	// write to db file
+	return ts.StateDB.Update(func(btx *bolt.Tx) error {
+		adrb := btx.Bucket(BKTadr)
+		if adrb == nil {
+			return fmt.Errorf("no adr bucket")
+		}
+
+		adr160 := ts.PathPubHash160(kg)
+		fmt.Printf("adding addr %x\n", adr160)
+		// add the 20-byte key-hash into the db
+		return adrb.Put(adr160, kg.Bytes())
+	})
+}
+
 // RecoverAdrs regenerates a fixed number of refund addresses for payment
 // channels, adds them to the DB, and then resets the DB sync height.
 func (ts *TxStore) RecoverAdrs() error {
@@ -321,10 +338,6 @@ func (ts *TxStore) RecoverAdrs() error {
 		adrb := btx.Bucket(BKTadr)
 		if adrb == nil {
 			return fmt.Errorf("no adr bucket")
-		}
-		sta := btx.Bucket(BKTState)
-		if sta == nil {
-			return fmt.Errorf("no state bucket")
 		}
 
 		// ########## can't return here; make loop with lots of puts
@@ -528,35 +541,6 @@ func (ts *TxStore) GetAllTxs() ([]*wire.MsgTx, error) {
 	}
 	return rtxs, nil
 }
-
-// GetAllTxids returns all the stored txids. Note that we don't remember
-// what height they were at.
-/*
-Don't think this is needed.
-func (ts *TxStore) GetAllTxids() ([]*wire.ShaHash, error) {
-	var txids []*wire.ShaHash
-
-	err := ts.StateDB.View(func(btx *bolt.Tx) error {
-		txns := btx.Bucket(BKTTxns)
-		if txns == nil {
-			return fmt.Errorf("no transactions in db")
-		}
-
-		return txns.ForEach(func(k, v []byte) error {
-			txid, err := wire.NewShaHash(k)
-			if err != nil {
-				return err
-			}
-			txids = append(txids, txid)
-			return nil
-		})
-	})
-	if err != nil {
-		return nil, err
-	}
-	return txids, nil
-}
-*/
 
 // GetAllWatchOPs returns all outpoints we're watching.  Both portxos and watch-only.
 func (ts *TxStore) GetAllOPs() ([]*wire.OutPoint, error) {

@@ -43,6 +43,15 @@ func (nd *LnNode) SignBreakTx(q *Qchan) (*wire.MsgTx, error) {
 	} else {
 		tx.TxIn[0].Witness = SpendMultiSigWitStack(pre, mySig, theirSig)
 	}
+
+	// save channel state as closed
+	q.CloseData.Closed = true
+	q.CloseData.CloseTxid = tx.TxHash()
+	err = nd.SaveQchanUtxoData(q)
+	if err != nil {
+		return nil, err
+	}
+
 	return tx, nil
 }
 
