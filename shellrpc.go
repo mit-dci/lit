@@ -15,9 +15,17 @@ import (
 	"github.com/btcsuite/btcutil"
 )
 
+/*
+Remote Procedure Calls
+RPCs are how people tell the lit node what to do.
+
+
+
+*/
+
 // multi-use structs
 
-type LNRpc struct {
+type LitRPC struct {
 	// nothing...?
 }
 type TxidsReply struct {
@@ -40,7 +48,7 @@ type AdrReply struct {
 	NewAddresses []string
 }
 
-func (r *LNRpc) Address(args *AdrArgs, reply *AdrReply) error {
+func (r *LitRPC) Address(args *AdrArgs, reply *AdrReply) error {
 	//	reply.PreviousAddresses = make([]string, len(SCon.TS.Adrs))
 	reply.NewAddresses = make([]string, args.NumToMake)
 
@@ -62,7 +70,6 @@ func (r *LNRpc) Address(args *AdrArgs, reply *AdrReply) error {
 		reply.NewAddresses[nokori-1] = wa.String()
 		nokori--
 	}
-
 	return nil
 }
 
@@ -96,7 +103,7 @@ type ChannelInfo struct {
 	PeerID    string
 }
 
-func (r *LNRpc) Bal(args *NoArgs, reply *BalReply) error {
+func (r *LitRPC) Bal(args *NoArgs, reply *BalReply) error {
 	// check current chain height; needed for time-locked outputs
 	curHeight, err := SCon.TS.GetDBSyncHeight()
 	if err != nil {
@@ -133,7 +140,7 @@ func (r *LNRpc) Bal(args *NoArgs, reply *BalReply) error {
 }
 
 // TxoList sends back a list of all non-channel utxos
-func (r *LNRpc) TxoList(args *NoArgs, reply *TxoListReply) error {
+func (r *LitRPC) TxoList(args *NoArgs, reply *TxoListReply) error {
 	allTxos, err := SCon.TS.GetAllUtxos()
 	if err != nil {
 		return err
@@ -152,7 +159,7 @@ func (r *LNRpc) TxoList(args *NoArgs, reply *TxoListReply) error {
 
 // ChannelList sends back a list of every (open?) channel with some
 // info for each.
-func (r *LNRpc) ChannelList(args *NoArgs, reply *ChannelListReply) error {
+func (r *LitRPC) ChannelList(args *NoArgs, reply *ChannelListReply) error {
 	qcs, err := LNode.GetAllQchans()
 	if err != nil {
 		return err
@@ -174,7 +181,7 @@ type SendArgs struct {
 	Amts      []int64
 }
 
-func (r *LNRpc) Send(args SendArgs, reply *TxidsReply) error {
+func (r *LitRPC) Send(args SendArgs, reply *TxidsReply) error {
 	var err error
 
 	nOutputs := len(args.DestAddrs)
@@ -214,7 +221,7 @@ type SweepArgs struct {
 	Drop    bool
 }
 
-func (r *LNRpc) Sweep(args SweepArgs, reply *TxidsReply) error {
+func (r *LitRPC) Sweep(args SweepArgs, reply *TxidsReply) error {
 	adr, err := btcutil.DecodeAddress(args.DestAdr, SCon.TS.Param)
 	if err != nil {
 		fmt.Printf("error parsing %s as address\t", args.DestAdr)
@@ -282,7 +289,7 @@ type FanArgs struct {
 	AmtPerOutput int64
 }
 
-func (r *LNRpc) Fanout(args FanArgs, reply *TxidsReply) error {
+func (r *LitRPC) Fanout(args FanArgs, reply *TxidsReply) error {
 	if args.NumOutputs < 1 {
 		return fmt.Errorf("Must have at least 1 output")
 	}
@@ -314,7 +321,7 @@ func (r *LNRpc) Fanout(args FanArgs, reply *TxidsReply) error {
 }
 
 // ------------------------- listen
-func (r *LNRpc) Listen(args NoArgs, reply *StatusReply) error {
+func (r *LitRPC) Listen(args NoArgs, reply *StatusReply) error {
 	err := TCPListener(":2448")
 	if err != nil {
 		return err
@@ -329,7 +336,7 @@ type ConnectArgs struct {
 	LNAddr string
 }
 
-func (r *LNRpc) Connect(args ConnectArgs, reply *StatusReply) error {
+func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
 
 	connectNode, err := lndc.LnAddrFromString(args.LNAddr)
 	if err != nil {
@@ -370,7 +377,7 @@ type FundArgs struct {
 	InitialSend int64 // Initial send of -1 means "ALL"
 }
 
-func (r *LNRpc) Fund(args FundArgs, reply *StatusReply) error {
+func (r *LitRPC) Fund(args FundArgs, reply *StatusReply) error {
 	if args.InitialSend > args.Capacity {
 		return fmt.Errorf("Initial send more than capacity")
 	}
@@ -388,7 +395,7 @@ type PushReply struct {
 	StateIndex uint64
 }
 
-func (r *LNRpc) Push(args PushArgs, reply *PushReply) error {
+func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 	if LNode.RemoteCon == nil || LNode.RemoteCon.RemotePub == nil {
 		return fmt.Errorf("Not connected to anyone, can't push\n")
 	}
@@ -422,10 +429,11 @@ func (r *LNRpc) Push(args PushArgs, reply *PushReply) error {
 }
 
 func rpcShellListen() error {
-	rpcl := new(LNRpc)
+	rpcl := new(LitRPC)
 	server := rpc.NewServer()
 	server.Register(rpcl)
-	server.HandleHTTP("/jsonrpc", "/debug/jsonrpc")
+	server.HandleHTTP(rpc.DefaultRPCPath, rpc.DefaultDebugPath)
+
 	listener, e := net.Listen("tcp", ":1234")
 	if e != nil {
 		return e
@@ -434,7 +442,7 @@ func rpcShellListen() error {
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
-				log.Printf("accept error: " + err.Error())
+				log.Printf("listener error: " + err.Error())
 			} else {
 				log.Printf("new connection from %s\n", conn.RemoteAddr().String())
 				go server.ServeCodec(jsonrpc.NewServerCodec(conn))
