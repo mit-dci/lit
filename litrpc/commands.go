@@ -1,33 +1,15 @@
-package main
+package litrpc
 
 import (
 	"fmt"
-	"log"
-	"net"
-	"net/rpc"
-	"net/rpc/jsonrpc"
 	"sort"
-
-	"github.com/mit-dci/lit/lndc"
-	"github.com/mit-dci/lit/portxo"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcutil"
+	"github.com/mit-dci/lit/lndc"
+	"github.com/mit-dci/lit/portxo"
 )
 
-/*
-Remote Procedure Calls
-RPCs are how people tell the lit node what to do.
-
-
-
-*/
-
-// multi-use structs
-
-type LitRPC struct {
-	// nothing...?
-}
 type TxidsReply struct {
 	Txids []string
 }
@@ -39,40 +21,6 @@ type NoArgs struct {
 	// nothin
 }
 
-// ------------------------- address
-type AdrArgs struct {
-	NumToMake uint32
-}
-type AdrReply struct {
-	//	PreviousAddresses []string
-	NewAddresses []string
-}
-
-func (r *LitRPC) Address(args *AdrArgs, reply *AdrReply) error {
-	//	reply.PreviousAddresses = make([]string, len(SCon.TS.Adrs))
-	reply.NewAddresses = make([]string, args.NumToMake)
-
-	//	for i, a := range SCon.TS.Adrs {
-	//		reply.PreviousAddresses[i] = a.PkhAdr.String()
-	//	}
-
-	nokori := args.NumToMake
-	for nokori > 0 {
-		a160, err := SCon.TS.NewAdr160()
-		if err != nil {
-			return err
-		}
-
-		wa, err := btcutil.NewAddressWitnessPubKeyHash(a160, SCon.Param)
-		if err != nil {
-			return err
-		}
-		reply.NewAddresses[nokori-1] = wa.String()
-		nokori--
-	}
-	return nil
-}
-
 // ------------------------- balance
 // BalReply is the reply when the user asks about their balance.
 // This is a Non-Channel
@@ -82,34 +30,14 @@ type BalReply struct {
 	SpendableNow      int64
 	SpendableNowWitty int64
 }
-type TxoListReply struct {
-	Txos []TxoInfo
-}
-type ChannelListReply struct {
-	Channels []ChannelInfo
-}
-type TxoInfo struct {
-	OutPoint string
-	Amt      int64
-	Height   int32
-
-	PeerNum uint32
-	KeyNum  uint32
-}
-type ChannelInfo struct {
-	OutPoint  string
-	Capacity  int64
-	MyBalance int64
-	PeerID    string
-}
 
 func (r *LitRPC) Bal(args *NoArgs, reply *BalReply) error {
 	// check current chain height; needed for time-locked outputs
-	curHeight, err := SCon.TS.GetDBSyncHeight()
+	curHeight, err := r.SCon.TS.GetDBSyncHeight()
 	if err != nil {
 		return err
 	}
-	allTxos, err := SCon.TS.GetAllUtxos()
+	allTxos, err := r.SCon.TS.GetAllUtxos()
 	if err != nil {
 		return err
 	}
@@ -127,7 +55,7 @@ func (r *LitRPC) Bal(args *NoArgs, reply *BalReply) error {
 	}
 
 	// get all channel states
-	qcs, err := LNode.GetAllQchans()
+	qcs, err := r.Node.GetAllQchans()
 	if err != nil {
 		return err
 	}
@@ -139,9 +67,20 @@ func (r *LitRPC) Bal(args *NoArgs, reply *BalReply) error {
 	return nil
 }
 
+type TxoInfo struct {
+	OutPoint string
+	Amt      int64
+	Height   int32
+
+	KeyPath string
+}
+type TxoListReply struct {
+	Txos []TxoInfo
+}
+
 // TxoList sends back a list of all non-channel utxos
 func (r *LitRPC) TxoList(args *NoArgs, reply *TxoListReply) error {
-	allTxos, err := SCon.TS.GetAllUtxos()
+	allTxos, err := r.SCon.TS.GetAllUtxos()
 	if err != nil {
 		return err
 	}
@@ -150,17 +89,26 @@ func (r *LitRPC) TxoList(args *NoArgs, reply *TxoListReply) error {
 	for i, u := range allTxos {
 		reply.Txos[i].Amt = u.Value
 		reply.Txos[i].Height = u.Height
-		reply.Txos[i].KeyNum = u.KeyGen.Step[4]
 		reply.Txos[i].OutPoint = u.Op.String()
-		reply.Txos[i].PeerNum = u.KeyGen.Step[3]
+		reply.Txos[i].KeyPath = u.KeyGen.String()
 	}
 	return nil
+}
+
+type ChannelInfo struct {
+	OutPoint  string
+	Capacity  int64
+	MyBalance int64
+	PeerID    string
+}
+type ChannelListReply struct {
+	Channels []ChannelInfo
 }
 
 // ChannelList sends back a list of every (open?) channel with some
 // info for each.
 func (r *LitRPC) ChannelList(args *NoArgs, reply *ChannelListReply) error {
-	qcs, err := LNode.GetAllQchans()
+	qcs, err := r.Node.GetAllQchans()
 	if err != nil {
 		return err
 	}
@@ -196,16 +144,19 @@ func (r *LitRPC) Send(args SendArgs, reply *TxidsReply) error {
 	adrs := make([]btcutil.Address, nOutputs)
 
 	for i, s := range args.DestAddrs {
-		adrs[i], err = btcutil.DecodeAddress(s, SCon.TS.Param)
+		adrs[i], err = btcutil.DecodeAddress(s, r.SCon.TS.Param)
 		if err != nil {
 			return err
 		}
+		if args.Amts[i] < 10000 {
+			return fmt.Errorf("Amt %d less than min 10000", args.Amts[i])
+		}
 	}
-	tx, err := SCon.TS.SendCoins(adrs, args.Amts)
+	tx, err := r.SCon.TS.SendCoins(adrs, args.Amts)
 	if err != nil {
 		return err
 	}
-	err = SCon.NewOutgoingTx(tx)
+	err = r.SCon.NewOutgoingTx(tx)
 	if err != nil {
 		return err
 	}
@@ -222,7 +173,7 @@ type SweepArgs struct {
 }
 
 func (r *LitRPC) Sweep(args SweepArgs, reply *TxidsReply) error {
-	adr, err := btcutil.DecodeAddress(args.DestAdr, SCon.TS.Param)
+	adr, err := btcutil.DecodeAddress(args.DestAdr, r.SCon.TS.Param)
 	if err != nil {
 		fmt.Printf("error parsing %s as address\t", args.DestAdr)
 		return err
@@ -234,7 +185,7 @@ func (r *LitRPC) Sweep(args SweepArgs, reply *TxidsReply) error {
 	nokori := args.NumTx
 
 	var allUtxos portxo.TxoSliceByAmt
-	allUtxos, err = SCon.TS.GetAllUtxos()
+	allUtxos, err = r.SCon.TS.GetAllUtxos()
 	if err != nil {
 		return err
 	}
@@ -260,12 +211,12 @@ func (r *LitRPC) Sweep(args SweepArgs, reply *TxidsReply) error {
 				//					return err
 				//				}
 			} else {
-				tx, err := SCon.TS.SendOne(*allUtxos[i], adr)
+				tx, err := r.SCon.TS.SendOne(*allUtxos[i], adr)
 				if err != nil {
 					return err
 				}
 				txid = tx.TxHash()
-				err = SCon.NewOutgoingTx(tx)
+				err = r.SCon.NewOutgoingTx(tx)
 				if err != nil {
 					return err
 				}
@@ -296,7 +247,7 @@ func (r *LitRPC) Fanout(args FanArgs, reply *TxidsReply) error {
 	if args.AmtPerOutput < 5000 {
 		return fmt.Errorf("Minimum 5000 per output")
 	}
-	adr, err := btcutil.DecodeAddress(args.DestAdr, SCon.TS.Param)
+	adr, err := btcutil.DecodeAddress(args.DestAdr, r.SCon.TS.Param)
 	if err != nil {
 		fmt.Printf("error parsing %s as address\t", args.DestAdr)
 		return err
@@ -308,11 +259,11 @@ func (r *LitRPC) Fanout(args FanArgs, reply *TxidsReply) error {
 		adrs[i] = adr
 		amts[i] = args.AmtPerOutput + i
 	}
-	tx, err := SCon.TS.SendCoins(adrs, amts)
+	tx, err := r.SCon.TS.SendCoins(adrs, amts)
 	if err != nil {
 		return err
 	}
-	err = SCon.NewOutgoingTx(tx)
+	err = r.SCon.NewOutgoingTx(tx)
 	if err != nil {
 		return err
 	}
@@ -322,18 +273,53 @@ func (r *LitRPC) Fanout(args FanArgs, reply *TxidsReply) error {
 
 // ------------------------- listen
 func (r *LitRPC) Listen(args NoArgs, reply *StatusReply) error {
-	err := TCPListener(":2448")
+
+	err := r.Node.TCPListener(":2448")
 	if err != nil {
 		return err
 	}
 	// todo: say what port and what pubkey in status message
-	reply.Status = fmt.Sprintf("listening on %s", LNode.RemoteCon.LocalAddr().String())
+	reply.Status = fmt.Sprintf("listening on %s", r.Node.RemoteCon.LocalAddr().String())
 	return nil
 }
 
 // ------------------------- connect
 type ConnectArgs struct {
 	LNAddr string
+}
+
+// ------------------------- address
+type AdrArgs struct {
+	NumToMake uint32
+}
+type AdrReply struct {
+	//	PreviousAddresses []string
+	NewAddresses []string
+}
+
+func (r *LitRPC) Address(args *AdrArgs, reply *AdrReply) error {
+	//	reply.PreviousAddresses = make([]string, len(SCon.TS.Adrs))
+	reply.NewAddresses = make([]string, args.NumToMake)
+
+	//	for i, a := range SCon.TS.Adrs {
+	//		reply.PreviousAddresses[i] = a.PkhAdr.String()
+	//	}
+
+	nokori := args.NumToMake
+	for nokori > 0 {
+		a160, err := r.SCon.TS.NewAdr160()
+		if err != nil {
+			return err
+		}
+
+		wa, err := btcutil.NewAddressWitnessPubKeyHash(a160, r.SCon.Param)
+		if err != nil {
+			return err
+		}
+		reply.NewAddresses[nokori-1] = wa.String()
+		nokori--
+	}
+	return nil
 }
 
 func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
@@ -344,27 +330,27 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
 	}
 
 	// get my private ID key
-	idPriv := SCon.TS.IdKey()
+	idPriv := r.Node.IdKey()
 
 	// Assign remote connection
-	LNode.RemoteCon = new(lndc.LNDConn)
+	r.Node.RemoteCon = new(lndc.LNDConn)
 
-	err = LNode.RemoteCon.Dial(idPriv,
+	err = r.Node.RemoteCon.Dial(idPriv,
 		connectNode.NetAddr.String(), connectNode.Base58Adr.ScriptAddress())
 	if err != nil {
 		return err
 	}
 
 	// store this peer in the db
-	_, err = LNode.NewPeer(LNode.RemoteCon.RemotePub)
+	_, err = r.Node.NewPeer(r.Node.RemoteCon.RemotePub)
 	if err != nil {
 		return err
 	}
 
-	idslice := btcutil.Hash160(LNode.RemoteCon.RemotePub.SerializeCompressed())
+	idslice := btcutil.Hash160(r.Node.RemoteCon.RemotePub.SerializeCompressed())
 	var newId [16]byte
 	copy(newId[:], idslice[:16])
-	go LNode.LNDCReceiver(LNode.RemoteCon, newId)
+	go r.Node.LNDCReceiver(r.Node.RemoteCon, newId)
 
 	return nil
 }
@@ -396,7 +382,7 @@ type PushReply struct {
 }
 
 func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
-	if LNode.RemoteCon == nil || LNode.RemoteCon.RemotePub == nil {
+	if r.Node.RemoteCon == nil || r.Node.RemoteCon.RemotePub == nil {
 		return fmt.Errorf("Not connected to anyone, can't push\n")
 	}
 	if args.Amt > 100000000 || args.Amt < 1 {
@@ -404,7 +390,7 @@ func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 	}
 
 	// find the peer index of who we're connected to
-	currentPeerIdx, err := LNode.GetPeerIdx(LNode.RemoteCon.RemotePub)
+	currentPeerIdx, err := r.Node.GetPeerIdx(r.Node.RemoteCon.RemotePub)
 	if err != nil {
 		return err
 	}
@@ -415,40 +401,15 @@ func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 	fmt.Printf("push %d to (%d,%d) %d times\n",
 		args.Amt, args.PeerIdx, args.QChanIdx)
 
-	qc, err := LNode.GetQchanByIdx(args.PeerIdx, args.QChanIdx)
+	qc, err := r.Node.GetQchanByIdx(args.PeerIdx, args.QChanIdx)
 	if err != nil {
 		return err
 	}
-	err = LNode.PushChannel(qc, uint32(args.Amt))
+	err = r.Node.PushChannel(qc, uint32(args.Amt))
 	if err != nil {
 		return err
 	}
 	reply.MyAmt = qc.State.MyAmt
 	reply.StateIndex = qc.State.StateIdx
-	return nil
-}
-
-func rpcShellListen() error {
-	rpcl := new(LitRPC)
-	server := rpc.NewServer()
-	server.Register(rpcl)
-	server.HandleHTTP(rpc.DefaultRPCPath, rpc.DefaultDebugPath)
-
-	listener, e := net.Listen("tcp", ":1234")
-	if e != nil {
-		return e
-	}
-	go func() {
-		for {
-			conn, err := listener.Accept()
-			if err != nil {
-				log.Printf("listener error: " + err.Error())
-			} else {
-				log.Printf("new connection from %s\n", conn.RemoteAddr().String())
-				go server.ServeCodec(jsonrpc.NewServerCodec(conn))
-			}
-		}
-	}()
-
 	return nil
 }

@@ -7,7 +7,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 )
 
-func (nd *LnNode) Init(
+func (nd *LitNode) Init(
 	dbfilename, watchname string, basewal UWallet, tower bool) error {
 
 	err := nd.OpenDB(dbfilename)
@@ -20,6 +20,8 @@ func (nd *LnNode) Init(
 
 	// connect to base wallet
 	nd.BaseWallet = basewal
+
+	nd.Param = nd.BaseWallet.Params()
 	// ask basewallet for outpoint event messages
 	go nd.OPEventHandler(nd.BaseWallet.LetMeKnow())
 	// optional tower activation
@@ -39,7 +41,7 @@ func (nd *LnNode) Init(
 
 // relay txs from the watchtower to the underlying wallet...
 // small, but a little ugly; maybe there's a cleaner way
-func (nd *LnNode) Relay(outbox chan *wire.MsgTx) {
+func (nd *LitNode) Relay(outbox chan *wire.MsgTx) {
 	for {
 		err := nd.BaseWallet.PushTx(<-outbox)
 		if err != nil {
@@ -49,15 +51,15 @@ func (nd *LnNode) Relay(outbox chan *wire.MsgTx) {
 }
 
 // Opens the DB file for the LnNode
-func (nd *LnNode) OpenDB(filename string) error {
+func (nd *LitNode) OpenDB(filename string) error {
 	var err error
 
-	nd.LnDB, err = bolt.Open(filename, 0644, nil)
+	nd.LitDB, err = bolt.Open(filename, 0644, nil)
 	if err != nil {
 		return err
 	}
 	// create buckets if they're not already there
-	err = nd.LnDB.Update(func(btx *bolt.Tx) error {
+	err = nd.LitDB.Update(func(btx *bolt.Tx) error {
 		_, err := btx.CreateBucketIfNotExists(BKTPeers)
 		if err != nil {
 			return err

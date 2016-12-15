@@ -84,7 +84,7 @@ type QCloseData struct {
 }
 
 // ChannelInfo prints info about a channel.
-func (nd *LnNode) QchanInfo(q *Qchan) error {
+func (nd *LitNode) QchanInfo(q *Qchan) error {
 	// display txid instead of outpoint because easier to copy/paste
 	fmt.Printf("CHANNEL %s h:%d %s cap: %d\n",
 		q.Op.String(), q.Height, q.KeyGen.String(), q.Value)
@@ -162,7 +162,7 @@ func (q *Qchan) GetChanHint(mine bool) uint64 {
 
 // GetDHSecret gets a per-channel shared secret from the Diffie-Helman of the
 // two pubkeys in the fund tx.
-func (nd *LnNode) GetDHSecret(q *Qchan) ([]byte, error) {
+func (nd *LitNode) GetDHSecret(q *Qchan) ([]byte, error) {
 
 	if nd == nil || q == nil {
 		return nil, fmt.Errorf("GetDHPoint: nil node or channel")

@@ -9,7 +9,7 @@ import (
 )
 
 // handles stuff that comes in over the wire.  Not user-initiated.
-func (nd *LnNode) OmniHandler() {
+func (nd *LitNode) OmniHandler() {
 	var from [16]byte
 	for {
 		newdata := <-nd.OmniChan // blocks here
@@ -112,7 +112,7 @@ func (nd *LnNode) OmniHandler() {
 // Every lndc has one of these running
 // it listens for incoming messages on the lndc and hands it over
 // to the OmniHandler via omnichan
-func (nd *LnNode) LNDCReceiver(l net.Conn, id [16]byte) error {
+func (nd *LitNode) LNDCReceiver(l net.Conn, id [16]byte) error {
 	// first store peer in DB if not yet known
 	_, err := nd.NewPeer(nd.RemoteCon.RemotePub)
 	if err != nil {
@@ -138,7 +138,7 @@ func (nd *LnNode) LNDCReceiver(l net.Conn, id [16]byte) error {
 // OPEventHandler gets outpoint events from the base wallet,
 // and modifies the ln node db to reflect confirmations.  Can also respond
 // with exporting txos to the base wallet, or penalty txs.
-func (nd *LnNode) OPEventHandler(OPEventChan chan lnutil.OutPointEvent) {
+func (nd *LitNode) OPEventHandler(OPEventChan chan lnutil.OutPointEvent) {
 	for {
 		curOPEvent := <-OPEventChan
 		// get all channels each time.  This is very inefficient!

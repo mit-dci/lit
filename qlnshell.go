@@ -13,12 +13,12 @@ func FundChannel(args []string) error {
 	if len(args) < 2 {
 		return fmt.Errorf("need args: fund capacity initialSend")
 	}
-	if LNode.RemoteCon == nil || LNode.RemoteCon.RemotePub == nil {
+	if Node.RemoteCon == nil || Node.RemoteCon.RemotePub == nil {
 		return fmt.Errorf("Not connected to anyone")
 	}
 
-	if LNode.InProg != nil && LNode.InProg.PeerIdx != 0 {
-		return fmt.Errorf("channel with peer %d not done yet", LNode.InProg.PeerIdx)
+	if Node.InProg != nil && Node.InProg.PeerIdx != 0 {
+		return fmt.Errorf("channel with peer %d not done yet", Node.InProg.PeerIdx)
 	}
 
 	// this stuff is all the same as in cclose, should put into a function...
@@ -50,22 +50,22 @@ func FundChannel(args []string) error {
 	}
 
 	var peerArr [33]byte
-	copy(peerArr[:], LNode.RemoteCon.RemotePub.SerializeCompressed())
+	copy(peerArr[:], Node.RemoteCon.RemotePub.SerializeCompressed())
 
-	peerIdx, cIdx, err := LNode.NextIdxForPeer(peerArr)
+	peerIdx, cIdx, err := Node.NextIdxForPeer(peerArr)
 	if err != nil {
 		return err
 	}
 
-	LNode.InProg = new(qln.InFlightFund)
+	Node.InProg = new(qln.InFlightFund)
 
-	LNode.InProg.ChanIdx = cIdx
-	LNode.InProg.PeerIdx = peerIdx
-	LNode.InProg.Amt = cCap
-	LNode.InProg.InitSend = iSend
+	Node.InProg.ChanIdx = cIdx
+	Node.InProg.PeerIdx = peerIdx
+	Node.InProg.Amt = cCap
+	Node.InProg.InitSend = iSend
 
 	msg := []byte{qln.MSGID_POINTREQ}
-	_, err = LNode.RemoteCon.Write(msg)
+	_, err = Node.RemoteCon.Write(msg)
 	return err
 }
 
@@ -76,7 +76,7 @@ func Resume(args []string) error {
 	if len(args) < 2 {
 		return fmt.Errorf("need args: fix peerIdx chanIdx")
 	}
-	if LNode.RemoteCon == nil || LNode.RemoteCon.RemotePub == nil {
+	if Node.RemoteCon == nil || Node.RemoteCon.RemotePub == nil {
 		return fmt.Errorf("Not connected to anyone, can't fix\n")
 	}
 	// this stuff is all the same as in cclose, should put into a function...
@@ -92,7 +92,7 @@ func Resume(args []string) error {
 	cIdx := uint32(cIdx64)
 
 	// find the peer index of who we're connected to
-	currentPeerIdx, err := LNode.GetPeerIdx(LNode.RemoteCon.RemotePub)
+	currentPeerIdx, err := Node.GetPeerIdx(Node.RemoteCon.RemotePub)
 	if err != nil {
 		return err
 	}
@@ -102,12 +102,12 @@ func Resume(args []string) error {
 	}
 	fmt.Printf("fix channel (%d,%d)\n", peerIdx, cIdx)
 
-	qc, err := LNode.GetQchanByIdx(peerIdx, cIdx)
+	qc, err := Node.GetQchanByIdx(peerIdx, cIdx)
 	if err != nil {
 		return err
 	}
 
-	return LNode.SendNextMsg(qc)
+	return Node.SendNextMsg(qc)
 }
 
 // Push is the shell command which calls PushChannel
@@ -115,7 +115,7 @@ func Push(args []string) error {
 	if len(args) < 3 {
 		return fmt.Errorf("need args: push peerIdx chanIdx amt (times)")
 	}
-	if LNode.RemoteCon == nil || LNode.RemoteCon.RemotePub == nil {
+	if Node.RemoteCon == nil || Node.RemoteCon.RemotePub == nil {
 		return fmt.Errorf("Not connected to anyone, can't push\n")
 	}
 	// this stuff is all the same as in cclose, should put into a function...
@@ -146,7 +146,7 @@ func Push(args []string) error {
 	cIdx := uint32(cIdx64)
 
 	// find the peer index of who we're connected to
-	currentPeerIdx, err := LNode.GetPeerIdx(LNode.RemoteCon.RemotePub)
+	currentPeerIdx, err := Node.GetPeerIdx(Node.RemoteCon.RemotePub)
 	if err != nil {
 		return err
 	}
@@ -156,7 +156,7 @@ func Push(args []string) error {
 	}
 	fmt.Printf("push %d to (%d,%d) %d times\n", amt, peerIdx, cIdx, times)
 
-	qc, err := LNode.GetQchanByIdx(peerIdx, cIdx)
+	qc, err := Node.GetQchanByIdx(peerIdx, cIdx)
 	if err != nil {
 		return err
 	}
@@ -164,12 +164,12 @@ func Push(args []string) error {
 		return fmt.Errorf("channel %d, %d is closed.", peerIdx, cIdx64)
 	}
 	for times > 0 {
-		err = LNode.ReloadQchan(qc)
+		err = Node.ReloadQchan(qc)
 		if err != nil {
 			return err
 		}
 
-		err = LNode.PushChannel(qc, uint32(amt))
+		err = Node.PushChannel(qc, uint32(amt))
 		if err != nil {
 			return err
 		}
@@ -185,7 +185,7 @@ func Push(args []string) error {
 func Watch(args []string) error {
 	if len(args) > 1 {
 		// send updated state to connected watch tower
-		if LNode.WatchCon == nil {
+		if Node.WatchCon == nil {
 			return fmt.Errorf("can't connect; no watch tower connected")
 		}
 		peerIdx64, err := strconv.ParseInt(args[0], 10, 32)
@@ -196,21 +196,21 @@ func Watch(args []string) error {
 		if err != nil {
 			return err
 		}
-		qc, err := LNode.GetQchanByIdx(uint32(peerIdx64), uint32(cIdx64))
+		qc, err := Node.GetQchanByIdx(uint32(peerIdx64), uint32(cIdx64))
 		if err != nil {
 			return err
 		}
 		if qc.CloseData.Closed {
 			return fmt.Errorf("channel %d, %d is closed.", peerIdx64, peerIdx64)
 		}
-		err = LNode.SyncWatch(qc)
+		err = Node.SyncWatch(qc)
 		if err != nil {
 			return err
 		}
 		return nil
 	}
 	// show contents of the local stash
-	s, err := LNode.ShowJusticeDB()
+	s, err := Node.ShowJusticeDB()
 	if err != nil {
 		return err
 	}
@@ -218,7 +218,7 @@ func Watch(args []string) error {
 	// Only query Tower if in hard mode and tower is active
 	if SCon.HardMode {
 		// show contents of watchtower db
-		s, err = LNode.Tower.Status()
+		s, err = Node.Tower.Status()
 		if err != nil {
 			return err
 		}
@@ -229,7 +229,7 @@ func Watch(args []string) error {
 
 // CloseChannel is a cooperative closing of a channel to a specified address.
 func CloseChannel(args []string) error {
-	if LNode.RemoteCon == nil || LNode.RemoteCon.RemotePub == nil {
+	if Node.RemoteCon == nil || Node.RemoteCon.RemotePub == nil {
 		return fmt.Errorf("Not connected to anyone\n")
 	}
 	// need args, fail
@@ -249,7 +249,7 @@ func CloseChannel(args []string) error {
 	cIdx := uint32(cIdx64)
 
 	// find the peer index of who we're connected to
-	currentPeerIdx, err := LNode.GetPeerIdx(LNode.RemoteCon.RemotePub)
+	currentPeerIdx, err := Node.GetPeerIdx(Node.RemoteCon.RemotePub)
 	if err != nil {
 		return err
 	}
@@ -258,7 +258,7 @@ func CloseChannel(args []string) error {
 			peerIdx, currentPeerIdx)
 	}
 
-	qc, err := LNode.GetQchanByIdx(peerIdx, cIdx)
+	qc, err := Node.GetQchanByIdx(peerIdx, cIdx)
 	if err != nil {
 		return err
 	}
@@ -273,7 +273,7 @@ func CloseChannel(args []string) error {
 		return err
 	}
 
-	sig, err := LNode.SignSimpleClose(qc, tx)
+	sig, err := Node.SignSimpleClose(qc, tx)
 	if err != nil {
 		return err
 	}
@@ -288,7 +288,7 @@ func CloseChannel(args []string) error {
 	msg = append(msg, opArr[:]...)
 	msg = append(msg, sig...)
 
-	_, err = LNode.RemoteCon.Write(msg)
+	_, err = Node.RemoteCon.Write(msg)
 	return nil
 }
 
@@ -311,7 +311,7 @@ func BreakChannel(args []string) error {
 		return err
 	}
 
-	qc, err := LNode.GetQchanByIdx(uint32(peerIdx), uint32(cIdx))
+	qc, err := Node.GetQchanByIdx(uint32(peerIdx), uint32(cIdx))
 	if err != nil {
 		return err
 	}
@@ -335,11 +335,11 @@ func BreakChannel(args []string) error {
 	fmt.Printf("elk recv 0: %s\n", z.String())
 	// set delta to 0...
 	qc.State.Delta = 0
-	tx, err := LNode.SignBreakTx(qc)
+	tx, err := Node.SignBreakTx(qc)
 	if err != nil {
 		return err
 	}
 
 	// broadcast
-	return LNode.BaseWallet.PushTx(tx)
+	return Node.BaseWallet.PushTx(tx)
 }

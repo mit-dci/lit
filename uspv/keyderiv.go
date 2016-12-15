@@ -117,7 +117,7 @@ func (t *TxStore) GetUsePub(kg portxo.KeyGen, use uint32) [33]byte {
 }
 
 // IdKey returns the identity private key
-func (t *TxStore) IdKey() *btcec.PrivateKey {
+func (t *TxStore) IdKeyx() *btcec.PrivateKey {
 	var kg portxo.KeyGen
 	kg.Depth = 5
 	kg.Step[0] = 44 | 1<<31

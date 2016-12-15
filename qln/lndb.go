@@ -47,8 +47,8 @@ Later on we can chop it up so that each channel gets it's own db file.
 
 // LnNode is the main struct for the node, keeping track of all channel state and
 // communicating with the underlying UWallet
-type LnNode struct {
-	LnDB *bolt.DB // place to write all this down
+type LitNode struct {
+	LitDB *bolt.DB // place to write all this down
 
 	// all nodes have a watchtower.  but could have a tower without a node
 	Tower watchtower.WatchTower
@@ -109,9 +109,9 @@ func CountKeysInBucket(bkt *bolt.Bucket) uint32 {
 // NewPeer saves a pubkey in the DB and assigns a peer index.  Call this
 // the first time you connect to someone.  Returns false if already known,
 // true if it added a new peer.  Errors for real errors.
-func (nd *LnNode) NewPeer(pub *btcec.PublicKey) (bool, error) {
+func (nd *LitNode) NewPeer(pub *btcec.PublicKey) (bool, error) {
 	itsnew := true
-	err := nd.LnDB.Update(func(btx *bolt.Tx) error {
+	err := nd.LitDB.Update(func(btx *bolt.Tx) error {
 		prs, _ := btx.CreateBucketIfNotExists(BKTPeers) // only errs on name
 
 		// you can't use KeyN because that includes everything in sub-buckets.
@@ -142,9 +142,9 @@ func (nd *LnNode) NewPeer(pub *btcec.PublicKey) (bool, error) {
 // NextPubForPeer returns the next pubkey index to use with the peer.
 // It first checks that the peer exists. Read only.
 // Feed the indexes into GetFundPUbkey.
-func (nd *LnNode) NextIdxForPeer(peerBytes [33]byte) (uint32, uint32, error) {
+func (nd *LitNode) NextIdxForPeer(peerBytes [33]byte) (uint32, uint32, error) {
 	var peerIdx, cIdx uint32
-	err := nd.LnDB.View(func(btx *bolt.Tx) error {
+	err := nd.LitDB.View(func(btx *bolt.Tx) error {
 		prs := btx.Bucket(BKTPeers)
 		if prs == nil {
 			return fmt.Errorf("NextIdxForPeer: no peers")
@@ -173,9 +173,9 @@ func (nd *LnNode) NextIdxForPeer(peerBytes [33]byte) (uint32, uint32, error) {
 }
 
 // GetPeerIdx returns the peer index given a pubkey.
-func (nd *LnNode) GetPeerIdx(pub *btcec.PublicKey) (uint32, error) {
+func (nd *LitNode) GetPeerIdx(pub *btcec.PublicKey) (uint32, error) {
 	var idx uint32
-	err := nd.LnDB.View(func(btx *bolt.Tx) error {
+	err := nd.LitDB.View(func(btx *bolt.Tx) error {
 		prs := btx.Bucket(BKTPeers)
 		if prs == nil {
 			return fmt.Errorf("GetPeerIdx: No peers evar")
@@ -191,8 +191,8 @@ func (nd *LnNode) GetPeerIdx(pub *btcec.PublicKey) (uint32, error) {
 	return idx, err
 }
 
-func (nd *LnNode) SaveQchanUtxoData(q *Qchan) error {
-	return nd.LnDB.Update(func(btx *bolt.Tx) error {
+func (nd *LitNode) SaveQchanUtxoData(q *Qchan) error {
+	return nd.LitDB.Update(func(btx *bolt.Tx) error {
 		prs := btx.Bucket(BKTPeers)
 		if prs == nil {
 			return fmt.Errorf("no peers")
@@ -231,13 +231,13 @@ func (nd *LnNode) SaveQchanUtxoData(q *Qchan) error {
 }
 
 // register a new Qchan in the db
-func (nd *LnNode) SaveQChan(q *Qchan) error {
+func (nd *LitNode) SaveQChan(q *Qchan) error {
 	if q == nil {
 		return fmt.Errorf("SaveQChan: nil qchan")
 	}
 
 	// save channel to db.  It has no state, and has no outpoint yet
-	err := nd.LnDB.Update(func(btx *bolt.Tx) error {
+	err := nd.LitDB.Update(func(btx *bolt.Tx) error {
 		prs := btx.Bucket(BKTPeers) // go into bucket for all peers
 		if prs == nil {
 			return fmt.Errorf("SaveQChan: no peers")
@@ -572,7 +572,7 @@ func (nd *LnNode) SignFundTx(
 // state index 1.  Data errors within the db will return errors, but having
 // *no* data for states or elkrem receiver is not considered an error, and will
 // populate with a state 0 / empty elkrem receiver and return that.
-func (nd *LnNode) RestoreQchanFromBucket(
+func (nd *LitNode) RestoreQchanFromBucket(
 	peerIdx uint32, peerPub []byte, bkt *bolt.Bucket) (*Qchan, error) {
 	if bkt == nil { // can't do anything without a bucket
 		return nil, fmt.Errorf("empty qchan bucket from peer %d", peerIdx)
@@ -636,11 +636,11 @@ func (nd *LnNode) RestoreQchanFromBucket(
 
 // ReloadQchan loads updated data from the db into the qchan.  Loads elkrem
 // and state, but does not change qchan info itself.  Faster than GetQchan()
-func (nd *LnNode) ReloadQchan(q *Qchan) error {
+func (nd *LitNode) ReloadQchan(q *Qchan) error {
 	var err error
 	opArr := lnutil.OutPointToBytes(q.Op)
 
-	return nd.LnDB.View(func(btx *bolt.Tx) error {
+	return nd.LitDB.View(func(btx *bolt.Tx) error {
 		prs := btx.Bucket(BKTPeers)
 		if prs == nil {
 			return fmt.Errorf("no peers")
@@ -677,8 +677,8 @@ func (nd *LnNode) ReloadQchan(q *Qchan) error {
 
 // SetQchanRefund overwrites "theirrefund" and "theirHAKDbase" in a qchan.
 //   This is needed after getting a chanACK.
-func (nd *LnNode) SetQchanRefund(q *Qchan, refund, hakdBase [33]byte) error {
-	return nd.LnDB.Update(func(btx *bolt.Tx) error {
+func (nd *LitNode) SetQchanRefund(q *Qchan, refund, hakdBase [33]byte) error {
+	return nd.LitDB.Update(func(btx *bolt.Tx) error {
 		prs := btx.Bucket(BKTPeers)
 		if prs == nil {
 			return fmt.Errorf("no peers")
@@ -717,8 +717,8 @@ func (nd *LnNode) SetQchanRefund(q *Qchan, refund, hakdBase [33]byte) error {
 // the descent into the qchan bucket is boilerplate and it'd be nice
 // if we can make that it's own function.  Get channel bucket maybe?  But then
 // you have to close it...
-func (nd *LnNode) SaveQchanState(q *Qchan) error {
-	return nd.LnDB.Update(func(btx *bolt.Tx) error {
+func (nd *LitNode) SaveQchanState(q *Qchan) error {
+	return nd.LitDB.Update(func(btx *bolt.Tx) error {
 		prs := btx.Bucket(BKTPeers)
 		if prs == nil {
 			return fmt.Errorf("no peers")
@@ -755,9 +755,9 @@ func (nd *LnNode) SaveQchanState(q *Qchan) error {
 }
 
 // GetAllQchans returns a slice of all Multiouts. empty slice is OK.
-func (nd *LnNode) GetAllQchans() ([]*Qchan, error) {
+func (nd *LitNode) GetAllQchans() ([]*Qchan, error) {
 	var qChans []*Qchan
-	err := nd.LnDB.View(func(btx *bolt.Tx) error {
+	err := nd.LitDB.View(func(btx *bolt.Tx) error {
 		prs := btx.Bucket(BKTPeers)
 		if prs == nil {
 			return nil
@@ -814,13 +814,13 @@ func (nd *LnNode) GetAllQchans() ([]*Qchan, error) {
 
 // GetQchan returns a single multi out.  You need to specify the peer
 // pubkey and outpoint bytes.
-func (nd *LnNode) GetQchan(
+func (nd *LitNode) GetQchan(
 	peerArr [33]byte, opArr [36]byte) (*Qchan, error) {
 
 	qc := new(Qchan)
 	var err error
 	op := lnutil.OutPointFromBytes(opArr)
-	err = nd.LnDB.View(func(btx *bolt.Tx) error {
+	err = nd.LitDB.View(func(btx *bolt.Tx) error {
 		prs := btx.Bucket(BKTPeers)
 		if prs == nil {
 			return fmt.Errorf("no peers")
@@ -866,13 +866,13 @@ func (nd *LnNode) GetQchan(
 // If the UI does it's job well you shouldn't really need this.
 // the unique identifiers are returned as []bytes because
 // they're probably going right back in to GetQchan()
-func (nd *LnNode) GetQGlobalIdFromIdx(
+func (nd *LitNode) GetQGlobalIdFromIdx(
 	peerIdx, cIdx uint32) ([]byte, []byte, error) {
 	var err error
 	var pubBytes, opBytes []byte
 
 	// go into the db
-	err = nd.LnDB.View(func(btx *bolt.Tx) error {
+	err = nd.LitDB.View(func(btx *bolt.Tx) error {
 		prs := btx.Bucket(BKTPeers)
 		if prs == nil {
 			return fmt.Errorf("no peers")
@@ -930,7 +930,7 @@ func (nd *LnNode) GetQGlobalIdFromIdx(
 
 // GetQchanByIdx is a gets the channel when you don't know the peer bytes and
 // outpoint.  Probably shouldn't have to use this if the UI is done right though.
-func (nd *LnNode) GetQchanByIdx(peerIdx, cIdx uint32) (*Qchan, error) {
+func (nd *LitNode) GetQchanByIdx(peerIdx, cIdx uint32) (*Qchan, error) {
 	pubBytes, opBytes, err := nd.GetQGlobalIdFromIdx(peerIdx, cIdx)
 	if err != nil {
 		return nil, err
@@ -947,10 +947,10 @@ func (nd *LnNode) GetQchanByIdx(peerIdx, cIdx uint32) (*Qchan, error) {
 }
 
 // SetChanClose sets the address to close to.
-func (nd *LnNode) SetChanClose(
+func (nd *LitNode) SetChanClose(
 	peerBytes []byte, opArr [36]byte, adrArr [20]byte) error {
 
-	return nd.LnDB.Update(func(btx *bolt.Tx) error {
+	return nd.LitDB.Update(func(btx *bolt.Tx) error {
 		prs := btx.Bucket(BKTPeers)
 		if prs == nil {
 			return fmt.Errorf("no peers")
@@ -974,10 +974,10 @@ func (nd *LnNode) SetChanClose(
 
 // GetChanClose recalls the address the multisig/channel has been requested to
 // close to.  If there's nothing there it returns a nil slice and an error.
-func (nd *LnNode) GetChanClose(peerBytes []byte, opArr [36]byte) ([]byte, error) {
+func (nd *LitNode) GetChanClose(peerBytes []byte, opArr [36]byte) ([]byte, error) {
 	adrBytes := make([]byte, 20)
 
-	err := nd.LnDB.View(func(btx *bolt.Tx) error {
+	err := nd.LitDB.View(func(btx *bolt.Tx) error {
 		prs := btx.Bucket(BKTPeers)
 		if prs == nil {
 			return fmt.Errorf("no peers")

@@ -26,7 +26,7 @@ doesn't reply, as the channel is closed.
 // CloseReqHandler takes in a close request from a remote host, signs and
 // responds with a close response.  Obviously later there will be some judgment
 // over what to do, but for now it just signs whatever it's requested to.
-func (nd *LnNode) CloseReqHandler(from [16]byte, reqbytes []byte) {
+func (nd *LitNode) CloseReqHandler(from [16]byte, reqbytes []byte) {
 	if len(reqbytes) < 100 {
 		fmt.Printf("got %d byte closereq, expect 100ish\n", len(reqbytes))
 		return

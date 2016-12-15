@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/qln"
 	"github.com/mit-dci/lit/uspv"
 )
@@ -31,7 +32,7 @@ var (
 	//	Params = &chaincfg.RegressionNetParams
 	SCon uspv.SPVCon // global here for now
 
-	LNode qln.LnNode
+	Node qln.LitNode
 )
 
 // variables for a goodelivery session
@@ -39,6 +40,7 @@ type LitConfig struct {
 	spvHost               string
 	regTest, reSync, hard bool // flag to set mainnet
 	birthblock            int32
+	rpcport               uint16
 
 	Params *chaincfg.Params
 }
@@ -53,6 +55,8 @@ func setConfig(lc *LitConfig) {
 	regtestptr := flag.Bool("reg", false, "use regtest (not testnet3)")
 	resyncprt := flag.Bool("resync", false, "force resync from given tip")
 
+	rpcportptr := flag.Int("rpcport", 9750, "port to listen for RPC")
+
 	flag.Parse()
 
 	lc.spvHost = *spvhostptr
@@ -61,6 +65,8 @@ func setConfig(lc *LitConfig) {
 	lc.regTest = *regtestptr
 	lc.reSync = *resyncprt
 	lc.hard = !*easyptr
+
+	lc.rpcport = uint16(*rpcportptr)
 
 	//	if lc.spvHost == "" {
 	//		lc.spvHost = "lit3.co"
@@ -110,7 +116,7 @@ func main() {
 	}
 
 	// Setup LN node.  Activate Tower if in hard mode.
-	err = LNode.Init(lndbFileName, watchdbFileName, &SCon, SCon.HardMode)
+	err = Node.Init(lndbFileName, watchdbFileName, &SCon, SCon.HardMode)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -148,10 +154,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = rpcShellListen()
-	if err != nil {
-		log.Printf(err.Error())
-	}
+	litrpc.RpcListen(SCon, Node, conf.rpcport)
+
 	// main shell loop
 	for {
 		// setup reader with max 4K input chars
