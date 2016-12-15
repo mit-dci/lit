@@ -37,9 +37,9 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 
 	// bal shows the current set of utxos, addresses and score
 	if cmd == "ls" {
-		err = lc.Bal(args)
+		err = lc.Ls(args)
 		if err != nil {
-			fmt.Printf("bal error: %s\n", err)
+			fmt.Printf("ls error: %s\n", err)
 		}
 		return nil
 	}
@@ -52,6 +52,45 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		}
 		return nil
 	}
+
+	if cmd == "lis" { // listen for lnd peers
+		err = lc.Lis(args)
+		if err != nil {
+			fmt.Printf("lis error: %s\n", err)
+		}
+		return nil
+	}
+
+	if cmd == "stop" { // stop remote node
+		// actually returns an error
+		return lc.Stop(args)
+	}
+
+	if cmd == "sweep" { // make lots of 1-in 1-out txs
+		err = lc.Sweep(args)
+		if err != nil {
+			fmt.Printf("sweep error: %s\n", err)
+		}
+		return nil
+	}
+
+	// push money in a channel away from you
+	if cmd == "push" {
+		err = lc.Push(args)
+		if err != nil {
+			fmt.Printf("push error: %s\n", err)
+		}
+		return nil
+	}
+
+	if cmd == "con" { // connect to lnd host
+		err = lc.Connect(args)
+		if err != nil {
+			fmt.Printf("con error: %s\n", err)
+		}
+		return nil
+	}
+
 	/*
 		if cmd == "msend" {
 			err = MSend(args)
@@ -82,13 +121,7 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 			}
 			return nil
 		}
-		if cmd == "sweep" { // make lots of 1-in 1-out txs
-			err = Sweep(args)
-			if err != nil {
-				fmt.Printf("sweep error: %s\n", err)
-			}
-			return nil
-		}
+
 		if cmd == "txs" { // show all txs
 			err = Txs(args)
 			if err != nil {
@@ -96,13 +129,7 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 			}
 			return nil
 		}
-		if cmd == "con" { // connect to lnd host
-			err = Con(args)
-			if err != nil {
-				fmt.Printf("con error: %s\n", err)
-			}
-			return nil
-		}
+
 		if cmd == "wcon" { // connect to watch tower
 			err = WCon(args)
 			if err != nil {
@@ -119,13 +146,7 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 			return nil
 		}
 
-		if cmd == "lis" { // listen for lnd peers
-			err = Lis(args)
-			if err != nil {
-				fmt.Printf("lis error: %s\n", err)
-			}
-			return nil
-		}
+
 
 		// Peer to peer actions
 		// send text message
@@ -144,14 +165,7 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 			}
 			return nil
 		}
-		// push money in a channel away from you
-		if cmd == "push" {
-			err = Push(args)
-			if err != nil {
-				fmt.Printf("push error: %s\n", err)
-			}
-			return nil
-		}
+
 		// cooperateive close of a channel
 		if cmd == "cclose" {
 			err = CloseChannel(args)
@@ -180,17 +194,13 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 	return nil
 }
 
-func (lc *litAfClient) Bal(textArgs []string) error {
+func (lc *litAfClient) Ls(textArgs []string) error {
 
-	bReply := new(litrpc.BalReply)
-	err := lc.rpccon.Call("LitRPC.Bal", nil, bReply)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("Txo: %d\nChannel: %d\n", bReply.TxoTotal, bReply.ChanTotal)
-
+	aReply := new(litrpc.AdrReply)
 	tReply := new(litrpc.TxoListReply)
-	err = lc.rpccon.Call("LitRPC.TxoList", nil, tReply)
+	bReply := new(litrpc.BalReply)
+
+	err := lc.rpccon.Call("LitRPC.TxoList", nil, tReply)
 	if err != nil {
 		return err
 	}
@@ -199,6 +209,21 @@ func (lc *litAfClient) Bal(textArgs []string) error {
 		fmt.Printf("%d %s h:%d amt:%d %s\n",
 			i, t.OutPoint, t.Height, t.Amt, t.KeyPath)
 	}
+
+	err = lc.rpccon.Call("LitRPC.Address", nil, aReply)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("\tAddresses:\n")
+	for i, a := range aReply.Addresses {
+		fmt.Printf("%d %s \n", i, a)
+	}
+	err = lc.rpccon.Call("LitRPC.Bal", nil, bReply)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("\tTxo: %d Conf:%d Channel: %d\n",
+		bReply.TxoTotal, bReply.Mature, bReply.ChanTotal)
 
 	return nil
 }
@@ -211,7 +236,7 @@ func (lc *litAfClient) Adr(textArgs []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("new adr(s): %s\n", reply.NewAddresses)
+	fmt.Printf("new adr(s): %s\n", reply.Addresses)
 	return nil
 }
 
@@ -248,6 +273,137 @@ func (lc *litAfClient) Send(textArgs []string) error {
 	for i, t := range reply.Txids {
 		fmt.Printf("\t%d %s\n", i, t)
 	}
+	return nil
+}
+
+// Lis starts listening.  Takes args of port to listen on.
+func (lc *litAfClient) Lis(textArgs []string) error {
+	args := new(litrpc.ListenArgs)
+	reply := new(litrpc.StatusReply)
+
+	args.Port = ":2448"
+	if len(textArgs) > 0 {
+		args.Port = ":" + textArgs[0]
+	}
+
+	err := lc.rpccon.Call("LitRPC.Listen", args, reply)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("%s\n", reply.Status)
+	return nil
+}
+
+func (lc *litAfClient) Connect(textArgs []string) error {
+	args := new(litrpc.ConnectArgs)
+	reply := new(litrpc.StatusReply)
+
+	if len(textArgs) == 0 {
+		return fmt.Errorf("need: con pubkeyhash@hostname:port")
+	}
+
+	args.LNAddr = textArgs[0]
+
+	err := lc.rpccon.Call("LitRPC.Connect", args, reply)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("%s\n", reply.Status)
+	return nil
+}
+
+func (lc *litAfClient) Stop(textArgs []string) error {
+	reply := new(litrpc.StatusReply)
+
+	err := lc.rpccon.Call("LitRPC.Stop", nil, reply)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("%s\n", reply.Status)
+
+	lc.rpccon.Close()
+	return fmt.Errorf("stopped remote lit node")
+}
+
+func (lc *litAfClient) Sweep(textArgs []string) error {
+	args := new(litrpc.SweepArgs)
+	reply := new(litrpc.TxidsReply)
+
+	var err error
+
+	if len(textArgs) < 2 {
+		return fmt.Errorf("sweep syntax: sweep adr howmany (drop)")
+	}
+
+	args.DestAdr = textArgs[0]
+	args.NumTx, err = strconv.Atoi(textArgs[1])
+	if err != nil {
+		return err
+	}
+
+	if len(textArgs) > 2 {
+		args.Drop = true
+	}
+
+	err = lc.rpccon.Call("LitRPC.Sweep", args, reply)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Swept\n")
+	for i, t := range reply.Txids {
+		fmt.Printf("%d %s\n", i, t)
+	}
+
+	return nil
+}
+
+// Push is the shell command which calls PushChannel
+func (lc *litAfClient) Push(textArgs []string) error {
+	args := new(litrpc.PushArgs)
+	reply := new(litrpc.PushReply)
+
+	if len(textArgs) < 3 {
+		return fmt.Errorf("need args: push peerIdx chanIdx amt (times)")
+	}
+
+	// this stuff is all the same as in cclose, should put into a function...
+	peerIdx64, err := strconv.ParseInt(textArgs[0], 10, 32)
+	if err != nil {
+		return err
+	}
+	cIdx64, err := strconv.ParseInt(textArgs[1], 10, 32)
+	if err != nil {
+		return err
+	}
+	amt, err := strconv.ParseInt(textArgs[2], 10, 32)
+	if err != nil {
+		return err
+	}
+
+	times := int64(1)
+	if len(textArgs) > 3 {
+		times, err = strconv.ParseInt(textArgs[3], 10, 32)
+		if err != nil {
+			return err
+		}
+	}
+
+	args.PeerIdx = uint32(peerIdx64)
+	args.QChanIdx = uint32(cIdx64)
+	args.Amt = amt
+
+	for times > 0 {
+		err := lc.rpccon.Call("LitRPC.Push", args, reply)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Pushed %d new balance %d at state %d\n",
+			amt, reply.MyAmt, reply.StateIndex)
+	}
+
 	return nil
 }
 

@@ -11,17 +11,17 @@ import (
 )
 
 // TCPListener starts a litNode listening for incoming LNDC connections
-func (nd *LitNode) TCPListener(lisIpPort string) error {
+func (nd *LitNode) TCPListener(lisIpPort string) (*btcutil.AddressPubKeyHash, error) {
 	idPriv := nd.IdKey()
 	listener, err := lndc.NewListener(nd.IdKey(), lisIpPort)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	myId := btcutil.Hash160(idPriv.PubKey().SerializeCompressed())
 	lisAdr, err := btcutil.NewAddressPubKeyHash(myId, nd.Param)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	fmt.Printf("Listening on %s\n", listener.Addr().String())
 	fmt.Printf("Listening with base58 address: %s lnid: %x\n",
@@ -50,7 +50,7 @@ func (nd *LitNode) TCPListener(lisIpPort string) error {
 			nd.RemoteCon = newConn
 		}
 	}()
-	return nil
+	return lisAdr, nil
 }
 
 // IdKey returns the identity private key

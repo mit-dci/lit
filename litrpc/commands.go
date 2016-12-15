@@ -25,10 +25,10 @@ type NoArgs struct {
 // BalReply is the reply when the user asks about their balance.
 // This is a Non-Channel
 type BalReply struct {
-	ChanTotal         int64
-	TxoTotal          int64
-	SpendableNow      int64
-	SpendableNowWitty int64
+	ChanTotal   int64 // total balance in channels
+	TxoTotal    int64 // all utxos
+	Mature      int64 // confirmed and spendable
+	MatureWitty int64 // confirmed, spendable and witness
 }
 
 func (r *LitRPC) Bal(args *NoArgs, reply *BalReply) error {
@@ -44,12 +44,10 @@ func (r *LitRPC) Bal(args *NoArgs, reply *BalReply) error {
 	// iterate through utxos to figure out how much we have
 	for _, u := range allTxos {
 		reply.TxoTotal += u.Value
-		if u.Seq == 0 {
-			reply.SpendableNow += u.Value
-		} else {
-			if u.Seq == 1 || u.Height+int32(u.Seq) > curHeight {
-				reply.SpendableNow += u.Value
-				reply.SpendableNowWitty += u.Value
+		if u.Height+int32(u.Seq) < curHeight {
+			reply.Mature += u.Value
+			if u.Mode&portxo.FlagTxoWitness != 0 {
+				reply.MatureWitty += u.Value
 			}
 		}
 	}
@@ -272,14 +270,22 @@ func (r *LitRPC) Fanout(args FanArgs, reply *TxidsReply) error {
 }
 
 // ------------------------- listen
-func (r *LitRPC) Listen(args NoArgs, reply *StatusReply) error {
+// ------------------------- connect
+type ListenArgs struct {
+	Port string
+}
 
-	err := r.Node.TCPListener(":2448")
+func (r *LitRPC) Listen(args ListenArgs, reply *StatusReply) error {
+	if args.Port == "" {
+		args.Port = ":2448"
+	}
+	adr, err := r.Node.TCPListener(args.Port)
 	if err != nil {
 		return err
 	}
 	// todo: say what port and what pubkey in status message
-	reply.Status = fmt.Sprintf("listening on %s", r.Node.RemoteCon.LocalAddr().String())
+	reply.Status = fmt.Sprintf("listening on %s with key %s",
+		args.Port, adr.String())
 	return nil
 }
 
@@ -293,20 +299,29 @@ type AdrArgs struct {
 	NumToMake uint32
 }
 type AdrReply struct {
-	//	PreviousAddresses []string
-	NewAddresses []string
+	Addresses []string
 }
 
 func (r *LitRPC) Address(args *AdrArgs, reply *AdrReply) error {
-	//	reply.PreviousAddresses = make([]string, len(SCon.TS.Adrs))
-	reply.NewAddresses = make([]string, args.NumToMake)
 
-	//	for i, a := range SCon.TS.Adrs {
-	//		reply.PreviousAddresses[i] = a.PkhAdr.String()
-	//	}
+	// If you tell it to make 0 new addresses, it sends a list of all the old ones
+	if args.NumToMake == 0 {
 
-	nokori := args.NumToMake
-	for nokori > 0 {
+		allAdr, err := r.SCon.TS.GetAllAddresses()
+		if err != nil {
+			return err
+		}
+
+		reply.Addresses = make([]string, len(allAdr))
+		for i, a := range allAdr {
+			reply.Addresses[i] = a.String()
+		}
+		return nil
+	}
+
+	reply.Addresses = make([]string, args.NumToMake)
+	remaining := args.NumToMake
+	for remaining > 0 {
 		a160, err := r.SCon.TS.NewAdr160()
 		if err != nil {
 			return err
@@ -316,9 +331,10 @@ func (r *LitRPC) Address(args *AdrArgs, reply *AdrReply) error {
 		if err != nil {
 			return err
 		}
-		reply.NewAddresses[nokori-1] = wa.String()
-		nokori--
+		reply.Addresses[remaining-1] = wa.String()
+		remaining--
 	}
+
 	return nil
 }
 
@@ -351,7 +367,8 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
 	var newId [16]byte
 	copy(newId[:], idslice[:16])
 	go r.Node.LNDCReceiver(r.Node.RemoteCon, newId)
-
+	reply.Status = fmt.Sprintf("connected to %s",
+		connectNode.Base58Adr.String())
 	return nil
 }
 
@@ -411,5 +428,11 @@ func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 	}
 	reply.MyAmt = qc.State.MyAmt
 	reply.StateIndex = qc.State.StateIdx
+	return nil
+}
+
+func (r *LitRPC) Stop(args NoArgs, reply *StatusReply) error {
+	reply.Status = "Stopping lit node"
+	r.OffButton <- true
 	return nil
 }

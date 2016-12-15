@@ -203,8 +203,8 @@ func Lis(args []string) error {
 		portstring = args[0]
 		portstring = ":" + portstring
 	}
-	go Node.TCPListener(portstring)
-	return nil
+	_, err := Node.TCPListener(portstring)
+	return err
 }
 
 // connects to the watchtower
