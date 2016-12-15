@@ -2,11 +2,20 @@
 
 Under development, not for use with real money.
 
-currently go-get will fail to compile.  Lit uses btcd libraries, and btcd does not yet have segwit support in master.  This will hopefully be merged soon, before segwit activates on mainnet.  
+## Installing on Linux 
 
-I have a fork of btcd from roasbeef/segwit, and could make it go-gettable by changing all the imports, but hopefully it will be merged in soon.
+1. Start by installing Go v1.6. 
+ * Check this tutorial out: <https://www.digitalocean.com/community/tutorials/how-to-install-go-1-6-on-ubuntu-14-04>
+  * TIP: You may want to install Go in a more localized place to keep your system cleaner from stray files.
 
-To build, after go-getting, try this:
+2. Make sure your Go paths are set correctly: the `.../go/bin` path is in `$PATH`, `$GOROOT` is set to `.../go/`, and `$GOPATH` is the location of where you want lit to be. 
+
+3. Download the lit project: `go get github.com/mit-dci/lit`
+
+4. The `go get` will fail. 
+  * Lit uses btcd libraries, and btcd does not yet have segwit support in master.  This will hopefully be merged soon, before segwit activates on mainnet.
+  * I have a fork of btcd from roasbeef/segwit, and could make it go-gettable by changing all the imports, but hopefully it will be merged in soon.
+  * To make it work, switch to the adiabat/btcd libraries:  
 ```
 # github.com/mit-dci/lit/uspv
 uspv/eight333.go:406: undefined: wire.InvTypeWitnessBlock
@@ -24,9 +33,10 @@ user@host:~/go/src/github.com/btcsuite/btcutil$ git remote add adiabat https://g
 user@host:~/go/src/github.com/btcsuite/btcutil$ git fetch adiabat
 user@host:~/go/src/github.com/btcsuite/btcutil$ git checkout adiabat/master
 ```
-it should build after switching to the adiabat/btcd libraries.  
 
-folders:
+5. Build, compile, and install: `go get install`
+
+## Folders:
 
 ### cmd
 has some rpc client code to interact with the lit node.  Not much there yet
