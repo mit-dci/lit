@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"sort"
 	"strconv"
 
@@ -204,48 +203,8 @@ func Lis(args []string) error {
 		portstring = args[0]
 		portstring = ":" + portstring
 	}
-	go TCPListener(portstring)
-	return nil
-}
-
-func TCPListener(lisIpPort string) error {
-	idPriv := SCon.TS.IdKey()
-
-	listener, err := lndc.NewListener(idPriv, lisIpPort)
-	if err != nil {
-		return err
-	}
-
-	myId := btcutil.Hash160(idPriv.PubKey().SerializeCompressed())
-	lisAdr, err := btcutil.NewAddressPubKeyHash(myId, SCon.Param)
-	fmt.Printf("Listening on %s\n", listener.Addr().String())
-	fmt.Printf("Listening with base58 address: %s lnid: %x\n",
-		lisAdr.String(), myId[:16])
-
-	go func() {
-		for {
-			netConn, err := listener.Accept() // this blocks
-			if err != nil {
-				log.Printf("Listener error: %s\n", err.Error())
-				continue
-			}
-			newConn, ok := netConn.(*lndc.LNDConn)
-			if !ok {
-				fmt.Printf("Got something that wasn't a LNDC")
-				continue
-			}
-
-			idslice := btcutil.Hash160(newConn.RemotePub.SerializeCompressed())
-			var newId [16]byte
-			copy(newId[:], idslice[:16])
-			fmt.Printf("Authed incoming connection from remote %s lnid %x OK\n",
-				newConn.RemoteAddr().String(), newId)
-
-			go LNode.LNDCReceiver(newConn, newId)
-			LNode.RemoteCon = newConn
-		}
-	}()
-	return nil
+	_, err := Node.TCPListener(portstring)
+	return err
 }
 
 // connects to the watchtower
@@ -261,10 +220,10 @@ func WCon(args []string) error {
 		return err
 	}
 
-	idPriv := SCon.TS.IdKey()
-	LNode.WatchCon = new(lndc.LNDConn)
+	idPriv := Node.IdKey()
+	Node.WatchCon = new(lndc.LNDConn)
 
-	err = LNode.WatchCon.Dial(
+	err = Node.WatchCon.Dial(
 		idPriv, newWatch.NetAddr.String(), newWatch.Base58Adr.ScriptAddress())
 	if err != nil {
 		return err
@@ -287,24 +246,24 @@ func Con(args []string) error {
 		return err
 	}
 
-	idPriv := SCon.TS.IdKey()
-	LNode.RemoteCon = new(lndc.LNDConn)
+	idPriv := Node.IdKey()
+	Node.RemoteCon = new(lndc.LNDConn)
 
-	err = LNode.RemoteCon.Dial(
+	err = Node.RemoteCon.Dial(
 		idPriv, newNode.NetAddr.String(), newNode.Base58Adr.ScriptAddress())
 	if err != nil {
 		return err
 	}
 	// store this peer
-	_, err = LNode.NewPeer(LNode.RemoteCon.RemotePub)
+	_, err = Node.NewPeer(Node.RemoteCon.RemotePub)
 	if err != nil {
 		return err
 	}
 
-	idslice := btcutil.Hash160(LNode.RemoteCon.RemotePub.SerializeCompressed())
+	idslice := btcutil.Hash160(Node.RemoteCon.RemotePub.SerializeCompressed())
 	var newId [16]byte
 	copy(newId[:], idslice[:16])
-	go LNode.LNDCReceiver(LNode.RemoteCon, newId)
+	go Node.LNDCReceiver(Node.RemoteCon, newId)
 
 	return nil
 }
@@ -315,7 +274,7 @@ func Say(args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("you have to say something")
 	}
-	if LNode.RemoteCon == nil || LNode.RemoteCon.RemotePub == nil {
+	if Node.RemoteCon == nil || Node.RemoteCon.RemotePub == nil {
 		return fmt.Errorf("Not connected to anyone\n")
 	}
 
@@ -325,7 +284,7 @@ func Say(args []string) error {
 	}
 	msg := append([]byte{qln.MSGID_TEXTCHAT}, []byte(chat)...)
 
-	_, err := LNode.RemoteCon.Write(msg)
+	_, err := Node.RemoteCon.Write(msg)
 	return err
 }
 
@@ -402,16 +361,16 @@ func Bal(args []string) error {
 			return err
 		}
 
-		qc, err := LNode.GetQchanByIdx(uint32(peerIdx), uint32(cIdx))
+		qc, err := Node.GetQchanByIdx(uint32(peerIdx), uint32(cIdx))
 		if err != nil {
 			return err
 		}
-		return LNode.QchanInfo(qc)
+		return Node.QchanInfo(qc)
 	}
 
 	fmt.Printf(" ----- Account Balance ----- \n")
 	fmt.Printf(" ----- Channels ----- \n")
-	qcs, err := LNode.GetAllQchans()
+	qcs, err := Node.GetAllQchans()
 	if err != nil {
 		return err
 	}

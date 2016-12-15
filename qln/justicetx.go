@@ -23,7 +23,7 @@ anymore.  We can hand over 1 point per commit & figure everything out from that.
 // BuildWatchTxidSig builds the partial txid and signature pair which can
 // be exported to the watchtower.
 // This get a channel that is 1 state old.  So we can produce a signature.
-func (nd *LnNode) BuildJusticeSig(q *Qchan) error {
+func (nd *LitNode) BuildJusticeSig(q *Qchan) error {
 	var parTxidSig [80]byte // 16 byte txid and 64 byte signature stuck together
 
 	// in this function, "bad" refers to the hypothetical transaction spending the
@@ -86,6 +86,7 @@ func (nd *LnNode) BuildJusticeSig(q *Qchan) error {
 	badOP := wire.NewOutPoint(&badTxid, badIdx)
 	// make the justice txin, empty sig / witness
 	justiceIn := wire.NewTxIn(badOP, nil, nil)
+	justiceIn.Sequence = 1
 	// make justice output script
 	justiceScript := lnutil.DirectWPKHScriptFromPKH(q.WatchRefundAdr)
 	// make justice txout
@@ -99,12 +100,14 @@ func (nd *LnNode) BuildJusticeSig(q *Qchan) error {
 	justiceTx.AddTxIn(justiceIn)
 	justiceTx.AddTxOut(justiceOut)
 
+	jtxid := justiceTx.TxHash()
+	fmt.Printf("made justice tx %s\n", jtxid.String())
 	// get hashcache for signing
 	hCache := txscript.NewTxSigHashes(justiceTx)
 
 	// sign with combined key.  Justice txs always have only 1 input, so txin is 0
 	bigSig, err := txscript.RawTxInWitnessSignature(
-		justiceTx, hCache, 0, q.Value, script, txscript.SigHashAll, combinedPrivKey)
+		justiceTx, hCache, 0, badAmt, script, txscript.SigHashAll, combinedPrivKey)
 	// truncate sig (last byte is sighash type, always sighashAll)
 	bigSig = bigSig[:len(bigSig)-1]
 
@@ -121,8 +124,8 @@ func (nd *LnNode) BuildJusticeSig(q *Qchan) error {
 
 // SaveJusticeSig save the txid/sig of a justice transaction to the db.  Pretty
 // straightforward
-func (nd *LnNode) SaveJusticeSig(comnum uint64, pkh [20]byte, txidsig [80]byte) error {
-	return nd.LnDB.Update(func(btx *bolt.Tx) error {
+func (nd *LitNode) SaveJusticeSig(comnum uint64, pkh [20]byte, txidsig [80]byte) error {
+	return nd.LitDB.Update(func(btx *bolt.Tx) error {
 		sigs := btx.Bucket(BKTWatch)
 		if sigs == nil {
 			return fmt.Errorf("no justice bucket")
@@ -137,10 +140,10 @@ func (nd *LnNode) SaveJusticeSig(comnum uint64, pkh [20]byte, txidsig [80]byte) 
 	})
 }
 
-func (nd *LnNode) LoadJusticeSig(comnum uint64, pkh [20]byte) ([80]byte, error) {
+func (nd *LitNode) LoadJusticeSig(comnum uint64, pkh [20]byte) ([80]byte, error) {
 	var txidsig [80]byte
 
-	err := nd.LnDB.View(func(btx *bolt.Tx) error {
+	err := nd.LitDB.View(func(btx *bolt.Tx) error {
 		sigs := btx.Bucket(BKTWatch)
 		if sigs == nil {
 			return fmt.Errorf("no justice bucket")
@@ -160,10 +163,10 @@ func (nd *LnNode) LoadJusticeSig(comnum uint64, pkh [20]byte) ([80]byte, error) 
 	return txidsig, err
 }
 
-func (nd *LnNode) ShowJusticeDB() (string, error) {
+func (nd *LitNode) ShowJusticeDB() (string, error) {
 	var s string
 
-	err := nd.LnDB.View(func(btx *bolt.Tx) error {
+	err := nd.LitDB.View(func(btx *bolt.Tx) error {
 		sigs := btx.Bucket(BKTWatch)
 		if sigs == nil {
 			return fmt.Errorf("no justice bucket")
@@ -186,7 +189,7 @@ func (nd *LnNode) ShowJusticeDB() (string, error) {
 }
 
 // SendWatch syncs up the remote watchtower with all justice signatures
-func (nd *LnNode) SyncWatch(qc *Qchan) error {
+func (nd *LitNode) SyncWatch(qc *Qchan) error {
 
 	// if watchUpTo isn't 2 behind the state number, there's nothing to send
 	// kindof confusing inequality: can't send state 0 info to watcher when at
@@ -234,7 +237,7 @@ func (nd *LnNode) SyncWatch(qc *Qchan) error {
 }
 
 // send WatchComMsg generates and sends the ComMsg to a watchtower
-func (nd *LnNode) SendWatchComMsg(qc *Qchan, idx uint64) error {
+func (nd *LitNode) SendWatchComMsg(qc *Qchan, idx uint64) error {
 	// retreive the sig data from db
 	txidsig, err := nd.LoadJusticeSig(idx, qc.WatchRefundAdr)
 	if err != nil {

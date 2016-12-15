@@ -102,7 +102,7 @@ an exact timing for the payment.
 // and a refund pubkey hash. (currently makes pubkey hash, need to only make 1)
 // so if someone sends 10 pubkeyreqs, they'll get the same pubkey back 10 times.
 // they have to provide an actual tx before the next pubkey will come out.
-func (nd *LnNode) PointReqHandler(from [16]byte, pointReqBytes []byte) {
+func (nd *LitNode) PointReqHandler(from [16]byte, pointReqBytes []byte) {
 	// pub req; check that idx matches next idx of ours and create pubkey
 	var peerArr [33]byte
 	copy(peerArr[:], nd.RemoteCon.RemotePub.SerializeCompressed())
@@ -136,7 +136,7 @@ func (nd *LnNode) PointReqHandler(from [16]byte, pointReqBytes []byte) {
 
 // FUNDER
 // PointRespHandler takes in a point response, and returns a channel description
-func (nd LnNode) PointRespHandler(from [16]byte, pointRespBytes []byte) error {
+func (nd LitNode) PointRespHandler(from [16]byte, pointRespBytes []byte) error {
 	// not sure how to do this yet
 
 	if nd.InProg.PeerIdx == 0 {
@@ -273,7 +273,7 @@ func (nd LnNode) PointRespHandler(from [16]byte, pointRespBytes []byte) error {
 // RECIPIENT
 // QChanDescHandler takes in a description of a channel output.  It then
 // saves it to the local db, and returns a channel acknowledgement
-func (nd *LnNode) QChanDescHandler(from [16]byte, descbytes []byte) {
+func (nd *LitNode) QChanDescHandler(from [16]byte, descbytes []byte) {
 	if len(descbytes) < 217 || len(descbytes) > 217 {
 		fmt.Printf("got %d byte channel description, expect 217", len(descbytes))
 		return
@@ -398,7 +398,7 @@ func (nd *LnNode) QChanDescHandler(from [16]byte, descbytes []byte) {
 // FUNDER
 // QChanAckHandler takes in an acknowledgement multisig description.
 // when a multisig outpoint is ackd, that causes the funder to sign and broadcast.
-func (nd *LnNode) QChanAckHandler(from [16]byte, ackbytes []byte) {
+func (nd *LitNode) QChanAckHandler(from [16]byte, ackbytes []byte) {
 	if len(ackbytes) < 166 || len(ackbytes) > 166 {
 		fmt.Printf("got %d byte multiAck, expect 166", len(ackbytes))
 		return
@@ -469,6 +469,14 @@ func (nd *LnNode) QChanAckHandler(from [16]byte, ackbytes []byte) {
 		fmt.Printf("QChanAckHandler WatchThis err %s", err.Error())
 		return
 	}
+
+	// tell base wallet about watcher refund address in case that happens
+	nullTxo := new(portxo.PorTxo)
+	nullTxo.Value = 0 // redundant, but explicitly show that this is just for adr
+	nullTxo.KeyGen = qc.KeyGen
+	nullTxo.KeyGen.Step[2] = UseChannelWatchRefund
+	nd.BaseWallet.ExportUtxo(nullTxo)
+
 	// sig proof should be sent later once there are confirmations.
 	// it'll have an spv proof of the fund tx.
 	// but for now just send the sig.
@@ -482,7 +490,7 @@ func (nd *LnNode) QChanAckHandler(from [16]byte, ackbytes []byte) {
 // RECIPIENT
 // SigProofHandler saves the signature the recipent stores.
 // In some cases you don't need this message.
-func (nd *LnNode) SigProofHandler(from [16]byte, sigproofbytes []byte) {
+func (nd *LitNode) SigProofHandler(from [16]byte, sigproofbytes []byte) {
 	if len(sigproofbytes) < 100 || len(sigproofbytes) > 100 {
 		fmt.Printf("got %d byte Sigproof, expect ~100\n", len(sigproofbytes))
 		return
@@ -518,13 +526,13 @@ func (nd *LnNode) SigProofHandler(from [16]byte, sigproofbytes []byte) {
 		fmt.Printf("SigProofHandler err %s", err.Error())
 		return
 	}
-	// add to bloom filter here; later should instead receive spv proof
-	//	filt, err := SCon.TS.GimmeFilter()
-	//	if err != nil {
-	//		fmt.Printf("QChanDescHandler RefilterLocal err %s", err.Error())
-	//		return
-	//	}
-	//	SCon.Refilter(filt)
+
+	// tell base wallet about watcher refund address in case that happens
+	nullTxo := new(portxo.PorTxo)
+	nullTxo.Value = 0 // redundant, but explicitly show that this is just for adr
+	nullTxo.KeyGen = qc.KeyGen
+	nullTxo.KeyGen.Step[2] = UseChannelWatchRefund
+	nd.BaseWallet.ExportUtxo(nullTxo)
 
 	// sig OK; in terms of UI here's where you can say "payment received"
 	// "channel online" etc

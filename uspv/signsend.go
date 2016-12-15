@@ -228,6 +228,25 @@ func (s *SPVCon) GrabAll() error {
 	return nil
 }
 
+// Directly send out a tx.  For things that plug in to the uspv wallet.
+func (s *SPVCon) DirectSendTx(tx *wire.MsgTx) error {
+	// don't ingest, just save
+	err := s.TS.SaveTx(tx)
+	if err != nil {
+		return err
+	}
+	txid := tx.TxHash()
+	// make an inv message to tell everyone about this tx
+	iv1 := wire.NewInvVect(wire.InvTypeWitnessTx, &txid)
+	invMsg := wire.NewMsgInv()
+	err = invMsg.AddInvVect(iv1)
+	if err != nil {
+		return err
+	}
+	s.outMsgQueue <- invMsg
+	return nil
+}
+
 // NewOutgoingTx runs a tx though the db first, then sends it out to the network.
 func (s *SPVCon) NewOutgoingTx(tx *wire.MsgTx) error {
 	txid := tx.TxHash()

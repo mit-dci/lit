@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/boltdb/bolt"
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
@@ -111,7 +112,7 @@ func (w *WatchTower) BuildJusticeTx(badTx *wire.MsgTx) (*wire.MsgTx, error) {
 
 	// get P2WSH output script
 	shOutputScript := lnutil.P2WSHify(script)
-	fmt.Printf("built script %xpkscript %x\n", script, shOutputScript)
+	fmt.Printf("built script %x\npkscript %x\n", script, shOutputScript)
 
 	// try to match WSH with output from tx
 	txoutNum := 999
@@ -140,15 +141,17 @@ func (w *WatchTower) BuildJusticeTx(badTx *wire.MsgTx) (*wire.MsgTx, error) {
 	justiceIn := wire.NewTxIn(badOP, nil, nil)
 	// expand the sig back to 71 bytes
 	bigSig := sig64.SigDecompress(iSig.Sig)
-	// witness stack is (1, sig) -- 1 means revoked path
+	bigSig = append(bigSig, byte(txscript.SigHashAll)) // put sighash_all byte on at the end
 
 	justiceIn.Sequence = 1                // sequence 1 means grab immediately
-	justiceIn.Witness = make([][]byte, 2) // timeout SH has one presig item
-	justiceIn.Witness[0] = []byte{0x01}   // stack top is a 1, for justice
-	justiceIn.Witness[1] = bigSig         // expanded signature goes on last
+	justiceIn.Witness = make([][]byte, 3) // timeout SH has one presig item
+	justiceIn.Witness[0] = bigSig         // expanded signature goes on bottom
+	justiceIn.Witness[1] = []byte{0x01}   // above sig is a 1, for justice
+	justiceIn.Witness[2] = script         // full script goes on at the top
 
 	// add in&out to the the final justiceTx
 	justiceTx := wire.NewMsgTx()
+	justiceTx.Version = 2 // shouldn't matter, but standardize
 	justiceTx.AddTxIn(justiceIn)
 	justiceTx.AddTxOut(justiceOut)
 

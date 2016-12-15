@@ -21,7 +21,7 @@ func (s *SPVCon) GetPub(k portxo.KeyGen) *btcec.PublicKey {
 }
 
 func (s *SPVCon) PushTx(tx *wire.MsgTx) error {
-	return s.NewOutgoingTx(tx)
+	return s.DirectSendTx(tx)
 }
 
 func (s *SPVCon) Params() *chaincfg.Params {
@@ -41,9 +41,18 @@ func (s *SPVCon) LetMeKnow() chan lnutil.OutPointEvent {
 // ExportUtxo is really *IM*port utxo on this side.
 // Not implemented yet.  Fix "ingest many" at the same time eh?
 func (s *SPVCon) ExportUtxo(u *portxo.PorTxo) {
-	err := s.TS.GainUtxo(*u)
-	if err != nil {
-		log.Printf(err.Error())
+
+	// zero value utxo counts as an address exort, not utxo export.
+	if u.Value == 0 {
+		err := s.TS.AddPorTxoAdr(u.KeyGen)
+		if err != nil {
+			log.Printf(err.Error())
+		}
+	} else {
+		err := s.TS.GainUtxo(*u)
+		if err != nil {
+			log.Printf(err.Error())
+		}
 	}
 
 	// make new filter

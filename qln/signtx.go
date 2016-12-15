@@ -11,7 +11,7 @@ import (
 )
 
 // SignBreak signs YOUR tx, which you already have a sig for
-func (nd *LnNode) SignBreakTx(q *Qchan) (*wire.MsgTx, error) {
+func (nd *LitNode) SignBreakTx(q *Qchan) (*wire.MsgTx, error) {
 	tx, err := q.BuildStateTx(true)
 	if err != nil {
 		return nil, err
@@ -43,12 +43,21 @@ func (nd *LnNode) SignBreakTx(q *Qchan) (*wire.MsgTx, error) {
 	} else {
 		tx.TxIn[0].Witness = SpendMultiSigWitStack(pre, mySig, theirSig)
 	}
+
+	// save channel state as closed
+	q.CloseData.Closed = true
+	q.CloseData.CloseTxid = tx.TxHash()
+	err = nd.SaveQchanUtxoData(q)
+	if err != nil {
+		return nil, err
+	}
+
 	return tx, nil
 }
 
 // SignSimpleClose signs the given simpleClose tx, given the other signature
 // Tx is modified in place.
-func (nd *LnNode) SignSimpleClose(q *Qchan, tx *wire.MsgTx) ([]byte, error) {
+func (nd *LitNode) SignSimpleClose(q *Qchan, tx *wire.MsgTx) ([]byte, error) {
 	// make hash cache
 	hCache := txscript.NewTxSigHashes(tx)
 
@@ -70,7 +79,7 @@ func (nd *LnNode) SignSimpleClose(q *Qchan, tx *wire.MsgTx) ([]byte, error) {
 }
 
 // SignNextState generates your signature for their state.
-func (nd *LnNode) SignState(q *Qchan) ([64]byte, error) {
+func (nd *LitNode) SignState(q *Qchan) ([64]byte, error) {
 	var sig [64]byte
 	// build transaction for next state
 	tx, err := q.BuildStateTx(false) // their tx, as I'm signing

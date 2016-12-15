@@ -1,8 +1,13 @@
 package qln
 
-import "github.com/boltdb/bolt"
+import (
+	"fmt"
 
-func (nd *LnNode) Init(
+	"github.com/boltdb/bolt"
+	"github.com/btcsuite/btcd/wire"
+)
+
+func (nd *LitNode) Init(
 	dbfilename, watchname string, basewal UWallet, tower bool) error {
 
 	err := nd.OpenDB(dbfilename)
@@ -15,6 +20,8 @@ func (nd *LnNode) Init(
 
 	// connect to base wallet
 	nd.BaseWallet = basewal
+
+	nd.Param = nd.BaseWallet.Params()
 	// ask basewallet for outpoint event messages
 	go nd.OPEventHandler(nd.BaseWallet.LetMeKnow())
 	// optional tower activation
@@ -26,20 +33,33 @@ func (nd *LnNode) Init(
 		nd.Tower.Accepting = true
 		// call base wallet blockmonitor and hand this channel to the tower
 		go nd.Tower.BlockHandler(nd.BaseWallet.BlockMonitor())
+		go nd.Relay(nd.Tower.JusticeOutbox())
 	}
+
 	return nil
 }
 
+// relay txs from the watchtower to the underlying wallet...
+// small, but a little ugly; maybe there's a cleaner way
+func (nd *LitNode) Relay(outbox chan *wire.MsgTx) {
+	for {
+		err := nd.BaseWallet.PushTx(<-outbox)
+		if err != nil {
+			fmt.Printf("PushTx error: %s", err.Error())
+		}
+	}
+}
+
 // Opens the DB file for the LnNode
-func (nd *LnNode) OpenDB(filename string) error {
+func (nd *LitNode) OpenDB(filename string) error {
 	var err error
 
-	nd.LnDB, err = bolt.Open(filename, 0644, nil)
+	nd.LitDB, err = bolt.Open(filename, 0644, nil)
 	if err != nil {
 		return err
 	}
 	// create buckets if they're not already there
-	err = nd.LnDB.Update(func(btx *bolt.Tx) error {
+	err = nd.LitDB.Update(func(btx *bolt.Tx) error {
 		_, err := btx.CreateBucketIfNotExists(BKTPeers)
 		if err != nil {
 			return err

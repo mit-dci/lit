@@ -1,25 +1,15 @@
-package main
+package litrpc
 
 import (
 	"fmt"
-	"log"
-	"net"
-	"net/rpc"
-	"net/rpc/jsonrpc"
 	"sort"
-
-	"github.com/mit-dci/lit/lndc"
-	"github.com/mit-dci/lit/portxo"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcutil"
+	"github.com/mit-dci/lit/lndc"
+	"github.com/mit-dci/lit/portxo"
 )
 
-// multi-use structs
-
-type LNRpc struct {
-	// nothing...?
-}
 type TxidsReply struct {
 	Txids []string
 }
@@ -31,96 +21,39 @@ type NoArgs struct {
 	// nothin
 }
 
-// ------------------------- address
-type AdrArgs struct {
-	NumToMake uint32
-}
-type AdrReply struct {
-	//	PreviousAddresses []string
-	NewAddresses []string
-}
-
-func (r *LNRpc) Address(args *AdrArgs, reply *AdrReply) error {
-	//	reply.PreviousAddresses = make([]string, len(SCon.TS.Adrs))
-	reply.NewAddresses = make([]string, args.NumToMake)
-
-	//	for i, a := range SCon.TS.Adrs {
-	//		reply.PreviousAddresses[i] = a.PkhAdr.String()
-	//	}
-
-	nokori := args.NumToMake
-	for nokori > 0 {
-		a160, err := SCon.TS.NewAdr160()
-		if err != nil {
-			return err
-		}
-
-		wa, err := btcutil.NewAddressWitnessPubKeyHash(a160, SCon.Param)
-		if err != nil {
-			return err
-		}
-		reply.NewAddresses[nokori-1] = wa.String()
-		nokori--
-	}
-
-	return nil
-}
-
 // ------------------------- balance
 // BalReply is the reply when the user asks about their balance.
 // This is a Non-Channel
 type BalReply struct {
-	ChanTotal         int64
-	TxoTotal          int64
-	SpendableNow      int64
-	SpendableNowWitty int64
-}
-type TxoListReply struct {
-	Txos []TxoInfo
-}
-type ChannelListReply struct {
-	Channels []ChannelInfo
-}
-type TxoInfo struct {
-	OutPoint string
-	Amt      int64
-	Height   int32
-
-	PeerNum uint32
-	KeyNum  uint32
-}
-type ChannelInfo struct {
-	OutPoint  string
-	Capacity  int64
-	MyBalance int64
-	PeerID    string
+	ChanTotal   int64 // total balance in channels
+	TxoTotal    int64 // all utxos
+	Mature      int64 // confirmed and spendable
+	MatureWitty int64 // confirmed, spendable and witness
 }
 
-func (r *LNRpc) Bal(args *NoArgs, reply *BalReply) error {
+func (r *LitRPC) Bal(args *NoArgs, reply *BalReply) error {
 	// check current chain height; needed for time-locked outputs
-	curHeight, err := SCon.TS.GetDBSyncHeight()
+	curHeight, err := r.SCon.TS.GetDBSyncHeight()
 	if err != nil {
 		return err
 	}
-	allTxos, err := SCon.TS.GetAllUtxos()
+	allTxos, err := r.SCon.TS.GetAllUtxos()
 	if err != nil {
 		return err
 	}
 	// iterate through utxos to figure out how much we have
 	for _, u := range allTxos {
 		reply.TxoTotal += u.Value
-		if u.Seq == 0 {
-			reply.SpendableNow += u.Value
-		} else {
-			if u.Seq == 1 || u.Height+int32(u.Seq) > curHeight {
-				reply.SpendableNow += u.Value
-				reply.SpendableNowWitty += u.Value
+		if u.Height+int32(u.Seq) < curHeight {
+			reply.Mature += u.Value
+			if u.Mode&portxo.FlagTxoWitness != 0 {
+				reply.MatureWitty += u.Value
 			}
 		}
 	}
 
 	// get all channel states
-	qcs, err := LNode.GetAllQchans()
+	qcs, err := r.Node.GetAllQchans()
 	if err != nil {
 		return err
 	}
@@ -132,9 +65,20 @@ func (r *LNRpc) Bal(args *NoArgs, reply *BalReply) error {
 	return nil
 }
 
+type TxoInfo struct {
+	OutPoint string
+	Amt      int64
+	Height   int32
+
+	KeyPath string
+}
+type TxoListReply struct {
+	Txos []TxoInfo
+}
+
 // TxoList sends back a list of all non-channel utxos
-func (r *LNRpc) TxoList(args *NoArgs, reply *TxoListReply) error {
-	allTxos, err := SCon.TS.GetAllUtxos()
+func (r *LitRPC) TxoList(args *NoArgs, reply *TxoListReply) error {
+	allTxos, err := r.SCon.TS.GetAllUtxos()
 	if err != nil {
 		return err
 	}
@@ -143,17 +87,26 @@ func (r *LNRpc) TxoList(args *NoArgs, reply *TxoListReply) error {
 	for i, u := range allTxos {
 		reply.Txos[i].Amt = u.Value
 		reply.Txos[i].Height = u.Height
-		reply.Txos[i].KeyNum = u.KeyGen.Step[4]
 		reply.Txos[i].OutPoint = u.Op.String()
-		reply.Txos[i].PeerNum = u.KeyGen.Step[3]
+		reply.Txos[i].KeyPath = u.KeyGen.String()
 	}
 	return nil
 }
 
+type ChannelInfo struct {
+	OutPoint  string
+	Capacity  int64
+	MyBalance int64
+	PeerID    string
+}
+type ChannelListReply struct {
+	Channels []ChannelInfo
+}
+
 // ChannelList sends back a list of every (open?) channel with some
 // info for each.
-func (r *LNRpc) ChannelList(args *NoArgs, reply *ChannelListReply) error {
-	qcs, err := LNode.GetAllQchans()
+func (r *LitRPC) ChannelList(args *NoArgs, reply *ChannelListReply) error {
+	qcs, err := r.Node.GetAllQchans()
 	if err != nil {
 		return err
 	}
@@ -174,7 +127,7 @@ type SendArgs struct {
 	Amts      []int64
 }
 
-func (r *LNRpc) Send(args SendArgs, reply *TxidsReply) error {
+func (r *LitRPC) Send(args SendArgs, reply *TxidsReply) error {
 	var err error
 
 	nOutputs := len(args.DestAddrs)
@@ -189,16 +142,19 @@ func (r *LNRpc) Send(args SendArgs, reply *TxidsReply) error {
 	adrs := make([]btcutil.Address, nOutputs)
 
 	for i, s := range args.DestAddrs {
-		adrs[i], err = btcutil.DecodeAddress(s, SCon.TS.Param)
+		adrs[i], err = btcutil.DecodeAddress(s, r.SCon.TS.Param)
 		if err != nil {
 			return err
 		}
+		if args.Amts[i] < 10000 {
+			return fmt.Errorf("Amt %d less than min 10000", args.Amts[i])
+		}
 	}
-	tx, err := SCon.TS.SendCoins(adrs, args.Amts)
+	tx, err := r.SCon.TS.SendCoins(adrs, args.Amts)
 	if err != nil {
 		return err
 	}
-	err = SCon.NewOutgoingTx(tx)
+	err = r.SCon.NewOutgoingTx(tx)
 	if err != nil {
 		return err
 	}
@@ -214,8 +170,8 @@ type SweepArgs struct {
 	Drop    bool
 }
 
-func (r *LNRpc) Sweep(args SweepArgs, reply *TxidsReply) error {
-	adr, err := btcutil.DecodeAddress(args.DestAdr, SCon.TS.Param)
+func (r *LitRPC) Sweep(args SweepArgs, reply *TxidsReply) error {
+	adr, err := btcutil.DecodeAddress(args.DestAdr, r.SCon.TS.Param)
 	if err != nil {
 		fmt.Printf("error parsing %s as address\t", args.DestAdr)
 		return err
@@ -227,7 +183,7 @@ func (r *LNRpc) Sweep(args SweepArgs, reply *TxidsReply) error {
 	nokori := args.NumTx
 
 	var allUtxos portxo.TxoSliceByAmt
-	allUtxos, err = SCon.TS.GetAllUtxos()
+	allUtxos, err = r.SCon.TS.GetAllUtxos()
 	if err != nil {
 		return err
 	}
@@ -253,12 +209,12 @@ func (r *LNRpc) Sweep(args SweepArgs, reply *TxidsReply) error {
 				//					return err
 				//				}
 			} else {
-				tx, err := SCon.TS.SendOne(*allUtxos[i], adr)
+				tx, err := r.SCon.TS.SendOne(*allUtxos[i], adr)
 				if err != nil {
 					return err
 				}
 				txid = tx.TxHash()
-				err = SCon.NewOutgoingTx(tx)
+				err = r.SCon.NewOutgoingTx(tx)
 				if err != nil {
 					return err
 				}
@@ -282,14 +238,14 @@ type FanArgs struct {
 	AmtPerOutput int64
 }
 
-func (r *LNRpc) Fanout(args FanArgs, reply *TxidsReply) error {
+func (r *LitRPC) Fanout(args FanArgs, reply *TxidsReply) error {
 	if args.NumOutputs < 1 {
 		return fmt.Errorf("Must have at least 1 output")
 	}
 	if args.AmtPerOutput < 5000 {
 		return fmt.Errorf("Minimum 5000 per output")
 	}
-	adr, err := btcutil.DecodeAddress(args.DestAdr, SCon.TS.Param)
+	adr, err := btcutil.DecodeAddress(args.DestAdr, r.SCon.TS.Param)
 	if err != nil {
 		fmt.Printf("error parsing %s as address\t", args.DestAdr)
 		return err
@@ -301,11 +257,11 @@ func (r *LNRpc) Fanout(args FanArgs, reply *TxidsReply) error {
 		adrs[i] = adr
 		amts[i] = args.AmtPerOutput + i
 	}
-	tx, err := SCon.TS.SendCoins(adrs, amts)
+	tx, err := r.SCon.TS.SendCoins(adrs, amts)
 	if err != nil {
 		return err
 	}
-	err = SCon.NewOutgoingTx(tx)
+	err = r.SCon.NewOutgoingTx(tx)
 	if err != nil {
 		return err
 	}
@@ -314,13 +270,22 @@ func (r *LNRpc) Fanout(args FanArgs, reply *TxidsReply) error {
 }
 
 // ------------------------- listen
-func (r *LNRpc) Listen(args NoArgs, reply *StatusReply) error {
-	err := TCPListener(":2448")
+// ------------------------- connect
+type ListenArgs struct {
+	Port string
+}
+
+func (r *LitRPC) Listen(args ListenArgs, reply *StatusReply) error {
+	if args.Port == "" {
+		args.Port = ":2448"
+	}
+	adr, err := r.Node.TCPListener(args.Port)
 	if err != nil {
 		return err
 	}
 	// todo: say what port and what pubkey in status message
-	reply.Status = fmt.Sprintf("listening on %s", LNode.RemoteCon.LocalAddr().String())
+	reply.Status = fmt.Sprintf("listening on %s with key %s",
+		args.Port, adr.String())
 	return nil
 }
 
@@ -329,7 +294,51 @@ type ConnectArgs struct {
 	LNAddr string
 }
 
-func (r *LNRpc) Connect(args ConnectArgs, reply *StatusReply) error {
+// ------------------------- address
+type AdrArgs struct {
+	NumToMake uint32
+}
+type AdrReply struct {
+	Addresses []string
+}
+
+func (r *LitRPC) Address(args *AdrArgs, reply *AdrReply) error {
+
+	// If you tell it to make 0 new addresses, it sends a list of all the old ones
+	if args.NumToMake == 0 {
+
+		allAdr, err := r.SCon.TS.GetAllAddresses()
+		if err != nil {
+			return err
+		}
+
+		reply.Addresses = make([]string, len(allAdr))
+		for i, a := range allAdr {
+			reply.Addresses[i] = a.String()
+		}
+		return nil
+	}
+
+	reply.Addresses = make([]string, args.NumToMake)
+	remaining := args.NumToMake
+	for remaining > 0 {
+		a160, err := r.SCon.TS.NewAdr160()
+		if err != nil {
+			return err
+		}
+
+		wa, err := btcutil.NewAddressWitnessPubKeyHash(a160, r.SCon.Param)
+		if err != nil {
+			return err
+		}
+		reply.Addresses[remaining-1] = wa.String()
+		remaining--
+	}
+
+	return nil
+}
+
+func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
 
 	connectNode, err := lndc.LnAddrFromString(args.LNAddr)
 	if err != nil {
@@ -337,28 +346,29 @@ func (r *LNRpc) Connect(args ConnectArgs, reply *StatusReply) error {
 	}
 
 	// get my private ID key
-	idPriv := SCon.TS.IdKey()
+	idPriv := r.Node.IdKey()
 
 	// Assign remote connection
-	LNode.RemoteCon = new(lndc.LNDConn)
+	r.Node.RemoteCon = new(lndc.LNDConn)
 
-	err = LNode.RemoteCon.Dial(idPriv,
+	err = r.Node.RemoteCon.Dial(idPriv,
 		connectNode.NetAddr.String(), connectNode.Base58Adr.ScriptAddress())
 	if err != nil {
 		return err
 	}
 
 	// store this peer in the db
-	_, err = LNode.NewPeer(LNode.RemoteCon.RemotePub)
+	_, err = r.Node.NewPeer(r.Node.RemoteCon.RemotePub)
 	if err != nil {
 		return err
 	}
 
-	idslice := btcutil.Hash160(LNode.RemoteCon.RemotePub.SerializeCompressed())
+	idslice := btcutil.Hash160(r.Node.RemoteCon.RemotePub.SerializeCompressed())
 	var newId [16]byte
 	copy(newId[:], idslice[:16])
-	go LNode.LNDCReceiver(LNode.RemoteCon, newId)
-
+	go r.Node.LNDCReceiver(r.Node.RemoteCon, newId)
+	reply.Status = fmt.Sprintf("connected to %s",
+		connectNode.Base58Adr.String())
 	return nil
 }
 
@@ -370,7 +380,7 @@ type FundArgs struct {
 	InitialSend int64 // Initial send of -1 means "ALL"
 }
 
-func (r *LNRpc) Fund(args FundArgs, reply *StatusReply) error {
+func (r *LitRPC) Fund(args FundArgs, reply *StatusReply) error {
 	if args.InitialSend > args.Capacity {
 		return fmt.Errorf("Initial send more than capacity")
 	}
@@ -388,8 +398,8 @@ type PushReply struct {
 	StateIndex uint64
 }
 
-func (r *LNRpc) Push(args PushArgs, reply *PushReply) error {
-	if LNode.RemoteCon == nil || LNode.RemoteCon.RemotePub == nil {
+func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
+	if r.Node.RemoteCon == nil || r.Node.RemoteCon.RemotePub == nil {
 		return fmt.Errorf("Not connected to anyone, can't push\n")
 	}
 	if args.Amt > 100000000 || args.Amt < 1 {
@@ -397,7 +407,7 @@ func (r *LNRpc) Push(args PushArgs, reply *PushReply) error {
 	}
 
 	// find the peer index of who we're connected to
-	currentPeerIdx, err := LNode.GetPeerIdx(LNode.RemoteCon.RemotePub)
+	currentPeerIdx, err := r.Node.GetPeerIdx(r.Node.RemoteCon.RemotePub)
 	if err != nil {
 		return err
 	}
@@ -408,11 +418,11 @@ func (r *LNRpc) Push(args PushArgs, reply *PushReply) error {
 	fmt.Printf("push %d to (%d,%d) %d times\n",
 		args.Amt, args.PeerIdx, args.QChanIdx)
 
-	qc, err := LNode.GetQchanByIdx(args.PeerIdx, args.QChanIdx)
+	qc, err := r.Node.GetQchanByIdx(args.PeerIdx, args.QChanIdx)
 	if err != nil {
 		return err
 	}
-	err = LNode.PushChannel(qc, uint32(args.Amt))
+	err = r.Node.PushChannel(qc, uint32(args.Amt))
 	if err != nil {
 		return err
 	}
@@ -421,26 +431,8 @@ func (r *LNRpc) Push(args PushArgs, reply *PushReply) error {
 	return nil
 }
 
-func rpcShellListen() error {
-	rpcl := new(LNRpc)
-	server := rpc.NewServer()
-	server.Register(rpcl)
-	server.HandleHTTP("/jsonrpc", "/debug/jsonrpc")
-	listener, e := net.Listen("tcp", ":1234")
-	if e != nil {
-		return e
-	}
-	go func() {
-		for {
-			conn, err := listener.Accept()
-			if err != nil {
-				log.Printf("accept error: " + err.Error())
-			} else {
-				log.Printf("new connection from %s\n", conn.RemoteAddr().String())
-				go server.ServeCodec(jsonrpc.NewServerCodec(conn))
-			}
-		}
-	}()
-
+func (r *LitRPC) Stop(args NoArgs, reply *StatusReply) error {
+	reply.Status = "Stopping lit node"
+	r.OffButton <- true
 	return nil
 }

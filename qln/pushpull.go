@@ -60,7 +60,7 @@ we might have to send it again anyway.
 
 // SendNextMsg determines what message needs to be sent next
 // based on the channel state.  It then calls the appropriate function.
-func (nd *LnNode) SendNextMsg(qc *Qchan) error {
+func (nd *LitNode) SendNextMsg(qc *Qchan) error {
 
 	// DeltaSig
 	if qc.State.Delta < 0 {
@@ -77,7 +77,7 @@ func (nd *LnNode) SendNextMsg(qc *Qchan) error {
 }
 
 // PushChannel initiates a state update by sending an RTS
-func (nd LnNode) PushChannel(qc *Qchan, amt uint32) error {
+func (nd LitNode) PushChannel(qc *Qchan, amt uint32) error {
 
 	// don't try to update state until all prior updates have cleared
 	// may want to change this later, but requires other changes.
@@ -107,7 +107,7 @@ func (nd LnNode) PushChannel(qc *Qchan, amt uint32) error {
 }
 
 // SendDeltaSig initiates a push, sending the amount to be pushed and the new sig.
-func (nd *LnNode) SendDeltaSig(q *Qchan) error {
+func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 	// increment state number, update balance, go to next elkpoint
 	q.State.StateIdx++
 	q.State.MyAmt += int64(q.State.Delta)
@@ -130,7 +130,7 @@ func (nd *LnNode) SendDeltaSig(q *Qchan) error {
 }
 
 // DeltaSigHandler takes in a DeltaSig and responds with an SigRev (if everything goes OK)
-func (nd *LnNode) DeltaSigHandler(from [16]byte, DeltaSigBytes []byte) {
+func (nd *LitNode) DeltaSigHandler(from [16]byte, DeltaSigBytes []byte) {
 
 	if len(DeltaSigBytes) < 104 || len(DeltaSigBytes) > 104 {
 		fmt.Printf("got %d byte DeltaSig, expect 104", len(DeltaSigBytes))
@@ -211,7 +211,7 @@ func (nd *LnNode) DeltaSigHandler(from [16]byte, DeltaSigBytes []byte) {
 }
 
 // SendSigRev sends an SigRev message based on channel info
-func (nd *LnNode) SendSigRev(q *Qchan) error {
+func (nd *LitNode) SendSigRev(q *Qchan) error {
 	// state number and balance has already been updated if the incoming sig worked.
 	// go to next elkpoint for signing
 	q.State.ElkPoint = q.State.NextElkPoint
@@ -246,7 +246,7 @@ func (nd *LnNode) SendSigRev(q *Qchan) error {
 }
 
 // SIGREVHandler takes in an SIGREV and responds with a REV (if everything goes OK)
-func (nd *LnNode) SigRevHandler(from [16]byte, SigRevBytes []byte) {
+func (nd *LitNode) SigRevHandler(from [16]byte, SigRevBytes []byte) {
 
 	if len(SigRevBytes) < 165 || len(SigRevBytes) > 165 {
 		fmt.Printf("got %d byte SIGREV, expect 165", len(SigRevBytes))
@@ -337,7 +337,7 @@ func (nd *LnNode) SigRevHandler(from [16]byte, SigRevBytes []byte) {
 }
 
 // SendREV sends a REV message based on channel info
-func (nd *LnNode) SendREV(q *Qchan) error {
+func (nd *LitNode) SendREV(q *Qchan) error {
 	// revoke previous already built state
 	elk, err := q.ElkSnd.AtIndex(q.State.StateIdx - 1)
 	if err != nil {
@@ -363,7 +363,7 @@ func (nd *LnNode) SendREV(q *Qchan) error {
 
 // REVHandler takes in an REV and clears the state's prev HAKD.  This is the
 // final message in the state update process and there is no response.
-func (nd *LnNode) REVHandler(from [16]byte, revBytes []byte) {
+func (nd *LitNode) REVHandler(from [16]byte, revBytes []byte) {
 	if len(revBytes) != 101 {
 		fmt.Printf("got %d byte REV, expect 101", len(revBytes))
 		return
