@@ -90,6 +90,37 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		}
 		return nil
 	}
+	// fund and create a new channel
+	if cmd == "fund" {
+		err = lc.FundChannel(args)
+		if err != nil {
+			fmt.Printf("fund error: %s\n", err)
+		}
+		return nil
+	}
+
+	// cooperateive close of a channel
+	if cmd == "cclose" {
+		err = lc.CloseChannel(args)
+		if err != nil {
+			fmt.Printf("cclose error: %s\n", err)
+		}
+		return nil
+	}
+	if cmd == "break" {
+		err = lc.BreakChannel(args)
+		if err != nil {
+			fmt.Printf("break error: %s\n", err)
+		}
+		return nil
+	}
+	if cmd == "say" {
+		err = lc.Say(args)
+		if err != nil {
+			fmt.Printf("say error: %s\n", err)
+		}
+		return nil
+	}
 
 	/*
 		if cmd == "msend" {
@@ -154,30 +185,6 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 			err = Say(args)
 			if err != nil {
 				fmt.Printf("say error: %s\n", err)
-			}
-			return nil
-		}
-		// fund and create a new channel
-		if cmd == "fund" {
-			err = FundChannel(args)
-			if err != nil {
-				fmt.Printf("fund error: %s\n", err)
-			}
-			return nil
-		}
-
-		// cooperateive close of a channel
-		if cmd == "cclose" {
-			err = CloseChannel(args)
-			if err != nil {
-				fmt.Printf("cclose error: %s\n", err)
-			}
-			return nil
-		}
-		if cmd == "break" {
-			err = BreakChannel(args)
-			if err != nil {
-				fmt.Printf("break error: %s\n", err)
 			}
 			return nil
 		}
@@ -360,50 +367,23 @@ func (lc *litAfClient) Sweep(textArgs []string) error {
 	return nil
 }
 
-// Push is the shell command which calls PushChannel
-func (lc *litAfClient) Push(textArgs []string) error {
-	args := new(litrpc.PushArgs)
-	reply := new(litrpc.PushReply)
+func (lc *litAfClient) Say(textArgs []string) error {
+	args := new(litrpc.SayArgs)
+	reply := new(litrpc.StatusReply)
 
-	if len(textArgs) < 3 {
-		return fmt.Errorf("need args: push peerIdx chanIdx amt (times)")
+	if len(textArgs) < 1 {
+		return fmt.Errorf("you have to say something")
 	}
 
-	// this stuff is all the same as in cclose, should put into a function...
-	peerIdx64, err := strconv.ParseInt(textArgs[0], 10, 32)
+	for _, s := range textArgs {
+		args.Message += s + " "
+	}
+
+	err := lc.rpccon.Call("LitRPC.Say", args, reply)
 	if err != nil {
 		return err
 	}
-	cIdx64, err := strconv.ParseInt(textArgs[1], 10, 32)
-	if err != nil {
-		return err
-	}
-	amt, err := strconv.ParseInt(textArgs[2], 10, 32)
-	if err != nil {
-		return err
-	}
-
-	times := int64(1)
-	if len(textArgs) > 3 {
-		times, err = strconv.ParseInt(textArgs[3], 10, 32)
-		if err != nil {
-			return err
-		}
-	}
-
-	args.PeerIdx = uint32(peerIdx64)
-	args.QChanIdx = uint32(cIdx64)
-	args.Amt = amt
-
-	for times > 0 {
-		err := lc.rpccon.Call("LitRPC.Push", args, reply)
-		if err != nil {
-			return err
-		}
-		fmt.Printf("Pushed %d new balance %d at state %d\n",
-			amt, reply.MyAmt, reply.StateIndex)
-	}
-
+	fmt.Printf("%s\n", reply.Status)
 	return nil
 }
 

@@ -177,7 +177,7 @@ func main() {
 		}
 	}()
 
-	litrpc.RpcListen(SCon, Node, conf.rpcport)
+	litrpc.RpcListen(&SCon, &Node, conf.rpcport)
 
 	return
 }

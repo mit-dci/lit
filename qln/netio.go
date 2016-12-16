@@ -46,8 +46,8 @@ func (nd *LitNode) TCPListener(lisIpPort string) (*btcutil.AddressPubKeyHash, er
 			fmt.Printf("Authed incoming connection from remote %s lnid %x OK\n",
 				newConn.RemoteAddr().String(), newId)
 
-			go nd.LNDCReceiver(newConn, newId)
 			nd.RemoteCon = newConn
+			go nd.LNDCReceiver(newConn, newId)
 		}
 	}()
 	return lisAdr, nil

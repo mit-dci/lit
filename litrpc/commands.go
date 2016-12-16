@@ -8,6 +8,7 @@ import (
 	"github.com/btcsuite/btcutil"
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/portxo"
+	"github.com/mit-dci/lit/qln"
 )
 
 type TxidsReply struct {
@@ -89,34 +90,6 @@ func (r *LitRPC) TxoList(args *NoArgs, reply *TxoListReply) error {
 		reply.Txos[i].Height = u.Height
 		reply.Txos[i].OutPoint = u.Op.String()
 		reply.Txos[i].KeyPath = u.KeyGen.String()
-	}
-	return nil
-}
-
-type ChannelInfo struct {
-	OutPoint  string
-	Capacity  int64
-	MyBalance int64
-	PeerID    string
-}
-type ChannelListReply struct {
-	Channels []ChannelInfo
-}
-
-// ChannelList sends back a list of every (open?) channel with some
-// info for each.
-func (r *LitRPC) ChannelList(args *NoArgs, reply *ChannelListReply) error {
-	qcs, err := r.Node.GetAllQchans()
-	if err != nil {
-		return err
-	}
-	reply.Channels = make([]ChannelInfo, len(qcs))
-
-	for i, q := range qcs {
-		reply.Channels[i].OutPoint = q.Op.String()
-		reply.Channels[i].Capacity = q.Value
-		reply.Channels[i].MyBalance = q.State.MyAmt
-		reply.Channels[i].PeerID = fmt.Sprintf("%x", q.PeerId)
 	}
 	return nil
 }
@@ -269,31 +242,6 @@ func (r *LitRPC) Fanout(args FanArgs, reply *TxidsReply) error {
 	return nil
 }
 
-// ------------------------- listen
-// ------------------------- connect
-type ListenArgs struct {
-	Port string
-}
-
-func (r *LitRPC) Listen(args ListenArgs, reply *StatusReply) error {
-	if args.Port == "" {
-		args.Port = ":2448"
-	}
-	adr, err := r.Node.TCPListener(args.Port)
-	if err != nil {
-		return err
-	}
-	// todo: say what port and what pubkey in status message
-	reply.Status = fmt.Sprintf("listening on %s with key %s",
-		args.Port, adr.String())
-	return nil
-}
-
-// ------------------------- connect
-type ConnectArgs struct {
-	LNAddr string
-}
-
 // ------------------------- address
 type AdrArgs struct {
 	NumToMake uint32
@@ -338,6 +286,31 @@ func (r *LitRPC) Address(args *AdrArgs, reply *AdrReply) error {
 	return nil
 }
 
+// ------------------------- listen
+
+type ListenArgs struct {
+	Port string
+}
+
+func (r *LitRPC) Listen(args ListenArgs, reply *StatusReply) error {
+	if args.Port == "" {
+		args.Port = ":2448"
+	}
+	adr, err := r.Node.TCPListener(args.Port)
+	if err != nil {
+		return err
+	}
+	// todo: say what port and what pubkey in status message
+	reply.Status = fmt.Sprintf("listening on %s with key %s",
+		args.Port, adr.String())
+	return nil
+}
+
+// ------------------------- connect
+type ConnectArgs struct {
+	LNAddr string
+}
+
 func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
 
 	connectNode, err := lndc.LnAddrFromString(args.LNAddr)
@@ -367,68 +340,25 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
 	var newId [16]byte
 	copy(newId[:], idslice[:16])
 	go r.Node.LNDCReceiver(r.Node.RemoteCon, newId)
-	reply.Status = fmt.Sprintf("connected to %s",
-		connectNode.Base58Adr.String())
+	reply.Status = fmt.Sprintf("connected to %x",
+		r.Node.RemoteCon.RemotePub.SerializeCompressed())
 	return nil
 }
 
-// ------------------------- fund
-type FundArgs struct {
-	LNAddr      string
-	Capacity    int64 // later can be minimum capacity
-	Roundup     int64 // ignore for now; can be used to round-up capacity
-	InitialSend int64 // Initial send of -1 means "ALL"
+type SayArgs struct {
+	Message string
 }
 
-func (r *LitRPC) Fund(args FundArgs, reply *StatusReply) error {
-	if args.InitialSend > args.Capacity {
-		return fmt.Errorf("Initial send more than capacity")
-	}
+func (r *LitRPC) Say(args SayArgs, reply *StatusReply) error {
 
-	return nil
-}
-
-// ------------------------- push
-type PushArgs struct {
-	PeerIdx, QChanIdx uint32
-	Amt               int64
-}
-type PushReply struct {
-	MyAmt      int64
-	StateIndex uint64
-}
-
-func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 	if r.Node.RemoteCon == nil || r.Node.RemoteCon.RemotePub == nil {
-		return fmt.Errorf("Not connected to anyone, can't push\n")
-	}
-	if args.Amt > 100000000 || args.Amt < 1 {
-		return fmt.Errorf("push %d, max push is 1 coin / 100000000", args.Amt)
+		return fmt.Errorf("Not connected to anyone\n")
 	}
 
-	// find the peer index of who we're connected to
-	currentPeerIdx, err := r.Node.GetPeerIdx(r.Node.RemoteCon.RemotePub)
-	if err != nil {
-		return err
-	}
-	if uint32(args.PeerIdx) != currentPeerIdx {
-		return fmt.Errorf("Want to close with peer %d but connected to %d",
-			args.PeerIdx, currentPeerIdx)
-	}
-	fmt.Printf("push %d to (%d,%d) %d times\n",
-		args.Amt, args.PeerIdx, args.QChanIdx)
+	msg := append([]byte{qln.MSGID_TEXTCHAT}, []byte(args.Message)...)
 
-	qc, err := r.Node.GetQchanByIdx(args.PeerIdx, args.QChanIdx)
-	if err != nil {
-		return err
-	}
-	err = r.Node.PushChannel(qc, uint32(args.Amt))
-	if err != nil {
-		return err
-	}
-	reply.MyAmt = qc.State.MyAmt
-	reply.StateIndex = qc.State.StateIdx
-	return nil
+	_, err := r.Node.RemoteCon.Write(msg)
+	return err
 }
 
 func (r *LitRPC) Stop(args NoArgs, reply *StatusReply) error {

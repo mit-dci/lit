@@ -103,7 +103,18 @@ func (nd LitNode) PushChannel(qc *Qchan, amt uint32) error {
 	if err != nil {
 		return err
 	}
-	return nd.SendDeltaSig(qc)
+	err = nd.SendDeltaSig(qc)
+	if err != nil {
+		return err
+	}
+
+	nd.PushClearMutex.Lock()
+	nd.PushClear[qc.Op.Hash] = make(chan bool)
+	nd.PushClearMutex.Unlock()
+
+	<-nd.PushClear[qc.Op.Hash]
+
+	return nil
 }
 
 // SendDeltaSig initiates a push, sending the amount to be pushed and the new sig.
@@ -332,6 +343,10 @@ func (nd *LitNode) SigRevHandler(from [16]byte, SigRevBytes []byte) {
 		fmt.Printf("SIGREVHandler err %s", err.Error())
 		return
 	}
+	// I'm done updating this channel
+	nd.PushClearMutex.Lock()
+	nd.PushClear[qc.Op.Hash] <- true
+	nd.PushClearMutex.Unlock()
 
 	return
 }

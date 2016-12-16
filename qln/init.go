@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/boltdb/bolt"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 )
 
@@ -14,9 +15,6 @@ func (nd *LitNode) Init(
 	if err != nil {
 		return err
 	}
-
-	nd.OmniChan = make(chan []byte, 10)
-	go nd.OmniHandler()
 
 	// connect to base wallet
 	nd.BaseWallet = basewal
@@ -35,6 +33,10 @@ func (nd *LitNode) Init(
 		go nd.Tower.BlockHandler(nd.BaseWallet.BlockMonitor())
 		go nd.Relay(nd.Tower.JusticeOutbox())
 	}
+
+	nd.PushClear = make(map[chainhash.Hash]chan bool)
+	nd.OmniChan = make(chan []byte, 10)
+	go nd.OmniHandler()
 
 	return nil
 }

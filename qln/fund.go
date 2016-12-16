@@ -103,6 +103,11 @@ an exact timing for the payment.
 // so if someone sends 10 pubkeyreqs, they'll get the same pubkey back 10 times.
 // they have to provide an actual tx before the next pubkey will come out.
 func (nd *LitNode) PointReqHandler(from [16]byte, pointReqBytes []byte) {
+	if nd.RemoteCon == nil || nd.RemoteCon.RemotePub == nil {
+		fmt.Printf("Not connected to anyone\n")
+		return
+	}
+
 	// pub req; check that idx matches next idx of ours and create pubkey
 	var peerArr [33]byte
 	copy(peerArr[:], nd.RemoteCon.RemotePub.SerializeCompressed())

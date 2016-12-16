@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"sync"
 
 	"github.com/boltdb/bolt"
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	"github.com/mit-dci/lit/elkrem"
@@ -71,6 +73,14 @@ type LitNode struct {
 
 	// Params live here... AND SCon
 	Param *chaincfg.Params // network parameters (testnet3, segnet, etc)
+
+	// UpdateClear has notifications of when LN channel updates finish.
+	// Right now doesn't distinguish between LN channels, so can only do 1 at a time.
+	// Need to change this to ... a waitgroup?  map of channels?  Some other
+	// structure...
+
+	PushClear      map[chainhash.Hash]chan bool // known good txids and their heights
+	PushClearMutex sync.Mutex
 }
 
 // InFlightFund is a funding transaction that has not yet been broadcast
