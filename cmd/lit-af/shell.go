@@ -203,15 +203,37 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 
 func (lc *litAfClient) Ls(textArgs []string) error {
 
+	cReply := new(litrpc.ChannelListReply)
 	aReply := new(litrpc.AdrReply)
 	tReply := new(litrpc.TxoListReply)
 	bReply := new(litrpc.BalReply)
 
-	err := lc.rpccon.Call("LitRPC.TxoList", nil, tReply)
+	err := lc.rpccon.Call("LitRPC.ChannelList", nil, cReply)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("\tTxos:\n")
+	if len(cReply.Channels) > 0 {
+		fmt.Printf("\tChannels:\n")
+	}
+
+	for _, c := range cReply.Channels {
+		if c.Closed {
+			fmt.Printf("Closed  ")
+		} else {
+			fmt.Printf("Channel ")
+		}
+		fmt.Printf("(%d,%d) %s\n\t cap: %d bal: %d h: %d state: %d\n",
+			c.PeerIdx, c.CIdx, c.OutPoint,
+			c.Capacity, c.MyBalance, c.Height, c.StateNum)
+	}
+
+	err = lc.rpccon.Call("LitRPC.TxoList", nil, tReply)
+	if err != nil {
+		return err
+	}
+	if len(tReply.Txos) > 0 {
+		fmt.Printf("\tTxos:\n")
+	}
 	for i, t := range tReply.Txos {
 		fmt.Printf("%d %s h:%d amt:%d %s\n",
 			i, t.OutPoint, t.Height, t.Amt, t.KeyPath)
@@ -229,7 +251,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("\tTxo: %d Conf:%d Channel: %d\n",
+	fmt.Printf("\tUtxo: %d Conf:%d Channel: %d\n",
 		bReply.TxoTotal, bReply.Mature, bReply.ChanTotal)
 
 	return nil
@@ -283,44 +305,6 @@ func (lc *litAfClient) Send(textArgs []string) error {
 	return nil
 }
 
-// Lis starts listening.  Takes args of port to listen on.
-func (lc *litAfClient) Lis(textArgs []string) error {
-	args := new(litrpc.ListenArgs)
-	reply := new(litrpc.StatusReply)
-
-	args.Port = ":2448"
-	if len(textArgs) > 0 {
-		args.Port = ":" + textArgs[0]
-	}
-
-	err := lc.rpccon.Call("LitRPC.Listen", args, reply)
-	if err != nil {
-		return err
-	}
-
-	fmt.Printf("%s\n", reply.Status)
-	return nil
-}
-
-func (lc *litAfClient) Connect(textArgs []string) error {
-	args := new(litrpc.ConnectArgs)
-	reply := new(litrpc.StatusReply)
-
-	if len(textArgs) == 0 {
-		return fmt.Errorf("need: con pubkeyhash@hostname:port")
-	}
-
-	args.LNAddr = textArgs[0]
-
-	err := lc.rpccon.Call("LitRPC.Connect", args, reply)
-	if err != nil {
-		return err
-	}
-
-	fmt.Printf("%s\n", reply.Status)
-	return nil
-}
-
 func (lc *litAfClient) Stop(textArgs []string) error {
 	reply := new(litrpc.StatusReply)
 
@@ -364,26 +348,6 @@ func (lc *litAfClient) Sweep(textArgs []string) error {
 		fmt.Printf("%d %s\n", i, t)
 	}
 
-	return nil
-}
-
-func (lc *litAfClient) Say(textArgs []string) error {
-	args := new(litrpc.SayArgs)
-	reply := new(litrpc.StatusReply)
-
-	if len(textArgs) < 1 {
-		return fmt.Errorf("you have to say something")
-	}
-
-	for _, s := range textArgs {
-		args.Message += s + " "
-	}
-
-	err := lc.rpccon.Call("LitRPC.Say", args, reply)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("%s\n", reply.Status)
 	return nil
 }
 

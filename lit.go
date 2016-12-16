@@ -1,11 +1,9 @@
 package main
 
 import (
-	"bufio"
 	"flag"
 	"fmt"
 	"log"
-	"os"
 	"strings"
 
 	"github.com/btcsuite/btcd/chaincfg"
@@ -155,28 +153,29 @@ func main() {
 	}
 
 	// shell loop -- to be removed
-	go func() {
-		for {
-			// setup reader with max 4K input chars
-			reader := bufio.NewReaderSize(os.Stdin, 4000)
-			fmt.Printf("LND# ")                 // prompt
-			msg, err := reader.ReadString('\n') // input finishes on enter key
-			if err != nil {
-				log.Fatal(err)
-			}
+	/*
+		go func() {
+			for {
+				// setup reader with max 4K input chars
+				reader := bufio.NewReaderSize(os.Stdin, 4000)
+				fmt.Printf("LND# ")                 // prompt
+				msg, err := reader.ReadString('\n') // input finishes on enter key
+				if err != nil {
+					log.Fatal(err)
+				}
 
-			cmdslice := strings.Fields(msg) // chop input up on whitespace
-			if len(cmdslice) < 1 {
-				continue // no input, just prompt again
+				cmdslice := strings.Fields(msg) // chop input up on whitespace
+				if len(cmdslice) < 1 {
+					continue // no input, just prompt again
+				}
+				fmt.Printf("entered command: %s\n", msg) // immediate feedback
+				err = Shellparse(cmdslice)
+				if err != nil { // only error should be user exit
+					log.Fatal(err)
+				}
 			}
-			fmt.Printf("entered command: %s\n", msg) // immediate feedback
-			err = Shellparse(cmdslice)
-			if err != nil { // only error should be user exit
-				log.Fatal(err)
-			}
-		}
-	}()
-
+		}()
+	*/
 	litrpc.RpcListen(&SCon, &Node, conf.rpcport)
 
 	return

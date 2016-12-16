@@ -37,7 +37,7 @@ func (lc *litAfClient) FundChannel(textArgs []string) error {
 
 // Request close of a channel.  Need to pass in peer, channel index
 func (lc *litAfClient) CloseChannel(textArgs []string) error {
-	args := new(litrpc.CloseArgs)
+	args := new(litrpc.ChanArgs)
 	reply := new(litrpc.StatusReply)
 
 	// need args, fail
@@ -66,7 +66,7 @@ func (lc *litAfClient) CloseChannel(textArgs []string) error {
 
 // Almost exactly the same as CloseChannel.  Maybe make "break" a bool...?
 func (lc *litAfClient) BreakChannel(textArgs []string) error {
-	args := new(litrpc.CloseArgs)
+	args := new(litrpc.ChanArgs)
 	reply := new(litrpc.StatusReply)
 
 	// need args, fail

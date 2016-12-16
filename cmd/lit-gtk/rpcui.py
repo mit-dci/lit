@@ -11,11 +11,11 @@ s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # global for socket conne
 
 def getBal():
 	rpcCmd = {
-		   "method": "LNRpc.Bal",
+		   "method": "LitRPC.Bal",
 		   "params": [{
 	   }]
 	}
-	rpcCmd.update({"jsonrpc": "2.0", "id": "99"})
+	rpcCmd.update({"jsonrpc": "2.0", "id": "93"})
 	print(json.dumps(rpcCmd))
 	s.sendall(json.dumps(rpcCmd))
 	r = json.loads(s.recv(8000000))
@@ -24,12 +24,12 @@ def getBal():
 
 def getAdr():
 	rpcCmd = {
-		   "method": "LNRpc.Address",
+		   "method": "LitRPC.Address",
 		   "params": [{
 	   "NumToMake": 0,
 	   }]
 	}
-	rpcCmd.update({"jsonrpc": "2.0", "id": "99"})
+	rpcCmd.update({"jsonrpc": "2.0", "id": "94"})
 	print(json.dumps(rpcCmd))
 	s.sendall(json.dumps(rpcCmd))
 	r = json.loads(s.recv(8000000))
@@ -39,10 +39,10 @@ def getAdr():
 	
 def prSend(adr, amt):
 	rpcCmd = {
-		   "method": "LNRpc.Send",
+		   "method": "LitRPC.Send",
 		   "params": [{"DestAddrs": [adr,],"Amts": [amt,]}]
 	}
-	rpcCmd.update({"jsonrpc": "2.0", "id": "99"})
+	rpcCmd.update({"jsonrpc": "2.0", "id": "95"})
 	print(json.dumps(rpcCmd))
 	s.sendall(json.dumps(rpcCmd))
 	r = json.loads(s.recv(8000000))
@@ -72,7 +72,7 @@ class lndrpcui:
 		window = gtk.Window(gtk.WINDOW_TOPLEVEL)
 		self.window = window
 		window.connect("destroy", lambda w: gtk.main_quit())
-		window.set_title("lndrpcui")
+		window.set_title("lit-gtk")
 
 		main_vbox = gtk.VBox(False, 5)
 		main_vbox.set_border_width(10)
@@ -156,7 +156,7 @@ class lndrpcui:
 		window.show_all()
 
 def main():
-	s.connect(("127.0.0.1", 1234))
+	s.connect(("127.0.0.1", 9750))
 	gtk.main()
 	return 0
 

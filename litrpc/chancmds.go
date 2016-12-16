@@ -8,10 +8,14 @@ import (
 )
 
 type ChannelInfo struct {
-	OutPoint  string
-	Capacity  int64
-	MyBalance int64
-	PeerID    string
+	OutPoint      string
+	Closed        bool
+	Capacity      int64
+	MyBalance     int64
+	Height        int32  // block height of channel fund confirmation
+	StateNum      uint64 // Most recent commit number
+	PeerIdx, CIdx uint32
+	PeerID        string
 }
 type ChannelListReply struct {
 	Channels []ChannelInfo
@@ -19,17 +23,34 @@ type ChannelListReply struct {
 
 // ChannelList sends back a list of every (open?) channel with some
 // info for each.
-func (r *LitRPC) ChannelList(args *NoArgs, reply *ChannelListReply) error {
-	qcs, err := r.Node.GetAllQchans()
-	if err != nil {
-		return err
+func (r *LitRPC) ChannelList(args ChanArgs, reply *ChannelListReply) error {
+	var err error
+	var qcs []*qln.Qchan
+
+	if args.PeerIdx == 0 && args.ChanIdx == 0 {
+		qcs, err = r.Node.GetAllQchans()
+		if err != nil {
+			return err
+		}
+	} else {
+		qc, err := r.Node.GetQchanByIdx(args.PeerIdx, args.ChanIdx)
+		if err != nil {
+			return err
+		}
+		qcs = append(qcs, qc)
 	}
+
 	reply.Channels = make([]ChannelInfo, len(qcs))
 
 	for i, q := range qcs {
 		reply.Channels[i].OutPoint = q.Op.String()
+		reply.Channels[i].Closed = q.CloseData.Closed
 		reply.Channels[i].Capacity = q.Value
 		reply.Channels[i].MyBalance = q.State.MyAmt
+		reply.Channels[i].Height = q.Height
+		reply.Channels[i].StateNum = q.State.StateIdx
+		reply.Channels[i].PeerIdx = q.KeyGen.Step[3] & 0x7fffffff
+		reply.Channels[i].CIdx = q.KeyGen.Step[4] & 0x7fffffff
 		reply.Channels[i].PeerID = fmt.Sprintf("%x", q.PeerId)
 	}
 	return nil
@@ -142,13 +163,13 @@ func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 }
 
 // ------------------------- cclose
-type CloseArgs struct {
+type ChanArgs struct {
 	PeerIdx, ChanIdx uint32
 }
 
 // reply with status string
 // CloseChannel is a cooperative closing of a channel to a specified address.
-func (r *LitRPC) CloseChannel(args CloseArgs, reply *StatusReply) error {
+func (r *LitRPC) CloseChannel(args ChanArgs, reply *StatusReply) error {
 
 	if r.Node.RemoteCon == nil || r.Node.RemoteCon.RemotePub == nil {
 		return fmt.Errorf("Not connected to anyone\n")
@@ -200,7 +221,7 @@ func (r *LitRPC) CloseChannel(args CloseArgs, reply *StatusReply) error {
 }
 
 // ------------------------- break
-func (r *LitRPC) BreakChannel(args CloseArgs, reply *StatusReply) error {
+func (r *LitRPC) BreakChannel(args ChanArgs, reply *StatusReply) error {
 
 	qc, err := r.Node.GetQchanByIdx(args.PeerIdx, args.ChanIdx)
 	if err != nil {

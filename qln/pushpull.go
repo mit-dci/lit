@@ -338,11 +338,14 @@ func (nd *LitNode) SigRevHandler(from [16]byte, SigRevBytes []byte) {
 	qc.State.StateIdx--
 	qc.State.MyAmt = prevAmt
 
-	err = nd.BuildJusticeSig(qc)
-	if err != nil {
-		fmt.Printf("SIGREVHandler err %s", err.Error())
-		return
-	}
+	/*
+		err = nd.BuildJusticeSig(qc)
+		if err != nil {
+			fmt.Printf("SIGREVHandler err %s", err.Error())
+			return
+		}
+	*/
+
 	// I'm done updating this channel
 	nd.PushClearMutex.Lock()
 	nd.PushClear[qc.Op.Hash] <- true
@@ -432,11 +435,14 @@ func (nd *LitNode) REVHandler(from [16]byte, revBytes []byte) {
 	// the justice signature
 	qc.State.StateIdx--      // back one state
 	qc.State.MyAmt = prevAmt // use stashed previous state amount
-	err = nd.BuildJusticeSig(qc)
-	if err != nil {
-		fmt.Printf("REVHandler err %s", err.Error())
-		return
-	}
+
+	/*
+		err = nd.BuildJusticeSig(qc)
+		if err != nil {
+			fmt.Printf("REVHandler err %s", err.Error())
+			return
+		}
+	*/
 
 	fmt.Printf("REV OK, state %d all clear.\n", qc.State.StateIdx)
 	return
