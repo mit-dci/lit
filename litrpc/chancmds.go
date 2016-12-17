@@ -66,10 +66,6 @@ type FundArgs struct {
 
 func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
 
-	if r.Node.RemoteCon == nil || r.Node.RemoteCon.RemotePub == nil {
-		return fmt.Errorf("Not connected to anyone")
-	}
-
 	if r.Node.InProg != nil && r.Node.InProg.PeerIdx != 0 {
 		return fmt.Errorf("channel with peer %d not done yet", r.Node.InProg.PeerIdx)
 	}
@@ -93,8 +89,7 @@ func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
 		return err
 	}
 
-	var peerArr [33]byte
-	copy(peerArr[:], r.Node.RemoteCon.RemotePub.SerializeCompressed())
+	peerArr := r.Node.GetPubFromPeerIdx(0)
 
 	peerIdx, cIdx, err := r.Node.NextIdxForPeer(peerArr)
 	if err != nil {
@@ -108,7 +103,7 @@ func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
 	r.Node.InProg.Amt = args.Capacity
 	r.Node.InProg.InitSend = args.InitialSend
 
-	msg := []byte{qln.MSGID_POINTREQ}
+	msg := []byte{lnutil.MSGID_POINTREQ}
 	_, err = r.Node.RemoteCon.Write(msg)
 	return err
 }
@@ -124,24 +119,21 @@ type PushReply struct {
 }
 
 func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
-	if r.Node.RemoteCon == nil || r.Node.RemoteCon.RemotePub == nil {
-		return fmt.Errorf("Not connected to anyone, can't push\n")
-	}
+
 	if args.Amt > 100000000 || args.Amt < 1 {
 		return fmt.Errorf("push %d, max push is 1 coin / 100000000", args.Amt)
 	}
 
-	// find the peer index of who we're connected to
-	currentPeerIdx, err := r.Node.GetPeerIdx(r.Node.RemoteCon.RemotePub)
-	if err != nil {
-		return err
-	}
-	if uint32(args.PeerIdx) != currentPeerIdx {
-		return fmt.Errorf("Want to close with peer %d but connected to %d",
-			args.PeerIdx, currentPeerIdx)
-	}
 	fmt.Printf("push %d to (%d,%d) %d times\n",
 		args.Amt, args.PeerIdx, args.ChanIdx)
+
+	r.Node.RemoteMtx.Lock()
+	_, ok := r.Node.RemoteCons[args.PeerIdx]
+	r.Node.RemoteMtx.Unlock()
+	if !ok {
+		return fmt.Errorf("not connected to specified peer %d ",
+			args.PeerIdx)
+	}
 
 	qc, err := r.Node.GetQchanByIdx(args.PeerIdx, args.ChanIdx)
 	if err != nil {
@@ -171,18 +163,12 @@ type ChanArgs struct {
 // CloseChannel is a cooperative closing of a channel to a specified address.
 func (r *LitRPC) CloseChannel(args ChanArgs, reply *StatusReply) error {
 
-	if r.Node.RemoteCon == nil || r.Node.RemoteCon.RemotePub == nil {
-		return fmt.Errorf("Not connected to anyone\n")
-	}
-
-	// find the peer index of who we're connected to
-	currentPeerIdx, err := r.Node.GetPeerIdx(r.Node.RemoteCon.RemotePub)
-	if err != nil {
-		return err
-	}
-	if args.PeerIdx != currentPeerIdx {
-		return fmt.Errorf("Want to close with peer %d but connected to %d	",
-			args.PeerIdx, currentPeerIdx)
+	r.Node.RemoteMtx.Lock()
+	_, ok := r.Node.RemoteCons[args.PeerIdx]
+	r.Node.RemoteMtx.Unlock()
+	if !ok {
+		return fmt.Errorf("not connected to specified peer %d ",
+			args.PeerIdx)
 	}
 
 	qc, err := r.Node.GetQchanByIdx(args.PeerIdx, args.ChanIdx)
@@ -211,7 +197,7 @@ func (r *LitRPC) CloseChannel(args ChanArgs, reply *StatusReply) error {
 
 	opArr := lnutil.OutPointToBytes(qc.Op)
 	// close request is just the op, sig
-	msg := []byte{qln.MSGID_CLOSEREQ}
+	msg := []byte{lnutil.MSGID_CLOSEREQ}
 	msg = append(msg, opArr[:]...)
 	msg = append(msg, sig...)
 
@@ -222,6 +208,14 @@ func (r *LitRPC) CloseChannel(args ChanArgs, reply *StatusReply) error {
 
 // ------------------------- break
 func (r *LitRPC) BreakChannel(args ChanArgs, reply *StatusReply) error {
+
+	r.Node.RemoteMtx.Lock()
+	_, ok := r.Node.RemoteCons[args.PeerIdx]
+	r.Node.RemoteMtx.Unlock()
+	if !ok {
+		return fmt.Errorf("not connected to specified peer %d ",
+			args.PeerIdx)
+	}
 
 	qc, err := r.Node.GetQchanByIdx(args.PeerIdx, args.ChanIdx)
 	if err != nil {

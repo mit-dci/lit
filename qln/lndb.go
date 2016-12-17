@@ -105,10 +105,17 @@ func (inff *InFlightFund) Clear() {
 }
 
 func (nd *LitNode) GetPubFromPeerIdx(idx uint32) [33]byte {
-	var empty [33]byte
+	var pub [33]byte
 	// look up peer in db; need an efficient mapping for this.
-
-	return empty
+	_ = nd.LitDB.View(func(btx *bolt.Tx) error {
+		mp, _ := btx.CreateBucketIfNotExists(BKTMap)
+		pubBytes := mp.Get(lnutil.U32tB(idx))
+		if pubBytes != nil {
+			copy(pub[:], pubBytes)
+		}
+		return nil
+	})
+	return pub
 }
 
 // CountKeysInBucket is needed for NewPeer.  Counts keys in a bucket without
@@ -160,39 +167,6 @@ func (nd *LitNode) NextIdxForPeer(peerBytes [33]byte) (uint32, uint32, error) {
 	return peerIdx, cIdx, nil
 }
 
-// NewPeer saves a pubkey in the DB and assigns a peer index.  Call this
-// the first time you connect to someone.  Returns false if already known,
-// true if it added a new peer.  Errors for real errors.
-func (nd *LitNode) NewPeer(pub *btcec.PublicKey) (bool, error) {
-	itsnew := true
-	err := nd.LitDB.Update(func(btx *bolt.Tx) error {
-
-		prs, _ := btx.CreateBucketIfNotExists(BKTPeers) // only errs on name
-
-		peerBkt := prs.Bucket(pub.SerializeCompressed())
-		if peerBkt != nil {
-
-		}
-		pr, err := prs.CreateBucket(pub.SerializeCompressed())
-		if err != nil {
-			itsnew = false
-			return nil // peer already exists
-		}
-		// peer is new, put their key in the map bucket
-
-		mp, _ := btx.CreateBucketIfNotExists(BKTMap)
-		// starts at 1. There IS NO PEER 0, so you can consider peer 0 invalid.
-		newPeerIdx := CountKeysInBucket(mp) + 1
-		err = mp.Put(lnutil.U32tB(newPeerIdx), pub.SerializeCompressed())
-		if err != nil {
-			return err
-		}
-
-		return pr.Put(KEYIdx, lnutil.U32tB(newPeerIdx))
-	})
-	return itsnew, err
-}
-
 // GetPeerIdx returns the peer index given a pubkey.  Creates it if it's not there
 // yet!  Also return a bool for new..?  not needed?
 func (nd *LitNode) GetPeerIdx(pub *btcec.PublicKey) (uint32, error) {
@@ -220,24 +194,6 @@ func (nd *LitNode) GetPeerIdx(pub *btcec.PublicKey) (uint32, error) {
 			return err
 		}
 		return thisPeerBkt.Put(KEYIdx, lnutil.U32tB(idx))
-	})
-	return idx, err
-}
-
-func (nd *LitNode) GetPeerIdxx(pub *btcec.PublicKey) (uint32, error) {
-	var idx uint32
-	err := nd.LitDB.View(func(btx *bolt.Tx) error {
-		prs := btx.Bucket(BKTPeers)
-		if prs == nil {
-			return fmt.Errorf("GetPeerIdx: No peers evar")
-		}
-		pr := prs.Bucket(pub.SerializeCompressed())
-		if pr == nil {
-			return fmt.Errorf("GetPeerIdx: Peer %x has no index saved",
-				pub.SerializeCompressed())
-		}
-		idx = lnutil.BtU32(pr.Get(KEYIdx))
-		return nil
 	})
 	return idx, err
 }
