@@ -26,22 +26,21 @@ doesn't reply, as the channel is closed.
 // CloseReqHandler takes in a close request from a remote host, signs and
 // responds with a close response.  Obviously later there will be some judgment
 // over what to do, but for now it just signs whatever it's requested to.
-func (nd *LitNode) CloseReqHandler(from [16]byte, reqbytes []byte) {
-	if len(reqbytes) < 100 {
-		fmt.Printf("got %d byte closereq, expect 100ish\n", len(reqbytes))
+func (nd *LitNode) CloseReqHandler(lm *lnutil.LitMsg) {
+	if len(lm.Data) < 100 {
+		fmt.Printf("got %d byte closereq, expect 100ish\n", len(lm.Data))
 		return
 	}
 
 	// figure out who we're talking to
-	var peerArr [33]byte
-	copy(peerArr[:], nd.RemoteCon.RemotePub.SerializeCompressed())
+	peerArr := nd.GetPubFromPeerIdx(lm.PeerIdx)
 
 	// deserialize outpoint
 	var opArr [36]byte
-	copy(opArr[:], reqbytes[:36])
+	copy(opArr[:], lm.Data[:36])
 
 	// find their sig
-	theirSig := reqbytes[36:]
+	theirSig := lm.Data[36:]
 
 	// get channel
 	qc, err := nd.GetQchan(peerArr, opArr)

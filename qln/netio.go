@@ -40,14 +40,18 @@ func (nd *LitNode) TCPListener(lisIpPort string) (*btcutil.AddressPubKeyHash, er
 				continue
 			}
 
-			idslice := btcutil.Hash160(newConn.RemotePub.SerializeCompressed())
-			var newId [16]byte
-			copy(newId[:], idslice[:16])
-			fmt.Printf("Authed incoming connection from remote %s lnid %x OK\n",
-				newConn.RemoteAddr().String(), newId)
+			peerIdx, err := nd.GetPeerIdx(newConn.RemotePub)
+			if err != nil {
+				log.Printf("Listener error: %s\n", err.Error())
+				continue
+			}
 
-			nd.RemoteCon = newConn
-			go nd.LNDCReceiver(newConn, newId)
+			nd.RemoteMtx.Lock()
+			nd.RemoteCons[peerIdx] = newConn
+			nd.RemoteMtx.Unlock()
+
+			// each connection to a peer gets its own LNDCReader
+			go nd.LNDCReader(newConn, peerIdx)
 		}
 	}()
 	return lisAdr, nil

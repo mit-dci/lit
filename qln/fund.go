@@ -102,15 +102,16 @@ an exact timing for the payment.
 // and a refund pubkey hash. (currently makes pubkey hash, need to only make 1)
 // so if someone sends 10 pubkeyreqs, they'll get the same pubkey back 10 times.
 // they have to provide an actual tx before the next pubkey will come out.
-func (nd *LitNode) PointReqHandler(from [16]byte, pointReqBytes []byte) {
+func (nd *LitNode) PointReqHandler(lm *lnutil.LitMsg) {
+
+	/* shouldn't be possible to get this error...
 	if nd.RemoteCon == nil || nd.RemoteCon.RemotePub == nil {
 		fmt.Printf("Not connected to anyone\n")
 		return
-	}
+	}*/
 
 	// pub req; check that idx matches next idx of ours and create pubkey
-	var peerArr [33]byte
-	copy(peerArr[:], nd.RemoteCon.RemotePub.SerializeCompressed())
+	peerArr := nd.GetPubFromPeerIdx(lm.PeerIdx)
 
 	peerIdx, cIdx, err := nd.NextIdxForPeer(peerArr)
 	if err != nil {
@@ -131,38 +132,39 @@ func (nd *LitNode) PointReqHandler(from [16]byte, pointReqBytes []byte) {
 	myHAKDbase := nd.GetUsePub(kg, UseChannelHAKDBase)
 	fmt.Printf("Generated channel pubkey %x\n", myChanPub)
 
-	msg := []byte{MSGID_POINTRESP}
+	var msg []byte
 	msg = append(msg, myChanPub[:]...)
 	msg = append(msg, myRefundPub[:]...)
 	msg = append(msg, myHAKDbase[:]...)
-	_, err = nd.RemoteCon.Write(msg)
+
+	outMsg := new(lnutil.LitMsg)
+	outMsg.MsgType = lnutil.MSGID_POINTRESP
+	outMsg.PeerIdx = lm.PeerIdx
+	outMsg.Data = msg
+	nd.OmniOut <- outMsg
+
 	return
 }
 
 // FUNDER
 // PointRespHandler takes in a point response, and returns a channel description
-func (nd LitNode) PointRespHandler(from [16]byte, pointRespBytes []byte) error {
+func (nd LitNode) PointRespHandler(lm *lnutil.LitMsg) error {
 	// not sure how to do this yet
 
 	if nd.InProg.PeerIdx == 0 {
 		return fmt.Errorf("Got point response but no channel creation in progress")
 	}
 
-	if len(pointRespBytes) != 99 {
-		return fmt.Errorf("PointRespHandler err: pointRespBytes %d bytes, expect 99\n",
-			len(pointRespBytes))
+	if len(lm.Data) != 99 {
+		return fmt.Errorf("PointRespHandler err: msg %d bytes, expect 99\n",
+			len(lm.Data))
 	}
 
 	// should put these pubkeys somewhere huh.
 
-	var peerArr [33]byte
-	copy(peerArr[:], nd.RemoteCon.RemotePub.SerializeCompressed())
+	peerArr := nd.GetPubFromPeerIdx(lm.PeerIdx)
 
-	peerIdx, err := nd.GetPeerIdx(nd.RemoteCon.RemotePub)
-	if err != nil {
-		return err
-	}
-	if nd.InProg.PeerIdx != peerIdx {
+	if nd.InProg.PeerIdx != lm.PeerIdx {
 		return fmt.Errorf("making channel with peer %d but got PointResp from %d")
 	}
 
@@ -186,12 +188,12 @@ func (nd LitNode) PointRespHandler(from [16]byte, pointRespBytes []byte) error {
 	qc.MyHAKDBase = nd.GetUsePub(qc.KeyGen, UseChannelHAKDBase)
 
 	// chop up incoming message, save points to channel struct
-	copy(qc.TheirPub[:], pointRespBytes[:33])
-	copy(qc.TheirRefundPub[:], pointRespBytes[33:66])
-	copy(qc.TheirHAKDBase[:], pointRespBytes[66:])
+	copy(qc.TheirPub[:], lm.Data[:33])
+	copy(qc.TheirRefundPub[:], lm.Data[33:66])
+	copy(qc.TheirHAKDBase[:], lm.Data[66:])
 
 	// make sure their pubkeys are real pubkeys
-	_, err = btcec.ParsePubKey(qc.TheirPub[:], btcec.S256())
+	_, err := btcec.ParsePubKey(qc.TheirPub[:], btcec.S256())
 	if err != nil {
 		return fmt.Errorf("PubRespHandler TheirPub err %s", err.Error())
 	}
@@ -261,7 +263,9 @@ func (nd LitNode) PointRespHandler(from [16]byte, pointRespBytes []byte) error {
 	// myHAKDbase(33), capacity (8),
 	// initial payment (8), ElkPoint0 (33), ElkPoint1 (33)
 	// total length 217
-	msg := []byte{MSGID_CHANDESC}
+
+	var msg []byte
+
 	msg = append(msg, opArr[:]...)
 	msg = append(msg, qc.MyPub[:]...)
 	msg = append(msg, qc.MyRefundPub[:]...)
@@ -270,7 +274,12 @@ func (nd LitNode) PointRespHandler(from [16]byte, pointRespBytes []byte) error {
 	msg = append(msg, initPayBytes...)
 	msg = append(msg, elkPointZero[:]...)
 	msg = append(msg, elkPointOne[:]...)
-	_, err = nd.RemoteCon.Write(msg)
+
+	outMsg := new(lnutil.LitMsg)
+	outMsg.MsgType = lnutil.MSGID_CHANDESC
+	outMsg.PeerIdx = lm.PeerIdx
+	outMsg.Data = msg
+	nd.OmniOut <- outMsg
 
 	return nil
 }
@@ -278,25 +287,25 @@ func (nd LitNode) PointRespHandler(from [16]byte, pointRespBytes []byte) error {
 // RECIPIENT
 // QChanDescHandler takes in a description of a channel output.  It then
 // saves it to the local db, and returns a channel acknowledgement
-func (nd *LitNode) QChanDescHandler(from [16]byte, descbytes []byte) {
-	if len(descbytes) < 217 || len(descbytes) > 217 {
-		fmt.Printf("got %d byte channel description, expect 217", len(descbytes))
+func (nd *LitNode) QChanDescHandler(lm *lnutil.LitMsg) {
+	if len(lm.Data) < 217 || len(lm.Data) > 217 {
+		fmt.Printf("got %d byte channel description, expect 217", len(lm.Data))
 		return
 	}
-	var peerArr, elkPointZero, elkPointOne, theirPub, theirRefundPub, theirHAKDbase [33]byte
+	var elkPointZero, elkPointOne, theirPub, theirRefundPub, theirHAKDbase [33]byte
 	var opArr [36]byte
-	copy(peerArr[:], nd.RemoteCon.RemotePub.SerializeCompressed())
+	peerArr := nd.GetPubFromPeerIdx(lm.PeerIdx)
 
 	// deserialize desc
-	copy(opArr[:], descbytes[:36])
+	copy(opArr[:], lm.Data[:36])
 	op := lnutil.OutPointFromBytes(opArr)
-	copy(theirPub[:], descbytes[36:69])
-	copy(theirRefundPub[:], descbytes[69:102])
-	copy(theirHAKDbase[:], descbytes[102:135])
-	amt := lnutil.BtI64(descbytes[135:143])
-	initPay := lnutil.BtI64(descbytes[143:151])
-	copy(elkPointZero[:], descbytes[151:184])
-	copy(elkPointOne[:], descbytes[184:])
+	copy(theirPub[:], lm.Data[36:69])
+	copy(theirRefundPub[:], lm.Data[69:102])
+	copy(theirHAKDbase[:], lm.Data[102:135])
+	amt := lnutil.BtI64(lm.Data[135:143])
+	initPay := lnutil.BtI64(lm.Data[143:151])
+	copy(elkPointZero[:], lm.Data[151:184])
+	copy(elkPointOne[:], lm.Data[184:])
 
 	peerIdx, cIdx, err := nd.NextIdxForPeer(peerArr)
 	if err != nil {
@@ -391,33 +400,40 @@ func (nd *LitNode) QChanDescHandler(from [16]byte, descbytes []byte) {
 	//	}
 	// ACK the channel address, which causes the funder to sign / broadcast
 	// ACK is outpoint (36), ElkPointZero (33), ElkPointOne (33), and signature (64)
-	msg := []byte{MSGID_CHANACK}
+	var msg []byte
+
 	msg = append(msg, opArr[:]...)
 	msg = append(msg, theirElkPointZero[:]...)
 	msg = append(msg, theirElkPointOne[:]...)
 	msg = append(msg, sig[:]...)
-	_, err = nd.RemoteCon.Write(msg)
+
+	outMsg := new(lnutil.LitMsg)
+	outMsg.MsgType = lnutil.MSGID_CHANACK
+	outMsg.PeerIdx = lm.PeerIdx
+	outMsg.Data = msg
+	nd.OmniOut <- outMsg
+
 	return
 }
 
 // FUNDER
 // QChanAckHandler takes in an acknowledgement multisig description.
 // when a multisig outpoint is ackd, that causes the funder to sign and broadcast.
-func (nd *LitNode) QChanAckHandler(from [16]byte, ackbytes []byte) {
-	if len(ackbytes) < 166 || len(ackbytes) > 166 {
-		fmt.Printf("got %d byte multiAck, expect 166", len(ackbytes))
+func (nd *LitNode) QChanAckHandler(lm *lnutil.LitMsg) {
+	if len(lm.Data) < 166 || len(lm.Data) > 166 {
+		fmt.Printf("got %d byte multiAck, expect 166", len(lm.Data))
 		return
 	}
 	var opArr [36]byte
-	var peerArr, elkPointZero, elkPointOne [33]byte
+	var elkPointZero, elkPointOne [33]byte
 	var sig [64]byte
 
-	copy(peerArr[:], nd.RemoteCon.RemotePub.SerializeCompressed())
+	peerArr := nd.GetPubFromPeerIdx(lm.PeerIdx)
 	// deserialize chanACK
-	copy(opArr[:], ackbytes[:36])
-	copy(elkPointZero[:], ackbytes[36:69])
-	copy(elkPointOne[:], ackbytes[69:102])
-	copy(sig[:], ackbytes[102:])
+	copy(opArr[:], lm.Data[:36])
+	copy(elkPointZero[:], lm.Data[36:69])
+	copy(elkPointOne[:], lm.Data[69:102])
+	copy(sig[:], lm.Data[102:])
 
 	//	op := lnutil.OutPointFromBytes(opArr)
 
@@ -485,27 +501,34 @@ func (nd *LitNode) QChanAckHandler(from [16]byte, ackbytes []byte) {
 	// sig proof should be sent later once there are confirmations.
 	// it'll have an spv proof of the fund tx.
 	// but for now just send the sig.
-	msg := []byte{MSGID_SIGPROOF}
+	var msg []byte
 	msg = append(msg, opArr[:]...)
 	msg = append(msg, sig[:]...)
-	_, err = nd.RemoteCon.Write(msg)
+
+	outMsg := new(lnutil.LitMsg)
+	outMsg.MsgType = lnutil.MSGID_SIGPROOF
+	outMsg.PeerIdx = lm.PeerIdx
+	outMsg.Data = msg
+	nd.OmniOut <- outMsg
+
 	return
 }
 
 // RECIPIENT
 // SigProofHandler saves the signature the recipent stores.
 // In some cases you don't need this message.
-func (nd *LitNode) SigProofHandler(from [16]byte, sigproofbytes []byte) {
-	if len(sigproofbytes) < 100 || len(sigproofbytes) > 100 {
-		fmt.Printf("got %d byte Sigproof, expect ~100\n", len(sigproofbytes))
+func (nd *LitNode) SigProofHandler(lm *lnutil.LitMsg) {
+	if len(lm.Data) < 100 || len(lm.Data) > 100 {
+		fmt.Printf("got %d byte Sigproof, expect ~100\n", len(lm.Data))
 		return
 	}
-	var peerArr [33]byte
+
 	var opArr [36]byte
 	var sig [64]byte
-	copy(peerArr[:], nd.RemoteCon.RemotePub.SerializeCompressed())
-	copy(opArr[:], sigproofbytes[:36])
-	copy(sig[:], sigproofbytes[36:])
+
+	peerArr := nd.GetPubFromPeerIdx(lm.PeerIdx)
+	copy(opArr[:], lm.Data[:36])
+	copy(sig[:], lm.Data[36:])
 
 	qc, err := nd.GetQchan(peerArr, opArr)
 	if err != nil {

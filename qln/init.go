@@ -6,6 +6,7 @@ import (
 	"github.com/boltdb/bolt"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/mit-dci/lit/lnutil"
 )
 
 func (nd *LitNode) Init(
@@ -35,7 +36,8 @@ func (nd *LitNode) Init(
 	}
 
 	nd.PushClear = make(map[chainhash.Hash]chan bool)
-	nd.OmniChan = make(chan []byte, 10)
+	nd.OmniOut = make(chan *lnutil.LitMsg, 10)
+	nd.OmniIn = make(chan *lnutil.LitMsg, 10)
 	go nd.OmniHandler()
 
 	return nil

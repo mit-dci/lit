@@ -1,8 +1,6 @@
 package qln
 
 import (
-	"bytes"
-	"encoding/binary"
 	"fmt"
 	"sync"
 
@@ -41,6 +39,11 @@ Peers
 			|-state number: txid, sig
 
 
+PeerMap
+|
+|-peerIdx(4) : peerPubkey(33)
+
+
 Right now these buckets are all in one boltDB.  This limits it to one db write
 at a time, which for super high thoughput could be too slow.
 Later on we can chop it up so that each channel gets it's own db file.
@@ -59,13 +62,15 @@ type LitNode struct {
 	// and network i/o
 	BaseWallet UWallet
 
-	RemoteCon *lndc.LNDConn // make a bunch of em later
+	RemoteCons map[uint32]*lndc.LNDConn
+	RemoteMtx  sync.Mutex
 
 	// WatchCon is currently just for the watchtower
 	WatchCon *lndc.LNDConn // merge these later
 
 	// OmniChan is the channel for the OmniHandler
-	OmniChan chan []byte
+	OmniIn  chan *lnutil.LitMsg
+	OmniOut chan *lnutil.LitMsg
 
 	// the current channel that in the process of being created
 	// (1 at a time for now)
@@ -99,6 +104,13 @@ func (inff *InFlightFund) Clear() {
 	inff.InitSend = 0
 }
 
+func (nd *LitNode) GetPubFromPeerIdx(idx uint32) [33]byte {
+	var empty [33]byte
+	// look up peer in db; need an efficient mapping for this.
+
+	return empty
+}
+
 // CountKeysInBucket is needed for NewPeer.  Counts keys in a bucket without
 // going into the sub-buckets and their keys. 2^32 max.
 // returns 0xffffffff if there's an error
@@ -113,40 +125,6 @@ func CountKeysInBucket(bkt *bolt.Bucket) uint32 {
 		return 0xffffffff
 	}
 	return i
-}
-
-//func (nd *LnNode) NewWatcher( )
-// NewPeer saves a pubkey in the DB and assigns a peer index.  Call this
-// the first time you connect to someone.  Returns false if already known,
-// true if it added a new peer.  Errors for real errors.
-func (nd *LitNode) NewPeer(pub *btcec.PublicKey) (bool, error) {
-	itsnew := true
-	err := nd.LitDB.Update(func(btx *bolt.Tx) error {
-		prs, _ := btx.CreateBucketIfNotExists(BKTPeers) // only errs on name
-
-		// you can't use KeyN because that includes everything in sub-buckets.
-		// so we have to count the number of peers here.
-		// If it's slow we could cache it but you probably won't have
-		// millions of peers.
-
-		newPeerIdx := CountKeysInBucket(prs) + 1
-		// starts at 1. There IS NO PEER 0, so you can consider peer 0 invalid.
-
-		pr, err := prs.CreateBucket(pub.SerializeCompressed())
-		if err != nil {
-			itsnew = false
-			return nil // peer already exists
-		}
-
-		var buf bytes.Buffer
-		// write 4 byte peer index
-		err = binary.Write(&buf, binary.BigEndian, newPeerIdx)
-		if err != nil {
-			return err
-		}
-		return pr.Put(KEYIdx, buf.Bytes())
-	})
-	return itsnew, err
 }
 
 // NextPubForPeer returns the next pubkey index to use with the peer.
@@ -182,8 +160,71 @@ func (nd *LitNode) NextIdxForPeer(peerBytes [33]byte) (uint32, uint32, error) {
 	return peerIdx, cIdx, nil
 }
 
-// GetPeerIdx returns the peer index given a pubkey.
+// NewPeer saves a pubkey in the DB and assigns a peer index.  Call this
+// the first time you connect to someone.  Returns false if already known,
+// true if it added a new peer.  Errors for real errors.
+func (nd *LitNode) NewPeer(pub *btcec.PublicKey) (bool, error) {
+	itsnew := true
+	err := nd.LitDB.Update(func(btx *bolt.Tx) error {
+
+		prs, _ := btx.CreateBucketIfNotExists(BKTPeers) // only errs on name
+
+		peerBkt := prs.Bucket(pub.SerializeCompressed())
+		if peerBkt != nil {
+
+		}
+		pr, err := prs.CreateBucket(pub.SerializeCompressed())
+		if err != nil {
+			itsnew = false
+			return nil // peer already exists
+		}
+		// peer is new, put their key in the map bucket
+
+		mp, _ := btx.CreateBucketIfNotExists(BKTMap)
+		// starts at 1. There IS NO PEER 0, so you can consider peer 0 invalid.
+		newPeerIdx := CountKeysInBucket(mp) + 1
+		err = mp.Put(lnutil.U32tB(newPeerIdx), pub.SerializeCompressed())
+		if err != nil {
+			return err
+		}
+
+		return pr.Put(KEYIdx, lnutil.U32tB(newPeerIdx))
+	})
+	return itsnew, err
+}
+
+// GetPeerIdx returns the peer index given a pubkey.  Creates it if it's not there
+// yet!  Also return a bool for new..?  not needed?
 func (nd *LitNode) GetPeerIdx(pub *btcec.PublicKey) (uint32, error) {
+	var idx uint32
+
+	err := nd.LitDB.Update(func(btx *bolt.Tx) error {
+		prs, _ := btx.CreateBucketIfNotExists(BKTPeers) // only errs on name
+		thisPeerBkt := prs.Bucket(pub.SerializeCompressed())
+		if thisPeerBkt != nil {
+			idx = lnutil.BtU32(thisPeerBkt.Get(KEYIdx))
+			return nil
+		}
+
+		// this peer doesn't exist yet.  Add new peer
+		mp, _ := btx.CreateBucketIfNotExists(BKTMap)
+		idx = CountKeysInBucket(mp) + 1
+		// save peer index:pubkey into map bucket
+		err := mp.Put(lnutil.U32tB(idx), pub.SerializeCompressed())
+		if err != nil {
+			return err
+		}
+
+		thisPeerBkt, err = prs.CreateBucket(pub.SerializeCompressed())
+		if err != nil {
+			return err
+		}
+		return thisPeerBkt.Put(KEYIdx, lnutil.U32tB(idx))
+	})
+	return idx, err
+}
+
+func (nd *LitNode) GetPeerIdxx(pub *btcec.PublicKey) (uint32, error) {
 	var idx uint32
 	err := nd.LitDB.View(func(btx *bolt.Tx) error {
 		prs := btx.Bucket(BKTPeers)
