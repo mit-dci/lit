@@ -53,6 +53,7 @@ type UWallet interface {
 	// wallet up to the LN module.
 	LetMeKnow() chan lnutil.OutPointEvent
 
+	// raw blocks coming in for the watchtower to check
 	BlockMonitor() chan *wire.MsgBlock
 
 	// Ask for network parameters

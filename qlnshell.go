@@ -1,14 +1,6 @@
 package main
 
-import (
-	"fmt"
-	"strconv"
-	"time"
-
-	"github.com/mit-dci/lit/lnutil"
-	"github.com/mit-dci/lit/qln"
-)
-
+/*
 func FundChannel(args []string) error {
 	if len(args) < 2 {
 		return fmt.Errorf("need args: fund capacity initialSend")
@@ -343,3 +335,4 @@ func BreakChannel(args []string) error {
 	// broadcast
 	return Node.BaseWallet.PushTx(tx)
 }
+*/

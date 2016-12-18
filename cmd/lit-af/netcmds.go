@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/mit-dci/lit/litrpc"
 )
@@ -48,15 +49,24 @@ func (lc *litAfClient) Say(textArgs []string) error {
 	args := new(litrpc.SayArgs)
 	reply := new(litrpc.StatusReply)
 
-	if len(textArgs) < 1 {
-		return fmt.Errorf("you have to say something")
+	if len(textArgs) < 2 {
+		return fmt.Errorf("usage: say peerNum message")
 	}
+
+	peerIdx, err := strconv.Atoi(textArgs[0])
+	if err != nil {
+		return err
+	}
+
+	textArgs = textArgs[1:]
 
 	for _, s := range textArgs {
 		args.Message += s + " "
 	}
 
-	err := lc.rpccon.Call("LitRPC.Say", args, reply)
+	args.Peer = uint32(peerIdx)
+
+	err = lc.rpccon.Call("LitRPC.Say", args, reply)
 	if err != nil {
 		return err
 	}

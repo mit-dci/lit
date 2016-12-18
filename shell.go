@@ -10,13 +10,12 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 
-	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/portxo"
-	"github.com/mit-dci/lit/qln"
-	"github.com/mit-dci/lit/uspv"
 )
 
 /* lit shell cooked in.  Switch to rpc shell soon */
+
+/*
 
 // Shellparse parses user input and hands it to command functions if matching
 func Shellparse(cmdslice []string) error {
@@ -446,6 +445,7 @@ func Bal(args []string) error {
 
 	return nil
 }
+*/
 
 // Adr makes a new address.
 func Adr(args []string) error {

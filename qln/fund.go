@@ -97,6 +97,55 @@ an exact timing for the payment.
 
 */
 
+// FundChannel opens a channel with a peer.  Doesn't return until the channel
+// has been created.  Maybe timeout if it takes too long?
+func (nd *LitNode) FundChannel(peerIdx uint32, ccap, initSend int64) (uint32, error) {
+
+	nd.InProg.mtx.Lock()
+	if nd.InProg.PeerIdx != 0 {
+		return 0, fmt.Errorf("fund with peer %d not done yet", nd.InProg.PeerIdx)
+	}
+
+	if initSend < 0 || ccap < 0 {
+		return 0, fmt.Errorf("Can't have negative send or capacity")
+	}
+	if ccap < 1000000 { // limit for now
+		return 0, fmt.Errorf("Min channel capacity 1M sat")
+	}
+	if initSend > ccap {
+		return 0, fmt.Errorf("Cant send %d in %d capacity channel", initSend, ccap)
+	}
+
+	// TODO - would be convenient if it auto connected to the peer huh
+	if !nd.ConnectedToPeer(peerIdx) {
+		return 0, fmt.Errorf("Not connected to peer %d. Do that yourself.", peerIdx)
+	}
+
+	fmt.Printf("got to here ---------- ")
+	peerArr := nd.GetPubFromPeerIdx(peerIdx)
+
+	peerIdx, cIdx, err := nd.NextIdxForPeer(peerArr)
+	if err != nil {
+		return 0, err
+	}
+
+	nd.InProg.ChanIdx = cIdx
+	nd.InProg.PeerIdx = peerIdx
+	nd.InProg.Amt = ccap
+	nd.InProg.InitSend = initSend
+	nd.InProg.mtx.Unlock()
+
+	outMsg := new(lnutil.LitMsg)
+	outMsg.MsgType = lnutil.MSGID_POINTREQ
+	outMsg.PeerIdx = peerIdx
+	// no message body / data
+	nd.OmniOut <- outMsg
+
+	// wait until it's done!
+	idx := <-nd.InProg.done
+	return idx, nil
+}
+
 // RECIPIENT
 // PubReqHandler gets a (content-less) pubkey request.  Respond with a pubkey
 // and a refund pubkey hash. (currently makes pubkey hash, need to only make 1)
@@ -149,7 +198,9 @@ func (nd *LitNode) PointReqHandler(lm *lnutil.LitMsg) {
 // FUNDER
 // PointRespHandler takes in a point response, and returns a channel description
 func (nd LitNode) PointRespHandler(lm *lnutil.LitMsg) error {
-	// not sure how to do this yet
+
+	nd.InProg.mtx.Lock()
+	defer nd.InProg.mtx.Unlock()
 
 	if nd.InProg.PeerIdx == 0 {
 		return fmt.Errorf("Got point response but no channel creation in progress")
@@ -159,8 +210,6 @@ func (nd LitNode) PointRespHandler(lm *lnutil.LitMsg) error {
 		return fmt.Errorf("PointRespHandler err: msg %d bytes, expect 99\n",
 			len(lm.Data))
 	}
-
-	// should put these pubkeys somewhere huh.
 
 	peerArr := nd.GetPubFromPeerIdx(lm.PeerIdx)
 
@@ -465,11 +514,7 @@ func (nd *LitNode) QChanAckHandler(lm *lnutil.LitMsg) {
 		return
 	}
 
-	// kindof want to clear inFlight and call ReallySend atomically, but clear
-	// inFlight first.  Worst case you've got some stuck / invalid non-channel,
-	// but no loss of funds.
-
-	nd.InProg.Clear()
+	// Make sure everything works & is saved, then clear InProg.
 
 	// sign their com tx to send
 	sig, err = nd.SignState(qc)
@@ -497,6 +542,14 @@ func (nd *LitNode) QChanAckHandler(lm *lnutil.LitMsg) {
 	nullTxo.KeyGen = qc.KeyGen
 	nullTxo.KeyGen.Step[2] = UseChannelWatchRefund
 	nd.BaseWallet.ExportUtxo(nullTxo)
+
+	// channel creation is ~complete, clear InProg.
+	// We may be asked to re-send the sig-proof
+
+	nd.InProg.mtx.Lock()
+	nd.InProg.done <- qc.KeyGen.Step[4] & 0x7fffffff
+	nd.InProg.Clear()
+	nd.InProg.mtx.Unlock()
 
 	// sig proof should be sent later once there are confirmations.
 	// it'll have an spv proof of the fund tx.

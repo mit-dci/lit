@@ -3,7 +3,6 @@ package litrpc
 import (
 	"fmt"
 
-	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/qln"
 )
 
@@ -58,10 +57,10 @@ func (r *LitRPC) ChannelList(args ChanArgs, reply *ChannelListReply) error {
 
 // ------------------------- fund
 type FundArgs struct {
-	LNAddr      string
-	Capacity    int64 // later can be minimum capacity
-	Roundup     int64 // ignore for now; can be used to round-up capacity
-	InitialSend int64 // Initial send of -1 means "ALL"
+	Peer        uint32 // who to make the channel with
+	Capacity    int64  // later can be minimum capacity
+	Roundup     int64  // ignore for now; can be used to round-up capacity
+	InitialSend int64  // Initial send of -1 means "ALL"
 }
 
 func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
@@ -81,31 +80,25 @@ func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
 			args.InitialSend, args.Capacity)
 	}
 
-	// see if we have enough money.  Doesn't freeze here though, just
-	// checks for ability to fund.  Freeze happens when we receive the response.
-	// Could fail if we run out of money before calling MaybeSend()
+	// see if we have enough money before calling the funding function.  Not
+	// strictly required but it's better to fail here instead of after net traffic.
+	// The litNode doesn't actually know how much money the basewallet has.
+	// So it could potentially try to start a channel and fail because it doesn't have
+	// the money.  Safe enough as all it's done is requested a point, which is
+	// idempotent on both sides.
 	_, _, err := r.SCon.TS.PickUtxos(args.Capacity, true)
 	if err != nil {
 		return err
 	}
 
-	peerArr := r.Node.GetPubFromPeerIdx(0)
-
-	peerIdx, cIdx, err := r.Node.NextIdxForPeer(peerArr)
+	idx, err := r.Node.FundChannel(args.Peer, args.Capacity, args.InitialSend)
 	if err != nil {
 		return err
 	}
 
-	r.Node.InProg = new(qln.InFlightFund)
+	reply.Status = fmt.Sprintf("funded channel %d", idx)
 
-	r.Node.InProg.ChanIdx = cIdx
-	r.Node.InProg.PeerIdx = peerIdx
-	r.Node.InProg.Amt = args.Capacity
-	r.Node.InProg.InitSend = args.InitialSend
-
-	msg := []byte{lnutil.MSGID_POINTREQ}
-	_, err = r.Node.RemoteCon.Write(msg)
-	return err
+	return nil
 }
 
 // ------------------------- push
@@ -124,8 +117,7 @@ func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 		return fmt.Errorf("push %d, max push is 1 coin / 100000000", args.Amt)
 	}
 
-	fmt.Printf("push %d to (%d,%d) %d times\n",
-		args.Amt, args.PeerIdx, args.ChanIdx)
+	fmt.Printf("push %d to (%d,%d)\n", args.Amt, args.PeerIdx, args.ChanIdx)
 
 	r.Node.RemoteMtx.Lock()
 	_, ok := r.Node.RemoteCons[args.PeerIdx]
@@ -163,47 +155,18 @@ type ChanArgs struct {
 // CloseChannel is a cooperative closing of a channel to a specified address.
 func (r *LitRPC) CloseChannel(args ChanArgs, reply *StatusReply) error {
 
-	r.Node.RemoteMtx.Lock()
-	_, ok := r.Node.RemoteCons[args.PeerIdx]
-	r.Node.RemoteMtx.Unlock()
-	if !ok {
-		return fmt.Errorf("not connected to specified peer %d ",
-			args.PeerIdx)
-	}
-
 	qc, err := r.Node.GetQchanByIdx(args.PeerIdx, args.ChanIdx)
 	if err != nil {
 		return err
 	}
 
-	if qc.CloseData.Closed {
-		return fmt.Errorf("can't close (%d,%d): already closed",
-			qc.KeyGen.Step[3]&0x7fffffff, qc.KeyGen.Step[4]&0x7fffffff)
-	}
-
-	tx, err := qc.SimpleCloseTx()
+	err = r.Node.CoopClose(qc)
 	if err != nil {
 		return err
 	}
+	reply.Status = "OK closed"
 
-	sig, err := r.Node.SignSimpleClose(qc, tx)
-	if err != nil {
-		return err
-	}
-
-	// Save something to db... TODO
-	// Should save something, just so the UI marks it as closed, and
-	// we don't accept payments on this channel anymore.
-
-	opArr := lnutil.OutPointToBytes(qc.Op)
-	// close request is just the op, sig
-	msg := []byte{lnutil.MSGID_CLOSEREQ}
-	msg = append(msg, opArr[:]...)
-	msg = append(msg, sig...)
-
-	_, err = r.Node.RemoteCon.Write(msg)
-
-	return err
+	return nil
 }
 
 // ------------------------- break
@@ -249,5 +212,4 @@ func (r *LitRPC) BreakChannel(args ChanArgs, reply *StatusReply) error {
 	// broadcast
 	return r.Node.BaseWallet.PushTx(tx)
 
-	return nil
 }

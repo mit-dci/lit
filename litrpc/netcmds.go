@@ -3,9 +3,7 @@ package litrpc
 import (
 	"fmt"
 
-	"github.com/btcsuite/btcutil"
 	"github.com/mit-dci/lit/lndc"
-	"github.com/mit-dci/lit/qln"
 )
 
 // ------------------------- listen
@@ -44,43 +42,38 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
 	idPriv := r.Node.IdKey()
 
 	// Assign remote connection
-	r.Node.RemoteCon = new(lndc.LNDConn)
+	newConn := new(lndc.LNDConn)
 
-	err = r.Node.RemoteCon.Dial(idPriv,
+	err = newConn.Dial(idPriv,
 		connectNode.NetAddr.String(), connectNode.Base58Adr.ScriptAddress())
 	if err != nil {
 		return err
 	}
 
-	// store this peer in the db
-	_, err = r.Node.NewPeer(r.Node.RemoteCon.RemotePub)
+	// figure out peer index, or assign new one for new peer
+	peerIdx, err := r.Node.GetPeerIdx(newConn.RemotePub)
 	if err != nil {
 		return err
 	}
 
-	idslice := btcutil.Hash160(r.Node.RemoteCon.RemotePub.SerializeCompressed())
-	var newId [16]byte
-	copy(newId[:], idslice[:16])
-	go r.Node.LNDCReceiver(r.Node.RemoteCon, newId)
-	reply.Status = fmt.Sprintf("connected to %x",
-		r.Node.RemoteCon.RemotePub.SerializeCompressed())
+	r.Node.RemoteMtx.Lock()
+	r.Node.RemoteCons[peerIdx] = newConn
+	r.Node.RemoteMtx.Unlock()
+
+	// each connection to a peer gets its own LNDCReader
+	go r.Node.LNDCReader(newConn, peerIdx)
+
+	reply.Status = fmt.Sprintf("connected to peer %d", peerIdx)
 	return nil
 }
 
 type SayArgs struct {
+	Peer    uint32
 	Message string
 }
 
 func (r *LitRPC) Say(args SayArgs, reply *StatusReply) error {
-
-	if r.Node.RemoteCon == nil || r.Node.RemoteCon.RemotePub == nil {
-		return fmt.Errorf("Not connected to anyone\n")
-	}
-
-	msg := append([]byte{qln.MSGID_TEXTCHAT}, []byte(args.Message)...)
-
-	_, err := r.Node.RemoteCon.Write(msg)
-	return err
+	return r.Node.SendChat(args.Peer, args.Message)
 }
 
 func (r *LitRPC) Stop(args NoArgs, reply *StatusReply) error {

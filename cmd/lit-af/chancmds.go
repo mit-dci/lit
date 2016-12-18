@@ -11,18 +11,23 @@ func (lc *litAfClient) FundChannel(textArgs []string) error {
 	args := new(litrpc.FundArgs)
 	reply := new(litrpc.StatusReply)
 
-	if len(textArgs) < 2 {
-		return fmt.Errorf("need args: fund capacity initialSend")
+	if len(textArgs) < 3 {
+		return fmt.Errorf("need args: fund peer capacity initialSend")
 	}
 
-	cCap, err := strconv.Atoi(textArgs[0])
+	peer, err := strconv.Atoi(textArgs[0])
 	if err != nil {
 		return err
 	}
-	iSend, err := strconv.Atoi(textArgs[1])
+	cCap, err := strconv.Atoi(textArgs[1])
 	if err != nil {
 		return err
 	}
+	iSend, err := strconv.Atoi(textArgs[2])
+	if err != nil {
+		return err
+	}
+	args.Peer = uint32(peer)
 	args.Capacity = int64(cCap)
 	args.InitialSend = int64(iSend)
 

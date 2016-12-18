@@ -23,6 +23,52 @@ doesn't reply, as the channel is closed.
 
 */
 
+// CoopClose requests a cooperative close of the channel
+func (nd *LitNode) CoopClose(qc *Qchan) error {
+
+	nd.RemoteMtx.Lock()
+	_, ok := nd.RemoteCons[qc.Peer()]
+	nd.RemoteMtx.Unlock()
+	if !ok {
+		return fmt.Errorf("not connected to peer %d ", qc.Peer())
+	}
+
+	if qc.CloseData.Closed {
+		return fmt.Errorf("can't close (%d,%d): already closed",
+			qc.KeyGen.Step[3]&0x7fffffff, qc.KeyGen.Step[4]&0x7fffffff)
+	}
+
+	tx, err := qc.SimpleCloseTx()
+	if err != nil {
+		return err
+	}
+
+	sig, err := nd.SignSimpleClose(qc, tx)
+	if err != nil {
+		return err
+	}
+
+	// Save something to db... TODO
+	// Should save something, just so the UI marks it as closed, and
+	// we don't accept payments on this channel anymore.
+
+	opArr := lnutil.OutPointToBytes(qc.Op)
+
+	var msg []byte
+	// close request is just the op, sig
+	msg = append(msg, opArr[:]...)
+	msg = append(msg, sig...)
+
+	outMsg := new(lnutil.LitMsg)
+	outMsg.MsgType = lnutil.MSGID_CLOSEREQ
+	outMsg.PeerIdx = qc.Peer()
+	outMsg.Data = msg
+
+	nd.OmniOut <- outMsg
+
+	return nil
+}
+
 // CloseReqHandler takes in a close request from a remote host, signs and
 // responds with a close response.  Obviously later there will be some judgment
 // over what to do, but for now it just signs whatever it's requested to.
