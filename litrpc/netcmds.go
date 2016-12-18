@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/mit-dci/lit/lndc"
+	"github.com/mit-dci/lit/qln"
 )
 
 // ------------------------- listen
@@ -64,6 +65,22 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
 	go r.Node.LNDCReader(newConn, peerIdx)
 
 	reply.Status = fmt.Sprintf("connected to peer %d", peerIdx)
+	return nil
+}
+
+// ------------------------- ShowConnections
+
+type ListConnectionsReply struct {
+	Connections []qln.PeerInfo
+}
+type ConInfo struct {
+	PeerNumber uint32
+	RemoteHost string
+}
+
+func (r *LitRPC) ListConnections(args NoArgs, reply *ListConnectionsReply) error {
+	reply.Connections = r.Node.GetConnectedPeerList()
+
 	return nil
 }
 

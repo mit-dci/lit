@@ -80,6 +80,24 @@ func (nd *LitNode) OutMessager() {
 	}
 }
 
+type PeerInfo struct {
+	PeerNumber uint32
+	RemoteHost string
+}
+
+func (nd *LitNode) GetConnectedPeerList() []PeerInfo {
+	nd.RemoteMtx.Lock()
+	nd.RemoteMtx.Unlock()
+	var peers []PeerInfo
+	for k, v := range nd.RemoteCons {
+		var newPeer PeerInfo
+		newPeer.PeerNumber = k
+		newPeer.RemoteHost = v.RemoteAddr().String()
+		peers = append(peers, newPeer)
+	}
+	return peers
+}
+
 // ConnectedToPeer checks whether you're connected to a specific peer
 func (nd *LitNode) ConnectedToPeer(peer uint32) bool {
 	nd.RemoteMtx.Lock()

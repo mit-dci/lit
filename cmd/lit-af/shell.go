@@ -202,13 +202,23 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 }
 
 func (lc *litAfClient) Ls(textArgs []string) error {
-
+	pReply := new(litrpc.ListConnectionsReply)
 	cReply := new(litrpc.ChannelListReply)
 	aReply := new(litrpc.AdrReply)
 	tReply := new(litrpc.TxoListReply)
 	bReply := new(litrpc.BalReply)
 
-	err := lc.rpccon.Call("LitRPC.ChannelList", nil, cReply)
+	err := lc.rpccon.Call("LitRPC.ListConnections", nil, pReply)
+	if err != nil {
+		return err
+	}
+	if len(pReply.Connections) > 0 {
+		for _, peer := range pReply.Connections {
+			fmt.Printf("%d %s\n", peer.PeerNumber, peer.RemoteHost)
+		}
+	}
+
+	err = lc.rpccon.Call("LitRPC.ChannelList", nil, cReply)
 	if err != nil {
 		return err
 	}
