@@ -10,59 +10,51 @@ import (
 
 // handles stuff that comes in over the wire.  Not user-initiated.
 func (nd *LitNode) OmniHandler() {
-	var from [16]byte
 	for {
-		newdata := <-nd.OmniChan // blocks here
-		if len(newdata) < 17 {
-			fmt.Printf("got too short a message")
-			continue
-		}
-		copy(from[:], newdata[:16])
-		msg := newdata[16:]
-		msgid := msg[0]
+		routedMsg := <-nd.OmniIn // blocks here
 
 		// TEXT MESSAGE.  SIMPLE
-		if msgid == MSGID_TEXTCHAT { //it's text
-			fmt.Printf("text from %x: %s\n", from, msg[1:])
+		if routedMsg.MsgType == lnutil.MSGID_TEXTCHAT { //it's text
+			fmt.Printf("text from %x: %s\n", routedMsg.PeerIdx, routedMsg.Data)
 			continue
 		}
 		// POINT REQUEST
-		if msgid == MSGID_POINTREQ {
-			fmt.Printf("Got point request from %x\n", from)
-			nd.PointReqHandler(from, msg[1:])
+		if routedMsg.MsgType == lnutil.MSGID_POINTREQ {
+			fmt.Printf("Got point request from %x\n", routedMsg.PeerIdx)
+			nd.PointReqHandler(routedMsg)
 			continue
 		}
 		// POINT RESPONSE
-		if msgid == MSGID_POINTRESP {
-			fmt.Printf("Got point response from %x\n", from)
-			err := nd.PointRespHandler(from, msg[1:])
+		if routedMsg.MsgType == lnutil.MSGID_POINTRESP {
+			fmt.Printf("Got point response from %x\n", routedMsg.PeerIdx)
+			err := nd.PointRespHandler(routedMsg)
 			if err != nil {
 				log.Printf(err.Error())
 			}
 			continue
 		}
 		// CHANNEL DESCRIPTION
-		if msgid == MSGID_CHANDESC {
-			fmt.Printf("Got channel description from %x\n", from)
-			nd.QChanDescHandler(from, msg[1:])
+		if routedMsg.MsgType == lnutil.MSGID_CHANDESC {
+			fmt.Printf("Got channel description from %x\n", routedMsg.PeerIdx)
+			nd.QChanDescHandler(routedMsg)
 			continue
 		}
 		// CHANNEL ACKNOWLEDGE
-		if msgid == MSGID_CHANACK {
-			fmt.Printf("Got channel acknowledgement from %x\n", from)
-			nd.QChanAckHandler(from, msg[1:])
+		if routedMsg.MsgType == lnutil.MSGID_CHANACK {
+			fmt.Printf("Got channel acknowledgement from %x\n", routedMsg.PeerIdx)
+			nd.QChanAckHandler(routedMsg)
 			continue
 		}
 		// HERE'S YOUR CHANNEL
-		if msgid == MSGID_SIGPROOF {
-			fmt.Printf("Got channel proof from %x\n", from)
-			nd.SigProofHandler(from, msg[1:])
+		if routedMsg.MsgType == lnutil.MSGID_SIGPROOF {
+			fmt.Printf("Got channel proof from %x\n", routedMsg.PeerIdx)
+			nd.SigProofHandler(routedMsg)
 			continue
 		}
 		// CLOSE REQ
-		if msgid == MSGID_CLOSEREQ {
-			fmt.Printf("Got close request from %x\n", from)
-			nd.CloseReqHandler(from, msg[1:])
+		if routedMsg.MsgType == lnutil.MSGID_CLOSEREQ {
+			fmt.Printf("Got close request from %x\n", routedMsg.PeerIdx)
+			nd.CloseReqHandler(routedMsg)
 			continue
 		}
 		// CLOSE RESP
@@ -72,39 +64,40 @@ func (nd *LitNode) OmniHandler() {
 		//			continue
 		//		}
 		// PUSH
-		if msgid == MSGID_DELTASIG {
-			fmt.Printf("Got DELTASIG from %x\n", from)
-			nd.DeltaSigHandler(from, msg[1:])
+		if routedMsg.MsgType == lnutil.MSGID_DELTASIG {
+			fmt.Printf("Got DELTASIG from %x\n", routedMsg.PeerIdx)
+			nd.DeltaSigHandler(routedMsg)
 			continue
 		}
 		// SIGNATURE AND REVOCATION
-		if msgid == MSGID_SIGREV {
-			fmt.Printf("Got SIGREV from %x\n", from)
-			nd.SigRevHandler(from, msg[1:])
+		if routedMsg.MsgType == lnutil.MSGID_SIGREV {
+			fmt.Printf("Got SIGREV from %x\n", routedMsg.PeerIdx)
+			nd.SigRevHandler(routedMsg)
 			continue
 		}
 		// REVOCATION
-		if msgid == MSGID_REV {
-			fmt.Printf("Got REV from %x\n", from)
-			nd.REVHandler(from, msg[1:])
+		if routedMsg.MsgType == lnutil.MSGID_REV {
+			fmt.Printf("Got REV from %x\n", routedMsg.PeerIdx)
+			nd.REVHandler(routedMsg)
 			continue
 		}
 
 		// messages to hand to the watchtower all start with 0xa_
 		// don't strip the first byte before handing it over
-		if msgid&0xf0 == 0xa0 {
+		if routedMsg.MsgType&0xf0 == 0xa0 {
 			if !nd.Tower.Accepting {
-				fmt.Printf("Error: Got tower msg from %x but tower disabled\n", from)
+				fmt.Printf("Error: Got tower msg from %x but tower disabled\n",
+					routedMsg.PeerIdx)
 				continue
 			}
-			err := nd.Tower.HandleMessage(from, msg)
+			err := nd.Tower.HandleMessage(routedMsg)
 			if err != nil {
 				fmt.Printf(err.Error())
 			}
 			continue
 		}
 
-		fmt.Printf("Unknown message id byte %x &f0", msgid)
+		fmt.Printf("Unknown message id byte %x &f0", routedMsg.MsgType)
 		continue
 	}
 }
@@ -112,26 +105,23 @@ func (nd *LitNode) OmniHandler() {
 // Every lndc has one of these running
 // it listens for incoming messages on the lndc and hands it over
 // to the OmniHandler via omnichan
-func (nd *LitNode) LNDCReceiver(l net.Conn, id [16]byte) error {
-	// first store peer in DB if not yet known
-	_, err := nd.NewPeer(nd.RemoteCon.RemotePub)
-	if err != nil {
-		return err
-	}
+func (nd *LitNode) LNDCReader(l net.Conn, peerIdx uint32) error {
 	for {
 		msg := make([]byte, 65535)
 		//	fmt.Printf("read message from %x\n", l.RemoteLNId)
 		n, err := l.Read(msg)
 		if err != nil {
-			fmt.Printf("read error with %x: %s\n",
-				id, err.Error())
-			//			delete(CnMap, id)
+			fmt.Printf("read error with %d: %s\n",
+				peerIdx, err.Error())
 			return l.Close()
 		}
 		msg = msg[:n]
-		msg = append(id[:], msg...)
-		//		fmt.Printf("incoming msg %x\n", msg)
-		nd.OmniChan <- msg
+		routedMsg := new(lnutil.LitMsg)
+		routedMsg.PeerIdx = peerIdx
+		routedMsg.MsgType = msg[0]
+		routedMsg.Data = msg[1:]
+
+		nd.OmniIn <- routedMsg
 	}
 }
 

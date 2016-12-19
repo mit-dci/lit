@@ -103,7 +103,18 @@ func (nd LitNode) PushChannel(qc *Qchan, amt uint32) error {
 	if err != nil {
 		return err
 	}
-	return nd.SendDeltaSig(qc)
+	err = nd.SendDeltaSig(qc)
+	if err != nil {
+		return err
+	}
+
+	nd.PushClearMutex.Lock()
+	nd.PushClear[qc.Op.Hash] = make(chan bool)
+	nd.PushClearMutex.Unlock()
+
+	<-nd.PushClear[qc.Op.Hash]
+
+	return nil
 }
 
 // SendDeltaSig initiates a push, sending the amount to be pushed and the new sig.
@@ -119,21 +130,28 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 		return err
 	}
 	opArr := lnutil.OutPointToBytes(q.Op)
+
+	var msg []byte
+
 	// DeltaSig is op (36), Delta (4),  sig (64)
 	// total length 104
-	msg := []byte{MSGID_DELTASIG}
 	msg = append(msg, opArr[:]...)
 	msg = append(msg, lnutil.I32tB(-q.State.Delta)...)
 	msg = append(msg, sig[:]...)
-	_, err = nd.RemoteCon.Write(msg)
+
+	outMsg := new(lnutil.LitMsg)
+	outMsg.MsgType = lnutil.MSGID_DELTASIG
+	outMsg.PeerIdx = q.KeyGen.Step[3] & 0x7fffffff
+	outMsg.Data = msg
+	nd.OmniOut <- outMsg
+
 	return err
 }
 
 // DeltaSigHandler takes in a DeltaSig and responds with an SigRev (if everything goes OK)
-func (nd *LitNode) DeltaSigHandler(from [16]byte, DeltaSigBytes []byte) {
-
-	if len(DeltaSigBytes) < 104 || len(DeltaSigBytes) > 104 {
-		fmt.Printf("got %d byte DeltaSig, expect 104", len(DeltaSigBytes))
+func (nd *LitNode) DeltaSigHandler(lm *lnutil.LitMsg) {
+	if len(lm.Data) < 104 || len(lm.Data) > 104 {
+		fmt.Printf("got %d byte DeltaSig, expect 104", len(lm.Data))
 		return
 	}
 
@@ -141,13 +159,13 @@ func (nd *LitNode) DeltaSigHandler(from [16]byte, DeltaSigBytes []byte) {
 	var incomingDelta uint32
 	var incomingSig [64]byte
 	// deserialize DeltaSig
-	copy(opArr[:], DeltaSigBytes[:36])
-	incomingDelta = lnutil.BtU32(DeltaSigBytes[36:40])
-	copy(incomingSig[:], DeltaSigBytes[40:])
+	copy(opArr[:], lm.Data[:36])
+	incomingDelta = lnutil.BtU32(lm.Data[36:40])
+	copy(incomingSig[:], lm.Data[40:])
 
 	// find who we're talkikng to
-	var peerArr [33]byte
-	copy(peerArr[:], nd.RemoteCon.RemotePub.SerializeCompressed())
+	peerArr := nd.GetPubFromPeerIdx(lm.PeerIdx)
+
 	// load qchan & state from DB
 	qc, err := nd.GetQchan(peerArr, opArr)
 	if err != nil {
@@ -233,23 +251,30 @@ func (nd *LitNode) SendSigRev(q *Qchan) error {
 	}
 
 	opArr := lnutil.OutPointToBytes(q.Op)
+
+	var msg []byte
+
 	// SigRev is op (36), sig (64), ElkHash (32), NextElkPoint (33)
 	// total length 165
-	msg := []byte{MSGID_SIGREV}
 	msg = append(msg, opArr[:]...)
 	msg = append(msg, sig[:]...)
 	msg = append(msg, elk[:]...)
 	msg = append(msg, NextElkPoint[:]...)
 
-	_, err = nd.RemoteCon.Write(msg)
+	outMsg := new(lnutil.LitMsg)
+	outMsg.MsgType = lnutil.MSGID_SIGREV
+	outMsg.PeerIdx = q.KeyGen.Step[3] & 0x7fffffff
+	outMsg.Data = msg
+	nd.OmniOut <- outMsg
+
 	return err
 }
 
 // SIGREVHandler takes in an SIGREV and responds with a REV (if everything goes OK)
-func (nd *LitNode) SigRevHandler(from [16]byte, SigRevBytes []byte) {
+func (nd *LitNode) SigRevHandler(lm *lnutil.LitMsg) {
 
-	if len(SigRevBytes) < 165 || len(SigRevBytes) > 165 {
-		fmt.Printf("got %d byte SIGREV, expect 165", len(SigRevBytes))
+	if len(lm.Data) < 165 || len(lm.Data) > 165 {
+		fmt.Printf("got %d byte SIGREV, expect 165", len(lm.Data))
 		return
 	}
 
@@ -257,14 +282,14 @@ func (nd *LitNode) SigRevHandler(from [16]byte, SigRevBytes []byte) {
 	var sig [64]byte
 	var nextElkPoint [33]byte
 	// deserialize SIGREV
-	copy(opArr[:], SigRevBytes[:36])
-	copy(sig[:], SigRevBytes[36:100])
-	revElk, _ := chainhash.NewHash(SigRevBytes[100:132])
-	copy(nextElkPoint[:], SigRevBytes[132:])
+	copy(opArr[:], lm.Data[:36])
+	copy(sig[:], lm.Data[36:100])
+	revElk, _ := chainhash.NewHash(lm.Data[100:132])
+	copy(nextElkPoint[:], lm.Data[132:])
 
 	// find who we're talkikng to
-	var peerArr [33]byte
-	copy(peerArr[:], nd.RemoteCon.RemotePub.SerializeCompressed())
+	peerArr := nd.GetPubFromPeerIdx(lm.PeerIdx)
+
 	// load qchan & state from DB
 	qc, err := nd.GetQchan(peerArr, opArr)
 	if err != nil {
@@ -327,11 +352,18 @@ func (nd *LitNode) SigRevHandler(from [16]byte, SigRevBytes []byte) {
 	qc.State.StateIdx--
 	qc.State.MyAmt = prevAmt
 
-	err = nd.BuildJusticeSig(qc)
-	if err != nil {
-		fmt.Printf("SIGREVHandler err %s", err.Error())
-		return
-	}
+	/*
+		err = nd.BuildJusticeSig(qc)
+		if err != nil {
+			fmt.Printf("SIGREVHandler err %s", err.Error())
+			return
+		}
+	*/
+
+	// I'm done updating this channel
+	nd.PushClearMutex.Lock()
+	nd.PushClear[qc.Op.Hash] <- true
+	nd.PushClearMutex.Unlock()
 
 	return
 }
@@ -350,34 +382,40 @@ func (nd *LitNode) SendREV(q *Qchan) error {
 	}
 
 	opArr := lnutil.OutPointToBytes(q.Op)
+
+	var msg []byte
 	// REV is op (36), elk hash (32), next elk point (33)
 	// total length 101
-	msg := []byte{MSGID_REV}
 	msg = append(msg, opArr[:]...)
 	msg = append(msg, elk[:]...)
 	msg = append(msg, nextElkPoint[:]...)
 
-	_, err = nd.RemoteCon.Write(msg)
+	outMsg := new(lnutil.LitMsg)
+	outMsg.MsgType = lnutil.MSGID_REV
+	outMsg.PeerIdx = q.KeyGen.Step[3] & 0x7fffffff
+	outMsg.Data = msg
+	nd.OmniOut <- outMsg
+
 	return err
 }
 
 // REVHandler takes in an REV and clears the state's prev HAKD.  This is the
 // final message in the state update process and there is no response.
-func (nd *LitNode) REVHandler(from [16]byte, revBytes []byte) {
-	if len(revBytes) != 101 {
-		fmt.Printf("got %d byte REV, expect 101", len(revBytes))
+func (nd *LitNode) REVHandler(lm *lnutil.LitMsg) {
+	if len(lm.Data) != 101 {
+		fmt.Printf("got %d byte REV, expect 101", len(lm.Data))
 		return
 	}
 	var opArr [36]byte
 	var nextElkPoint [33]byte
 	// deserialize SigRev
-	copy(opArr[:], revBytes[:36])
-	revElk, _ := chainhash.NewHash(revBytes[36:68])
-	copy(nextElkPoint[:], revBytes[68:])
+	copy(opArr[:], lm.Data[:36])
+	revElk, _ := chainhash.NewHash(lm.Data[36:68])
+	copy(nextElkPoint[:], lm.Data[68:])
 
 	// find who we're talkikng to
-	var peerArr [33]byte
-	copy(peerArr[:], nd.RemoteCon.RemotePub.SerializeCompressed())
+	peerArr := nd.GetPubFromPeerIdx(lm.PeerIdx)
+
 	// load qchan & state from DB
 	qc, err := nd.GetQchan(peerArr, opArr)
 	if err != nil {
@@ -417,11 +455,14 @@ func (nd *LitNode) REVHandler(from [16]byte, revBytes []byte) {
 	// the justice signature
 	qc.State.StateIdx--      // back one state
 	qc.State.MyAmt = prevAmt // use stashed previous state amount
-	err = nd.BuildJusticeSig(qc)
-	if err != nil {
-		fmt.Printf("REVHandler err %s", err.Error())
-		return
-	}
+
+	/*
+		err = nd.BuildJusticeSig(qc)
+		if err != nil {
+			fmt.Printf("REVHandler err %s", err.Error())
+			return
+		}
+	*/
 
 	fmt.Printf("REV OK, state %d all clear.\n", qc.State.StateIdx)
 	return

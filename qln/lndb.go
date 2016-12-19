@@ -1,13 +1,13 @@
 package qln
 
 import (
-	"bytes"
-	"encoding/binary"
 	"fmt"
+	"sync"
 
 	"github.com/boltdb/bolt"
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	"github.com/mit-dci/lit/elkrem"
@@ -39,6 +39,11 @@ Peers
 			|-state number: txid, sig
 
 
+PeerMap
+|
+|-peerIdx(4) : peerPubkey(33)
+
+
 Right now these buckets are all in one boltDB.  This limits it to one db write
 at a time, which for super high thoughput could be too slow.
 Later on we can chop it up so that each channel gets it's own db file.
@@ -57,13 +62,15 @@ type LitNode struct {
 	// and network i/o
 	BaseWallet UWallet
 
-	RemoteCon *lndc.LNDConn // make a bunch of em later
+	RemoteCons map[uint32]*lndc.LNDConn
+	RemoteMtx  sync.Mutex
 
 	// WatchCon is currently just for the watchtower
 	WatchCon *lndc.LNDConn // merge these later
 
 	// OmniChan is the channel for the OmniHandler
-	OmniChan chan []byte
+	OmniIn  chan *lnutil.LitMsg
+	OmniOut chan *lnutil.LitMsg
 
 	// the current channel that in the process of being created
 	// (1 at a time for now)
@@ -71,6 +78,14 @@ type LitNode struct {
 
 	// Params live here... AND SCon
 	Param *chaincfg.Params // network parameters (testnet3, segnet, etc)
+
+	// UpdateClear has notifications of when LN channel updates finish.
+	// Right now doesn't distinguish between LN channels, so can only do 1 at a time.
+	// Need to change this to ... a waitgroup?  map of channels?  Some other
+	// structure...
+
+	PushClear      map[chainhash.Hash]chan bool // known good txids and their heights
+	PushClearMutex sync.Mutex
 }
 
 // InFlightFund is a funding transaction that has not yet been broadcast
@@ -79,6 +94,10 @@ type InFlightFund struct {
 	Amt, InitSend    int64
 
 	op *wire.OutPoint
+
+	done chan uint32
+	// use this to avoid crashiness
+	mtx sync.Mutex
 }
 
 func (inff *InFlightFund) Clear() {
@@ -87,6 +106,26 @@ func (inff *InFlightFund) Clear() {
 
 	inff.Amt = 0
 	inff.InitSend = 0
+}
+
+func (nd *LitNode) GetPubFromPeerIdx(idx uint32) [33]byte {
+	var pub [33]byte
+	// look up peer in db; need an efficient mapping for this.
+	err := nd.LitDB.View(func(btx *bolt.Tx) error {
+		mp := btx.Bucket(BKTMap)
+		if mp == nil {
+			return nil
+		}
+		pubBytes := mp.Get(lnutil.U32tB(idx))
+		if pubBytes != nil {
+			copy(pub[:], pubBytes)
+		}
+		return nil
+	})
+	if err != nil {
+		fmt.Printf(err.Error())
+	}
+	return pub
 }
 
 // CountKeysInBucket is needed for NewPeer.  Counts keys in a bucket without
@@ -103,40 +142,6 @@ func CountKeysInBucket(bkt *bolt.Bucket) uint32 {
 		return 0xffffffff
 	}
 	return i
-}
-
-//func (nd *LnNode) NewWatcher( )
-// NewPeer saves a pubkey in the DB and assigns a peer index.  Call this
-// the first time you connect to someone.  Returns false if already known,
-// true if it added a new peer.  Errors for real errors.
-func (nd *LitNode) NewPeer(pub *btcec.PublicKey) (bool, error) {
-	itsnew := true
-	err := nd.LitDB.Update(func(btx *bolt.Tx) error {
-		prs, _ := btx.CreateBucketIfNotExists(BKTPeers) // only errs on name
-
-		// you can't use KeyN because that includes everything in sub-buckets.
-		// so we have to count the number of peers here.
-		// If it's slow we could cache it but you probably won't have
-		// millions of peers.
-
-		newPeerIdx := CountKeysInBucket(prs) + 1
-		// starts at 1. There IS NO PEER 0, so you can consider peer 0 invalid.
-
-		pr, err := prs.CreateBucket(pub.SerializeCompressed())
-		if err != nil {
-			itsnew = false
-			return nil // peer already exists
-		}
-
-		var buf bytes.Buffer
-		// write 4 byte peer index
-		err = binary.Write(&buf, binary.BigEndian, newPeerIdx)
-		if err != nil {
-			return err
-		}
-		return pr.Put(KEYIdx, buf.Bytes())
-	})
-	return itsnew, err
 }
 
 // NextPubForPeer returns the next pubkey index to use with the peer.
@@ -172,21 +177,33 @@ func (nd *LitNode) NextIdxForPeer(peerBytes [33]byte) (uint32, uint32, error) {
 	return peerIdx, cIdx, nil
 }
 
-// GetPeerIdx returns the peer index given a pubkey.
+// GetPeerIdx returns the peer index given a pubkey.  Creates it if it's not there
+// yet!  Also return a bool for new..?  not needed?
 func (nd *LitNode) GetPeerIdx(pub *btcec.PublicKey) (uint32, error) {
 	var idx uint32
-	err := nd.LitDB.View(func(btx *bolt.Tx) error {
-		prs := btx.Bucket(BKTPeers)
-		if prs == nil {
-			return fmt.Errorf("GetPeerIdx: No peers evar")
+
+	err := nd.LitDB.Update(func(btx *bolt.Tx) error {
+		prs, _ := btx.CreateBucketIfNotExists(BKTPeers) // only errs on name
+		thisPeerBkt := prs.Bucket(pub.SerializeCompressed())
+		if thisPeerBkt != nil {
+			idx = lnutil.BtU32(thisPeerBkt.Get(KEYIdx))
+			return nil
 		}
-		pr := prs.Bucket(pub.SerializeCompressed())
-		if pr == nil {
-			return fmt.Errorf("GetPeerIdx: Peer %x has no index saved",
-				pub.SerializeCompressed())
+
+		// this peer doesn't exist yet.  Add new peer
+		mp, _ := btx.CreateBucketIfNotExists(BKTMap)
+		idx = CountKeysInBucket(mp) + 1
+		// save peer index:pubkey into map bucket
+		err := mp.Put(lnutil.U32tB(idx), pub.SerializeCompressed())
+		if err != nil {
+			return err
 		}
-		idx = lnutil.BtU32(pr.Get(KEYIdx))
-		return nil
+
+		thisPeerBkt, err = prs.CreateBucket(pub.SerializeCompressed())
+		if err != nil {
+			return err
+		}
+		return thisPeerBkt.Put(KEYIdx, lnutil.U32tB(idx))
 	})
 	return idx, err
 }
@@ -405,157 +422,6 @@ func (nd *LitNode) SaveQChan(q *Qchan) error {
 
 //	return &qc.Op, nil
 //}
-
-// SaveFundTx saves the data in a multiDesc to DB.  We know the outpoint
-// but that's about it.  Do detection, verification, and capacity check
-// once the outpoint is seen on 8333.
-//func (nd *LnNode) SaveFundTx(op *wire.OutPoint, amt int64,
-//	peerArr, theirChanPub, theirRefund, theirHAKDbase [33]byte) (*Qchan, error) {
-
-//	var cIdx uint32
-//	qc := new(Qchan)
-
-//	err := nd.LnDB.Update(func(btx *bolt.Tx) error {
-//		prs := btx.Bucket(BKTPeers) // go into bucket for all peers
-//		if prs == nil {
-//			return fmt.Errorf("SaveMultiTx: no peers")
-//		}
-//		pr := prs.Bucket(peerArr[:]) // go into this peers bucket
-//		if pr == nil {
-//			return fmt.Errorf("SaveMultiTx: peer %x not found", peerArr)
-//		}
-//		// just sanity checking here, not used
-//		peerIdxBytes := pr.Get(KEYIdx) // find peer index
-//		if peerIdxBytes == nil {
-//			return fmt.Errorf("SaveMultiTx: peer %x has no index? db bad", peerArr)
-//		}
-//		//		pIdx := BtU32(peerIdxBytes)
-//		// use key counter here?
-//		cIdx = CountKeysInBucket(pr) + 1
-
-//		// make new bucket for this mutliout
-//		qcOP := lnutil.OutPointToBytes(*op)
-//		multiBucket, err := pr.CreateBucket(qcOP[:])
-//		if err != nil {
-//			return err
-//		}
-
-//		qc.Height = -1
-//		qc.KeyGen.Depth = 5
-//		qc.KeyGen.Step[0] = 44 | 1<<31
-//		qc.KeyGen.Step[1] = 0 | 1<<31
-//		qc.KeyGen.Step[2] = UseChannelFund
-//		qc.KeyGen.Step[3] = lnutil.BtU32(peerIdxBytes) | 1<<31
-//		qc.KeyGen.Step[4] = cIdx | 1<<31
-//		qc.Value = amt
-//		qc.Mode = portxo.TxoP2WSHComp
-//		qc.Op = *op
-
-//		qc.MyPub = nd.GetUsePub(qc.KeyGen, UseChannelFund)
-//		qc.TheirPub = theirChanPub
-//		qc.PeerId = peerArr
-//		qc.TheirRefundPub = theirRefund
-//		qc.TheirHAKDBase = theirHAKDbase
-//		qc.MyRefundPub = nd.GetUsePub(qc.KeyGen, UseChannelRefund)
-//		qc.MyHAKDBase = nd.GetUsePub(qc.KeyGen, UseChannelHAKDBase)
-//		// serialize qchan
-//		qcBytes, err := qc.ToBytes()
-//		if err != nil {
-//			return err
-//		}
-
-//		// save qchan in the bucket
-//		err = multiBucket.Put(KEYutxo, qcBytes)
-//		if err != nil {
-//			return err
-//		}
-//		return nil
-//	})
-//	if err != nil {
-//		return nil, err
-//	}
-//	return qc, nil
-//}
-
-// SignFundTx happens once everything's ready for the tx to be signed and
-// broadcast (once you get it ack'd.  It finds the mutli tx, signs it and
-// returns it.  Presumably you send this tx out to the network once it's returned.
-// this function itself doesn't modify height, so it'll still be at -1 untill
-// Ingest() makes it 0 or an acutal block height.
-/*
-func (nd *LnNode) SignFundTx(
-	op *wire.OutPoint, peerArr [33]byte) (*wire.MsgTx, error) {
-
-	tx := wire.NewMsgTx()
-
-	err := nd.LnDB.View(func(btx *bolt.Tx) error {
-		duf := btx.Bucket(BKTUtxos)
-		if duf == nil {
-			return fmt.Errorf("SignMultiTx: no duffel bag")
-		}
-
-		prs := btx.Bucket(BKTPeers)
-		if prs == nil {
-			return fmt.Errorf("SignMultiTx: no peers")
-		}
-		pr := prs.Bucket(peerArr[:]) // go into this peers bucket
-		if pr == nil {
-			return fmt.Errorf("SignMultiTx: peer %x not found", peerArr)
-		}
-		// just sanity checking here, not used
-		peerIdxBytes := pr.Get(KEYIdx) // find peer index
-		if peerIdxBytes == nil {
-			return fmt.Errorf("SignMultiTx: peer %x has no index? db bad", peerArr)
-		}
-		opArr := OutPointToBytes(*op)
-		multiBucket := pr.Bucket(opArr[:])
-		if multiBucket == nil {
-			return fmt.Errorf("SignMultiTx: outpoint %s not in db", op.String())
-		}
-		txBytes := multiBucket.Get(KEYUnsig)
-
-		buf := bytes.NewBuffer(txBytes)
-		err := tx.Deserialize(buf)
-		if err != nil {
-			return err
-		}
-
-		hCache := txscript.NewTxSigHashes(tx)
-		// got tx, now figure out keys for the inputs and sign.
-		for i, txin := range tx.TxIn {
-			opArr := OutPointToBytes(txin.PreviousOutPoint)
-			v := duf.Get(opArr[:])
-			if v == nil {
-				return fmt.Errorf("SignMultiTx: input %d not in utxo set", i)
-			}
-			// create a new utxo
-			x := make([]byte, 36+len(v))
-			copy(x, opArr[:])
-			copy(x[36:], v)
-			utxo, err := portxo.PorTxoFromBytes(x)
-			if err != nil {
-				return err
-			}
-
-			priv := ts.PathPrivkey(utxo.KeyGen)
-
-			tx.TxIn[i].Witness, err = txscript.WitnessScript(
-				tx, hCache, i, utxo.Value, utxo.PkScript,
-				txscript.SigHashAll, priv, true)
-			if err != nil {
-				return err
-			}
-			// witness added OK
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return tx, nil
-}
-*/
 
 // RestoreQchanFromBucket loads the full qchan into memory from the
 // bucket where it's stored.  Loads the channel info, the elkrems,
@@ -1004,110 +870,3 @@ func (nd *LitNode) GetChanClose(peerBytes []byte, opArr [36]byte) ([]byte, error
 	}
 	return adrBytes, nil
 }
-
-/*
-	if prs != nil { // there are peers, check this TX for chan/mult
-		err = prs.ForEach(func(idPub, nothin []byte) error {
-			if nothin != nil {
-				return nil // non-bucket
-			}
-			pr := prs.Bucket(idPub) // go into this peer's bucket
-			pIdx := BtU32(pr.Get(KEYIdx))
-			if pIdx == 0 {
-				return fmt.Errorf("Peer %x has no index", idPub)
-			}
-			//TODO optimization: could only check 0conf channels,
-			// or ignore 0conf and only accept spv proofs.
-			// Then we could only look for the spentOP hash, so that
-			// Ingest() only detects channel closes.
-			return pr.ForEach(func(qcOpBytes, nthin []byte) error {
-				if nthin != nil {
-					//	fmt.Printf("val %x\n", nthin)
-					return nil // non-bucket / outpoint
-				}
-				qchanBucket := pr.Bucket(qcOpBytes)
-				if qchanBucket == nil {
-					return nil // nothing stored / not a bucket
-				}
-				// load everything about the channel from the bucket
-				hitQChan, err := ts.RestoreQchanFromBucket(pIdx, idPub, qchanBucket)
-				if err != nil {
-					return err
-				}
-
-				//					hitQChan.PeerIdx = pIdx
-				// will need state to see if grabbable
-				//					hitQChan.State, err = StatComFromBytes(qchanBucket.Get(KEYState))
-				//					if err != nil {
-				//						return err
-				//					}
-
-				// check if we gain a known txid but unknown tx
-				for i, txid := range cachedShas {
-					if txid.IsEqual(&hitQChan.Op.Hash) {
-						// hit; ingesting tx which matches chan/multi
-						// all we do is assign height and increment hits
-						// (which will save the tx)
-						hitTxs[i] = true
-						hitQChan.Height = height
-						qcBytes, err := hitQChan.ToBytes()
-						if err != nil {
-							return err
-						}
-						// save multiout in the bucket
-						err = qchanBucket.Put(KEYutxo, qcBytes)
-						if err != nil {
-							return err
-						}
-					}
-				}
-				// check if it's spending the multiout
-				// there's some problem here as it doesn't always detect it
-				// properly...? still has this problem....
-				for i, spentOP := range spentOPs {
-					if bytes.Equal(spentOP[:], qcOpBytes) {
-						// this multixo is now spent.
-						hitTxs[spentTxIdx[i]] = true
-						// set qchan's spending txid and height
-						hitQChan.CloseData.CloseTxid = *cachedShas[spentTxIdx[i]]
-						hitQChan.CloseData.CloseHeight = height
-						hitQChan.CloseData.Closed = true
-						// serialize
-						closeBytes, err := hitQChan.CloseData.ToBytes()
-						if err != nil {
-							return err
-						}
-
-						// need my pubkey too
-						// needed? already have this, right?
-						// hitQChan.MyRefundPub = ts.GetUsePub(
-						// hitQChan.KeyGen, UseChannelRefund)
-
-						// save to close bucket
-						err = qchanBucket.Put(KEYqclose, closeBytes)
-						if err != nil {
-							return err
-						}
-						// generate utxos from the close tx, if any.
-						ctxos, err := hitQChan.GetCloseTxos(txs[spentTxIdx[i]])
-						if err != nil {
-							return err
-						}
-						// serialize utxos to save later
-						for _, ctxo := range ctxos {
-							b, err := ctxo.Bytes()
-							if err != nil {
-								return err
-							}
-							nUtxoBytes = append(nUtxoBytes, b)
-						}
-					}
-				}
-				return nil
-			})
-		})
-		if err != nil {
-			return err
-		}
-		// end of peer checking
-	}*/

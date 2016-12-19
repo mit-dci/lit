@@ -30,6 +30,8 @@ type Qchan struct {
 
 	MyHAKDBase    [33]byte // D my base point for HAKD and timeout keys
 	TheirHAKDBase [33]byte // S their base point for HAKD and timeout keys
+	// PKH for penalty tx.  Derived
+	WatchRefundAdr [20]byte
 
 	// Elkrem is used for revoking state commitments
 	ElkSnd *elkrem.ElkremSender   // D derived from channel specific key
@@ -38,9 +40,6 @@ type Qchan struct {
 	Delay uint16 // blocks for timeout (default 5 for testing)
 
 	State *StatCom // S current state of channel
-
-	// PKH for penalty tx.  Derived
-	WatchRefundAdr [20]byte
 }
 
 // StatComs are State Commitments.
@@ -133,6 +132,20 @@ func (nd *LitNode) QchanInfo(q *Qchan) error {
 	//		fmt.Printf("\t\t%d) amt: %d spendable: %d\n", i, u.Value, u.Seq)
 	//	}
 	return nil
+}
+
+func (q *Qchan) Peer() uint32 {
+	if q == nil {
+		return 0
+	}
+	return q.KeyGen.Step[3]
+}
+
+func (q *Qchan) Idx() uint32 {
+	if q == nil {
+		return 0
+	}
+	return q.KeyGen.Step[4]
 }
 
 // GetChanHint gives the 6 byte hint mask of the channel.  It's derived from the

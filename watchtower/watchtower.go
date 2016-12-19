@@ -6,6 +6,7 @@ import (
 	"github.com/boltdb/bolt"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/mit-dci/lit/lnutil"
 )
 
 const (
@@ -60,25 +61,25 @@ type IdxSig struct {
 	Sig      [64]byte // What
 }
 
-func (w *WatchTower) HandleMessage(from [16]byte, msg []byte) error {
-	fmt.Printf("got message from %x\n", from)
+func (w *WatchTower) HandleMessage(lm *lnutil.LitMsg) error {
+	fmt.Printf("got message from %x\n", lm.PeerIdx)
 
-	switch msg[0] {
+	switch lm.MsgType {
 	case MSGID_WATCH_DESC:
 		fmt.Printf("new channel to watch\n")
-		desc := WatchannelDescriptorFromBytes(msg[1:])
+		desc := WatchannelDescriptorFromBytes(lm.Data)
 		return w.AddNewChannel(desc)
 
 	case MSGID_WATCH_COMMSG:
 		fmt.Printf("new commsg\n")
-		commsg := ComMsgFromBytes(msg[1:])
+		commsg := ComMsgFromBytes(lm.Data)
 		return w.AddState(commsg)
 
 	case MSGID_WATCH_DELETE:
 		fmt.Printf("delete message\n")
 		// delete not yet implemented
 	default:
-		fmt.Printf("unknown message type %x\n", msg[0])
+		fmt.Printf("unknown message type %x\n", lm.MsgType)
 	}
 	return nil
 }
