@@ -5,3 +5,9 @@ ln.db
 testkey.hex
 utxo.db
 watch.db
+
+*.pyc
+
+#Editor temp files
+\#*
+.\#*
