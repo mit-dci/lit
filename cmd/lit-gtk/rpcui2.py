@@ -29,11 +29,11 @@ class rpcCom():
         #TODO: What is the purpose of this `id`
         rpcCmd.update({"jsonrpc": "2.0", "id": "93"})
 
-        print json.dumps(rpcCmd)
+        #print json.dumps(rpcCmd)
         self.conn.sendall(json.dumps(rpcCmd))
 
         r = json.loads(self.conn.recv(8000000))
-        print r
+        #print r
 
         return r["result"]["TxoTotal"]
 
@@ -45,11 +45,11 @@ class rpcCom():
 
 	rpcCmd.update({"jsonrpc": "2.0", "id": "94"})
 
-	print json.dumps(rpcCmd)
+	#print json.dumps(rpcCmd)
 	self.conn.sendall(json.dumps(rpcCmd))
 
 	r = json.loads(self.conn.recv(8000000))
-	print r
+	#print r
 
 	return r["result"]["Addresses"][-1]
 
@@ -61,14 +61,14 @@ class rpcCom():
 
 	rpcCmd.update({"jsonrpc": "2.0", "id": "95"})
 
-	print json.dumps(rpcCmd)
+	#print json.dumps(rpcCmd)
 	self.conn.sendall(json.dumps(rpcCmd))
 
 	r = json.loads(self.conn.recv(8000000))
-	print r
+	#print r
 
 	if r["error"] != None:
-            return "send error: " + r["error"]
+            raise RuntimeError(r["error"])
 
 	return "Sent. TXID: " + r["result"]["Txids"][0]
 
@@ -89,9 +89,24 @@ class mainWindow(QtGui.QMainWindow, rpcui_ui.Ui_MainWindow):
 
     #Sets the text value for the balance label. Make this its own function to 
     # be used as a callback for the "Refresh" button
-    def setBalLabel(self):
+    def set_bal_label(self):
         bal = self.rpcCom.getBal()
         self.bal_label.setText(str(bal))
+
+    #The trigger for the send button being clicked
+    def send_button_clicked(self):
+        #TODO: Implement address validity verification
+        to_addr = str(self.send_addr_line_edit.text())
+        amt = self.send_amt_spin_box.value()
+        
+        try:
+            #TODO: Make this display something to the user that their input is poor
+            if amt == 0:
+                raise RuntimeError("Invalid input send amount")
+
+            self.rpcCom.prSend(to_addr, amt)
+        except RuntimeError as rterror:
+            print "Error: " + str(rterror)
 
     def setup_connections(self):
         #Populate the address label
@@ -99,10 +114,13 @@ class mainWindow(QtGui.QMainWindow, rpcui_ui.Ui_MainWindow):
         self.addr_label.setText(addr);
 
         #Populate the balance label
-        self.setBalLabel()
+        self.set_bal_label()
 
-        #Set the trigger for the "Refresh" button
-        self.bal_refresh_button.clicked.connect(self.setBalLabel)
+        #Connect the trigger for the "Refresh" button
+        self.bal_refresh_button.clicked.connect(self.set_bal_label)
+
+        #Connect the trigger for the "Send" button
+        self.send_button.clicked.connect(self.send_button_clicked)
 
 
 def main(args):

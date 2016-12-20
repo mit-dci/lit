@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'rpcui.ui'
 #
-# Created: Mon Dec 19 22:04:30 2016
+# Created: Mon Dec 19 22:21:19 2016
 #      by: PyQt4 UI code generator 4.10.4
 #
 # WARNING! All changes made in this file will be lost!
@@ -76,15 +76,15 @@ class Ui_MainWindow(object):
         self.send_frame.setObjectName(_fromUtf8("send_frame"))
         self.gridLayout_2 = QtGui.QGridLayout(self.send_frame)
         self.gridLayout_2.setObjectName(_fromUtf8("gridLayout_2"))
-        self.spinBox = QtGui.QSpinBox(self.send_frame)
-        self.spinBox.setAccelerated(True)
-        self.spinBox.setMaximum(999999999)
-        self.spinBox.setObjectName(_fromUtf8("spinBox"))
-        self.gridLayout_2.addWidget(self.spinBox, 1, 1, 1, 1)
-        self.lineEdit = QtGui.QLineEdit(self.send_frame)
-        self.lineEdit.setText(_fromUtf8(""))
-        self.lineEdit.setObjectName(_fromUtf8("lineEdit"))
-        self.gridLayout_2.addWidget(self.lineEdit, 1, 0, 1, 1)
+        self.send_amt_spin_box = QtGui.QSpinBox(self.send_frame)
+        self.send_amt_spin_box.setAccelerated(True)
+        self.send_amt_spin_box.setMaximum(999999999)
+        self.send_amt_spin_box.setObjectName(_fromUtf8("send_amt_spin_box"))
+        self.gridLayout_2.addWidget(self.send_amt_spin_box, 1, 1, 1, 1)
+        self.send_addr_line_edit = QtGui.QLineEdit(self.send_frame)
+        self.send_addr_line_edit.setText(_fromUtf8(""))
+        self.send_addr_line_edit.setObjectName(_fromUtf8("send_addr_line_edit"))
+        self.gridLayout_2.addWidget(self.send_addr_line_edit, 1, 0, 1, 1)
         self.label_6 = QtGui.QLabel(self.send_frame)
         self.label_6.setObjectName(_fromUtf8("label_6"))
         self.gridLayout_2.addWidget(self.label_6, 0, 1, 1, 1)
@@ -114,7 +114,7 @@ class Ui_MainWindow(object):
         self.bal_refresh_button.setText(_translate("MainWindow", "Refresh", None))
         self.bal_label.setText(_translate("MainWindow", "balance here", None))
         self.label_3.setText(_translate("MainWindow", "Current Balance:", None))
-        self.lineEdit.setPlaceholderText(_translate("MainWindow", "Address Here", None))
+        self.send_addr_line_edit.setPlaceholderText(_translate("MainWindow", "Address Here", None))
         self.label_6.setText(_translate("MainWindow", "Amount (Satoshi)", None))
         self.label_4.setText(_translate("MainWindow", "Send To:", None))
         self.send_button.setText(_translate("MainWindow", "Send", None))
