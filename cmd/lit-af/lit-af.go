@@ -70,6 +70,9 @@ func main() {
 	defer client.Close()
 
 	lc.rpccon = jsonrpc.NewClient(client)
+
+	go lc.RequestAsync()
+
 	// main shell loop
 	for {
 		// setup reader with max 4K input chars

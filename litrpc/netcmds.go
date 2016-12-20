@@ -84,6 +84,12 @@ func (r *LitRPC) ListConnections(args NoArgs, reply *ListConnectionsReply) error
 	return nil
 }
 
+// ------- receive chat
+func (r *LitRPC) GetMessages(args NoArgs, reply *StatusReply) error {
+	reply.Status = <-r.Node.UserMessageBox
+	return nil
+}
+
 type SayArgs struct {
 	Peer    uint32
 	Message string

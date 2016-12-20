@@ -86,6 +86,9 @@ type LitNode struct {
 
 	PushClear      map[chainhash.Hash]chan bool // known good txids and their heights
 	PushClearMutex sync.Mutex
+
+	// queue for async messages to RPC user
+	UserMessageBox chan string
 }
 
 // InFlightFund is a funding transaction that has not yet been broadcast

@@ -7,6 +7,22 @@ import (
 	"github.com/mit-dci/lit/litrpc"
 )
 
+// RequestAsync keeps requesting messages from the server.  The server blocks
+// and will send a response once it gets one.  Once the rpc client receives a
+// response, it will immediately request another.
+func (lc *litAfClient) RequestAsync() {
+	for {
+		args := new(litrpc.NoArgs)
+		reply := new(litrpc.StatusReply)
+
+		err := lc.rpccon.Call("LitRPC.GetMessages", args, reply)
+		if err != nil {
+			fmt.Printf("RequestAsync error %s\n", err.Error())
+		}
+		fmt.Printf("%s\n", reply.Status)
+	}
+}
+
 // Lis starts listening.  Takes args of port to listen on.
 func (lc *litAfClient) Lis(textArgs []string) error {
 	args := new(litrpc.ListenArgs)

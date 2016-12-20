@@ -37,6 +37,7 @@ func (nd *LitNode) Init(
 	}
 
 	// make maps and channels
+	nd.UserMessageBox = make(chan string, 32)
 
 	nd.InProg = new(InFlightFund)
 	nd.InProg.done = make(chan uint32, 1)

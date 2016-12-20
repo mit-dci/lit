@@ -15,7 +15,8 @@ func (nd *LitNode) OmniHandler() {
 
 		// TEXT MESSAGE.  SIMPLE
 		if routedMsg.MsgType == lnutil.MSGID_TEXTCHAT { //it's text
-			fmt.Printf("text from %x: %s\n", routedMsg.PeerIdx, routedMsg.Data)
+			nd.UserMessageBox <- fmt.Sprintf(
+				"msg from %d: %s", routedMsg.PeerIdx, routedMsg.Data)
 			continue
 		}
 		// POINT REQUEST
