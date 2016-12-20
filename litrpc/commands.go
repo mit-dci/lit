@@ -60,7 +60,7 @@ func (r *LitRPC) Bal(args *NoArgs, reply *BalReply) error {
 	for _, q := range qcs {
 		reply.ChanTotal += q.State.MyAmt
 	}
-
+	
 	return nil
 }
 
