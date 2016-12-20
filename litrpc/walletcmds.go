@@ -60,7 +60,7 @@ func (r *LitRPC) Bal(args *NoArgs, reply *BalReply) error {
 	for _, q := range qcs {
 		reply.ChanTotal += q.State.MyAmt
 	}
-	
+
 	return nil
 }
 
@@ -68,6 +68,7 @@ type TxoInfo struct {
 	OutPoint string
 	Amt      int64
 	Height   int32
+	Delay    int32
 
 	KeyPath string
 }
@@ -81,12 +82,19 @@ func (r *LitRPC) TxoList(args *NoArgs, reply *TxoListReply) error {
 	if err != nil {
 		return err
 	}
+	syncHeight, err := r.SCon.TS.GetDBSyncHeight()
+	if err != nil {
+		return err
+	}
 
 	reply.Txos = make([]TxoInfo, len(allTxos))
 	for i, u := range allTxos {
+		reply.Txos[i].OutPoint = u.Op.String()
 		reply.Txos[i].Amt = u.Value
 		reply.Txos[i].Height = u.Height
-		reply.Txos[i].OutPoint = u.Op.String()
+		if u.Seq != 0 {
+			reply.Txos[i].Delay = u.Height + int32(u.Seq) - syncHeight
+		}
 		reply.Txos[i].KeyPath = u.KeyGen.String()
 	}
 	return nil

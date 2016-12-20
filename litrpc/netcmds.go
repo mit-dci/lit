@@ -2,6 +2,7 @@ package litrpc
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/qln"
@@ -34,9 +35,19 @@ type ConnectArgs struct {
 
 func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
 
-	connectNode, err := lndc.LnAddrFromString(args.LNAddr)
+	// first, see if the peer to connect to is referenced by peer index.
+	var connectAdr *lndc.LNAdr
+	var peerIdx uint32
+
+	peerIdxint, err := strconv.Atoi(args.LNAddr)
 	if err != nil {
-		return err
+		peerIdx = uint32(peerIdxint)
+		// get peer from address book
+	} else {
+		connectAdr, err = lndc.LnAddrFromString(args.LNAddr)
+		if err != nil {
+			return err
+		}
 	}
 
 	// get my private ID key
@@ -46,13 +57,13 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
 	newConn := new(lndc.LNDConn)
 
 	err = newConn.Dial(idPriv,
-		connectNode.NetAddr.String(), connectNode.Base58Adr.ScriptAddress())
+		connectAdr.NetAddr.String(), connectAdr.Base58Adr.ScriptAddress())
 	if err != nil {
 		return err
 	}
 
 	// figure out peer index, or assign new one for new peer
-	peerIdx, err := r.Node.GetPeerIdx(newConn.RemotePub)
+	peerIdx, err = r.Node.GetPeerIdx(newConn.RemotePub)
 	if err != nil {
 		return err
 	}

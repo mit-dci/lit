@@ -121,7 +121,7 @@ func (nd *LitNode) GetPubFromPeerIdx(idx uint32) [33]byte {
 		}
 		pubBytes := mp.Get(lnutil.U32tB(idx))
 		if pubBytes != nil {
-			copy(pub[:], pubBytes)
+			copy(pub[:], pubBytes[:33])
 		}
 		return nil
 	})

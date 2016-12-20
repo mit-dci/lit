@@ -172,14 +172,6 @@ func (r *LitRPC) CloseChannel(args ChanArgs, reply *StatusReply) error {
 // ------------------------- break
 func (r *LitRPC) BreakChannel(args ChanArgs, reply *StatusReply) error {
 
-	r.Node.RemoteMtx.Lock()
-	_, ok := r.Node.RemoteCons[args.PeerIdx]
-	r.Node.RemoteMtx.Unlock()
-	if !ok {
-		return fmt.Errorf("not connected to specified peer %d ",
-			args.PeerIdx)
-	}
-
 	qc, err := r.Node.GetQchanByIdx(args.PeerIdx, args.ChanIdx)
 	if err != nil {
 		return err
@@ -208,7 +200,8 @@ func (r *LitRPC) BreakChannel(args ChanArgs, reply *StatusReply) error {
 	if err != nil {
 		return err
 	}
-
+	reply.Status = fmt.Sprintf("Broke channel %d with tx %s",
+		args.ChanIdx, tx.TxHash().String())
 	// broadcast
 	return r.Node.BaseWallet.PushTx(tx)
 

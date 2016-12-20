@@ -40,7 +40,8 @@ func (nd *LitNode) TCPListener(lisIpPort string) (*btcutil.AddressPubKeyHash, er
 				fmt.Printf("Got something that wasn't a LNDC")
 				continue
 			}
-
+			fmt.Printf("Incomming connection from %x on %s\n",
+				newConn.RemotePub.SerializeCompressed(), newConn.RemoteAddr().String())
 			peerIdx, err := nd.GetPeerIdx(newConn.RemotePub)
 			if err != nil {
 				log.Printf("Listener error: %s\n", err.Error())
