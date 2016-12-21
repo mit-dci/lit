@@ -122,7 +122,7 @@ func (nd *LitNode) FundChannel(peerIdx uint32, ccap, initSend int64) (uint32, er
 	}
 
 	fmt.Printf("got to here ---------- ")
-	peerArr := nd.GetPubFromPeerIdx(peerIdx)
+	peerArr, _ := nd.GetPubHostFromPeerIdx(peerIdx)
 
 	peerIdx, cIdx, err := nd.NextIdxForPeer(peerArr)
 	if err != nil {
@@ -160,7 +160,7 @@ func (nd *LitNode) PointReqHandler(lm *lnutil.LitMsg) {
 	}*/
 
 	// pub req; check that idx matches next idx of ours and create pubkey
-	peerArr := nd.GetPubFromPeerIdx(lm.PeerIdx)
+	peerArr, _ := nd.GetPubHostFromPeerIdx(lm.PeerIdx)
 
 	peerIdx, cIdx, err := nd.NextIdxForPeer(peerArr)
 	if err != nil {
@@ -211,7 +211,7 @@ func (nd LitNode) PointRespHandler(lm *lnutil.LitMsg) error {
 			len(lm.Data))
 	}
 
-	peerArr := nd.GetPubFromPeerIdx(lm.PeerIdx)
+	peerArr, _ := nd.GetPubHostFromPeerIdx(lm.PeerIdx)
 
 	if nd.InProg.PeerIdx != lm.PeerIdx {
 		return fmt.Errorf("making channel with peer %d but got PointResp from %d")
@@ -343,7 +343,7 @@ func (nd *LitNode) QChanDescHandler(lm *lnutil.LitMsg) {
 	}
 	var elkPointZero, elkPointOne, theirPub, theirRefundPub, theirHAKDbase [33]byte
 	var opArr [36]byte
-	peerArr := nd.GetPubFromPeerIdx(lm.PeerIdx)
+	peerArr, _ := nd.GetPubHostFromPeerIdx(lm.PeerIdx)
 
 	// deserialize desc
 	copy(opArr[:], lm.Data[:36])
@@ -477,7 +477,7 @@ func (nd *LitNode) QChanAckHandler(lm *lnutil.LitMsg) {
 	var elkPointZero, elkPointOne [33]byte
 	var sig [64]byte
 
-	peerArr := nd.GetPubFromPeerIdx(lm.PeerIdx)
+	peerArr, _ := nd.GetPubHostFromPeerIdx(lm.PeerIdx)
 	// deserialize chanACK
 	copy(opArr[:], lm.Data[:36])
 	copy(elkPointZero[:], lm.Data[36:69])
@@ -579,7 +579,7 @@ func (nd *LitNode) SigProofHandler(lm *lnutil.LitMsg) {
 	var opArr [36]byte
 	var sig [64]byte
 
-	peerArr := nd.GetPubFromPeerIdx(lm.PeerIdx)
+	peerArr, _ := nd.GetPubHostFromPeerIdx(lm.PeerIdx)
 	copy(opArr[:], lm.Data[:36])
 	copy(sig[:], lm.Data[36:])
 

@@ -18,6 +18,9 @@ func (lc *litAfClient) RequestAsync() {
 		err := lc.rpccon.Call("LitRPC.GetMessages", args, reply)
 		if err != nil {
 			fmt.Printf("RequestAsync error %s\n", err.Error())
+			break
+			// end loop on first error.  it's probably a connection error
+
 		}
 		fmt.Printf("%s\n", reply.Status)
 	}

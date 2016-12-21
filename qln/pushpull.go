@@ -164,7 +164,7 @@ func (nd *LitNode) DeltaSigHandler(lm *lnutil.LitMsg) {
 	copy(incomingSig[:], lm.Data[40:])
 
 	// find who we're talkikng to
-	peerArr := nd.GetPubFromPeerIdx(lm.PeerIdx)
+	peerArr, _ := nd.GetPubHostFromPeerIdx(lm.PeerIdx)
 
 	// load qchan & state from DB
 	qc, err := nd.GetQchan(peerArr, opArr)
@@ -288,7 +288,7 @@ func (nd *LitNode) SigRevHandler(lm *lnutil.LitMsg) {
 	copy(nextElkPoint[:], lm.Data[132:])
 
 	// find who we're talkikng to
-	peerArr := nd.GetPubFromPeerIdx(lm.PeerIdx)
+	peerArr, _ := nd.GetPubHostFromPeerIdx(lm.PeerIdx)
 
 	// load qchan & state from DB
 	qc, err := nd.GetQchan(peerArr, opArr)
@@ -414,7 +414,7 @@ func (nd *LitNode) REVHandler(lm *lnutil.LitMsg) {
 	copy(nextElkPoint[:], lm.Data[68:])
 
 	// find who we're talkikng to
-	peerArr := nd.GetPubFromPeerIdx(lm.PeerIdx)
+	peerArr, _ := nd.GetPubHostFromPeerIdx(lm.PeerIdx)
 
 	// load qchan & state from DB
 	qc, err := nd.GetQchan(peerArr, opArr)

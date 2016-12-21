@@ -79,7 +79,7 @@ func (nd *LitNode) CloseReqHandler(lm *lnutil.LitMsg) {
 	}
 
 	// figure out who we're talking to
-	peerArr := nd.GetPubFromPeerIdx(lm.PeerIdx)
+	peerArr, _ := nd.GetPubHostFromPeerIdx(lm.PeerIdx)
 
 	// deserialize outpoint
 	var opArr [36]byte

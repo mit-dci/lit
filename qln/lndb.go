@@ -111,8 +111,9 @@ func (inff *InFlightFund) Clear() {
 	inff.InitSend = 0
 }
 
-func (nd *LitNode) GetPubFromPeerIdx(idx uint32) [33]byte {
+func (nd *LitNode) GetPubHostFromPeerIdx(idx uint32) ([33]byte, string) {
 	var pub [33]byte
+	var host string
 	// look up peer in db; need an efficient mapping for this.
 	err := nd.LitDB.View(func(btx *bolt.Tx) error {
 		mp := btx.Bucket(BKTMap)
@@ -122,13 +123,14 @@ func (nd *LitNode) GetPubFromPeerIdx(idx uint32) [33]byte {
 		pubBytes := mp.Get(lnutil.U32tB(idx))
 		if pubBytes != nil {
 			copy(pub[:], pubBytes[:33])
+			host = string(pubBytes[33:])
 		}
 		return nil
 	})
 	if err != nil {
 		fmt.Printf(err.Error())
 	}
-	return pub
+	return pub, host
 }
 
 // CountKeysInBucket is needed for NewPeer.  Counts keys in a bucket without
@@ -182,12 +184,13 @@ func (nd *LitNode) NextIdxForPeer(peerBytes [33]byte) (uint32, uint32, error) {
 
 // GetPeerIdx returns the peer index given a pubkey.  Creates it if it's not there
 // yet!  Also return a bool for new..?  not needed?
-func (nd *LitNode) GetPeerIdx(pub *btcec.PublicKey) (uint32, error) {
+func (nd *LitNode) GetPeerIdx(pub *btcec.PublicKey, host string) (uint32, error) {
 	var idx uint32
-
+	var pubHost []byte
 	err := nd.LitDB.Update(func(btx *bolt.Tx) error {
 		prs, _ := btx.CreateBucketIfNotExists(BKTPeers) // only errs on name
 		thisPeerBkt := prs.Bucket(pub.SerializeCompressed())
+		// peer is already registered, return index without altering db.
 		if thisPeerBkt != nil {
 			idx = lnutil.BtU32(thisPeerBkt.Get(KEYIdx))
 			return nil
@@ -196,7 +199,12 @@ func (nd *LitNode) GetPeerIdx(pub *btcec.PublicKey) (uint32, error) {
 		// this peer doesn't exist yet.  Add new peer
 		mp, _ := btx.CreateBucketIfNotExists(BKTMap)
 		idx = CountKeysInBucket(mp) + 1
-		// save peer index:pubkey into map bucket
+
+		// save peer index:pubkey,host into map bucket
+		pubHost = pub.SerializeCompressed()
+		if host != "" {
+			pubHost = append(pubHost, []byte(host)...)
+		}
 		err := mp.Put(lnutil.U32tB(idx), pub.SerializeCompressed())
 		if err != nil {
 			return err

@@ -42,7 +42,9 @@ func (nd *LitNode) TCPListener(lisIpPort string) (*btcutil.AddressPubKeyHash, er
 			}
 			fmt.Printf("Incomming connection from %x on %s\n",
 				newConn.RemotePub.SerializeCompressed(), newConn.RemoteAddr().String())
-			peerIdx, err := nd.GetPeerIdx(newConn.RemotePub)
+
+			// don't save host/port for incomming connections
+			peerIdx, err := nd.GetPeerIdx(newConn.RemotePub, "")
 			if err != nil {
 				log.Printf("Listener error: %s\n", err.Error())
 				continue
