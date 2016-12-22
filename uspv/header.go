@@ -90,17 +90,22 @@ func calcDiffAdjust(start, end wire.BlockHeader, p *chaincfg.Params) uint32 {
 	return blockchain.BigToCompact(newTarget)
 }
 
-func CheckHeader(r io.ReadSeeker, height int32, p *chaincfg.Params) bool {
+func CheckHeader(r io.ReadSeeker, height, startheight int32, p *chaincfg.Params) bool {
+	// startHeight is the height the file starts at
+	// header start must be 0 mod 2106
+
 	var err error
 	var cur, prev, epochStart wire.BlockHeader
 	// don't try to verfy the genesis block.  That way madness lies.
 	if height == 0 {
 		return true
 	}
+
+	offsetHeight := height - startheight
 	// initial load of headers
 	// load epochstart, previous and current.
 	// get the header from the epoch start, up to 2016 blocks ago
-	_, err = r.Seek(int64(80*(height-(height%epochLength))), os.SEEK_SET)
+	_, err = r.Seek(int64(80*(offsetHeight-(height%epochLength))), os.SEEK_SET)
 	if err != nil {
 		log.Printf(err.Error())
 		return false
@@ -113,7 +118,7 @@ func CheckHeader(r io.ReadSeeker, height int32, p *chaincfg.Params) bool {
 	//	log.Printf("start epoch at height %d ", height-(height%epochLength))
 
 	// seek to n-1 header
-	_, err = r.Seek(int64(80*(height-1)), os.SEEK_SET)
+	_, err = r.Seek(int64(80*(offsetHeight-1)), os.SEEK_SET)
 	if err != nil {
 		log.Printf(err.Error())
 		return false
@@ -125,7 +130,7 @@ func CheckHeader(r io.ReadSeeker, height int32, p *chaincfg.Params) bool {
 		return false
 	}
 	// seek to curHeight header and read in
-	_, err = r.Seek(int64(80*(height)), os.SEEK_SET)
+	_, err = r.Seek(int64(80*(offsetHeight)), os.SEEK_SET)
 	if err != nil {
 		log.Printf(err.Error())
 		return false
@@ -184,9 +189,9 @@ difficulty adjustments, and that they all link in to each other properly.
 This is the only blockchain technology in the whole code base.
 Returns false if anything bad happens.  Returns true if the range checks
 out with no errors. */
-func CheckRange(r io.ReadSeeker, first, last int32, p *chaincfg.Params) bool {
+func CheckRange(r io.ReadSeeker, first, last, startHeight int32, p *chaincfg.Params) bool {
 	for i := first; i <= last; i++ {
-		if !CheckHeader(r, i, p) {
+		if !CheckHeader(r, i, startHeight, p) {
 			return false
 		}
 	}

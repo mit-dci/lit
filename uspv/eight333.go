@@ -30,8 +30,9 @@ type SPVCon struct {
 	HardMode bool // hard mode doesn't use filters.
 	Ironman  bool // ironman only gets blocks, never requests txs.
 
-	headerMutex sync.Mutex
-	headerFile  *os.File // file for SPV headers
+	headerMutex       sync.Mutex
+	headerFile        *os.File // file for SPV headers
+	headerStartHeight int32    // first header on disk is nth header in chain
 
 	OKTxids map[chainhash.Hash]int32 // known good txids and their heights
 	OKMutex sync.Mutex
@@ -205,7 +206,7 @@ func (s *SPVCon) IngestHeaders(m *wire.MsgHeaders) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	tip := int32(endPos/80) - 1 // move back 1 header length to read
+	tip := int32(endPos/80) + (s.headerStartHeight - 1) // move back 1 header length to read
 
 	// check first header returned to make sure it fits on the end
 	// of our header file
@@ -213,9 +214,9 @@ func (s *SPVCon) IngestHeaders(m *wire.MsgHeaders) (bool, error) {
 		// delete 100 headers if this happens!  Dumb reorg.
 		log.Printf("reorg? header msg doesn't fit. points to %s, expect %s",
 			m.Headers[0].PrevBlock.String(), prevHash.String())
-		if endPos < 8080 {
+		if endPos < 8160 {
 			// jeez I give up, back to genesis
-			s.headerFile.Truncate(80)
+			s.headerFile.Truncate(160)
 		} else {
 			err = s.headerFile.Truncate(endPos - 8000)
 			if err != nil {
@@ -234,11 +235,11 @@ func (s *SPVCon) IngestHeaders(m *wire.MsgHeaders) (bool, error) {
 		// advance chain tip
 		tip++
 		// check last header
-		worked := CheckHeader(s.headerFile, tip, s.Param)
+		worked := CheckHeader(s.headerFile, tip, s.headerStartHeight, s.Param)
 		if !worked {
-			if endPos < 8080 {
+			if endPos < 8160 {
 				// jeez I give up, back to genesis
-				s.headerFile.Truncate(80)
+				s.headerFile.Truncate(160)
 			} else {
 				err = s.headerFile.Truncate(endPos - 8000)
 				if err != nil {
@@ -356,7 +357,8 @@ func (s *SPVCon) AskForBlocks(dbTip int32) error {
 	s.headerMutex.Unlock() // checked, unlock
 	endPos := stat.Size()
 
-	headerTip := int32(endPos/80) - 1 // move back 1 header length to read
+	// move back 1 header length to read
+	headerTip := int32(endPos/80) + (s.headerStartHeight - 1)
 
 	fmt.Printf("dbTip %d headerTip %d\n", dbTip, headerTip)
 	if dbTip > headerTip {
@@ -390,7 +392,7 @@ func (s *SPVCon) AskForBlocks(dbTip int32) error {
 
 		// load header from file
 		s.headerMutex.Lock() // seek to header we need
-		_, err = s.headerFile.Seek(int64((dbTip)*80), os.SEEK_SET)
+		_, err = s.headerFile.Seek(int64((dbTip-s.headerStartHeight)*80), os.SEEK_SET)
 		if err != nil {
 			return err
 		}

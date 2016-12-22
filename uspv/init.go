@@ -2,6 +2,7 @@ package uspv
 
 import (
 	"bytes"
+	"encoding/hex"
 	"io/ioutil"
 	"log"
 	"net"
@@ -132,14 +133,36 @@ func (s *SPVCon) Connect(remoteNode string) error {
 	return nil
 }
 
+/*
+Truncated header files
+Like a regular header but the first 80 bytes is mostly empty.
+The very first 4 bytes (big endian) says what height the empty 80 bytes
+replace.  The next header, starting at offset 80, needs to be valid.
+*/
+//
+
 func (s *SPVCon) openHeaderFile(hfn string) error {
 	_, err := os.Stat(hfn)
 	if err != nil {
 		if os.IsNotExist(err) {
 			var b bytes.Buffer
-			err = s.TS.Param.GenesisBlock.Header.Serialize(&b)
-			if err != nil {
-				return err
+			// if testnet, start with hardcoded height
+			if s.TS.Param.Name == "testnet3" {
+				// hard-coded millionth block header
+				hdr, err := hex.DecodeString("00000020da33925b1f7a55e9fa8e6c955a20ea094148b60c5c88f69a4f500000000000003673b7b6ce8157d3cfcaf415b6740918df7610a8769d70334aa9abd9c941b25e7621215880ba371a85bf9646")
+				if err != nil {
+					return err
+				}
+				_, err = b.Write(hdr)
+				if err != nil {
+					return err
+				}
+			} else {
+				// not testnet3, start from beginning.
+				err = s.TS.Param.GenesisBlock.Header.Serialize(&b)
+				if err != nil {
+					return err
+				}
 			}
 			err = ioutil.WriteFile(hfn, b.Bytes(), 0600)
 			if err != nil {
@@ -149,6 +172,10 @@ func (s *SPVCon) openHeaderFile(hfn string) error {
 				hfn)
 		}
 	}
+	if s.TS.Param.Name == "testnet3" {
+		s.headerStartHeight = 1032192
+	}
+
 	s.headerFile, err = os.OpenFile(hfn, os.O_RDWR, 0600)
 	if err != nil {
 		return err
