@@ -441,7 +441,7 @@ func (nd *LitNode) SaveQChan(q *Qchan) error {
 // up in the db.  Also the peer's id pubkey.
 // restore happens all at once, but saving to the db can happen
 // incrementally (updating states)
-// This should populate everything int he Qchan struct: the elkrems and the states.
+// This should populate everything in the Qchan struct: the elkrems and the states.
 // Elkrem sender always works; is derived from local key data.
 // Elkrem receiver can be "empty" with nothing in it (no data in db)
 // Current state can also be not in the DB, which results in

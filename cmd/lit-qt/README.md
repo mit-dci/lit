@@ -2,7 +2,7 @@
 
 1. Make sure you have the following dependencies:
    * `python-qt4`
-   * `pyqt4-dev-tool`
+   * `pyqt4-dev-tools`
    * `qt4-designer`
 
 2. Edit the ui files in `qt_files/` with the `QT Designer` program accordingly
