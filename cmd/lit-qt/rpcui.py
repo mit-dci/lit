@@ -47,7 +47,11 @@ class rpcCom():
         #If `params` is a string, load it as a json dict into `json_params`. Otherwise, it should
         # be a dict for which can be directly plugged into the `rpcCmd`
         if type(params) == str:
-            json_params = json.loads(params)
+            #Upon error, re-raise the error with a more meaningful message
+            try:
+                json_params = json.loads(params)
+            except:
+                raise RuntimeError("Poorly formatted input parameters: %s" % params)
         
         #Build the `rpcCmd`
         rpcCmd = {
@@ -57,8 +61,8 @@ class rpcCom():
 
         rpcCmd.update({'jsonrpc' : "2.0", 'id' : "96"})
 
-	self.conn.sendall(json.dumps(rpcCmd))
-	r = json.loads(self.conn.recv(8000000))
+        self.conn.sendall(json.dumps(rpcCmd))
+        r = json.loads(self.conn.recv(8000000))
 
 	if r['error'] != None:
             raise RuntimeError(r['error'])
@@ -86,6 +90,11 @@ class mainWindow(QtGui.QMainWindow, rpcui_ui.Ui_MainWindow):
         bal = self.rpcCom.getBal()
         self.bal_label.setText(str(bal))
 
+    #Give the `statusbar` some text, usual error messages
+    def set_statusbar(self, text):
+        #Display the `text` for 10 seconds
+        self.statusbar.showMessage(text, 10 * 1000)
+
     #The trigger handler for the send button being clicked
     def send_button_clicked(self):
         #TODO: Implement address validity verification
@@ -98,8 +107,7 @@ class mainWindow(QtGui.QMainWindow, rpcui_ui.Ui_MainWindow):
 
             self.rpcCom.prSend(to_addr, amt)
         except Exception as error:
-            #TODO: Display something on error!
-            print "Error: " + str(error)
+            self.set_statusbar("Error: " + str(error))
 
     #The trigger handler for the rpc line edit field for when the return key is pressed
     def rpc_line_edit_return_pressed(self):
@@ -107,7 +115,10 @@ class mainWindow(QtGui.QMainWindow, rpcui_ui.Ui_MainWindow):
         rpc_split = rpc_cmd.split(" ", 1) #Split once around the first space
 
         try:
-            if len(rpc_split) != 2:
+            #Assume that this is only a command w/o params
+            if len(rpc_split) == 1:
+                rpc_split.append('{}') #Append some empty params
+            elif len(rpc_split) != 2:
                 raise RuntimeError("Invalid input! Should be: Command {json-args}")
 
             rpc_response = self.rpcCom.rpcCommand(*rpc_split)
@@ -117,8 +128,7 @@ class mainWindow(QtGui.QMainWindow, rpcui_ui.Ui_MainWindow):
             fmt_cmd = rpc_split[0] + " " + rpc_split[1]
             self.rpc_console_text_browser.append(fmt_cmd + " : " + str(rpc_response['result']))
         except Exception as error:
-            #TODO: Display something on error!
-            print "Error: " + str(error)
+            self.set_statusbar("Error: " + str(error))
         finally:
             #Clear the line edit after appending the result
             self.rpc_line_edit.clear()
