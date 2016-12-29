@@ -7,7 +7,7 @@ Under development, not for use with real money.
 
 1. Start by installing Go v1.6. 
    * Check this tutorial out: <https://www.digitalocean.com/community/tutorials/how-to-install-go-1-6-on-ubuntu-14-04>
-     * TIP: You may want to install Go in a more localized place to keep your system cleaner from stray files.
+   * TIP: You may want to install Go in a more localized place to keep your system cleaner from stray files.
 3. Make sure your Go paths are set correctly: the `.../go/bin` path is in `$PATH` and `$GOROOT` is set to `.../go/`.
 
 3. Create the directory to house the lit project (`mkdir .../lit`) and assign `$GOPATH` to that location.
