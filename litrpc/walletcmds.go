@@ -100,6 +100,17 @@ func (r *LitRPC) TxoList(args *NoArgs, reply *TxoListReply) error {
 	return nil
 }
 
+type SyncHeightReply struct {
+	SyncHeight   int32
+	HeaderHeight int32
+}
+
+func (r *LitRPC) SyncHeight(args *NoArgs, reply *SyncHeightReply) error {
+	var err error
+	reply.SyncHeight, err = r.SCon.TS.GetDBSyncHeight()
+	return err
+}
+
 // ------------------------- send
 type SendArgs struct {
 	DestAddrs []string

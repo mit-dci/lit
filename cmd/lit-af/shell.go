@@ -206,6 +206,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	aReply := new(litrpc.AdrReply)
 	tReply := new(litrpc.TxoListReply)
 	bReply := new(litrpc.BalReply)
+	sReply := new(litrpc.SyncHeightReply)
 
 	err := lc.rpccon.Call("LitRPC.ListConnections", nil, pReply)
 	if err != nil {
@@ -264,8 +265,15 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	if err != nil {
 		return err
 	}
+
 	fmt.Printf("\tUtxo: %d Conf:%d Channel: %d\n",
 		bReply.TxoTotal, bReply.Mature, bReply.ChanTotal)
+
+	err = lc.rpccon.Call("LitRPC.SyncHeight", nil, sReply)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Sync Height %d\n", sReply.SyncHeight)
 
 	return nil
 }

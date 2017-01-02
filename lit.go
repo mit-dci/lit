@@ -22,7 +22,7 @@ const (
 	// this is my local testnet node, replace it with your own close by.
 	// Random internet testnet nodes usually work but sometimes don't, so
 	// maybe I should test against different versions out there.
-	hardHeight = 1038000 // height to start at if not specified
+	hardHeight = 1063333 // height to start at if not specified
 )
 
 var (
