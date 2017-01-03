@@ -112,7 +112,7 @@ func (lc *litAfClient) Push(textArgs []string) error {
 	}
 
 	times := int(1)
-	if len(textArgs) > 3 {
+	if len(textArgs) > 2 {
 		times, err = strconv.Atoi(textArgs[2])
 		if err != nil {
 			return err

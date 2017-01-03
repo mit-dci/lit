@@ -64,21 +64,24 @@ func (nd *LitNode) OmniHandler() {
 		//			CloseRespHandler(from, msg[1:])
 		//			continue
 		//		}
+
 		// PUSH
+		// just put 'go' in front.  then it's concurrent.
 		if routedMsg.MsgType == lnutil.MSGID_DELTASIG {
 			fmt.Printf("Got DELTASIG from %x\n", routedMsg.PeerIdx)
-			nd.DeltaSigHandler(routedMsg)
+			go nd.DeltaSigHandler(routedMsg)
 			continue
 		}
 		// SIGNATURE AND REVOCATION
 		if routedMsg.MsgType == lnutil.MSGID_SIGREV {
 			fmt.Printf("Got SIGREV from %x\n", routedMsg.PeerIdx)
-			nd.SigRevHandler(routedMsg)
+			go nd.SigRevHandler(routedMsg)
 			continue
 		}
 		// REVOCATION
 		if routedMsg.MsgType == lnutil.MSGID_REV {
 			fmt.Printf("Got REV from %x\n", routedMsg.PeerIdx)
+			// breaks if concurrent!  Maybe fix that for a little speedup.
 			nd.REVHandler(routedMsg)
 			continue
 		}
