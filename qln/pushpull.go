@@ -58,6 +58,21 @@ but that doesn't seem that useful because we don't know if they got it so
 we might have to send it again anyway.
 */
 
+/*
+
+2 options for dealing with push collision:
+sequential and concurrent.
+sequential has a deterministic priority which selects who to continue
+the go-ahead node completes the push, then waits for the other node to push.
+
+concurrent means if you get a deltasig in response to a deltasig, send a
+modified SigRev ( sig is state n, rev is state n-2), and wait for a
+modified SigRev.  Upon receiving, send a normal rev.
+
+concurrent feels cleaner, will sketch it out more.
+
+*/
+
 // SendNextMsg determines what message needs to be sent next
 // based on the channel state.  It then calls the appropriate function.
 func (nd *LitNode) SendNextMsg(qc *Qchan) error {

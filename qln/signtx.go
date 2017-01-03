@@ -110,7 +110,7 @@ func (nd *LitNode) SignState(q *Qchan) ([64]byte, error) {
 		return sig, err
 	}
 
-	fmt.Printf("____ sig creation for channel (%d,%d):\n", q.KeyGen.Step[3], q.KeyGen.Step[4])
+	fmt.Printf("____ sig creation for channel (%d,%d):\n", q.Peer(), q.Idx())
 	fmt.Printf("\tinput %s\n", tx.TxIn[0].PreviousOutPoint.String())
 	fmt.Printf("\toutput 0: %x %d\n", tx.TxOut[0].PkScript, tx.TxOut[0].Value)
 	fmt.Printf("\toutput 1: %x %d\n", tx.TxOut[1].PkScript, tx.TxOut[1].Value)
@@ -158,7 +158,7 @@ func (q *Qchan) VerifySig(sig [64]byte) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("____ sig verification for channel (%d,%d):\n", q.KeyGen.Step[3], q.KeyGen.Step[4])
+	fmt.Printf("____ sig verification for channel (%d,%d):\n", q.Peer(), q.Idx())
 	fmt.Printf("\tinput %s\n", tx.TxIn[0].PreviousOutPoint.String())
 	fmt.Printf("\toutput 0: %x %d\n", tx.TxOut[0].PkScript, tx.TxOut[0].Value)
 	fmt.Printf("\toutput 1: %x %d\n", tx.TxOut[1].PkScript, tx.TxOut[1].Value)

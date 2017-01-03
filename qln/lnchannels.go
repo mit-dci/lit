@@ -1,6 +1,7 @@
 package qln
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/mit-dci/lit/elkrem"
@@ -132,6 +133,7 @@ func (nd *LitNode) QchanInfo(q *Qchan) error {
 	return nil
 }
 
+// Peer returns the local peer index of the channel
 func (q *Qchan) Peer() uint32 {
 	if q == nil {
 		return 0
@@ -139,11 +141,17 @@ func (q *Qchan) Peer() uint32 {
 	return q.KeyGen.Step[3] & 0x7fffffff
 }
 
+// Idx returns the local index of the channel
 func (q *Qchan) Idx() uint32 {
 	if q == nil {
 		return 0
 	}
 	return q.KeyGen.Step[4] & 0x7fffffff
+}
+
+// ImFirst decides who goes first when it's unclear.  Smaller pubkey goes first.
+func (q *Qchan) ImFirst() bool {
+	return bytes.Compare(q.MyRefundPub, q.TheirRefundPub) == -1
 }
 
 // GetChanHint gives the 6 byte hint mask of the channel.  It's derived from the
