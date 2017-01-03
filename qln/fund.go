@@ -121,10 +121,7 @@ func (nd *LitNode) FundChannel(peerIdx uint32, ccap, initSend int64) (uint32, er
 		return 0, fmt.Errorf("Not connected to peer %d. Do that yourself.", peerIdx)
 	}
 
-	fmt.Printf("got to here ---------- ")
-	peerArr, _ := nd.GetPubHostFromPeerIdx(peerIdx)
-
-	peerIdx, cIdx, err := nd.NextIdxForPeer(peerArr)
+	cIdx, err := nd.NextChannelIdx()
 	if err != nil {
 		return 0, err
 	}
@@ -160,9 +157,9 @@ func (nd *LitNode) PointReqHandler(lm *lnutil.LitMsg) {
 	}*/
 
 	// pub req; check that idx matches next idx of ours and create pubkey
-	peerArr, _ := nd.GetPubHostFromPeerIdx(lm.PeerIdx)
+	// peerArr, _ := nd.GetPubHostFromPeerIdx(lm.PeerIdx)
 
-	peerIdx, cIdx, err := nd.NextIdxForPeer(peerArr)
+	cIdx, err := nd.NextChannelIdx()
 	if err != nil {
 		fmt.Printf("PointReqHandler err %s", err.Error())
 		return
@@ -173,7 +170,7 @@ func (nd *LitNode) PointReqHandler(lm *lnutil.LitMsg) {
 	kg.Step[0] = 44 | 1<<31
 	kg.Step[1] = 0 | 1<<31
 	kg.Step[2] = UseChannelFund
-	kg.Step[3] = peerIdx | 1<<31
+	kg.Step[3] = lm.PeerIdx | 1<<31
 	kg.Step[4] = cIdx | 1<<31
 
 	myChanPub := nd.GetUsePub(kg, UseChannelFund)
@@ -211,8 +208,6 @@ func (nd LitNode) PointRespHandler(lm *lnutil.LitMsg) error {
 			len(lm.Data))
 	}
 
-	peerArr, _ := nd.GetPubHostFromPeerIdx(lm.PeerIdx)
-
 	if nd.InProg.PeerIdx != lm.PeerIdx {
 		return fmt.Errorf("making channel with peer %d but got PointResp from %d")
 	}
@@ -220,7 +215,6 @@ func (nd LitNode) PointRespHandler(lm *lnutil.LitMsg) error {
 	// make channel (not in db) just for keys / elk
 	qc := new(Qchan)
 
-	qc.PeerId = peerArr
 	qc.Height = -1
 
 	qc.Value = nd.InProg.Amt
@@ -343,7 +337,6 @@ func (nd *LitNode) QChanDescHandler(lm *lnutil.LitMsg) {
 	}
 	var elkPointZero, elkPointOne, theirPub, theirRefundPub, theirHAKDbase [33]byte
 	var opArr [36]byte
-	peerArr, _ := nd.GetPubHostFromPeerIdx(lm.PeerIdx)
 
 	// deserialize desc
 	copy(opArr[:], lm.Data[:36])
@@ -356,7 +349,7 @@ func (nd *LitNode) QChanDescHandler(lm *lnutil.LitMsg) {
 	copy(elkPointZero[:], lm.Data[151:184])
 	copy(elkPointOne[:], lm.Data[184:])
 
-	peerIdx, cIdx, err := nd.NextIdxForPeer(peerArr)
+	cIdx, err := nd.NextChannelIdx()
 	if err != nil {
 		fmt.Printf("QChanDescHandler err %s", err.Error())
 		return
@@ -369,7 +362,7 @@ func (nd *LitNode) QChanDescHandler(lm *lnutil.LitMsg) {
 	qc.KeyGen.Step[0] = 44 | 1<<31
 	qc.KeyGen.Step[1] = 0 | 1<<31
 	qc.KeyGen.Step[2] = UseChannelFund
-	qc.KeyGen.Step[3] = peerIdx | 1<<31
+	qc.KeyGen.Step[3] = lm.PeerIdx | 1<<31
 	qc.KeyGen.Step[4] = cIdx | 1<<31
 	qc.Value = amt
 	qc.Mode = portxo.TxoP2WSHComp
@@ -377,7 +370,6 @@ func (nd *LitNode) QChanDescHandler(lm *lnutil.LitMsg) {
 
 	qc.MyPub = nd.GetUsePub(qc.KeyGen, UseChannelFund)
 	qc.TheirPub = theirPub
-	qc.PeerId = peerArr
 	qc.TheirRefundPub = theirRefundPub
 	qc.TheirHAKDBase = theirHAKDbase
 	qc.MyRefundPub = nd.GetUsePub(qc.KeyGen, UseChannelRefund)
@@ -418,7 +410,7 @@ func (nd *LitNode) QChanDescHandler(lm *lnutil.LitMsg) {
 	}
 
 	// load ... the thing I just saved.  why?
-	qc, err = nd.GetQchan(peerArr, opArr)
+	qc, err = nd.GetQchan(opArr)
 	if err != nil {
 		fmt.Printf("QChanDescHandler GetQchan err %s", err.Error())
 		return
@@ -477,7 +469,6 @@ func (nd *LitNode) QChanAckHandler(lm *lnutil.LitMsg) {
 	var elkPointZero, elkPointOne [33]byte
 	var sig [64]byte
 
-	peerArr, _ := nd.GetPubHostFromPeerIdx(lm.PeerIdx)
 	// deserialize chanACK
 	copy(opArr[:], lm.Data[:36])
 	copy(elkPointZero[:], lm.Data[36:69])
@@ -487,7 +478,7 @@ func (nd *LitNode) QChanAckHandler(lm *lnutil.LitMsg) {
 	//	op := lnutil.OutPointFromBytes(opArr)
 
 	// load channel to save their refund address
-	qc, err := nd.GetQchan(peerArr, opArr)
+	qc, err := nd.GetQchan(opArr)
 	if err != nil {
 		fmt.Printf("QChanAckHandler GetQchan err %s", err.Error())
 		return
@@ -579,11 +570,10 @@ func (nd *LitNode) SigProofHandler(lm *lnutil.LitMsg) {
 	var opArr [36]byte
 	var sig [64]byte
 
-	peerArr, _ := nd.GetPubHostFromPeerIdx(lm.PeerIdx)
 	copy(opArr[:], lm.Data[:36])
 	copy(sig[:], lm.Data[36:])
 
-	qc, err := nd.GetQchan(peerArr, opArr)
+	qc, err := nd.GetQchan(opArr)
 	if err != nil {
 		fmt.Printf("SigProofHandler err %s", err.Error())
 		return

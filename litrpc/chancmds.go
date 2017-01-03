@@ -26,13 +26,13 @@ func (r *LitRPC) ChannelList(args ChanArgs, reply *ChannelListReply) error {
 	var err error
 	var qcs []*qln.Qchan
 
-	if args.PeerIdx == 0 && args.ChanIdx == 0 {
+	if args.ChanIdx == 0 {
 		qcs, err = r.Node.GetAllQchans()
 		if err != nil {
 			return err
 		}
 	} else {
-		qc, err := r.Node.GetQchanByIdx(args.PeerIdx, args.ChanIdx)
+		qc, err := r.Node.GetQchanByIdx(args.ChanIdx)
 		if err != nil {
 			return err
 		}
@@ -50,7 +50,6 @@ func (r *LitRPC) ChannelList(args ChanArgs, reply *ChannelListReply) error {
 		reply.Channels[i].StateNum = q.State.StateIdx
 		reply.Channels[i].PeerIdx = q.KeyGen.Step[3] & 0x7fffffff
 		reply.Channels[i].CIdx = q.KeyGen.Step[4] & 0x7fffffff
-		reply.Channels[i].PeerID = fmt.Sprintf("%x", q.PeerId)
 	}
 	return nil
 }
@@ -103,8 +102,8 @@ func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
 
 // ------------------------- push
 type PushArgs struct {
-	PeerIdx, ChanIdx uint32
-	Amt              int64
+	ChanIdx uint32
+	Amt     int64
 }
 type PushReply struct {
 	MyAmt      int64
@@ -117,24 +116,25 @@ func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 		return fmt.Errorf("push %d, max push is 1 coin / 100000000", args.Amt)
 	}
 
-	fmt.Printf("push %d to (%d,%d)\n", args.Amt, args.PeerIdx, args.ChanIdx)
+	fmt.Printf("push %d to chan %d\n", args.Amt, args.ChanIdx)
 
-	r.Node.RemoteMtx.Lock()
-	_, ok := r.Node.RemoteCons[args.PeerIdx]
-	r.Node.RemoteMtx.Unlock()
-	if !ok {
-		return fmt.Errorf("not connected to specified peer %d ",
-			args.PeerIdx)
-	}
-
-	qc, err := r.Node.GetQchanByIdx(args.PeerIdx, args.ChanIdx)
+	qc, err := r.Node.GetQchanByIdx(args.ChanIdx)
 	if err != nil {
 		return err
 	}
 
+	fmt.Printf("channel %s\n", qc.Op.String())
+
 	if qc.CloseData.Closed {
-		return fmt.Errorf("Channel (%d,%d) already closed by tx %s",
-			args.PeerIdx, args.ChanIdx, qc.CloseData.CloseTxid.String())
+		return fmt.Errorf("Channel %d already closed by tx %s",
+			args.ChanIdx, qc.CloseData.CloseTxid.String())
+	}
+
+	r.Node.RemoteMtx.Lock()
+	_, ok := r.Node.RemoteCons[qc.Peer()]
+	r.Node.RemoteMtx.Unlock()
+	if !ok {
+		return fmt.Errorf("not connected to specified peer %d ", qc.Peer())
 	}
 
 	err = r.Node.PushChannel(qc, uint32(args.Amt))
@@ -148,14 +148,14 @@ func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 
 // ------------------------- cclose
 type ChanArgs struct {
-	PeerIdx, ChanIdx uint32
+	ChanIdx uint32
 }
 
 // reply with status string
 // CloseChannel is a cooperative closing of a channel to a specified address.
 func (r *LitRPC) CloseChannel(args ChanArgs, reply *StatusReply) error {
 
-	qc, err := r.Node.GetQchanByIdx(args.PeerIdx, args.ChanIdx)
+	qc, err := r.Node.GetQchanByIdx(args.ChanIdx)
 	if err != nil {
 		return err
 	}
@@ -172,7 +172,7 @@ func (r *LitRPC) CloseChannel(args ChanArgs, reply *StatusReply) error {
 // ------------------------- break
 func (r *LitRPC) BreakChannel(args ChanArgs, reply *StatusReply) error {
 
-	qc, err := r.Node.GetQchanByIdx(args.PeerIdx, args.ChanIdx)
+	qc, err := r.Node.GetQchanByIdx(args.ChanIdx)
 	if err != nil {
 		return err
 	}

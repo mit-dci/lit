@@ -232,8 +232,8 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		} else {
 			fmt.Printf("Channel ")
 		}
-		fmt.Printf("(%d,%d) %s\n\t cap: %d bal: %d h: %d state: %d\n",
-			c.PeerIdx, c.CIdx, c.OutPoint,
+		fmt.Printf("%d (peer %d) %s\n\t cap: %d bal: %d h: %d state: %d\n",
+			c.CIdx, c.PeerIdx, c.OutPoint,
 			c.Capacity, c.MyBalance, c.Height, c.StateNum)
 	}
 

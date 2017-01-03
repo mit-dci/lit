@@ -76,7 +76,7 @@ func (nd *LitNode) SendNextMsg(qc *Qchan) error {
 	return nd.SendREV(qc)
 }
 
-// PushChannel initiates a state update by sending an RTS
+// PushChannel initiates a state update by sending an DeltaSig
 func (nd LitNode) PushChannel(qc *Qchan, amt uint32) error {
 
 	// don't try to update state until all prior updates have cleared
@@ -163,11 +163,8 @@ func (nd *LitNode) DeltaSigHandler(lm *lnutil.LitMsg) {
 	incomingDelta = lnutil.BtU32(lm.Data[36:40])
 	copy(incomingSig[:], lm.Data[40:])
 
-	// find who we're talkikng to
-	peerArr, _ := nd.GetPubHostFromPeerIdx(lm.PeerIdx)
-
 	// load qchan & state from DB
-	qc, err := nd.GetQchan(peerArr, opArr)
+	qc, err := nd.GetQchan(opArr)
 	if err != nil {
 		fmt.Printf("DeltaSigHandler GetQchan err %s", err.Error())
 		return
@@ -192,12 +189,6 @@ func (nd *LitNode) DeltaSigHandler(lm *lnutil.LitMsg) {
 	if int64(incomingDelta) > (qc.Value-qc.State.MyAmt)+minBal {
 		fmt.Printf("DeltaSigHandler err: RTS delta %d but they have %d, minBal %d",
 			incomingDelta, qc.Value-qc.State.MyAmt, minBal)
-		return
-	}
-
-	if peerArr != qc.PeerId {
-		fmt.Printf("DeltaSigHandler err: peer %x trying to modify peer %x's channel\n",
-			peerArr, qc.PeerId)
 		return
 	}
 
@@ -287,18 +278,10 @@ func (nd *LitNode) SigRevHandler(lm *lnutil.LitMsg) {
 	revElk, _ := chainhash.NewHash(lm.Data[100:132])
 	copy(nextElkPoint[:], lm.Data[132:])
 
-	// find who we're talkikng to
-	peerArr, _ := nd.GetPubHostFromPeerIdx(lm.PeerIdx)
-
 	// load qchan & state from DB
-	qc, err := nd.GetQchan(peerArr, opArr)
+	qc, err := nd.GetQchan(opArr)
 	if err != nil {
 		fmt.Printf("SIGREVHandler err %s", err.Error())
-		return
-	}
-	if peerArr != qc.PeerId {
-		fmt.Printf("SIGREVHandler err: peer %x trying to modify peer %x's channel\n",
-			peerArr, qc.PeerId)
 		return
 	}
 
@@ -413,18 +396,10 @@ func (nd *LitNode) REVHandler(lm *lnutil.LitMsg) {
 	revElk, _ := chainhash.NewHash(lm.Data[36:68])
 	copy(nextElkPoint[:], lm.Data[68:])
 
-	// find who we're talkikng to
-	peerArr, _ := nd.GetPubHostFromPeerIdx(lm.PeerIdx)
-
 	// load qchan & state from DB
-	qc, err := nd.GetQchan(peerArr, opArr)
+	qc, err := nd.GetQchan(opArr)
 	if err != nil {
 		fmt.Printf("REVHandler err %s", err.Error())
-		return
-	}
-	if peerArr != qc.PeerId {
-		fmt.Printf("REVHandler err: peer %x trying to modify peer %x's channel\n",
-			peerArr, qc.PeerId)
 		return
 	}
 

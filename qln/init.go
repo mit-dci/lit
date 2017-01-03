@@ -75,7 +75,21 @@ func (nd *LitNode) OpenDB(filename string) error {
 	}
 	// create buckets if they're not already there
 	err = nd.LitDB.Update(func(btx *bolt.Tx) error {
-		_, err := btx.CreateBucketIfNotExists(BKTPeers)
+		_, err := btx.CreateBucketIfNotExists(BKTChannel)
+		if err != nil {
+			return err
+		}
+
+		_, err = btx.CreateBucketIfNotExists(BKTPeers)
+		if err != nil {
+			return err
+		}
+
+		_, err = btx.CreateBucketIfNotExists(BKTChanMap)
+		if err != nil {
+			return err
+		}
+		_, err = btx.CreateBucketIfNotExists(BKTPeerMap)
 		if err != nil {
 			return err
 		}

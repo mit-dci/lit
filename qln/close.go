@@ -78,9 +78,6 @@ func (nd *LitNode) CloseReqHandler(lm *lnutil.LitMsg) {
 		return
 	}
 
-	// figure out who we're talking to
-	peerArr, _ := nd.GetPubHostFromPeerIdx(lm.PeerIdx)
-
 	// deserialize outpoint
 	var opArr [36]byte
 	copy(opArr[:], lm.Data[:36])
@@ -89,7 +86,7 @@ func (nd *LitNode) CloseReqHandler(lm *lnutil.LitMsg) {
 	theirSig := lm.Data[36:]
 
 	// get channel
-	qc, err := nd.GetQchan(peerArr, opArr)
+	qc, err := nd.GetQchan(opArr)
 	if err != nil {
 		fmt.Printf("CloseReqHandler GetQchan err %s", err.Error())
 		return

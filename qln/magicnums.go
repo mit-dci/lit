@@ -19,14 +19,18 @@ const (
 )
 
 var (
+	BKTChannel = []byte("chn") // all channel data is in this bucket.
 	BKTPeers   = []byte("pir") // all peer data is in this bucket.
-	BKTMap     = []byte("map") // map of peer index to pubkey
+	BKTPeerMap = []byte("pmp") // map of peer index to pubkey
+	BKTChanMap = []byte("cmp") // map of channel index to outpoint
 	BKTWatch   = []byte("wch") // txids & signatures for export to watchtowers
-	KEYIdx     = []byte("idx") // index for key derivation
+
+	KEYIdx  = []byte("idx") // index for key derivation
+	KEYhost = []byte("hst") // hostname where peer lives
+
 	KEYutxo    = []byte("utx") // serialized utxo for the channel
-	KEYUnsig   = []byte("usg") // unsigned fund tx
 	KEYCladr   = []byte("cdr") // coop close address (Don't make fun of my lisp)
-	KEYState   = []byte("ima") // channel state
+	KEYState   = []byte("now") // channel state
 	KEYElkRecv = []byte("elk") // elkrem receiver
-	KEYqclose  = []byte("qcl") // channel close outpoint & height
+	KEYqclose  = []byte("cls") // channel close outpoint & height
 )

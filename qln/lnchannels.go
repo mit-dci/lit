@@ -22,8 +22,6 @@ type Qchan struct {
 	MyPub    [33]byte // D my channel specific pubkey
 	TheirPub [33]byte // S their channel specific pubkey
 
-	PeerId [33]byte // D useful for quick traverse of db
-
 	// Refunds are also elkremified
 	MyRefundPub    [33]byte // D my refund pubkey for channel break
 	TheirRefundPub [33]byte // S their pubkey for channel break
@@ -138,14 +136,14 @@ func (q *Qchan) Peer() uint32 {
 	if q == nil {
 		return 0
 	}
-	return q.KeyGen.Step[3]
+	return q.KeyGen.Step[3] & 0x7fffffff
 }
 
 func (q *Qchan) Idx() uint32 {
 	if q == nil {
 		return 0
 	}
-	return q.KeyGen.Step[4]
+	return q.KeyGen.Step[4] & 0x7fffffff
 }
 
 // GetChanHint gives the 6 byte hint mask of the channel.  It's derived from the
