@@ -65,11 +65,22 @@ sequential and concurrent.
 sequential has a deterministic priority which selects who to continue
 the go-ahead node completes the push, then waits for the other node to push.
 
-concurrent means if you get a deltasig in response to a deltasig, send a
-modified SigRev ( sig is state n, rev is state n-2), and wait for a
-modified SigRev.  Upon receiving, send a normal rev.
+DeltaSig collision handling:
 
-concurrent feels cleaner, will sketch it out more.
+Send a DeltaSig.  Delta < 0.
+Receive a DeltaSig with Delta < 0; need to send a GapSigRev
+COLLISION: Set the collision flag (delta-(1<<30))
+update amount with increment from received deltaSig
+verify received signature & save to disk, update state number
+*your delta value stays the same*
+Send GapSigRev: revocation of previous state, and sig for next state
+Receive GapSigRev
+Clear collision flag
+set delta = -delta (turns positive)
+Update amount,  verity received signature & save to disk, update state number
+Send Rev for previous state
+Receive Rev for previous state
+
 
 */
 
@@ -99,6 +110,15 @@ func (nd LitNode) PushChannel(qc *Qchan, amt uint32) error {
 	if qc.State.Delta != 0 {
 		return fmt.Errorf("channel update in progress, cannot push")
 	}
+
+	if amt == 0 {
+		return fmt.Errorf("have to send non-zero amount")
+	}
+
+	if amt >= 1<<30 {
+		return fmt.Errorf("max send 1G sat (1073741823)")
+	}
+
 	// check if this push would lower my balance below minBal
 	if int64(amt)+minBal > qc.State.MyAmt {
 		return fmt.Errorf("want to push %d but %d available, %d minBal",
@@ -156,7 +176,7 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 
 	outMsg := new(lnutil.LitMsg)
 	outMsg.MsgType = lnutil.MSGID_DELTASIG
-	outMsg.PeerIdx = q.KeyGen.Step[3] & 0x7fffffff
+	outMsg.PeerIdx = q.Peer()
 	outMsg.Data = msg
 	nd.OmniOut <- outMsg
 
@@ -184,14 +204,27 @@ func (nd *LitNode) DeltaSigHandler(lm *lnutil.LitMsg) {
 		fmt.Printf("DeltaSigHandler GetQchan err %s", err.Error())
 		return
 	}
+
 	if qc.CloseData.Closed {
 		fmt.Printf("DeltaSigHandler err: %d, %d is closed.",
-			qc.KeyGen.Step[3], qc.KeyGen.Step[4])
+			qc.Peer(), qc.Idx())
 		return
 	}
-	if qc.State.Delta != 0 {
-		fmt.Printf("DeltaSigHandler err: %d, %d is in progress, delta %d",
-			qc.KeyGen.Step[3], qc.KeyGen.Step[4], qc.State.Delta)
+
+	if qc.State.Delta > 0 {
+		fmt.Printf("DeltaSigHandler err: chan %d is delta %d, expect rev",
+			qc.Idx(), qc.State.Delta)
+		return
+	}
+
+	if qc.State.Delta < 0 {
+		fmt.Printf("DeltaSigHandler: chan %d collision; delta %d (GapSigRev)",
+			qc.Idx(), qc.State.Delta)
+		// give up on channel update
+		nd.PushClearMutex.Lock()
+		nd.PushClear[qc.Op.Hash] <- true
+		nd.PushClearMutex.Unlock()
+		return
 	}
 
 	// they have to actually send you money
@@ -300,6 +333,13 @@ func (nd *LitNode) SigRevHandler(lm *lnutil.LitMsg) {
 		return
 	}
 
+	// check if we're supposed to get a SigRev now. Delta should be negative
+	if qc.State.Delta >= 0 {
+		fmt.Printf("SIGREVHandler err: chan %d unexpected SigRev, delta %d",
+			qc.Idx(), qc.State.Delta)
+		return
+	}
+
 	// stash previous amount here for watchtower sig creation
 	prevAmt := qc.State.MyAmt
 
@@ -390,7 +430,7 @@ func (nd *LitNode) SendREV(q *Qchan) error {
 
 	outMsg := new(lnutil.LitMsg)
 	outMsg.MsgType = lnutil.MSGID_REV
-	outMsg.PeerIdx = q.KeyGen.Step[3] & 0x7fffffff
+	outMsg.PeerIdx = q.Peer()
 	outMsg.Data = msg
 	nd.OmniOut <- outMsg
 

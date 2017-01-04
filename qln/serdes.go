@@ -16,8 +16,8 @@ bytes   desc   ends at
 8	StateIdx		8
 8	MyAmt		16
 4	Delta		20
-33	MyRev		53
-33	MyPrevRev	86
+33	ElkPoint		53
+33	NextElkPoint	86
 64	Sig			150
 
 
@@ -54,7 +54,7 @@ func (s *StatCom) ToBytes() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	// write 33 byte my elk point R
+	// write 33 byte my elk point 
 	_, err = buf.Write(s.ElkPoint[:])
 	if err != nil {
 		return nil, err

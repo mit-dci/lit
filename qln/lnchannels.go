@@ -50,7 +50,7 @@ type StatCom struct {
 
 	MyAmt int64 // my channel allocation
 	// their Amt is the utxo.Value minus this
-	Delta int32 // fun amount in-transit; is negative for the pusher
+	Delta int32 // fund amount in-transit; is negative for the pusher
 
 	// Elkrem point from counterparty, used to make
 	// Homomorphic Adversarial Key Derivation public keys (HAKD)
@@ -151,7 +151,7 @@ func (q *Qchan) Idx() uint32 {
 
 // ImFirst decides who goes first when it's unclear.  Smaller pubkey goes first.
 func (q *Qchan) ImFirst() bool {
-	return bytes.Compare(q.MyRefundPub, q.TheirRefundPub) == -1
+	return bytes.Compare(q.MyRefundPub[:], q.TheirRefundPub[:]) == -1
 }
 
 // GetChanHint gives the 6 byte hint mask of the channel.  It's derived from the
