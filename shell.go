@@ -493,6 +493,7 @@ func Adr(args []string) error {
 	if err != nil {
 		return err
 	}
+
 	fmt.Printf("made new address %s\n",
 		wa.String())
 

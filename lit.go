@@ -88,10 +88,8 @@ func setConfig(lc *LitConfig) {
 }
 
 func main() {
-	fmt.Printf("lit spv shell v0.0\n")
-
-	fmt.Printf("-spv hostname to specify node to connect to.\n")
-	fmt.Printf("-reg for regtest mode instead of testnet3\n")
+	fmt.Printf("lit node v0.0\n")
+	fmt.Printf("-h for list of options.\n")
 
 	conf := new(LitConfig)
 	setConfig(conf)

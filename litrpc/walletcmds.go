@@ -69,6 +69,7 @@ type TxoInfo struct {
 	Amt      int64
 	Height   int32
 	Delay    int32
+	Witty    bool
 
 	KeyPath string
 }
@@ -95,6 +96,7 @@ func (r *LitRPC) TxoList(args *NoArgs, reply *TxoListReply) error {
 		if u.Seq != 0 {
 			reply.Txos[i].Delay = u.Height + int32(u.Seq) - syncHeight
 		}
+		reply.Txos[i].Witty = u.Mode&portxo.FlagTxoWitness != 0
 		reply.Txos[i].KeyPath = u.KeyGen.String()
 	}
 	return nil
@@ -264,7 +266,8 @@ type AdrArgs struct {
 	NumToMake uint32
 }
 type AdrReply struct {
-	Addresses []string
+	WitAddresses    []string
+	LegacyAddresses []string
 }
 
 func (r *LitRPC) Address(args *AdrArgs, reply *AdrReply) error {
@@ -277,14 +280,27 @@ func (r *LitRPC) Address(args *AdrArgs, reply *AdrReply) error {
 			return err
 		}
 
-		reply.Addresses = make([]string, len(allAdr))
+		reply.WitAddresses = make([]string, len(allAdr))
+		reply.LegacyAddresses = make([]string, len(allAdr))
 		for i, a := range allAdr {
-			reply.Addresses[i] = a.String()
+			// add witness address
+			reply.WitAddresses[i] = a.String()
+
+			// take 20-byte PKH out and convert to old address
+			oldAdr, err := btcutil.NewAddressPubKeyHash(
+				a.ScriptAddress(), r.SCon.Param)
+			if err != nil {
+				return err
+			}
+			reply.LegacyAddresses[i] = oldAdr.String()
 		}
+
 		return nil
 	}
 
-	reply.Addresses = make([]string, args.NumToMake)
+	reply.WitAddresses = make([]string, args.NumToMake)
+	reply.LegacyAddresses = make([]string, args.NumToMake)
+
 	remaining := args.NumToMake
 	for remaining > 0 {
 		a160, err := r.SCon.TS.NewAdr160()
@@ -296,7 +312,16 @@ func (r *LitRPC) Address(args *AdrArgs, reply *AdrReply) error {
 		if err != nil {
 			return err
 		}
-		reply.Addresses[remaining-1] = wa.String()
+		reply.WitAddresses[remaining-1] = wa.String()
+
+		// take 20-byte PKH out and convert to old address
+		oldAdr, err := btcutil.NewAddressPubKeyHash(
+			wa.ScriptAddress(), r.SCon.Param)
+		if err != nil {
+			return err
+		}
+
+		reply.LegacyAddresses[remaining-1] = oldAdr.String()
 		remaining--
 	}
 

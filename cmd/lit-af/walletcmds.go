@@ -125,6 +125,6 @@ func (lc *litAfClient) Adr(textArgs []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("new adr(s): %s\n", reply.Addresses)
+	fmt.Printf("new adr(s): %s\nold: %s\n", reply.WitAddresses, reply.LegacyAddresses)
 	return nil
 }

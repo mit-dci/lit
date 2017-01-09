@@ -99,10 +99,10 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 	}
 
 	// cooperateive close of a channel
-	if cmd == "cclose" {
+	if cmd == "close" {
 		err = lc.CloseChannel(args)
 		if err != nil {
-			fmt.Printf("cclose error: %s\n", err)
+			fmt.Printf("close error: %s\n", err)
 		}
 		return nil
 	}
@@ -250,6 +250,9 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		if t.Delay != 0 {
 			fmt.Printf(" delay: %d", t.Delay)
 		}
+		if !t.Witty {
+			fmt.Printf(" non-witness")
+		}
 		fmt.Printf("\n")
 	}
 
@@ -258,8 +261,8 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		return err
 	}
 	fmt.Printf("\tAddresses:\n")
-	for i, a := range aReply.Addresses {
-		fmt.Printf("%d %s \n", i, a)
+	for i, a := range aReply.WitAddresses {
+		fmt.Printf("%d %s (%s)\n", i, a, aReply.LegacyAddresses[i])
 	}
 	err = lc.rpccon.Call("LitRPC.Bal", nil, bReply)
 	if err != nil {
@@ -294,6 +297,6 @@ func (lc *litAfClient) Stop(textArgs []string) error {
 
 func Help(args []string) error {
 	fmt.Printf("commands:\n")
-	fmt.Printf("help adr bal send fake fan sweep lis con fund push cclose break exit\n")
+	fmt.Printf("help say ls adr send fan sweep lis con fund push close break stop exit\n")
 	return nil
 }
