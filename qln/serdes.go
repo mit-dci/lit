@@ -56,6 +56,12 @@ func (s *StatCom) ToBytes() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	// write 4 byte collision.  Only non zero briefly on collision
+	err = binary.Write(&buf, binary.BigEndian, s.Collision)
+	if err != nil {
+		return nil, err
+	}
+
 	// write 33 byte my elk point
 	_, err = buf.Write(s.ElkPoint[:])
 	if err != nil {
@@ -72,16 +78,6 @@ func (s *StatCom) ToBytes() ([]byte, error) {
 		return nil, err
 	}
 
-	// write the collision bool
-	if s.Collision {
-		err = buf.WriteByte(0x01)
-	} else {
-		err = buf.WriteByte(0x00)
-	}
-	if err != nil {
-		return nil, err
-	}
-
 	// write their sig
 	_, err = buf.Write(s.sig[:])
 	if err != nil {
@@ -93,8 +89,8 @@ func (s *StatCom) ToBytes() ([]byte, error) {
 // StatComFromBytes turns 192 bytes into a StatCom
 func StatComFromBytes(b []byte) (*StatCom, error) {
 	var s StatCom
-	if len(b) < 192 || len(b) > 192 {
-		return nil, fmt.Errorf("StatComFromBytes got %d bytes, expect 191",
+	if len(b) < 195 || len(b) > 195 {
+		return nil, fmt.Errorf("StatComFromBytes got %d bytes, expect 195",
 			len(b))
 	}
 	buf := bytes.NewBuffer(b)
@@ -119,18 +115,17 @@ func StatComFromBytes(b []byte) (*StatCom, error) {
 	if err != nil {
 		return nil, err
 	}
+	// read 4 byte collision.
+	err = binary.Read(buf, binary.BigEndian, &s.Collision)
+	if err != nil {
+		return nil, err
+	}
 	// read 33 byte elk point
 	copy(s.ElkPoint[:], buf.Next(33))
 	// read 33 byte next elk point
 	copy(s.NextElkPoint[:], buf.Next(33))
 	// read 33 byte n+2 elk point
 	copy(s.N2ElkPoint[:], buf.Next(33))
-
-	// read the collision bool
-	col, _ := buf.ReadByte()
-	if col == 0x01 {
-		s.Collision = true
-	}
 
 	// the rest is their sig
 	copy(s.sig[:], buf.Next(64))

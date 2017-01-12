@@ -166,6 +166,7 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 	if err != nil {
 		return err
 	}
+
 	opArr := lnutil.OutPointToBytes(q.Op)
 
 	var msg []byte
@@ -231,8 +232,8 @@ func (nd *LitNode) DeltaSigHandler(lm *lnutil.LitMsg) error {
 
 	}
 
-	// stash channel's initial delta before overwriting it
-	initDelta := qc.State.Delta
+	// stash channel's initial delta before overwriting it (usually it's 0)
+	qc.State.Collision = qc.State.Delta
 
 	// update to the next state to verify
 	qc.State.Delta = int32(incomingDelta)
@@ -247,18 +248,15 @@ func (nd *LitNode) DeltaSigHandler(lm *lnutil.LitMsg) error {
 
 	// (seems odd, but everything so far we still do in case of collision, so
 	// only check here.  If it's a collision, set, save, send gapSigRev
-	if initDelta < 0 {
-		// SigRev expected, got deltaSig; collision.
-		qc.State.Collision = true
-	}
 
 	// save channel with new state, new sig, and positive delta set
+	// and maybe collision; still haven't checked
 	err = nd.SaveQchanState(qc)
 	if err != nil {
 		return fmt.Errorf("DeltaSigHandler SaveQchanState err %s", err.Error())
 	}
 
-	if qc.State.Collision {
+	if qc.State.Collision != 0 {
 		err = nd.SendGapSigRev(qc)
 		if err != nil {
 			return fmt.Errorf("DeltaSigHandler SendGapSigRev err %s", err.Error())
@@ -274,7 +272,7 @@ func (nd *LitNode) DeltaSigHandler(lm *lnutil.LitMsg) error {
 
 // SendGapSigRev is different; it signs for state+1 and revokes state-1
 func (nd *LitNode) SendGapSigRev(q *Qchan) error {
-	// state should already be set to the "gap" state; generate revocation
+	// state should already be set to the "gap" state; generate revocation of
 
 	return nil
 }

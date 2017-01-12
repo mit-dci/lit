@@ -127,7 +127,7 @@ func main() {
 			if conf.birthblock < 100000 {
 				tip = conf.birthblock
 			} else {
-				tip = 10 // for regtest
+				tip = 500 // for regtest
 			}
 		} else {
 			tip = conf.birthblock // for testnet3. should base on keyfile date?

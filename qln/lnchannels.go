@@ -51,6 +51,8 @@ type StatCom struct {
 	MyAmt int64 // my channel allocation
 	// their Amt is the utxo.Value minus this
 	Delta int32 // fund amount in-transit; is negative for the pusher
+	// Delta for when the channel is in a collision state which needs to be resolved
+	Collision int32
 
 	// Elkrem point from counterparty, used to make
 	// Homomorphic Adversarial Key Derivation public keys (HAKD)
@@ -61,8 +63,6 @@ type StatCom struct {
 	sig [64]byte // Counterparty's signature for current state
 	// don't write to sig directly; only overwrite via fn() call
 
-	// Flag for if the channel is in a collision state which needs to be resolved
-	Collision bool
 	// note sig can be nil during channel creation. if stateIdx isn't 0,
 	// sig should have a sig.
 	// only one sig is ever stored, to prevent broadcasting the wrong tx.
