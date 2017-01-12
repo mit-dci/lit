@@ -158,6 +158,8 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 	q.State.StateIdx++
 	q.State.MyAmt += int64(q.State.Delta)
 	q.State.ElkPoint = q.State.NextElkPoint
+	q.State.NextElkPoint = q.State.N2ElkPoint
+	// N2Elk is now invalid
 
 	// make the signature to send over
 	sig, err := nd.SignState(q)
@@ -184,10 +186,9 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 }
 
 // DeltaSigHandler takes in a DeltaSig and responds with an SigRev (if everything goes OK)
-func (nd *LitNode) DeltaSigHandler(lm *lnutil.LitMsg) {
+func (nd *LitNode) DeltaSigHandler(lm *lnutil.LitMsg) error {
 	if len(lm.Data) < 104 || len(lm.Data) > 104 {
-		fmt.Printf("got %d byte DeltaSig, expect 104", len(lm.Data))
-		return
+		return fmt.Errorf("got %d byte DeltaSig, expect 104", len(lm.Data))
 	}
 
 	var opArr [36]byte
@@ -201,44 +202,37 @@ func (nd *LitNode) DeltaSigHandler(lm *lnutil.LitMsg) {
 	// load qchan & state from DB
 	qc, err := nd.GetQchan(opArr)
 	if err != nil {
-		fmt.Printf("DeltaSigHandler GetQchan err %s", err.Error())
-		return
+		return fmt.Errorf("DeltaSigHandler GetQchan err %s", err.Error())
+
 	}
 
 	if qc.CloseData.Closed {
-		fmt.Printf("DeltaSigHandler err: %d, %d is closed.",
+		return fmt.Errorf("DeltaSigHandler err: %d, %d is closed.",
 			qc.Peer(), qc.Idx())
-		return
+
 	}
 
 	if qc.State.Delta > 0 {
-		fmt.Printf("DeltaSigHandler err: chan %d is delta %d, expect rev",
+		return fmt.Errorf("DeltaSigHandler err: chan %d is delta %d, expect rev",
 			qc.Idx(), qc.State.Delta)
-		return
-	}
 
-	if qc.State.Delta < 0 {
-		fmt.Printf("DeltaSigHandler: chan %d collision; delta %d (GapSigRev)",
-			qc.Idx(), qc.State.Delta)
-		// give up on channel update
-		nd.PushClearMutex.Lock()
-		nd.PushClear[qc.Op.Hash] <- true
-		nd.PushClearMutex.Unlock()
-		return
 	}
 
 	// they have to actually send you money
 	if incomingDelta < 1 {
-		fmt.Printf("DeltaSigHandler err: delta %d", incomingDelta)
-		return
+		return fmt.Errorf("DeltaSigHandler err: delta %d", incomingDelta)
+
 	}
 
 	// check if this push would lower counterparty balance below minBal
 	if int64(incomingDelta) > (qc.Value-qc.State.MyAmt)+minBal {
-		fmt.Printf("DeltaSigHandler err: RTS delta %d but they have %d, minBal %d",
+		return fmt.Errorf("DeltaSigHandler err: RTS delta %d but they have %d, minBal %d",
 			incomingDelta, qc.Value-qc.State.MyAmt, minBal)
-		return
+
 	}
+
+	// stash channel's initial delta before overwriting it
+	initDelta := qc.State.Delta
 
 	// update to the next state to verify
 	qc.State.Delta = int32(incomingDelta)
@@ -248,23 +242,41 @@ func (nd *LitNode) DeltaSigHandler(lm *lnutil.LitMsg) {
 	// verify sig for the next state. only save if this works
 	err = qc.VerifySig(incomingSig)
 	if err != nil {
-		fmt.Printf("DeltaSigHandler err %s", err.Error())
-		return
+		return fmt.Errorf("DeltaSigHandler err %s", err.Error())
+	}
+
+	// (seems odd, but everything so far we still do in case of collision, so
+	// only check here.  If it's a collision, set, save, send gapSigRev
+	if initDelta < 0 {
+		// SigRev expected, got deltaSig; collision.
+		qc.State.Collision = true
 	}
 
 	// save channel with new state, new sig, and positive delta set
 	err = nd.SaveQchanState(qc)
 	if err != nil {
-		fmt.Printf("DeltaSigHandler SaveQchanState err %s", err.Error())
-		return
-	}
-	// saved to db, now proceed to create & sign their tx
-	err = nd.SendSigRev(qc)
-	if err != nil {
-		fmt.Printf("DeltaSigHandler SendACKSIG err %s", err.Error())
-		return
+		return fmt.Errorf("DeltaSigHandler SaveQchanState err %s", err.Error())
 	}
 
+	if qc.State.Collision {
+		err = nd.SendGapSigRev(qc)
+		if err != nil {
+			return fmt.Errorf("DeltaSigHandler SendGapSigRev err %s", err.Error())
+		}
+	} else { // saved to db, now proceed to create & sign their tx
+		err = nd.SendSigRev(qc)
+		if err != nil {
+			return fmt.Errorf("DeltaSigHandler SendSigRev err %s", err.Error())
+		}
+	}
+	return nil
+}
+
+// SendGapSigRev is different; it signs for state+1 and revokes state-1
+func (nd *LitNode) SendGapSigRev(q *Qchan) error {
+	// state should already be set to the "gap" state; generate revocation
+
+	return nil
 }
 
 // SendSigRev sends an SigRev message based on channel info
@@ -272,6 +284,8 @@ func (nd *LitNode) SendSigRev(q *Qchan) error {
 	// state number and balance has already been updated if the incoming sig worked.
 	// go to next elkpoint for signing
 	q.State.ElkPoint = q.State.NextElkPoint
+	q.State.NextElkPoint = q.State.N2ElkPoint
+	// n2elk invalid here
 
 	sig, err := nd.SignState(q)
 	if err != nil {
@@ -284,7 +298,7 @@ func (nd *LitNode) SendSigRev(q *Qchan) error {
 		return err
 	}
 	// send commitment elkrem point for next round of messages
-	NextElkPoint, err := q.NextElkPointForThem()
+	n2ElkPoint, err := q.N2ElkPointForThem()
 	if err != nil {
 		return err
 	}
@@ -298,7 +312,7 @@ func (nd *LitNode) SendSigRev(q *Qchan) error {
 	msg = append(msg, opArr[:]...)
 	msg = append(msg, sig[:]...)
 	msg = append(msg, elk[:]...)
-	msg = append(msg, NextElkPoint[:]...)
+	msg = append(msg, n2ElkPoint[:]...)
 
 	outMsg := new(lnutil.LitMsg)
 	outMsg.MsgType = lnutil.MSGID_SIGREV
@@ -310,34 +324,31 @@ func (nd *LitNode) SendSigRev(q *Qchan) error {
 }
 
 // SIGREVHandler takes in an SIGREV and responds with a REV (if everything goes OK)
-func (nd *LitNode) SigRevHandler(lm *lnutil.LitMsg) {
+func (nd *LitNode) SigRevHandler(lm *lnutil.LitMsg) error {
 
 	if len(lm.Data) < 165 || len(lm.Data) > 165 {
-		fmt.Printf("got %d byte SIGREV, expect 165", len(lm.Data))
-		return
+		return fmt.Errorf("got %d byte SIGREV, expect 165", len(lm.Data))
 	}
 
 	var opArr [36]byte
 	var sig [64]byte
-	var nextElkPoint [33]byte
+	var n2elkPoint [33]byte
 	// deserialize SIGREV
 	copy(opArr[:], lm.Data[:36])
 	copy(sig[:], lm.Data[36:100])
 	revElk, _ := chainhash.NewHash(lm.Data[100:132])
-	copy(nextElkPoint[:], lm.Data[132:])
+	copy(n2elkPoint[:], lm.Data[132:])
 
 	// load qchan & state from DB
 	qc, err := nd.GetQchan(opArr)
 	if err != nil {
-		fmt.Printf("SIGREVHandler err %s", err.Error())
-		return
+		return fmt.Errorf("SIGREVHandler err %s", err.Error())
 	}
 
 	// check if we're supposed to get a SigRev now. Delta should be negative
 	if qc.State.Delta >= 0 {
-		fmt.Printf("SIGREVHandler err: chan %d unexpected SigRev, delta %d",
+		return fmt.Errorf("SIGREVHandler err: chan %d unexpected SigRev, delta %d",
 			qc.Idx(), qc.State.Delta)
-		return
 	}
 
 	// stash previous amount here for watchtower sig creation
@@ -354,16 +365,15 @@ func (nd *LitNode) SigRevHandler(lm *lnutil.LitMsg) {
 	// (if elkrem ingest fails later, at least we close out with a bit more money)
 	err = qc.VerifySig(sig)
 	if err != nil {
-		fmt.Printf("SIGREVHandler err %s", err.Error())
-		return
+		return fmt.Errorf("SIGREVHandler err %s", err.Error())
+
 	}
 
 	// verify elkrem and save it in ram
-	err = qc.AdvanceElkrem(revElk, nextElkPoint)
+	err = qc.AdvanceElkrem(revElk, n2elkPoint)
 	if err != nil {
-		fmt.Printf("SIGREVHandler err %s", err.Error())
-		fmt.Printf(" ! non-recoverable error, need to close the channel here.\n")
-		return
+		return fmt.Errorf("SIGREVHandler err %s", err.Error())
+		// ! non-recoverable error, need to close the channel here.
 	}
 	// if the elkrem failed but sig didn't... we should update the DB to reflect
 	// that and try to close with the incremented amount, why not.
@@ -372,15 +382,13 @@ func (nd *LitNode) SigRevHandler(lm *lnutil.LitMsg) {
 	// all verified; Save finished state to DB, puller is pretty much done.
 	err = nd.SaveQchanState(qc)
 	if err != nil {
-		fmt.Printf("SIGREVHandler err %s", err.Error())
-		return
+		return fmt.Errorf("SIGREVHandler err %s", err.Error())
 	}
 
 	fmt.Printf("SIGREV OK, state %d, will send REV\n", qc.State.StateIdx)
 	err = nd.SendREV(qc)
 	if err != nil {
-		fmt.Printf("SIGREVHandler err %s", err.Error())
-		return
+		return fmt.Errorf("SIGREVHandler err %s", err.Error())
 	}
 
 	// now that we've saved & sent everything, before ending the function, we
@@ -403,7 +411,7 @@ func (nd *LitNode) SigRevHandler(lm *lnutil.LitMsg) {
 	nd.PushClear[qc.Op.Hash] <- true
 	nd.PushClearMutex.Unlock()
 
-	return
+	return nil
 }
 
 // SendREV sends a REV message based on channel info
@@ -414,7 +422,7 @@ func (nd *LitNode) SendREV(q *Qchan) error {
 		return err
 	}
 	// send commitment elkrem point for next round of messages
-	nextElkPoint, err := q.NextElkPointForThem()
+	n2ElkPoint, err := q.N2ElkPointForThem()
 	if err != nil {
 		return err
 	}
@@ -422,11 +430,11 @@ func (nd *LitNode) SendREV(q *Qchan) error {
 	opArr := lnutil.OutPointToBytes(q.Op)
 
 	var msg []byte
-	// REV is op (36), elk hash (32), next elk point (33)
+	// REV is op (36), elk hash (32), n2 elk point (33)
 	// total length 101
 	msg = append(msg, opArr[:]...)
 	msg = append(msg, elk[:]...)
-	msg = append(msg, nextElkPoint[:]...)
+	msg = append(msg, n2ElkPoint[:]...)
 
 	outMsg := new(lnutil.LitMsg)
 	outMsg.MsgType = lnutil.MSGID_REV
@@ -445,11 +453,11 @@ func (nd *LitNode) REVHandler(lm *lnutil.LitMsg) {
 		return
 	}
 	var opArr [36]byte
-	var nextElkPoint [33]byte
+	var n2elkPoint [33]byte
 	// deserialize SigRev
 	copy(opArr[:], lm.Data[:36])
 	revElk, _ := chainhash.NewHash(lm.Data[36:68])
-	copy(nextElkPoint[:], lm.Data[68:])
+	copy(n2elkPoint[:], lm.Data[68:])
 
 	// load qchan & state from DB
 	qc, err := nd.GetQchan(opArr)
@@ -465,7 +473,7 @@ func (nd *LitNode) REVHandler(lm *lnutil.LitMsg) {
 	}
 
 	// verify elkrem
-	err = qc.AdvanceElkrem(revElk, nextElkPoint)
+	err = qc.AdvanceElkrem(revElk, n2elkPoint)
 	if err != nil {
 		fmt.Printf("REVHandler err %s", err.Error())
 		fmt.Printf(" ! non-recoverable error, need to close the channel here.\n")

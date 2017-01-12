@@ -17,8 +17,10 @@ bytes   desc   ends at
 8	MyAmt		16
 4	Delta		20
 33	ElkPoint		53
-33	NextElkPoint	86
-64	Sig			150
+33	N1ElkPoint	86
+33	N2ElkPoint
+1	Collision
+64	Sig
 
 
 note that sigs are truncated and don't have the sighash type byte at the end.
@@ -28,7 +30,7 @@ and the stateidx.  hash160(elkremsend(sIdx)[:16])
 
 */
 
-// ToBytes turns a StatCom into 158ish bytes
+// ToBytes turns a StatCom into 192ish bytes
 func (s *StatCom) ToBytes() ([]byte, error) {
 	var buf bytes.Buffer
 	var err error
@@ -54,13 +56,28 @@ func (s *StatCom) ToBytes() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	// write 33 byte my elk point 
+	// write 33 byte my elk point
 	_, err = buf.Write(s.ElkPoint[:])
 	if err != nil {
 		return nil, err
 	}
 	// write 33 byte Next elk point
 	_, err = buf.Write(s.NextElkPoint[:])
+	if err != nil {
+		return nil, err
+	}
+	// write 33 byte Next elk point
+	_, err = buf.Write(s.N2ElkPoint[:])
+	if err != nil {
+		return nil, err
+	}
+
+	// write the collision bool
+	if s.Collision {
+		err = buf.WriteByte(0x01)
+	} else {
+		err = buf.WriteByte(0x00)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -73,11 +90,11 @@ func (s *StatCom) ToBytes() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// StatComFromBytes turns 158 bytes into a StatCom
+// StatComFromBytes turns 192 bytes into a StatCom
 func StatComFromBytes(b []byte) (*StatCom, error) {
 	var s StatCom
-	if len(b) < 158 || len(b) > 158 {
-		return nil, fmt.Errorf("StatComFromBytes got %d bytes, expect 158",
+	if len(b) < 192 || len(b) > 192 {
+		return nil, fmt.Errorf("StatComFromBytes got %d bytes, expect 191",
 			len(b))
 	}
 	buf := bytes.NewBuffer(b)
@@ -106,6 +123,14 @@ func StatComFromBytes(b []byte) (*StatCom, error) {
 	copy(s.ElkPoint[:], buf.Next(33))
 	// read 33 byte next elk point
 	copy(s.NextElkPoint[:], buf.Next(33))
+	// read 33 byte n+2 elk point
+	copy(s.N2ElkPoint[:], buf.Next(33))
+
+	// read the collision bool
+	col, _ := buf.ReadByte()
+	if col == 0x01 {
+		s.Collision = true
+	}
 
 	// the rest is their sig
 	copy(s.sig[:], buf.Next(64))

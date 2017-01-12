@@ -56,11 +56,13 @@ type StatCom struct {
 	// Homomorphic Adversarial Key Derivation public keys (HAKD)
 	ElkPoint     [33]byte // saved to disk, current revealable point
 	NextElkPoint [33]byte // Point stored for next state
+	N2ElkPoint   [33]byte // Point for state after next (in case of collision)
 
 	sig [64]byte // Counterparty's signature for current state
-
 	// don't write to sig directly; only overwrite via fn() call
 
+	// Flag for if the channel is in a collision state which needs to be resolved
+	Collision bool
 	// note sig can be nil during channel creation. if stateIdx isn't 0,
 	// sig should have a sig.
 	// only one sig is ever stored, to prevent broadcasting the wrong tx.

@@ -44,7 +44,7 @@ type LitConfig struct {
 }
 
 func setConfig(lc *LitConfig) {
-	spvhostptr := flag.String("spv", "lit3.co", "full node to connect to")
+	spvhostptr := flag.String("spv", "tn.lit3.co", "full node to connect to")
 
 	birthptr := flag.Int("tip", hardHeight, "height to begin db sync")
 

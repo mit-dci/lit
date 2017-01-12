@@ -289,12 +289,17 @@ func (nd LitNode) PointRespHandler(lm *lnutil.LitMsg) error {
 		return fmt.Errorf("PointRespHandler SaveQchanState err %s", err.Error())
 	}
 
-	// when funding a channel, give them the first *2* elkpoints.
+	// when funding a channel, give them the first *3* elkpoints.
 	elkPointZero, err := qc.ElkPoint(false, 0)
 	if err != nil {
 		return err
 	}
-	elkPointOne, err := qc.NextElkPointForThem()
+	elkPointOne, err := qc.ElkPoint(false, 1)
+	if err != nil {
+		return err
+	}
+
+	elkPointTwo, err := qc.N2ElkPointForThem()
 	if err != nil {
 		return err
 	}
@@ -304,8 +309,8 @@ func (nd LitNode) PointRespHandler(lm *lnutil.LitMsg) error {
 
 	// description is outpoint (36), mypub(33), myrefund(33),
 	// myHAKDbase(33), capacity (8),
-	// initial payment (8), ElkPoint0 (33), ElkPoint1 (33)
-	// total length 217
+	// initial payment (8), ElkPoint0,1,2 (99)
+	// total length 250
 
 	var msg []byte
 
@@ -317,7 +322,7 @@ func (nd LitNode) PointRespHandler(lm *lnutil.LitMsg) error {
 	msg = append(msg, initPayBytes...)
 	msg = append(msg, elkPointZero[:]...)
 	msg = append(msg, elkPointOne[:]...)
-
+	msg = append(msg, elkPointTwo[:]...)
 	outMsg := new(lnutil.LitMsg)
 	outMsg.MsgType = lnutil.MSGID_CHANDESC
 	outMsg.PeerIdx = lm.PeerIdx
@@ -331,11 +336,11 @@ func (nd LitNode) PointRespHandler(lm *lnutil.LitMsg) error {
 // QChanDescHandler takes in a description of a channel output.  It then
 // saves it to the local db, and returns a channel acknowledgement
 func (nd *LitNode) QChanDescHandler(lm *lnutil.LitMsg) {
-	if len(lm.Data) < 217 || len(lm.Data) > 217 {
-		fmt.Printf("got %d byte channel description, expect 217", len(lm.Data))
+	if len(lm.Data) < 250 || len(lm.Data) > 250 {
+		fmt.Printf("got %d byte channel description, expect 250", len(lm.Data))
 		return
 	}
-	var elkPointZero, elkPointOne, theirPub, theirRefundPub, theirHAKDbase [33]byte
+	var elkPointZero, elkPointOne, elkPointTwo, theirPub, theirRefundPub, theirHAKDbase [33]byte
 	var opArr [36]byte
 
 	// deserialize desc
@@ -347,7 +352,8 @@ func (nd *LitNode) QChanDescHandler(lm *lnutil.LitMsg) {
 	amt := lnutil.BtI64(lm.Data[135:143])
 	initPay := lnutil.BtI64(lm.Data[143:151])
 	copy(elkPointZero[:], lm.Data[151:184])
-	copy(elkPointOne[:], lm.Data[184:])
+	copy(elkPointOne[:], lm.Data[184:217])
+	copy(elkPointTwo[:], lm.Data[217:])
 
 	cIdx, err := nd.NextChannelIdx()
 	if err != nil {
@@ -393,6 +399,7 @@ func (nd *LitNode) QChanDescHandler(lm *lnutil.LitMsg) {
 	// use new ElkPoint for signing
 	qc.State.ElkPoint = elkPointZero
 	qc.State.NextElkPoint = elkPointOne
+	qc.State.N2ElkPoint = elkPointTwo
 
 	// create empty elkrem receiver to save
 	//	qc.ElkRcv = new(elkrem.ElkremReceiver)
@@ -417,12 +424,18 @@ func (nd *LitNode) QChanDescHandler(lm *lnutil.LitMsg) {
 	}
 
 	// when funding a channel, give them the first *2* elkpoints.
-	theirElkPointZero, err := qc.ElkPoint(false, qc.State.StateIdx)
+	theirElkPointZero, err := qc.ElkPoint(false, 0)
 	if err != nil {
 		fmt.Printf("QChanDescHandler err %s", err.Error())
 		return
 	}
-	theirElkPointOne, err := qc.NextElkPointForThem()
+	theirElkPointOne, err := qc.ElkPoint(false, 1)
+	if err != nil {
+		fmt.Printf("QChanDescHandler err %s", err.Error())
+		return
+	}
+
+	theirElkPointTwo, err := qc.N2ElkPointForThem()
 	if err != nil {
 		fmt.Printf("QChanDescHandler err %s", err.Error())
 		return
@@ -440,12 +453,13 @@ func (nd *LitNode) QChanDescHandler(lm *lnutil.LitMsg) {
 	//		return
 	//	}
 	// ACK the channel address, which causes the funder to sign / broadcast
-	// ACK is outpoint (36), ElkPointZero (33), ElkPointOne (33), and signature (64)
+	// ACK is outpoint (36), ElkPoint0,1,2 (99) and signature (64)
 	var msg []byte
 
 	msg = append(msg, opArr[:]...)
 	msg = append(msg, theirElkPointZero[:]...)
 	msg = append(msg, theirElkPointOne[:]...)
+	msg = append(msg, theirElkPointTwo[:]...)
 	msg = append(msg, sig[:]...)
 
 	outMsg := new(lnutil.LitMsg)
@@ -461,21 +475,20 @@ func (nd *LitNode) QChanDescHandler(lm *lnutil.LitMsg) {
 // QChanAckHandler takes in an acknowledgement multisig description.
 // when a multisig outpoint is ackd, that causes the funder to sign and broadcast.
 func (nd *LitNode) QChanAckHandler(lm *lnutil.LitMsg) {
-	if len(lm.Data) < 166 || len(lm.Data) > 166 {
-		fmt.Printf("got %d byte multiAck, expect 166", len(lm.Data))
+	if len(lm.Data) < 199 || len(lm.Data) > 199 {
+		fmt.Printf("got %d byte multiAck, expect 199", len(lm.Data))
 		return
 	}
 	var opArr [36]byte
-	var elkPointZero, elkPointOne [33]byte
+	var elkPointZero, elkPointOne, elkPointTwo [33]byte
 	var sig [64]byte
 
 	// deserialize chanACK
 	copy(opArr[:], lm.Data[:36])
 	copy(elkPointZero[:], lm.Data[36:69])
 	copy(elkPointOne[:], lm.Data[69:102])
-	copy(sig[:], lm.Data[102:])
-
-	//	op := lnutil.OutPointFromBytes(opArr)
+	copy(elkPointTwo[:], lm.Data[102:135])
+	copy(sig[:], lm.Data[135:])
 
 	// load channel to save their refund address
 	qc, err := nd.GetQchan(opArr)
@@ -491,6 +504,7 @@ func (nd *LitNode) QChanAckHandler(lm *lnutil.LitMsg) {
 	//	}
 	qc.State.ElkPoint = elkPointZero
 	qc.State.NextElkPoint = elkPointOne
+	qc.State.N2ElkPoint = elkPointTwo
 
 	err = qc.VerifySig(sig)
 	if err != nil {

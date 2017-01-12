@@ -12,9 +12,9 @@ functions dealing with elkrem points and the elkrem structure
 */
 
 // CurElkPointForThem makes the current state elkrem point to send out
-func (q *Qchan) NextElkPointForThem() (p [33]byte, err error) {
+func (q *Qchan) N2ElkPointForThem() (p [33]byte, err error) {
 	// generate revocable elkrem point
-	return q.ElkPoint(false, q.State.StateIdx+1)
+	return q.ElkPoint(false, q.State.StateIdx+2)
 }
 
 // ElkPoint generates an elkrem Point.  "My" elkrem point is the point
@@ -50,7 +50,7 @@ func (q *Qchan) ElkPoint(mine bool, idx uint64) (p [33]byte, err error) {
 	return
 }
 
-func (q *Qchan) AdvanceElkrem(elk *chainhash.Hash, nextElk [33]byte) error {
+func (q *Qchan) AdvanceElkrem(elk *chainhash.Hash, n2Elk [33]byte) error {
 	// check that the revocation works
 	err := q.IngestElkrem(elk)
 	if err != nil {
@@ -59,8 +59,10 @@ func (q *Qchan) AdvanceElkrem(elk *chainhash.Hash, nextElk [33]byte) error {
 	// if ingest was succesful, update the stored elk points
 	// the already stored "next" point becomes the current point
 	q.State.ElkPoint = q.State.NextElkPoint
-	// and the newly received point is stored as the next point
-	q.State.NextElkPoint = nextElk
+	// n+2 drops to n+1
+	q.State.NextElkPoint = q.State.N2ElkPoint
+	// and the newly received point is n+2
+	q.State.N2ElkPoint = n2Elk
 	return nil
 }
 
