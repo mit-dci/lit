@@ -186,7 +186,9 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 	return err
 }
 
-// DeltaSigHandler takes in a DeltaSig and responds with an SigRev (if everything goes OK)
+// DeltaSigHandler takes in a DeltaSig and responds with an SigRev (normally)
+// or a GapSigRev (if there's a collision)
+// Leaves the channel either expecting a Rev (normally) or a GapSigRev (collision)
 func (nd *LitNode) DeltaSigHandler(lm *lnutil.LitMsg) error {
 	if len(lm.Data) < 104 || len(lm.Data) > 104 {
 		return fmt.Errorf("got %d byte DeltaSig, expect 104", len(lm.Data))
@@ -272,15 +274,73 @@ func (nd *LitNode) DeltaSigHandler(lm *lnutil.LitMsg) error {
 
 // SendGapSigRev is different; it signs for state+1 and revokes state-1
 func (nd *LitNode) SendGapSigRev(q *Qchan) error {
-	// state should already be set to the "gap" state; generate revocation of
+	// state should already be set to the "gap" state; generate signature for n+1
+	// the signature generation is similar to normal sigrev signing
+	// in these "send_whatever" methods we don't modify and save to disk
+
+	// state has been incremented in DeltaSigHandler so n is the gap state
+	// revoke n-1
+	elk, err := q.ElkSnd.AtIndex(q.State.StateIdx - 1)
+	if err != nil {
+		return err
+	}
+
+	// send elkpoint for n+2
+	n2ElkPoint, err := q.N2ElkPointForThem()
+	if err != nil {
+		return err
+	}
+
+	// go up to n+1 elkpoint for the signing
+	q.State.ElkPoint = q.State.N2ElkPoint
+	// state is already incremented from DeltaSigHandler, increment again for n+1
+	// (note that we've moved n here.)
+	q.State.StateIdx++
+	// amt is collision (negative) plus current amt (their delta already added
+	// in during DeltaSigHandler
+	q.State.MyAmt += int64(q.State.Collision)
+
+	// sign state n+1
+	sig, err := nd.SignState(q)
+	if err != nil {
+		return err
+	}
+
+	// send
+	// GapSigRev is op (36), sig (64), ElkHash (32), NextElkPoint (33)
+	// total length 165
+	opArr := lnutil.OutPointToBytes(q.Op)
+
+	var msg []byte
+
+	// SigRev is op (36), sig (64), ElkHash (32), NextElkPoint (33)
+	// total length 165
+	msg = append(msg, opArr[:]...)
+	msg = append(msg, sig[:]...)
+	msg = append(msg, elk[:]...)
+	msg = append(msg, n2ElkPoint[:]...)
+
+	outMsg := new(lnutil.LitMsg)
+	outMsg.MsgType = lnutil.MSGID_GAPSIGREV
+	outMsg.PeerIdx = q.KeyGen.Step[3] & 0x7fffffff
+	outMsg.Data = msg
+	nd.OmniOut <- outMsg
 
 	return nil
 }
 
 // SendSigRev sends an SigRev message based on channel info
 func (nd *LitNode) SendSigRev(q *Qchan) error {
+
+	// revoke n-1
+	elk, err := q.ElkSnd.AtIndex(q.State.StateIdx - 1)
+	if err != nil {
+		return err
+	}
+
 	// state number and balance has already been updated if the incoming sig worked.
 	// go to next elkpoint for signing
+	// note that we have to keep the old elkpoint on disk for when the rev comes in
 	q.State.ElkPoint = q.State.NextElkPoint
 	q.State.NextElkPoint = q.State.N2ElkPoint
 	// n2elk invalid here
@@ -290,11 +350,6 @@ func (nd *LitNode) SendSigRev(q *Qchan) error {
 		return err
 	}
 
-	// revoke previous already built state
-	elk, err := q.ElkSnd.AtIndex(q.State.StateIdx - 1)
-	if err != nil {
-		return err
-	}
 	// send commitment elkrem point for next round of messages
 	n2ElkPoint, err := q.N2ElkPointForThem()
 	if err != nil {
@@ -318,10 +373,72 @@ func (nd *LitNode) SendSigRev(q *Qchan) error {
 	outMsg.Data = msg
 	nd.OmniOut <- outMsg
 
-	return err
+	return nil
+}
+
+// GapSigRevHandler takes in a GapSigRev, responds with a Rev, and
+// leaves the channel in a state expecting a Rev.
+func (nd *LitNode) GapSigRevHandler(lm *lnutil.LitMsg) error {
+	if len(lm.Data) < 165 || len(lm.Data) > 165 {
+		return fmt.Errorf("got %d byte GAPSIGREV, expect 165", len(lm.Data))
+	}
+
+	var opArr [36]byte
+	var sig [64]byte
+	var n2elkPoint [33]byte
+	// deserialize GapSigRev
+	copy(opArr[:], lm.Data[:36])
+	copy(sig[:], lm.Data[36:100])
+	revElk, _ := chainhash.NewHash(lm.Data[100:132])
+	copy(n2elkPoint[:], lm.Data[132:])
+
+	// load qchan & state from DB
+	q, err := nd.GetQchan(opArr)
+	if err != nil {
+		return fmt.Errorf("GapSigRevHandler err %s", err.Error())
+	}
+
+	// check if we're supposed to get a GapSigRev now. Collision should be set
+	if q.State.Collision == 0 {
+		return fmt.Errorf(
+			"GapSigRevHandler err: chan %d got GapSigRev but collision = 0",
+			q.Idx())
+	}
+
+	// stash previous amount here for watchtower sig creation
+	// will do this later
+	//	prevAmt := qc.State.MyAmt
+
+	// go up to n+2 elkpoint for the signing
+	q.State.ElkPoint = q.State.N2ElkPoint
+	// state is already incremented from DeltaSigHandler, increment again for n+2
+	// (note that we've moved n here.)
+	q.State.StateIdx++
+	// amt is collision (negative) plus current amt (their delta already added
+	// in during DeltaSigHandler
+	q.State.MyAmt += int64(q.State.Collision)
+
+	// increment state for sig verification
+	q.State.StateIdx++
+
+	// verify the sig
+	err = q.VerifySig(sig)
+	if err != nil {
+		return fmt.Errorf("GapSigRevHandler err %s", err.Error())
+	}
+
+	// verify elkrem and save it in ram
+	err = q.AdvanceElkrem(revElk, n2elkPoint)
+	if err != nil {
+		return fmt.Errorf("SIGREVHandler err %s", err.Error())
+		// ! non-recoverable error, need to close the channel here.
+	}
+
+	return nil
 }
 
 // SIGREVHandler takes in an SIGREV and responds with a REV (if everything goes OK)
+// Leaves the channel in a clear / rest state.
 func (nd *LitNode) SigRevHandler(lm *lnutil.LitMsg) error {
 
 	if len(lm.Data) < 165 || len(lm.Data) > 165 {
@@ -355,16 +472,12 @@ func (nd *LitNode) SigRevHandler(lm *lnutil.LitMsg) error {
 	qc.State.StateIdx++
 	qc.State.MyAmt += int64(qc.State.Delta)
 	qc.State.Delta = 0
-	// go to next elkpoint for sig verification.  If it doesn't work we'll crash
-	// without overwriting the old elkpoint
-	//	qc.State.ElkPoint = qc.State.NextElkPoint
 
 	// first verify sig.
 	// (if elkrem ingest fails later, at least we close out with a bit more money)
 	err = qc.VerifySig(sig)
 	if err != nil {
 		return fmt.Errorf("SIGREVHandler err %s", err.Error())
-
 	}
 
 	// verify elkrem and save it in ram
@@ -445,6 +558,7 @@ func (nd *LitNode) SendREV(q *Qchan) error {
 
 // REVHandler takes in an REV and clears the state's prev HAKD.  This is the
 // final message in the state update process and there is no response.
+// Leaves the channel in a clear / rest state.
 func (nd *LitNode) REVHandler(lm *lnutil.LitMsg) {
 	if len(lm.Data) != 101 {
 		fmt.Printf("got %d byte REV, expect 101", len(lm.Data))

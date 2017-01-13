@@ -88,6 +88,18 @@ func (nd *LitNode) OmniHandler() {
 			}()
 			continue
 		}
+		// GAP SIGNATURE AND REVOCATION
+		if routedMsg.MsgType == lnutil.MSGID_GAPSIGREV {
+			fmt.Printf("Got GapSigRev from %x\n", routedMsg.PeerIdx)
+			go func() {
+				err := nd.GapSigRevHandler(routedMsg)
+				if err != nil {
+					fmt.Printf(err.Error())
+				}
+			}()
+			continue
+		}
+
 		// REVOCATION
 		if routedMsg.MsgType == lnutil.MSGID_REV {
 			fmt.Printf("Got REV from %x\n", routedMsg.PeerIdx)

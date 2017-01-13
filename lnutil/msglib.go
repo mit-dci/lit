@@ -24,6 +24,8 @@ const (
 	MSGID_SIGREV = 0x81 // pulling funds; signing new state and revoking old
 	MSGID_REV    = 0x82 // pushing funds; revoking previous channel state
 
+	MSGID_GAPSIGREV = 0x83 // resolving collision
+
 	MSGID_FWDMSG     = 0x20
 	MSGID_FWDAUTHREQ = 0x21
 )

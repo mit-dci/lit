@@ -167,7 +167,8 @@ func (q *Qchan) VerifySig(sig [64]byte) error {
 
 	worked := pSig.Verify(hash, theirPubKey)
 	if !worked {
-		return fmt.Errorf("Their sig was no good!!!!!111")
+		return fmt.Errorf("Invalid signature on chan %d state %d",
+			q.Idx(), q.State.StateIdx)
 	}
 
 	// copy signature, overwriting old signature.
