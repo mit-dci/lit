@@ -77,7 +77,7 @@ func (nd *LitNode) OutMessager() {
 		if err != nil {
 			fmt.Printf("error writing to peer %d: %s\n", err.Error())
 		} else {
-			fmt.Printf("%d bytes to peer %d\n", n, msg.PeerIdx)
+			fmt.Printf("type %x %d bytes to peer %d\n", msg.MsgType, n, msg.PeerIdx)
 		}
 		nd.RemoteMtx.Unlock()
 	}

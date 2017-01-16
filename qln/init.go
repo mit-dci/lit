@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/boltdb/bolt"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
@@ -44,7 +43,7 @@ func (nd *LitNode) Init(
 
 	nd.RemoteCons = make(map[uint32]*lndc.LNDConn)
 
-	nd.PushClear = make(map[chainhash.Hash]chan bool)
+	nd.PushClear = make(map[uint32]chan bool)
 
 	nd.OmniOut = make(chan *lnutil.LitMsg, 10)
 	nd.OmniIn = make(chan *lnutil.LitMsg, 10)

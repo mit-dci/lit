@@ -65,46 +65,12 @@ func (nd *LitNode) OmniHandler() {
 		//			continue
 		//		}
 
-		// PUSH
-		// just put 'go' in front.  then it's concurrent.
-		if routedMsg.MsgType == lnutil.MSGID_DELTASIG {
-			fmt.Printf("Got DELTASIG from %x\n", routedMsg.PeerIdx)
-			go func() {
-				err := nd.DeltaSigHandler(routedMsg)
-				if err != nil {
-					fmt.Printf(err.Error())
-				}
-			}()
-			continue
-		}
-		// SIGNATURE AND REVOCATION
-		if routedMsg.MsgType == lnutil.MSGID_SIGREV {
-			fmt.Printf("Got SIGREV from %x\n", routedMsg.PeerIdx)
-			go func() {
-				err := nd.SigRevHandler(routedMsg)
-				if err != nil {
-					fmt.Printf(err.Error())
-				}
-			}()
-			continue
-		}
-		// GAP SIGNATURE AND REVOCATION
-		if routedMsg.MsgType == lnutil.MSGID_GAPSIGREV {
-			fmt.Printf("Got GapSigRev from %x\n", routedMsg.PeerIdx)
-			go func() {
-				err := nd.GapSigRevHandler(routedMsg)
-				if err != nil {
-					fmt.Printf(err.Error())
-				}
-			}()
-			continue
-		}
-
-		// REVOCATION
-		if routedMsg.MsgType == lnutil.MSGID_REV {
-			fmt.Printf("Got REV from %x\n", routedMsg.PeerIdx)
-			// breaks if concurrent!  Maybe fix that for a little speedup.
-			nd.REVHandler(routedMsg)
+		// PUSH type messages are 0x8?, and get their own helper function
+		if routedMsg.MsgType&0xf0 == 0x80 {
+			err := nd.PushPullHandler(routedMsg)
+			if err != nil {
+				fmt.Printf(err.Error())
+			}
 			continue
 		}
 
@@ -149,6 +115,34 @@ func (nd *LitNode) LNDCReader(l net.Conn, peerIdx uint32) error {
 
 		nd.OmniIn <- routedMsg
 	}
+}
+
+func (nd *LitNode) PushPullHandler(routedMsg *lnutil.LitMsg) error {
+
+	if routedMsg.MsgType == lnutil.MSGID_DELTASIG {
+		fmt.Printf("Got DELTASIG from %x\n", routedMsg.PeerIdx)
+		return nd.DeltaSigHandler(routedMsg)
+	}
+
+	// SIGNATURE AND REVOCATION
+	if routedMsg.MsgType == lnutil.MSGID_SIGREV {
+		fmt.Printf("Got SIGREV from %x\n", routedMsg.PeerIdx)
+		return nd.SigRevHandler(routedMsg)
+	}
+
+	// GAP SIGNATURE AND REVOCATION
+	if routedMsg.MsgType == lnutil.MSGID_GAPSIGREV {
+		fmt.Printf("Got GapSigRev from %x\n", routedMsg.PeerIdx)
+		return nd.GapSigRevHandler(routedMsg)
+	}
+
+	// REVOCATION
+	if routedMsg.MsgType == lnutil.MSGID_REV {
+		fmt.Printf("Got REV from %x\n", routedMsg.PeerIdx)
+		return nd.REVHandler(routedMsg)
+	}
+
+	return fmt.Errorf("Unknown message type %x", routedMsg.MsgType)
 }
 
 // OPEventHandler gets outpoint events from the base wallet,

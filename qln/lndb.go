@@ -7,7 +7,6 @@ import (
 	"github.com/boltdb/bolt"
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	"github.com/mit-dci/lit/elkrem"
@@ -93,7 +92,7 @@ type LitNode struct {
 	// Need to change this to ... a waitgroup?  map of channels?  Some other
 	// structure...
 
-	PushClear      map[chainhash.Hash]chan bool // known good txids and their heights
+	PushClear      map[uint32]chan bool // for channel concurrency and responses
 	PushClearMutex sync.Mutex
 
 	// queue for async messages to RPC user
