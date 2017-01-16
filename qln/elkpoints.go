@@ -83,7 +83,7 @@ func (q *Qchan) IngestElkrem(elk *chainhash.Hash) error {
 	}
 	fmt.Printf("ingested hash, receiver now has up to %d\n", q.ElkRcv.UpTo())
 
-	// if this is state 1, then we have elkrem 0 and we can stop here.
+	// if this is state 0, then we have elkrem 0 and we can stop here.
 	// there's nothing to revoke.
 	if q.State.StateIdx == 0 {
 		return nil

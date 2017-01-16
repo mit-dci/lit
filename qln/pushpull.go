@@ -431,33 +431,29 @@ func (nd *LitNode) GapSigRevHandler(lm *lnutil.LitMsg) error {
 	// stash previous amount here for watchtower sig creation
 	// will do this later
 	//	prevAmt := qc.State.MyAmt
-
+	q.State.MyAmt += int64(q.State.Delta)
 	q.State.Delta = q.State.Collision
 	q.State.Collision = 0
 
 	// go up to n+2 elkpoint for the signing
 	q.State.ElkPoint = q.State.N2ElkPoint
+
+	// verify elkrem and save it in ram
+	// Doesn't work.  Off by one...
+	err = q.AdvanceElkrem(revElk, n2elkPoint)
+	if err != nil {
+		return fmt.Errorf("GapSigRevHandler err %s", err.Error())
+		// ! non-recoverable error, need to close the channel here.
+	}
+
 	// state is already incremented from DeltaSigHandler, increment again for n+2
 	// (note that we've moved n here.)
-	q.State.StateIdx++
-	// amt is collision (negative) plus current amt (their delta already added
-	// in during DeltaSigHandler
-	q.State.MyAmt += int64(q.State.Collision)
-
-	// increment state for sig verification
 	q.State.StateIdx++
 
 	// verify the sig
 	err = q.VerifySig(sig)
 	if err != nil {
 		return fmt.Errorf("GapSigRevHandler err %s", err.Error())
-	}
-
-	// verify elkrem and save it in ram
-	err = q.AdvanceElkrem(revElk, n2elkPoint)
-	if err != nil {
-		return fmt.Errorf("GapSigRevHandler err %s", err.Error())
-		// ! non-recoverable error, need to close the channel here.
 	}
 
 	err = nd.SaveQchanState(q)
