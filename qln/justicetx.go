@@ -24,6 +24,7 @@ anymore.  We can hand over 1 point per commit & figure everything out from that.
 // be exported to the watchtower.
 // This get a channel that is 1 state old.  So we can produce a signature.
 func (nd *LitNode) BuildJusticeSig(q *Qchan) error {
+	// justice-ing should be done in the background...
 	var parTxidSig [80]byte // 16 byte txid and 64 byte signature stuck together
 
 	// in this function, "bad" refers to the hypothetical transaction spending the

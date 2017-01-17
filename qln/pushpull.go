@@ -439,11 +439,11 @@ func (nd *LitNode) GapSigRevHandler(lm *lnutil.LitMsg) error {
 			q.Idx(), q.State.Delta)
 	}
 
-	// stash previous amount here for watchtower sig creation
-	// will do this later
-	//	prevAmt := qc.State.MyAmt
-	q.State.MyAmt += int64(q.State.Delta)
-	q.State.Delta = q.State.Collision
+	// stash for justice tx
+	prevAmt := q.State.MyAmt - int64(q.State.Collision) // myAmt before collision
+
+	q.State.MyAmt += int64(q.State.Delta) // delta should be negative
+	q.State.Delta = q.State.Collision     // now delta is positive
 	q.State.Collision = 0
 
 	// verify elkrem and save it in ram
@@ -477,6 +477,18 @@ func (nd *LitNode) GapSigRevHandler(lm *lnutil.LitMsg) error {
 	if err != nil {
 		return fmt.Errorf("GapSigRevHandler err %s", err.Error())
 	}
+
+	// for justice, have to create signature for n-2.  Remember the n-2 amount
+
+	q.State.StateIdx -= 2
+	q.State.MyAmt = prevAmt
+
+	go func() {
+		err = nd.BuildJusticeSig(q)
+		if err != nil {
+			fmt.Printf("GapSigRevHandler BuildJusticeSig err %s", err.Error())
+		}
+	}()
 
 	return nil
 }
@@ -558,13 +570,12 @@ func (nd *LitNode) SigRevHandler(lm *lnutil.LitMsg) error {
 	qc.State.StateIdx--
 	qc.State.MyAmt = prevAmt
 
-	/*
+	go func() {
 		err = nd.BuildJusticeSig(qc)
 		if err != nil {
-			fmt.Printf("SIGREVHandler err %s", err.Error())
-			return
+			fmt.Printf("SigRevHandler BuildJusticeSig err %s", err.Error())
 		}
-	*/
+	}()
 
 	// I'm done updating this channel
 	nd.PushClear[qc.Idx()] <- true
@@ -649,14 +660,12 @@ func (nd *LitNode) REVHandler(lm *lnutil.LitMsg) error {
 	// the justice signature
 	qc.State.StateIdx--      // back one state
 	qc.State.MyAmt = prevAmt // use stashed previous state amount
-
-	/*
+	go func() {
 		err = nd.BuildJusticeSig(qc)
 		if err != nil {
-			fmt.Printf("REVHandler err %s", err.Error())
-			return
+			fmt.Printf("RevHandler BuildJusticeSig err %s", err.Error())
 		}
-	*/
+	}()
 
 	// if there was a collision & we started a push, this should clear it
 	nd.PushClear[qc.Idx()] <- true
