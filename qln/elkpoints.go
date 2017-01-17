@@ -100,14 +100,12 @@ func (q *Qchan) IngestElkrem(elk *chainhash.Hash) error {
 
 	// see if it matches previous elk point
 	if point != q.State.ElkPoint {
+		fmt.Printf("elk1: %x\nelk2: %x\nelk3: %x\nngst: %x\n",
+			q.State.ElkPoint, q.State.NextElkPoint, q.State.N2ElkPoint, point)
 		// didn't match, the whole channel is borked.
 		return fmt.Errorf("hash %x (index %d) fits tree but creates wrong elkpoint!",
-			elk[:8], q.State.ElkPoint)
+			elk[:8], q.State.StateIdx)
 	}
-
-	// it did match, so we can clear the previous HAKD pub
-	//	var empty [33]byte
-	//	q.State.PrevElkPoint = empty
 
 	return nil
 }

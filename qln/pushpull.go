@@ -108,10 +108,11 @@ func (nd LitNode) PushChannel(qc *Qchan, amt uint32) error {
 	// lock this channel
 	nd.PushClearMutex.Lock()
 	if nd.PushClear[qc.Idx()] != nil {
+		nd.PushClearMutex.Unlock()
 		return fmt.Errorf("channel %d busy", qc.Idx())
 	}
 	nd.PushClear[qc.Idx()] = make(chan bool, 1)
-	nd.PushClearMutex.Unlock()
+
 	// reload from disk here, after unlock
 	err := nd.ReloadQchan(qc)
 	if err != nil {
@@ -151,6 +152,9 @@ func (nd LitNode) PushChannel(qc *Qchan, amt uint32) error {
 	if err != nil {
 		return err
 	}
+	// move unlock to here so that delta is saved before
+	nd.PushClearMutex.Unlock()
+
 	err = nd.SendDeltaSig(qc)
 	if err != nil {
 		return err
@@ -233,10 +237,17 @@ func (nd *LitNode) DeltaSigHandler(lm *lnutil.LitMsg) error {
 		nd.PushClear[qc.Idx()] = make(chan bool, 1)
 	} else {
 		// this means there was a collision
-		// collision; incoming delta saved as collision value,
+		// reload from disk; collision may have happened after disk read
+		err := nd.ReloadQchan(qc)
+		if err != nil {
+			return fmt.Errorf("DeltaSigHandler err %s", err.Error())
+		}
+		// incoming delta saved as collision value,
 		// existing (negative) delta value retained.
+
 		qc.State.Collision = int32(incomingDelta)
 		fmt.Printf("delta sig COLLISION (%d)\n", qc.State.Collision)
+
 	}
 	nd.PushClearMutex.Unlock()
 
@@ -315,9 +326,9 @@ func (nd *LitNode) SendGapSigRev(q *Qchan) error {
 		return err
 	}
 
-	// go up to n+1 elkpoint for the signing
+	// go up to n+2 elkpoint for the signing
 	q.State.ElkPoint = q.State.N2ElkPoint
-	// state is already incremented from DeltaSigHandler, increment again for n+1
+	// state is already incremented from DeltaSigHandler, increment *again* for n+1
 	// (note that we've moved n here.)
 	q.State.StateIdx++
 	// amt is delta (negative) plus current amt (collision already added in)
@@ -365,7 +376,7 @@ func (nd *LitNode) SendSigRev(q *Qchan) error {
 	// go to next elkpoint for signing
 	// note that we have to keep the old elkpoint on disk for when the rev comes in
 	q.State.ElkPoint = q.State.NextElkPoint
-	q.State.NextElkPoint = q.State.N2ElkPoint
+	// q.State.NextElkPoint = q.State.N2ElkPoint // not needed
 	// n2elk invalid here
 
 	sig, err := nd.SignState(q)
@@ -435,16 +446,16 @@ func (nd *LitNode) GapSigRevHandler(lm *lnutil.LitMsg) error {
 	q.State.Delta = q.State.Collision
 	q.State.Collision = 0
 
-	// go up to n+2 elkpoint for the signing
-	q.State.ElkPoint = q.State.N2ElkPoint
-
 	// verify elkrem and save it in ram
-	// Doesn't work.  Off by one...
 	err = q.AdvanceElkrem(revElk, n2elkPoint)
 	if err != nil {
 		return fmt.Errorf("GapSigRevHandler err %s", err.Error())
 		// ! non-recoverable error, need to close the channel here.
 	}
+
+	// go up to n+1 elkpoint for the sig verification
+	stashElkPoint := q.State.ElkPoint
+	q.State.ElkPoint = q.State.NextElkPoint
 
 	// state is already incremented from DeltaSigHandler, increment again for n+2
 	// (note that we've moved n here.)
@@ -455,6 +466,8 @@ func (nd *LitNode) GapSigRevHandler(lm *lnutil.LitMsg) error {
 	if err != nil {
 		return fmt.Errorf("GapSigRevHandler err %s", err.Error())
 	}
+	// go back to sequential elkpoints
+	q.State.ElkPoint = stashElkPoint
 
 	err = nd.SaveQchanState(q)
 	if err != nil {
@@ -462,7 +475,7 @@ func (nd *LitNode) GapSigRevHandler(lm *lnutil.LitMsg) error {
 	}
 	err = nd.SendREV(q)
 	if err != nil {
-		return fmt.Errorf("SIGREVHandler err %s", err.Error())
+		return fmt.Errorf("GapSigRevHandler err %s", err.Error())
 	}
 
 	return nil
