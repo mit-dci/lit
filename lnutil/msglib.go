@@ -3,6 +3,7 @@ package lnutil
 // all the messages to and from peers look like this internally
 type LitMsg struct {
 	PeerIdx uint32
+	ChanIdx uint32 // optional, may be 0
 	MsgType uint8
 	Data    []byte
 }

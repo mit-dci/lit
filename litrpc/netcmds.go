@@ -84,7 +84,9 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
 	}
 
 	r.Node.RemoteMtx.Lock()
-	r.Node.RemoteCons[peerIdx] = newConn
+	var p qln.RemotePeer
+	p.Con = newConn
+	r.Node.RemoteCons[peerIdx] = p
 	r.Node.RemoteMtx.Unlock()
 
 	// each connection to a peer gets its own LNDCReader

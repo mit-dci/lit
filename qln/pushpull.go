@@ -86,15 +86,17 @@ Receive Rev for previous state
 
 // SendNextMsg determines what message needs to be sent next
 // based on the channel state.  It then calls the appropriate function.
-func (nd *LitNode) SendNextMsg(qc *Qchan) error {
+func (nd *LitNode) ReSendMsg(qc *Qchan) error {
 
 	// DeltaSig
 	if qc.State.Delta < 0 {
+		fmt.Printf("Sending previously sent DeltaSig\n")
 		return nd.SendDeltaSig(qc)
 	}
 
 	// SigRev
 	if qc.State.Delta > 0 {
+		fmt.Printf("Sending previously sent SigRev\n")
 		return nd.SendSigRev(qc)
 	}
 
@@ -119,22 +121,37 @@ func (nd LitNode) PushChannel(qc *Qchan, amt uint32) error {
 		return err
 	}
 
-	// don't try to update state until all prior updates have cleared
-	// may want to change this later, but requires other changes.
+	// if we got here, but channel is not in rest state, try to fix it.
 	if qc.State.Delta != 0 {
-		return fmt.Errorf("channel update in progress, cannot push")
+		err = nd.ReSendMsg(qc)
+		if err != nil {
+			return err
+		}
+
+		delete(nd.PushClear, qc.Idx())
+		nd.PushClearMutex.Unlock()
+		return fmt.Errorf("Didn't send.  Recovered though, so try again!")
 	}
 
 	if amt == 0 {
+
+		delete(nd.PushClear, qc.Idx())
+		nd.PushClearMutex.Unlock()
 		return fmt.Errorf("have to send non-zero amount")
 	}
 
 	if amt >= 1<<30 {
+
+		delete(nd.PushClear, qc.Idx())
+		nd.PushClearMutex.Unlock()
 		return fmt.Errorf("max send 1G sat (1073741823)")
 	}
 
 	// check if this push would lower my balance below minBal
 	if int64(amt)+minBal > qc.State.MyAmt {
+
+		delete(nd.PushClear, qc.Idx())
+		nd.PushClearMutex.Unlock()
 		return fmt.Errorf("want to push %d but %d available, %d minBal",
 			amt, qc.State.MyAmt, minBal)
 	}
@@ -142,6 +159,9 @@ func (nd LitNode) PushChannel(qc *Qchan, amt uint32) error {
 	// state 1)
 	// if qc.State.StateIdx < 2 && int64(amt)+(qc.Value-qc.State.MyAmt) < minBal {
 	if int64(amt)+(qc.Value-qc.State.MyAmt) < minBal {
+
+		delete(nd.PushClear, qc.Idx())
+		nd.PushClearMutex.Unlock()
 		return fmt.Errorf("pushing %d insufficient; counterparty minBal %d",
 			amt, minBal)
 	}
@@ -199,7 +219,7 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 	outMsg.Data = msg
 	nd.OmniOut <- outMsg
 
-	return err
+	return nil
 }
 
 // DeltaSigHandler takes in a DeltaSig and responds with an SigRev (normally)
@@ -252,8 +272,11 @@ func (nd *LitNode) DeltaSigHandler(lm *lnutil.LitMsg) error {
 	nd.PushClearMutex.Unlock()
 
 	if qc.State.Delta > 0 {
-		return fmt.Errorf("DeltaSigHandler err: chan %d is delta %d, expect rev",
+		fmt.Printf(
+			"DeltaSigHandler err: chan %d delta %d, expect rev, send empty rev",
 			qc.Idx(), qc.State.Delta)
+
+		return nd.SendREV(qc)
 	}
 
 	if qc.State.Collision == 0 {
@@ -517,9 +540,14 @@ func (nd *LitNode) SigRevHandler(lm *lnutil.LitMsg) error {
 	}
 
 	// check if we're supposed to get a SigRev now. Delta should be negative
-	if qc.State.Delta >= 0 {
-		return fmt.Errorf("SIGREVHandler err: chan %d unexpected SigRev, delta %d",
+	if qc.State.Delta > 0 {
+		return fmt.Errorf("SIGREVHandler err: chan %d got SigRev, expect Rev. delta %d",
 			qc.Idx(), qc.State.Delta)
+	}
+
+	if qc.State.Delta == 0 {
+		// re-sent last rev; they probably didn't get it
+		return nd.SendREV(qc)
 	}
 
 	if qc.State.Collision != 0 {
@@ -637,8 +665,12 @@ func (nd *LitNode) REVHandler(lm *lnutil.LitMsg) error {
 
 	// check if there's nothing for them to revoke
 	if qc.State.Delta == 0 {
-		return fmt.Errorf("got REV message with hash %s, but nothing to revoke\n",
-			revElk.String())
+		return fmt.Errorf("got REV, expected deltaSig, ignoring.", revElk.String())
+	}
+	// maybe this is an unexpected rev, asking us for a rev repeat
+	if qc.State.Delta < 0 {
+		fmt.Printf("got Rev, expected SigRev.  Re-sending last REV.\n")
+		return nd.SendREV(qc)
 	}
 
 	// verify elkrem

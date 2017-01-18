@@ -70,7 +70,7 @@ type LitNode struct {
 	// and network i/o
 	BaseWallet UWallet
 
-	RemoteCons map[uint32]*lndc.LNDConn
+	RemoteCons map[uint32]RemotePeer
 	RemoteMtx  sync.Mutex
 
 	// WatchCon is currently just for the watchtower
@@ -97,6 +97,10 @@ type LitNode struct {
 
 	// queue for async messages to RPC user
 	UserMessageBox chan string
+}
+
+type RemotePeer struct {
+	Con *lndc.LNDConn
 }
 
 // InFlightFund is a funding transaction that has not yet been broadcast

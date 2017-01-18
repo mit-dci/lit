@@ -9,89 +9,76 @@ import (
 )
 
 // handles stuff that comes in over the wire.  Not user-initiated.
-func (nd *LitNode) OmniHandler() {
-	for {
-		routedMsg := <-nd.OmniIn // blocks here
+func (nd *LitNode) PeerHandler(msg *lnutil.LitMsg) error {
 
-		// TEXT MESSAGE.  SIMPLE
-		if routedMsg.MsgType == lnutil.MSGID_TEXTCHAT { //it's text
-			nd.UserMessageBox <- fmt.Sprintf(
-				"msg from %d: %s", routedMsg.PeerIdx, routedMsg.Data)
-			continue
-		}
-		// POINT REQUEST
-		if routedMsg.MsgType == lnutil.MSGID_POINTREQ {
-			fmt.Printf("Got point request from %x\n", routedMsg.PeerIdx)
-			nd.PointReqHandler(routedMsg)
-			continue
-		}
-		// POINT RESPONSE
-		if routedMsg.MsgType == lnutil.MSGID_POINTRESP {
-			fmt.Printf("Got point response from %x\n", routedMsg.PeerIdx)
-			err := nd.PointRespHandler(routedMsg)
-			if err != nil {
-				log.Printf(err.Error())
-			}
-			continue
-		}
-		// CHANNEL DESCRIPTION
-		if routedMsg.MsgType == lnutil.MSGID_CHANDESC {
-			fmt.Printf("Got channel description from %x\n", routedMsg.PeerIdx)
-			nd.QChanDescHandler(routedMsg)
-			continue
-		}
-		// CHANNEL ACKNOWLEDGE
-		if routedMsg.MsgType == lnutil.MSGID_CHANACK {
-			fmt.Printf("Got channel acknowledgement from %x\n", routedMsg.PeerIdx)
-			nd.QChanAckHandler(routedMsg)
-			continue
-		}
-		// HERE'S YOUR CHANNEL
-		if routedMsg.MsgType == lnutil.MSGID_SIGPROOF {
-			fmt.Printf("Got channel proof from %x\n", routedMsg.PeerIdx)
-			nd.SigProofHandler(routedMsg)
-			continue
-		}
-		// CLOSE REQ
-		if routedMsg.MsgType == lnutil.MSGID_CLOSEREQ {
-			fmt.Printf("Got close request from %x\n", routedMsg.PeerIdx)
-			nd.CloseReqHandler(routedMsg)
-			continue
-		}
-		// CLOSE RESP
-		//		if msgid == uspv.MSGID_CLOSERESP {
-		//			fmt.Printf("Got close response from %x\n", from)
-		//			CloseRespHandler(from, msg[1:])
-		//			continue
-		//		}
-
-		// PUSH type messages are 0x8?, and get their own helper function
-		if routedMsg.MsgType&0xf0 == 0x80 {
-			err := nd.PushPullHandler(routedMsg)
-			if err != nil {
-				fmt.Printf(err.Error())
-			}
-			continue
-		}
-
-		// messages to hand to the watchtower all start with 0xa_
-		// don't strip the first byte before handing it over
-		if routedMsg.MsgType&0xf0 == 0xa0 {
-			if !nd.Tower.Accepting {
-				fmt.Printf("Error: Got tower msg from %x but tower disabled\n",
-					routedMsg.PeerIdx)
-				continue
-			}
-			err := nd.Tower.HandleMessage(routedMsg)
-			if err != nil {
-				fmt.Printf(err.Error())
-			}
-			continue
-		}
-
-		fmt.Printf("Unknown message id byte %x &f0", routedMsg.MsgType)
-		continue
+	// TEXT MESSAGE.  SIMPLE
+	if msg.MsgType == lnutil.MSGID_TEXTCHAT { //it's text
+		nd.UserMessageBox <- fmt.Sprintf(
+			"msg from %d: %s", msg.PeerIdx, msg.Data)
+		return nil
 	}
+	// POINT REQUEST
+	if msg.MsgType == lnutil.MSGID_POINTREQ {
+		fmt.Printf("Got point request from %x\n", msg.PeerIdx)
+		nd.PointReqHandler(msg)
+		return nil
+	}
+	// POINT RESPONSE
+	if msg.MsgType == lnutil.MSGID_POINTRESP {
+		fmt.Printf("Got point response from %x\n", msg.PeerIdx)
+		err := nd.PointRespHandler(msg)
+		if err != nil {
+			log.Printf(err.Error())
+		}
+		return nil
+	}
+	// CHANNEL DESCRIPTION
+	if msg.MsgType == lnutil.MSGID_CHANDESC {
+		fmt.Printf("Got channel description from %x\n", msg.PeerIdx)
+		nd.QChanDescHandler(msg)
+		return nil
+	}
+	// CHANNEL ACKNOWLEDGE
+	if msg.MsgType == lnutil.MSGID_CHANACK {
+		fmt.Printf("Got channel acknowledgement from %x\n", msg.PeerIdx)
+		nd.QChanAckHandler(msg)
+		return nil
+	}
+	// HERE'S YOUR CHANNEL
+	if msg.MsgType == lnutil.MSGID_SIGPROOF {
+		fmt.Printf("Got channel proof from %x\n", msg.PeerIdx)
+		nd.SigProofHandler(msg)
+		return nil
+	}
+	// CLOSE REQ
+	if msg.MsgType == lnutil.MSGID_CLOSEREQ {
+		fmt.Printf("Got close request from %x\n", msg.PeerIdx)
+		nd.CloseReqHandler(msg)
+		return nil
+	}
+	// CLOSE RESP
+	//		if msgid == uspv.MSGID_CLOSERESP {
+	//			fmt.Printf("Got close response from %x\n", from)
+	//			CloseRespHandler(from, msg[1:])
+	//			continue
+	//		}
+
+	// PUSH type messages are 0x8?, and get their own helper function
+	if msg.MsgType&0xf0 == 0x80 {
+		return nd.PushPullHandler(msg)
+	}
+
+	// messages to hand to the watchtower all start with 0xa_
+	// don't strip the first byte before handing it over
+	if msg.MsgType&0xf0 == 0xa0 {
+		if !nd.Tower.Accepting {
+			return fmt.Errorf("Error: Got tower msg from %x but tower disabled\n",
+				msg.PeerIdx)
+		}
+		return nd.Tower.HandleMessage(msg)
+	}
+
+	return fmt.Errorf("Unknown message id byte %x &f0", msg.MsgType)
 }
 
 // Every lndc has one of these running
@@ -113,9 +100,15 @@ func (nd *LitNode) LNDCReader(l net.Conn, peerIdx uint32) error {
 		routedMsg.MsgType = msg[0]
 		routedMsg.Data = msg[1:]
 
-		nd.OmniIn <- routedMsg
+		err = nd.PeerHandler(routedMsg)
+		if err != nil {
+			fmt.Printf("PeerHandler error with %d: %s\n",
+				peerIdx, err.Error())
+		}
 	}
 }
+
+// need a go routine for each qchan.
 
 func (nd *LitNode) PushPullHandler(routedMsg *lnutil.LitMsg) error {
 

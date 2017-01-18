@@ -51,7 +51,9 @@ func (nd *LitNode) TCPListener(lisIpPort string) (*btcutil.AddressPubKeyHash, er
 			}
 
 			nd.RemoteMtx.Lock()
-			nd.RemoteCons[peerIdx] = newConn
+			var peer RemotePeer
+			peer.Con = newConn
+			nd.RemoteCons[peerIdx] = peer
 			nd.RemoteMtx.Unlock()
 
 			// each connection to a peer gets its own LNDCReader
@@ -73,9 +75,9 @@ func (nd *LitNode) OutMessager() {
 
 		rawmsg := append([]byte{msg.MsgType}, msg.Data...)
 		nd.RemoteMtx.Lock() // not sure this is needed...
-		n, err := nd.RemoteCons[msg.PeerIdx].Write(rawmsg)
+		n, err := nd.RemoteCons[msg.PeerIdx].Con.Write(rawmsg)
 		if err != nil {
-			fmt.Printf("error writing to peer %d: %s\n", err.Error())
+			fmt.Printf("error writing to peer %d: %s\n", msg.PeerIdx, err.Error())
 		} else {
 			fmt.Printf("type %x %d bytes to peer %d\n", msg.MsgType, n, msg.PeerIdx)
 		}
@@ -95,7 +97,7 @@ func (nd *LitNode) GetConnectedPeerList() []PeerInfo {
 	for k, v := range nd.RemoteCons {
 		var newPeer PeerInfo
 		newPeer.PeerNumber = k
-		newPeer.RemoteHost = v.RemoteAddr().String()
+		newPeer.RemoteHost = v.Con.RemoteAddr().String()
 		peers = append(peers, newPeer)
 	}
 	return peers
