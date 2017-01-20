@@ -52,15 +52,59 @@ func (nd *LitNode) TCPListener(lisIpPort string) (*btcutil.AddressPubKeyHash, er
 
 			nd.RemoteMtx.Lock()
 			var peer RemotePeer
+			peer.Idx = peerIdx
 			peer.Con = newConn
 			nd.RemoteCons[peerIdx] = peer
 			nd.RemoteMtx.Unlock()
 
 			// each connection to a peer gets its own LNDCReader
-			go nd.LNDCReader(newConn, peerIdx)
+			go nd.LNDCReader(&peer)
 		}
 	}()
 	return lisAdr, nil
+}
+
+// DialPeer makes an outgoing connection to another node.
+func (nd *LitNode) DialPeer(lnAdr *lndc.LNAdr) error {
+	// get my private ID key
+	idPriv := nd.IdKey()
+
+	// Assign remote connection
+	newConn := new(lndc.LNDConn)
+
+	var id []byte
+	if lnAdr.PubKey != nil {
+		id = lnAdr.PubKey.SerializeCompressed()
+	} else {
+		id = lnAdr.Base58Adr.ScriptAddress()
+	}
+
+	err := newConn.Dial(idPriv, lnAdr.NetAddr.String(), id)
+	if err != nil {
+		return err
+	}
+
+	// if connect is successful, either query for already existing peer index, or
+	// if the peer is new, make an new index, and save the hostname&port
+
+	// figure out peer index, or assign new one for new peer.  Since
+	// we're connecting out, also specify the hostname&port
+	peerIdx, err := nd.GetPeerIdx(newConn.RemotePub, newConn.RemoteAddr().String())
+	if err != nil {
+		return err
+	}
+
+	nd.RemoteMtx.Lock()
+	var p RemotePeer
+	p.Con = newConn
+	p.Idx = peerIdx
+	nd.RemoteCons[peerIdx] = p
+	nd.RemoteMtx.Unlock()
+
+	// each connection to a peer gets its own LNDCReader
+	go nd.LNDCReader(&p)
+
+	return nil
 }
 
 // OutMessager takes messages from the outbox and sends them to the ether. net.

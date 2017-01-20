@@ -110,6 +110,10 @@ type PushReply struct {
 	StateIndex uint64
 }
 
+// Push is the command to push miney to the other side of the channel.
+// Currently waits for the process to complete before returning.
+// Will change to .. tries to send, but may not complete.
+
 func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 
 	if args.Amt > 100000000 || args.Amt < 1 {

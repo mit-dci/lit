@@ -474,7 +474,7 @@ func (nd *LitNode) QChanDescHandler(lm *lnutil.LitMsg) {
 // FUNDER
 // QChanAckHandler takes in an acknowledgement multisig description.
 // when a multisig outpoint is ackd, that causes the funder to sign and broadcast.
-func (nd *LitNode) QChanAckHandler(lm *lnutil.LitMsg) {
+func (nd *LitNode) QChanAckHandler(lm *lnutil.LitMsg, peer *RemotePeer) {
 	if len(lm.Data) < 199 || len(lm.Data) > 199 {
 		fmt.Printf("got %d byte multiAck, expect 199", len(lm.Data))
 		return
@@ -556,6 +556,9 @@ func (nd *LitNode) QChanAckHandler(lm *lnutil.LitMsg) {
 	nd.InProg.Clear()
 	nd.InProg.mtx.Unlock()
 
+	peer.QCs[qc.Idx()] = qc
+	peer.OpMap[opArr] = qc.Idx()
+
 	// sig proof should be sent later once there are confirmations.
 	// it'll have an spv proof of the fund tx.
 	// but for now just send the sig.
@@ -575,7 +578,7 @@ func (nd *LitNode) QChanAckHandler(lm *lnutil.LitMsg) {
 // RECIPIENT
 // SigProofHandler saves the signature the recipent stores.
 // In some cases you don't need this message.
-func (nd *LitNode) SigProofHandler(lm *lnutil.LitMsg) {
+func (nd *LitNode) SigProofHandler(lm *lnutil.LitMsg, peer *RemotePeer) {
 	if len(lm.Data) < 100 || len(lm.Data) > 100 {
 		fmt.Printf("got %d byte Sigproof, expect ~100\n", len(lm.Data))
 		return
@@ -618,6 +621,9 @@ func (nd *LitNode) SigProofHandler(lm *lnutil.LitMsg) {
 	nullTxo.KeyGen = qc.KeyGen
 	nullTxo.KeyGen.Step[2] = UseChannelWatchRefund
 	nd.BaseWallet.ExportUtxo(nullTxo)
+
+	peer.QCs[qc.Idx()] = qc
+	peer.OpMap[opArr] = qc.Idx()
 
 	// sig OK; in terms of UI here's where you can say "payment received"
 	// "channel online" etc

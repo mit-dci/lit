@@ -37,12 +37,12 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
 
 	// first, see if the peer to connect to is referenced by peer index.
 	var connectAdr *lndc.LNAdr
-	var peerIdx uint32
 
 	// check if a peer number was supplied instead of a pubkeyhash
 	peerIdxint, err := strconv.Atoi(args.LNAddr)
 	// number will mean no error
 	if err == nil {
+		// get peer from address book
 		pubArr, host := r.Node.GetPubHostFromPeerIdx(uint32(peerIdxint))
 		adrString := fmt.Sprintf("%x", pubArr)
 		if host != "" {
@@ -54,45 +54,21 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
 		if err != nil {
 			return err
 		}
-		// get peer from address book
+
 	} else {
+		// use string as is
 		connectAdr, err = lndc.LnAddrFromString(args.LNAddr)
 		if err != nil {
 			return err
 		}
 	}
 
-	// get my private ID key
-	idPriv := r.Node.IdKey()
-
-	// Assign remote connection
-	newConn := new(lndc.LNDConn)
-
-	err = newConn.Dial(idPriv,
-		connectAdr.NetAddr.String(), connectAdr.Base58Adr.ScriptAddress())
-	if err != nil {
-		return err
-	}
-	// if connect is successful, either query for already existing peer index, or
-	// if the peer is new, make an new index, and save the hostname&port
-
-	// figure out peer index, or assign new one for new peer.  Since
-	// we're connecting out, also specify the hostname&port
-	peerIdx, err = r.Node.GetPeerIdx(newConn.RemotePub, newConn.RemoteAddr().String())
+	err = r.Node.DialPeer(connectAdr)
 	if err != nil {
 		return err
 	}
 
-	r.Node.RemoteMtx.Lock()
-	var p qln.RemotePeer
-	p.Con = newConn
-	r.Node.RemoteCons[peerIdx] = p
-	r.Node.RemoteMtx.Unlock()
-
-	// each connection to a peer gets its own LNDCReader
-	go r.Node.LNDCReader(newConn, peerIdx)
-
-	reply.Status = fmt.Sprintf("connected to peer %d", peerIdx)
+	reply.Status = fmt.Sprintf("connected to peer %s", connectAdr.String())
 	return nil
 }
 

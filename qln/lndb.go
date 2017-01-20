@@ -100,7 +100,10 @@ type LitNode struct {
 }
 
 type RemotePeer struct {
-	Con *lndc.LNDConn
+	Idx   uint32 // the peer index
+	Con   *lndc.LNDConn
+	QCs   map[uint32]*Qchan   // keep map of all peer's channels in ram
+	OpMap map[[36]byte]uint32 // quick lookup for channels
 }
 
 // InFlightFund is a funding transaction that has not yet been broadcast
@@ -153,22 +156,6 @@ func (nd *LitNode) GetPubHostFromPeerIdx(idx uint32) ([33]byte, string) {
 		fmt.Printf(err.Error())
 	}
 	return pub, host
-}
-
-// CountKeysInBucket is needed for NewPeer.  Counts keys in a bucket without
-// going into the sub-buckets and their keys. 2^32 max.
-// returns 0xffffffff if there's an error
-func CountKeysInBucketx(bkt *bolt.Bucket) uint32 {
-	var i uint32
-	err := bkt.ForEach(func(_, _ []byte) error {
-		i++
-		return nil
-	})
-	if err != nil {
-		fmt.Printf("CountKeysInBucket error: %s\n", err.Error())
-		return 0xffffffff
-	}
-	return i
 }
 
 // NextIdx returns the next channel index to use.
@@ -568,7 +555,7 @@ func (nd *LitNode) GetAllQchans() ([]*Qchan, error) {
 	return qChans, nil
 }
 
-// GetQchan returns a single multi out.  You need to specify the peer
+// GetQchan returns a single channel.
 // pubkey and outpoint bytes.
 func (nd *LitNode) GetQchan(opArr [36]byte) (*Qchan, error) {
 

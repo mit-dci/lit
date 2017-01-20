@@ -106,7 +106,25 @@ func (nd *LitNode) ReSendMsg(qc *Qchan) error {
 
 // PushChannel initiates a state update by sending an DeltaSig
 func (nd LitNode) PushChannel(qc *Qchan, amt uint32) error {
-	// first, see if channel is busy, error if so, lock if not
+	// sanity checks
+	if amt >= 1<<30 {
+		return fmt.Errorf("max send 1G sat (1073741823)")
+	}
+	if amt == 0 {
+		return fmt.Errorf("have to send non-zero amount")
+	}
+	// check if this push would lower my balance below minBal
+	if int64(amt)+minBal > qc.State.MyAmt {
+		return fmt.Errorf("want to push %d but %d available, %d minBal",
+			amt, qc.State.MyAmt, minBal)
+	}
+	// check if this push is sufficient to get them above minBal
+	if int64(amt)+(qc.Value-qc.State.MyAmt) < minBal {
+		return fmt.Errorf("pushing %d insufficient; counterparty minBal %d",
+			amt, minBal)
+	}
+
+	// see if channel is busy, error if so, lock if not
 	// lock this channel
 	nd.PushClearMutex.Lock()
 	if nd.PushClear[qc.Idx()] != nil {
@@ -131,39 +149,6 @@ func (nd LitNode) PushChannel(qc *Qchan, amt uint32) error {
 		delete(nd.PushClear, qc.Idx())
 		nd.PushClearMutex.Unlock()
 		return fmt.Errorf("Didn't send.  Recovered though, so try again!")
-	}
-
-	if amt == 0 {
-
-		delete(nd.PushClear, qc.Idx())
-		nd.PushClearMutex.Unlock()
-		return fmt.Errorf("have to send non-zero amount")
-	}
-
-	if amt >= 1<<30 {
-
-		delete(nd.PushClear, qc.Idx())
-		nd.PushClearMutex.Unlock()
-		return fmt.Errorf("max send 1G sat (1073741823)")
-	}
-
-	// check if this push would lower my balance below minBal
-	if int64(amt)+minBal > qc.State.MyAmt {
-
-		delete(nd.PushClear, qc.Idx())
-		nd.PushClearMutex.Unlock()
-		return fmt.Errorf("want to push %d but %d available, %d minBal",
-			amt, qc.State.MyAmt, minBal)
-	}
-	// check if this push is sufficient to get them above minBal (only needed at
-	// state 1)
-	// if qc.State.StateIdx < 2 && int64(amt)+(qc.Value-qc.State.MyAmt) < minBal {
-	if int64(amt)+(qc.Value-qc.State.MyAmt) < minBal {
-
-		delete(nd.PushClear, qc.Idx())
-		nd.PushClearMutex.Unlock()
-		return fmt.Errorf("pushing %d insufficient; counterparty minBal %d",
-			amt, minBal)
 	}
 
 	qc.State.Delta = int32(-amt)
@@ -225,25 +210,23 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 // DeltaSigHandler takes in a DeltaSig and responds with an SigRev (normally)
 // or a GapSigRev (if there's a collision)
 // Leaves the channel either expecting a Rev (normally) or a GapSigRev (collision)
-func (nd *LitNode) DeltaSigHandler(lm *lnutil.LitMsg) error {
+func (nd *LitNode) DeltaSigHandler(lm *lnutil.LitMsg, qc *Qchan) error {
 
 	if len(lm.Data) < 104 || len(lm.Data) > 104 {
 		return fmt.Errorf("got %d byte DeltaSig, expect 104", len(lm.Data))
 	}
 
-	var opArr [36]byte
 	var incomingDelta uint32
 	var incomingSig [64]byte
 	// deserialize DeltaSig
-	copy(opArr[:], lm.Data[:36])
 	incomingDelta = lnutil.BtU32(lm.Data[36:40])
 	copy(incomingSig[:], lm.Data[40:])
 
-	// see if there is an actual channel
-	// load qchan & state from DB
-	qc, err := nd.GetQchan(opArr)
+	// reload state from DB
+
+	err := nd.ReloadQchan(qc)
 	if err != nil {
-		return fmt.Errorf("DeltaSigHandler GetQchan err %s", err.Error())
+		return fmt.Errorf("DeltaSigHandler ReloadQchan err %s", err.Error())
 	}
 
 	if qc.CloseData.Closed {
@@ -435,22 +418,20 @@ func (nd *LitNode) SendSigRev(q *Qchan) error {
 
 // GapSigRevHandler takes in a GapSigRev, responds with a Rev, and
 // leaves the channel in a state expecting a Rev.
-func (nd *LitNode) GapSigRevHandler(lm *lnutil.LitMsg) error {
+func (nd *LitNode) GapSigRevHandler(lm *lnutil.LitMsg, q *Qchan) error {
 	if len(lm.Data) < 165 || len(lm.Data) > 165 {
 		return fmt.Errorf("got %d byte GAPSIGREV, expect 165", len(lm.Data))
 	}
 
-	var opArr [36]byte
 	var sig [64]byte
 	var n2elkPoint [33]byte
 	// deserialize GapSigRev
-	copy(opArr[:], lm.Data[:36])
 	copy(sig[:], lm.Data[36:100])
 	revElk, _ := chainhash.NewHash(lm.Data[100:132])
 	copy(n2elkPoint[:], lm.Data[132:])
 
 	// load qchan & state from DB
-	q, err := nd.GetQchan(opArr)
+	err := nd.ReloadQchan(q)
 	if err != nil {
 		return fmt.Errorf("GapSigRevHandler err %s", err.Error())
 	}
@@ -518,23 +499,20 @@ func (nd *LitNode) GapSigRevHandler(lm *lnutil.LitMsg) error {
 
 // SIGREVHandler takes in an SIGREV and responds with a REV (if everything goes OK)
 // Leaves the channel in a clear / rest state.
-func (nd *LitNode) SigRevHandler(lm *lnutil.LitMsg) error {
-
+func (nd *LitNode) SigRevHandler(lm *lnutil.LitMsg, qc *Qchan) error {
 	if len(lm.Data) < 165 || len(lm.Data) > 165 {
 		return fmt.Errorf("got %d byte SIGREV, expect 165", len(lm.Data))
 	}
 
-	var opArr [36]byte
 	var sig [64]byte
 	var n2elkPoint [33]byte
 	// deserialize SIGREV
-	copy(opArr[:], lm.Data[:36])
 	copy(sig[:], lm.Data[36:100])
 	revElk, _ := chainhash.NewHash(lm.Data[100:132])
 	copy(n2elkPoint[:], lm.Data[132:])
 
 	// load qchan & state from DB
-	qc, err := nd.GetQchan(opArr)
+	err := nd.ReloadQchan(qc)
 	if err != nil {
 		return fmt.Errorf("SIGREVHandler err %s", err.Error())
 	}
@@ -646,19 +624,18 @@ func (nd *LitNode) SendREV(q *Qchan) error {
 // REVHandler takes in an REV and clears the state's prev HAKD.  This is the
 // final message in the state update process and there is no response.
 // Leaves the channel in a clear / rest state.
-func (nd *LitNode) REVHandler(lm *lnutil.LitMsg) error {
+func (nd *LitNode) RevHandler(lm *lnutil.LitMsg, qc *Qchan) error {
 	if len(lm.Data) != 101 {
 		return fmt.Errorf("got %d byte REV, expect 101", len(lm.Data))
 	}
-	var opArr [36]byte
+
 	var n2elkPoint [33]byte
 	// deserialize SigRev
-	copy(opArr[:], lm.Data[:36])
 	revElk, _ := chainhash.NewHash(lm.Data[36:68])
 	copy(n2elkPoint[:], lm.Data[68:])
 
 	// load qchan & state from DB
-	qc, err := nd.GetQchan(opArr)
+	err := nd.ReloadQchan(qc)
 	if err != nil {
 		return fmt.Errorf("REVHandler err %s", err.Error())
 	}

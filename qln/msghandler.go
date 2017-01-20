@@ -3,13 +3,12 @@ package qln
 import (
 	"fmt"
 	"log"
-	"net"
 
 	"github.com/mit-dci/lit/lnutil"
 )
 
 // handles stuff that comes in over the wire.  Not user-initiated.
-func (nd *LitNode) PeerHandler(msg *lnutil.LitMsg) error {
+func (nd *LitNode) PeerHandler(msg *lnutil.LitMsg, q *Qchan, peer *RemotePeer) error {
 
 	// TEXT MESSAGE.  SIMPLE
 	if msg.MsgType == lnutil.MSGID_TEXTCHAT { //it's text
@@ -41,13 +40,13 @@ func (nd *LitNode) PeerHandler(msg *lnutil.LitMsg) error {
 	// CHANNEL ACKNOWLEDGE
 	if msg.MsgType == lnutil.MSGID_CHANACK {
 		fmt.Printf("Got channel acknowledgement from %x\n", msg.PeerIdx)
-		nd.QChanAckHandler(msg)
+		nd.QChanAckHandler(msg, peer)
 		return nil
 	}
 	// HERE'S YOUR CHANNEL
 	if msg.MsgType == lnutil.MSGID_SIGPROOF {
 		fmt.Printf("Got channel proof from %x\n", msg.PeerIdx)
-		nd.SigProofHandler(msg)
+		nd.SigProofHandler(msg, peer)
 		return nil
 	}
 	// CLOSE REQ
@@ -65,7 +64,10 @@ func (nd *LitNode) PeerHandler(msg *lnutil.LitMsg) error {
 
 	// PUSH type messages are 0x8?, and get their own helper function
 	if msg.MsgType&0xf0 == 0x80 {
-		return nd.PushPullHandler(msg)
+		if q == nil {
+			return fmt.Errorf("pushpull message but no matching channel")
+		}
+		return nd.PushPullHandler(msg, q)
 	}
 
 	// messages to hand to the watchtower all start with 0xa_
@@ -84,55 +86,97 @@ func (nd *LitNode) PeerHandler(msg *lnutil.LitMsg) error {
 // Every lndc has one of these running
 // it listens for incoming messages on the lndc and hands it over
 // to the OmniHandler via omnichan
-func (nd *LitNode) LNDCReader(l net.Conn, peerIdx uint32) error {
+func (nd *LitNode) LNDCReader(peer *RemotePeer) error {
+	// this is a new peer connection; load all channels for this peer
+
+	// no concurrency risk since we just got this map
+	// have this as a separate func to drop extra channels from mem
+	err := nd.PopulateQchanMap(peer)
+	if err != nil {
+		return err
+	}
+	var opArr [36]byte
+	// make a local map of outpoints to channel indexes
+	peer.OpMap = make(map[[36]byte]uint32)
+	// inerate through all this peer's channels to extract outpoints
+	for _, q := range peer.QCs {
+		opArr = lnutil.OutPointToBytes(q.Op)
+		peer.OpMap[opArr] = q.Idx()
+	}
+
 	for {
 		msg := make([]byte, 65535)
 		//	fmt.Printf("read message from %x\n", l.RemoteLNId)
-		n, err := l.Read(msg)
+		n, err := peer.Con.Read(msg)
 		if err != nil {
-			fmt.Printf("read error with %d: %s\n",
-				peerIdx, err.Error())
-			return l.Close()
+			fmt.Printf("read error with %d: %s\n", peer.Idx, err.Error())
+			return peer.Con.Close()
 		}
 		msg = msg[:n]
 		routedMsg := new(lnutil.LitMsg)
-		routedMsg.PeerIdx = peerIdx
+		// if message is long enough, try to set channel index of message
+		if len(msg) > 38 {
+			copy(opArr[:], msg[1:37])
+			chanIdx, ok := peer.OpMap[opArr]
+			if ok {
+				routedMsg.ChanIdx = chanIdx
+			}
+		}
+		routedMsg.PeerIdx = peer.Idx
 		routedMsg.MsgType = msg[0]
 		routedMsg.Data = msg[1:]
-
-		err = nd.PeerHandler(routedMsg)
+		if routedMsg.ChanIdx != 0 {
+			err = nd.PeerHandler(routedMsg, peer.QCs[routedMsg.ChanIdx], peer)
+		} else {
+			err = nd.PeerHandler(routedMsg, nil, peer)
+		}
 		if err != nil {
-			fmt.Printf("PeerHandler error with %d: %s\n",
-				peerIdx, err.Error())
+			fmt.Printf("PeerHandler error with %d: %s\n", peer.Idx, err.Error())
 		}
 	}
 }
 
+func (nd *LitNode) PopulateQchanMap(peer *RemotePeer) error {
+	allQs, err := nd.GetAllQchans()
+	if err != nil {
+		return err
+	}
+	// initialize map
+	peer.QCs = make(map[uint32]*Qchan)
+	// populate from all channels (inefficient)
+	for i, q := range allQs {
+		if q.Peer() == peer.Idx {
+			peer.QCs[q.Idx()] = allQs[i]
+		}
+	}
+	return nil
+}
+
 // need a go routine for each qchan.
 
-func (nd *LitNode) PushPullHandler(routedMsg *lnutil.LitMsg) error {
+func (nd *LitNode) PushPullHandler(routedMsg *lnutil.LitMsg, q *Qchan) error {
 
 	if routedMsg.MsgType == lnutil.MSGID_DELTASIG {
 		fmt.Printf("Got DELTASIG from %x\n", routedMsg.PeerIdx)
-		return nd.DeltaSigHandler(routedMsg)
+		return nd.DeltaSigHandler(routedMsg, q)
 	}
 
 	// SIGNATURE AND REVOCATION
 	if routedMsg.MsgType == lnutil.MSGID_SIGREV {
 		fmt.Printf("Got SIGREV from %x\n", routedMsg.PeerIdx)
-		return nd.SigRevHandler(routedMsg)
+		return nd.SigRevHandler(routedMsg, q)
 	}
 
 	// GAP SIGNATURE AND REVOCATION
 	if routedMsg.MsgType == lnutil.MSGID_GAPSIGREV {
 		fmt.Printf("Got GapSigRev from %x\n", routedMsg.PeerIdx)
-		return nd.GapSigRevHandler(routedMsg)
+		return nd.GapSigRevHandler(routedMsg, q)
 	}
 
 	// REVOCATION
 	if routedMsg.MsgType == lnutil.MSGID_REV {
 		fmt.Printf("Got REV from %x\n", routedMsg.PeerIdx)
-		return nd.REVHandler(routedMsg)
+		return nd.RevHandler(routedMsg, q)
 	}
 
 	return fmt.Errorf("Unknown message type %x", routedMsg.MsgType)
