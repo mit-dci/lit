@@ -40,9 +40,7 @@ func (nd *LitNode) Init(
 	nd.InProg = new(InFlightFund)
 	nd.InProg.done = make(chan uint32, 1)
 
-	nd.RemoteCons = make(map[uint32]RemotePeer)
-
-	nd.PushClear = make(map[uint32]chan bool)
+	nd.RemoteCons = make(map[uint32]*RemotePeer)
 
 	nd.OmniOut = make(chan *lnutil.LitMsg, 10)
 	nd.OmniIn = make(chan *lnutil.LitMsg, 10)

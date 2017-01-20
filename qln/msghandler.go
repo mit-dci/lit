@@ -62,8 +62,8 @@ func (nd *LitNode) PeerHandler(msg *lnutil.LitMsg, q *Qchan, peer *RemotePeer) e
 	//			continue
 	//		}
 
-	// PUSH type messages are 0x8?, and get their own helper function
-	if msg.MsgType&0xf0 == 0x80 {
+	// PUSH type messages are 0x7?, and get their own helper function
+	if msg.MsgType&0xf0 == 0x70 {
 		if q == nil {
 			return fmt.Errorf("pushpull message but no matching channel")
 		}

@@ -122,9 +122,28 @@ func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 
 	fmt.Printf("push %d to chan %d\n", args.Amt, args.ChanIdx)
 
-	qc, err := r.Node.GetQchanByIdx(args.ChanIdx)
+	// load the whole channel from disk just to see who the peer is
+	// (pretty inefficient)
+	dummyqc, err := r.Node.GetQchanByIdx(args.ChanIdx)
 	if err != nil {
 		return err
+	}
+
+	// but we want to reference the qc that's already in ram
+	// first see if we're connected to that peer
+
+	// map read, need mutex...?
+	r.Node.RemoteMtx.Lock()
+	peer, ok := r.Node.RemoteCons[dummyqc.Peer()]
+	r.Node.RemoteMtx.Unlock()
+	if !ok {
+		return fmt.Errorf("not connected to peer %d for channel %d",
+			dummyqc.Peer(), dummyqc.Idx())
+	}
+	qc, ok := peer.QCs[dummyqc.Idx()]
+	if !ok {
+		return fmt.Errorf("peer %d doesn't have channel %d",
+			dummyqc.Peer(), dummyqc.Idx())
 	}
 
 	fmt.Printf("channel %s\n", qc.Op.String())
@@ -132,13 +151,6 @@ func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 	if qc.CloseData.Closed {
 		return fmt.Errorf("Channel %d already closed by tx %s",
 			args.ChanIdx, qc.CloseData.CloseTxid.String())
-	}
-
-	r.Node.RemoteMtx.Lock()
-	_, ok := r.Node.RemoteCons[qc.Peer()]
-	r.Node.RemoteMtx.Unlock()
-	if !ok {
-		return fmt.Errorf("not connected to specified peer %d ", qc.Peer())
 	}
 
 	err = r.Node.PushChannel(qc, uint32(args.Amt))

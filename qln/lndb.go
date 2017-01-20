@@ -70,7 +70,7 @@ type LitNode struct {
 	// and network i/o
 	BaseWallet UWallet
 
-	RemoteCons map[uint32]RemotePeer
+	RemoteCons map[uint32]*RemotePeer
 	RemoteMtx  sync.Mutex
 
 	// WatchCon is currently just for the watchtower
@@ -86,14 +86,6 @@ type LitNode struct {
 
 	// Params live here... AND SCon
 	Param *chaincfg.Params // network parameters (testnet3, segnet, etc)
-
-	// UpdateClear has notifications of when LN channel updates finish.
-	// Right now doesn't distinguish between LN channels, so can only do 1 at a time.
-	// Need to change this to ... a waitgroup?  map of channels?  Some other
-	// structure...
-
-	PushClear      map[uint32]chan bool // for channel concurrency and responses
-	PushClearMutex sync.Mutex
 
 	// queue for async messages to RPC user
 	UserMessageBox chan string
@@ -409,6 +401,12 @@ func (nd *LitNode) RestoreQchanFromBucket(bkt *bolt.Bucket) (*Qchan, error) {
 	r := nd.GetElkremRoot(qc.KeyGen)
 	// set sender
 	qc.ElkSnd = elkrem.NewElkremSender(r)
+
+	// make the clear to send chan
+	qc.ClearToSend = make(chan bool, 1)
+	// set it to true (all qchannels start as clear to send in ram
+	// maybe they shouldn't be...?
+	qc.ClearToSend <- true
 
 	return &qc, nil
 }

@@ -18,13 +18,15 @@ const (
 	MSGID_CLOSEREQ  = 0x40 // close channel
 	MSGID_CLOSERESP = 0x41
 
-	MSGID_TEXTCHAT = 0x70 // send a text message
+	MSGID_TEXTCHAT = 0x60 // send a text message
 
-	MSGID_DELTASIG  = 0x80 // pushing funds in channel; request to send
-	MSGID_SIGREV    = 0x82 // pulling funds; signing new state and revoking old
-	MSGID_GAPSIGREV = 0x83 // resolving collision
-	MSGID_REV       = 0x84 // pushing funds; revoking previous channel state
+	MSGID_DELTASIG  = 0x70 // pushing funds in channel; request to send
+	MSGID_SIGREV    = 0x72 // pulling funds; signing new state and revoking old
+	MSGID_GAPSIGREV = 0x73 // resolving collision
+	MSGID_REV       = 0x74 // pushing funds; revoking previous channel state
 
 	MSGID_FWDMSG     = 0x20
 	MSGID_FWDAUTHREQ = 0x21
+
+	MSGID_SELFPUSH = 0x80
 )

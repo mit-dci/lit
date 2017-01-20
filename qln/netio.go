@@ -54,7 +54,7 @@ func (nd *LitNode) TCPListener(lisIpPort string) (*btcutil.AddressPubKeyHash, er
 			var peer RemotePeer
 			peer.Idx = peerIdx
 			peer.Con = newConn
-			nd.RemoteCons[peerIdx] = peer
+			nd.RemoteCons[peerIdx] = &peer
 			nd.RemoteMtx.Unlock()
 
 			// each connection to a peer gets its own LNDCReader
@@ -98,7 +98,7 @@ func (nd *LitNode) DialPeer(lnAdr *lndc.LNAdr) error {
 	var p RemotePeer
 	p.Con = newConn
 	p.Idx = peerIdx
-	nd.RemoteCons[peerIdx] = p
+	nd.RemoteCons[peerIdx] = &p
 	nd.RemoteMtx.Unlock()
 
 	// each connection to a peer gets its own LNDCReader

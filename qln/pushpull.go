@@ -106,6 +106,7 @@ func (nd *LitNode) ReSendMsg(qc *Qchan) error {
 
 // PushChannel initiates a state update by sending an DeltaSig
 func (nd LitNode) PushChannel(qc *Qchan, amt uint32) error {
+
 	// sanity checks
 	if amt >= 1<<30 {
 		return fmt.Errorf("max send 1G sat (1073741823)")
@@ -126,12 +127,14 @@ func (nd LitNode) PushChannel(qc *Qchan, amt uint32) error {
 
 	// see if channel is busy, error if so, lock if not
 	// lock this channel
-	nd.PushClearMutex.Lock()
-	if nd.PushClear[qc.Idx()] != nil {
-		nd.PushClearMutex.Unlock()
-		return fmt.Errorf("channel %d busy", qc.Idx())
+
+	select {
+	case <-qc.ClearToSend:
+	// keep going
+	default:
+		return fmt.Errorf("Channel %d busy", qc.Idx())
 	}
-	nd.PushClear[qc.Idx()] = make(chan bool, 1)
+	// ClearToSend is now empty
 
 	// reload from disk here, after unlock
 	err := nd.ReloadQchan(qc)
@@ -145,9 +148,6 @@ func (nd LitNode) PushChannel(qc *Qchan, amt uint32) error {
 		if err != nil {
 			return err
 		}
-
-		delete(nd.PushClear, qc.Idx())
-		nd.PushClearMutex.Unlock()
 		return fmt.Errorf("Didn't send.  Recovered though, so try again!")
 	}
 
@@ -158,17 +158,18 @@ func (nd LitNode) PushChannel(qc *Qchan, amt uint32) error {
 		return err
 	}
 	// move unlock to here so that delta is saved before
-	nd.PushClearMutex.Unlock()
 
 	err = nd.SendDeltaSig(qc)
 	if err != nil {
 		return err
 	}
 
-	<-nd.PushClear[qc.Idx()]
-	nd.PushClearMutex.Lock()
-	delete(nd.PushClear, qc.Idx())
-	nd.PushClearMutex.Unlock()
+	fmt.Printf("got pre CTS... \n")
+	// block until clear to send is full again
+	<-qc.ClearToSend
+	fmt.Printf("got post CTS... \n")
+	// since we cleared with that statement, fill it again before returning
+	qc.ClearToSend <- true
 
 	return nil
 }
@@ -216,14 +217,23 @@ func (nd *LitNode) DeltaSigHandler(lm *lnutil.LitMsg, qc *Qchan) error {
 		return fmt.Errorf("got %d byte DeltaSig, expect 104", len(lm.Data))
 	}
 
+	var collision bool
 	var incomingDelta uint32
 	var incomingSig [64]byte
 	// deserialize DeltaSig
 	incomingDelta = lnutil.BtU32(lm.Data[36:40])
 	copy(incomingSig[:], lm.Data[40:])
 
-	// reload state from DB
+	// we should be clear to send when we get a deltaSig
+	select {
+	case <-qc.ClearToSend:
+	// keep going, normal
+	default:
+		// collision
+		collision = true
+	}
 
+	// load state from disk
 	err := nd.ReloadQchan(qc)
 	if err != nil {
 		return fmt.Errorf("DeltaSigHandler ReloadQchan err %s", err.Error())
@@ -234,25 +244,26 @@ func (nd *LitNode) DeltaSigHandler(lm *lnutil.LitMsg, qc *Qchan) error {
 			qc.Peer(), qc.Idx())
 	}
 
-	// detect if channel is already locked, and lock if not
-	nd.PushClearMutex.Lock()
-	if nd.PushClear[qc.Idx()] == nil {
-		nd.PushClear[qc.Idx()] = make(chan bool, 1)
-	} else {
-		// this means there was a collision
-		// reload from disk; collision may have happened after disk read
-		err := nd.ReloadQchan(qc)
-		if err != nil {
-			return fmt.Errorf("DeltaSigHandler err %s", err.Error())
-		}
+	if collision {
 		// incoming delta saved as collision value,
 		// existing (negative) delta value retained.
-
 		qc.State.Collision = int32(incomingDelta)
 		fmt.Printf("delta sig COLLISION (%d)\n", qc.State.Collision)
-
 	}
-	nd.PushClearMutex.Unlock()
+
+	// detect if channel is already locked, and lock if not
+	//	nd.PushClearMutex.Lock()
+	//	if nd.PushClear[qc.Idx()] == nil {
+	//		nd.PushClear[qc.Idx()] = make(chan bool, 1)
+	//	} else {
+	// this means there was a collision
+	// reload from disk; collision may have happened after disk read
+	//		err := nd.ReloadQchan(qc)
+	//		if err != nil {
+	//			return fmt.Errorf("DeltaSigHandler err %s", err.Error())
+	//		}
+
+	//	}
 
 	if qc.State.Delta > 0 {
 		fmt.Printf(
@@ -262,7 +273,7 @@ func (nd *LitNode) DeltaSigHandler(lm *lnutil.LitMsg, qc *Qchan) error {
 		return nd.SendREV(qc)
 	}
 
-	if qc.State.Collision == 0 {
+	if !collision {
 		// no collision, incoming (positive) delta saved.
 		qc.State.Delta = int32(incomingDelta)
 	}
@@ -583,9 +594,8 @@ func (nd *LitNode) SigRevHandler(lm *lnutil.LitMsg, qc *Qchan) error {
 		}
 	}()
 
-	// I'm done updating this channel
-	nd.PushClear[qc.Idx()] <- true
-	// that will delete this channel from the map
+	// done updating channel, no new messages expected.  Set clear to send
+	qc.ClearToSend <- true
 
 	return nil
 }
@@ -676,13 +686,8 @@ func (nd *LitNode) RevHandler(lm *lnutil.LitMsg, qc *Qchan) error {
 		}
 	}()
 
-	// if there was a collision & we started a push, this should clear it
-	nd.PushClear[qc.Idx()] <- true
-
-	// if this was received only, this will clear it
-	nd.PushClearMutex.Lock()
-	delete(nd.PushClear, qc.Idx())
-	nd.PushClearMutex.Unlock()
+	// got rev, assert clear to send
+	qc.ClearToSend <- true
 
 	fmt.Printf("REV OK, state %d all clear.\n", qc.State.StateIdx)
 	return nil

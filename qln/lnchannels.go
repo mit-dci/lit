@@ -39,6 +39,9 @@ type Qchan struct {
 	Delay uint16 // blocks for timeout (default 5 for testing)
 
 	State *StatCom // S current state of channel
+
+	ClearToSend chan bool // send a true here when you get a rev
+	// exists only in ram, doesn't touch disk
 }
 
 // StatComs are State Commitments.
