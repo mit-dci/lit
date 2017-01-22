@@ -85,7 +85,8 @@ func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
 	// So it could potentially try to start a channel and fail because it doesn't have
 	// the money.  Safe enough as all it's done is requested a point, which is
 	// idempotent on both sides.
-	_, _, err := r.SCon.TS.PickUtxos(args.Capacity, true)
+	// also assume a fee of like 50K sat just to be safe
+	_, _, err := r.SCon.TS.PickUtxos(args.Capacity+50000, true)
 	if err != nil {
 		return err
 	}

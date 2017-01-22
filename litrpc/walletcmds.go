@@ -43,7 +43,7 @@ func (r *LitRPC) Bal(args *NoArgs, reply *BalReply) error {
 	// iterate through utxos to figure out how much we have
 	for _, u := range allTxos {
 		reply.TxoTotal += u.Value
-		if u.Height+int32(u.Seq) < curHeight {
+		if u.Height > 0 && u.Height+int32(u.Seq) < curHeight {
 			reply.Mature += u.Value
 			if u.Mode&portxo.FlagTxoWitness != 0 {
 				reply.MatureWitty += u.Value

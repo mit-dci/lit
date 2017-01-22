@@ -52,8 +52,20 @@ func (s *SPVCon) MaybeSend(txos []*wire.TxOut) ([]*wire.OutPoint, error) {
 		return nil, err
 	}
 
-	// estimate fee with outputs, see if change should be truncated
+	// estimate needed fee with outputs, see if change should be truncated
 	fee := EstFee(utxos, txos, satPerByte)
+
+	fmt.Printf("MaybeSend has fee %d, %d inputs\n", fee, len(utxos))
+
+	// input sum is not enough, we need more inputs.
+	// keep doing this until fee is sufficient or PickUtxos errors out
+	for fee > overshoot {
+		utxos, overshoot, err = s.TS.PickUtxos(totalSend+fee, true)
+		if err != nil {
+			return nil, err
+		}
+		fee = EstFee(utxos, txos, satPerByte)
+	}
 
 	// add a change output if we have enough extra
 	if overshoot-fee > dustCutoff {
@@ -124,23 +136,6 @@ func (s *SPVCon) ReallySend(txid *chainhash.Hash) error {
 	if err != nil {
 		return err
 	}
-
-	// actually, don't do this, it's up to the top layer to tell us what to watch.
-	/*
-		// All non-change outputs of the frozenTx are registered as watch-outpoints
-		for i, txout := range tx.TxOut {
-			if !bytes.Equal(frozenTx.ChangeOut.PkScript, txout.PkScript) {
-				// not the change output, so register it as a watched OP
-				var op wire.OutPoint
-				op.Hash = tx.TxHash()
-				op.Index = uint32(i)
-				err = s.TS.RegisterWatchOP(op)
-				if err != nil {
-					return err
-				}
-			}
-		}
-	*/
 
 	return s.NewOutgoingTx(tx)
 }
@@ -534,7 +529,10 @@ func (ts *TxStore) BuildAndSign(
 	utxos []*portxo.PorTxo, txos []*wire.TxOut) (*wire.MsgTx, error) {
 	var err error
 
-	// sort utxos first.  I think this works.
+	if len(utxos) == 0 || len(txos) == 0 {
+		return nil, fmt.Errorf("BuildAndSign args no utxos or txos")
+	}
+	// sort input utxos first.
 	sort.Sort(portxo.TxoSliceByBip69(utxos))
 
 	// make the tx
@@ -545,6 +543,9 @@ func (ts *TxStore) BuildAndSign(
 
 	// add all the txouts, direct from the argument slice
 	for _, txo := range txos {
+		if txo == nil || txo.PkScript == nil || txo.Value == 0 {
+			return nil, fmt.Errorf("BuildAndSign arg invalid txo")
+		}
 		tx.AddTxOut(txo)
 	}
 	// add all the txins, first refenecing the prev outPoints
