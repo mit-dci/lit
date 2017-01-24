@@ -92,24 +92,25 @@ func (lc *litAfClient) Fan(textArgs []string) error {
 	}
 	var err error
 	args.DestAdr = textArgs[0]
-	amt, err := strconv.Atoi(textArgs[1])
-	if err != nil {
-		return err
-	}
-	args.AmtPerOutput = int64(amt)
 
-	outputs, err := strconv.Atoi(textArgs[2])
+	outputs, err := strconv.Atoi(textArgs[1])
 	if err != nil {
 		return err
 	}
 	args.NumOutputs = uint32(outputs)
 
-	err = lc.rpccon.Call("LitRPC.Fan", args, reply)
+	amt, err := strconv.Atoi(textArgs[2])
+	if err != nil {
+		return err
+	}
+	args.AmtPerOutput = int64(amt)
+
+	err = lc.rpccon.Call("LitRPC.Fanout", args, reply)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("Famout:\n")
+	fmt.Printf("Fanout:\n")
 	for i, t := range reply.Txids {
 		fmt.Printf("\t%d %s\n", i, t)
 	}

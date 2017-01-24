@@ -121,6 +121,14 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		return nil
 	}
 
+	if cmd == "fan" { // fan-out tx
+		err = lc.Fan(args)
+		if err != nil {
+			fmt.Printf("fan error: %s\n", err)
+		}
+		return nil
+	}
+
 	/*
 		if cmd == "msend" {
 			err = MSend(args)
@@ -144,13 +152,6 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 			return nil
 		}
 
-		if cmd == "fan" { // fan-out tx
-			err = Fan(args)
-			if err != nil {
-				fmt.Printf("fan error: %s\n", err)
-			}
-			return nil
-		}
 
 		if cmd == "txs" { // show all txs
 			err = Txs(args)
