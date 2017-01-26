@@ -14,6 +14,7 @@ import (
 )
 
 const (
+	// keyFileName and headerFileName are not referred in this file? -- takaya
 	keyFileName    = "testseed.hex"
 	headerFileName = "headers.bin"
 
@@ -353,7 +354,7 @@ func (s *SPVCon) AskForBlocks(dbTip int32) error {
 	var hdr wire.BlockHeader
 
 	s.headerMutex.Lock() // lock just to check filesize
-	stat, err := os.Stat(headerFileName)
+	stat, err := os.Stat(s.headerFile.Name())
 	s.headerMutex.Unlock() // checked, unlock
 	endPos := stat.Size()
 

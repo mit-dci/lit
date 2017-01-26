@@ -4,6 +4,8 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/btcsuite/btcd/chaincfg"
@@ -13,6 +15,8 @@ import (
 )
 
 const (
+	litHomeDirName = ".lit"
+
 	keyFileName     = "testkey.hex"
 	headerFileName  = "headers.bin"
 	utxodbFileName  = "utxo.db"
@@ -39,6 +43,7 @@ type LitConfig struct {
 	regTest, reSync, hard bool // flag to set mainnet
 	birthblock            int32
 	rpcport               uint16
+	litHomeDir            string
 
 	Params *chaincfg.Params
 }
@@ -55,6 +60,8 @@ func setConfig(lc *LitConfig) {
 
 	rpcportptr := flag.Int("rpcport", 9750, "port to listen for RPC")
 
+	litHomeDir := flag.String("dir", filepath.Join(os.Getenv("HOME"), litHomeDirName), "lit home directory")
+
 	flag.Parse()
 
 	lc.spvHost = *spvhostptr
@@ -65,6 +72,8 @@ func setConfig(lc *LitConfig) {
 	lc.hard = !*easyptr
 
 	lc.rpcport = uint16(*rpcportptr)
+
+	lc.litHomeDir = *litHomeDir
 
 	//	if lc.spvHost == "" {
 	//		lc.spvHost = "lit3.co"
@@ -94,17 +103,28 @@ func main() {
 	conf := new(LitConfig)
 	setConfig(conf)
 
+	// create lit home directory if the diretory does not exist
+	if _, err := os.Stat(conf.litHomeDir); os.IsNotExist(err) {
+		os.Mkdir(conf.litHomeDir, 0700)
+	}
+
+	// define file paths based on lit home directory
+	keyFilePath := filepath.Join(conf.litHomeDir, keyFileName)
+	headerFilePath := filepath.Join(conf.litHomeDir, headerFileName)
+	utxodbFilePath := filepath.Join(conf.litHomeDir, utxodbFileName)
+	lndbFilePath := filepath.Join(conf.litHomeDir, lndbFileName)
+	watchdbFilePath := filepath.Join(conf.litHomeDir, watchdbFileName)
+
 	// read key file (generate if not found)
-	rootPriv, err := uspv.ReadKeyFileToECPriv(keyFileName, conf.Params)
+	rootPriv, err := uspv.ReadKeyFileToECPriv(keyFilePath, conf.Params)
 	if err != nil {
 		log.Fatal(err)
 	}
 	// setup TxStore first (before spvcon)
 	Store := uspv.NewTxStore(rootPriv, conf.Params)
-	// setup spvCon
 
 	// setup SPVCon
-	SCon, err = uspv.OpenSPV(headerFileName, utxodbFileName, &Store,
+	SCon, err = uspv.OpenSPV(headerFilePath, utxodbFilePath, &Store,
 		conf.hard, false, conf.Params)
 	if err != nil {
 		log.Printf("can't connect: %s", err.Error())
@@ -112,7 +132,7 @@ func main() {
 	}
 
 	// Setup LN node.  Activate Tower if in hard mode.
-	err = Node.Init(lndbFileName, watchdbFileName, &SCon, SCon.HardMode)
+	err = Node.Init(lndbFilePath, watchdbFilePath, &SCon, SCon.HardMode)
 	if err != nil {
 		log.Fatal(err)
 	}
