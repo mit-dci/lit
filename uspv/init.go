@@ -168,8 +168,9 @@ func (s *SPVCon) openHeaderFile(hfn string) error {
 			if err != nil {
 				return err
 			}
-			log.Printf("created hardcoded genesis header at %s\n",
-				hfn)
+			log.Printf("made genesis block %x\n", b.Bytes())
+			log.Printf("made genesis header %s\n", s.TS.Param.GenesisHash.String())
+			log.Printf("created hardcoded genesis header at %s\n", hfn)
 		}
 	}
 	if s.TS.Param.Name == "testnet3" {

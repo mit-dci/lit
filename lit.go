@@ -36,7 +36,8 @@ var (
 // variables for a goodelivery session
 type LitConfig struct {
 	spvHost               string
-	regTest, reSync, hard bool // flag to set mainnet
+	regTest, reSync, hard bool // flag to set networks
+	bc2Net                bool
 	birthblock            int32
 	rpcport               uint16
 
@@ -44,13 +45,14 @@ type LitConfig struct {
 }
 
 func setConfig(lc *LitConfig) {
-	spvhostptr := flag.String("spv", "tn.lit3.co", "full node to connect to")
+	spvhostptr := flag.String("spv", "172.16.120.201", "full node to connect to")
 
 	birthptr := flag.Int("tip", hardHeight, "height to begin db sync")
 
 	easyptr := flag.Bool("ez", false, "use easy mode (bloom filters)")
 
 	regtestptr := flag.Bool("reg", false, "use regtest (not testnet3)")
+	bc2ptr := flag.Bool("bc2", false, "use bc2 network (not testnet3)")
 	resyncprt := flag.Bool("resync", false, "force resync from given tip")
 
 	rpcportptr := flag.Int("rpcport", 9750, "port to listen for RPC")
@@ -61,6 +63,7 @@ func setConfig(lc *LitConfig) {
 	lc.birthblock = int32(*birthptr)
 
 	lc.regTest = *regtestptr
+	lc.bc2Net = *bc2ptr
 	lc.reSync = *resyncprt
 	lc.hard = !*easyptr
 
@@ -70,10 +73,19 @@ func setConfig(lc *LitConfig) {
 	//		lc.spvHost = "lit3.co"
 	//	}
 
+	if lc.regTest && lc.bc2Net {
+		log.Fatal("error: can't have -bc2 and -reg")
+	}
+
 	if lc.regTest {
 		lc.Params = &chaincfg.RegressionNetParams
 		if !strings.Contains(lc.spvHost, ":") {
 			lc.spvHost = lc.spvHost + ":18444"
+		}
+	} else if lc.bc2Net {
+		lc.Params = &chaincfg.BC2NetParams
+		if !strings.Contains(lc.spvHost, ":") {
+			lc.spvHost = lc.spvHost + ":8444"
 		}
 	} else {
 		lc.Params = &chaincfg.TestNet3Params
@@ -123,11 +135,11 @@ func main() {
 	}
 
 	if tip == 0 || conf.reSync { // DB has never been used, set to birthday
-		if conf.regTest {
+		if conf.regTest || conf.bc2Net {
 			if conf.birthblock < 100000 {
 				tip = conf.birthblock
 			} else {
-				tip = 500 // for regtest
+				tip = 500 // for regtest/bc2
 			}
 		} else {
 			tip = conf.birthblock // for testnet3. should base on keyfile date?

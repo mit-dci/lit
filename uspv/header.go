@@ -21,12 +21,13 @@ import (
 // chaincfg.Params so they'll go here.  If you're into the [ANN]altcoin scene,
 // you may want to paramaterize these constants.
 const (
-	targetTimespan      = time.Hour * 24 * 14
-	targetSpacing       = time.Minute * 10
-	epochLength         = int32(targetTimespan / targetSpacing) // 2016
-	maxDiffAdjust       = 4
-	minRetargetTimespan = int64(targetTimespan / maxDiffAdjust)
-	maxRetargetTimespan = int64(targetTimespan * maxDiffAdjust)
+	targetTimespanx = time.Hour * 24 * 14
+	targetSpacingx  = time.Minute * 10
+	//	epochLength         = int32(targetTimespan / targetSpacing) // 2016
+//	maxDiffAdjust = 4
+
+//	minRetargetTimespan = int64(targetTimespan / maxDiffAdjust)
+//	maxRetargetTimespan = int64(targetTimespan * maxDiffAdjust)
 )
 
 /* checkProofOfWork verifies the header hashes into something
@@ -62,6 +63,9 @@ Only feed it headers n-2016 and n-1, otherwise it will calculate a difficulty
 when no adjustment should take place, and return false.
 Note that the epoch is actually 2015 blocks long, which is confusing. */
 func calcDiffAdjust(start, end wire.BlockHeader, p *chaincfg.Params) uint32 {
+
+	minRetargetTimespan := int64(p.TargetTimespan.Seconds()) / p.RetargetAdjustmentFactor
+	maxRetargetTimespan := int64(p.TargetTimespan.Seconds()) * p.RetargetAdjustmentFactor
 	duration := end.Timestamp.UnixNano() - start.Timestamp.UnixNano()
 	if duration < minRetargetTimespan {
 		log.Printf("whoa there, block %s off-scale high 4X diff adjustment!",
@@ -79,7 +83,7 @@ func calcDiffAdjust(start, end wire.BlockHeader, p *chaincfg.Params) uint32 {
 	// new target is old * duration...
 	newTarget := new(big.Int).Mul(prevTarget, big.NewInt(duration))
 	// divided by 2 weeks
-	newTarget.Div(newTarget, big.NewInt(int64(targetTimespan)))
+	newTarget.Div(newTarget, big.NewInt(int64(p.TargetTimespan)))
 
 	// clip again if above minimum target (too easy)
 	if newTarget.Cmp(p.PowLimit) > 0 {
@@ -93,7 +97,7 @@ func calcDiffAdjust(start, end wire.BlockHeader, p *chaincfg.Params) uint32 {
 func CheckHeader(r io.ReadSeeker, height, startheight int32, p *chaincfg.Params) bool {
 	// startHeight is the height the file starts at
 	// header start must be 0 mod 2106
-
+	epochLength := int32(p.TargetTimespan / p.TargetTimePerBlock)
 	var err error
 	var cur, prev, epochStart wire.BlockHeader
 	// don't try to verfy the genesis block.  That way madness lies.
@@ -164,7 +168,7 @@ func CheckHeader(r io.ReadSeeker, height, startheight int32, p *chaincfg.Params)
 	} else { // not a new epoch
 		// if on testnet, check for difficulty nerfing
 		if p.ReduceMinDifficulty && cur.Timestamp.After(
-			prev.Timestamp.Add(targetSpacing*2)) {
+			prev.Timestamp.Add(p.TargetTimePerBlock*2)) {
 			//	fmt.Printf("nerf %d ", curHeight)
 			rightBits = p.PowLimitBits // difficulty 1
 		}
