@@ -12,7 +12,8 @@ import (
 )
 
 // TCPListener starts a litNode listening for incoming LNDC connections
-func (nd *LitNode) TCPListener(lisIpPort string) (*btcutil.AddressPubKeyHash, error) {
+func (nd *LitNode) TCPListener(
+	lisIpPort string) (*btcutil.AddressWitnessPubKeyHash, error) {
 	idPriv := nd.IdKey()
 	listener, err := lndc.NewListener(nd.IdKey(), lisIpPort)
 	if err != nil {
@@ -20,7 +21,7 @@ func (nd *LitNode) TCPListener(lisIpPort string) (*btcutil.AddressPubKeyHash, er
 	}
 
 	myId := btcutil.Hash160(idPriv.PubKey().SerializeCompressed())
-	lisAdr, err := btcutil.NewAddressPubKeyHash(myId, nd.Param)
+	lisAdr, err := btcutil.NewAddressWitnessPubKeyHash(myId, nd.Param)
 	if err != nil {
 		return nil, err
 	}

@@ -46,9 +46,6 @@ func setConfig(lc *litAfClient) {
 	hostptr := flag.String("node", "127.0.0.1", "host to connect to")
 	portptr := flag.Int("p", 9750, "port to connect to")
 
-	//	regtestptr := flag.Bool("reg", false, "use regtest (not testnet3)")
-	//	resyncprt := flag.Bool("resync", false, "force resync from given tip")
-
 	flag.Parse()
 
 	lc.remote = *hostptr

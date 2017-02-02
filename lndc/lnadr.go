@@ -39,7 +39,7 @@ func (l *LNAdr) String() string {
 }
 
 // newLnAddr...
-func LnAddrFromString(encodedAddr string) (*LNAdr, error) {
+func LnAddrFromString(encodedAddr string, param *chaincfg.Params) (*LNAdr, error) {
 	// The format of an lnaddr is "<pubkey or pkh>@host:port"
 
 	if !strings.ContainsRune(encodedAddr, '@') {
@@ -82,16 +82,16 @@ func LnAddrFromString(encodedAddr string) (*LNAdr, error) {
 
 		// got pubey, populate address from pubkey
 		pkh := btcutil.Hash160(addr.PubKey.SerializeCompressed())
-		addr.Base58Adr, err = btcutil.NewAddressPubKeyHash(pkh,
-			&chaincfg.TestNet3Params)
+		addr.Base58Adr, err = btcutil.NewAddressPubKeyHash(pkh, param)
 		if err != nil {
 			return nil, err
 		}
+
 	// Is the ID a string encoded bitcoin address?
-	case idLen > 33 && idLen < 37:
-		addr.Base58Adr, err = btcutil.DecodeAddress(idHost[0],
-			&chaincfg.TestNet3Params)
+	case idLen > 30 && idLen < 39:
+		addr.Base58Adr, err = btcutil.DecodeAddress(idHost[0], param)
 		if err != nil {
+			fmt.Printf("error from DecodeAddress %s\n", idHost[0])
 			return nil, err
 		}
 	default:
@@ -108,7 +108,7 @@ func LnAddrFromString(encodedAddr string) (*LNAdr, error) {
 // Note that this does not check any internal consistency, because on local
 // storage there's no point.  Check separately if needed.
 // Also, old and probably needs to be changed / updated
-func (l *LNAdr) Deserialize(s []byte) error {
+func (l *LNAdr) Deserialize(s []byte, param *chaincfg.Params) error {
 	b := bytes.NewBuffer(s)
 
 	// Fail if on-disk LNId too short
@@ -128,14 +128,12 @@ func (l *LNAdr) Deserialize(s []byte) error {
 		}
 
 		l.Base58Adr, err = btcutil.NewAddressPubKeyHash(
-			btcutil.Hash160(l.PubKey.SerializeCompressed()),
-			&chaincfg.TestNet3Params)
+			btcutil.Hash160(l.PubKey.SerializeCompressed()), param)
 		if err != nil {
 			return err
 		}
 	} else if x == 0xa0 { // for pubkeyhash storage
-		l.Base58Adr, err = btcutil.NewAddressPubKeyHash(
-			b.Next(20), &chaincfg.TestNet3Params)
+		l.Base58Adr, err = btcutil.NewAddressPubKeyHash(b.Next(20), param)
 		if err != nil {
 			return err
 		}

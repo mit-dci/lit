@@ -127,8 +127,7 @@ func (lc *litAfClient) Push(textArgs []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Pushed %d new balance %d at state %d\n",
-			amt, reply.MyAmt, reply.StateIndex)
+		fmt.Printf("Pushed %d at state %d\n", amt, reply.StateIndex)
 		times--
 	}
 

@@ -107,7 +107,6 @@ type PushArgs struct {
 	Amt     int64
 }
 type PushReply struct {
-	MyAmt      int64
 	StateIndex uint64
 }
 
@@ -158,7 +157,7 @@ func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 	if err != nil {
 		return err
 	}
-	reply.MyAmt = qc.State.MyAmt
+
 	reply.StateIndex = qc.State.StateIdx
 	return nil
 }
