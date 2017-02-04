@@ -128,6 +128,10 @@ func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 	if err != nil {
 		return err
 	}
+	// see if channel is closed and error early
+	if dummyqc.CloseData.Closed {
+		return fmt.Errorf("Can't push; channel %d closed", args.ChanIdx)
+	}
 
 	// but we want to reference the qc that's already in ram
 	// first see if we're connected to that peer
