@@ -656,7 +656,7 @@ func Send(args []string) error {
 	}
 	// need args, fail
 	if len(args) < 2 {
-		return fmt.Errorf("need args: ssend address amount(satoshis) wit?")
+		return fmt.Errorf("need args: send address amount(satoshis) wit?")
 	}
 	adr, err := btcutil.DecodeAddress(args[0], SCon.TS.Param)
 	if err != nil {
