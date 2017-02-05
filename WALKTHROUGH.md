@@ -78,7 +78,7 @@ Sync Height 1060000
 
 ls shows how much money Alice has, which is none.  She can get some from a faucet.
 
-Bob can start a wallet in the same way; if bob's node is running on the same computer, he'll have to run lit with -rpcport to listen on a different port, and start lit-af with -p to connect to that port.  Once Alice and Bob are both set up, they can connect to each other.
+Bob can start a wallet in the same way; if bob's node is running on the same computer, he'll have to run lit with -rpcport to listen on a different port and -dir to store lit files in a different direcotry, and start lit-af with -p to connect to that port.  Once Alice and Bob are both set up, they can connect to each other.
 
 ### Step 3: Connect
 
