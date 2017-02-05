@@ -1,7 +1,7 @@
 package main
 
 import (
-	"bufio"
+	"path/filepath"
 	"flag"
 	"fmt"
 	"log"
@@ -10,6 +10,7 @@ import (
 	"net/rpc/jsonrpc"
 	"os"
 	"strings"
+	"github.com/chzyer/readline"
 )
 
 /*
@@ -36,10 +37,16 @@ May end up using termbox-go
 //	SpendableNowWitty int64
 //}
 
+const (
+	litHomeDirName  = ".lit"
+	historyFilename = "lit-af.history"
+)
+
 type litAfClient struct {
 	remote string
 	port   uint16
 	rpccon *rpc.Client
+	litHomeDir string
 }
 
 func setConfig(lc *litAfClient) {
@@ -50,6 +57,7 @@ func setConfig(lc *litAfClient) {
 
 	lc.remote = *hostptr
 	lc.port = uint16(*portptr)
+	lc.litHomeDir = filepath.Join(os.Getenv("HOME"), litHomeDirName)
 }
 
 // for now just testing how to connect and get messages back and forth
@@ -70,20 +78,29 @@ func main() {
 
 	go lc.RequestAsync()
 
+	rl, err := readline.NewEx(&readline.Config{
+		Prompt: "lit-af# ",
+		HistoryFile: filepath.Join(lc.litHomeDir, historyFilename),
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer rl.Close()
+
 	// main shell loop
 	for {
 		// setup reader with max 4K input chars
-		reader := bufio.NewReaderSize(os.Stdin, 4000)
-		fmt.Printf("lit-af# ")              // prompt
-		msg, err := reader.ReadString('\n') // input finishes on enter key
+		msg, err := rl.Readline()
 		if err != nil {
-			log.Fatal(err)
+			break
 		}
+		msg = strings.TrimSpace(msg)
+		if len(msg) == 0 {
+			continue
+		}
+		rl.SaveHistory(msg)
 
 		cmdslice := strings.Fields(msg) // chop input up on whitespace
-		if len(cmdslice) < 1 {
-			continue // no input, just prompt again
-		}
 		fmt.Printf("entered command: %s\n", msg) // immediate feedback
 		err = lc.Shellparse(cmdslice)
 		if err != nil { // only error should be user exit
