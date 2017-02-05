@@ -47,7 +47,7 @@ func (lc *litAfClient) CloseChannel(textArgs []string) error {
 
 	// need args, fail
 	if len(textArgs) < 1 {
-		return fmt.Errorf("need args: cclose chanIdx")
+		return fmt.Errorf("need args: close chanIdx")
 	}
 
 	cIdx, err := strconv.Atoi(textArgs[0])
@@ -73,7 +73,7 @@ func (lc *litAfClient) BreakChannel(textArgs []string) error {
 
 	// need args, fail
 	if len(textArgs) < 1 {
-		return fmt.Errorf("need args: cclose chanIdx")
+		return fmt.Errorf("need args: break chanIdx")
 	}
 
 	cIdx, err := strconv.Atoi(textArgs[0])
