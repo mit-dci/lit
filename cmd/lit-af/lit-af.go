@@ -81,6 +81,7 @@ func main() {
 	rl, err := readline.NewEx(&readline.Config{
 		Prompt: "lit-af# ",
 		HistoryFile: filepath.Join(lc.litHomeDir, historyFilename),
+		AutoComplete: lc.NewAutoCompleter(),
 	})
 	if err != nil {
 		log.Fatal(err)

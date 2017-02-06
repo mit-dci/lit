@@ -1,0 +1,96 @@
+package main
+
+import (
+	"fmt"
+	"github.com/mit-dci/lit/litrpc"
+	"github.com/chzyer/readline"
+)
+
+func (lc *litAfClient) completePeers(line string) []string {
+	names := make([]string, 0)
+	pReply := new(litrpc.ListConnectionsReply)
+	err := lc.rpccon.Call("LitRPC.ListConnections", nil, pReply)
+	if err != nil {
+		return names
+	}
+	if len(pReply.Connections) > 0 {
+		for _, peer := range pReply.Connections {
+			var peerStr = fmt.Sprint(peer.PeerNumber)
+			names = append(names, peerStr)
+		}
+	}
+	return names
+}
+
+func (lc *litAfClient) completeAdr(line string) []string {
+	names := make([]string, 0)
+	aReply := new(litrpc.AdrReply)
+	err := lc.rpccon.Call("LitRPC.Address", nil, aReply)
+	if err != nil {
+		return names
+	}
+	for i, a := range aReply.WitAddresses {
+		names = append(names, a)
+		names = append(names, aReply.LegacyAddresses[i])
+	}
+	return names
+}
+
+func (lc *litAfClient) completeChannelIdx(line string) []string {
+	names := make([]string, 0)
+	cReply := new(litrpc.ChannelListReply)
+	err := lc.rpccon.Call("LitRPC.ChannelList", nil, cReply)
+	if err != nil {
+		return names
+	}
+	for _, c := range cReply.Channels {
+		if !c.Closed {
+			var cidxStr = fmt.Sprint(c.CIdx)
+			names = append(names, cidxStr)
+		}
+	}
+	return names
+}
+
+
+func (lc *litAfClient) NewAutoCompleter() readline.AutoCompleter {
+	var completer = readline.NewPrefixCompleter(
+		readline.PcItem("help",
+			readline.PcItem("say"),
+			readline.PcItem("ls"),
+			readline.PcItem("con"),
+			readline.PcItem("lis"),
+			readline.PcItem("adr"),
+			readline.PcItem("send"),
+			readline.PcItem("fan"),
+			readline.PcItem("sweep"),
+			readline.PcItem("fund"),
+			readline.PcItem("push"),
+			readline.PcItem("close"),
+			readline.PcItem("break"),
+			readline.PcItem("stop"),
+			readline.PcItem("exit"),
+		),
+		readline.PcItem("say",
+			readline.PcItemDynamic(lc.completePeers)),
+		readline.PcItem("ls"),
+		readline.PcItem("con"),
+		readline.PcItem("lis"),
+		readline.PcItem("adr"),
+		readline.PcItem("send"),
+		readline.PcItem("fan"),
+		readline.PcItem("sweep"),
+		readline.PcItem("fund",
+			readline.PcItemDynamic(lc.completePeers)),
+		readline.PcItem("push",
+			readline.PcItemDynamic(lc.completeChannelIdx)),
+		readline.PcItem("close",
+			readline.PcItemDynamic(lc.completeChannelIdx)),
+		readline.PcItem("break",
+			readline.PcItemDynamic(lc.completeChannelIdx)),
+		readline.PcItem("stop"),
+		readline.PcItem("exit"),
+	)
+    
+    return completer
+}
