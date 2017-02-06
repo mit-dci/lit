@@ -116,13 +116,13 @@ func (nd LitNode) PushChannel(qc *Qchan, amt uint32) error {
 	}
 	// check if this push would lower my balance below minBal
 	if int64(amt)+minBal > qc.State.MyAmt {
-		return fmt.Errorf("want to push %d but %d available, %d minBal",
-			amt, qc.State.MyAmt, minBal)
+		return fmt.Errorf("want to push %s but %s available, %s minBal",
+			lnutil.SatoshiColor(int64(amt)), lnutil.SatoshiColor(qc.State.MyAmt), lnutil.SatoshiColor(minBal))
 	}
 	// check if this push is sufficient to get them above minBal
 	if int64(amt)+(qc.Value-qc.State.MyAmt) < minBal {
-		return fmt.Errorf("pushing %d insufficient; counterparty minBal %d",
-			amt, minBal)
+		return fmt.Errorf("pushing %s insufficient; counterparty minBal %s",
+			lnutil.SatoshiColor(int64(amt)), lnutil.SatoshiColor(minBal))
 	}
 
 	// see if channel is busy, error if so, lock if not

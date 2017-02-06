@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/litrpc"
 )
 
 // Send sends coins somewhere
 func (lc *litAfClient) Send(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Printf("Syntax: send <addr> <amount>\n")
+		fmt.Printf("%s%s\n", lnutil.White("send"), lnutil.ReqColor("addr", "amount"))
 		fmt.Printf("Send the given amount of satoshis to the given address.\n")
 		return nil
 	}
@@ -53,7 +54,7 @@ func (lc *litAfClient) Send(textArgs []string) error {
 // Sweep moves utxos with many 1-in-1-out txs
 func (lc *litAfClient) Sweep(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Printf("Syntax: sweep <addr> <howmany> [<drop>]\n")
+		fmt.Printf("%s%s%s\n", lnutil.White("sweep"), lnutil.ReqColor("addr", "howmany"), lnutil.OptColor("drop"))
 		fmt.Printf("Move UTXOs with many 1-in-1-out txs.\n")
 		// TODO: Make this more clear.
 		return nil
@@ -99,7 +100,7 @@ func (lc *litAfClient) Sweep(textArgs []string) error {
 
 func (lc *litAfClient) Fan(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Printf("Syntax: fan <addr> <howmany> <howmuch>\n")
+		fmt.Printf("%s%s\n", lnutil.White("fan"), lnutil.ReqColor("addr", "howmany", "howmuch"))
 		// TODO: Add description.
 		return nil
 	}
@@ -139,7 +140,7 @@ func (lc *litAfClient) Fan(textArgs []string) error {
 // Adr makes new addresses
 func (lc *litAfClient) Adr(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Printf("Syntax: adr\n")
+		fmt.Printf(lnutil.White("adr\n"))
 		fmt.Printf("Makes a new address.\n")
 		// TODO: Make this more clear.
 		return nil
@@ -152,6 +153,6 @@ func (lc *litAfClient) Adr(textArgs []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("new adr(s): %s\nold: %s\n", reply.WitAddresses, reply.LegacyAddresses)
+	fmt.Printf("new adr(s): %s\nold: %s\n", lnutil.Green(reply.WitAddresses), lnutil.Yellow(reply.LegacyAddresses))
 	return nil
 }

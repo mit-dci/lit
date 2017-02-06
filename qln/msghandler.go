@@ -13,7 +13,7 @@ func (nd *LitNode) PeerHandler(msg *lnutil.LitMsg, q *Qchan, peer *RemotePeer) e
 	// TEXT MESSAGE.  SIMPLE
 	if msg.MsgType == lnutil.MSGID_TEXTCHAT { //it's text
 		nd.UserMessageBox <- fmt.Sprintf(
-			"msg from %d: %s", msg.PeerIdx, msg.Data)
+			"\nmsg from %s: %s", lnutil.White(msg.PeerIdx), lnutil.Green(string(msg.Data[:])))
 		return nil
 	}
 	// POINT REQUEST
