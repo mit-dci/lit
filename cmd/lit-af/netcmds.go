@@ -28,6 +28,13 @@ func (lc *litAfClient) RequestAsync() {
 
 // Lis starts listening.  Takes args of port to listen on.
 func (lc *litAfClient) Lis(textArgs []string) error {
+	if len(textArgs) > 0 && textArgs[0] == "-h" {
+		fmt.Printf("Syntax: lis [<port>]\n")
+		fmt.Printf("Start listening for incoming connections.\n")
+		fmt.Printf("The port number, if omitted, defaults to 2448.\n")
+		return nil
+	}
+
 	args := new(litrpc.ListenArgs)
 	reply := new(litrpc.StatusReply)
 
@@ -46,6 +53,14 @@ func (lc *litAfClient) Lis(textArgs []string) error {
 }
 
 func (lc *litAfClient) Connect(textArgs []string) error {
+	if len(textArgs) > 0 && textArgs[0] == "-h" {
+		fmt.Printf("Syntax: con <pubkeyhash>@<hostname>[:<port>]\n")
+		fmt.Printf("Make a connection to another host by connecting to their pubkeyhash\n")
+		fmt.Printf("(printed when listening using the lis command), on the given host.\n")
+		fmt.Printf("A port may be provided; if omitted, 2448 is used.\n")
+		return nil
+	}
+
 	args := new(litrpc.ConnectArgs)
 	reply := new(litrpc.StatusReply)
 
@@ -65,6 +80,12 @@ func (lc *litAfClient) Connect(textArgs []string) error {
 }
 
 func (lc *litAfClient) Say(textArgs []string) error {
+	if len(textArgs) > 0 && textArgs[0] == "-h" {
+		fmt.Printf("Syntax: say <peer> <message>\n")
+		fmt.Printf("Send a message to a peer.\n")
+		return nil
+	}
+
 	args := new(litrpc.SayArgs)
 	reply := new(litrpc.StatusReply)
 
