@@ -22,18 +22,39 @@ func (lc *litAfClient) completePeers(line string) []string {
 	return names
 }
 
-func (lc *litAfClient) completeAdr(line string) []string {
-	names := make([]string, 0)
-	aReply := new(litrpc.AdrReply)
-	err := lc.rpccon.Call("LitRPC.Address", nil, aReply)
+func (lc *litAfClient) completeClosedPeers(line string) []string {
+	channelpeers := make([]string, 0)
+	connectedpeers := make([]string, 0)
+	pReply := new(litrpc.ListConnectionsReply)
+	cReply := new(litrpc.ChannelListReply)
+	err := lc.rpccon.Call("LitRPC.ListConnections", nil, pReply)
 	if err != nil {
-		return names
+		return channelpeers
 	}
-	for i, a := range aReply.WitAddresses {
-		names = append(names, a)
-		names = append(names, aReply.LegacyAddresses[i])
+	err = lc.rpccon.Call("LitRPC.ChannelList", nil, cReply)
+	if err != nil {
+		return channelpeers
 	}
-	return names
+	if len(pReply.Connections) > 0 {
+		for _, peer := range pReply.Connections {
+			var peerStr = fmt.Sprint(peer.PeerNumber)
+			connectedpeers = append(connectedpeers, peerStr)
+		}
+	}
+	for _, c := range cReply.Channels {
+		var peerid = fmt.Sprint(c.PeerIdx)
+		var found = false
+		for _, v := range connectedpeers {
+			if v == peerid {
+				found = true
+				break
+			}
+		}
+		if !found {
+			channelpeers = append(channelpeers, peerid)
+		}
+	}
+	return channelpeers
 }
 
 func (lc *litAfClient) completeChannelIdx(line string) []string {
@@ -74,7 +95,8 @@ func (lc *litAfClient) NewAutoCompleter() readline.AutoCompleter {
 		readline.PcItem("say",
 			readline.PcItemDynamic(lc.completePeers)),
 		readline.PcItem("ls"),
-		readline.PcItem("con"),
+		readline.PcItem("con",
+			readline.PcItemDynamic(lc.completeClosedPeers)),
 		readline.PcItem("lis"),
 		readline.PcItem("adr"),
 		readline.PcItem("send"),
