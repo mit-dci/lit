@@ -9,6 +9,12 @@ import (
 
 // Send sends coins somewhere
 func (lc *litAfClient) Send(textArgs []string) error {
+	if len(textArgs) > 0 && textArgs[0] == "-h" {
+		fmt.Printf("Syntax: send <addr> <amount>\n")
+		fmt.Printf("Send the given amount of satoshis to the given address.\n")
+		return nil
+	}
+
 	args := new(litrpc.SendArgs)
 	reply := new(litrpc.TxidsReply)
 
@@ -46,6 +52,13 @@ func (lc *litAfClient) Send(textArgs []string) error {
 
 // Sweep moves utxos with many 1-in-1-out txs
 func (lc *litAfClient) Sweep(textArgs []string) error {
+	if len(textArgs) > 0 && textArgs[0] == "-h" {
+		fmt.Printf("Syntax: sweep <addr> <howmany> [<drop>]\n")
+		fmt.Printf("Move UTXOs with many 1-in-1-out txs.\n")
+		// TODO: Make this more clear.
+		return nil
+	}
+
 	args := new(litrpc.SweepArgs)
 	reply := new(litrpc.TxidsReply)
 
@@ -85,6 +98,12 @@ func (lc *litAfClient) Sweep(textArgs []string) error {
 //}
 
 func (lc *litAfClient) Fan(textArgs []string) error {
+	if len(textArgs) > 0 && textArgs[0] == "-h" {
+		fmt.Printf("Syntax: fan <addr> <howmany> <howmuch>\n")
+		// TODO: Add description.
+		return nil
+	}
+
 	args := new(litrpc.FanArgs)
 	reply := new(litrpc.TxidsReply)
 	if len(textArgs) < 3 {
@@ -119,6 +138,13 @@ func (lc *litAfClient) Fan(textArgs []string) error {
 
 // Adr makes new addresses
 func (lc *litAfClient) Adr(textArgs []string) error {
+	if len(textArgs) > 0 && textArgs[0] == "-h" {
+		fmt.Printf("Syntax: adr\n")
+		fmt.Printf("Makes a new address.\n")
+		// TODO: Make this more clear.
+		return nil
+	}
+
 	args := new(litrpc.AdrArgs)
 	args.NumToMake = 1
 	reply := new(litrpc.AdrReply)

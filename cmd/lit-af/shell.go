@@ -15,11 +15,11 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		args = cmdslice[1:]
 	}
 	if cmd == "exit" || cmd == "quit" {
-		return fmt.Errorf("User exit")
+		return lc.Exit(args)
 	}
 	// help gives you really terse help.  Just a list of commands.
 	if cmd == "help" {
-		err = Help(args)
+		err = lc.Help(args)
 		if err != nil {
 			fmt.Printf("help error: %s\n", err)
 		}
@@ -201,7 +201,26 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 	return nil
 }
 
+func (lc *litAfClient) Exit(textArgs []string) error {
+	if len(textArgs) > 0 {
+		if len(textArgs) == 1 && textArgs[0] == "-h" {
+			fmt.Printf("Syntax: exit\nAlias: quit\nExit the interactive shell.\n")
+			return nil
+		}
+		fmt.Printf("Unexpected argument: " + textArgs[0])
+		return nil
+	}
+	return fmt.Errorf("User exit")
+}
+
 func (lc *litAfClient) Ls(textArgs []string) error {
+	if len(textArgs) > 0 && textArgs[0] == "-h" {
+		fmt.Printf("Syntax: ls\n")
+		fmt.Printf("Show various information about our current state, such as connections,\n")
+		fmt.Printf("addresses, UTXO's, balances, etc.\n")
+		return nil
+	}
+
 	pReply := new(litrpc.ListConnectionsReply)
 	cReply := new(litrpc.ChannelListReply)
 	aReply := new(litrpc.AdrReply)
@@ -283,6 +302,12 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 }
 
 func (lc *litAfClient) Stop(textArgs []string) error {
+	if len(textArgs) > 0 && textArgs[0] == "-h" {
+		fmt.Printf("Syntax: stop\n")
+		fmt.Printf("Shut down the lit node.\n")
+		return nil
+	}
+
 	reply := new(litrpc.StatusReply)
 
 	err := lc.rpccon.Call("LitRPC.Stop", nil, reply)
@@ -296,8 +321,19 @@ func (lc *litAfClient) Stop(textArgs []string) error {
 	return fmt.Errorf("stopped remote lit node")
 }
 
-func Help(args []string) error {
-	fmt.Printf("commands:\n")
-	fmt.Printf("help say ls adr send fan sweep lis con fund push close break stop exit\n")
-	return nil
+func (lc *litAfClient) Help(textArgs []string) error {
+	if len(textArgs) == 0 {
+		fmt.Printf("commands:\n")
+		fmt.Printf("help say ls adr send fan sweep lis con fund push close break stop exit\n")
+		return nil
+	}
+	if textArgs[0] == "help" || textArgs[0] == "-h" {
+		fmt.Printf("Syntax: help [<command>]\n")
+		fmt.Printf("Show information about a given command\n")
+		return nil
+	}
+	res := make([]string, 0)
+	res = append(res, textArgs[0])
+	res = append(res, "-h")
+	return lc.Shellparse(res)
 }
