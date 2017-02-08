@@ -110,6 +110,9 @@ func (nd *LitNode) LNDCReader(peer *RemotePeer) error {
 		n, err := peer.Con.Read(msg)
 		if err != nil {
 			fmt.Printf("read error with %d: %s\n", peer.Idx, err.Error())
+			nd.RemoteMtx.Lock()
+			delete(nd.RemoteCons, peer.Idx)
+			nd.RemoteMtx.Unlock()
 			return peer.Con.Close()
 		}
 		msg = msg[:n]
