@@ -173,6 +173,7 @@ func (l *Listener) authenticateConnection(
 		}
 
 		resp := make([]byte, 20)
+
 		_, err = lnConn.Conn.Read(resp)
 		if err != nil {
 			fmt.Printf("here it dies ")

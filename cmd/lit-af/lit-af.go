@@ -1,7 +1,6 @@
 package main
 
 import (
-	"path/filepath"
 	"flag"
 	"fmt"
 	"log"
@@ -9,7 +8,9 @@ import (
 	"net/rpc"
 	"net/rpc/jsonrpc"
 	"os"
+	"path/filepath"
 	"strings"
+
 	"github.com/chzyer/readline"
 )
 
@@ -43,21 +44,22 @@ const (
 )
 
 type litAfClient struct {
-	remote string
-	port   uint16
-	rpccon *rpc.Client
+	remote     string
+	port       uint16
+	rpccon     *rpc.Client
 	litHomeDir string
 }
 
 func setConfig(lc *litAfClient) {
 	hostptr := flag.String("node", "127.0.0.1", "host to connect to")
 	portptr := flag.Int("p", 9750, "port to connect to")
+	dirptr := flag.String("dir", filepath.Join(os.Getenv("HOME"), litHomeDirName), "directory to save settings")
 
 	flag.Parse()
 
 	lc.remote = *hostptr
 	lc.port = uint16(*portptr)
-	lc.litHomeDir = filepath.Join(os.Getenv("HOME"), litHomeDirName)
+	lc.litHomeDir = *dirptr
 }
 
 // for now just testing how to connect and get messages back and forth
@@ -79,8 +81,8 @@ func main() {
 	go lc.RequestAsync()
 
 	rl, err := readline.NewEx(&readline.Config{
-		Prompt: "lit-af# ",
-		HistoryFile: filepath.Join(lc.litHomeDir, historyFilename),
+		Prompt:       "lit-af# ",
+		HistoryFile:  filepath.Join(lc.litHomeDir, historyFilename),
 		AutoComplete: lc.NewAutoCompleter(),
 	})
 	if err != nil {
@@ -101,7 +103,7 @@ func main() {
 		}
 		rl.SaveHistory(msg)
 
-		cmdslice := strings.Fields(msg) // chop input up on whitespace
+		cmdslice := strings.Fields(msg)          // chop input up on whitespace
 		fmt.Printf("entered command: %s\n", msg) // immediate feedback
 		err = lc.Shellparse(cmdslice)
 		if err != nil { // only error should be user exit
