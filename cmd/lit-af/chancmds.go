@@ -8,6 +8,14 @@ import (
 )
 
 func (lc *litAfClient) FundChannel(textArgs []string) error {
+	if len(textArgs) > 0 && textArgs[0] == "-h" {
+		fmt.Printf("Syntax: fund <peer> <capacity> <initialSend>\n")
+		fmt.Printf("Establish and fund a new lightning channel with the given peer.\n")
+		fmt.Printf("The capacity is the amount of satoshi we insert into the channel,\n")
+		fmt.Printf("and initialSend is the amount we initially hand over to the other party.\n")
+		return nil
+	}
+
 	args := new(litrpc.FundArgs)
 	reply := new(litrpc.StatusReply)
 
@@ -42,6 +50,14 @@ func (lc *litAfClient) FundChannel(textArgs []string) error {
 
 // Request close of a channel.  Need to pass in peer, channel index
 func (lc *litAfClient) CloseChannel(textArgs []string) error {
+	if len(textArgs) > 0 && textArgs[0] == "-h" {
+		fmt.Printf("Syntax: close <channel idx>\n")
+		fmt.Printf("Cooperatively close the channel with the given index by asking\n")
+		fmt.Printf("the other party to finalize the channel pay-out.\n")
+		fmt.Printf("See also: break\n")
+		return nil
+	}
+
 	args := new(litrpc.ChanArgs)
 	reply := new(litrpc.StatusReply)
 
@@ -68,6 +84,14 @@ func (lc *litAfClient) CloseChannel(textArgs []string) error {
 
 // Almost exactly the same as CloseChannel.  Maybe make "break" a bool...?
 func (lc *litAfClient) BreakChannel(textArgs []string) error {
+	if len(textArgs) > 0 && textArgs[0] == "-h" {
+		fmt.Printf("Syntax: break <channel idx>\n")
+		fmt.Printf("Forcibly break the given channel. Note that we need to wait\n")
+		fmt.Printf("a set number of blocks before we can use the money.\n")
+		fmt.Printf("See also: stop\n")
+		return nil
+	}
+
 	args := new(litrpc.ChanArgs)
 	reply := new(litrpc.StatusReply)
 
@@ -94,6 +118,13 @@ func (lc *litAfClient) BreakChannel(textArgs []string) error {
 
 // Push is the shell command which calls PushChannel
 func (lc *litAfClient) Push(textArgs []string) error {
+	if len(textArgs) > 0 && textArgs[0] == "-h" {
+		fmt.Printf("Syntax: push <channel idx> <amount> [<times>]\n")
+		fmt.Printf("Push the given amount (in satoshis) to the other party on the given channel.\n")
+		fmt.Printf("Optionally, the push operation can be repeated <times> number of times.\n")
+		return nil
+	}
+
 	args := new(litrpc.PushArgs)
 	reply := new(litrpc.PushReply)
 
