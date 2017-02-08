@@ -69,11 +69,11 @@ func FundTxScript(aPub, bPub [33]byte) ([]byte, bool, error) {
 // Give it the two pubkeys and it'll give you the p2sh'd txout.
 // You don't have to remember the p2sh preimage, as long as you remember the
 // pubkeys involved.
-func FundTxOut(pubA, puB [33]byte, amt int64) (*wire.TxOut, error) {
+func FundTxOut(pubA, pubB [33]byte, amt int64) (*wire.TxOut, error) {
 	if amt < 0 {
 		return nil, fmt.Errorf("Can't create FundTx script with negative coins")
 	}
-	scriptBytes, _, err := FundTxScript(pubA, puB)
+	scriptBytes, _, err := FundTxScript(pubA, pubB)
 	if err != nil {
 		return nil, err
 	}
