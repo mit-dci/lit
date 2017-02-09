@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mit-dci/lit/lnutil"
 	"github.com/chzyer/readline"
 )
 
@@ -81,7 +82,7 @@ func main() {
 	go lc.RequestAsync()
 
 	rl, err := readline.NewEx(&readline.Config{
-		Prompt:       "lit-af# ",
+		Prompt:       lnutil.Yellow("lit-af") + lnutil.White("# "),
 		HistoryFile:  filepath.Join(lc.litHomeDir, historyFilename),
 		AutoComplete: lc.NewAutoCompleter(),
 	})

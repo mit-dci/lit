@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/litrpc"
 )
 
@@ -204,7 +205,7 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 func (lc *litAfClient) Exit(textArgs []string) error {
 	if len(textArgs) > 0 {
 		if len(textArgs) == 1 && textArgs[0] == "-h" {
-			fmt.Printf("Syntax: exit\nAlias: quit\nExit the interactive shell.\n")
+			fmt.Printf(lnutil.White("exit") + "\nAlias: quit\nExit the interactive shell.\n")
 			return nil
 		}
 		fmt.Printf("Unexpected argument: " + textArgs[0])
@@ -215,7 +216,7 @@ func (lc *litAfClient) Exit(textArgs []string) error {
 
 func (lc *litAfClient) Ls(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Printf("Syntax: ls\n")
+		fmt.Printf(lnutil.White("ls\n"))
 		fmt.Printf("Show various information about our current state, such as connections,\n")
 		fmt.Printf("addresses, UTXO's, balances, etc.\n")
 		return nil
@@ -233,8 +234,9 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		return err
 	}
 	if len(pReply.Connections) > 0 {
+		fmt.Printf("\t%s\n", lnutil.Cyan("Peers:"))
 		for _, peer := range pReply.Connections {
-			fmt.Printf("%d %s\n", peer.PeerNumber, peer.RemoteHost)
+			fmt.Printf("%s %s\n", lnutil.White(peer.PeerNumber), peer.RemoteHost)
 		}
 	}
 
@@ -243,18 +245,18 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		return err
 	}
 	if len(cReply.Channels) > 0 {
-		fmt.Printf("\tChannels:\n")
+		fmt.Printf("\t%s\n", lnutil.Cyan("Channels:"))
 	}
 
 	for _, c := range cReply.Channels {
 		if c.Closed {
-			fmt.Printf("Closed  ")
+			fmt.Printf(lnutil.Red("Closed  "))
 		} else {
-			fmt.Printf("Channel ")
+			fmt.Printf(lnutil.Green("Channel "))
 		}
-		fmt.Printf("%d (peer %d) %s\n\t cap: %d bal: %d h: %d state: %d\n",
-			c.CIdx, c.PeerIdx, c.OutPoint,
-			c.Capacity, c.MyBalance, c.Height, c.StateNum)
+		fmt.Printf("%s (peer %d) %s\n\t cap: %s bal: %s h: %d state: %d\n",
+			lnutil.White(c.CIdx), c.PeerIdx, c.OutPoint,
+			lnutil.SatoshiColor(c.Capacity), lnutil.SatoshiColor(c.MyBalance), c.Height, c.StateNum)
 	}
 
 	err = lc.rpccon.Call("LitRPC.TxoList", nil, tReply)
@@ -262,11 +264,11 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		return err
 	}
 	if len(tReply.Txos) > 0 {
-		fmt.Printf("\tTxos:\n")
+		fmt.Printf(lnutil.Cyan("\tTxos:\n"))
 	}
 	for i, t := range tReply.Txos {
-		fmt.Printf("%d %s h:%d amt:%d %s",
-			i, t.OutPoint, t.Height, t.Amt, t.KeyPath)
+		fmt.Printf("%d %s h:%d amt:%s %s",
+			i, t.OutPoint, t.Height, lnutil.SatoshiColor(t.Amt), t.KeyPath)
 		if t.Delay != 0 {
 			fmt.Printf(" delay: %d", t.Delay)
 		}
@@ -280,7 +282,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("\tAddresses:\n")
+	fmt.Printf(lnutil.Cyan("\tAddresses:\n"))
 	for i, a := range aReply.WitAddresses {
 		fmt.Printf("%d %s (%s)\n", i, a, aReply.LegacyAddresses[i])
 	}
@@ -289,21 +291,21 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		return err
 	}
 
-	fmt.Printf("\tUtxo: %d Conf:%d Channel: %d\n",
-		bReply.TxoTotal, bReply.Mature, bReply.ChanTotal)
+	fmt.Printf("\t%s %s %s %s %s %s\n",
+		lnutil.Cyan("Utxo:"), lnutil.SatoshiColor(bReply.TxoTotal), lnutil.Cyan("Conf:"), lnutil.SatoshiColor(bReply.Mature), lnutil.Cyan("Channel:"), lnutil.SatoshiColor(bReply.ChanTotal))
 
 	err = lc.rpccon.Call("LitRPC.SyncHeight", nil, sReply)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Sync Height %d\n", sReply.SyncHeight)
+	fmt.Printf("%s %d\n", lnutil.Cyan("Sync Height:"), sReply.SyncHeight)
 
 	return nil
 }
 
 func (lc *litAfClient) Stop(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Printf("Syntax: stop\n")
+		fmt.Printf(lnutil.White("stop\n"))
 		fmt.Printf("Shut down the lit node.\n")
 		return nil
 	}
@@ -328,7 +330,7 @@ func (lc *litAfClient) Help(textArgs []string) error {
 		return nil
 	}
 	if textArgs[0] == "help" || textArgs[0] == "-h" {
-		fmt.Printf("Syntax: help [<command>]\n")
+		fmt.Printf("%s%s\n", lnutil.White("help"), lnutil.OptColor("command"))
 		fmt.Printf("Show information about a given command\n")
 		return nil
 	}

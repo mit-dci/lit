@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/litrpc"
 )
 
@@ -17,7 +18,7 @@ func (lc *litAfClient) RequestAsync() {
 
 		err := lc.rpccon.Call("LitRPC.GetMessages", args, reply)
 		if err != nil {
-			fmt.Printf("RequestAsync error %s\n", err.Error())
+			fmt.Printf("RequestAsync error %s\n", lnutil.Red(err.Error()))
 			break
 			// end loop on first error.  it's probably a connection error
 
@@ -29,7 +30,7 @@ func (lc *litAfClient) RequestAsync() {
 // Lis starts listening.  Takes args of port to listen on.
 func (lc *litAfClient) Lis(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Printf("Syntax: lis [<port>]\n")
+		fmt.Printf("%s%s\n", lnutil.White("lis"), lnutil.OptColor("port"))
 		fmt.Printf("Start listening for incoming connections.\n")
 		fmt.Printf("The port number, if omitted, defaults to 2448.\n")
 		return nil
@@ -54,7 +55,7 @@ func (lc *litAfClient) Lis(textArgs []string) error {
 
 func (lc *litAfClient) Connect(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Printf("Syntax: con <pubkeyhash>@<hostname>[:<port>]\n")
+		fmt.Printf("%s <%s>@<%s>[:<%s>]\n", lnutil.White("con"), lnutil.White("pubkeyhash"), lnutil.White("hostname"), lnutil.White("port"))
 		fmt.Printf("Make a connection to another host by connecting to their pubkeyhash\n")
 		fmt.Printf("(printed when listening using the lis command), on the given host.\n")
 		fmt.Printf("A port may be provided; if omitted, 2448 is used.\n")
@@ -81,7 +82,7 @@ func (lc *litAfClient) Connect(textArgs []string) error {
 
 func (lc *litAfClient) Say(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Printf("Syntax: say <peer> <message>\n")
+		fmt.Printf("%s%s\n", lnutil.White("say"), lnutil.ReqColor("peer", "message"))
 		fmt.Printf("Send a message to a peer.\n")
 		return nil
 	}
