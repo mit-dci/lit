@@ -44,7 +44,7 @@ func (lc *litAfClient) completeClosedPeers(line string) []string {
 	for _, c := range cReply.Channels {
 		var peerid = fmt.Sprint(c.PeerIdx)
 		var found = false
-		for _, v := range connectedpeers {
+		for _, v := range append(connectedpeers, channelpeers...) {
 			if v == peerid {
 				found = true
 				break
