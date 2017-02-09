@@ -8,12 +8,15 @@ import (
 
 var (
     White = color.New(color.FgHiWhite).SprintFunc()
-    Cyan = color.New(color.FgHiCyan).SprintFunc()
-    Yellow = color.New(color.FgHiYellow).SprintFunc()
-    Red = color.New(color.FgHiRed).SprintFunc()
     Green = color.New(color.FgHiGreen).SprintFunc()
-    WhiteUL = color.New(color.FgHiWhite).Add(color.Underline).SprintFunc()
-    Faint = color.New(color.Faint).SprintFunc()
+    Red = color.New(color.FgHiRed).SprintFunc()
+
+    Header = color.New(color.FgHiCyan).SprintFunc()
+    Prompt = color.New(color.FgHiYellow).SprintFunc()
+    OutPoint = color.New(color.FgYellow).SprintFunc()
+    Address = color.New(color.FgMagenta).SprintFunc()
+    BTC = color.New(color.FgHiWhite).Add(color.Underline).SprintFunc()
+    Satoshi = color.New(color.Faint).SprintFunc()
 )
 
 func ReqColor(required ...interface{}) string {
@@ -41,14 +44,14 @@ func OptColor(optional ...interface{}) string {
 func SatoshiColor(value int64) string {
     var mBTC = value / 100000
     if mBTC < 1 {
-        return Faint(value)
+        return Satoshi(value)
     }
     var sat = value - (mBTC * 100000)
     var btc = mBTC / 1000
     mBTC -= (btc * 1000)
     if btc < 1 {
-        return fmt.Sprintf("%d%s", mBTC, Faint(fmt.Sprintf("%05d", sat)))
+        return fmt.Sprintf("%d%s", mBTC, Satoshi(fmt.Sprintf("%05d", sat)))
     }
 
-    return fmt.Sprintf("%s%03d%s", WhiteUL(btc), mBTC, Faint(fmt.Sprintf("%05d", sat)))
+    return fmt.Sprintf("%s%03d%s", BTC(btc), mBTC, Satoshi(fmt.Sprintf("%05d", sat)))
 }

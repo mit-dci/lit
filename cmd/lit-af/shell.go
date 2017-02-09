@@ -234,7 +234,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		return err
 	}
 	if len(pReply.Connections) > 0 {
-		fmt.Printf("\t%s\n", lnutil.Cyan("Peers:"))
+		fmt.Printf("\t%s\n", lnutil.Header("Peers:"))
 		for _, peer := range pReply.Connections {
 			fmt.Printf("%s %s\n", lnutil.White(peer.PeerNumber), peer.RemoteHost)
 		}
@@ -245,7 +245,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		return err
 	}
 	if len(cReply.Channels) > 0 {
-		fmt.Printf("\t%s\n", lnutil.Cyan("Channels:"))
+		fmt.Printf("\t%s\n", lnutil.Header("Channels:"))
 	}
 
 	for _, c := range cReply.Channels {
@@ -255,7 +255,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 			fmt.Printf(lnutil.Green("Channel "))
 		}
 		fmt.Printf("%s (peer %d) %s\n\t cap: %s bal: %s h: %d state: %d\n",
-			lnutil.White(c.CIdx), c.PeerIdx, c.OutPoint,
+			lnutil.White(c.CIdx), c.PeerIdx, lnutil.OutPoint(c.OutPoint),
 			lnutil.SatoshiColor(c.Capacity), lnutil.SatoshiColor(c.MyBalance), c.Height, c.StateNum)
 	}
 
@@ -264,11 +264,11 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		return err
 	}
 	if len(tReply.Txos) > 0 {
-		fmt.Printf(lnutil.Cyan("\tTxos:\n"))
+		fmt.Printf(lnutil.Header("\tTxos:\n"))
 	}
 	for i, t := range tReply.Txos {
 		fmt.Printf("%d %s h:%d amt:%s %s",
-			i, t.OutPoint, t.Height, lnutil.SatoshiColor(t.Amt), t.KeyPath)
+			i, lnutil.OutPoint(t.OutPoint), t.Height, lnutil.SatoshiColor(t.Amt), t.KeyPath)
 		if t.Delay != 0 {
 			fmt.Printf(" delay: %d", t.Delay)
 		}
@@ -282,9 +282,9 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf(lnutil.Cyan("\tAddresses:\n"))
+	fmt.Printf(lnutil.Header("\tAddresses:\n"))
 	for i, a := range aReply.WitAddresses {
-		fmt.Printf("%d %s (%s)\n", i, a, aReply.LegacyAddresses[i])
+		fmt.Printf("%d %s (%s)\n", i, lnutil.Address(a), lnutil.Address(aReply.LegacyAddresses[i]))
 	}
 	err = lc.rpccon.Call("LitRPC.Bal", nil, bReply)
 	if err != nil {
@@ -292,13 +292,13 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	}
 
 	fmt.Printf("\t%s %s %s %s %s %s\n",
-		lnutil.Cyan("Utxo:"), lnutil.SatoshiColor(bReply.TxoTotal), lnutil.Cyan("Conf:"), lnutil.SatoshiColor(bReply.Mature), lnutil.Cyan("Channel:"), lnutil.SatoshiColor(bReply.ChanTotal))
+		lnutil.Header("Utxo:"), lnutil.SatoshiColor(bReply.TxoTotal), lnutil.Header("Conf:"), lnutil.SatoshiColor(bReply.Mature), lnutil.Header("Channel:"), lnutil.SatoshiColor(bReply.ChanTotal))
 
 	err = lc.rpccon.Call("LitRPC.SyncHeight", nil, sReply)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%s %d\n", lnutil.Cyan("Sync Height:"), sReply.SyncHeight)
+	fmt.Printf("%s %d\n", lnutil.Header("Sync Height:"), sReply.SyncHeight)
 
 	return nil
 }

@@ -82,7 +82,7 @@ func main() {
 	go lc.RequestAsync()
 
 	rl, err := readline.NewEx(&readline.Config{
-		Prompt:       lnutil.Yellow("lit-af") + lnutil.White("# "),
+		Prompt:       lnutil.Prompt("lit-af") + lnutil.White("# "),
 		HistoryFile:  filepath.Join(lc.litHomeDir, historyFilename),
 		AutoComplete: lc.NewAutoCompleter(),
 	})
