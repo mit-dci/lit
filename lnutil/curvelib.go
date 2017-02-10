@@ -11,7 +11,7 @@ import (
 )
 
 // PrivKeyAddBytes adds bytes to a private key.
-// NOTE that this modifies the key in place, overwriting it!!!!1
+// NOTE that this modifies the key in place, overwriting it!!!!!
 // If k is nil, does nothing and doesn't error (k stays nil)
 func PrivKeyAddBytes(k *btcec.PrivateKey, b []byte) {
 	if k == nil {
@@ -30,7 +30,7 @@ func PrivKeyAddBytes(k *btcec.PrivateKey, b []byte) {
 }
 
 // PubKeyAddBytes adds bytes to a public key.
-// NOTE that this modifies the key in place, overwriting it!!!!1
+// NOTE that this modifies the key in place, overwriting it!!!!!
 func PubKeyAddBytes(k *btcec.PublicKey, b []byte) {
 	// turn b into a point on the curve
 	bx, by := btcec.S256().ScalarBaseMult(b)
