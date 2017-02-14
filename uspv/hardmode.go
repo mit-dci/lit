@@ -15,7 +15,7 @@ var (
 	WitMagicBytes = []byte{0x6a, 0x24, 0xaa, 0x21, 0xa9, 0xed}
 )
 
-// BlockRootOK checks for block self-consistency.
+// BlockOK checks for block self-consistency.
 // If the block has no wintess txs, and no coinbase witness commitment,
 // it only checks the tx merkle root.  If either a witness commitment or
 // any witnesses are detected, it also checks that as well.
