@@ -35,42 +35,42 @@ func TestOutPointsEqual(t *testing.T) {
 	var u2 uint32 = 2
 
 	tests := []struct {
-		in_a wire.OutPoint
-		in_b wire.OutPoint
+		inA  wire.OutPoint
+		inB  wire.OutPoint
 		want bool
 	}{
 		//
 		// normal situation
 		//
-		// hash of in_a is not the same as hash of in_b
-		// index of in_a is not the same as index of in_b
+		// hash of inA is not the same as hash of inB
+		// index of inA is not the same as index of inB
 		{
-			wire.OutPoint{hash1, u2}, // in_a
-			wire.OutPoint{hash2, u1}, // in_b
+			wire.OutPoint{hash1, u2}, // inA
+			wire.OutPoint{hash2, u1}, // inB
 			false,
 		},
 
-		// hash of in_a is not the same as hash of in_b
-		// index of in_a is the same as index of in_b
+		// hash of inA is not the same as hash of inB
+		// index of inA is the same as index of inB
 		{
-			wire.OutPoint{hash1, u1}, // in_a
-			wire.OutPoint{hash2, u1}, // in_b
+			wire.OutPoint{hash1, u1}, // inA
+			wire.OutPoint{hash2, u1}, // inB
 			false,
 		},
 
-		// hash of in_a is the same as hash of in_b
-		// index of in_a is not the same as index of in_b
+		// hash of inA is the same as hash of inB
+		// index of inA is not the same as index of inB
 		{
-			wire.OutPoint{hash1, u1}, // in_a
-			wire.OutPoint{hash1, u2}, // in_b
+			wire.OutPoint{hash1, u1}, // inA
+			wire.OutPoint{hash1, u2}, // inB
 			false,
 		},
 
-		// hash of in_a is the same as hash of in_b
-		// index of in_a is the same as index of in_b
+		// hash of inA is the same as hash of inB
+		// index of inA is the same as index of inB
 		{
-			wire.OutPoint{hash1, u1}, // in_a
-			wire.OutPoint{hash1, u1}, // in_b
+			wire.OutPoint{hash1, u1}, // inA
+			wire.OutPoint{hash1, u1}, // inB
 			true,
 		},
 
@@ -79,33 +79,34 @@ func TestOutPointsEqual(t *testing.T) {
 		//
 		// index of OutPoint is uint32 and the index can not be nil
 		// so no test for nil index
+		// inA and inB can not be nil so test just initialized one
 
-		// hash of in_a is just initialized
+		// hash of inA is just initialized
 		{
-			wire.OutPoint{[32]byte{}, u1}, // in_a
-			wire.OutPoint{hash1, u1},      // in_b
+			wire.OutPoint{[32]byte{}, u1}, // inA
+			wire.OutPoint{hash1, u1},      // inB
 			false,
 		},
 
-		// hash of in_b is just initialized
+		// hash of inB is just initialized
 		{
-			wire.OutPoint{hash1, u1},      // in_a
-			wire.OutPoint{[32]byte{}, u1}, // in_b
+			wire.OutPoint{hash1, u1},      // inA
+			wire.OutPoint{[32]byte{}, u1}, // inB
 			false,
 		},
 
-		// hash of in_a is just initialized
-		// hash of in_b is just initialized
+		// hash of inA is just initialized
+		// hash of inB is just initialized
 		{
-			wire.OutPoint{[32]byte{}, u1}, // in_a
-			wire.OutPoint{[32]byte{}, u1}, // in_b
+			wire.OutPoint{[32]byte{}, u1}, // inA
+			wire.OutPoint{[32]byte{}, u1}, // inB
 			true,
 		},
 	}
 
 	// compare with want
 	for i, test := range tests {
-		result := OutPointsEqual(test.in_a, test.in_b)
+		result := OutPointsEqual(test.inA, test.inB)
 		if test.want != result {
 			t.Fatalf("test failed at %d th test", i+1)
 			continue
