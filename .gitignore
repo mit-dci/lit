@@ -11,6 +11,3 @@ watch.db
 #Editor temp files
 \#*
 .\#*
-.lit/ln.db.lock
-.lit/utxo.db.lock
-.lit/watch.db.lock
