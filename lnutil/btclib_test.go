@@ -2,13 +2,10 @@ package lnutil
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
 )
 
 // OutPointsEqual
@@ -198,27 +195,21 @@ func TestOutPointFromBytes(t *testing.T) {
 // P2WSHify
 // test some simple script bytes
 func TestP2WSHify(t *testing.T) {
-	// test for a normal situation
-	// input: []bytes slice, []byte{0x00, 0x01}
-	// output: []bytes slice, script bytes
-	//
-	// no problem if input equals to output
+	// test for a normal situation(blackbox test)
+	// input: inB2, []bytes slice, []byte{0x00, 0x01}
+	// want: wantScriptB, []bytes slice, script bytes
 
 	// a bytes slice to be an input for P2WSHify()
 	var inB2 = []byte{0x00, 0x01}
 
 	// script to be compared
-	// sha256.Sum256() needs a bytes slice
-	sha256InB2 := sha256.Sum256(inB2) // use a different built-in function from fastsha26.Sum256()
+	wantScriptB := []byte{0x00, 0x20, 0xb4, 0x13, 0xf4, 0x7d, 0x13, 0xee,
+		0x2f, 0xe6, 0xc8, 0x45, 0xb2, 0xee, 0x14, 0x1a,
+		0xf8, 0x1d, 0xe8, 0x58, 0xdf, 0x4e, 0xc5, 0x49,
+		0xa5, 0x8b, 0x79, 0x70, 0xbb, 0x96, 0x64, 0x5b,
+		0xc8, 0xd2}
 
-	bScript := []byte{txscript.OP_0}
-	bScript = append(bScript, txscript.OP_DATA_32) // data for sha256
-	for _, b := range sha256InB2 {
-		bScript = append(bScript, byte(b))
-	}
-
-	// compare an output of P2WSHify() and bScript
-	if !bytes.Equal(P2WSHify(inB2), bScript) {
+	if !bytes.Equal(P2WSHify(inB2), wantScriptB) {
 		t.Fatalf("it needs to be equal")
 	}
 
@@ -229,11 +220,9 @@ func TestP2WSHify(t *testing.T) {
 // test some public keys
 // this depends on a test of Hash160() in btcsuite/btcutil
 func TestDirectWPKHScript(t *testing.T) {
-	// test for a normal situation
-	// input: [33]bytes array, public key
-	// output: []bytes slice, script bytes
-	//
-	// no problem if input equals to output
+	// test for a normal situation(blackbox test)
+	// input: inB33, [33]bytes array, public key
+	// want: wantScriptB, []bytes slice, script bytes
 
 	// a bytes array to be an input for P2WSHify()
 	var inB33 = [33]byte{0x00, 0x00, 0x00, 0x00,
@@ -247,16 +236,11 @@ func TestDirectWPKHScript(t *testing.T) {
 		0x01}
 
 	// script to be compared
-	bScript := []byte{txscript.OP_0}
-	bScript = append(bScript, txscript.OP_DATA_20) // data for hash160
+	wantScriptB := []byte{0x00, 0x14, 0x4c, 0x20, 0xbb, 0x22, 0xf2, 0x88,
+		0xee, 0x1f, 0xae, 0xc2, 0x66, 0xdf, 0x21, 0x52,
+		0x0e, 0x4c, 0x13, 0xc7, 0x25, 0x6c}
 
-	hash160InB33 := btcutil.Hash160(inB33[:])
-	for _, b := range hash160InB33 {
-		bScript = append(bScript, byte(b))
-	}
-
-	// compare an output of DirectWPKHScript() and bScript
-	if !bytes.Equal(DirectWPKHScript(inB33), bScript) {
+	if !bytes.Equal(DirectWPKHScript(inB33), wantScriptB) {
 		t.Fatalf("it needs to be equal")
 	}
 
@@ -266,11 +250,9 @@ func TestDirectWPKHScript(t *testing.T) {
 // DirectWPKHScriptFromPKH
 // test some public key hashes
 func TestDirectWPKHScriptFromPKH(t *testing.T) {
-	// test for a normal situation
-	// input: [20]bytes array, public key hash
-	// output: []bytes slice, script bytes
-	//
-	// no problem if input equals to output
+	// test for a normal situation(blackbox test)
+	// input: inB20, [20]bytes array, public key hash
+	// want: wantScriptB, []bytes slice, script bytes
 
 	// a bytes array to be an input for DirectWPKHScriptFromPKH()
 	var inB20 = [20]byte{0x00, 0x00, 0x00, 0x00,
@@ -279,14 +261,11 @@ func TestDirectWPKHScriptFromPKH(t *testing.T) {
 		0x00, 0x00, 0x00, 0x01}
 
 	// Script to be compared
-	bScript := []byte{txscript.OP_0}
-	bScript = append(bScript, txscript.OP_DATA_20) // public key hash
-	for _, b := range inB20 {
-		bScript = append(bScript, byte(b))
-	}
+	wantScriptB := []byte{0x00, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x01, 0x00, 0x00, 0x00, 0x00}
 
-	// compare an output of DirectWPKHScriptFromPKH() and bScript
-	if !bytes.Equal(DirectWPKHScriptFromPKH(inB20), bScript) {
+	if !bytes.Equal(DirectWPKHScriptFromPKH(inB20), wantScriptB) {
 		t.Fatalf("it needs to be equal")
 	}
 
