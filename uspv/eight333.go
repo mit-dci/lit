@@ -54,7 +54,7 @@ type SPVCon struct {
 	RBytes uint64 // total bytes read
 
 	Param *chaincfg.Params // network parameters (testnet3, segnet, etc)
-	TS    *TxStore         // transaction store to write to
+	//	TS    *TxStore         // transaction store to write to
 
 	// RawBlockSender is a channel to send full blocks up to the qln / watchtower
 	// only kicks in when requested from upper layer

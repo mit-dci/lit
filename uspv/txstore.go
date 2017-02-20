@@ -34,6 +34,8 @@ type TxStore struct {
 	// Params live here... AND SCon
 	Param *chaincfg.Params // network parameters (testnet3, segnet, etc)
 
+	SpvHook SPVCon
+
 	// From here, comes everything. It's a secret to everybody.
 	rootPrivKey *hdkeychain.ExtendedKey
 }
@@ -111,12 +113,7 @@ func (t *TxStore) GimmeFilter() (*bloom.Filter, error) {
 	// actually... we should monitor addresses, not txids, right?
 	// or no...?
 	for _, wop := range allWatchOP {
-		//	 aha, add HASH here, not the outpoint! (txid of fund tx)
-		f.AddHash(&wop.Hash)
-		// also add outpoint...?  wouldn't the hash be enough?
-		// not sure why I have to do both of these, but seems like close txs get
-		// ignored without the outpoint, and fund txs get ignored without the
-		// shahash. Might be that shahash operates differently (on txids, not txs)
+		// try just outpoints, not the txids as well
 		f.AddOutPoint(wop)
 	}
 	// still some problem with filter?  When they broadcast a close which doesn't

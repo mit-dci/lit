@@ -13,6 +13,23 @@ import (
 	"github.com/btcsuite/btcd/wire"
 )
 
+func (ts *TxStore) OpenSPV(
+	headerFileName, dbFileName string, hard, iron bool) error {
+	var s SPVCon
+	s.HardMode = hard
+	s.Ironman = iron
+	s.Param = ts.Param
+
+	s.OKTxids = make(map[chainhash.Hash]int32)
+
+	err := s.openHeaderFile(headerFileName)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // OpenSPV starts the SPV connector.  Doesn't actually dial out though.
 func OpenSPV(headerFileName, dbFileName string,
 	inTs *TxStore, hard bool, iron bool, p *chaincfg.Params) (SPVCon, error) {
@@ -122,12 +139,15 @@ func (s *SPVCon) Connect(remoteNode string) error {
 	go s.fPositiveHandler()
 
 	if s.HardMode { // what about for non-hard?  send filter?
-		filt, err := s.TS.GimmeFilter()
-		if err != nil {
-			return err
-		}
-		s.localFilter = filt
-		//		s.Refilter(filt)
+		/*
+			Ignore filters now; switch to filters fed to SPVcon from TS
+				filt, err := s.TS.GimmeFilter()
+				if err != nil {
+					return err
+				}
+				s.localFilter = filt
+				//		s.Refilter(filt)
+		*/
 	}
 
 	return nil
