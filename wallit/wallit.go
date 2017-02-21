@@ -31,9 +31,10 @@ type Wallit struct {
 	// Gets initialized and activates when called by qln
 	OPEventChan chan lnutil.OutPointEvent
 
-	// Params live here... AND SCon
+	// Params live here...
 	Param *chaincfg.Params // network parameters (testnet3, segnet, etc)
 
+	// Hook is the connection to a blockchain.
 	Hook ChainHook
 
 	// From here, comes everything. It's a secret to everybody.
@@ -54,12 +55,12 @@ type Stxo struct {
 	SpendTxid     chainhash.Hash // the tx that consumed it
 }
 
-func NewTxStore(rootkey *hdkeychain.ExtendedKey, p *chaincfg.Params) Wallit {
-	var txs Wallit
-	txs.rootPrivKey = rootkey
-	txs.Param = p
-	txs.FreezeSet = make(map[wire.OutPoint]*FrozenTx)
-	return txs
+func NewWallit(rootkey *hdkeychain.ExtendedKey, p *chaincfg.Params) Wallit {
+	var w Wallit
+	w.rootPrivKey = rootkey
+	w.Param = p
+	w.FreezeSet = make(map[wire.OutPoint]*FrozenTx)
+	return w
 }
 
 // TxToString prints out some info about a transaction. for testing / debugging

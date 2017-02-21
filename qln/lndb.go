@@ -545,7 +545,6 @@ func (nd *LitNode) GetAllQchans() ([]*Qchan, error) {
 			return nil
 
 		})
-		return nil
 	})
 	if err != nil {
 		return nil, err

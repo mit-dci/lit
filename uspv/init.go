@@ -8,16 +8,17 @@ import (
 	"net"
 	"os"
 
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 )
 
-func (w *Wallit) OpenSPV(
+func (s *SPVCon) Start(p *chaincfg.Params,
 	headerFileName, dbFileName string, hard, iron bool) error {
-	var s SPVCon
+
 	s.HardMode = hard
 	s.Ironman = iron
-	s.Param = w.Param
+	s.Param = p
 
 	s.OKTxids = make(map[chainhash.Hash]int32)
 

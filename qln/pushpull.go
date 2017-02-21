@@ -652,7 +652,7 @@ func (nd *LitNode) RevHandler(lm *lnutil.LitMsg, qc *Qchan) error {
 
 	// check if there's nothing for them to revoke
 	if qc.State.Delta == 0 {
-		return fmt.Errorf("got REV, expected deltaSig, ignoring.", revElk.String())
+		return fmt.Errorf("got REV, expected deltaSig, ignoring.")
 	}
 	// maybe this is an unexpected rev, asking us for a rev repeat
 	if qc.State.Delta < 0 {

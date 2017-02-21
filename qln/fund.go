@@ -209,7 +209,9 @@ func (nd LitNode) PointRespHandler(lm *lnutil.LitMsg) error {
 	}
 
 	if nd.InProg.PeerIdx != lm.PeerIdx {
-		return fmt.Errorf("making channel with peer %d but got PointResp from %d")
+		return fmt.Errorf(
+			"making channel with peer %d but got PointResp from %d",
+			nd.InProg.PeerIdx, lm.PeerIdx)
 	}
 
 	// make channel (not in db) just for keys / elk
