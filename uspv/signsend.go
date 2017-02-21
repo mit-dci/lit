@@ -161,7 +161,7 @@ func (s *SPVCon) NahDontSend(txid *chainhash.Hash) error {
 }
 
 // FindFreezeTx looks through the frozen map to find a tx.  Error if it can't find it
-func (ts *TxStore) FindFreezeTx(txid *chainhash.Hash) (*FrozenTx, error) {
+func (ts *Wallit) FindFreezeTx(txid *chainhash.Hash) (*FrozenTx, error) {
 	for op := range ts.FreezeSet {
 		frozenTxid := ts.FreezeSet[op].Txid
 		if frozenTxid.IsEqual(txid) {
@@ -268,7 +268,7 @@ func (s *SPVCon) NewOutgoingTx(tx *wire.MsgTx) error {
 // PickUtxos Picks Utxos for spending.  Tell it how much money you want.
 // It returns a tx-sortable utxoslice, and the overshoot amount.  Also errors.
 // if "ow" is true, only gives witness utxos (for channel funding)
-func (ts *TxStore) PickUtxos(
+func (ts *Wallit) PickUtxos(
 	amtWanted int64, ow bool) (portxo.TxoSliceByBip69, int64, error) {
 	satPerByte := int64(80) // satoshis per byte fee; have as arg later
 	curHeight, err := ts.GetDBSyncHeight()
@@ -463,7 +463,7 @@ func (ts *TxStore) SendDrop(
 */
 // SendOne is for the sweep function, and doesn't do change.
 // Probably can get rid of this for real txs.
-func (ts *TxStore) SendOne(u portxo.PorTxo, adr btcutil.Address) (*wire.MsgTx, error) {
+func (ts *Wallit) SendOne(u portxo.PorTxo, adr btcutil.Address) (*wire.MsgTx, error) {
 
 	ts.FreezeMutex.Lock()
 	defer ts.FreezeMutex.Unlock()
@@ -499,7 +499,7 @@ func (ts *TxStore) SendOne(u portxo.PorTxo, adr btcutil.Address) (*wire.MsgTx, e
 }
 
 // Builds tx from inputs and outputs, returns tx.  Sorts.  Doesn't sign.
-func (ts *TxStore) BuildDontSign(
+func (ts *Wallit) BuildDontSign(
 	utxos []*portxo.PorTxo, txos []*wire.TxOut) (*wire.MsgTx, error) {
 
 	// make the tx
@@ -525,7 +525,7 @@ func (ts *TxStore) BuildDontSign(
 // Build and sign builds a tx from a slice of utxos and txOuts.
 // It then signs all the inputs and returns the tx.  Should
 // pretty much always work for any inputs.
-func (ts *TxStore) BuildAndSign(
+func (ts *Wallit) BuildAndSign(
 	utxos []*portxo.PorTxo, txos []*wire.TxOut) (*wire.MsgTx, error) {
 	var err error
 
@@ -628,7 +628,7 @@ func (ts *TxStore) BuildAndSign(
 }
 
 // SendCoins sends coins.
-func (ts *TxStore) SendCoins(
+func (ts *Wallit) SendCoins(
 	adrs []btcutil.Address, sendAmts []int64) (*wire.MsgTx, error) {
 
 	if len(adrs) != len(sendAmts) {

@@ -8,17 +8,16 @@ import (
 	"net"
 	"os"
 
-	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 )
 
-func (ts *TxStore) OpenSPV(
+func (w *Wallit) OpenSPV(
 	headerFileName, dbFileName string, hard, iron bool) error {
 	var s SPVCon
 	s.HardMode = hard
 	s.Ironman = iron
-	s.Param = ts.Param
+	s.Param = w.Param
 
 	s.OKTxids = make(map[chainhash.Hash]int32)
 
@@ -30,9 +29,10 @@ func (ts *TxStore) OpenSPV(
 	return nil
 }
 
+/*
 // OpenSPV starts the SPV connector.  Doesn't actually dial out though.
 func OpenSPV(headerFileName, dbFileName string,
-	inTs *TxStore, hard bool, iron bool, p *chaincfg.Params) (SPVCon, error) {
+	inTs *Wallit, hard bool, iron bool, p *chaincfg.Params) (SPVCon, error) {
 	// create new SPVCon
 	var s SPVCon
 	s.HardMode = hard
@@ -65,6 +65,7 @@ func OpenSPV(headerFileName, dbFileName string,
 	//	s.OKMutex.Unlock()
 	return s, nil
 }
+*/
 
 // Connect dials out and connects to full nodes.
 func (s *SPVCon) Connect(remoteNode string) error {

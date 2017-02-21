@@ -19,7 +19,9 @@ import (
 	"github.com/mit-dci/lit/portxo"
 )
 
-type TxStore struct {
+// The Wallit is lit's main wallet struct.  It's got the root key, the dbs, and
+// contains the SPVhooks into the network.
+type Wallit struct {
 	// could get rid of adr slice, it's just an in-ram cache...
 	StateDB *bolt.DB // place to write all this down
 
@@ -54,8 +56,8 @@ type Stxo struct {
 	SpendTxid     chainhash.Hash // the tx that consumed it
 }
 
-func NewTxStore(rootkey *hdkeychain.ExtendedKey, p *chaincfg.Params) TxStore {
-	var txs TxStore
+func NewTxStore(rootkey *hdkeychain.ExtendedKey, p *chaincfg.Params) Wallit {
+	var txs Wallit
 	txs.rootPrivKey = rootkey
 	txs.Param = p
 	txs.FreezeSet = make(map[wire.OutPoint]*FrozenTx)
@@ -77,7 +79,7 @@ func (s *SPVCon) OKTxid(txid *chainhash.Hash, height int32) error {
 }
 
 // GimmeFilter ... or I'm gonna fade away
-func (t *TxStore) GimmeFilter() (*bloom.Filter, error) {
+func (t *Wallit) GimmeFilter() (*bloom.Filter, error) {
 	// get all address hash160s
 	adr160s, err := t.GetAllAdr160s()
 	if err != nil {

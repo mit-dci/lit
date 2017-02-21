@@ -134,14 +134,14 @@ func (s *SPVCon) Refilter(f *bloom.Filter) {
 
 // IngestBlock is like IngestMerkleBlock but aralphic
 // different enough that it's better to have 2 separate functions
-func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
+func (w *Wallit) IngestBlock(m *wire.MsgBlock) {
 	var err error
 
 	// hand block over to the watchtower via the RawBlockSender chan
 	// omit this if qln not connected
 
-	if cap(s.RawBlockSender) != 0 {
-		s.RawBlockSender <- m
+	if cap(w.SpvHook.RawBlockSender) != 0 {
+		w.SpvHook.RawBlockSender <- m
 	} else {
 		fmt.Printf("Watchtower not initialized\n")
 	}
@@ -154,7 +154,7 @@ func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
 
 	var hah HashAndHeight
 	select { // select here so we don't block on an unrequested mblock
-	case hah = <-s.blockQueue: // pop height off mblock queue
+	case hah = <-w.SpvHook.blockQueue: // pop height off mblock queue
 		break
 	default:
 		log.Printf("Unrequested full block")
@@ -179,14 +179,14 @@ func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
 	for _, tx := range m.Transactions {
 		utilTx := btcutil.NewTx(tx)
 		// find txs that look like hits
-		if s.localFilter.MatchTxAndUpdate(utilTx) {
+		if w.SpvHook.localFilter.MatchTxAndUpdate(utilTx) {
 			txs = append(txs, tx)
 		}
 	}
 	// anything good?
 	if len(txs) > 0 {
 		// ingest all the txs
-		hits, err := s.TS.IngestMany(txs, hah.height)
+		hits, err := w.IngestMany(txs, hah.height)
 		if err != nil {
 			log.Printf("Incoming block error: %s\n", err.Error())
 			return
@@ -201,17 +201,17 @@ func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
 
 	if fPositive > reFilter {
 		fmt.Printf("%d filter false positives in this block\n", fPositive)
-		filt, err := s.TS.GimmeFilter()
+		filt, err := w.GimmeFilter()
 		if err != nil {
 			log.Printf("Refilter error: %s\n", err.Error())
 			return
 		}
-		s.Refilter(filt)
+		w.SpvHook.Refilter(filt)
 	}
 	// write to db that we've sync'd to the height indicated in the
 	// merkle block.  This isn't QUITE true since we haven't actually gotten
 	// the txs yet but if there are problems with the txs we should backtrack.
-	err = s.TS.SetDBSyncHeight(hah.height)
+	err = w.SetDBSyncHeight(hah.height)
 	if err != nil {
 		log.Printf("full block sync error: %s\n", err.Error())
 		return
@@ -225,7 +225,7 @@ func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
 		// this way the only thing that triggers waitstate is asking for headers,
 		// getting 0, calling AskForMerkBlocks(), and seeing you don't need any.
 		// that way you are pretty sure you're synced up.
-		err = s.AskForHeaders()
+		err = w.SpvHook.AskForHeaders()
 		if err != nil {
 			log.Printf("Merkle block error: %s\n", err.Error())
 			return

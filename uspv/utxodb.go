@@ -63,7 +63,7 @@ var (
 	KEYTipHeight = []byte("TipHeight") // height synced to
 )
 
-func (ts *TxStore) OpenDB(filename string) error {
+func (ts *Wallit) OpenDB(filename string) error {
 	var err error
 	var numKeys uint32
 	ts.StateDB, err = bolt.Open(filename, 0644, nil)
@@ -125,7 +125,7 @@ func (ts *TxStore) OpenDB(filename string) error {
 }
 
 // Get all Addresses, in order.
-func (ts *TxStore) GetAllAddresses() ([]btcutil.Address, error) {
+func (ts *Wallit) GetAllAddresses() ([]btcutil.Address, error) {
 	var i, last uint32 // number of addresses made so far
 	var adrSlice []btcutil.Address
 
@@ -167,7 +167,7 @@ func (ts *TxStore) GetAllAddresses() ([]btcutil.Address, error) {
 // GetAllAdrs gets all the addresses hash160s stored in the DB
 // unsorted.  This is only for making a filter; for UI use GetAllAdr
 // This is probably faster than generating the pubkeys, but I should test that.
-func (ts *TxStore) GetAllAdr160s() ([][]byte, error) {
+func (ts *Wallit) GetAllAdr160s() ([][]byte, error) {
 
 	// all 20byte address pkhs
 	var allAdr160s [][]byte
@@ -199,7 +199,7 @@ func (ts *TxStore) GetAllAdr160s() ([][]byte, error) {
 
 // make a new change output.  I guess this is supposed to be on a different
 // branch than regular addresses...
-func (ts *TxStore) NewChangeOut(amt int64) (*wire.TxOut, error) {
+func (ts *Wallit) NewChangeOut(amt int64) (*wire.TxOut, error) {
 	change160, err := ts.NewAdr160() // change is always witnessy
 	if err != nil {
 		return nil, err
@@ -219,7 +219,7 @@ func (ts *TxStore) NewChangeOut(amt int64) (*wire.TxOut, error) {
 
 // NewAdr creates a new, never before seen address, and increments the
 // DB counter, and returns the hash160 of the pubkey.
-func (ts *TxStore) NewAdr160() ([]byte, error) {
+func (ts *Wallit) NewAdr160() ([]byte, error) {
 	var err error
 	if ts.Param == nil {
 		return nil, fmt.Errorf("NewAdr error: nil param")
@@ -283,7 +283,7 @@ func (ts *TxStore) NewAdr160() ([]byte, error) {
 
 // AddPorTxoAdr adds an externally sourced address to the db.  Looks at the keygen
 // to derive hash160.
-func (ts *TxStore) AddPorTxoAdr(kg portxo.KeyGen) error {
+func (ts *Wallit) AddPorTxoAdr(kg portxo.KeyGen) error {
 	// write to db file
 	return ts.StateDB.Update(func(btx *bolt.Tx) error {
 		adrb := btx.Bucket(BKTadr)
@@ -300,7 +300,7 @@ func (ts *TxStore) AddPorTxoAdr(kg portxo.KeyGen) error {
 
 // RecoverAdrs regenerates a fixed number of refund addresses for payment
 // channels, adds them to the DB, and then resets the DB sync height.
-func (ts *TxStore) RecoverAdrs() error {
+func (ts *Wallit) RecoverAdrs() error {
 	var err error
 	if ts.Param == nil {
 		return fmt.Errorf("NewAdr error: nil param")
@@ -369,7 +369,7 @@ func (ts *TxStore) RecoverAdrs() error {
 
 // SetDBSyncHeight sets sync height of the db, indicated the latest block
 // of which it has ingested all the transactions.
-func (ts *TxStore) SetDBSyncHeight(n int32) error {
+func (ts *Wallit) SetDBSyncHeight(n int32) error {
 	var buf bytes.Buffer
 	_ = binary.Write(&buf, binary.BigEndian, n)
 
@@ -380,7 +380,7 @@ func (ts *TxStore) SetDBSyncHeight(n int32) error {
 }
 
 // SyncHeight returns the chain height to which the db has synced
-func (ts *TxStore) GetDBSyncHeight() (int32, error) {
+func (ts *Wallit) GetDBSyncHeight() (int32, error) {
 	var n int32
 	err := ts.StateDB.View(func(btx *bolt.Tx) error {
 		sta := btx.Bucket(BKTState)
@@ -408,7 +408,7 @@ func (ts *TxStore) GetDBSyncHeight() (int32, error) {
 
 // GetAllUtxos returns a slice of all portxos in the db. empty slice is OK.
 // Doesn't return watch only outpoints
-func (ts *TxStore) GetAllUtxos() ([]*portxo.PorTxo, error) {
+func (ts *Wallit) GetAllUtxos() ([]*portxo.PorTxo, error) {
 	var utxos []*portxo.PorTxo
 	err := ts.StateDB.View(func(btx *bolt.Tx) error {
 		dufb := btx.Bucket(BKToutpoint)
@@ -445,7 +445,7 @@ func (ts *TxStore) GetAllUtxos() ([]*portxo.PorTxo, error) {
 }
 
 // GetAllStxos returns a slice of all stxos known to the db. empty slice is OK.
-func (ts *TxStore) GetAllStxos() ([]*Stxo, error) {
+func (ts *Wallit) GetAllStxos() ([]*Stxo, error) {
 	// this is almost the same as GetAllUtxos but whatever, it'd be more
 	// complicated to make one contain the other or something
 	var stxos []*Stxo
@@ -478,7 +478,7 @@ func (ts *TxStore) GetAllStxos() ([]*Stxo, error) {
 }
 
 // SaveTx unconditionally saves a tx in the DB, usually for sending out to nodes
-func (ts *TxStore) SaveTx(tx *wire.MsgTx) error {
+func (ts *Wallit) SaveTx(tx *wire.MsgTx) error {
 	// open db
 	return ts.StateDB.Update(func(btx *bolt.Tx) error {
 		// get the outpoint watch bucket
@@ -494,7 +494,7 @@ func (ts *TxStore) SaveTx(tx *wire.MsgTx) error {
 }
 
 // GetTx takes a txid and returns the transaction.  If we have it.
-func (ts *TxStore) GetTx(txid *chainhash.Hash) (*wire.MsgTx, error) {
+func (ts *Wallit) GetTx(txid *chainhash.Hash) (*wire.MsgTx, error) {
 	rtx := wire.NewMsgTx()
 
 	err := ts.StateDB.View(func(btx *bolt.Tx) error {
@@ -516,7 +516,7 @@ func (ts *TxStore) GetTx(txid *chainhash.Hash) (*wire.MsgTx, error) {
 }
 
 // GetAllTxs returns all the stored txs
-func (ts *TxStore) GetAllTxs() ([]*wire.MsgTx, error) {
+func (ts *Wallit) GetAllTxs() ([]*wire.MsgTx, error) {
 	var rtxs []*wire.MsgTx
 
 	err := ts.StateDB.View(func(btx *bolt.Tx) error {
@@ -543,7 +543,7 @@ func (ts *TxStore) GetAllTxs() ([]*wire.MsgTx, error) {
 }
 
 // GetAllWatchOPs returns all outpoints we're watching.  Both portxos and watch-only.
-func (ts *TxStore) GetAllOPs() ([]*wire.OutPoint, error) {
+func (ts *Wallit) GetAllOPs() ([]*wire.OutPoint, error) {
 	var OPs []*wire.OutPoint
 	// open db
 	err := ts.StateDB.View(func(btx *bolt.Tx) error {
@@ -574,7 +574,7 @@ func (ts *TxStore) GetAllOPs() ([]*wire.OutPoint, error) {
 }
 
 // RegisterWatchOP registers an outpoint to watch.  Called from ReallySend()
-func (ts *TxStore) RegisterWatchOP(op wire.OutPoint) error {
+func (ts *Wallit) RegisterWatchOP(op wire.OutPoint) error {
 	opArr := lnutil.OutPointToBytes(op)
 	// open db
 	return ts.StateDB.Update(func(btx *bolt.Tx) error {
@@ -590,7 +590,7 @@ func (ts *TxStore) RegisterWatchOP(op wire.OutPoint) error {
 // GetPendingInv returns an inv message containing all txs known to the
 // db which are at height 0 (not known to be confirmed).
 // This can be useful on startup or to rebroadcast unconfirmed txs.
-func (ts *TxStore) GetPendingInv() (*wire.MsgInv, error) {
+func (ts *Wallit) GetPendingInv() (*wire.MsgInv, error) {
 	// use a map (really a set) do avoid dupes
 	txidMap := make(map[chainhash.Hash]struct{})
 
@@ -633,7 +633,7 @@ func (ts *TxStore) GetPendingInv() (*wire.MsgInv, error) {
 
 // GainUtxo registers the utxo in the duffel bag
 // don't register address; they shouldn't be re-used ever anyway.
-func (ts *TxStore) GainUtxo(u portxo.PorTxo) error {
+func (ts *Wallit) GainUtxo(u portxo.PorTxo) error {
 	fmt.Printf("gaining exported utxo %s at height %d\n",
 		u.Op.String(), u.Height)
 	// serialize porTxo
@@ -711,7 +711,7 @@ func KeyHashFromPkScript(pkscript []byte) []byte {
 	return nil
 }
 
-func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
+func (ts *Wallit) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 	return ts.IngestMany([]*wire.MsgTx{tx}, height)
 }
 
@@ -726,7 +726,7 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 // IngestMany can probably work OK even if the txs are out of order.
 // But don't do that, that's weird and untested.
 // also it'll error if you give it more than 1M txs, so don't.
-func (ts *TxStore) IngestMany(txs []*wire.MsgTx, height int32) (uint32, error) {
+func (ts *Wallit) IngestMany(txs []*wire.MsgTx, height int32) (uint32, error) {
 	var hits uint32
 	var err error
 

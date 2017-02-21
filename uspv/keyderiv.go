@@ -21,7 +21,7 @@ Channel refund keys are use 3, peer and index per peer / channel.
 
 // PathPrivkey returns a private key by descending the given path
 // Returns nil if there's an error.
-func (t *TxStore) PathPrivkey(kg portxo.KeyGen) *btcec.PrivateKey {
+func (t *Wallit) PathPrivkey(kg portxo.KeyGen) *btcec.PrivateKey {
 	// in uspv, we require path depth of 5
 	if kg.Depth != 5 {
 		return nil
@@ -36,7 +36,7 @@ func (t *TxStore) PathPrivkey(kg portxo.KeyGen) *btcec.PrivateKey {
 
 // PathPubkey returns a public key by descending the given path.
 // Returns nil if there's an error.
-func (t *TxStore) PathPubkey(kg portxo.KeyGen) *btcec.PublicKey {
+func (t *Wallit) PathPubkey(kg portxo.KeyGen) *btcec.PublicKey {
 	priv := t.PathPrivkey(kg)
 	if priv == nil {
 		return nil
@@ -46,7 +46,7 @@ func (t *TxStore) PathPubkey(kg portxo.KeyGen) *btcec.PublicKey {
 
 // PathPubHash160 returns a 20 byte pubkey hash for the given path
 // It'll always return 20 bytes, or a nil if there's an error.
-func (t *TxStore) PathPubHash160(kg portxo.KeyGen) []byte {
+func (t *Wallit) PathPubHash160(kg portxo.KeyGen) []byte {
 	pub := t.PathPubkey(kg)
 	if pub == nil {
 		return nil
@@ -57,7 +57,7 @@ func (t *TxStore) PathPubHash160(kg portxo.KeyGen) []byte {
 // ------------- end of 2 main key deriv functions
 
 // get a private key from the regular wallet
-func (t *TxStore) GetWalletPrivkey(idx uint32) *btcec.PrivateKey {
+func (t *Wallit) GetWalletPrivkey(idx uint32) *btcec.PrivateKey {
 	var kg portxo.KeyGen
 	kg.Depth = 5
 	kg.Step[0] = 44 | 1<<31
@@ -81,7 +81,7 @@ func GetWalletKeygen(idx uint32) portxo.KeyGen {
 }
 
 // get a public key from the regular wallet
-func (t *TxStore) GetWalletAddress(idx uint32) *btcutil.AddressWitnessPubKeyHash {
+func (t *Wallit) GetWalletAddress(idx uint32) *btcutil.AddressWitnessPubKeyHash {
 	if t == nil {
 		fmt.Printf("GetAddress %d nil txstore\n", idx)
 		return nil
@@ -101,13 +101,13 @@ func (t *TxStore) GetWalletAddress(idx uint32) *btcutil.AddressWitnessPubKeyHash
 }
 
 // GetUsePrive generates a private key for the given use case & keypath
-func (t *TxStore) GetUsePriv(kg portxo.KeyGen, use uint32) *btcec.PrivateKey {
+func (t *Wallit) GetUsePriv(kg portxo.KeyGen, use uint32) *btcec.PrivateKey {
 	kg.Step[2] = use
 	return t.PathPrivkey(kg)
 }
 
 // GetUsePub generates a pubkey for the given use case & keypath
-func (t *TxStore) GetUsePub(kg portxo.KeyGen, use uint32) [33]byte {
+func (t *Wallit) GetUsePub(kg portxo.KeyGen, use uint32) [33]byte {
 	var b [33]byte
 	pub := t.GetUsePriv(kg, use).PubKey()
 	if pub != nil {
@@ -117,7 +117,7 @@ func (t *TxStore) GetUsePub(kg portxo.KeyGen, use uint32) [33]byte {
 }
 
 // IdKey returns the identity private key
-func (t *TxStore) IdKeyx() *btcec.PrivateKey {
+func (t *Wallit) IdKeyx() *btcec.PrivateKey {
 	var kg portxo.KeyGen
 	kg.Depth = 5
 	kg.Step[0] = 44 | 1<<31
