@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
+	"github.com/fatih/color"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/qln"
@@ -109,8 +109,8 @@ func setConfig(lc *LitConfig) {
 }
 
 func main() {
-	fmt.Printf("lit node v0.0\n")
-	fmt.Printf("-h for list of options.\n")
+	fmt.Fprintf(color.Output,"lit node v0.0\n")
+	fmt.Fprintf(color.Output,"-h for list of options.\n")
 
 	conf := new(LitConfig)
 	setConfig(conf)
@@ -188,7 +188,7 @@ func main() {
 			for {
 				// setup reader with max 4K input chars
 				reader := bufio.NewReaderSize(os.Stdin, 4000)
-				fmt.Printf("LND# ")                 // prompt
+				fmt.Fprintf(color.Output,"LND# ")                 // prompt
 				msg, err := reader.ReadString('\n') // input finishes on enter key
 				if err != nil {
 					log.Fatal(err)
@@ -198,7 +198,7 @@ func main() {
 				if len(cmdslice) < 1 {
 					continue // no input, just prompt again
 				}
-				fmt.Printf("entered command: %s\n", msg) // immediate feedback
+				fmt.Fprintf(color.Output,"entered command: %s\n", msg) // immediate feedback
 				err = Shellparse(cmdslice)
 				if err != nil { // only error should be user exit
 					log.Fatal(err)

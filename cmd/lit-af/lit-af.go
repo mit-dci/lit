@@ -10,7 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
+	"github.com/fatih/color"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/chzyer/readline"
 )
@@ -105,7 +105,7 @@ func main() {
 		rl.SaveHistory(msg)
 
 		cmdslice := strings.Fields(msg)          // chop input up on whitespace
-		fmt.Printf("entered command: %s\n", msg) // immediate feedback
+		fmt.Fprintf(color.Output,"entered command: %s\n", msg) // immediate feedback
 		err = lc.Shellparse(cmdslice)
 		if err != nil { // only error should be user exit
 			log.Fatal(err)
