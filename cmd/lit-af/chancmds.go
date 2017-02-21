@@ -3,17 +3,17 @@ package main
 import (
 	"fmt"
 	"strconv"
-
+	"github.com/fatih/color"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/litrpc"
 )
 
 func (lc *litAfClient) FundChannel(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Printf("%s%s\n", lnutil.White("fund"), lnutil.ReqColor("peer", "capacity", "initialSend"))
-		fmt.Printf("Establish and fund a new lightning channel with the given peer.\n")
-		fmt.Printf("The capacity is the amount of satoshi we insert into the channel,\n")
-		fmt.Printf("and initialSend is the amount we initially hand over to the other party.\n")
+		fmt.Fprintf(color.Output,"%s%s\n", lnutil.White("fund"), lnutil.ReqColor("peer", "capacity", "initialSend"))
+		fmt.Fprintf(color.Output,"Establish and fund a new lightning channel with the given peer.\n")
+		fmt.Fprintf(color.Output,"The capacity is the amount of satoshi we insert into the channel,\n")
+		fmt.Fprintf(color.Output,"and initialSend is the amount we initially hand over to the other party.\n")
 		return nil
 	}
 
@@ -45,17 +45,17 @@ func (lc *litAfClient) FundChannel(textArgs []string) error {
 		return err
 	}
 
-	fmt.Printf("%s\n", reply.Status)
+	fmt.Fprintf(color.Output,"%s\n", reply.Status)
 	return nil
 }
 
 // Request close of a channel.  Need to pass in peer, channel index
 func (lc *litAfClient) CloseChannel(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Printf("%s%s\n", lnutil.White("close"), lnutil.ReqColor("channel idx"))
-		fmt.Printf("Cooperatively close the channel with the given index by asking\n")
-		fmt.Printf("the other party to finalize the channel pay-out.\n")
-		fmt.Printf("See also: break\n")
+		fmt.Fprintf(color.Output,"%s%s\n", lnutil.White("close"), lnutil.ReqColor("channel idx"))
+		fmt.Fprintf(color.Output,"Cooperatively close the channel with the given index by asking\n")
+		fmt.Fprintf(color.Output,"the other party to finalize the channel pay-out.\n")
+		fmt.Fprintf(color.Output,"See also: break\n")
 		return nil
 	}
 
@@ -79,17 +79,17 @@ func (lc *litAfClient) CloseChannel(textArgs []string) error {
 		return err
 	}
 
-	fmt.Printf("%s\n", reply.Status)
+	fmt.Fprintf(color.Output,"%s\n", reply.Status)
 	return nil
 }
 
 // Almost exactly the same as CloseChannel.  Maybe make "break" a bool...?
 func (lc *litAfClient) BreakChannel(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Printf("%s%s\n", lnutil.White("break"), lnutil.ReqColor("channel idx"))
-		fmt.Printf("Forcibly break the given channel. Note that we need to wait\n")
-		fmt.Printf("a set number of blocks before we can use the money.\n")
-		fmt.Printf("See also: stop\n")
+		fmt.Fprintf(color.Output,"%s%s\n", lnutil.White("break"), lnutil.ReqColor("channel idx"))
+		fmt.Fprintf(color.Output,"Forcibly break the given channel. Note that we need to wait\n")
+		fmt.Fprintf(color.Output,"a set number of blocks before we can use the money.\n")
+		fmt.Fprintf(color.Output,"See also: stop\n")
 		return nil
 	}
 
@@ -113,16 +113,16 @@ func (lc *litAfClient) BreakChannel(textArgs []string) error {
 		return err
 	}
 
-	fmt.Printf("%s\n", reply.Status)
+	fmt.Fprintf(color.Output,"%s\n", reply.Status)
 	return nil
 }
 
 // Push is the shell command which calls PushChannel
 func (lc *litAfClient) Push(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Printf("%s%s%s\n", lnutil.White("push"), lnutil.ReqColor("channel idx", "amount"), lnutil.OptColor("times"))
-		fmt.Printf("Push the given amount (in satoshis) to the other party on the given channel.\n")
-		fmt.Printf("Optionally, the push operation can be repeated <times> number of times.\n")
+		fmt.Fprintf(color.Output,"%s%s%s\n", lnutil.White("push"), lnutil.ReqColor("channel idx", "amount"), lnutil.OptColor("times"))
+		fmt.Fprintf(color.Output,"Push the given amount (in satoshis) to the other party on the given channel.\n")
+		fmt.Fprintf(color.Output,"Optionally, the push operation can be repeated <times> number of times.\n")
 		return nil
 	}
 
@@ -159,7 +159,7 @@ func (lc *litAfClient) Push(textArgs []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Pushed %s at state %s\n", lnutil.SatoshiColor(int64(amt)), lnutil.White(reply.StateIndex))
+		fmt.Fprintf(color.Output,"Pushed %s at state %s\n", lnutil.SatoshiColor(int64(amt)), lnutil.White(reply.StateIndex))
 		times--
 	}
 
