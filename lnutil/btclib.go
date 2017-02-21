@@ -10,6 +10,12 @@ import (
 	"github.com/btcsuite/fastsha256"
 )
 
+// TxAndHeight is just a tx, and the height at which it was confirmed.
+type TxAndHeight struct {
+	Tx     *wire.MsgTx
+	Height int32
+}
+
 // OutPointEvent is a message describing events concerning an outpoint.
 // There's 2 event types: confirmation and spend.  If the Tx pointer is nil,
 // then it's a confirm.  If the Tx has an actual MsgTx in there, it's a spend.
