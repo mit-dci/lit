@@ -149,64 +149,42 @@ func main() {
 		log.Fatal(err)
 	}
 
-	tip, err := SCon.TS.GetDBSyncHeight() // ask for sync height
-	if err != nil {
-		log.Fatal(err)
-	}
+	litrpc.RpcListen(&SCon, &Node, conf.rpcport)
 
-	if tip == 0 || conf.reSync { // DB has never been used, set to birthday
-		if conf.regTest || conf.bc2Net {
-			if conf.birthblock < 100000 {
-				tip = conf.birthblock
-			} else {
-				tip = 500 // for regtest/bc2
-			}
-		} else {
-			tip = conf.birthblock // for testnet3. should base on keyfile date?
-		}
-		err = SCon.TS.SetDBSyncHeight(tip)
+	/*
+		tip, err := SCon.TS.GetDBSyncHeight() // ask for sync height
 		if err != nil {
 			log.Fatal(err)
 		}
-	}
 
-	// Connect to full node
-	err = SCon.Connect(conf.spvHost)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// once we're connected, initiate headers sync
-	err = SCon.AskForHeaders()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// shell loop -- to be removed
-	/*
-		go func() {
-			for {
-				// setup reader with max 4K input chars
-				reader := bufio.NewReaderSize(os.Stdin, 4000)
-				fmt.Printf("LND# ")                 // prompt
-				msg, err := reader.ReadString('\n') // input finishes on enter key
-				if err != nil {
-					log.Fatal(err)
+		if tip == 0 || conf.reSync { // DB has never been used, set to birthday
+			if conf.regTest || conf.bc2Net {
+				if conf.birthblock < 100000 {
+					tip = conf.birthblock
+				} else {
+					tip = 500 // for regtest/bc2
 				}
-
-				cmdslice := strings.Fields(msg) // chop input up on whitespace
-				if len(cmdslice) < 1 {
-					continue // no input, just prompt again
-				}
-				fmt.Printf("entered command: %s\n", msg) // immediate feedback
-				err = Shellparse(cmdslice)
-				if err != nil { // only error should be user exit
-					log.Fatal(err)
-				}
+			} else {
+				tip = conf.birthblock // for testnet3. should base on keyfile date?
 			}
-		}()
+			err = SCon.TS.SetDBSyncHeight(tip)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+
+		// Connect to full node
+		err = SCon.Connect(conf.spvHost)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// once we're connected, initiate headers sync
+		err = SCon.AskForHeaders()
+		if err != nil {
+			log.Fatal(err)
+		}
 	*/
-	litrpc.RpcListen(&SCon, &Node, conf.rpcport)
 
 	return
 }

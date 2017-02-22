@@ -8,27 +8,8 @@ import (
 	"net"
 	"os"
 
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 )
-
-func (s *SPVCon) Start(p *chaincfg.Params,
-	headerFileName, dbFileName string, hard, iron bool) error {
-
-	s.HardMode = hard
-	s.Ironman = iron
-	s.Param = p
-
-	s.OKTxids = make(map[chainhash.Hash]int32)
-
-	err := s.openHeaderFile(headerFileName)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
 
 /*
 // OpenSPV starts the SPV connector.  Doesn't actually dial out though.
@@ -169,7 +150,7 @@ func (s *SPVCon) openHeaderFile(hfn string) error {
 		if os.IsNotExist(err) {
 			var b bytes.Buffer
 			// if testnet, start with hardcoded height
-			if s.TS.Param.Name == "testnet3" {
+			if s.Param.Name == "testnet3" {
 				// hard-coded millionth block header
 				hdr, err := hex.DecodeString("00000020da33925b1f7a55e9fa8e6c955a20ea094148b60c5c88f69a4f500000000000003673b7b6ce8157d3cfcaf415b6740918df7610a8769d70334aa9abd9c941b25e7621215880ba371a85bf9646")
 				if err != nil {
@@ -181,7 +162,7 @@ func (s *SPVCon) openHeaderFile(hfn string) error {
 				}
 			} else {
 				// not testnet3, start from beginning.
-				err = s.TS.Param.GenesisBlock.Header.Serialize(&b)
+				err = s.Param.GenesisBlock.Header.Serialize(&b)
 				if err != nil {
 					return err
 				}

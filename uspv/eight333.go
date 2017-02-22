@@ -68,6 +68,9 @@ type SPVCon struct {
 	// waitState is a channel that is empty while in the header and block
 	// sync modes, but when in the idle state has a "true" in it.
 	inWaitState chan bool
+
+	// CurrentHeightChan is how we tell the wallit when blocks come in
+	CurrentHeightChan chan int32
 }
 
 // AskForTx requests a tx we heard about from an inv message.
@@ -150,14 +153,9 @@ func (s *SPVCon) IngestMerkleBlock(m *wire.MsgMerkleBlock) {
 			return
 		}
 	}
-	// write to db that we've sync'd to the height indicated in the
-	// merkle block.  This isn't QUITE true since we haven't actually gotten
-	// the txs yet but if there are problems with the txs we should backtrack.
-	err = s.TS.SetDBSyncHeight(hah.height)
-	if err != nil {
-		log.Printf("Merkle block error: %s\n", err.Error())
-		return
-	}
+	// actually we should do this AFTER sending all the txs...
+	s.CurrentHeightChan <- hah.height
+
 	if hah.final {
 		// don't set waitstate; instead, ask for headers again!
 		// this way the only thing that triggers waitstate is asking for headers,
@@ -370,13 +368,15 @@ func (s *SPVCon) AskForBlocks(dbTip int32) error {
 		fmt.Printf("no blocks to request, entering wait state\n")
 		fmt.Printf("%d bytes received\n", s.RBytes)
 		s.inWaitState <- true
+
 		// check if we can grab outputs
-		err = s.GrabAll()
-		if err != nil {
-			return err
-		}
+		// Do this on wallit level instead
+		//		err = s.GrabAll()
+		//		if err != nil {
+		//			return err
+		//		}
 		// also advertise any unconfirmed txs here
-		s.Rebroadcast()
+		//		s.Rebroadcast()
 		// ask for mempool each time...?  put something in to only ask the
 		// first time we sync...?
 		//		if !s.Ironman {

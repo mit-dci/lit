@@ -53,6 +53,23 @@ func (w *Wallit) NewChangeOut(amt int64) (*wire.TxOut, error) {
 	return changeOut, nil
 }
 
+// AddPorTxoAdr adds an externally sourced address to the db.  Looks at the keygen
+// to derive hash160.
+func (w *Wallit) AddPorTxoAdr(kg portxo.KeyGen) error {
+	// write to db file
+	return w.StateDB.Update(func(btx *bolt.Tx) error {
+		adrb := btx.Bucket(BKTadr)
+		if adrb == nil {
+			return fmt.Errorf("no adr bucket")
+		}
+
+		adr160 := w.PathPubHash160(kg)
+		fmt.Printf("adding addr %x\n", adr160)
+		// add the 20-byte key-hash into the db
+		return adrb.Put(adr160, kg.Bytes())
+	})
+}
+
 // NewAdr creates a new, never before seen address, and increments the
 // DB counter, and returns the hash160 of the pubkey.
 func (w *Wallit) NewAdr160() ([]byte, error) {

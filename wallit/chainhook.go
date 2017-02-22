@@ -15,7 +15,6 @@ what it's seen.  The ChainHook is ephemeral, and has some state in RAM but
 shouldn't have to keep track of too much; or at least what it keeps track of
 is internal and not exported out to the wallit (eg a fullnode keeps track
 of a lot, and SPV node, somewhat less, and a block explorer shim basically nothing)
-
 */
 
 type ChainHook interface {
@@ -35,10 +34,10 @@ type ChainHook interface {
 	// Give it an array; Currently needs to be 20 bytes.  Only p2pkh / p2wpkh
 	// are supported.
 	// Later could add a separate function for script hashes (20/32)
-	RegisterAddress(address [20]byte)
+	RegisterAddress(address [20]byte) error
 
 	// RegisterOutPoint tells the ChainHook about an outpoint of interest.
-	RegisterOutPoint(wire.OutPoint)
+	RegisterOutPoint(wire.OutPoint) error
 
 	// SetHeight sets the height ChainHook needs to look above.
 	// Returns a channel which tells the wallit what height the ChainHook has
@@ -52,5 +51,7 @@ type ChainHook interface {
 	// though, so this takes some time.
 	PushTx(tx *wire.MsgTx) error
 
+	// Request all incoming blocks over this channel.
+	RawBlocks() chan *wire.MsgBlock
 	// TODO -- reorgs.  Oh and doublespends and stuff.
 }
