@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"strconv"
-
+	"github.com/fatih/color"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/litrpc"
 )
@@ -11,8 +11,8 @@ import (
 // Send sends coins somewhere
 func (lc *litAfClient) Send(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Printf("%s%s\n", lnutil.White("send"), lnutil.ReqColor("addr", "amount"))
-		fmt.Printf("Send the given amount of satoshis to the given address.\n")
+		fmt.Fprintf(color.Output,"%s%s\n", lnutil.White("send"), lnutil.ReqColor("addr", "amount"))
+		fmt.Fprintf(color.Output,"Send the given amount of satoshis to the given address.\n")
 		return nil
 	}
 
@@ -26,7 +26,7 @@ func (lc *litAfClient) Send(textArgs []string) error {
 	/*
 		adr, err := btcutil.DecodeAddress(args[0], lc.Param)
 		if err != nil {
-			fmt.Printf("error parsing %s as address\t", args[0])
+			fmt.Fprintf(color.Output,"error parsing %s as address\t", args[0])
 			return err
 		}
 	*/
@@ -35,7 +35,7 @@ func (lc *litAfClient) Send(textArgs []string) error {
 		return err
 	}
 
-	fmt.Printf("send %d to address: %s \n", amt, textArgs[0])
+	fmt.Fprintf(color.Output,"send %d to address: %s \n", amt, textArgs[0])
 
 	args.DestAddrs = []string{textArgs[0]}
 	args.Amts = []int64{int64(amt)}
@@ -44,9 +44,9 @@ func (lc *litAfClient) Send(textArgs []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("sent txid(s):\n")
+	fmt.Fprintf(color.Output,"sent txid(s):\n")
 	for i, t := range reply.Txids {
-		fmt.Printf("\t%d %s\n", i, t)
+		fmt.Fprintf(color.Output,"\t%d %s\n", i, t)
 	}
 	return nil
 }
@@ -54,8 +54,8 @@ func (lc *litAfClient) Send(textArgs []string) error {
 // Sweep moves utxos with many 1-in-1-out txs
 func (lc *litAfClient) Sweep(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Printf("%s%s%s\n", lnutil.White("sweep"), lnutil.ReqColor("addr", "howmany"), lnutil.OptColor("drop"))
-		fmt.Printf("Move UTXOs with many 1-in-1-out txs.\n")
+		fmt.Fprintf(color.Output,"%s%s%s\n", lnutil.White("sweep"), lnutil.ReqColor("addr", "howmany"), lnutil.OptColor("drop"))
+		fmt.Fprintf(color.Output,"Move UTXOs with many 1-in-1-out txs.\n")
 		// TODO: Make this more clear.
 		return nil
 	}
@@ -83,9 +83,9 @@ func (lc *litAfClient) Sweep(textArgs []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Swept\n")
+	fmt.Fprintf(color.Output,"Swept\n")
 	for i, t := range reply.Txids {
-		fmt.Printf("%d %s\n", i, t)
+		fmt.Fprintf(color.Output,"%d %s\n", i, t)
 	}
 
 	return nil
@@ -100,7 +100,7 @@ func (lc *litAfClient) Sweep(textArgs []string) error {
 
 func (lc *litAfClient) Fan(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Printf("%s%s\n", lnutil.White("fan"), lnutil.ReqColor("addr", "howmany", "howmuch"))
+		fmt.Fprintf(color.Output,"%s%s\n", lnutil.White("fan"), lnutil.ReqColor("addr", "howmany", "howmuch"))
 		// TODO: Add description.
 		return nil
 	}
@@ -130,9 +130,9 @@ func (lc *litAfClient) Fan(textArgs []string) error {
 		return err
 	}
 
-	fmt.Printf("Fanout:\n")
+	fmt.Fprintf(color.Output,"Fanout:\n")
 	for i, t := range reply.Txids {
-		fmt.Printf("\t%d %s\n", i, t)
+		fmt.Fprintf(color.Output,"\t%d %s\n", i, t)
 	}
 	return nil
 }
@@ -140,8 +140,8 @@ func (lc *litAfClient) Fan(textArgs []string) error {
 // Adr makes new addresses
 func (lc *litAfClient) Adr(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Printf(lnutil.White("adr\n"))
-		fmt.Printf("Makes a new address.\n")
+		fmt.Fprintf(color.Output,lnutil.White("adr\n"))
+		fmt.Fprintf(color.Output,"Makes a new address.\n")
 		// TODO: Make this more clear.
 		return nil
 	}
@@ -153,6 +153,6 @@ func (lc *litAfClient) Adr(textArgs []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("new adr(s): %s\nold: %s\n", lnutil.Address(reply.WitAddresses), lnutil.Address(reply.LegacyAddresses))
+	fmt.Fprintf(color.Output,"new adr(s): %s\nold: %s\n", lnutil.Address(reply.WitAddresses), lnutil.Address(reply.LegacyAddresses))
 	return nil
 }
