@@ -3,7 +3,9 @@ package lnutil
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 
+	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
@@ -86,4 +88,29 @@ func DirectWPKHScriptFromPKH(pkh [20]byte) []byte {
 	builder.AddOp(txscript.OP_0).AddData(pkh[:])
 	b, _ := builder.Script()
 	return b
+}
+
+// TxToString prints out some info about a transaction. for testing / debugging
+func TxToString(tx *wire.MsgTx) string {
+	utx := btcutil.NewTx(tx)
+	str := fmt.Sprintf("size %d vsize %d wsize %d locktime %d wit: %t txid %s\n",
+		tx.SerializeSizeStripped(), blockchain.GetTxVirtualSize(utx),
+		tx.SerializeSize(), tx.LockTime, tx.HasWitness(), tx.TxHash().String())
+	for i, in := range tx.TxIn {
+		str += fmt.Sprintf("Input %d spends %s seq %d\n",
+			i, in.PreviousOutPoint.String(), in.Sequence)
+		str += fmt.Sprintf("\tSigScript: %x\n", in.SignatureScript)
+		for j, wit := range in.Witness {
+			str += fmt.Sprintf("\twitness %d: %x\n", j, wit)
+		}
+	}
+	for i, out := range tx.TxOut {
+		if out != nil {
+			str += fmt.Sprintf("output %d script: %x amt: %d\n",
+				i, out.PkScript, out.Value)
+		} else {
+			str += fmt.Sprintf("output %d nil (WARNING)\n", i)
+		}
+	}
+	return str
 }

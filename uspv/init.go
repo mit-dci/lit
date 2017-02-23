@@ -7,36 +7,9 @@ import (
 	"log"
 	"net"
 	"os"
-	"path/filepath"
 
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/mit-dci/lit/lnutil"
 )
-
-// OpenSPV starts the SPV connector.  Doesn't actually dial out though.
-func NewSPV(
-	folderPath string, hard bool, iron bool, p *chaincfg.Params) (*SPVCon, error) {
-	// create new SPVCon
-	var s SPVCon
-	s.HardMode = hard
-	s.Ironman = iron
-	s.Param = p
-	// I should really merge SPVCon and TxStore, they're basically the same
-	s.OKTxids = make(map[chainhash.Hash]int32)
-	s.TxUpToWallit = make(chan lnutil.TxAndHeight, 1) // I dunno, capacity 1?
-
-	headerFilePath := filepath.Join(folderPath, "header.bin")
-
-	// open header file
-	err := s.openHeaderFile(headerFilePath)
-	if err != nil {
-		return &s, err
-	}
-
-	return &s, nil
-}
 
 // Connect dials out and connects to full nodes.
 func (s *SPVCon) Connect(remoteNode string) error {

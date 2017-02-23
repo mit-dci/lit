@@ -1,6 +1,7 @@
 package wallit
 
 import (
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/mit-dci/lit/lnutil"
 )
@@ -24,7 +25,10 @@ type ChainHook interface {
 	// The TxChannel should never give txs that the wallit doesn't care about.  In the
 	// case of bloom fitlers, false positives should be handled and stopped at the
 	// ChainHook layer; wallit should not have to handle ingesting irrelevant txs.
-	Start() (chan lnutil.TxAndHeight, error)
+	// You get back an error and 2 channels: one for txs with height attached, and
+	// one with block heights.  Subject to change; maybe this is redundant.
+	Start(height int32, path string, params *chaincfg.Params) (
+		chan lnutil.TxAndHeight, chan int32, error)
 
 	// The Register functions send information to the ChainHook about what txs to
 	// return.  Txs matching either the addresses or outpoints will be returned
@@ -43,7 +47,8 @@ type ChainHook interface {
 	// Returns a channel which tells the wallit what height the ChainHook has
 	// sync'd up to.  This chan should push int32s *after* the TxAndHeights
 	// have come in; so getting a "54" here means block 54 is done and fully parsed.
-	SetHeight(startHeight int32) chan int32
+	// Removed, put into Start().
+	//	SetHeight(startHeight int32) chan int32
 
 	// PushTx sends a tx out to the network via the ChainHook.
 	// Note that this does NOT register anything in the tx, so by just using this,
@@ -51,7 +56,9 @@ type ChainHook interface {
 	// though, so this takes some time.
 	PushTx(tx *wire.MsgTx) error
 
-	// Request all incoming blocks over this channel.
+	// Request all incoming blocks over this channel.  If RawBlocks isn't called,
+	// then the undelying hook package doesn't need to get full blocks.
+	// Currently you always call it with uspv...
 	RawBlocks() chan *wire.MsgBlock
 	// TODO -- reorgs.  Oh and doublespends and stuff.
 }
