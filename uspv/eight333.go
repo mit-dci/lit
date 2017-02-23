@@ -3,11 +3,8 @@ package uspv
 import (
 	"fmt"
 	"log"
-	"net"
 	"os"
-	"sync"
 
-	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil/bloom"
@@ -23,54 +20,49 @@ const (
 	VERSION = 70012
 )
 
-type SPVCon struct {
-	con net.Conn // the (probably tcp) connection to the node
+// GimmeFilter ... or I'm gonna fade away
+func (s *SPVCon) GimmeFilter() (*bloom.Filter, error) {
 
-	// Enhanced SPV modes for users who have outgrown easy mode SPV
-	// but have not yet graduated to full nodes.
-	HardMode bool // hard mode doesn't use filters.
-	Ironman  bool // ironman only gets blocks, never requests txs.
+	filterElements := uint32(len(s.TrackingAdrs) + (len(s.TrackingOPs)))
 
-	headerMutex       sync.Mutex
-	headerFile        *os.File // file for SPV headers
-	headerStartHeight int32    // first header on disk is nth header in chain
+	f := bloom.NewFilter(filterElements, 0, 0.000001, wire.BloomUpdateAll)
 
-	OKTxids map[chainhash.Hash]int32 // known good txids and their heights
-	OKMutex sync.Mutex
+	// note there could be false positives since we're just looking
+	// for the 20 byte PKH without the opcodes.
+	for _, a160 := range s.TrackingAdrs { // add 20-byte pubkeyhash
+		//		fmt.Printf("adding address hash %x\n", a160)
+		f.Add(a160[:])
+	}
+	//	for _, u := range allUtxos {
+	//		f.AddOutPoint(&u.Op)
+	//	}
 
-	localFilter *bloom.Filter // local bloom filter for hard mode
+	// actually... we should monitor addresses, not txids, right?
+	// or no...?
+	for _, wop := range s.TrackingOPs {
+		// try just outpoints, not the txids as well
+		f.AddOutPoint(&wop)
+	}
+	// still some problem with filter?  When they broadcast a close which doesn't
+	// send any to us, sometimes we don't see it and think the channel is still open.
+	// so not monitoring the channel outpoint properly?  here or in ingest()
 
-	//[doesn't work without fancy mutexes, nevermind, just use header file]
-	// localHeight   int32  // block height we're on
-	remoteHeight  int32  // block height they're on
-	localVersion  uint32 // version we report
-	remoteVersion uint32 // version remote node
+	fmt.Printf("made %d element filter\n", filterElements)
+	return f, nil
+}
 
-	// what's the point of the input queue? remove? leave for now...
-	inMsgQueue  chan wire.Message // Messages coming in from remote node
-	outMsgQueue chan wire.Message // Messages going out to remote node
-
-	WBytes uint64 // total bytes written
-	RBytes uint64 // total bytes read
-
-	Param *chaincfg.Params // network parameters (testnet3, segnet, etc)
-	//	TS    *TxStore         // transaction store to write to
-
-	// RawBlockSender is a channel to send full blocks up to the qln / watchtower
-	// only kicks in when requested from upper layer
-	RawBlockSender chan *wire.MsgBlock
-
-	// mBlockQueue is for keeping track of what height we've requested.
-	blockQueue chan HashAndHeight
-	// fPositives is a channel to keep track of bloom filter false positives.
-	fPositives chan int32
-
-	// waitState is a channel that is empty while in the header and block
-	// sync modes, but when in the idle state has a "true" in it.
-	inWaitState chan bool
-
-	// CurrentHeightChan is how we tell the wallit when blocks come in
-	CurrentHeightChan chan int32
+// OKTxid assigns a height to a txid.  This means that
+// the txid exists at that height, with whatever assurance (for height 0
+// it's no assurance at all)
+func (s *SPVCon) OKTxid(txid *chainhash.Hash, height int32) error {
+	if txid == nil {
+		return fmt.Errorf("tried to add nil txid")
+	}
+	log.Printf("added %s to OKTxids at height %d\n", txid.String(), height)
+	s.OKMutex.Lock()
+	s.OKTxids[*txid] = height
+	s.OKMutex.Unlock()
+	return nil
 }
 
 // AskForTx requests a tx we heard about from an inv message.

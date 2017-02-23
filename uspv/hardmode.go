@@ -9,6 +9,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/bloom"
+	"github.com/mit-dci/lit/lnutil"
 )
 
 var (
@@ -134,18 +135,18 @@ func (s *SPVCon) Refilter(f *bloom.Filter) {
 
 // IngestBlock is like IngestMerkleBlock but aralphic
 // different enough that it's better to have 2 separate functions
-func (w *Wallit) IngestBlock(m *wire.MsgBlock) {
+func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
 	var err error
 
 	// hand block over to the watchtower via the RawBlockSender chan
 	// omit this if qln not connected
-
-	if cap(w.SpvHook.RawBlockSender) != 0 {
-		w.SpvHook.RawBlockSender <- m
-	} else {
-		fmt.Printf("Watchtower not initialized\n")
-	}
-
+	/*
+		if cap(w.SpvHook.RawBlockSender) != 0 {
+			w.SpvHook.RawBlockSender <- m
+		} else {
+			fmt.Printf("Watchtower not initialized\n")
+		}
+	*/
 	ok := BlockOK(*m) // check block self-consistency
 	if !ok {
 		fmt.Printf("block %s not OK!!11\n", m.BlockHash().String())
@@ -154,7 +155,7 @@ func (w *Wallit) IngestBlock(m *wire.MsgBlock) {
 
 	var hah HashAndHeight
 	select { // select here so we don't block on an unrequested mblock
-	case hah = <-w.SpvHook.blockQueue: // pop height off mblock queue
+	case hah = <-s.blockQueue: // pop height off mblock queue
 		break
 	default:
 		log.Printf("Unrequested full block")
@@ -179,43 +180,31 @@ func (w *Wallit) IngestBlock(m *wire.MsgBlock) {
 	for _, tx := range m.Transactions {
 		utilTx := btcutil.NewTx(tx)
 		// find txs that look like hits
-		if w.SpvHook.localFilter.MatchTxAndUpdate(utilTx) {
+		if s.localFilter.MatchTxAndUpdate(utilTx) {
 			txs = append(txs, tx)
 		}
 	}
 	// anything good?
 	if len(txs) > 0 {
 		// ingest all the txs
-		hits, err := w.IngestMany(txs, hah.height)
-		if err != nil {
-			log.Printf("Incoming block error: %s\n", err.Error())
-			return
-		}
-		if hits > 0 {
-			// log.Printf("block %d tx %d %s ingested and matches %d utxo/adrs.",
-			//	hah.height, i, tx.TxSha().String(), hits)
-		} else {
-			fPositive += len(txs) // matched filter but no hits
+		for _, tx := range txs {
+			s.TxUpToWallit <- lnutil.TxAndHeight{tx, hah.height}
 		}
 	}
 
 	if fPositive > reFilter {
 		fmt.Printf("%d filter false positives in this block\n", fPositive)
-		filt, err := w.GimmeFilter()
+		filt, err := s.GimmeFilter()
 		if err != nil {
 			log.Printf("Refilter error: %s\n", err.Error())
 			return
 		}
-		w.SpvHook.Refilter(filt)
+		s.Refilter(filt)
 	}
 	// write to db that we've sync'd to the height indicated in the
 	// merkle block.  This isn't QUITE true since we haven't actually gotten
 	// the txs yet but if there are problems with the txs we should backtrack.
-	err = w.SetDBSyncHeight(hah.height)
-	if err != nil {
-		log.Printf("full block sync error: %s\n", err.Error())
-		return
-	}
+	s.CurrentHeightChan <- hah.height
 
 	fmt.Printf("ingested full block %s height %d OK\n",
 		m.Header.BlockHash().String(), hah.height)
@@ -225,7 +214,7 @@ func (w *Wallit) IngestBlock(m *wire.MsgBlock) {
 		// this way the only thing that triggers waitstate is asking for headers,
 		// getting 0, calling AskForMerkBlocks(), and seeing you don't need any.
 		// that way you are pretty sure you're synced up.
-		err = w.SpvHook.AskForHeaders()
+		err = s.AskForHeaders()
 		if err != nil {
 			log.Printf("Merkle block error: %s\n", err.Error())
 			return

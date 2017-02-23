@@ -24,7 +24,7 @@ type ChainHook interface {
 	// The TxChannel should never give txs that the wallit doesn't care about.  In the
 	// case of bloom fitlers, false positives should be handled and stopped at the
 	// ChainHook layer; wallit should not have to handle ingesting irrelevant txs.
-	Start() chan lnutil.TxAndHeight
+	Start() (chan lnutil.TxAndHeight, error)
 
 	// The Register functions send information to the ChainHook about what txs to
 	// return.  Txs matching either the addresses or outpoints will be returned

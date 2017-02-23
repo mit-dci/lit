@@ -46,3 +46,11 @@ func (s *SPVCon) RegisterOutPoint(wire.OutPoint) error {
 func (s *SPVCon) SetHeight(startHeight int32) chan int32 {
 	return s.CurrentHeightChan
 }
+
+func (s *SPVCon) PushTx(tx *wire.MsgTx) error {
+	return nil
+}
+
+func (s *SPVCon) RawBlocks() chan *wire.MsgBlock {
+	return s.RawBlockSender
+}

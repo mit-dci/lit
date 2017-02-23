@@ -55,14 +55,6 @@ type Stxo struct {
 	SpendTxid     chainhash.Hash // the tx that consumed it
 }
 
-func NewWallit(rootkey *hdkeychain.ExtendedKey, p *chaincfg.Params) Wallit {
-	var w Wallit
-	w.rootPrivKey = rootkey
-	w.Param = p
-	w.FreezeSet = make(map[wire.OutPoint]*FrozenTx)
-	return w
-}
-
 // TxToString prints out some info about a transaction. for testing / debugging
 func TxToString(tx *wire.MsgTx) string {
 	utx := btcutil.NewTx(tx)

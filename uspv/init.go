@@ -7,47 +7,36 @@ import (
 	"log"
 	"net"
 	"os"
+	"path/filepath"
 
+	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/mit-dci/lit/lnutil"
 )
 
-/*
 // OpenSPV starts the SPV connector.  Doesn't actually dial out though.
-func OpenSPV(headerFileName, dbFileName string,
-	inTs *Wallit, hard bool, iron bool, p *chaincfg.Params) (SPVCon, error) {
+func NewSPV(
+	folderPath string, hard bool, iron bool, p *chaincfg.Params) (*SPVCon, error) {
 	// create new SPVCon
 	var s SPVCon
 	s.HardMode = hard
 	s.Ironman = iron
 	s.Param = p
 	// I should really merge SPVCon and TxStore, they're basically the same
-	inTs.Param = p
 	s.OKTxids = make(map[chainhash.Hash]int32)
-	s.TS = inTs // copy pointer of txstore into spvcon
+	s.TxUpToWallit = make(chan lnutil.TxAndHeight, 1) // I dunno, capacity 1?
+
+	headerFilePath := filepath.Join(folderPath, "header.bin")
 
 	// open header file
-	err := s.openHeaderFile(headerFileName)
+	err := s.openHeaderFile(headerFilePath)
 	if err != nil {
-		return s, err
+		return &s, err
 	}
-	// open db file
-	err = inTs.OpenDB(dbFileName)
-	if err != nil {
-		return s, err
-	}
-	// load known txids into ram
-	//	txids, err := inTs.GetAllTxids()
-	//	if err != nil {
-	//		return s, err
-	//	}
-	//	s.OKMutex.Lock()
-	//	for _, txid := range txids {
-	//		s.OKTxids[*txid] = 0
-	//	}
-	//	s.OKMutex.Unlock()
-	return s, nil
+
+	return &s, nil
 }
-*/
 
 // Connect dials out and connects to full nodes.
 func (s *SPVCon) Connect(remoteNode string) error {
@@ -172,11 +161,11 @@ func (s *SPVCon) openHeaderFile(hfn string) error {
 				return err
 			}
 			log.Printf("made genesis block %x\n", b.Bytes())
-			log.Printf("made genesis header %s\n", s.TS.Param.GenesisHash.String())
+			log.Printf("made genesis header %s\n", s.Param.GenesisHash.String())
 			log.Printf("created hardcoded genesis header at %s\n", hfn)
 		}
 	}
-	if s.TS.Param.Name == "testnet3" {
+	if s.Param.Name == "testnet3" {
 		s.headerStartHeight = 1032192
 	}
 
