@@ -208,11 +208,7 @@ func (w *Wallit) GrabAll() error {
 
 // Directly send out a tx.  For things that plug in to the uspv wallet.
 func (w *Wallit) DirectSendTx(tx *wire.MsgTx) error {
-	// don't ingest, just save
-	err := w.SaveTx(tx)
-	if err != nil {
-		return err
-	}
+	// don't ingest, just push out
 	return w.Hook.PushTx(tx)
 }
 
@@ -469,12 +465,13 @@ func (w *Wallit) BuildAndSign(
 	return tx, nil
 }
 
-// SendCoins sends coins.
+// SendCoins sends coins.  Saves to the wallit db, and pushes the tx out to
+// the chainhook
 func (w *Wallit) SendCoins(
-	adrs []btcutil.Address, sendAmts []int64) (*wire.MsgTx, error) {
+	adrs []btcutil.Address, sendAmts []int64) error {
 
 	if len(adrs) != len(sendAmts) {
-		return nil, fmt.Errorf(
+		return fmt.Errorf(
 			"%d addresses and %d amounts", len(adrs), len(sendAmts))
 	}
 	var err error
@@ -492,7 +489,7 @@ func (w *Wallit) SendCoins(
 		// make address script 76a914...88ac or 0014...
 		outAdrScript, err := txscript.PayToAddrScript(adr)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		// make user specified txout and add to tx
 		txout := wire.NewTxOut(sendAmts[i], outAdrScript)
@@ -503,7 +500,7 @@ func (w *Wallit) SendCoins(
 	// This might not be enough for the fee if the inputs line up right...
 	utxos, overshoot, err := w.PickUtxos(totalSend, false)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	fmt.Printf("Overshot by %d, can make change output\n", overshoot)
 
@@ -514,12 +511,23 @@ func (w *Wallit) SendCoins(
 	if overshoot-fee > dustCutoff {
 		changeOut, err := w.NewChangeOut(overshoot - fee)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		txos = append(txos, changeOut)
 	}
+	tx, err := w.BuildAndSign(utxos, txos)
+	if err != nil {
+		return err
+	}
 
-	return w.BuildAndSign(utxos, txos)
+	// save tx in db; ingest at height 0
+	_, err = w.Ingest(tx, 0)
+	if err != nil {
+		return err
+	}
+
+	// push out to chainhook
+	return w.Hook.PushTx(tx)
 }
 
 // EstFee gives a fee estimate based on a input / output set and a sat/Byte target.

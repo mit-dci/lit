@@ -119,7 +119,7 @@ func (nd *LitNode) CloseReqHandler(lm *lnutil.LitMsg) {
 	}
 	fmt.Printf(lnutil.TxToString(tx))
 	// broadcast
-	err = nd.BaseWallet.PushTx(tx)
+	err = nd.SubWallet.PushTx(tx)
 	if err != nil {
 		fmt.Printf("CloseReqHandler NewOutgoingTx err %s", err.Error())
 		return

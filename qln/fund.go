@@ -261,7 +261,7 @@ func (nd LitNode) PointRespHandler(lm *lnutil.LitMsg) error {
 	}
 
 	// call MaybeSend, freezing inputs and learning the txid of the channel
-	outPoints, err := nd.BaseWallet.MaybeSend([]*wire.TxOut{txo})
+	outPoints, err := nd.SubWallet.MaybeSend([]*wire.TxOut{txo})
 	if err != nil {
 		return err
 	}
@@ -531,13 +531,13 @@ func (nd *LitNode) QChanAckHandler(lm *lnutil.LitMsg, peer *RemotePeer) {
 	}
 
 	// OK to fund.
-	err = nd.BaseWallet.ReallySend(&qc.Op.Hash)
+	err = nd.SubWallet.ReallySend(&qc.Op.Hash)
 	if err != nil {
 		fmt.Printf("QChanAckHandler ReallySend err %s", err.Error())
 		return
 	}
 
-	err = nd.BaseWallet.WatchThis(qc.Op)
+	err = nd.SubWallet.WatchThis(qc.Op)
 	if err != nil {
 		fmt.Printf("QChanAckHandler WatchThis err %s", err.Error())
 		return
@@ -548,7 +548,7 @@ func (nd *LitNode) QChanAckHandler(lm *lnutil.LitMsg, peer *RemotePeer) {
 	nullTxo.Value = 0 // redundant, but explicitly show that this is just for adr
 	nullTxo.KeyGen = qc.KeyGen
 	nullTxo.KeyGen.Step[2] = UseChannelWatchRefund
-	nd.BaseWallet.ExportUtxo(nullTxo)
+	nd.SubWallet.ExportUtxo(nullTxo)
 
 	// channel creation is ~complete, clear InProg.
 	// We may be asked to re-send the sig-proof
@@ -611,7 +611,7 @@ func (nd *LitNode) SigProofHandler(lm *lnutil.LitMsg, peer *RemotePeer) {
 		return
 	}
 	op := lnutil.OutPointFromBytes(opArr)
-	err = nd.BaseWallet.WatchThis(*op)
+	err = nd.SubWallet.WatchThis(*op)
 	if err != nil {
 		fmt.Printf("SigProofHandler err %s", err.Error())
 		return
@@ -622,7 +622,7 @@ func (nd *LitNode) SigProofHandler(lm *lnutil.LitMsg, peer *RemotePeer) {
 	nullTxo.Value = 0 // redundant, but explicitly show that this is just for adr
 	nullTxo.KeyGen = qc.KeyGen
 	nullTxo.KeyGen.Step[2] = UseChannelWatchRefund
-	nd.BaseWallet.ExportUtxo(nullTxo)
+	nd.SubWallet.ExportUtxo(nullTxo)
 
 	peer.QCs[qc.Idx()] = qc
 	peer.OpMap[opArr] = qc.Idx()

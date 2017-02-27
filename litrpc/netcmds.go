@@ -50,14 +50,14 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
 		}
 		fmt.Printf("try string %s\n", adrString)
 		// pretty ugly to build the string here...
-		connectAdr, err = lndc.LnAddrFromString(adrString, r.Node.Param)
+		connectAdr, err = lndc.LnAddrFromString(adrString, r.Node.SubWallet.Params())
 		if err != nil {
 			return err
 		}
 
 	} else {
 		// use string as is
-		connectAdr, err = lndc.LnAddrFromString(args.LNAddr, r.Node.Param)
+		connectAdr, err = lndc.LnAddrFromString(args.LNAddr, r.Node.SubWallet.Params())
 		if err != nil {
 			return err
 		}

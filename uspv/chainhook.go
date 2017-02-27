@@ -33,6 +33,11 @@ func (s *SPVCon) Start(
 
 	s.Param = params
 
+	s.TrackingAdrs = make(map[[20]byte]bool)
+	s.TrackingOPs = make(map[wire.OutPoint]bool)
+
+	s.TxMap = make(map[chainhash.Hash]*wire.MsgTx)
+
 	s.OKTxids = make(map[chainhash.Hash]int32)
 
 	s.TxUpToWallit = make(chan lnutil.TxAndHeight, 1)
@@ -52,18 +57,36 @@ func (s *SPVCon) Start(
 }
 
 func (s *SPVCon) RegisterAddress(adr160 [20]byte) error {
+	s.TrackingAdrs[adr160] = true
 	return nil
 }
 
-func (s *SPVCon) RegisterOutPoint(wire.OutPoint) error {
+func (s *SPVCon) RegisterOutPoint(op wire.OutPoint) error {
+	s.TrackingOPs[op] = true
 	return nil
 }
 
 func (s *SPVCon) SetHeight(startHeight int32) chan int32 {
+	s.syncHeight = startHeight
 	return s.CurrentHeightChan
 }
 
+// PushTx sends a tx out to the global network
 func (s *SPVCon) PushTx(tx *wire.MsgTx) error {
+	// store tx in the RAM map for when other nodes ask for it
+	txid := tx.TxHash()
+	s.TxMap[txid] = tx
+
+	// send out an inv message telling nodes we have this new tx
+	iv1 := wire.NewInvVect(wire.InvTypeWitnessTx, &txid)
+	invMsg := wire.NewMsgInv()
+	err := invMsg.AddInvVect(iv1)
+	if err != nil {
+		return err
+	}
+	// broadcast inv message
+	s.outMsgQueue <- invMsg
+
 	return nil
 }
 

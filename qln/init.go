@@ -4,33 +4,47 @@ import (
 	"fmt"
 
 	"github.com/boltdb/bolt"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcutil/hdkeychain"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/wallit"
 )
 
-func (nd *LitNode) Init(
-	dbfilename, watchname string, basewal UWallet, tower bool) error {
+// Init starts up a lit node.  Needs priv key, and some paths.
+// Right now the SubWallet is hardcoded but can be an arg.
+// Also only 1 param arg, but can break that out later.
+func NewLitNode(privKey *[32]byte, p *chaincfg.Params,
+	dbfilename, watchname string, tower bool) (*LitNode, error) {
+
+	nd := new(LitNode)
 
 	err := nd.OpenDB(dbfilename)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	// connect to base wallet
-	nd.BaseWallet = basewal
+	rootpriv, err := hdkeychain.NewMaster(privKey[:], p)
+	if err != nil {
+		return nil, err
+	}
+	// make a base wallet
+	wallit := wallit.NewWallit(rootpriv, p)
 
-	nd.Param = nd.BaseWallet.Params()
+	// connect to base wallet
+	nd.SubWallet = wallit
+
 	// ask basewallet for outpoint event messages
-	go nd.OPEventHandler(nd.BaseWallet.LetMeKnow())
+	go nd.OPEventHandler(nd.SubWallet.LetMeKnow())
 	// optional tower activation
 	if tower {
 		err = nd.Tower.OpenDB(watchname)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		nd.Tower.Accepting = true
 		// call base wallet blockmonitor and hand this channel to the tower
-		go nd.Tower.BlockHandler(nd.BaseWallet.BlockMonitor())
+		go nd.Tower.BlockHandler(nd.SubWallet.BlockMonitor())
 		go nd.Relay(nd.Tower.JusticeOutbox())
 	}
 
@@ -47,14 +61,14 @@ func (nd *LitNode) Init(
 	//	go nd.OmniHandler()
 	go nd.OutMessager()
 
-	return nil
+	return nd, nil
 }
 
 // relay txs from the watchtower to the underlying wallet...
 // small, but a little ugly; maybe there's a cleaner way
 func (nd *LitNode) Relay(outbox chan *wire.MsgTx) {
 	for {
-		err := nd.BaseWallet.PushTx(<-outbox)
+		err := nd.SubWallet.PushTx(<-outbox)
 		if err != nil {
 			fmt.Printf("PushTx error: %s", err.Error())
 		}

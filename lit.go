@@ -10,8 +10,8 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/mit-dci/lit/litrpc"
+	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/qln"
-	"github.com/mit-dci/lit/uspv"
 )
 
 const (
@@ -27,14 +27,6 @@ const (
 	// Random internet testnet nodes usually work but sometimes don't, so
 	// maybe I should test against different versions out there.
 	hardHeight = 1063333 // height to start at if not specified
-)
-
-var (
-	//	Params = &chaincfg.TestNet3Params
-	//	Params = &chaincfg.RegressionNetParams
-	SCon uspv.SPVCon // global here for now
-
-	Node qln.LitNode
 )
 
 // variables for a goodelivery session
@@ -128,63 +120,20 @@ func main() {
 	watchdbFilePath := filepath.Join(conf.litHomeDir, watchdbFileName)
 
 	// read key file (generate if not found)
-	rootPriv, err := uspv.ReadKeyFileToECPriv(keyFilePath, conf.Params)
+	key, err := lnutil.ReadKeyFile(keyFilePath)
 	if err != nil {
 		log.Fatal(err)
 	}
-	// setup TxStore first (before spvcon)
-	Store := uspv.NewTxStore(rootPriv, conf.Params)
 
-	// setup SPVCon
-	SCon, err = uspv.OpenSPV(headerFilePath, utxodbFilePath, &Store,
-		conf.hard, false, conf.Params)
-	if err != nil {
-		log.Printf("can't connect: %s", err.Error())
-		log.Fatal(err) // back to fatal when can't connect
-	}
+	node := new(qln.LitNode)
 
 	// Setup LN node.  Activate Tower if in hard mode.
-	err = Node.Init(lndbFilePath, watchdbFilePath, &SCon, SCon.HardMode)
+	err = node.Init(key, lndbFilePath, watchdbFilePath, conf.Params)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	litrpc.RpcListen(&SCon, &Node, conf.rpcport)
-
-	/*
-		tip, err := SCon.TS.GetDBSyncHeight() // ask for sync height
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		if tip == 0 || conf.reSync { // DB has never been used, set to birthday
-			if conf.regTest || conf.bc2Net {
-				if conf.birthblock < 100000 {
-					tip = conf.birthblock
-				} else {
-					tip = 500 // for regtest/bc2
-				}
-			} else {
-				tip = conf.birthblock // for testnet3. should base on keyfile date?
-			}
-			err = SCon.TS.SetDBSyncHeight(tip)
-			if err != nil {
-				log.Fatal(err)
-			}
-		}
-
-		// Connect to full node
-		err = SCon.Connect(conf.spvHost)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		// once we're connected, initiate headers sync
-		err = SCon.AskForHeaders()
-		if err != nil {
-			log.Fatal(err)
-		}
-	*/
+	litrpc.RpcListen(node, conf.rpcport)
 
 	return
 }

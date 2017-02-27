@@ -29,7 +29,7 @@ func (s *SPVCon) GimmeFilter() (*bloom.Filter, error) {
 
 	// note there could be false positives since we're just looking
 	// for the 20 byte PKH without the opcodes.
-	for _, a160 := range s.TrackingAdrs { // add 20-byte pubkeyhash
+	for a160, _ := range s.TrackingAdrs { // add 20-byte pubkeyhash
 		//		fmt.Printf("adding address hash %x\n", a160)
 		f.Add(a160[:])
 	}
@@ -39,7 +39,7 @@ func (s *SPVCon) GimmeFilter() (*bloom.Filter, error) {
 
 	// actually... we should monitor addresses, not txids, right?
 	// or no...?
-	for _, wop := range s.TrackingOPs {
+	for wop, _ := range s.TrackingOPs {
 		// try just outpoints, not the txids as well
 		f.AddOutPoint(&wop)
 	}
