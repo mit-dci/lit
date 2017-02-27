@@ -192,7 +192,7 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 	opArr := lnutil.OutPointToBytes(q.Op)
 
 	var msg []byte
-
+	
 	// DeltaSig is op (36), Delta (4),  sig (64)
 	// total length 104
 	msg = append(msg, opArr[:]...)

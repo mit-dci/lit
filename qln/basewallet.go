@@ -52,10 +52,10 @@ type UWallet interface {
 	NewAdr() btcutil.Address
 
 	// Dump all the utxos in the sub wallet
-	UtxoDump() []*portxo.PorTxo
+	UtxoDump() ([]*portxo.PorTxo, error)
 
 	// Dump all the addresses the sub wallet is watching
-	AdrDump() []btcutil.Address
+	AdrDump() ([]btcutil.Address, error)
 
 	// Return current height the wallet is synced to
 	CurrentHeight() int32

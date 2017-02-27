@@ -70,6 +70,46 @@ func (w *Wallit) AddPorTxoAdr(kg portxo.KeyGen) error {
 	})
 }
 
+// AdrDump returns all the addresses in the wallit.
+func (w Wallit) AdrDump() ([]btcutil.Address, error) {
+	var i, last uint32 // number of addresses made so far
+	var adrSlice []btcutil.Address
+
+	err := w.StateDB.View(func(btx *bolt.Tx) error {
+		sta := btx.Bucket(BKTState)
+		if sta == nil {
+			return fmt.Errorf("no state bucket")
+		}
+
+		oldNBytes := sta.Get(KEYNumKeys)
+		last = lnutil.BtU32(oldNBytes)
+		// update the db with number of created keys
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if last > 1<<20 {
+		return nil, fmt.Errorf("Got %d keys stored, expect something reasonable", last)
+	}
+
+	for i = 0; i < last; i++ {
+		nKg := GetWalletKeygen(i)
+		nAdr160 := w.PathPubHash160(nKg)
+		if nAdr160 == nil {
+			return nil, fmt.Errorf("NewAdr error: got nil h160")
+		}
+
+		wa, err := btcutil.NewAddressWitnessPubKeyHash(nAdr160, w.Param)
+		if err != nil {
+			return nil, err
+		}
+		adrSlice = append(adrSlice, btcutil.Address(wa))
+	}
+	return adrSlice, nil
+}
+
 // NewAdr creates a new, never before seen address, and increments the
 // DB counter, and returns the hash160 of the pubkey.
 func (w *Wallit) NewAdr160() ([]byte, error) {

@@ -31,34 +31,34 @@ type UWallet interface {
 
 // --- implementation of BaseWallet interface ----
 
-func (w *Wallit) GetPriv(k portxo.KeyGen) *btcec.PrivateKey {
+func (w Wallit) GetPriv(k portxo.KeyGen) *btcec.PrivateKey {
 	return w.PathPrivkey(k)
 }
 
-func (w *Wallit) GetPub(k portxo.KeyGen) *btcec.PublicKey {
+func (w Wallit) GetPub(k portxo.KeyGen) *btcec.PublicKey {
 	return w.PathPubkey(k)
 }
 
-func (w *Wallit) PushTx(tx *wire.MsgTx) error {
+func (w Wallit) PushTx(tx *wire.MsgTx) error {
 	return w.Hook.PushTx(tx)
 }
 
-func (w *Wallit) Params() *chaincfg.Params {
+func (w Wallit) Params() *chaincfg.Params {
 	return w.Param
 }
 
-func (w *Wallit) BlockMonitor() chan *wire.MsgBlock {
+func (w Wallit) BlockMonitor() chan *wire.MsgBlock {
 	return w.Hook.RawBlocks()
 }
 
-func (w *Wallit) LetMeKnow() chan lnutil.OutPointEvent {
+func (w Wallit) LetMeKnow() chan lnutil.OutPointEvent {
 	w.OPEventChan = make(chan lnutil.OutPointEvent, 1)
 	return w.OPEventChan
 }
 
 // ExportUtxo is really *IM*port utxo on this side.
 // Not implemented yet.  Fix "ingest many" at the same time eh?
-func (w *Wallit) ExportUtxo(u *portxo.PorTxo) {
+func (w Wallit) ExportUtxo(u *portxo.PorTxo) {
 
 	// zero value utxo counts as an address exort, not utxo export.
 	if u.Value == 0 {
@@ -74,7 +74,6 @@ func (w *Wallit) ExportUtxo(u *portxo.PorTxo) {
 	}
 
 	// Register new address with chainhook
-
 	var adr160 [20]byte
 	copy(adr160[:], w.PathPubHash160(u.KeyGen))
 	err := w.Hook.RegisterAddress(adr160)
@@ -85,7 +84,7 @@ func (w *Wallit) ExportUtxo(u *portxo.PorTxo) {
 
 // WatchThis registers an outpoint to watch.  Register as watched OP, and
 // passes to chainhook.
-func (w *Wallit) WatchThis(op wire.OutPoint) error {
+func (w Wallit) WatchThis(op wire.OutPoint) error {
 	err := w.Hook.RegisterOutPoint(op)
 	if err != nil {
 		return err
