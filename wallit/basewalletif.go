@@ -1,6 +1,7 @@
 package wallit
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/btcsuite/btcd/btcec"
@@ -54,6 +55,15 @@ func (w Wallit) BlockMonitor() chan *wire.MsgBlock {
 func (w Wallit) LetMeKnow() chan lnutil.OutPointEvent {
 	w.OPEventChan = make(chan lnutil.OutPointEvent, 1)
 	return w.OPEventChan
+}
+
+func (w Wallit) CurrentHeight() int32 {
+	h, err := w.GetDBSyncHeight()
+	if err != nil {
+		fmt.Printf("can't get height from db...")
+		return -99
+	}
+	return h
 }
 
 // ExportUtxo is really *IM*port utxo on this side.
