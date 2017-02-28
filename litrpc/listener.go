@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/mit-dci/lit/qln"
-	"github.com/mit-dci/lit/uspv"
 )
 
 /*
@@ -27,7 +26,7 @@ type LitRPC struct {
 	OffButton chan bool
 }
 
-func RpcListen(scon *uspv.SPVCon, node *qln.LitNode, port uint16) {
+func RpcListen(node *qln.LitNode, port uint16) {
 	rpcl := new(LitRPC)
 	rpcl.Node = node
 	rpcl.OffButton = make(chan bool, 1)

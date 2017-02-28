@@ -8,7 +8,7 @@ import (
 
 // HowMuchTotal returns the amount of all known current utxo.
 // Returns -1 if there's an error.
-func (w Wallit) HowMuchTotal() int64 {
+func (w *Wallit) HowMuchTotal() int64 {
 	allTxos, err := w.GetAllUtxos()
 	if err != nil {
 		return -1
@@ -25,7 +25,7 @@ func (w Wallit) HowMuchTotal() int64 {
 // HowMuchWitConf returns the amount of confirmed, mature, witness utxo.
 // (for building channels)
 // Returns -1 if there's an error.
-func (w Wallit) HowMuchWitConf() int64 {
+func (w *Wallit) HowMuchWitConf() int64 {
 	currentHeight, err := w.GetDBSyncHeight()
 	if err != nil {
 		fmt.Printf(err.Error())

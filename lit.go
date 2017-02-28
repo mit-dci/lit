@@ -17,12 +17,8 @@ import (
 const (
 	litHomeDirName = ".lit"
 
-	keyFileName     = "testkey.hex"
-	headerFileName  = "headers.bin"
-	utxodbFileName  = "utxo.db"
-	lndbFileName    = "ln.db"
-	watchdbFileName = "watch.db"
-	sorcFileName    = "sorc.db"
+	keyFileName = "testkey.hex"
+
 	// this is my local testnet node, replace it with your own close by.
 	// Random internet testnet nodes usually work but sometimes don't, so
 	// maybe I should test against different versions out there.
@@ -112,12 +108,7 @@ func main() {
 		os.Mkdir(conf.litHomeDir, 0700)
 	}
 
-	// define file paths based on lit home directory
 	keyFilePath := filepath.Join(conf.litHomeDir, keyFileName)
-	headerFilePath := filepath.Join(conf.litHomeDir, headerFileName)
-	utxodbFilePath := filepath.Join(conf.litHomeDir, utxodbFileName)
-	lndbFilePath := filepath.Join(conf.litHomeDir, lndbFileName)
-	watchdbFilePath := filepath.Join(conf.litHomeDir, watchdbFileName)
 
 	// read key file (generate if not found)
 	key, err := lnutil.ReadKeyFile(keyFilePath)
@@ -125,10 +116,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	node := new(qln.LitNode)
-
 	// Setup LN node.  Activate Tower if in hard mode.
-	err = node.Init(key, lndbFilePath, watchdbFilePath, conf.Params)
+	// give node and below file pathof lit home directoy
+	node, err := qln.NewLitNode(key, conf.litHomeDir, conf.Params, true)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -3,10 +3,14 @@ package wallit
 import (
 	"fmt"
 	"log"
+	"sort"
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcutil"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 )
@@ -32,32 +36,32 @@ type UWallet interface {
 
 // --- implementation of BaseWallet interface ----
 
-func (w Wallit) GetPriv(k portxo.KeyGen) *btcec.PrivateKey {
+func (w *Wallit) GetPriv(k portxo.KeyGen) *btcec.PrivateKey {
 	return w.PathPrivkey(k)
 }
 
-func (w Wallit) GetPub(k portxo.KeyGen) *btcec.PublicKey {
+func (w *Wallit) GetPub(k portxo.KeyGen) *btcec.PublicKey {
 	return w.PathPubkey(k)
 }
 
-func (w Wallit) PushTx(tx *wire.MsgTx) error {
+func (w *Wallit) PushTx(tx *wire.MsgTx) error {
 	return w.Hook.PushTx(tx)
 }
 
-func (w Wallit) Params() *chaincfg.Params {
+func (w *Wallit) Params() *chaincfg.Params {
 	return w.Param
 }
 
-func (w Wallit) BlockMonitor() chan *wire.MsgBlock {
+func (w *Wallit) BlockMonitor() chan *wire.MsgBlock {
 	return w.Hook.RawBlocks()
 }
 
-func (w Wallit) LetMeKnow() chan lnutil.OutPointEvent {
+func (w *Wallit) LetMeKnow() chan lnutil.OutPointEvent {
 	w.OPEventChan = make(chan lnutil.OutPointEvent, 1)
 	return w.OPEventChan
 }
 
-func (w Wallit) CurrentHeight() int32 {
+func (w *Wallit) CurrentHeight() int32 {
 	h, err := w.GetDBSyncHeight()
 	if err != nil {
 		fmt.Printf("can't get height from db...")
@@ -66,9 +70,27 @@ func (w Wallit) CurrentHeight() int32 {
 	return h
 }
 
+func (w *Wallit) NewAdr() btcutil.Address {
+	var a btcutil.Address
+	adr160, err := w.NewAdr160()
+	if err != nil {
+		// should have an error here..?  Return empty address...
+		fmt.Printf("can't make address: %s\n", err.Error())
+		return a
+	}
+
+	a, err = btcutil.NewAddressWitnessPubKeyHash(adr160, w.Param)
+	if err != nil {
+		// should have an error here..?  Return empty address...
+		fmt.Printf("can't make address: %s\n", err.Error())
+	}
+
+	return a
+}
+
 // ExportUtxo is really *IM*port utxo on this side.
 // Not implemented yet.  Fix "ingest many" at the same time eh?
-func (w Wallit) ExportUtxo(u *portxo.PorTxo) {
+func (w *Wallit) ExportUtxo(u *portxo.PorTxo) {
 
 	// zero value utxo counts as an address exort, not utxo export.
 	if u.Value == 0 {
@@ -94,7 +116,7 @@ func (w Wallit) ExportUtxo(u *portxo.PorTxo) {
 
 // WatchThis registers an outpoint to watch.  Register as watched OP, and
 // passes to chainhook.
-func (w Wallit) WatchThis(op wire.OutPoint) error {
+func (w *Wallit) WatchThis(op wire.OutPoint) error {
 	err := w.Hook.RegisterOutPoint(op)
 	if err != nil {
 		return err
@@ -104,4 +126,44 @@ func (w Wallit) WatchThis(op wire.OutPoint) error {
 		return err
 	}
 	return nil
+}
+
+// ********* sweep is for testing / spamming, remove for real use
+func (w *Wallit) Sweep(adr btcutil.Address, n uint32) ([]*chainhash.Hash, error) {
+	var err error
+	var txids []*chainhash.Hash
+
+	var utxos portxo.TxoSliceByAmt
+	utxos, err = w.GetAllUtxos()
+	if err != nil {
+		return nil, err
+	}
+
+	// smallest and unconfirmed last (because it's reversed)
+	sort.Sort(sort.Reverse(utxos))
+
+	for _, u := range utxos {
+		if n < 1 {
+			return txids, nil
+		}
+
+		if u.Height != 0 && u.Value > 10000 {
+			outputscript, err := txscript.PayToAddrScript(adr)
+			if err != nil {
+				return nil, err
+			}
+			txo := wire.NewTxOut(u.Value, outputscript)
+
+			ops, err := w.MaybeSend([]*wire.TxOut{txo})
+
+			err = w.ReallySend(&ops[0].Hash)
+			if err != nil {
+				return nil, err
+			}
+			txids = append(txids, &ops[0].Hash)
+			n--
+		}
+	}
+
+	return txids, nil
 }

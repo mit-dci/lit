@@ -43,9 +43,6 @@ func (s *SPVCon) Start(
 	s.TxUpToWallit = make(chan lnutil.TxAndHeight, 1)
 	s.CurrentHeightChan = make(chan int32, 1)
 
-	coinName := params.Name
-	path = filepath.Join(path, coinName)
-
 	headerFilePath := filepath.Join(path, "header.bin")
 	// open header file
 	err := s.openHeaderFile(headerFilePath)

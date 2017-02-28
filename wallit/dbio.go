@@ -71,7 +71,7 @@ func (w *Wallit) AddPorTxoAdr(kg portxo.KeyGen) error {
 }
 
 // AdrDump returns all the addresses in the wallit.
-func (w Wallit) AdrDump() ([]btcutil.Address, error) {
+func (w *Wallit) AdrDump() ([]btcutil.Address, error) {
 	var i, last uint32 // number of addresses made so far
 	var adrSlice []btcutil.Address
 
@@ -227,6 +227,10 @@ func (w *Wallit) SaveTx(tx *wire.MsgTx) error {
 		txid := tx.TxHash()
 		return txbkt.Put(txid[:], buf.Bytes())
 	})
+}
+
+func (w *Wallit) UtxoDump() ([]*portxo.PorTxo, error) {
+	return w.GetAllUtxos()
 }
 
 // GetAllUtxos returns a slice of all portxos in the db. empty slice is OK.

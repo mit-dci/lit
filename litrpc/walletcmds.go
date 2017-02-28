@@ -84,7 +84,10 @@ type TxoListReply struct {
 
 // TxoList sends back a list of all non-channel utxos
 func (r *LitRPC) TxoList(args *NoArgs, reply *TxoListReply) error {
-	allTxos := r.Node.SubWallet.UtxoDump()
+	allTxos, err := r.Node.SubWallet.UtxoDump()
+	if err != nil {
+		return err
+	}
 
 	syncHeight := r.Node.SubWallet.CurrentHeight()
 
@@ -164,13 +167,25 @@ func (r *LitRPC) Send(args SendArgs, reply *TxidsReply) error {
 // ------------------------- sweep
 type SweepArgs struct {
 	DestAdr string
-	NumTx   int
+	NumTx   uint32
 	Drop    bool
 }
 
 func (r *LitRPC) Sweep(args SweepArgs, reply *TxidsReply) error {
 
-	r.Node.SubWallet.Sweep()
+	//	r.Node.SubWallet.Sweep()
+
+	adr, err := btcutil.DecodeAddress(args.DestAdr, r.Node.SubWallet.Params())
+	if err != nil {
+		fmt.Printf("error parsing %s as address\t", args.DestAdr)
+		return err
+	}
+	fmt.Printf("numtx: %d\n", args.NumTx)
+	if args.NumTx < 1 {
+		return fmt.Errorf("can't send %d txs", args.NumTx)
+	}
+
+	r.Node.SubWallet.Sweep(adr, args.NumTx)
 
 	/*
 		adr, err := btcutil.DecodeAddress(args.DestAdr, r.Node.Param)
@@ -293,7 +308,10 @@ func (r *LitRPC) Address(args *AdrArgs, reply *AdrReply) error {
 	// If you tell it to make 0 new addresses, it sends a list of all the old ones
 	if args.NumToMake == 0 {
 
-		allAdr := r.Node.SubWallet.AdrDump()
+		allAdr, err := r.Node.SubWallet.AdrDump()
+		if err != nil {
+			return err
+		}
 
 		reply.WitAddresses = make([]string, len(allAdr))
 		reply.LegacyAddresses = make([]string, len(allAdr))

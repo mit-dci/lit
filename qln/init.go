@@ -2,6 +2,7 @@ package qln
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/boltdb/bolt"
 	"github.com/btcsuite/btcd/chaincfg"
@@ -14,12 +15,13 @@ import (
 // Init starts up a lit node.  Needs priv key, and some paths.
 // Right now the SubWallet is hardcoded but can be an arg.
 // Also only 1 param arg, but can break that out later.
-func NewLitNode(privKey *[32]byte, p *chaincfg.Params,
-	dbfilename, watchname string, tower bool) (*LitNode, error) {
+func NewLitNode(privKey *[32]byte, path string,
+	p *chaincfg.Params, tower bool) (*LitNode, error) {
 
 	nd := new(LitNode)
 
-	err := nd.OpenDB(dbfilename)
+	litdbpath := filepath.Join(path, "ln.db")
+	err := nd.OpenDB(litdbpath)
 	if err != nil {
 		return nil, err
 	}
@@ -29,7 +31,7 @@ func NewLitNode(privKey *[32]byte, p *chaincfg.Params,
 		return nil, err
 	}
 	// make a base wallet
-	wallit := wallit.NewWallit(rootpriv, p)
+	wallit := wallit.NewWallit(rootpriv, path, p)
 
 	// connect to base wallet
 	nd.SubWallet = wallit
@@ -38,6 +40,7 @@ func NewLitNode(privKey *[32]byte, p *chaincfg.Params,
 	go nd.OPEventHandler(nd.SubWallet.LetMeKnow())
 	// optional tower activation
 	if tower {
+		watchname := filepath.Join(path, "watch.db")
 		err = nd.Tower.OpenDB(watchname)
 		if err != nil {
 			return nil, err
