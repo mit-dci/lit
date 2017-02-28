@@ -5,6 +5,7 @@ type LitMsg struct {
 	PeerIdx uint32
 	ChanIdx uint32 // optional, may be 0
 	MsgType uint8
+
 	Data    []byte
 }
 
@@ -30,3 +31,7 @@ const (
 
 	MSGID_SELFPUSH = 0x80
 )
+
+func (self LitMsg) setData(out []byte, out []byte, out []byte) string {
+		
+}
