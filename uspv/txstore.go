@@ -112,7 +112,7 @@ func (t *TxStore) GimmeFilter() (*bloom.Filter, error) {
 	// or no...?
 	for _, wop := range allWatchOP {
 		//	 aha, add HASH here, not the outpoint! (txid of fund tx)
-		f.AddHash(&wop.Hash)
+		f.AddHash(&wop.Hash) // this is probably not needed, as only the prevout is added, not prevout.hash (bloom.cpp#182-199)
 		// also add outpoint...?  wouldn't the hash be enough?
 		// not sure why I have to do both of these, but seems like close txs get
 		// ignored without the outpoint, and fund txs get ignored without the
