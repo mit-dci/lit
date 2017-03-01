@@ -38,7 +38,7 @@ type LitConfig struct {
 }
 
 func setConfig(lc *LitConfig) {
-	spvhostptr := flag.String("spv", "172.16.120.201", "full node to connect to")
+	spvhostptr := flag.String("spv", "na", "full node to connect to")
 
 	birthptr := flag.Int("tip", hardHeight, "height to begin db sync")
 
@@ -118,7 +118,12 @@ func main() {
 
 	// Setup LN node.  Activate Tower if in hard mode.
 	// give node and below file pathof lit home directoy
-	node, err := qln.NewLitNode(key, conf.litHomeDir, conf.Params, true)
+	node, err := qln.NewLitNode(conf.litHomeDir, false)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = node.LinkBaseWallet(key, conf.birthblock, conf.spvHost, conf.Params)
 	if err != nil {
 		log.Fatal(err)
 	}

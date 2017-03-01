@@ -27,7 +27,7 @@ type ChainHook interface {
 	// ChainHook layer; wallit should not have to handle ingesting irrelevant txs.
 	// You get back an error and 2 channels: one for txs with height attached, and
 	// one with block heights.  Subject to change; maybe this is redundant.
-	Start(height int32, path string, params *chaincfg.Params) (
+	Start(height int32, host, path string, params *chaincfg.Params) (
 		chan lnutil.TxAndHeight, chan int32, error)
 
 	// The Register functions send information to the ChainHook about what txs to

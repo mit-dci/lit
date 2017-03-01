@@ -62,6 +62,8 @@ Later on we can chop it up so that each channel gets it's own db file.
 type LitNode struct {
 	LitDB *bolt.DB // place to write all this down
 
+	LitFolder string // path to save stuff
+
 	// all nodes have a watchtower.  but could have a tower without a node
 	Tower watchtower.WatchTower
 

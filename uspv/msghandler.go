@@ -5,7 +5,6 @@ import (
 	"log"
 
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/bloom"
 	"github.com/mit-dci/lit/lnutil"
 )
@@ -145,17 +144,17 @@ func (s *SPVCon) HeaderHandler(m *wire.MsgHeaders) {
 
 // TxHandler takes in transaction messages that come in from either a request
 // after an inv message or after a merkle block message.
-func (s *SPVCon) TxHandler(m *wire.MsgTx) {
-	log.Printf("received msgtx %s\n", m.TxHash().String())
+func (s *SPVCon) TxHandler(tx *wire.MsgTx) {
+	log.Printf("received msgtx %s\n", tx.TxHash().String())
 	// check if we have a height for this tx.
 	s.OKMutex.Lock()
-	height, ok := s.OKTxids[m.TxHash()]
+	height, ok := s.OKTxids[tx.TxHash()]
 	s.OKMutex.Unlock()
 	// if we don't have a height for this / it's not in the map, discard.
 	// currently CRASHES when this happens because I want to see if it ever does.
 	// it shouldn't if things are working properly.
 	if !ok {
-		log.Printf("Tx %s unknown, will not ingest\n", m.TxHash().String())
+		log.Printf("Tx %s unknown, will not ingest\n", tx.TxHash().String())
 		panic("unknown tx")
 		return
 	}
@@ -178,38 +177,9 @@ func (s *SPVCon) TxHandler(m *wire.MsgTx) {
 	//		}
 	//	}
 
-	utilTx := btcutil.NewTx(m)
-	if !s.HardMode || s.localFilter.MatchTxAndUpdate(utilTx) {
-		// send txs up to wallit
-
-		s.TxUpToWallit <- lnutil.TxAndHeight{utilTx.MsgTx(), height}
-
-		/*
-			hits, err := s.TS.Ingest(m, height)
-			if err != nil {
-				log.Printf("Incoming Tx error: %s\n", err.Error())
-				return
-			}
-
-			if hits == 0 {
-				log.Printf("tx %s had no hits, filter false positive.",
-					m.TxHash().String())
-				s.fPositives <- 1 // add one false positive to chan
-			} else {
-				// there was a hit, send new filter I guess.  Feels like
-				// you shouldn't have to..?
-				// make new filter
-				filt, err := s.TS.GimmeFilter()
-				if err != nil {
-					log.Printf("Incoming Tx error: %s\n", err.Error())
-					return
-				}
-				// send filter
-				s.Refilter(filt)
-			}
-			log.Printf("tx %s ingested and matches %d utxo/adrs.",
-				m.TxHash().String(), hits)
-		*/
+	// send txs up to wallit
+	if s.MatchTx(tx) {
+		s.TxUpToWallit <- lnutil.TxAndHeight{tx, height}
 	}
 }
 

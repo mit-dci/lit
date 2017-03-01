@@ -7,7 +7,6 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/bloom"
 	"github.com/mit-dci/lit/lnutil"
 )
@@ -126,9 +125,7 @@ func calcRoot(hashes []*chainhash.Hash) *chainhash.Hash {
 // RefilterLocal reconstructs the local in-memory bloom filter.  It does
 // this by calling GimmeFilter() but doesn't broadcast the result.
 func (s *SPVCon) Refilter(f *bloom.Filter) {
-	if s.HardMode {
-		s.localFilter.Reload(f.MsgFilterLoad())
-	} else {
+	if !s.HardMode {
 		s.SendFilter(f)
 	}
 }
@@ -168,43 +165,25 @@ func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
 		return
 	}
 
-	fPositive := 0 // local filter false positives
-	reFilter := 2  // after that many false positives, regenerate filter.
+	//	fPositive := 0 // local filter false positives
+	//	reFilter := 2  // after that many false positives, regenerate filter.
 	// 2?  Making it up.  False positives have disk i/o cost, and regenning
 	// the filter also has costs.  With a large local filter, false positives
 	//	 should be rare.
 
 	// iterate through all txs in the block, looking for matches.
-	// use a local bloom filter to ignore txs that don't affect us
-	txs := make([]*wire.MsgTx, 0, len(m.Transactions))
+	fmt.Printf("%d adrs\t", len(s.TrackingAdrs))
 	for _, tx := range m.Transactions {
-		utilTx := btcutil.NewTx(tx)
-		// find txs that look like hits
-		if s.localFilter.MatchTxAndUpdate(utilTx) {
-			txs = append(txs, tx)
-		}
-	}
-	// anything good?
-	if len(txs) > 0 {
-		// ingest all the txs
-		for _, tx := range txs {
+		if s.MatchTx(tx) {
+			fmt.Printf("found matching tx %s\n", tx.TxHash().String())
 			s.TxUpToWallit <- lnutil.TxAndHeight{tx, hah.height}
 		}
 	}
 
-	if fPositive > reFilter {
-		fmt.Printf("%d filter false positives in this block\n", fPositive)
-		filt, err := s.GimmeFilter()
-		if err != nil {
-			log.Printf("Refilter error: %s\n", err.Error())
-			return
-		}
-		s.Refilter(filt)
-	}
-	// write to db that we've sync'd to the height indicated in the
-	// merkle block.  This isn't QUITE true since we haven't actually gotten
-	// the txs yet but if there are problems with the txs we should backtrack.
+	// tell upper level height has been reached
 	s.CurrentHeightChan <- hah.height
+	// track our internal height
+	s.syncHeight = hah.height
 
 	fmt.Printf("ingested full block %s height %d OK\n",
 		m.Header.BlockHash().String(), hah.height)

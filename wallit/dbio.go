@@ -170,6 +170,12 @@ func (w *Wallit) NewAdr160() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	var adr20 [20]byte
+	copy(adr20[:], nAdr160)
+	err = w.Hook.RegisterAddress(adr20)
+	if err != nil {
+		return nil, err
+	}
 
 	return nAdr160, nil
 }
@@ -330,27 +336,6 @@ func NewPorTxoBytesFromKGBytes(
 	return ptxo.Bytes()
 }
 
-// KeyHashFromPkScript extracts the 20 or 32 byte hash from a txout PkScript
-func KeyHashFromPkScript(pkscript []byte) []byte {
-	// match p2pkh
-	if len(pkscript) == 25 && pkscript[0] == 0x76 && pkscript[1] == 0xa9 &&
-		pkscript[2] == 0x14 && pkscript[23] == 0x88 && pkscript[24] == 0xac {
-		return pkscript[3:23]
-	}
-
-	// match p2wpkh
-	if len(pkscript) == 22 && pkscript[0] == 0x00 && pkscript[1] == 0x14 {
-		return pkscript[2:]
-	}
-
-	// match p2wsh
-	if len(pkscript) == 34 && pkscript[0] == 0x00 && pkscript[1] == 0x20 {
-		return pkscript[2:]
-	}
-
-	return nil
-}
-
 // Ingest -- take in a tx from the ChainHook
 func (w *Wallit) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 	return w.IngestMany([]*wire.MsgTx{tx}, height)
@@ -415,7 +400,7 @@ func (w *Wallit) IngestMany(txs []*wire.MsgTx, height int32) (uint32, error) {
 		for i, tx := range txs {
 			for j, out := range tx.TxOut {
 				// Don't try to Get() a nil.  I think? works ok though?
-				keygenBytes := adrb.Get(KeyHashFromPkScript(out.PkScript))
+				keygenBytes := adrb.Get(lnutil.KeyHashFromPkScript(out.PkScript))
 				if keygenBytes != nil {
 					// fmt.Printf("txout script:%x matched kg: %x\n", out.PkScript, keygenBytes)
 					// build new portxo

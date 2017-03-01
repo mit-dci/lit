@@ -12,35 +12,39 @@ import (
 	"github.com/mit-dci/lit/wallit"
 )
 
-// Init starts up a lit node.  Needs priv key, and some paths.
-// Right now the SubWallet is hardcoded but can be an arg.
-// Also only 1 param arg, but can break that out later.
-func NewLitNode(privKey *[32]byte, path string,
-	p *chaincfg.Params, tower bool) (*LitNode, error) {
+// Init starts up a lit node.  Needs priv key, and a path.
+// Does not activate a subwallet; do that after init.
+func NewLitNode(path string, tower bool) (*LitNode, error) {
 
 	nd := new(LitNode)
+	nd.LitFolder = path
 
-	litdbpath := filepath.Join(path, "ln.db")
+	litdbpath := filepath.Join(nd.LitFolder, "ln.db")
 	err := nd.OpenDB(litdbpath)
 	if err != nil {
 		return nil, err
 	}
 
-	rootpriv, err := hdkeychain.NewMaster(privKey[:], p)
-	if err != nil {
-		return nil, err
-	}
-	// make a base wallet
-	wallit := wallit.NewWallit(rootpriv, path, p)
+	/*
+		rootpriv, err := hdkeychain.NewMaster(privKey[:], p)
+		if err != nil {
+			return nil, err
+		}
 
-	// connect to base wallet
-	nd.SubWallet = wallit
 
-	// ask basewallet for outpoint event messages
-	go nd.OPEventHandler(nd.SubWallet.LetMeKnow())
+			// make a base wallet
+			wallit := wallit.NewWallit(rootpriv, path, p)
+
+			// connect to base wallet
+			nd.SubWallet = wallit
+
+			// ask basewallet for outpoint event messages
+			go nd.OPEventHandler(nd.SubWallet.LetMeKnow())
+	*/
+
 	// optional tower activation
 	if tower {
-		watchname := filepath.Join(path, "watch.db")
+		watchname := filepath.Join(nd.LitFolder, "watch.db")
 		err = nd.Tower.OpenDB(watchname)
 		if err != nil {
 			return nil, err
@@ -65,6 +69,24 @@ func NewLitNode(privKey *[32]byte, path string,
 	go nd.OutMessager()
 
 	return nd, nil
+}
+
+// LinkBaseWallet activates a wallet and hooks it into the litnode.
+func (nd *LitNode) LinkBaseWallet(
+	privKey *[32]byte, height int32, host string, param *chaincfg.Params) error {
+	if nd.SubWallet != nil {
+		return fmt.Errorf("wallet %s already hooked up", nd.SubWallet.Params().Name)
+	}
+
+	rootpriv, err := hdkeychain.NewMaster(privKey[:], param)
+	if err != nil {
+		return err
+	}
+	nd.SubWallet = wallit.NewWallit(rootpriv, height, host, nd.LitFolder, param)
+
+	go nd.OPEventHandler(nd.SubWallet.LetMeKnow())
+
+	return nil
 }
 
 // relay txs from the watchtower to the underlying wallet...

@@ -2,6 +2,7 @@ package wallit
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/boltdb/bolt"
@@ -13,7 +14,8 @@ import (
 )
 
 func NewWallit(
-	rootkey *hdkeychain.ExtendedKey, path string, p *chaincfg.Params) *Wallit {
+	rootkey *hdkeychain.ExtendedKey,
+	height int32, spvhost, path string, p *chaincfg.Params) *Wallit {
 
 	var w Wallit
 	w.rootPrivKey = rootkey
@@ -22,16 +24,22 @@ func NewWallit(
 
 	wallitpath := filepath.Join(path, p.Name)
 
-	wallitdbname := filepath.Join(wallitpath, "utxo.db")
-	err := w.OpenDB(wallitdbname)
-	if err != nil {
-		fmt.Printf("crash  %s ", err.Error())
+	// create wallit sub dir if it's not there
+	_, err := os.Stat(wallitpath)
+	if os.IsNotExist(err) {
+		os.Mkdir(wallitpath, 0700)
 	}
 
 	u := new(uspv.SPVCon)
 	w.Hook = u
 
-	incomingTx, incomingBlockheight, err := w.Hook.Start(1000000, wallitpath, p)
+	incomingTx, incomingBlockheight, err := w.Hook.Start(height, spvhost, wallitpath, p)
+	if err != nil {
+		fmt.Printf("crash  %s ", err.Error())
+	}
+
+	wallitdbname := filepath.Join(wallitpath, "utxo.db")
+	err = w.OpenDB(wallitdbname)
 	if err != nil {
 		fmt.Printf("crash  %s ", err.Error())
 	}
@@ -50,6 +58,7 @@ func NewWallit(
 func (w *Wallit) TxHandler(incomingTxAndHeight chan lnutil.TxAndHeight) {
 	for {
 		txah := <-incomingTxAndHeight
+		w.Ingest(txah.Tx, txah.Height)
 		fmt.Printf("got tx %s at height %d\n",
 			txah.Tx.TxHash().String(), txah.Height)
 	}

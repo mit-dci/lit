@@ -90,6 +90,27 @@ func DirectWPKHScriptFromPKH(pkh [20]byte) []byte {
 	return b
 }
 
+// KeyHashFromPkScript extracts the 20 or 32 byte hash from a txout PkScript
+func KeyHashFromPkScript(pkscript []byte) []byte {
+	// match p2pkh
+	if len(pkscript) == 25 && pkscript[0] == 0x76 && pkscript[1] == 0xa9 &&
+		pkscript[2] == 0x14 && pkscript[23] == 0x88 && pkscript[24] == 0xac {
+		return pkscript[3:23]
+	}
+
+	// match p2wpkh
+	if len(pkscript) == 22 && pkscript[0] == 0x00 && pkscript[1] == 0x14 {
+		return pkscript[2:]
+	}
+
+	// match p2wsh
+	if len(pkscript) == 34 && pkscript[0] == 0x00 && pkscript[1] == 0x20 {
+		return pkscript[2:]
+	}
+
+	return nil
+}
+
 // TxToString prints out some info about a transaction. for testing / debugging
 func TxToString(tx *wire.MsgTx) string {
 	utx := btcutil.NewTx(tx)

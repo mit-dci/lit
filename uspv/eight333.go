@@ -8,6 +8,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil/bloom"
+	"github.com/mit-dci/lit/lnutil"
 )
 
 const (
@@ -49,6 +50,26 @@ func (s *SPVCon) GimmeFilter() (*bloom.Filter, error) {
 
 	fmt.Printf("made %d element filter\n", filterElements)
 	return f, nil
+}
+
+// MatchTx queries whether a tx mathches registered addresses and outpoints.
+func (s *SPVCon) MatchTx(tx *wire.MsgTx) bool {
+	// start with optimism.  We may gain money.  Iterate through all output scripts.
+	for _, out := range tx.TxOut {
+		// 20 byte pubkey hash of this txout (if any)
+		var adr20 [20]byte
+		copy(adr20[:], lnutil.KeyHashFromPkScript(out.PkScript))
+		if s.TrackingAdrs[adr20] {
+			return true
+		}
+	}
+	// next pessimism.  Iterate through inputs, matching tracked outpoints
+	for _, in := range tx.TxIn {
+		if s.TrackingOPs[in.PreviousOutPoint] {
+			return true
+		}
+	}
+	return false
 }
 
 // OKTxid assigns a height to a txid.  This means that

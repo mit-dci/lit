@@ -24,7 +24,7 @@ type ChainHook interface {
 // --- implementation of ChainHook interface ----
 
 func (s *SPVCon) Start(
-	startHeight int32, path string, params *chaincfg.Params) (
+	startHeight int32, host, path string, params *chaincfg.Params) (
 	chan lnutil.TxAndHeight, chan int32, error) {
 
 	// These can be set before calling Start()
@@ -46,6 +46,16 @@ func (s *SPVCon) Start(
 	headerFilePath := filepath.Join(path, "header.bin")
 	// open header file
 	err := s.openHeaderFile(headerFilePath)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = s.Connect(host)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = s.AskForHeaders()
 	if err != nil {
 		return nil, nil, err
 	}

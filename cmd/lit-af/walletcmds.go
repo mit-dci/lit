@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/litrpc"
+	"github.com/mit-dci/lit/lnutil"
 )
 
 // Send sends coins somewhere
@@ -70,11 +70,11 @@ func (lc *litAfClient) Sweep(textArgs []string) error {
 	}
 
 	args.DestAdr = textArgs[0]
-	args.NumTx, err = strconv.Atoi(textArgs[1])
+	numTxs, err := strconv.Atoi(textArgs[1])
 	if err != nil {
 		return err
 	}
-
+	args.NumTx = uint32(numTxs)
 	if len(textArgs) > 2 {
 		args.Drop = true
 	}

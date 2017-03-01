@@ -8,7 +8,6 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil/bloom"
 	"github.com/mit-dci/lit/lnutil"
 )
 
@@ -36,8 +35,6 @@ type SPVCon struct {
 
 	// TxMap is an in-memory map of all the Txs the SPVCon knows about
 	TxMap map[chainhash.Hash]*wire.MsgTx
-
-	localFilter *bloom.Filter // local bloom filter for hard mode
 
 	//[doesn't work without fancy mutexes, nevermind, just use header file]
 	// localHeight   int32  // block height we're on
