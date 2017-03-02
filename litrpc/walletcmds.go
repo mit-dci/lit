@@ -185,67 +185,15 @@ func (r *LitRPC) Sweep(args SweepArgs, reply *TxidsReply) error {
 		return fmt.Errorf("can't send %d txs", args.NumTx)
 	}
 
-	r.Node.SubWallet.Sweep(adr, args.NumTx)
+	txids, err := r.Node.SubWallet.Sweep(adr, args.NumTx)
+	if err != nil {
+		return err
+	}
 
-	/*
-		adr, err := btcutil.DecodeAddress(args.DestAdr, r.Node.Param)
-		if err != nil {
-			fmt.Printf("error parsing %s as address\t", args.DestAdr)
-			return err
-		}
-		fmt.Printf("numtx: %d\n", args.NumTx)
-		if args.NumTx < 1 {
-			return fmt.Errorf("can't send %d txs", args.NumTx)
-		}
-		nokori := args.NumTx
+	for _, txid := range txids {
+		reply.Txids = append(reply.Txids, txid.String())
+	}
 
-		var allUtxos portxo.TxoSliceByAmt
-		allUtxos, err = r.Node.SubWallet.GetAllUtxos()
-		if err != nil {
-			return err
-		}
-
-		// smallest and unconfirmed last (because it's reversed)
-		sort.Sort(sort.Reverse(allUtxos))
-
-		for i, u := range allUtxos {
-			if u.Height != 0 && u.Value > 10000 {
-				var txid chainhash.Hash
-				if args.Drop {
-					//				intx, outtx, err := SCon.TS.SendDrop(*allUtxos[i], adr)
-					//				if err != nil {
-					//					return err
-					//				}
-					//				txid = outtx.TxSha()
-					//				err = SCon.NewOutgoingTx(intx)
-					//				if err != nil {
-					//					return err
-					//				}
-					//				err = SCon.NewOutgoingTx(outtx)
-					//				if err != nil {
-					//					return err
-					//				}
-				} else {
-					tx, err := r.Node.SubWallet.MaybeSend().SendOne(*allUtxos[i], adr)
-					if err != nil {
-						return err
-					}
-					txid = tx.TxHash()
-					err = r.SCon.NewOutgoingTx(tx)
-					if err != nil {
-						return err
-					}
-				}
-				reply.Txids = append(reply.Txids, txid.String())
-				nokori--
-				if nokori == 0 {
-					return nil
-				}
-			}
-		}
-	*/
-	nokori := 0
-	fmt.Printf("spent all confirmed utxos; not enough by %d\n", nokori)
 	return nil
 }
 

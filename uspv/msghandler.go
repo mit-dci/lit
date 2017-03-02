@@ -135,7 +135,7 @@ func (s *SPVCon) HeaderHandler(m *wire.MsgHeaders) {
 		fmt.Printf("sent filter %x\n", filt.MsgFilterLoad().Filter)
 	}
 
-	err = s.AskForBlocks(s.syncHeight)
+	err = s.AskForBlocks()
 	if err != nil {
 		log.Printf("AskForBlocks error: %s", err.Error())
 		return

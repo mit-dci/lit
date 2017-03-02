@@ -54,15 +54,27 @@ func (s *SPVCon) GimmeFilter() (*bloom.Filter, error) {
 
 // MatchTx queries whether a tx mathches registered addresses and outpoints.
 func (s *SPVCon) MatchTx(tx *wire.MsgTx) bool {
+	gain := false
+	txid := tx.TxHash()
 	// start with optimism.  We may gain money.  Iterate through all output scripts.
-	for _, out := range tx.TxOut {
+	for i, out := range tx.TxOut {
 		// 20 byte pubkey hash of this txout (if any)
 		var adr20 [20]byte
 		copy(adr20[:], lnutil.KeyHashFromPkScript(out.PkScript))
+		// when we gain utxo, set as gain so we can return a match, but
+		// also go through all gained utxos and register to track them
 		if s.TrackingAdrs[adr20] {
-			return true
+			gain = true
+			op := wire.NewOutPoint(&txid, uint32(i))
+			s.TrackingOPs[*op] = true
 		}
 	}
+
+	// No need to check for loss if we have a gain
+	if gain {
+		return true
+	}
+
 	// next pessimism.  Iterate through inputs, matching tracked outpoints
 	for _, in := range tx.TxIn {
 		if s.TrackingOPs[in.PreviousOutPoint] {
@@ -319,7 +331,7 @@ func (s *SPVCon) AskForHeaders() error {
 // AskForMerkBlocks requests blocks from current to last
 // right now this asks for 1 block per getData message.
 // Maybe it's faster to ask for many in a each message?
-func (s *SPVCon) AskForBlocks(dbTip int32) error {
+func (s *SPVCon) AskForBlocks() error {
 	var hdr wire.BlockHeader
 
 	s.headerMutex.Lock() // lock just to check filesize
@@ -330,11 +342,11 @@ func (s *SPVCon) AskForBlocks(dbTip int32) error {
 	// move back 1 header length to read
 	headerTip := int32(endPos/80) + (s.headerStartHeight - 1)
 
-	fmt.Printf("dbTip %d headerTip %d\n", dbTip, headerTip)
-	if dbTip > headerTip {
+	fmt.Printf("blockTip to %d headerTip %d\n", s.syncHeight, headerTip)
+	if s.syncHeight > headerTip {
 		return fmt.Errorf("error- db longer than headers! shouldn't happen.")
 	}
-	if dbTip == headerTip {
+	if s.syncHeight == headerTip {
 		// nothing to ask for; set wait state and return
 		fmt.Printf("no blocks to request, entering wait state\n")
 		fmt.Printf("%d bytes received\n", s.RBytes)
@@ -356,15 +368,17 @@ func (s *SPVCon) AskForBlocks(dbTip int32) error {
 		return nil
 	}
 
-	fmt.Printf("will request blocks %d to %d\n", dbTip+1, headerTip)
+	fmt.Printf("will request blocks %d to %d\n", s.syncHeight+1, headerTip)
+	reqHeight := s.syncHeight
 
 	// loop through all heights where we want merkleblocks.
-	for dbTip < headerTip {
-		dbTip++ // we're requesting the next header
+	for reqHeight < headerTip {
+		reqHeight++ // we're requesting the next header
 
 		// load header from file
 		s.headerMutex.Lock() // seek to header we need
-		_, err = s.headerFile.Seek(int64((dbTip-s.headerStartHeight)*80), os.SEEK_SET)
+		_, err = s.headerFile.Seek(
+			int64((reqHeight-s.headerStartHeight)*80), os.SEEK_SET)
 		if err != nil {
 			return err
 		}
@@ -392,8 +406,8 @@ func (s *SPVCon) AskForBlocks(dbTip int32) error {
 			return err
 		}
 
-		hah := NewRootAndHeight(hdr.BlockHash(), dbTip)
-		if dbTip == headerTip { // if this is the last block, indicate finality
+		hah := NewRootAndHeight(hdr.BlockHash(), reqHeight)
+		if reqHeight == headerTip { // if this is the last block, indicate finality
 			hah.final = true
 		}
 		// waits here most of the time for the queue to empty out

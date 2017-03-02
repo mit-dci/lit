@@ -73,7 +73,7 @@ func NewLitNode(path string, tower bool) (*LitNode, error) {
 
 // LinkBaseWallet activates a wallet and hooks it into the litnode.
 func (nd *LitNode) LinkBaseWallet(
-	privKey *[32]byte, height int32, host string, param *chaincfg.Params) error {
+	privKey *[32]byte, birthHeight int32, host string, param *chaincfg.Params) error {
 	if nd.SubWallet != nil {
 		return fmt.Errorf("wallet %s already hooked up", nd.SubWallet.Params().Name)
 	}
@@ -82,7 +82,7 @@ func (nd *LitNode) LinkBaseWallet(
 	if err != nil {
 		return err
 	}
-	nd.SubWallet = wallit.NewWallit(rootpriv, height, host, nd.LitFolder, param)
+	nd.SubWallet = wallit.NewWallit(rootpriv, birthHeight, host, nd.LitFolder, param)
 
 	go nd.OPEventHandler(nd.SubWallet.LetMeKnow())
 

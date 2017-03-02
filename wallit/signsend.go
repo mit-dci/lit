@@ -129,7 +129,11 @@ func (w *Wallit) ReallySend(txid *chainhash.Hash) error {
 		delete(w.FreezeSet, txin.Op)
 	}
 
-	allOuts := append(frozenTx.Outs, frozenTx.ChangeOut)
+	allOuts := frozenTx.Outs
+
+	if frozenTx.ChangeOut != nil {
+		allOuts = append(frozenTx.Outs, frozenTx.ChangeOut)
+	}
 
 	tx, err := w.BuildAndSign(frozenTx.Ins, allOuts)
 	if err != nil {

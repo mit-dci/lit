@@ -43,6 +43,8 @@ func (s *SPVCon) Start(
 	s.TxUpToWallit = make(chan lnutil.TxAndHeight, 1)
 	s.CurrentHeightChan = make(chan int32, 1)
 
+	s.syncHeight = startHeight
+
 	headerFilePath := filepath.Join(path, "header.bin")
 	// open header file
 	err := s.openHeaderFile(headerFilePath)
@@ -71,11 +73,6 @@ func (s *SPVCon) RegisterAddress(adr160 [20]byte) error {
 func (s *SPVCon) RegisterOutPoint(op wire.OutPoint) error {
 	s.TrackingOPs[op] = true
 	return nil
-}
-
-func (s *SPVCon) SetHeight(startHeight int32) chan int32 {
-	s.syncHeight = startHeight
-	return s.CurrentHeightChan
 }
 
 // PushTx sends a tx out to the global network

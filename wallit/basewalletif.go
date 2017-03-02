@@ -147,14 +147,19 @@ func (w *Wallit) Sweep(adr btcutil.Address, n uint32) ([]*chainhash.Hash, error)
 			return txids, nil
 		}
 
-		if u.Height != 0 && u.Value > 10000 {
+		// this doesn't really work with maybeSend huh...
+		if u.Height != 0 && u.Value > 20000 {
 			outputscript, err := txscript.PayToAddrScript(adr)
 			if err != nil {
 				return nil, err
 			}
-			txo := wire.NewTxOut(u.Value, outputscript)
+
+			txo := wire.NewTxOut(u.Value-20000, outputscript)
 
 			ops, err := w.MaybeSend([]*wire.TxOut{txo})
+			if err != nil {
+				return nil, err
+			}
 
 			err = w.ReallySend(&ops[0].Hash)
 			if err != nil {

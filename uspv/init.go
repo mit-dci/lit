@@ -113,7 +113,7 @@ func (s *SPVCon) openHeaderFile(hfn string) error {
 			var b bytes.Buffer
 			// if testnet, start with hardcoded height
 			if s.Param.Name == "testnet3" {
-				// hard-coded millionth block header
+				// hard-coded millionth block header (actually 1032192)
 				hdr, err := hex.DecodeString("00000020da33925b1f7a55e9fa8e6c955a20ea094148b60c5c88f69a4f500000000000003673b7b6ce8157d3cfcaf415b6740918df7610a8769d70334aa9abd9c941b25e7621215880ba371a85bf9646")
 				if err != nil {
 					return err

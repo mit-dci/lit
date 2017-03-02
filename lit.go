@@ -76,6 +76,7 @@ func setConfig(lc *LitConfig) {
 
 	if lc.regTest {
 		lc.Params = &chaincfg.RegressionNetParams
+		lc.birthblock = 120
 		if !strings.Contains(lc.spvHost, ":") {
 			lc.spvHost = lc.spvHost + ":18444"
 		}
