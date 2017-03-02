@@ -316,48 +316,6 @@ func (s *SPVCon) AskForHeaders() error {
 	return nil
 }
 
-// Ask for their mempool.  2 line func. 1 of which is "return"
-func (s *SPVCon) AskForMempool() {
-	s.outMsgQueue <- wire.NewMsgMemPool()
-	return
-}
-
-// AskForOneBlock is for testing only, so you can ask for a specific block height
-// and see what goes wrong
-/* not used
-func (s *SPVCon) AskForOneBlock(h int32) error {
-	var hdr wire.BlockHeader
-	var err error
-
-	dbTip := int32(h)
-	s.headerMutex.Lock() // seek to header we need
-	_, err = s.headerFile.Seek(int64((dbTip)*80), os.SEEK_SET)
-	if err != nil {
-		return err
-	}
-	err = hdr.Deserialize(s.headerFile) // read header, done w/ file for now
-	s.headerMutex.Unlock()              // unlock after reading 1 header
-	if err != nil {
-		log.Printf("header deserialize error!\n")
-		return err
-	}
-
-	bHash := hdr.BlockSha()
-	// create inventory we're asking for
-	iv1 := wire.NewInvVect(wire.InvTypeWitnessBlock, &bHash)
-	gdataMsg := wire.NewMsgGetData()
-	// add inventory
-	err = gdataMsg.AddInvVect(iv1)
-	if err != nil {
-		return err
-	}
-	hah := NewRootAndHeight(bHash, h)
-	s.outMsgQueue <- gdataMsg
-	s.blockQueue <- hah // push height and mroot of requested block on queue
-	return nil
-}
-*/
-
 // AskForMerkBlocks requests blocks from current to last
 // right now this asks for 1 block per getData message.
 // Maybe it's faster to ask for many in a each message?

@@ -165,12 +165,6 @@ func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
 		return
 	}
 
-	//	fPositive := 0 // local filter false positives
-	//	reFilter := 2  // after that many false positives, regenerate filter.
-	// 2?  Making it up.  False positives have disk i/o cost, and regenning
-	// the filter also has costs.  With a large local filter, false positives
-	//	 should be rare.
-
 	// iterate through all txs in the block, looking for matches.
 	fmt.Printf("%d adrs\t", len(s.TrackingAdrs))
 	for _, tx := range m.Transactions {
