@@ -8,7 +8,6 @@ import (
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	"github.com/mit-dci/lit/lnutil"
@@ -149,23 +148,23 @@ func (w *Wallit) Sweep(adr btcutil.Address, n uint32) ([]*chainhash.Hash, error)
 
 		// this doesn't really work with maybeSend huh...
 		if u.Height != 0 && u.Value > 20000 {
-			outputscript, err := txscript.PayToAddrScript(adr)
+			tx, err := w.SendOne(*u, adr)
 			if err != nil {
 				return nil, err
 			}
 
-			txo := wire.NewTxOut(u.Value-20000, outputscript)
-
-			ops, err := w.MaybeSend([]*wire.TxOut{txo})
+			_, err = w.Ingest(tx, 0)
 			if err != nil {
 				return nil, err
 			}
 
-			err = w.ReallySend(&ops[0].Hash)
+			err = w.PushTx(tx)
 			if err != nil {
 				return nil, err
 			}
-			txids = append(txids, &ops[0].Hash)
+			txid := tx.TxHash()
+			txids = append(txids, &txid)
+
 			n--
 		}
 	}
