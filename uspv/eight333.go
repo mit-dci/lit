@@ -58,6 +58,9 @@ func (s *SPVCon) MatchTx(tx *wire.MsgTx) bool {
 	txid := tx.TxHash()
 	// start with optimism.  We may gain money.  Iterate through all output scripts.
 	for i, out := range tx.TxOut {
+		// create outpoint of what we're looking at
+		op := wire.NewOutPoint(&txid, uint32(i))
+
 		// 20 byte pubkey hash of this txout (if any)
 		var adr20 [20]byte
 		copy(adr20[:], lnutil.KeyHashFromPkScript(out.PkScript))
@@ -67,11 +70,17 @@ func (s *SPVCon) MatchTx(tx *wire.MsgTx) bool {
 		fmt.Printf("got output key %x ", adr20)
 		if s.TrackingAdrs[adr20] {
 			gain = true
-			op := wire.NewOutPoint(&txid, uint32(i))
 			s.TrackingOPs[*op] = true
 		} else {
 			fmt.Printf(" no match\n")
 		}
+
+		// this outpoint may confirm an outpoint we're watching.  Check that here.
+		if s.TrackingOPs[*op] {
+			// not quite "gain", more like confirm, but same idea.
+			gain = true
+		}
+
 	}
 
 	// No need to check for loss if we have a gain
@@ -85,6 +94,7 @@ func (s *SPVCon) MatchTx(tx *wire.MsgTx) bool {
 			return true
 		}
 	}
+
 	return false
 }
 

@@ -277,6 +277,20 @@ func (w *Wallit) GetAllUtxos() ([]*portxo.PorTxo, error) {
 	return utxos, nil
 }
 
+// RegisterWatchOP registers an outpoint to watch.  Called from ReallySend()
+func (w *Wallit) RegisterWatchOP(op wire.OutPoint) error {
+	opArr := lnutil.OutPointToBytes(op)
+	// open db
+	return w.StateDB.Update(func(btx *bolt.Tx) error {
+		// get the outpoint watch bucket
+		dufb := btx.Bucket(BKToutpoint)
+		if dufb == nil {
+			return fmt.Errorf("watch bucket not in db")
+		}
+		return dufb.Put(opArr[:], nil)
+	})
+}
+
 // GainUtxo registers the utxo in the duffel bag
 // don't register address; they shouldn't be re-used ever anyway.
 func (w *Wallit) GainUtxo(u portxo.PorTxo) error {

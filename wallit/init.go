@@ -89,7 +89,6 @@ func (w *Wallit) HeightHandler(incomingHeight chan int32) {
 		if err != nil {
 			fmt.Printf("HeightHandler crash  %s ", err.Error())
 		}
-
 	}
 }
 

@@ -116,14 +116,19 @@ func (w *Wallit) ExportUtxo(u *portxo.PorTxo) {
 // WatchThis registers an outpoint to watch.  Register as watched OP, and
 // passes to chainhook.
 func (w *Wallit) WatchThis(op wire.OutPoint) error {
+
+	// first, tell the chainhook
 	err := w.Hook.RegisterOutPoint(op)
 	if err != nil {
 		return err
 	}
-	err = w.Hook.RegisterOutPoint(op)
+
+	// then register in the wallit
+	err = w.RegisterWatchOP(op)
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
