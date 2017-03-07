@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/fatih/color"
 	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/qln"
@@ -98,8 +99,8 @@ func setConfig(lc *LitConfig) {
 }
 
 func main() {
-	fmt.Printf("lit node v0.0\n")
-	fmt.Printf("-h for list of options.\n")
+	fmt.Fprintf(color.Output, "lit node v0.0\n")
+	fmt.Fprintf(color.Output, "-h for list of options.\n")
 
 	conf := new(LitConfig)
 	setConfig(conf)
