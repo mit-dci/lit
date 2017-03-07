@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/btcsuite/btcd/btcec"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcutil"
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
@@ -21,7 +22,12 @@ func (nd *LitNode) TCPListener(
 	}
 
 	myId := btcutil.Hash160(idPriv.PubKey().SerializeCompressed())
-	lisAdr, err := btcutil.NewAddressWitnessPubKeyHash(myId, nd.Param)
+
+	// listening pubkey hash should be in a format independent of subwallets.
+	lisAdr, err := btcutil.NewAddressWitnessPubKeyHash(
+		myId, &chaincfg.TestNet3Params)
+	// Really we need to make LN-specific encodings here ^^
+
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +171,7 @@ func (nd *LitNode) IdKey() *btcec.PrivateKey {
 	kg.Step[2] = 9 | 1<<31
 	kg.Step[3] = 0 | 1<<31
 	kg.Step[4] = 0 | 1<<31
-	return nd.BaseWallet.GetPriv(kg)
+	return nd.SubWallet.GetPriv(kg)
 }
 
 // SendChat sends a text string to a peer

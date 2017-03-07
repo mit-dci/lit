@@ -2,35 +2,56 @@ package qln
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/boltdb/bolt"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcutil/hdkeychain"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/wallit"
 )
 
-func (nd *LitNode) Init(
-	dbfilename, watchname string, basewal UWallet, tower bool) error {
+// Init starts up a lit node.  Needs priv key, and a path.
+// Does not activate a subwallet; do that after init.
+func NewLitNode(path string, tower bool) (*LitNode, error) {
 
-	err := nd.OpenDB(dbfilename)
+	nd := new(LitNode)
+	nd.LitFolder = path
+
+	litdbpath := filepath.Join(nd.LitFolder, "ln.db")
+	err := nd.OpenDB(litdbpath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	// connect to base wallet
-	nd.BaseWallet = basewal
+	/*
+		rootpriv, err := hdkeychain.NewMaster(privKey[:], p)
+		if err != nil {
+			return nil, err
+		}
 
-	nd.Param = nd.BaseWallet.Params()
-	// ask basewallet for outpoint event messages
-	go nd.OPEventHandler(nd.BaseWallet.LetMeKnow())
+
+			// make a base wallet
+			wallit := wallit.NewWallit(rootpriv, path, p)
+
+			// connect to base wallet
+			nd.SubWallet = wallit
+
+			// ask basewallet for outpoint event messages
+			go nd.OPEventHandler(nd.SubWallet.LetMeKnow())
+	*/
+
 	// optional tower activation
 	if tower {
+		watchname := filepath.Join(nd.LitFolder, "watch.db")
 		err = nd.Tower.OpenDB(watchname)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		nd.Tower.Accepting = true
 		// call base wallet blockmonitor and hand this channel to the tower
-		go nd.Tower.BlockHandler(nd.BaseWallet.BlockMonitor())
+		go nd.Tower.BlockHandler(nd.SubWallet.BlockMonitor())
 		go nd.Relay(nd.Tower.JusticeOutbox())
 	}
 
@@ -47,6 +68,24 @@ func (nd *LitNode) Init(
 	//	go nd.OmniHandler()
 	go nd.OutMessager()
 
+	return nd, nil
+}
+
+// LinkBaseWallet activates a wallet and hooks it into the litnode.
+func (nd *LitNode) LinkBaseWallet(
+	privKey *[32]byte, birthHeight int32, host string, param *chaincfg.Params) error {
+	if nd.SubWallet != nil {
+		return fmt.Errorf("wallet %s already hooked up", nd.SubWallet.Params().Name)
+	}
+
+	rootpriv, err := hdkeychain.NewMaster(privKey[:], param)
+	if err != nil {
+		return err
+	}
+	nd.SubWallet = wallit.NewWallit(rootpriv, birthHeight, host, nd.LitFolder, param)
+
+	go nd.OPEventHandler(nd.SubWallet.LetMeKnow())
+
 	return nil
 }
 
@@ -54,7 +93,7 @@ func (nd *LitNode) Init(
 // small, but a little ugly; maybe there's a cleaner way
 func (nd *LitNode) Relay(outbox chan *wire.MsgTx) {
 	for {
-		err := nd.BaseWallet.PushTx(<-outbox)
+		err := nd.SubWallet.PushTx(<-outbox)
 		if err != nil {
 			fmt.Printf("PushTx error: %s", err.Error())
 		}

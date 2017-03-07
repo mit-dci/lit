@@ -1,5 +1,10 @@
 package lnutil
 
+import (
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/wire"
+)
+
 // all the messages to and from peers look like this internally
 type LitMsg struct {
 	PeerIdx uint32
@@ -30,3 +35,14 @@ const (
 
 	MSGID_SELFPUSH = 0x80
 )
+
+type RevMsg struct {
+	outpoit wire.OutPoint
+	revelk  chainhash.Hash // 32 bytes
+	nextpoint [33]byte
+
+}
+
+//	msg = append(msg, opArr[:]...)
+//	msg = append(msg, elk[:]...)
+//	msg = append(msg, n2ElkPoint[:]...)

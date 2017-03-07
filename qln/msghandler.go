@@ -249,12 +249,12 @@ func (nd *LitNode) OPEventHandler(OPEventChan chan lnutil.OutPointEvent) {
 					var elkScalar [32]byte
 					// swap out elkscalar, leaving privkey empty
 					elkScalar, portxo.KeyGen.PrivKey = portxo.KeyGen.PrivKey, elkScalar
-					privBase := nd.BaseWallet.GetPriv(portxo.KeyGen)
+					privBase := nd.SubWallet.GetPriv(portxo.KeyGen)
 					portxo.PrivKey = lnutil.CombinePrivKeyAndSubtract(
 						privBase, elkScalar[:])
 				}
 				// make this concurrent to avoid circular locking
-				go nd.BaseWallet.ExportUtxo(&portxo)
+				go nd.SubWallet.ExportUtxo(&portxo)
 			}
 		}
 	}

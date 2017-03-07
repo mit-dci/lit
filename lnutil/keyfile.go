@@ -1,4 +1,4 @@
-package uspv
+package lnutil
 
 import (
 	"crypto/rand"
@@ -8,12 +8,13 @@ import (
 	"os"
 	"strings"
 
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcutil/hdkeychain"
 	"github.com/howeyc/gopass"
 	"golang.org/x/crypto/nacl/secretbox"
 	"golang.org/x/crypto/scrypt"
 )
+
+/* should switch to the codahale/chacha20poly1305 package.  Or whatever we're
+using for LNDC; otherwise it's 2 almost-the-same stream ciphers to import */
 
 // warning! look at those imports! crypto! hopefully this works!
 
@@ -162,22 +163,22 @@ func SaveKeyToFileArg(filename string, priv32 *[32]byte, pass []byte) error {
 	return nil
 }
 
-// ReadKeyFileToECPriv returns an extendedkey from a file.
+// ReadKeyFile returns an 32 byte key from a file.
 // If there's no file there, it'll make one.  If there's a password needed,
 // it'll prompt for one.  One stop function.
-func ReadKeyFileToECPriv(
-	filename string, p *chaincfg.Params) (*hdkeychain.ExtendedKey, error) {
+func ReadKeyFile(filename string) (*[32]byte, error) {
 	key32 := new([32]byte)
 	_, err := os.Stat(filename)
 	if err != nil {
 		if os.IsNotExist(err) {
 			// no key found, generate and save one
 			fmt.Printf("No file %s, generating.\n", filename)
-			rn, err := hdkeychain.GenerateSeed(32)
+
+			_, err := rand.Read(key32[:])
 			if err != nil {
 				return nil, err
 			}
-			copy(key32[:], rn[:])
+
 			err = SaveKeyToFileInteractive(filename, key32)
 			if err != nil {
 				return nil, err
@@ -188,15 +189,5 @@ func ReadKeyFileToECPriv(
 			return nil, err
 		}
 	}
-
-	key, err := LoadKeyFromFileInteractive(filename)
-	if err != nil {
-		return nil, err
-	}
-
-	rootpriv, err := hdkeychain.NewMaster(key[:], p)
-	if err != nil {
-		return nil, err
-	}
-	return rootpriv, nil
+	return LoadKeyFromFileInteractive(filename)
 }

@@ -1,9 +1,8 @@
-package uspv
+package wallit
 
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"sort"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -21,7 +20,7 @@ import (
 // Bunch of redundancy with SendMany, maybe move that to a shared function...
 //NOTE this does not support multiple txouts with identical pkscripts in one tx.
 // The code would be trivial; it's not supported on purpose.  Use unique pkscripts.
-func (s *SPVCon) MaybeSend(txos []*wire.TxOut) ([]*wire.OutPoint, error) {
+func (w *Wallit) MaybeSend(txos []*wire.TxOut) ([]*wire.OutPoint, error) {
 	var err error
 	var totalSend int64
 	dustCutoff := int64(20000) // below this amount, just give to miners
@@ -43,11 +42,11 @@ func (s *SPVCon) MaybeSend(txos []*wire.TxOut) ([]*wire.OutPoint, error) {
 	}
 
 	// start access to utxos
-	s.TS.FreezeMutex.Lock()
-	defer s.TS.FreezeMutex.Unlock()
+	w.FreezeMutex.Lock()
+	defer w.FreezeMutex.Unlock()
 	// get inputs for this tx.  Only segwit
 	// This might not be enough for the fee if the inputs line up right...
-	utxos, overshoot, err := s.TS.PickUtxos(totalSend, true)
+	utxos, overshoot, err := w.PickUtxos(totalSend, true)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +59,7 @@ func (s *SPVCon) MaybeSend(txos []*wire.TxOut) ([]*wire.OutPoint, error) {
 	// input sum is not enough, we need more inputs.
 	// keep doing this until fee is sufficient or PickUtxos errors out
 	for fee > overshoot {
-		utxos, overshoot, err = s.TS.PickUtxos(totalSend+fee, true)
+		utxos, overshoot, err = w.PickUtxos(totalSend+fee, true)
 		if err != nil {
 			return nil, err
 		}
@@ -69,7 +68,7 @@ func (s *SPVCon) MaybeSend(txos []*wire.TxOut) ([]*wire.OutPoint, error) {
 
 	// add a change output if we have enough extra
 	if overshoot-fee > dustCutoff {
-		changeOut, err = s.TS.NewChangeOut(overshoot - fee)
+		changeOut, err = w.NewChangeOut(overshoot - fee)
 		if err != nil {
 			return nil, err
 		}
@@ -86,7 +85,7 @@ func (s *SPVCon) MaybeSend(txos []*wire.TxOut) ([]*wire.OutPoint, error) {
 	}
 
 	// BuildDontSign gets the txid.  Also sorts txin, txout slices in place
-	tx, err := s.TS.BuildDontSign(utxos, txos)
+	tx, err := w.BuildDontSign(utxos, txos)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +93,7 @@ func (s *SPVCon) MaybeSend(txos []*wire.TxOut) ([]*wire.OutPoint, error) {
 	fTx.Txid = tx.TxHash()
 
 	for _, utxo := range utxos {
-		s.TS.FreezeSet[utxo.Op] = fTx
+		w.FreezeSet[utxo.Op] = fTx
 	}
 
 	// figure out where outputs ended up after adding the change output and sorting
@@ -114,83 +113,71 @@ func (s *SPVCon) MaybeSend(txos []*wire.TxOut) ([]*wire.OutPoint, error) {
 
 // Sign and broadcast a tx previously built with MaybeSend.  This clears the freeze
 // on the utxos but they're not utxos anymore anyway.
-func (s *SPVCon) ReallySend(txid *chainhash.Hash) error {
+func (w *Wallit) ReallySend(txid *chainhash.Hash) error {
 	fmt.Printf("Reallysend %s\n", txid.String())
 	// start frozen set access
-	s.TS.FreezeMutex.Lock()
-	defer s.TS.FreezeMutex.Unlock()
+	w.FreezeMutex.Lock()
+	defer w.FreezeMutex.Unlock()
 	// get the transaction
-	frozenTx, err := s.TS.FindFreezeTx(txid)
+	frozenTx, err := w.FindFreezeTx(txid)
 	if err != nil {
 		return err
 	}
 	// delete inputs from frozen set (they're gone anyway, but just to clean it up)
 	for _, txin := range frozenTx.Ins {
 		fmt.Printf("\t remove %s from frozen outpoints\n", txin.Op.String())
-		delete(s.TS.FreezeSet, txin.Op)
+		delete(w.FreezeSet, txin.Op)
 	}
 
-	allOuts := append(frozenTx.Outs, frozenTx.ChangeOut)
+	allOuts := frozenTx.Outs
 
-	tx, err := s.TS.BuildAndSign(frozenTx.Ins, allOuts)
+	if frozenTx.ChangeOut != nil {
+		allOuts = append(frozenTx.Outs, frozenTx.ChangeOut)
+	}
+
+	tx, err := w.BuildAndSign(frozenTx.Ins, allOuts)
 	if err != nil {
 		return err
 	}
 
-	return s.NewOutgoingTx(tx)
+	return w.NewOutgoingTx(tx)
 }
 
 // Cancel the hold on a tx previously built with MaybeSend.  Clears freeze on
 // utxos so they can be used somewhere else.
-func (s *SPVCon) NahDontSend(txid *chainhash.Hash) error {
+func (w *Wallit) NahDontSend(txid *chainhash.Hash) error {
 	fmt.Printf("Nahdontsend %s\n", txid.String())
 	// start frozen set access
-	s.TS.FreezeMutex.Lock()
-	defer s.TS.FreezeMutex.Unlock()
+	w.FreezeMutex.Lock()
+	defer w.FreezeMutex.Unlock()
 	// get the transaction
-	frozenTx, err := s.TS.FindFreezeTx(txid)
+	frozenTx, err := w.FindFreezeTx(txid)
 	if err != nil {
 		return err
 	}
 	// go through all its inputs, and remove those outpoints from the frozen set
 	for _, txin := range frozenTx.Ins {
 		fmt.Printf("\t remove %s from frozen outpoints\n", txin.Op.String())
-		delete(s.TS.FreezeSet, txin.Op)
+		delete(w.FreezeSet, txin.Op)
 	}
 	return nil
 }
 
 // FindFreezeTx looks through the frozen map to find a tx.  Error if it can't find it
-func (ts *TxStore) FindFreezeTx(txid *chainhash.Hash) (*FrozenTx, error) {
-	for op := range ts.FreezeSet {
-		frozenTxid := ts.FreezeSet[op].Txid
+func (w *Wallit) FindFreezeTx(txid *chainhash.Hash) (*FrozenTx, error) {
+	for op := range w.FreezeSet {
+		frozenTxid := w.FreezeSet[op].Txid
 		if frozenTxid.IsEqual(txid) {
-			return ts.FreezeSet[op], nil
+			return w.FreezeSet[op], nil
 		}
 	}
 	return nil, fmt.Errorf("couldn't find %s in frozen set", txid.String())
 }
 
-// Rebroadcast sends an inv message of all the unconfirmed txs the db is
-// aware of.  This is called after every sync.  Only txids so hopefully not
-// too annoying for nodes.
-func (s *SPVCon) Rebroadcast() {
-	// get all unconfirmed txs
-	invMsg, err := s.TS.GetPendingInv()
-	if err != nil {
-		log.Printf("Rebroadcast GetPendingInv error: %s", err.Error())
-		return
-	}
-	if len(invMsg.InvList) == 0 { // nothing to broadcast, so don't
-		return
-	}
-	s.outMsgQueue <- invMsg
-	return
-}
-
-func (s *SPVCon) GrabAll() error {
+// GrabAll makes first-party justice txs.
+func (w *Wallit) GrabAll() error {
 	// no args, look through all utxos
-	utxos, err := s.TS.GetAllUtxos()
+	utxos, err := w.GetAllUtxos()
 	if err != nil {
 		return err
 	}
@@ -200,17 +187,17 @@ func (s *SPVCon) GrabAll() error {
 	for _, u := range utxos {
 		if u.Seq == 1 && u.Height > 0 { // grabbable
 			fmt.Printf("found %s to grab!\n", u.String())
-			adr160, err := s.TS.NewAdr160()
+			adr160, err := w.NewAdr160()
 			if err != nil {
 				return err
 			}
 			nAdr, err := btcutil.NewAddressWitnessPubKeyHash(
-				adr160, s.TS.Param)
-			tx, err := s.TS.SendOne(*u, nAdr)
+				adr160, w.Param)
+			tx, err := w.SendOne(*u, nAdr)
 			if err != nil {
 				return err
 			}
-			err = s.NewOutgoingTx(tx)
+			err = w.NewOutgoingTx(tx)
 			if err != nil {
 				return err
 			}
@@ -224,67 +211,40 @@ func (s *SPVCon) GrabAll() error {
 }
 
 // Directly send out a tx.  For things that plug in to the uspv wallet.
-func (s *SPVCon) DirectSendTx(tx *wire.MsgTx) error {
-	// don't ingest, just save
-	err := s.TS.SaveTx(tx)
-	if err != nil {
-		return err
-	}
-	txid := tx.TxHash()
-	// make an inv message to tell everyone about this tx
-	iv1 := wire.NewInvVect(wire.InvTypeWitnessTx, &txid)
-	invMsg := wire.NewMsgInv()
-	err = invMsg.AddInvVect(iv1)
-	if err != nil {
-		return err
-	}
-	s.outMsgQueue <- invMsg
-	return nil
+func (w *Wallit) DirectSendTx(tx *wire.MsgTx) error {
+	// don't ingest, just push out
+	return w.Hook.PushTx(tx)
 }
 
 // NewOutgoingTx runs a tx though the db first, then sends it out to the network.
-func (s *SPVCon) NewOutgoingTx(tx *wire.MsgTx) error {
-	txid := tx.TxHash()
-	// assign height of zero for txs we create
-	err := s.OKTxid(&txid, 0)
+func (w *Wallit) NewOutgoingTx(tx *wire.MsgTx) error {
+	_, err := w.Ingest(tx, 0) // our own tx; don't keep track of false positives
 	if err != nil {
 		return err
 	}
-	_, err = s.TS.Ingest(tx, 0) // our own tx; don't keep track of false positives
-	if err != nil {
-		return err
-	}
-	// make an inv message instead of a tx message to be polite
-	iv1 := wire.NewInvVect(wire.InvTypeWitnessTx, &txid)
-	invMsg := wire.NewMsgInv()
-	err = invMsg.AddInvVect(iv1)
-	if err != nil {
-		return err
-	}
-	s.outMsgQueue <- invMsg
-	return nil
+	return w.Hook.PushTx(tx)
 }
 
 // PickUtxos Picks Utxos for spending.  Tell it how much money you want.
 // It returns a tx-sortable utxoslice, and the overshoot amount.  Also errors.
 // if "ow" is true, only gives witness utxos (for channel funding)
-func (ts *TxStore) PickUtxos(
+func (w *Wallit) PickUtxos(
 	amtWanted int64, ow bool) (portxo.TxoSliceByBip69, int64, error) {
 	satPerByte := int64(80) // satoshis per byte fee; have as arg later
-	curHeight, err := ts.GetDBSyncHeight()
+	curHeight, err := w.GetDBSyncHeight()
 	if err != nil {
 		return nil, 0, err
 	}
 
 	var allUtxos portxo.TxoSliceByAmt
-	allUtxos, err = ts.GetAllUtxos()
+	allUtxos, err = w.GetAllUtxos()
 	if err != nil {
 		return nil, 0, err
 	}
 
 	// remove frozen utxos from allUtxo slice.  Iterate backwards / trailing delete
 	for i := len(allUtxos) - 1; i >= 0; i-- {
-		_, frozen := ts.FreezeSet[allUtxos[i].Op]
+		_, frozen := w.FreezeSet[allUtxos[i].Op]
 		if frozen {
 			// faster than append, and we're sorting a few lines later anyway
 			allUtxos[i] = allUtxos[len(allUtxos)-1] // redundant if at last index
@@ -343,136 +303,18 @@ func (ts *TxStore) PickUtxos(
 	return rSlice, -nokori, nil
 }
 
-// sendDrop is broken, try to fix it for better spamming.
-
-// SendDrop sends 2 chained transactions; one to a 2drop script, and then
-// one spending that to an address.
-// Note that this is completely insecure for any purpose, and
-// all it does is waste space.  Kindof useless.
-// Returns the 2nd, large tx's txid.
-// Probably doesn't work with time-locked.  Doesn't really matter.
-/*
-func (ts *TxStore) SendDrop(
-	u portxo.PorTxo, adr btcutil.Address) (*wire.MsgTx, *wire.MsgTx, error) {
-	var err error
-	// fixed fee
-	fee := int64(5000)
-
-	sendAmt := u.Value - fee
-	tx := wire.NewMsgTx() // make new tx
-
-	// add single dropdrop output
-	builder := txscript.NewScriptBuilder()
-	builder.AddOp(txscript.OP_2DROP)
-	builder.AddOp(txscript.OP_2DROP)
-	builder.AddOp(txscript.OP_2DROP)
-	builder.AddOp(txscript.OP_2DROP)
-	builder.AddOp(txscript.OP_2DROP)
-	builder.AddOp(txscript.OP_2DROP)
-	builder.AddOp(txscript.OP_2DROP)
-	builder.AddOp(txscript.OP_2DROP)
-	builder.AddOp(txscript.OP_1)
-	outpre, _ := builder.Script()
-
-	txout := wire.NewTxOut(sendAmt, lnutil.P2WSHify(outpre))
-	tx.AddTxOut(txout)
-
-	// build input
-	var prevPKs []byte
-	if u.Mode&portxo.FlagTxoWitness != 0 {
-		wa, err := btcutil.NewAddressWitnessPubKeyHash(
-			ts.Adrs[u.KeyGen.Step[4]].PkhAdr.ScriptAddress(), ts.Param)
-		prevPKs, err = txscript.PayToAddrScript(wa)
-		if err != nil {
-			return nil, nil, err
-		}
-	} else { // otherwise generate directly
-		prevPKs, err = txscript.PayToAddrScript(
-			ts.Adrs[u.KeyGen.Step[4]].PkhAdr)
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-	tx.AddTxIn(wire.NewTxIn(&u.Op, prevPKs, nil))
-
-	var sig []byte
-	var wit [][]byte
-	hCache := txscript.NewTxSigHashes(tx)
-
-	priv := ts.PathPrivkey(u.KeyGen)
-	if priv == nil {
-		return nil, nil, fmt.Errorf("SendDrop: nil privkey")
-	}
-
-	// This is where witness based sighash types need to happen
-	// sign into stash
-	if u.Mode&portxo.FlagTxoWitness != 0 {
-		wit, err = txscript.WitnessScript(
-			tx, hCache, 0, u.Value, tx.TxIn[0].SignatureScript,
-			txscript.SigHashAll, priv, true)
-		if err != nil {
-			return nil, nil, err
-		}
-	} else {
-		sig, err = txscript.SignatureScript(
-			tx, 0, tx.TxIn[0].SignatureScript,
-			txscript.SigHashAll, priv, true)
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-
-	// swap sigs into sigScripts in txins
-	if sig != nil {
-		tx.TxIn[0].SignatureScript = sig
-	}
-	if wit != nil {
-		tx.TxIn[0].Witness = wit
-		tx.TxIn[0].SignatureScript = nil
-	}
-
-	tx1id := tx.TxSha()
-	sendAmt2 := sendAmt - fee
-	tx2 := wire.NewMsgTx() // make new tx
-
-	// now build a NEW tx spending that one!
-	// add single output
-	outAdrScript, err := txscript.PayToAddrScript(adr)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	txout2 := wire.NewTxOut(sendAmt2, outAdrScript)
-	tx2.AddTxOut(txout2)
-
-	dropIn := wire.NewTxIn(wire.NewOutPoint(&tx1id, 0), nil, nil)
-	dropIn.Witness = make([][]byte, 17)
-
-	for i, _ := range dropIn.Witness {
-		dropIn.Witness[i] = make([]byte, 512)
-		_, err := rand.Read(dropIn.Witness[i])
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-	dropIn.Witness[16] = outpre
-	tx2.AddTxIn(dropIn)
-
-	return tx, tx2, nil
-}
-*/
 // SendOne is for the sweep function, and doesn't do change.
 // Probably can get rid of this for real txs.
-func (ts *TxStore) SendOne(u portxo.PorTxo, adr btcutil.Address) (*wire.MsgTx, error) {
+func (w *Wallit) SendOne(u portxo.PorTxo, adr btcutil.Address) (*wire.MsgTx, error) {
 
-	ts.FreezeMutex.Lock()
-	defer ts.FreezeMutex.Unlock()
-	_, frozen := ts.FreezeSet[u.Op]
+	w.FreezeMutex.Lock()
+	defer w.FreezeMutex.Unlock()
+	_, frozen := w.FreezeSet[u.Op]
 	if frozen {
 		return nil, fmt.Errorf("%s is frozen, can't spend", u.Op.String())
 	}
 
-	curHeight, err := ts.GetDBSyncHeight()
+	curHeight, err := w.GetDBSyncHeight()
 	if err != nil {
 		return nil, err
 	}
@@ -495,11 +337,11 @@ func (ts *TxStore) SendOne(u portxo.PorTxo, adr btcutil.Address) (*wire.MsgTx, e
 	// make user specified txout and add to tx
 	txout := wire.NewTxOut(sendAmt, outAdrScript)
 
-	return ts.BuildAndSign([]*portxo.PorTxo{&u}, []*wire.TxOut{txout})
+	return w.BuildAndSign([]*portxo.PorTxo{&u}, []*wire.TxOut{txout})
 }
 
 // Builds tx from inputs and outputs, returns tx.  Sorts.  Doesn't sign.
-func (ts *TxStore) BuildDontSign(
+func (w *Wallit) BuildDontSign(
 	utxos []*portxo.PorTxo, txos []*wire.TxOut) (*wire.MsgTx, error) {
 
 	// make the tx
@@ -525,7 +367,7 @@ func (ts *TxStore) BuildDontSign(
 // Build and sign builds a tx from a slice of utxos and txOuts.
 // It then signs all the inputs and returns the tx.  Should
 // pretty much always work for any inputs.
-func (ts *TxStore) BuildAndSign(
+func (w *Wallit) BuildAndSign(
 	utxos []*portxo.PorTxo, txos []*wire.TxOut) (*wire.MsgTx, error) {
 	var err error
 
@@ -568,7 +410,7 @@ func (ts *TxStore) BuildAndSign(
 
 	for i, _ := range tx.TxIn {
 		// get key
-		priv := ts.PathPrivkey(utxos[i].KeyGen)
+		priv := w.PathPrivkey(utxos[i].KeyGen)
 		fmt.Printf("signing with privkey pub %x\n", priv.PubKey().SerializeCompressed())
 
 		if priv == nil {
@@ -625,59 +467,6 @@ func (ts *TxStore) BuildAndSign(
 
 	fmt.Printf("tx: %s", TxToString(tx))
 	return tx, nil
-}
-
-// SendCoins sends coins.
-func (ts *TxStore) SendCoins(
-	adrs []btcutil.Address, sendAmts []int64) (*wire.MsgTx, error) {
-
-	if len(adrs) != len(sendAmts) {
-		return nil, fmt.Errorf(
-			"%d addresses and %d amounts", len(adrs), len(sendAmts))
-	}
-	var err error
-	var txos []*wire.TxOut
-	var totalSend int64
-	dustCutoff := int64(20000) // below this amount, just give to miners
-	satPerByte := int64(80)    // satoshis per byte fee; have as arg later
-
-	for _, amt := range sendAmts {
-		totalSend += amt
-	}
-
-	// add non-change (arg) outputs
-	for i, adr := range adrs {
-		// make address script 76a914...88ac or 0014...
-		outAdrScript, err := txscript.PayToAddrScript(adr)
-		if err != nil {
-			return nil, err
-		}
-		// make user specified txout and add to tx
-		txout := wire.NewTxOut(sendAmts[i], outAdrScript)
-		txos = append(txos, txout)
-	}
-
-	// get inputs for this tx
-	// This might not be enough for the fee if the inputs line up right...
-	utxos, overshoot, err := ts.PickUtxos(totalSend, false)
-	if err != nil {
-		return nil, err
-	}
-	fmt.Printf("Overshot by %d, can make change output\n", overshoot)
-
-	// estimate fee with outputs, see if change should be truncated
-	fee := EstFee(utxos, txos, satPerByte)
-
-	// add a change output if we have enough extra
-	if overshoot-fee > dustCutoff {
-		changeOut, err := ts.NewChangeOut(overshoot - fee)
-		if err != nil {
-			return nil, err
-		}
-		txos = append(txos, changeOut)
-	}
-
-	return ts.BuildAndSign(utxos, txos)
 }
 
 // EstFee gives a fee estimate based on a input / output set and a sat/Byte target.

@@ -50,14 +50,14 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
 		}
 		fmt.Printf("try string %s\n", adrString)
 		// pretty ugly to build the string here...
-		connectAdr, err = lndc.LnAddrFromString(adrString, r.Node.Param)
+		connectAdr, err = lndc.LnAddrFromString(adrString, r.Node.SubWallet.Params())
 		if err != nil {
 			return err
 		}
 
 	} else {
 		// use string as is
-		connectAdr, err = lndc.LnAddrFromString(args.LNAddr, r.Node.Param)
+		connectAdr, err = lndc.LnAddrFromString(args.LNAddr, r.Node.SubWallet.Params())
 		if err != nil {
 			return err
 		}
@@ -76,6 +76,7 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
 
 type ListConnectionsReply struct {
 	Connections []qln.PeerInfo
+	MyPKH       string
 }
 type ConInfo struct {
 	PeerNumber uint32
@@ -84,7 +85,6 @@ type ConInfo struct {
 
 func (r *LitRPC) ListConnections(args NoArgs, reply *ListConnectionsReply) error {
 	reply.Connections = r.Node.GetConnectedPeerList()
-
 	return nil
 }
 

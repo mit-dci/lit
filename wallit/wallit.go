@@ -1,10 +1,9 @@
-package uspv
+package wallit
 
 import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"log"
 	"sync"
 
 	"github.com/boltdb/bolt"
@@ -13,13 +12,14 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcutil/bloom"
 	"github.com/btcsuite/btcutil/hdkeychain"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 )
 
-type TxStore struct {
+// The Wallit is lit's main wallet struct.  It's got the root key, the dbs, and
+// contains the SPVhooks into the network.
+type Wallit struct {
 	// could get rid of adr slice, it's just an in-ram cache...
 	StateDB *bolt.DB // place to write all this down
 
@@ -31,8 +31,11 @@ type TxStore struct {
 	// Gets initialized and activates when called by qln
 	OPEventChan chan lnutil.OutPointEvent
 
-	// Params live here... AND SCon
+	// Params live here...
 	Param *chaincfg.Params // network parameters (testnet3, segnet, etc)
+
+	// Hook is the connection to a blockchain.
+	Hook ChainHook
 
 	// From here, comes everything. It's a secret to everybody.
 	rootPrivKey *hdkeychain.ExtendedKey
@@ -50,112 +53,6 @@ type Stxo struct {
 	portxo.PorTxo                // when it used to be a utxo
 	SpendHeight   int32          // height at which it met its demise
 	SpendTxid     chainhash.Hash // the tx that consumed it
-}
-
-func NewTxStore(rootkey *hdkeychain.ExtendedKey, p *chaincfg.Params) TxStore {
-	var txs TxStore
-	txs.rootPrivKey = rootkey
-	txs.Param = p
-	txs.FreezeSet = make(map[wire.OutPoint]*FrozenTx)
-	return txs
-}
-
-// OKTxid assigns a height to a txid.  This means that
-// the txid exists at that height, with whatever assurance (for height 0
-// it's no assurance at all)
-func (s *SPVCon) OKTxid(txid *chainhash.Hash, height int32) error {
-	if txid == nil {
-		return fmt.Errorf("tried to add nil txid")
-	}
-	log.Printf("added %s to OKTxids at height %d\n", txid.String(), height)
-	s.OKMutex.Lock()
-	s.OKTxids[*txid] = height
-	s.OKMutex.Unlock()
-	return nil
-}
-
-// GimmeFilter ... or I'm gonna fade away
-func (t *TxStore) GimmeFilter() (*bloom.Filter, error) {
-	// get all address hash160s
-	adr160s, err := t.GetAllAdr160s()
-	if err != nil {
-		return nil, err
-	}
-
-	// get all utxos to add outpoints to filter
-	//	allUtxos, err := t.GetAllUtxos()
-	//	if err != nil {
-	//		return nil, err
-	//	}
-	// get all outpoints
-	allWatchOP, err := t.GetAllOPs()
-	if err != nil {
-		return nil, err
-	}
-
-	filterElements := uint32(len(adr160s) + (len(allWatchOP) * 2))
-	// *2 because I'm adding the op and the txid...?
-
-	f := bloom.NewFilter(filterElements, 0, 0.000001, wire.BloomUpdateAll)
-
-	// note there could be false positives since we're just looking
-	// for the 20 byte PKH without the opcodes.
-	for _, a160 := range adr160s { // add 20-byte pubkeyhash
-		//		fmt.Printf("adding address hash %x\n", a160)
-		f.Add(a160)
-	}
-	//	for _, u := range allUtxos {
-	//		f.AddOutPoint(&u.Op)
-	//	}
-
-	// actually... we should monitor addresses, not txids, right?
-	// or no...?
-	for _, wop := range allWatchOP {
-		//	 aha, add HASH here, not the outpoint! (txid of fund tx)
-		f.AddHash(&wop.Hash)
-		// also add outpoint...?  wouldn't the hash be enough?
-		// not sure why I have to do both of these, but seems like close txs get
-		// ignored without the outpoint, and fund txs get ignored without the
-		// shahash. Might be that shahash operates differently (on txids, not txs)
-		f.AddOutPoint(wop)
-	}
-	// still some problem with filter?  When they broadcast a close which doesn't
-	// send any to us, sometimes we don't see it and think the channel is still open.
-	// so not monitoring the channel outpoint properly?  here or in ingest()
-
-	fmt.Printf("made %d element filter\n", filterElements)
-	return f, nil
-}
-
-// GetDoubleSpends takes a transaction and compares it with
-// all transactions in the db.  It returns a slice of all txids in the db
-// which are double spent by the received tx.
-func CheckDoubleSpends(
-	argTx *wire.MsgTx, txs []*wire.MsgTx) ([]*chainhash.Hash, error) {
-
-	var dubs []*chainhash.Hash // slice of all double-spent txs
-	argTxid := argTx.TxHash()
-
-	for _, compTx := range txs {
-		compTxid := compTx.TxHash()
-		// check if entire tx is dup
-		if argTxid.IsEqual(&compTxid) {
-			return nil, fmt.Errorf("tx %s is dup", argTxid.String())
-		}
-		// not dup, iterate through inputs of argTx
-		for _, argIn := range argTx.TxIn {
-			// iterate through inputs of compTx
-			for _, compIn := range compTx.TxIn {
-				if lnutil.OutPointsEqual(
-					argIn.PreviousOutPoint, compIn.PreviousOutPoint) {
-					// found double spend
-					dubs = append(dubs, &compTxid)
-					break // back to argIn loop
-				}
-			}
-		}
-	}
-	return dubs, nil
 }
 
 // TxToString prints out some info about a transaction. for testing / debugging
