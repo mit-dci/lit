@@ -67,12 +67,12 @@ func (s *SPVCon) MatchTx(tx *wire.MsgTx) bool {
 		// when we gain utxo, set as gain so we can return a match, but
 		// also go through all gained utxos and register to track them
 
-		fmt.Printf("got output key %x ", adr20)
+		//		fmt.Printf("got output key %x ", adr20)
 		if s.TrackingAdrs[adr20] {
 			gain = true
 			s.TrackingOPs[*op] = true
 		} else {
-			fmt.Printf(" no match\n")
+			//			fmt.Printf(" no match\n")
 		}
 
 		// this outpoint may confirm an outpoint we're watching.  Check that here.

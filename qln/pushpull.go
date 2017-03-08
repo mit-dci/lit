@@ -235,7 +235,7 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 	opArr := lnutil.OutPointToBytes(q.Op)
 
 	var msg []byte
-	
+
 	// DeltaSig is op (36), Delta (4),  sig (64)
 	// total length 104
 	msg = append(msg, opArr[:]...)
@@ -578,7 +578,7 @@ func (nd *LitNode) SigRevHandler(lm *lnutil.LitMsg, qc *Qchan) error {
 	}
 
 	if qc.State.Delta == 0 {
-		// re-sent last rev; they probably didn't get it
+		// re-send last rev; they probably didn't get it
 		return nd.SendREV(qc)
 	}
 
