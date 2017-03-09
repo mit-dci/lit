@@ -12,11 +12,16 @@ import (
 	"github.com/mit-dci/lit/portxo"
 )
 
-// Gets the list of ports where LitNode is listening for incoming connections, & the connection key
-func (nd *LitNode) GetLisAddressAndPorts() (*btcutil.AddressWitnessPubKeyHash, []string, error) {
-    idPriv := nd.IdKey()
-    myId := btcutil.Hash160(idPriv.PubKey().SerializeCompressed())
-    lisAdr, err := btcutil.NewAddressWitnessPubKeyHash(myId, nd.Param)
+// Gets the list of ports where LitNode is listening for incoming connections,
+// & the connection key
+func (nd *LitNode) GetLisAddressAndPorts() (
+	*btcutil.AddressWitnessPubKeyHash, []string, error) {
+
+	idPriv := nd.IdKey()
+	myId := btcutil.Hash160(idPriv.PubKey().SerializeCompressed())
+	// litNode addresses transcend network parameters
+	lisAdr, err := btcutil.NewAddressWitnessPubKeyHash(myId,
+		&chaincfg.TestNet3Params)
 	if err != nil {
 		return nil, nil, err
 	}
