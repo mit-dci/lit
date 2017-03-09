@@ -88,6 +88,21 @@ func (r *LitRPC) ListConnections(args NoArgs, reply *ListConnectionsReply) error
 	return nil
 }
 
+type ListeningPortsReply struct {
+	LisIpPorts []string
+	Adr string
+}
+
+func (r *LitRPC) GetListeningPorts(args NoArgs, reply *ListeningPortsReply) error {
+	adr, lisIpPorts, err := r.Node.GetLisAddressAndPorts()
+	reply.LisIpPorts = lisIpPorts
+	reply.Adr = adr.String()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // ------- receive chat
 func (r *LitRPC) GetMessages(args NoArgs, reply *StatusReply) error {
 	reply.Status = <-r.Node.UserMessageBox

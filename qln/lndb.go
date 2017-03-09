@@ -89,6 +89,9 @@ type LitNode struct {
 
 	// queue for async messages to RPC user
 	UserMessageBox chan string
+
+	// The port(s) in which it listens for incoming connections
+	LisIpPorts []string
 }
 
 type RemotePeer struct {
