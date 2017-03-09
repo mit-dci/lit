@@ -12,6 +12,20 @@ import (
 	"github.com/mit-dci/lit/portxo"
 )
 
+// Gets the list of ports where LitNode is listening for incoming connections, & the connection key
+func (nd *LitNode) GetLisAddressAndPorts() (*btcutil.AddressWitnessPubKeyHash, []string, error) {
+    idPriv := nd.IdKey()
+    myId := btcutil.Hash160(idPriv.PubKey().SerializeCompressed())
+    lisAdr, err := btcutil.NewAddressWitnessPubKeyHash(myId, nd.Param)
+	if err != nil {
+		return nil, nil, err
+	}
+	nd.RemoteMtx.Lock()
+	ports := nd.LisIpPorts
+	nd.RemoteMtx.Unlock()
+	return lisAdr, ports, nil
+}
+
 // TCPListener starts a litNode listening for incoming LNDC connections
 func (nd *LitNode) TCPListener(
 	lisIpPort string) (*btcutil.AddressWitnessPubKeyHash, error) {
@@ -20,7 +34,6 @@ func (nd *LitNode) TCPListener(
 	if err != nil {
 		return nil, err
 	}
-
 	myId := btcutil.Hash160(idPriv.PubKey().SerializeCompressed())
 
 	// listening pubkey hash should be in a format independent of subwallets.
@@ -68,6 +81,9 @@ func (nd *LitNode) TCPListener(
 			go nd.LNDCReader(&peer)
 		}
 	}()
+	nd.RemoteMtx.Lock()
+	nd.LisIpPorts = append(nd.LisIpPorts, lisIpPort)
+	nd.RemoteMtx.Unlock()
 	return lisAdr, nil
 }
 
@@ -143,7 +159,7 @@ type PeerInfo struct {
 
 func (nd *LitNode) GetConnectedPeerList() []PeerInfo {
 	nd.RemoteMtx.Lock()
-	nd.RemoteMtx.Unlock()
+	nd.RemoteMtx.Unlock() //TODO: This unlock is in the wrong place...?
 	var peers []PeerInfo
 	for k, v := range nd.RemoteCons {
 		var newPeer PeerInfo
