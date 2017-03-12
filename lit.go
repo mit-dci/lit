@@ -194,7 +194,7 @@ func main() {
 			for {
 				// setup reader with max 4K input chars
 				reader := bufio.NewReaderSize(os.Stdin, 4000)
-				fmt.Fprintf(color.Output,"LND# ")                 // prompt
+				fmt.Printf("LND# ")                 // prompt
 				msg, err := reader.ReadString('\n') // input finishes on enter key
 				if err != nil {
 					log.Fatal(err)
@@ -204,7 +204,7 @@ func main() {
 				if len(cmdslice) < 1 {
 					continue // no input, just prompt again
 				}
-				fmt.Fprintf(color.Output,"entered command: %s\n", msg) // immediate feedback
+				fmt.Printf("entered command: %s\n", msg) // immediate feedback
 				err = Shellparse(cmdslice)
 				if err != nil { // only error should be user exit
 					log.Fatal(err)
