@@ -1,7 +1,6 @@
 package uspv
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/btcsuite/btcd/wire"
@@ -89,7 +88,7 @@ func (s *SPVCon) fPositiveHandler() {
 			}
 			// send filter
 			s.Refilter(filt)
-			fmt.Printf("sent filter %x\n", filt.MsgFilterLoad().Filter)
+			log.Printf("sent filter %x\n", filt.MsgFilterLoad().Filter)
 
 			// clear the channel
 		finClear:
@@ -102,7 +101,7 @@ func (s *SPVCon) fPositiveHandler() {
 				}
 			}
 
-			fmt.Printf("reset %d false positives\n", fpAccumulator)
+			log.Printf("reset %d false positives\n", fpAccumulator)
 			// reset accumulator
 			fpAccumulator = 0
 		}
@@ -132,7 +131,7 @@ func (s *SPVCon) HeaderHandler(m *wire.MsgHeaders) {
 		}
 		// send filter
 		s.SendFilter(filt)
-		fmt.Printf("sent filter %x\n", filt.MsgFilterLoad().Filter)
+		log.Printf("sent filter %x\n", filt.MsgFilterLoad().Filter)
 	}
 	dbTip, err := s.TS.GetDBSyncHeight()
 	if err != nil {
@@ -278,14 +277,14 @@ func (s *SPVCon) InvHandler(m *wire.MsgInv) {
 			select {
 			case <-s.inWaitState:
 				// start getting headers
-				fmt.Printf("asking for headers due to inv block\n")
+				log.Printf("asking for headers due to inv block\n")
 				err := s.AskForHeaders()
 				if err != nil {
 					log.Printf("AskForHeaders error: %s", err.Error())
 				}
 			default:
 				// drop it as if its component particles had high thermal energies
-				fmt.Printf("inv block but ignoring; not synced\n")
+				log.Printf("inv block but ignoring; not synced\n")
 			}
 		}
 	}

@@ -2,7 +2,6 @@ package uspv
 
 import (
 	"bytes"
-	"fmt"
 	"log"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -143,12 +142,12 @@ func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
 	if cap(s.RawBlockSender) != 0 {
 		s.RawBlockSender <- m
 	} else {
-		fmt.Printf("Watchtower not initialized\n")
+		log.Printf("Watchtower not initialized\n")
 	}
 
 	ok := BlockOK(*m) // check block self-consistency
 	if !ok {
-		fmt.Printf("block %s not OK!!11\n", m.BlockHash().String())
+		log.Printf("block %s not OK!!11\n", m.BlockHash().String())
 		return
 	}
 
@@ -200,7 +199,7 @@ func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
 	}
 
 	if fPositive > reFilter {
-		fmt.Printf("%d filter false positives in this block\n", fPositive)
+		log.Printf("%d filter false positives in this block\n", fPositive)
 		filt, err := s.TS.GimmeFilter()
 		if err != nil {
 			log.Printf("Refilter error: %s\n", err.Error())
@@ -217,7 +216,7 @@ func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
 		return
 	}
 
-	fmt.Printf("ingested full block %s height %d OK\n",
+	log.Printf("ingested full block %s height %d OK\n",
 		m.Header.BlockHash().String(), hah.height)
 
 	if hah.final { // check sync end

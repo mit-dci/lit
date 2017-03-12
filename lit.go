@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"io"
 	"log"
 	"os"
@@ -111,13 +110,13 @@ func setConfig(lc *LitConfig) {
 }
 
 func main() {
-	f, err := os.OpenFile("testlogfile", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	f, err := os.OpenFile("logfile", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	defer f.Close()
 	mw := io.MultiWriter(color.Output, f)
 	log.SetOutput(mw)
 
-	fmt.Fprintf(mw, "lit node v0.0\n")
-	fmt.Fprintf(mw, "-h for list of options.\n")
+	log.Printf("lit node v0.0\n")
+	log.Printf("-h for list of options.\n")
 
 	conf := new(LitConfig)
 	setConfig(conf)

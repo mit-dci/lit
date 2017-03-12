@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"log"
 
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -97,9 +98,9 @@ func (ts *TxStore) OpenDB(filename string) error {
 		numKeysBytes := sta.Get(KEYNumKeys)
 		if numKeysBytes != nil { // NumKeys exists, read into uint32
 			numKeys = lnutil.BtU32(numKeysBytes)
-			fmt.Printf("db says %d keys\n", numKeys)
+			log.Printf("db says %d keys\n", numKeys)
 		} else { // no adrs yet, make it 0.  Then make an address.
-			fmt.Printf("NumKeys not in DB, must be new DB. 0 Keys\n")
+			log.Printf("NumKeys not in DB, must be new DB. 0 Keys\n")
 			numKeys = 0
 			b0 := lnutil.U32tB(numKeys)
 			err = sta.Put(KEYNumKeys, b0)
@@ -247,7 +248,7 @@ func (ts *TxStore) NewAdr160() ([]byte, error) {
 	if nAdr160 == nil {
 		return nil, fmt.Errorf("NewAdr error: got nil h160")
 	}
-	fmt.Printf("adr %d hash is %x\n", n, nAdr160)
+	log.Printf("adr %d hash is %x\n", n, nAdr160)
 
 	kgBytes := nKg.Bytes()
 
@@ -292,7 +293,7 @@ func (ts *TxStore) AddPorTxoAdr(kg portxo.KeyGen) error {
 		}
 
 		adr160 := ts.PathPubHash160(kg)
-		fmt.Printf("adding addr %x\n", adr160)
+		log.Printf("adding addr %x\n", adr160)
 		// add the 20-byte key-hash into the db
 		return adrb.Put(adr160, kg.Bytes())
 	})
@@ -324,14 +325,14 @@ func (ts *TxStore) RecoverAdrs() error {
 			if nAdr160 == nil {
 				return fmt.Errorf("NewAdr error: got nil h160")
 			}
-			fmt.Printf("recov adr %d hash is %x\n", ind, nAdr160)
+			log.Printf("recov adr %d hash is %x\n", ind, nAdr160)
 			nAdr160Store[ind] = nAdr160
 			kgBytes := nKg.Bytes()
 			kgBytesStore[ind] = kgBytes
 		}
 	}
 	if len(nAdr160Store) == len(kgBytesStore) {
-		fmt.Println("Recov adr stores populated!")
+		log.Println("Recov adr stores populated!")
 	}
 	// write to db file
 	err = ts.StateDB.Update(func(btx *bolt.Tx) error {
@@ -349,14 +350,14 @@ func (ts *TxStore) RecoverAdrs() error {
 				return err
 			}
 		}
-		fmt.Println("DB populated with recov adrs!")
+		log.Println("DB populated with recov adrs!")
 		/*
 			err := ts.SetDBSyncHeight(int32(0))
 			if err != nil {
 				return err
 			}
 		*/
-		fmt.Println("Reset DB height to trigger rescan!")
+		log.Println("Reset DB height to trigger rescan!")
 		return nil
 
 	})
@@ -634,7 +635,7 @@ func (ts *TxStore) GetPendingInv() (*wire.MsgInv, error) {
 // GainUtxo registers the utxo in the duffel bag
 // don't register address; they shouldn't be re-used ever anyway.
 func (ts *TxStore) GainUtxo(u portxo.PorTxo) error {
-	fmt.Printf("gaining exported utxo %s at height %d\n",
+	log.Printf("gaining exported utxo %s at height %d\n",
 		u.Op.String(), u.Height)
 	// serialize porTxo
 	utxoBytes, err := u.Bytes()
@@ -857,7 +858,7 @@ func (ts *TxStore) IngestMany(txs []*wire.MsgTx, height int32) (uint32, error) {
 					return err
 				}
 				// print lost portxo
-				fmt.Printf(lostTxo.String())
+				log.Printf(lostTxo.String())
 
 				// after marking for deletion, save stxo to old bucket
 				var st Stxo                               // generate spent txo
@@ -895,6 +896,6 @@ func (ts *TxStore) IngestMany(txs []*wire.MsgTx, height int32) (uint32, error) {
 		return nil
 	})
 
-	fmt.Printf("ingest %d txs, %d hits\n", len(txs), hits)
+	log.Printf("ingest %d txs, %d hits\n", len(txs), hits)
 	return hits, err
 }

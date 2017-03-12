@@ -123,7 +123,7 @@ func (t *TxStore) GimmeFilter() (*bloom.Filter, error) {
 	// send any to us, sometimes we don't see it and think the channel is still open.
 	// so not monitoring the channel outpoint properly?  here or in ingest()
 
-	fmt.Printf("made %d element filter\n", filterElements)
+	log.Printf("made %d element filter\n", filterElements)
 	return f, nil
 }
 
@@ -244,7 +244,7 @@ func StxoFromBytes(b []byte) (Stxo, error) {
 
 	u, err := portxo.PorTxoFromBytes(buf.Bytes())
 	if err != nil {
-		fmt.Printf(" eof? ")
+		log.Printf(" eof? ")
 		return s, err
 	}
 	s.PorTxo = *u // assign the utxo

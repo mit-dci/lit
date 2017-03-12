@@ -1,7 +1,7 @@
 package uspv
 
 import (
-	"fmt"
+	"log"
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcutil"
@@ -28,7 +28,7 @@ func (t *TxStore) PathPrivkey(kg portxo.KeyGen) *btcec.PrivateKey {
 	}
 	priv, err := kg.DerivePrivateKey(t.rootPrivKey)
 	if err != nil {
-		fmt.Printf("PathPrivkey err %s", err.Error())
+		log.Printf("PathPrivkey err %s", err.Error())
 		return nil
 	}
 	return priv
@@ -83,18 +83,18 @@ func GetWalletKeygen(idx uint32) portxo.KeyGen {
 // get a public key from the regular wallet
 func (t *TxStore) GetWalletAddress(idx uint32) *btcutil.AddressWitnessPubKeyHash {
 	if t == nil {
-		fmt.Printf("GetAddress %d nil txstore\n", idx)
+		log.Printf("GetAddress %d nil txstore\n", idx)
 		return nil
 	}
 	priv := t.GetWalletPrivkey(idx)
 	if priv == nil {
-		fmt.Printf("GetAddress %d made nil pub\n", idx)
+		log.Printf("GetAddress %d made nil pub\n", idx)
 		return nil
 	}
 	adr, err := btcutil.NewAddressWitnessPubKeyHash(
 		btcutil.Hash160(priv.PubKey().SerializeCompressed()), t.Param)
 	if err != nil {
-		fmt.Printf("GetAddress %d made nil pub\n", idx)
+		log.Printf("GetAddress %d made nil pub\n", idx)
 		return nil
 	}
 	return adr

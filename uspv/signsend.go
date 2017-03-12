@@ -55,7 +55,7 @@ func (s *SPVCon) MaybeSend(txos []*wire.TxOut) ([]*wire.OutPoint, error) {
 	// estimate needed fee with outputs, see if change should be truncated
 	fee := EstFee(utxos, txos, satPerByte)
 
-	fmt.Printf("MaybeSend has fee %d, %d inputs\n", fee, len(utxos))
+	log.Printf("MaybeSend has fee %d, %d inputs\n", fee, len(utxos))
 
 	// input sum is not enough, we need more inputs.
 	// keep doing this until fee is sufficient or PickUtxos errors out
@@ -115,7 +115,7 @@ func (s *SPVCon) MaybeSend(txos []*wire.TxOut) ([]*wire.OutPoint, error) {
 // Sign and broadcast a tx previously built with MaybeSend.  This clears the freeze
 // on the utxos but they're not utxos anymore anyway.
 func (s *SPVCon) ReallySend(txid *chainhash.Hash) error {
-	fmt.Printf("Reallysend %s\n", txid.String())
+	log.Printf("Reallysend %s\n", txid.String())
 	// start frozen set access
 	s.TS.FreezeMutex.Lock()
 	defer s.TS.FreezeMutex.Unlock()
@@ -126,7 +126,7 @@ func (s *SPVCon) ReallySend(txid *chainhash.Hash) error {
 	}
 	// delete inputs from frozen set (they're gone anyway, but just to clean it up)
 	for _, txin := range frozenTx.Ins {
-		fmt.Printf("\t remove %s from frozen outpoints\n", txin.Op.String())
+		log.Printf("\t remove %s from frozen outpoints\n", txin.Op.String())
 		delete(s.TS.FreezeSet, txin.Op)
 	}
 
@@ -143,7 +143,7 @@ func (s *SPVCon) ReallySend(txid *chainhash.Hash) error {
 // Cancel the hold on a tx previously built with MaybeSend.  Clears freeze on
 // utxos so they can be used somewhere else.
 func (s *SPVCon) NahDontSend(txid *chainhash.Hash) error {
-	fmt.Printf("Nahdontsend %s\n", txid.String())
+	log.Printf("Nahdontsend %s\n", txid.String())
 	// start frozen set access
 	s.TS.FreezeMutex.Lock()
 	defer s.TS.FreezeMutex.Unlock()
@@ -154,7 +154,7 @@ func (s *SPVCon) NahDontSend(txid *chainhash.Hash) error {
 	}
 	// go through all its inputs, and remove those outpoints from the frozen set
 	for _, txin := range frozenTx.Ins {
-		fmt.Printf("\t remove %s from frozen outpoints\n", txin.Op.String())
+		log.Printf("\t remove %s from frozen outpoints\n", txin.Op.String())
 		delete(s.TS.FreezeSet, txin.Op)
 	}
 	return nil
@@ -199,7 +199,7 @@ func (s *SPVCon) GrabAll() error {
 	nothin := true
 	for _, u := range utxos {
 		if u.Seq == 1 && u.Height > 0 { // grabbable
-			fmt.Printf("found %s to grab!\n", u.String())
+			log.Printf("found %s to grab!\n", u.String())
 			adr160, err := s.TS.NewAdr160()
 			if err != nil {
 				return err
@@ -218,7 +218,7 @@ func (s *SPVCon) GrabAll() error {
 		}
 	}
 	if nothin {
-		fmt.Printf("Nothing to grab\n")
+		log.Printf("Nothing to grab\n")
 	}
 	return nil
 }
@@ -569,7 +569,7 @@ func (ts *TxStore) BuildAndSign(
 	for i, _ := range tx.TxIn {
 		// get key
 		priv := ts.PathPrivkey(utxos[i].KeyGen)
-		fmt.Printf("signing with privkey pub %x\n", priv.PubKey().SerializeCompressed())
+		log.Printf("signing with privkey pub %x\n", priv.PubKey().SerializeCompressed())
 
 		if priv == nil {
 			return nil, fmt.Errorf("SendCoins: nil privkey")
@@ -623,7 +623,7 @@ func (ts *TxStore) BuildAndSign(
 		}
 	}
 
-	fmt.Printf("tx: %s", TxToString(tx))
+	log.Printf("tx: %s", TxToString(tx))
 	return tx, nil
 }
 
@@ -663,7 +663,7 @@ func (ts *TxStore) SendCoins(
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("Overshot by %d, can make change output\n", overshoot)
+	log.Printf("Overshot by %d, can make change output\n", overshoot)
 
 	// estimate fee with outputs, see if change should be truncated
 	fee := EstFee(utxos, txos, satPerByte)
@@ -706,6 +706,6 @@ func EstFee(txins []*portxo.PorTxo, txouts []*wire.TxOut, spB int64) int64 {
 	for _, txout := range txouts {
 		size += 8 + int64(len(txout.PkScript))
 	}
-	fmt.Printf("%d spB, est vsize %d, fee %d\n", spB, size, size*spB)
+	log.Printf("%d spB, est vsize %d, fee %d\n", spB, size, size*spB)
 	return size * spB
 }
