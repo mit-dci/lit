@@ -10,9 +10,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/chzyer/readline"
 	"github.com/fatih/color"
 	"github.com/mit-dci/lit/lnutil"
-	"github.com/chzyer/readline"
 )
 
 /*
@@ -51,6 +52,12 @@ type litAfClient struct {
 	litHomeDir string
 }
 
+type Command struct {
+	Format           string
+	Description      string
+	ShortDescription string
+}
+
 func setConfig(lc *litAfClient) {
 	hostptr := flag.String("node", "127.0.0.1", "host to connect to")
 	portptr := flag.Int("p", 9750, "port to connect to")
@@ -65,7 +72,6 @@ func setConfig(lc *litAfClient) {
 
 // for now just testing how to connect and get messages back and forth
 func main() {
-
 	lc := new(litAfClient)
 	setConfig(lc)
 
@@ -104,8 +110,8 @@ func main() {
 		}
 		rl.SaveHistory(msg)
 
-		cmdslice := strings.Fields(msg)          // chop input up on whitespace
-		fmt.Fprintf(color.Output,"entered command: %s\n", msg) // immediate feedback
+		cmdslice := strings.Fields(msg)                           // chop input up on whitespace
+		fmt.Fprintf(color.Output, "entered command: %s\n\n", msg) // immediate feedback
 		err = lc.Shellparse(cmdslice)
 		if err != nil { // only error should be user exit
 			log.Fatal(err)

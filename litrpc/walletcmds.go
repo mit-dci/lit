@@ -243,15 +243,15 @@ func (r *LitRPC) Fanout(args FanArgs, reply *TxidsReply) error {
 }
 
 // ------------------------- address
-type AdrArgs struct {
+type AddressArgs struct {
 	NumToMake uint32
 }
-type AdrReply struct {
+type AddressReply struct {
 	WitAddresses    []string
 	LegacyAddresses []string
 }
 
-func (r *LitRPC) Address(args *AdrArgs, reply *AdrReply) error {
+func (r *LitRPC) Address(args *AddressArgs, reply *AddressReply) error {
 
 	// If you tell it to make 0 new addresses, it sends a list of all the old ones
 	if args.NumToMake == 0 {
