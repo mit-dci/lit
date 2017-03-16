@@ -1,12 +1,15 @@
 package litrpc
 
 import (
+	"bytes"
 	"fmt"
+	"io/ioutil"
 	"log"
-	"net"
+	"net/http"
 	"net/rpc"
 	"net/rpc/jsonrpc"
-	"time"
+
+	"golang.org/x/net/websocket"
 
 	"github.com/mit-dci/lit/qln"
 )
@@ -16,47 +19,35 @@ Remote Procedure Calls
 RPCs are how people tell the lit node what to do.
 It ends up being the root of ~everything in the executable.
 
-
 */
 
 // A LitRPC is the user I/O interface; it owns and initialized a SPVCon and LitNode
 // and listens and responds on RPC
+
 type LitRPC struct {
 	Node      *qln.LitNode
 	OffButton chan bool
 }
 
-func RpcListen(node *qln.LitNode, port uint16) {
-	rpcl := new(LitRPC)
-	rpcl.Node = node
-	rpcl.OffButton = make(chan bool, 1)
-
-	server := rpc.NewServer()
-	server.Register(rpcl)
-	server.HandleHTTP(rpc.DefaultRPCPath, rpc.DefaultDebugPath)
-
-	portString := fmt.Sprintf(":%d", port)
-	listener, err := net.Listen("tcp", portString)
+func serveWS(ws *websocket.Conn) {
+	body, err := ioutil.ReadAll(ws.Request().Body)
 	if err != nil {
-		fmt.Printf(err.Error())
+		log.Printf("Error reading body: %v", err)
 		return
 	}
 
-	go func() {
-		for {
-			conn, err := listener.Accept()
-			if err != nil {
-				log.Printf("listener error: " + err.Error())
-			} else {
-				log.Printf("new connection from %s\n", conn.RemoteAddr().String())
-				go server.ServeCodec(jsonrpc.NewServerCodec(conn))
-			}
-		}
-	}()
+	log.Printf(string(body))
+	ws.Request().Body = ioutil.NopCloser(bytes.NewBuffer(body))
 
-	// ugly; add real synchronization here
-	<-rpcl.OffButton
-	fmt.Printf("Got stop request\n")
-	time.Sleep(time.Second)
-	return
+	jsonrpc.ServeConn(ws)
+}
+
+func RPCListen(rpcl *LitRPC, port uint16) {
+
+	rpc.Register(rpcl)
+
+	listenString := fmt.Sprintf("127.0.0.1:%d", port)
+
+	http.Handle("/ws", websocket.Handler(serveWS))
+	go http.ListenAndServe(listenString, nil)
 }

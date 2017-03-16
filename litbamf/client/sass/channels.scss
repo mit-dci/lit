@@ -1,0 +1,61 @@
+@import "./globals";
+
+#chanbox {
+  width: 90%;
+  height: 500px;
+  margin: auto;
+  border: 1px solid white;
+  display: flex;
+  flex-direction: row;
+
+  #peerList {
+    height: 100%;
+    width: 100px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    li {
+
+      margin: 20px 10px;
+    }
+  }
+
+  #channelList {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    flex: 1;
+
+    table {
+      width: 100%;
+
+      col:nth-child(1){width:150px;}
+      col:nth-child(2){width:150px;}
+      col:nth-child(3){width:75px;}
+      col:nth-child(3){flex: 1}
+      col:nth-child(3){flex: 1}
+
+       th, td {
+        padding: 10px 0;
+        text-align: center;
+
+        .chan-xtra {
+          button {
+            width: 20;
+            height: 20;
+          }
+        }
+      }
+    }
+  }
+}
+
+#chatbox {
+  width: 80%;
+  margin: auto;
+
+  .chan-capacity {
+    width: 100px;
+  }
+}
