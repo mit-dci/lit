@@ -8,46 +8,8 @@ import (
 	"net"
 	"os"
 
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 )
-
-// OpenSPV starts the SPV connector.  Doesn't actually dial out though.
-func OpenSPV(headerFileName, dbFileName string,
-	inTs *TxStore, hard bool, iron bool, p *chaincfg.Params) (SPVCon, error) {
-	// create new SPVCon
-	var s SPVCon
-	s.HardMode = hard
-	s.Ironman = iron
-	s.Param = p
-	// I should really merge SPVCon and TxStore, they're basically the same
-	inTs.Param = p
-	s.OKTxids = make(map[chainhash.Hash]int32)
-	s.TS = inTs // copy pointer of txstore into spvcon
-
-	// open header file
-	err := s.openHeaderFile(headerFileName)
-	if err != nil {
-		return s, err
-	}
-	// open db file
-	err = inTs.OpenDB(dbFileName)
-	if err != nil {
-		return s, err
-	}
-	// load known txids into ram
-	//	txids, err := inTs.GetAllTxids()
-	//	if err != nil {
-	//		return s, err
-	//	}
-	//	s.OKMutex.Lock()
-	//	for _, txid := range txids {
-	//		s.OKTxids[*txid] = 0
-	//	}
-	//	s.OKMutex.Unlock()
-	return s, nil
-}
 
 // Connect dials out and connects to full nodes.
 func (s *SPVCon) Connect(remoteNode string) error {
@@ -72,14 +34,16 @@ func (s *SPVCon) Connect(remoteNode string) error {
 	// set this to enable segWit
 	myMsgVer.AddService(wire.SFNodeWitness)
 	// this actually sends
-	n, err := wire.WriteMessageWithEncodingN(s.con, myMsgVer, s.localVersion, s.Param.Net, wire.LatestEncoding)
+	n, err := wire.WriteMessageWithEncodingN(
+		s.con, myMsgVer, s.localVersion, s.Param.Net, wire.LatestEncoding)
 	if err != nil {
 		return err
 	}
 	s.WBytes += uint64(n)
 	log.Printf("wrote %d byte version message to %s\n",
 		n, s.con.RemoteAddr().String())
-	n, m, b, err := wire.ReadMessageWithEncodingN(s.con, s.localVersion, s.Param.Net, wire.LatestEncoding)
+	n, m, b, err := wire.ReadMessageWithEncodingN(
+		s.con, s.localVersion, s.Param.Net, wire.LatestEncoding)
 	if err != nil {
 		return err
 	}
@@ -96,7 +60,8 @@ func (s *SPVCon) Connect(remoteNode string) error {
 	// set remote height
 	s.remoteHeight = mv.LastBlock
 	mva := wire.NewMsgVerAck()
-	n, err = wire.WriteMessageWithEncodingN(s.con, mva, s.localVersion, s.Param.Net, wire.LatestEncoding)
+	n, err = wire.WriteMessageWithEncodingN(
+		s.con, mva, s.localVersion, s.Param.Net, wire.LatestEncoding)
 	if err != nil {
 		return err
 	}
@@ -122,12 +87,15 @@ func (s *SPVCon) Connect(remoteNode string) error {
 	go s.fPositiveHandler()
 
 	if s.HardMode { // what about for non-hard?  send filter?
-		filt, err := s.TS.GimmeFilter()
-		if err != nil {
-			return err
-		}
-		s.localFilter = filt
-		//		s.Refilter(filt)
+		/*
+			Ignore filters now; switch to filters fed to SPVcon from TS
+				filt, err := s.TS.GimmeFilter()
+				if err != nil {
+					return err
+				}
+				s.localFilter = filt
+				//		s.Refilter(filt)
+		*/
 	}
 
 	return nil
@@ -147,8 +115,8 @@ func (s *SPVCon) openHeaderFile(hfn string) error {
 		if os.IsNotExist(err) {
 			var b bytes.Buffer
 			// if testnet, start with hardcoded height
-			if s.TS.Param.Name == "testnet3" {
-				// hard-coded millionth block header
+			if s.Param.Name == "testnet3" {
+				// hard-coded millionth block header (actually 1032192)
 				hdr, err := hex.DecodeString("00000020da33925b1f7a55e9fa8e6c955a20ea094148b60c5c88f69a4f500000000000003673b7b6ce8157d3cfcaf415b6740918df7610a8769d70334aa9abd9c941b25e7621215880ba371a85bf9646")
 				if err != nil {
 					return err
@@ -159,7 +127,7 @@ func (s *SPVCon) openHeaderFile(hfn string) error {
 				}
 			} else {
 				// not testnet3, start from beginning.
-				err = s.TS.Param.GenesisBlock.Header.Serialize(&b)
+				err = s.Param.GenesisBlock.Header.Serialize(&b)
 				if err != nil {
 					return err
 				}
@@ -169,11 +137,11 @@ func (s *SPVCon) openHeaderFile(hfn string) error {
 				return err
 			}
 			log.Printf("made genesis block %x\n", b.Bytes())
-			log.Printf("made genesis header %s\n", s.TS.Param.GenesisHash.String())
+			log.Printf("made genesis header %s\n", s.Param.GenesisHash.String())
 			log.Printf("created hardcoded genesis header at %s\n", hfn)
 		}
 	}
-	if s.TS.Param.Name == "testnet3" {
+	if s.Param.Name == "testnet3" {
 		s.headerStartHeight = 1032192
 	}
 

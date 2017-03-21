@@ -6,7 +6,6 @@ import (
 
 	"github.com/boltdb/bolt"
 	"github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	"github.com/mit-dci/lit/elkrem"
@@ -63,12 +62,14 @@ Later on we can chop it up so that each channel gets it's own db file.
 type LitNode struct {
 	LitDB *bolt.DB // place to write all this down
 
+	LitFolder string // path to save stuff
+
 	// all nodes have a watchtower.  but could have a tower without a node
 	Tower watchtower.WatchTower
 
 	// BaseWallet is the underlying wallet which keeps track of utxos, secrets,
 	// and network i/o
-	BaseWallet UWallet
+	SubWallet UWallet
 
 	RemoteCons map[uint32]*RemotePeer
 	RemoteMtx  sync.Mutex
@@ -84,11 +85,14 @@ type LitNode struct {
 	// (1 at a time for now)
 	InProg *InFlightFund
 
-	// Params live here... AND SCon
-	Param *chaincfg.Params // network parameters (testnet3, segnet, etc)
+	// Nodes don't have Params; their SubWallets do
+	// Param *chaincfg.Params // network parameters (testnet3, segnet, etc)
 
 	// queue for async messages to RPC user
 	UserMessageBox chan string
+
+	// The port(s) in which it listens for incoming connections
+	LisIpPorts []string
 }
 
 type RemotePeer struct {
@@ -545,7 +549,6 @@ func (nd *LitNode) GetAllQchans() ([]*Qchan, error) {
 			return nil
 
 		})
-		return nil
 	})
 	if err != nil {
 		return nil, err

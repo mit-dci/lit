@@ -228,6 +228,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	tReply := new(litrpc.TxoListReply)
 	bReply := new(litrpc.BalReply)
 	sReply := new(litrpc.SyncHeightReply)
+	lReply := new(litrpc.ListeningPortsReply)
 
 	err := lc.rpccon.Call("LitRPC.ListConnections", nil, pReply)
 	if err != nil {
@@ -277,6 +278,16 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		}
 		fmt.Fprintf(color.Output,"\n")
 	}
+
+	err = lc.rpccon.Call("LitRPC.GetListeningPorts", nil, lReply)
+	if err != nil {
+		return err
+	}
+	if len(lReply.LisIpPorts) > 0 {
+		fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Listening Ports:"))
+		fmt.Fprintf(color.Output,"Listening for connections on port(s) %v with key %s\n", lnutil.White(lReply.LisIpPorts), lReply.Adr)
+	}
+
 
 	err = lc.rpccon.Call("LitRPC.Address", nil, aReply)
 	if err != nil {

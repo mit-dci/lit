@@ -6,6 +6,7 @@ import (
 	"github.com/mit-dci/lit/lnutil"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/wire"
 )
 
 const minBal = 10000 // channels have to have 10K sat in them; can make variable later.
@@ -84,6 +85,49 @@ Receive Rev for previous state
 
 */
 
+// example message struct
+type SigRevMsg struct {
+	Op    wire.OutPoint
+	Delta int32
+	Sig   [64]byte
+}
+
+// example serialization method
+func (m *SigRevMsg) Bytes() []byte {
+	var b []byte
+
+	// DeltaSig is op (36), Delta (4),  sig (64)
+	// total length 104
+
+	opbytes := lnutil.OutPointToBytes(m.Op)
+	b = append(b, opbytes[:]...)
+	b = append(b, lnutil.I32tB(m.Delta)...)
+	b = append(b, m.Sig[:]...)
+
+	return b
+}
+
+// example deserialization method
+func SigRevFromBytes(b []byte) (*SigRevMsg, error) {
+	if len(b) != 104 {
+		return nil, fmt.Errorf("%d bytes, need 104", len(b))
+	}
+
+	m := new(SigRevMsg)
+
+	var opArr [36]byte
+	copy(opArr[:], b[:36])
+	op := lnutil.OutPointFromBytes(opArr)
+	m.Op = *op
+
+	m.Delta = lnutil.BtI32(b[36:40])
+
+	copy(m.Sig[:], b[40:])
+
+	return m, nil
+
+}
+
 // SendNextMsg determines what message needs to be sent next
 // based on the channel state.  It then calls the appropriate function.
 func (nd *LitNode) ReSendMsg(qc *Qchan) error {
@@ -106,7 +150,6 @@ func (nd *LitNode) ReSendMsg(qc *Qchan) error {
 
 // PushChannel initiates a state update by sending an DeltaSig
 func (nd LitNode) PushChannel(qc *Qchan, amt uint32) error {
-
 	// sanity checks
 	if amt >= 1<<30 {
 		return fmt.Errorf("max send 1G sat (1073741823)")
@@ -551,7 +594,7 @@ func (nd *LitNode) SigRevHandler(lm *lnutil.LitMsg, qc *Qchan) error {
 	}
 
 	if qc.State.Delta == 0 {
-		// re-sent last rev; they probably didn't get it
+		// re-send last rev; they probably didn't get it
 		return nd.SendREV(qc)
 	}
 
@@ -675,7 +718,7 @@ func (nd *LitNode) RevHandler(lm *lnutil.LitMsg, qc *Qchan) error {
 
 	// check if there's nothing for them to revoke
 	if qc.State.Delta == 0 {
-		return fmt.Errorf("got REV, expected deltaSig, ignoring.", revElk.String())
+		return fmt.Errorf("got REV, expected deltaSig, ignoring.")
 	}
 	// maybe this is an unexpected rev, asking us for a rev repeat
 	if qc.State.Delta < 0 {

@@ -5,11 +5,31 @@ import (
 	"log"
 
 	"github.com/btcsuite/btcd/btcec"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcutil"
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 )
+
+// Gets the list of ports where LitNode is listening for incoming connections,
+// & the connection key
+func (nd *LitNode) GetLisAddressAndPorts() (
+	*btcutil.AddressWitnessPubKeyHash, []string, error) {
+
+	idPriv := nd.IdKey()
+	myId := btcutil.Hash160(idPriv.PubKey().SerializeCompressed())
+	// litNode addresses transcend network parameters
+	lisAdr, err := btcutil.NewAddressWitnessPubKeyHash(myId,
+		&chaincfg.TestNet3Params)
+	if err != nil {
+		return nil, nil, err
+	}
+	nd.RemoteMtx.Lock()
+	ports := nd.LisIpPorts
+	nd.RemoteMtx.Unlock()
+	return lisAdr, ports, nil
+}
 
 // TCPListener starts a litNode listening for incoming LNDC connections
 func (nd *LitNode) TCPListener(
@@ -19,9 +39,13 @@ func (nd *LitNode) TCPListener(
 	if err != nil {
 		return nil, err
 	}
-
 	myId := btcutil.Hash160(idPriv.PubKey().SerializeCompressed())
-	lisAdr, err := btcutil.NewAddressWitnessPubKeyHash(myId, nd.Param)
+
+	// listening pubkey hash should be in a format independent of subwallets.
+	lisAdr, err := btcutil.NewAddressWitnessPubKeyHash(
+		myId, &chaincfg.TestNet3Params)
+	// Really we need to make LN-specific encodings here ^^
+
 	if err != nil {
 		return nil, err
 	}
@@ -62,6 +86,9 @@ func (nd *LitNode) TCPListener(
 			go nd.LNDCReader(&peer)
 		}
 	}()
+	nd.RemoteMtx.Lock()
+	nd.LisIpPorts = append(nd.LisIpPorts, lisIpPort)
+	nd.RemoteMtx.Unlock()
 	return lisAdr, nil
 }
 
@@ -137,7 +164,7 @@ type PeerInfo struct {
 
 func (nd *LitNode) GetConnectedPeerList() []PeerInfo {
 	nd.RemoteMtx.Lock()
-	nd.RemoteMtx.Unlock()
+	nd.RemoteMtx.Unlock() //TODO: This unlock is in the wrong place...?
 	var peers []PeerInfo
 	for k, v := range nd.RemoteCons {
 		var newPeer PeerInfo
@@ -165,7 +192,7 @@ func (nd *LitNode) IdKey() *btcec.PrivateKey {
 	kg.Step[2] = 9 | 1<<31
 	kg.Step[3] = 0 | 1<<31
 	kg.Step[4] = 0 | 1<<31
-	return nd.BaseWallet.GetPriv(kg)
+	return nd.SubWallet.GetPriv(kg)
 }
 
 // SendChat sends a text string to a peer

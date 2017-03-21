@@ -46,6 +46,7 @@ const (
 	MSGID_SELFPUSH = 0x80
 )
 
+<<<<<<< HEAD
 type DeltaSigMsg struct {
 	PeerIdx   uint32
 	Outpoint  wire.OutPoint
@@ -171,3 +172,15 @@ func (self *RevMsg) Peer() uint32    { return self.PeerIdx }
 func (self *RevMsg) MsgType() uint32 { return MSGID_REV }
 
 //----------
+=======
+type RevMsg struct {
+	outpoit wire.OutPoint
+	revelk  chainhash.Hash // 32 bytes
+	nextpoint [33]byte
+
+}
+
+//	msg = append(msg, opArr[:]...)
+//	msg = append(msg, elk[:]...)
+//	msg = append(msg, n2ElkPoint[:]...)
+>>>>>>> bd46fec7fac60389da8733669544ad4b9e3e4cdc

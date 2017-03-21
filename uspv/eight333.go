@@ -3,14 +3,12 @@ package uspv
 import (
 	"fmt"
 	"log"
-	"net"
 	"os"
-	"sync"
 
-	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil/bloom"
+	"github.com/mit-dci/lit/lnutil"
 )
 
 const (
@@ -23,51 +21,95 @@ const (
 	VERSION = 70012
 )
 
-type SPVCon struct {
-	con net.Conn // the (probably tcp) connection to the node
+// GimmeFilter ... or I'm gonna fade away
+func (s *SPVCon) GimmeFilter() (*bloom.Filter, error) {
 
-	// Enhanced SPV modes for users who have outgrown easy mode SPV
-	// but have not yet graduated to full nodes.
-	HardMode bool // hard mode doesn't use filters.
-	Ironman  bool // ironman only gets blocks, never requests txs.
+	filterElements := uint32(len(s.TrackingAdrs) + (len(s.TrackingOPs)))
 
-	headerMutex       sync.Mutex
-	headerFile        *os.File // file for SPV headers
-	headerStartHeight int32    // first header on disk is nth header in chain
+	f := bloom.NewFilter(filterElements, 0, 0.000001, wire.BloomUpdateAll)
 
-	OKTxids map[chainhash.Hash]int32 // known good txids and their heights
-	OKMutex sync.Mutex
+	// note there could be false positives since we're just looking
+	// for the 20 byte PKH without the opcodes.
+	for a160, _ := range s.TrackingAdrs { // add 20-byte pubkeyhash
+		//		fmt.Printf("adding address hash %x\n", a160)
+		f.Add(a160[:])
+	}
+	//	for _, u := range allUtxos {
+	//		f.AddOutPoint(&u.Op)
+	//	}
 
-	localFilter *bloom.Filter // local bloom filter for hard mode
+	// actually... we should monitor addresses, not txids, right?
+	// or no...?
+	for wop, _ := range s.TrackingOPs {
+		// try just outpoints, not the txids as well
+		f.AddOutPoint(&wop)
+	}
+	// still some problem with filter?  When they broadcast a close which doesn't
+	// send any to us, sometimes we don't see it and think the channel is still open.
+	// so not monitoring the channel outpoint properly?  here or in ingest()
 
-	//[doesn't work without fancy mutexes, nevermind, just use header file]
-	// localHeight   int32  // block height we're on
-	remoteHeight  int32  // block height they're on
-	localVersion  uint32 // version we report
-	remoteVersion uint32 // version remote node
+	fmt.Printf("made %d element filter\n", filterElements)
+	return f, nil
+}
 
-	// what's the point of the input queue? remove? leave for now...
-	inMsgQueue  chan wire.Message // Messages coming in from remote node
-	outMsgQueue chan wire.Message // Messages going out to remote node
+// MatchTx queries whether a tx mathches registered addresses and outpoints.
+func (s *SPVCon) MatchTx(tx *wire.MsgTx) bool {
+	gain := false
+	txid := tx.TxHash()
+	// start with optimism.  We may gain money.  Iterate through all output scripts.
+	for i, out := range tx.TxOut {
+		// create outpoint of what we're looking at
+		op := wire.NewOutPoint(&txid, uint32(i))
 
-	WBytes uint64 // total bytes written
-	RBytes uint64 // total bytes read
+		// 20 byte pubkey hash of this txout (if any)
+		var adr20 [20]byte
+		copy(adr20[:], lnutil.KeyHashFromPkScript(out.PkScript))
+		// when we gain utxo, set as gain so we can return a match, but
+		// also go through all gained utxos and register to track them
 
-	Param *chaincfg.Params // network parameters (testnet3, segnet, etc)
-	TS    *TxStore         // transaction store to write to
+		//		fmt.Printf("got output key %x ", adr20)
+		if s.TrackingAdrs[adr20] {
+			gain = true
+			s.TrackingOPs[*op] = true
+		} else {
+			//			fmt.Printf(" no match\n")
+		}
 
-	// RawBlockSender is a channel to send full blocks up to the qln / watchtower
-	// only kicks in when requested from upper layer
-	RawBlockSender chan *wire.MsgBlock
+		// this outpoint may confirm an outpoint we're watching.  Check that here.
+		if s.TrackingOPs[*op] {
+			// not quite "gain", more like confirm, but same idea.
+			gain = true
+		}
 
-	// mBlockQueue is for keeping track of what height we've requested.
-	blockQueue chan HashAndHeight
-	// fPositives is a channel to keep track of bloom filter false positives.
-	fPositives chan int32
+	}
 
-	// waitState is a channel that is empty while in the header and block
-	// sync modes, but when in the idle state has a "true" in it.
-	inWaitState chan bool
+	// No need to check for loss if we have a gain
+	if gain {
+		return true
+	}
+
+	// next pessimism.  Iterate through inputs, matching tracked outpoints
+	for _, in := range tx.TxIn {
+		if s.TrackingOPs[in.PreviousOutPoint] {
+			return true
+		}
+	}
+
+	return false
+}
+
+// OKTxid assigns a height to a txid.  This means that
+// the txid exists at that height, with whatever assurance (for height 0
+// it's no assurance at all)
+func (s *SPVCon) OKTxid(txid *chainhash.Hash, height int32) error {
+	if txid == nil {
+		return fmt.Errorf("tried to add nil txid")
+	}
+	log.Printf("added %s to OKTxids at height %d\n", txid.String(), height)
+	s.OKMutex.Lock()
+	s.OKTxids[*txid] = height
+	s.OKMutex.Unlock()
+	return nil
 }
 
 // AskForTx requests a tx we heard about from an inv message.
@@ -150,14 +192,9 @@ func (s *SPVCon) IngestMerkleBlock(m *wire.MsgMerkleBlock) {
 			return
 		}
 	}
-	// write to db that we've sync'd to the height indicated in the
-	// merkle block.  This isn't QUITE true since we haven't actually gotten
-	// the txs yet but if there are problems with the txs we should backtrack.
-	err = s.TS.SetDBSyncHeight(hah.height)
-	if err != nil {
-		log.Printf("Merkle block error: %s\n", err.Error())
-		return
-	}
+	// actually we should do this AFTER sending all the txs...
+	s.CurrentHeightChan <- hah.height
+
 	if hah.final {
 		// don't set waitstate; instead, ask for headers again!
 		// this way the only thing that triggers waitstate is asking for headers,
@@ -305,52 +342,10 @@ func (s *SPVCon) AskForHeaders() error {
 	return nil
 }
 
-// Ask for their mempool.  2 line func. 1 of which is "return"
-func (s *SPVCon) AskForMempool() {
-	s.outMsgQueue <- wire.NewMsgMemPool()
-	return
-}
-
-// AskForOneBlock is for testing only, so you can ask for a specific block height
-// and see what goes wrong
-/* not used
-func (s *SPVCon) AskForOneBlock(h int32) error {
-	var hdr wire.BlockHeader
-	var err error
-
-	dbTip := int32(h)
-	s.headerMutex.Lock() // seek to header we need
-	_, err = s.headerFile.Seek(int64((dbTip)*80), os.SEEK_SET)
-	if err != nil {
-		return err
-	}
-	err = hdr.Deserialize(s.headerFile) // read header, done w/ file for now
-	s.headerMutex.Unlock()              // unlock after reading 1 header
-	if err != nil {
-		log.Printf("header deserialize error!\n")
-		return err
-	}
-
-	bHash := hdr.BlockSha()
-	// create inventory we're asking for
-	iv1 := wire.NewInvVect(wire.InvTypeWitnessBlock, &bHash)
-	gdataMsg := wire.NewMsgGetData()
-	// add inventory
-	err = gdataMsg.AddInvVect(iv1)
-	if err != nil {
-		return err
-	}
-	hah := NewRootAndHeight(bHash, h)
-	s.outMsgQueue <- gdataMsg
-	s.blockQueue <- hah // push height and mroot of requested block on queue
-	return nil
-}
-*/
-
 // AskForMerkBlocks requests blocks from current to last
 // right now this asks for 1 block per getData message.
 // Maybe it's faster to ask for many in a each message?
-func (s *SPVCon) AskForBlocks(dbTip int32) error {
+func (s *SPVCon) AskForBlocks() error {
 	var hdr wire.BlockHeader
 
 	s.headerMutex.Lock() // lock just to check filesize
@@ -361,22 +356,24 @@ func (s *SPVCon) AskForBlocks(dbTip int32) error {
 	// move back 1 header length to read
 	headerTip := int32(endPos/80) + (s.headerStartHeight - 1)
 
-	fmt.Printf("dbTip %d headerTip %d\n", dbTip, headerTip)
-	if dbTip > headerTip {
+	fmt.Printf("blockTip to %d headerTip %d\n", s.syncHeight, headerTip)
+	if s.syncHeight > headerTip {
 		return fmt.Errorf("error- db longer than headers! shouldn't happen.")
 	}
-	if dbTip == headerTip {
+	if s.syncHeight == headerTip {
 		// nothing to ask for; set wait state and return
 		fmt.Printf("no blocks to request, entering wait state\n")
 		fmt.Printf("%d bytes received\n", s.RBytes)
 		s.inWaitState <- true
+
 		// check if we can grab outputs
-		err = s.GrabAll()
-		if err != nil {
-			return err
-		}
+		// Do this on wallit level instead
+		//		err = s.GrabAll()
+		//		if err != nil {
+		//			return err
+		//		}
 		// also advertise any unconfirmed txs here
-		s.Rebroadcast()
+		//		s.Rebroadcast()
 		// ask for mempool each time...?  put something in to only ask the
 		// first time we sync...?
 		//		if !s.Ironman {
@@ -385,15 +382,17 @@ func (s *SPVCon) AskForBlocks(dbTip int32) error {
 		return nil
 	}
 
-	fmt.Printf("will request blocks %d to %d\n", dbTip+1, headerTip)
+	fmt.Printf("will request blocks %d to %d\n", s.syncHeight+1, headerTip)
+	reqHeight := s.syncHeight
 
 	// loop through all heights where we want merkleblocks.
-	for dbTip < headerTip {
-		dbTip++ // we're requesting the next header
+	for reqHeight < headerTip {
+		reqHeight++ // we're requesting the next header
 
 		// load header from file
 		s.headerMutex.Lock() // seek to header we need
-		_, err = s.headerFile.Seek(int64((dbTip-s.headerStartHeight)*80), os.SEEK_SET)
+		_, err = s.headerFile.Seek(
+			int64((reqHeight-s.headerStartHeight)*80), os.SEEK_SET)
 		if err != nil {
 			return err
 		}
@@ -421,8 +420,8 @@ func (s *SPVCon) AskForBlocks(dbTip int32) error {
 			return err
 		}
 
-		hah := NewRootAndHeight(hdr.BlockHash(), dbTip)
-		if dbTip == headerTip { // if this is the last block, indicate finality
+		hah := NewRootAndHeight(hdr.BlockHash(), reqHeight)
+		if reqHeight == headerTip { // if this is the last block, indicate finality
 			hah.final = true
 		}
 		// waits here most of the time for the queue to empty out

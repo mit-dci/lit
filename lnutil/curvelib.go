@@ -155,7 +155,6 @@ func (p CombinablePubKeySlice) Combine() *btcec.PublicKey {
 			q.X, q.Y = btcec.S256().Add(q.X, q.Y, k.X, k.Y)
 		}
 	}
-
 	return q
 }
 

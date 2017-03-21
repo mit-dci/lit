@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/mit-dci/lit/qln"
-	"github.com/mit-dci/lit/uspv"
 )
 
 /*
@@ -23,14 +22,12 @@ It ends up being the root of ~everything in the executable.
 // A LitRPC is the user I/O interface; it owns and initialized a SPVCon and LitNode
 // and listens and responds on RPC
 type LitRPC struct {
-	SCon      *uspv.SPVCon
 	Node      *qln.LitNode
 	OffButton chan bool
 }
 
-func RpcListen(scon *uspv.SPVCon, node *qln.LitNode, port uint16) {
+func RpcListen(node *qln.LitNode, port uint16) {
 	rpcl := new(LitRPC)
-	rpcl.SCon = scon
 	rpcl.Node = node
 	rpcl.OffButton = make(chan bool, 1)
 

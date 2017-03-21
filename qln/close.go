@@ -9,7 +9,6 @@ import (
 	"github.com/btcsuite/fastsha256"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
-	"github.com/mit-dci/lit/uspv"
 )
 
 /* CloseChannel --- cooperative close
@@ -118,9 +117,9 @@ func (nd *LitNode) CloseReqHandler(lm *lnutil.LitMsg) {
 	} else {
 		tx.TxIn[0].Witness = SpendMultiSigWitStack(pre, mySig, theirSig)
 	}
-	fmt.Printf(uspv.TxToString(tx))
+	fmt.Printf(lnutil.TxToString(tx))
 	// broadcast
-	err = nd.BaseWallet.PushTx(tx)
+	err = nd.SubWallet.PushTx(tx)
 	if err != nil {
 		fmt.Printf("CloseReqHandler NewOutgoingTx err %s", err.Error())
 		return
