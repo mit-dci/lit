@@ -1,10 +1,15 @@
 package lnutil
 
+import (
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/wire"
+)
+
 // all the messages to and from peers look like this internally
 type Msg interface {
 	setData(...[]byte)
 }
-type LitMsg struct { // RETRACTED -> remove then fix errors caused
+type LitMsg struct { // RETRACTED
 	PeerIdx uint32
 	ChanIdx uint32 // optional, may be 0
 	MsgType uint8
@@ -12,7 +17,7 @@ type LitMsg struct { // RETRACTED -> remove then fix errors caused
 }
 
 type NewLitMsg interface {
-	PeerIdx() uint32
+	Peer() uint32
 	//ChanIdx() uint32 // optional, may be 0
 	MsgType() uint8
 	Bytes() []byte
@@ -42,143 +47,127 @@ const (
 )
 
 type DeltaSigMsg struct {
-	peerIdx   uint32
-	outpoint  [36]byte
-	delta     [4]byte
-	signature [64]byte
+	PeerIdx   uint32
+	Outpoint  wire.OutPoint
+	Delta     int32
+	Signature [64]byte
 }
 
-func NewDeltaSigMsg(peerid uint32, OP []byte, DELTA []byte, SIG []byte) (*DeltaSigMsg, error) {
+func NewDeltaSigMsg(peerid uint32, OP wire.OutPoint, DELTA int32, SIG [64]byte) *DeltaSigMsg {
 	d := new(DeltaSigMsg)
-	d.peerIdx = peerid
-	err := d.setData(OP, DELTA, SIG)
-	return d, err
-}
-func (self *DeltaSigMsg) setData(OP []byte, DELTA []byte, SIG []byte) error {
-	copy(self.outpoint[:], OP[:])
-	copy(self.delta[:], DELTA[:])
-	copy(self.signature[:], SIG[:])
-	return nil
+	d.PeerIdx = peerid
+	d.Outpoint = OP
+	d.Delta = DELTA
+	d.Signature = SIG
+	return d
 }
 
 func (self *DeltaSigMsg) Bytes() []byte {
 	var msg []byte
-	msg = append(msg, self.outpoint[:]...)
-	msg = append(msg, self.delta[:]...)
-	msg = append(msg, self.signature[:]...)
+	opArr := OutPointToBytes(self.Outpoint)
+	msg = append(msg, opArr[:]...)
+	msg = append(msg, I32tB(self.Delta)...)
+	msg = append(msg, self.Signature[:]...)
 	return msg
 }
 
-func (self *DeltaSigMsg) PeerIdx() uint32 { return self.peerIdx }
+func (self *DeltaSigMsg) Peer() uint32    { return self.PeerIdx }
 func (self *DeltaSigMsg) MsgType() uint32 { return MSGID_DELTASIG }
 
 //----------
 
 type SigRevMsg struct {
-	peerIdx    uint32
-	outpoint   [36]byte
-	signature  [64]byte
-	elk        [32]byte
-	n2ElkPoint [33]byte
+	PeerIdx    uint32
+	Outpoint   wire.OutPoint
+	Signature  [64]byte
+	Elk        chainhash.Hash
+	N2ElkPoint [33]byte
 }
 
-func NewSigRev(peerid uint32, OP [36]byte, SIG [64]byte, ELK []byte, N2ELK [33]byte) (*SigRevMsg, error) {
+func NewSigRev(peerid uint32, OP wire.OutPoint, SIG [64]byte, ELK chainhash.Hash, N2ELK [33]byte) *SigRevMsg {
 	s := new(SigRevMsg)
-	s.peerIdx = peerid
-	err := s.setData(OP, SIG, ELK, N2ELK)
-	return s, err
-}
-
-func (self *SigRevMsg) setData(OP [36]byte, SIG [64]byte, ELK []byte, N2ELK [33]byte) error {
-	copy(self.outpoint[:], OP[:])
-	copy(self.signature[:], SIG[:])
-	copy(self.elk[:], ELK[:])
-	copy(self.n2ElkPoint[:], N2ELK[:])
-	// add some way of checking lengths
-	return nil
+	s.PeerIdx = peerid
+	s.Outpoint = OP
+	s.Signature = SIG
+	s.Elk = ELK
+	s.N2ElkPoint = N2ELK
+	return s
 }
 
 func (self *SigRevMsg) Bytes() []byte {
 	var msg []byte
-	msg = append(msg, self.outpoint[:]...)
-	msg = append(msg, self.signature[:]...)
-	msg = append(msg, self.elk[:]...)
-	msg = append(msg, self.n2ElkPoint[:]...)
+	opArr := OutPointToBytes(self.Outpoint)
+	msg = append(msg, opArr[:]...)
+	msg = append(msg, self.Signature[:]...)
+	msg = append(msg, self.Elk[:]...)
+	msg = append(msg, self.N2ElkPoint[:]...)
 	return msg
 }
 
-func (self *SigRevMsg) PeerIdx() uint32 { return self.peerIdx }
+func (self *SigRevMsg) Peer() uint32    { return self.PeerIdx }
 func (self *SigRevMsg) MsgType() uint32 { return MSGID_SIGREV }
 
 //----------
 
 type GapSigRevMsg struct {
-	peerIdx    uint32
-	outpoint   [36]byte
-	signature  [64]byte
-	elk        [32]byte
-	n2ElkPoint [33]byte
+	PeerIdx    uint32
+	Outpoint   wire.OutPoint
+	Signature  [64]byte
+	Elk        chainhash.Hash
+	N2ElkPoint [33]byte
 }
 
-func NewGapSigRev(peerid uint32, OP [36]byte, SIG [64]byte, ELK []byte, N2ELK [33]byte) (*GapSigRevMsg, error) {
+func NewGapSigRev(peerid uint32, OP wire.OutPoint, SIG [64]byte, ELK chainhash.Hash, N2ELK [33]byte) *GapSigRevMsg {
 	g := new(GapSigRevMsg)
-	g.peerIdx = peerid
-	err := g.setData(OP, SIG, ELK, N2ELK)
-	return g, err
-}
-
-func (self *GapSigRevMsg) setData(OP [36]byte, SIG [64]byte, ELK []byte, N2ELK [33]byte) error {
-	copy(self.outpoint[:], OP[:])
-	copy(self.signature[:], SIG[:])
-	copy(self.elk[:], ELK[:])
-	copy(self.n2ElkPoint[:], N2ELK[:])
-	// add some way of checking lengths
-	return nil
+	g.PeerIdx = peerid
+	g.Outpoint = OP
+	g.Signature = SIG
+	g.Elk = ELK
+	g.N2ElkPoint = N2ELK
+	return g
 }
 
 func (self *GapSigRevMsg) Bytes() []byte {
 	var msg []byte
-	msg = append(msg, self.outpoint[:]...)
-	msg = append(msg, self.signature[:]...)
-	msg = append(msg, self.elk[:]...)
-	msg = append(msg, self.n2ElkPoint[:]...)
+	opArr := OutPointToBytes(self.Outpoint)
+	msg = append(msg, opArr[:]...)
+	msg = append(msg, self.Signature[:]...)
+	msg = append(msg, self.Elk[:]...)
+	msg = append(msg, self.N2ElkPoint[:]...)
 	return msg
 }
 
-func (self *GapSigRevMsg) PeerIdx() uint32 { return self.peerIdx }
+func (self *GapSigRevMsg) Peer() uint32    { return self.PeerIdx }
 func (self *GapSigRevMsg) MsgType() uint32 { return MSGID_GAPSIGREV }
 
 //----------
 
 type RevMsg struct {
-	peerIdx    uint32
-	outpoint   [36]byte
-	elk        [32]byte
-	n2ElkPoint [33]byte
+	PeerIdx    uint32
+	Outpoint   wire.OutPoint
+	Elk        chainhash.Hash
+	N2ElkPoint [33]byte
 }
 
-func NewRevMsg(peerid uint32, OP [36]byte, ELK []byte, N2ELK [33]byte) (*RevMsg, error) {
+func NewRevMsg(peerid uint32, OP wire.OutPoint, ELK chainhash.Hash, N2ELK [33]byte) *RevMsg {
 	r := new(RevMsg)
-	r.peerIdx = peerid
-	err := r.setData(OP, ELK, N2ELK)
-	return r, err
-}
-
-func (self *RevMsg) setData(OP [36]byte, ELK []byte, N2ELK [33]byte) error {
-	copy(self.outpoint[:], OP[:])
-	copy(self.elk[:], ELK[:])
-	copy(self.n2ElkPoint[:], N2ELK[:])
-	return nil
+	r.PeerIdx = peerid
+	r.Outpoint = OP
+	r.Elk = ELK
+	r.N2ElkPoint = N2ELK
+	return r
 }
 
 func (self *RevMsg) Bytes() []byte {
 	var msg []byte
-	msg = append(msg, self.outpoint[:]...)
-	msg = append(msg, self.elk[:]...)
-	msg = append(msg, self.n2ElkPoint[:]...)
+	opArr := OutPointToBytes(self.Outpoint)
+	msg = append(msg, opArr[:]...)
+	msg = append(msg, self.Elk[:]...)
+	msg = append(msg, self.N2ElkPoint[:]...)
 	return msg
 }
 
-func (self *RevMsg) PeerIdx() uint32 { return self.peerIdx }
-func (self *RevMsg) MsgType() uint32 { return MSGID_REV } // maybe switch to use strings instead, probably better
+func (self *RevMsg) Peer() uint32    { return self.PeerIdx }
+func (self *RevMsg) MsgType() uint32 { return MSGID_REV }
+
 //----------

@@ -188,7 +188,7 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 	if err != nil {
 		return err
 	}
-
+	/* RETRACTED
 	opArr := lnutil.OutPointToBytes(q.Op)
 
 	var msg []byte
@@ -203,9 +203,10 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 	outMsg.MsgType = lnutil.MSGID_DELTASIG
 	outMsg.PeerIdx = q.Peer()
 	outMsg.Data = msg
-
-	//outMsg, err := NewDeltaSigMsg(q.Peer(), opArr[], lnutil.I32tB(-q.State.Delta), sig[])
-
+	*/
+	outMsg := new(lnutil.LitMsg)
+	outMsg2 := lnutil.NewDeltaSigMsg(q.Peer(), q.Op, q.State.Delta, sig)
+	outMsg2.Bytes()
 	nd.OmniOut <- outMsg
 
 	return nil
@@ -216,7 +217,7 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 // Leaves the channel either expecting a Rev (normally) or a GapSigRev (collision)
 func (nd *LitNode) DeltaSigHandler(lm *lnutil.LitMsg, qc *Qchan) error {
 
-	if len(lm.Data) < 104 || len(lm.Data) > 104 {
+	if len(lm.Data) != 104 {
 		return fmt.Errorf("got %d byte DeltaSig, expect 104", len(lm.Data))
 	}
 
@@ -363,6 +364,8 @@ func (nd *LitNode) SendGapSigRev(q *Qchan) error {
 	// send
 	// GapSigRev is op (36), sig (64), ElkHash (32), NextElkPoint (33)
 	// total length 165
+
+	/* RETRACTED
 	opArr := lnutil.OutPointToBytes(q.Op)
 
 	var msg []byte
@@ -378,10 +381,12 @@ func (nd *LitNode) SendGapSigRev(q *Qchan) error {
 	outMsg.MsgType = lnutil.MSGID_GAPSIGREV
 	outMsg.PeerIdx = q.KeyGen.Step[3] & 0x7fffffff
 	outMsg.Data = msg
-
-	//outM, err := lnutil.NewGapSigRev(q.KeyGen.Step[3]&0x7fffffff, opArr, sig, elk[:], n2ElkPoint)
+	*/
+	outMsg := new(lnutil.LitMsg)
+	outMsg2 := lnutil.NewGapSigRev(q.KeyGen.Step[3]&0x7fffffff, q.Op, sig, *elk, n2ElkPoint)
 
 	nd.OmniOut <- outMsg
+	outMsg2.Bytes()
 
 	return nil
 }
@@ -413,6 +418,7 @@ func (nd *LitNode) SendSigRev(q *Qchan) error {
 		return err
 	}
 
+	/* RETRACTED
 	opArr := lnutil.OutPointToBytes(q.Op)
 
 	var msg []byte
@@ -428,11 +434,12 @@ func (nd *LitNode) SendSigRev(q *Qchan) error {
 	outMsg.MsgType = lnutil.MSGID_SIGREV
 	outMsg.PeerIdx = q.KeyGen.Step[3] & 0x7fffffff
 	outMsg.Data = msg
-
-	//outMsg, err := lnutil.NewSigRev(q.KeyGen.Step[3]&0x7fffffff, opArr, sig, elk[:], n2ElkPoint)
+	*/
+	outMsg := new(lnutil.LitMsg)
+	outMsg2 := lnutil.NewSigRev(q.KeyGen.Step[3]&0x7fffffff, q.Op, sig, *elk, n2ElkPoint)
 
 	nd.OmniOut <- outMsg
-
+	outMsg2.Bytes()
 	return nil
 }
 
@@ -622,6 +629,7 @@ func (nd *LitNode) SendREV(q *Qchan) error {
 		return err
 	}
 
+	/* RETRACTED
 	opArr := lnutil.OutPointToBytes(q.Op)
 
 	var msg []byte
@@ -635,10 +643,13 @@ func (nd *LitNode) SendREV(q *Qchan) error {
 	outMsg.MsgType = lnutil.MSGID_REV
 	outMsg.PeerIdx = q.Peer()
 	outMsg.Data = msg
+	*/
 
-	//outMsg, err := lnutil.NewRevMsg(q.Peer(), opArr, elk[:], n2ElkPoint)
+	outMsg := new(lnutil.LitMsg)
+	outMsg2 := lnutil.NewRevMsg(q.Peer(), q.Op, *elk, n2ElkPoint)
 
 	nd.OmniOut <- outMsg
+	outMsg2.Bytes()
 
 	return err
 }
