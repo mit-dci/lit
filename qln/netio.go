@@ -201,11 +201,17 @@ func (nd *LitNode) SendChat(peer uint32, chat string) error {
 		return fmt.Errorf("Not connected to peer %d", peer)
 	}
 
+	/* RETRACTED
 	outMsg := new(lnutil.LitMsg)
 	outMsg.MsgType = lnutil.MSGID_TEXTCHAT
 	outMsg.PeerIdx = peer
 	outMsg.Data = []byte(chat)
+	*/
+	outMsg := new(lnutil.LitMsg)
+	outMsg2 := lnutil.NewChatMsg(peer, chat)
+
 	nd.OmniOut <- outMsg
+	outMsg2.Bytes()
 
 	return nil
 }

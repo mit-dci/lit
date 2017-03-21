@@ -132,12 +132,17 @@ func (nd *LitNode) FundChannel(peerIdx uint32, ccap, initSend int64) (uint32, er
 	nd.InProg.InitSend = initSend
 	nd.InProg.mtx.Unlock()
 
+	/* RETRACTED
 	outMsg := new(lnutil.LitMsg)
 	outMsg.MsgType = lnutil.MSGID_POINTREQ
 	outMsg.PeerIdx = peerIdx
-	// no message body / data
-	nd.OmniOut <- outMsg
+	*/
 
+	outMsg := new(lnutil.LitMsg)
+	outMsg2 := lnutil.NewPointReqMsg(peerIdx) // no message body / data
+
+	nd.OmniOut <- outMsg
+	outMsg2.Bytes()
 	// wait until it's done!
 	idx := <-nd.InProg.done
 	return idx, nil
@@ -178,6 +183,7 @@ func (nd *LitNode) PointReqHandler(lm *lnutil.LitMsg) {
 	myHAKDbase := nd.GetUsePub(kg, UseChannelHAKDBase)
 	fmt.Printf("Generated channel pubkey %x\n", myChanPub)
 
+	/* RETRACTED
 	var msg []byte
 	msg = append(msg, myChanPub[:]...)
 	msg = append(msg, myRefundPub[:]...)
@@ -187,7 +193,11 @@ func (nd *LitNode) PointReqHandler(lm *lnutil.LitMsg) {
 	outMsg.MsgType = lnutil.MSGID_POINTRESP
 	outMsg.PeerIdx = lm.PeerIdx
 	outMsg.Data = msg
+	*/
+	outMsg := new(lnutil.LitMsg)
+	outMsg2 := lnutil.NewPointRespMsg(lm.PeerIdx, myChanPub, myRefundPub, myHAKDbase)
 	nd.OmniOut <- outMsg
+	outMsg2.Bytes()
 
 	return
 }
@@ -564,6 +574,8 @@ func (nd *LitNode) QChanAckHandler(lm *lnutil.LitMsg, peer *RemotePeer) {
 	// sig proof should be sent later once there are confirmations.
 	// it'll have an spv proof of the fund tx.
 	// but for now just send the sig.
+
+	/* RETRACTED
 	var msg []byte
 	msg = append(msg, opArr[:]...)
 	msg = append(msg, sig[:]...)
@@ -572,7 +584,14 @@ func (nd *LitNode) QChanAckHandler(lm *lnutil.LitMsg, peer *RemotePeer) {
 	outMsg.MsgType = lnutil.MSGID_SIGPROOF
 	outMsg.PeerIdx = lm.PeerIdx
 	outMsg.Data = msg
+	*/
+
+	outMsg := new(lnutil.LitMsg)
+	//op = wire.NewOutpoint(hash, uint32) -> to use outpoint instead of opArray
+	outMsg2 = lnutil.NewSigProofMsg(lm.Peer(), lm.Outpoint, lm.Signature)
+
 	nd.OmniOut <- outMsg
+	outMsg2.Bytes()
 
 	return
 }

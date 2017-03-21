@@ -46,7 +46,6 @@ const (
 	MSGID_SELFPUSH = 0x80
 )
 
-<<<<<<< HEAD
 type DeltaSigMsg struct {
 	PeerIdx   uint32
 	Outpoint  wire.OutPoint
@@ -172,15 +171,150 @@ func (self *RevMsg) Peer() uint32    { return self.PeerIdx }
 func (self *RevMsg) MsgType() uint32 { return MSGID_REV }
 
 //----------
-=======
-type RevMsg struct {
-	outpoit wire.OutPoint
-	revelk  chainhash.Hash // 32 bytes
-	nextpoint [33]byte
 
+type CloseReqMsg struct {
+	PeerIdx   uint32
+	Outpoint  wire.OutPoint
+	Signature [64]byte
 }
 
-//	msg = append(msg, opArr[:]...)
-//	msg = append(msg, elk[:]...)
-//	msg = append(msg, n2ElkPoint[:]...)
->>>>>>> bd46fec7fac60389da8733669544ad4b9e3e4cdc
+func NewCloseReqMsg(peerid uint32, OP wire.OutPoint, SIG [64]byte) *CloseReqMsg {
+	cr := new(CloseReqMsg)
+	cr.PeerIdx = peerid
+	cr.Outpoint = OP
+	cr.Signature = SIG
+	return cr
+}
+
+func (self *CloseReqMsg) Bytes() []byte {
+	var msg []byte
+	opArr := OutPointToBytes(self.Outpoint)
+	msg = append(msg, opArr[:]...)
+	msg = append(msg, self.Signature[:]...)
+	return msg
+}
+
+func (self *CloseReqMsg) Peer() uint32    { return self.PeerIdx }
+func (self *CloseReqMsg) MsgType() uint32 { return MSGID_CLOSEREQ }
+
+//----------
+
+type PointReqMsg struct {
+	PeerIdx uint32
+}
+
+func NewPointReqMsg(peerid uint32) *PointReqMsg {
+	p := new(PointReqMsg)
+	p.PeerIdx = peerid
+	return p
+}
+
+func (self *PointReqMsg) Bytes() []byte { return nil } // no data in this type of message
+
+func (self *PointReqMsg) Peer() uint32    { return self.PeerIdx }
+func (self *PointReqMsg) MsgType() uint32 { return MSGID_POINTREQ }
+
+//----------
+
+type PointRespMsg struct {
+	PeerIdx    uint32
+	ChannelPub [33]byte
+	RefundPub  [33]byte
+	HAKDbase   [33]byte
+}
+
+func NewPointRespMsg(peerid uint32, chanpub [33]byte, refundpub [33]byte, HAKD [33]byte) *PointRespMsg {
+	pr := new(PointRespMsg)
+	pr.PeerIdx = peerid
+	pr.ChannelPub = chanpub
+	pr.RefundPub = refundpub
+	pr.HAKDbase = HAKD
+	return pr
+}
+
+func (self *PointRespMsg) Bytes() []byte {
+	var msg []byte
+	msg = append(msg, self.ChannelPub[:]...)
+	msg = append(msg, self.RefundPub[:]...)
+	msg = append(msg, self.HAKDbase[:]...)
+	return msg
+}
+
+func (self *PointRespMsg) Peer() uint32    { return self.PeerIdx }
+func (self *PointRespMsg) MsgType() uint32 { return MSGID_POINTRESP }
+
+//----------
+
+type ChatMsg struct {
+	PeerIdx uint32
+	Text    string
+}
+
+func NewChatMsg(peerid uint32, text string) *ChatMsg {
+	t := new(ChatMsg)
+	t.PeerIdx = peerid
+	t.Text = text
+	return t
+}
+
+func (self *ChatMsg) Bytes() []byte { return []byte(self.Text) } // no data in this type of message
+
+func (self *ChatMsg) Peer() uint32    { return self.PeerIdx }
+func (self *ChatMsg) MsgType() uint32 { return MSGID_TEXTCHAT }
+
+//----------
+
+type SigProofMsg struct {
+	PeerIdx   uint32
+	Outpoint  wire.OutPoint
+	Signature [64]byte
+}
+
+func NewSigProofMsg(peerid uint32, OP wire.OutPoint, SIG [64]byte) *SigProofMsg {
+	sp := new(SigProofMsg)
+	sp.PeerIdx = peerid
+	sp.Outpoint = OP
+	sp.Signature = SIG
+	return sp
+}
+
+func (self *SigProofMsg) Bytes() []byte {
+	var msg []byte
+	opArr := OutPointToBytes(self.Outpoint)
+	msg = append(msg, opArr[:]...)
+	msg = append(msg, self.Signature[:]...)
+	return msg
+}
+
+func (self *SigProofMsg) Peer() uint32    { return self.PeerIdx }
+func (self *SigProofMsg) MsgType() uint32 { return MSGID_SIGPROOF }
+
+//----------
+
+type ChanAckMsg struct { //in construction
+	PeerIdx  uint32
+	Outpoint wire.OutPoint
+	// elkpointarray
+	Signature [64]byte
+}
+
+func NewChanAckMsg(peerid uint32, OP wire.OutPoint, SIG [64]byte) *ChanAckMsg {
+	ca := new(ChanAckMsg)
+	ca.PeerIdx = peerid
+	ca.Outpoint = OP
+	ca.Signature = SIG
+	return ca
+}
+
+func (self *ChanAckMsg) Bytes() []byte {
+	var msg []byte
+	opArr := OutPointToBytes(self.Outpoint)
+	msg = append(msg, opArr[:]...)
+	msg = append(msg, self.Signature[:]...)
+	return msg
+}
+
+func (self *ChanAckMsg) Peer() uint32    { return self.PeerIdx }
+func (self *ChanAckMsg) MsgType() uint32 { return MSGID_CHANACK }
+
+//----------

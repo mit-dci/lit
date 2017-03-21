@@ -51,6 +51,7 @@ func (nd *LitNode) CoopClose(qc *Qchan) error {
 	// Should save something, just so the UI marks it as closed, and
 	// we don't accept payments on this channel anymore.
 
+	/* RETRACTED
 	opArr := lnutil.OutPointToBytes(qc.Op)
 
 	var msg []byte
@@ -62,9 +63,15 @@ func (nd *LitNode) CoopClose(qc *Qchan) error {
 	outMsg.MsgType = lnutil.MSGID_CLOSEREQ
 	outMsg.PeerIdx = qc.Peer()
 	outMsg.Data = msg
+	*/
+	outMsg := new(lnutil.LitMsg)
+
+	var signature [64]byte
+	copy(signature[:], sig[:])
+	outMsg2 := lnutil.NewCloseReqMsg(qc.Peer(), qc.Op, signature)
 
 	nd.OmniOut <- outMsg
-
+	outMsg2.Bytes()
 	return nil
 }
 
