@@ -100,7 +100,7 @@ func setConfig(lc *LitConfig) {
 func main() {
 	f, err := os.OpenFile("logfile", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	defer f.Close()
-	mw := io.MultiWriter(color.Output, f)
+	mw := io.MultiWriter(os.Stdout, f)
 	log.SetOutput(mw)
 
 	log.Printf("lit node v0.0\n")

@@ -2,6 +2,7 @@ package watchtower
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
@@ -127,7 +128,7 @@ func (w *WatchTower) AddNewChannel(wd WatchannelDescriptor) error {
 		if k != nil {
 			newIdx = lnutil.BtU32(k) + 1 // and add 1
 		}
-		fmt.Printf("assigning new channel index %d\n", newIdx)
+		log.Printf("assigning new channel index %d\n", newIdx)
 		newIdxBytes := lnutil.U32tB(newIdx)
 
 		allChanbkt := btx.Bucket(BUCKETChandata)
@@ -145,7 +146,7 @@ func (w *WatchTower) AddNewChannel(wd WatchannelDescriptor) error {
 			return fmt.Errorf("watchdescriptor %d bytes, expect 96")
 		}
 		chanBucket.Put(KEYStatic, wdBytes[:96])
-		fmt.Printf("saved new channel to pkh %x\n", wd.DestPKHScript)
+		log.Printf("saved new channel to pkh %x\n", wd.DestPKHScript)
 		// save index
 		err = chanBucket.Put(KEYIdx, newIdxBytes)
 		if err != nil {
@@ -223,7 +224,7 @@ func (w *WatchTower) AddState(cm ComMsg) error {
 		copy(sigIdxBytes[4:10], stateNumBytes[2:]) // next 6 is state number
 		copy(sigIdxBytes[10:], cm.Sig[:])          // the rest is signature
 
-		fmt.Printf("chan %x (pkh %x) up to state %x\n",
+		log.Printf("chan %x (pkh %x) up to state %x\n",
 			cIdxBytes, cm.DestPKH, stateNumBytes)
 		// save sigIdx into the txid bucket.
 		// TODO truncate txid, and deal with collisions.
@@ -250,7 +251,7 @@ func (w *WatchTower) MatchTxids(txids []chainhash.Hash) ([]chainhash.Hash, error
 			}
 			b := txidbkt.Get(txid[:16])
 			if b != nil {
-				fmt.Printf("zomg hit %s\n", txid.String())
+				log.Printf("zomg hit %s\n", txid.String())
 				hits = append(hits, txid)
 			}
 		}
@@ -260,11 +261,11 @@ func (w *WatchTower) MatchTxids(txids []chainhash.Hash) ([]chainhash.Hash, error
 }
 
 func (w *WatchTower) BlockHandler(bchan chan *wire.MsgBlock) {
-	fmt.Printf("-- started BlockHandler, cap %d\n", cap(bchan))
+	log.Printf("-- started BlockHandler, cap %d\n", cap(bchan))
 	for {
 		err := w.IngestBlock(<-bchan)
 		if err != nil {
-			fmt.Printf(err.Error())
+			log.Printf(err.Error())
 		}
 	}
 }
@@ -275,10 +276,10 @@ func (w *WatchTower) IngestBlock(block *wire.MsgBlock) error {
 		return nil
 	}
 	if block == nil || len(block.Transactions) < 2 {
-		fmt.Printf("nil / empty block")
+		log.Printf("nil / empty block")
 		return nil
 	}
-	fmt.Printf("checking block %s, %d txs\n",
+	log.Printf("checking block %s, %d txs\n",
 		block.BlockHash().String(), len(block.Transactions))
 
 	txids, err := block.TxHashes()
@@ -292,7 +293,7 @@ func (w *WatchTower) IngestBlock(block *wire.MsgBlock) error {
 	}
 	if len(hits) > 0 {
 		for _, hitTxid := range hits {
-			fmt.Printf("zomg tx %s matched db\n", hitTxid.String())
+			log.Printf("zomg tx %s matched db\n", hitTxid.String())
 			for _, tx := range block.Transactions { // inefficient here
 				curTxid := tx.TxHash()
 				if curTxid.IsEqual(&hitTxid) {
@@ -300,7 +301,7 @@ func (w *WatchTower) IngestBlock(block *wire.MsgBlock) error {
 					if err != nil {
 						return err
 					}
-					fmt.Printf("made & sent out justice tx %s\n", justice.TxHash().String())
+					log.Printf("made & sent out justice tx %s\n", justice.TxHash().String())
 					w.OutBox <- justice
 				}
 			}

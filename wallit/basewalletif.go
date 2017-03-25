@@ -1,7 +1,6 @@
 package wallit
 
 import (
-	"fmt"
 	"log"
 	"sort"
 
@@ -63,7 +62,7 @@ func (w *Wallit) LetMeKnow() chan lnutil.OutPointEvent {
 func (w *Wallit) CurrentHeight() int32 {
 	h, err := w.GetDBSyncHeight()
 	if err != nil {
-		fmt.Printf("can't get height from db...")
+		log.Printf("can't get height from db...")
 		return -99
 	}
 	return h
@@ -74,14 +73,14 @@ func (w *Wallit) NewAdr() btcutil.Address {
 	adr160, err := w.NewAdr160()
 	if err != nil {
 		// should have an error here..?  Return empty address...
-		fmt.Printf("can't make address: %s\n", err.Error())
+		log.Printf("can't make address: %s\n", err.Error())
 		return a
 	}
 
 	a, err = btcutil.NewAddressWitnessPubKeyHash(adr160, w.Param)
 	if err != nil {
 		// should have an error here..?  Return empty address...
-		fmt.Printf("can't make address: %s\n", err.Error())
+		log.Printf("can't make address: %s\n", err.Error())
 	}
 
 	return a

@@ -1,7 +1,7 @@
 package wallit
 
 import (
-	"fmt"
+	"log"
 
 	"github.com/mit-dci/lit/portxo"
 )
@@ -28,7 +28,7 @@ func (w *Wallit) HowMuchTotal() int64 {
 func (w *Wallit) HowMuchWitConf() int64 {
 	currentHeight, err := w.GetDBSyncHeight()
 	if err != nil {
-		fmt.Printf(err.Error())
+		log.Printf(err.Error())
 		return -1
 	}
 

@@ -1,7 +1,7 @@
 package watchtower
 
 import (
-	"fmt"
+	"log"
 
 	"github.com/boltdb/bolt"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -62,24 +62,24 @@ type IdxSig struct {
 }
 
 func (w *WatchTower) HandleMessage(lm *lnutil.LitMsg) error {
-	fmt.Printf("got message from %x\n", lm.PeerIdx)
+	log.Printf("got message from %x\n", lm.PeerIdx)
 
 	switch lm.MsgType {
 	case MSGID_WATCH_DESC:
-		fmt.Printf("new channel to watch\n")
+		log.Printf("new channel to watch\n")
 		desc := WatchannelDescriptorFromBytes(lm.Data)
 		return w.AddNewChannel(desc)
 
 	case MSGID_WATCH_COMMSG:
-		fmt.Printf("new commsg\n")
+		log.Printf("new commsg\n")
 		commsg := ComMsgFromBytes(lm.Data)
 		return w.AddState(commsg)
 
 	case MSGID_WATCH_DELETE:
-		fmt.Printf("delete message\n")
+		log.Printf("delete message\n")
 		// delete not yet implemented
 	default:
-		fmt.Printf("unknown message type %x\n", lm.MsgType)
+		log.Printf("unknown message type %x\n", lm.MsgType)
 	}
 	return nil
 }
