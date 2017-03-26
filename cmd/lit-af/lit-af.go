@@ -10,9 +10,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/chzyer/readline"
 	"github.com/fatih/color"
 	"github.com/mit-dci/lit/lnutil"
-	"github.com/chzyer/readline"
 )
 
 /*
@@ -45,9 +46,10 @@ const (
 )
 
 type litAfClient struct {
-	remote     string
-	port       uint16
-	rpccon     *rpc.Client
+	remote string
+	port   uint16
+	rpccon *rpc.Client
+	//httpcon
 	litHomeDir string
 }
 
@@ -104,8 +106,8 @@ func main() {
 		}
 		rl.SaveHistory(msg)
 
-		cmdslice := strings.Fields(msg)          // chop input up on whitespace
-		fmt.Fprintf(color.Output,"entered command: %s\n", msg) // immediate feedback
+		cmdslice := strings.Fields(msg)                         // chop input up on whitespace
+		fmt.Fprintf(color.Output, "entered command: %s\n", msg) // immediate feedback
 		err = lc.Shellparse(cmdslice)
 		if err != nil { // only error should be user exit
 			log.Fatal(err)

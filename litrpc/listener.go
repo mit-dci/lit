@@ -75,7 +75,7 @@ func RpcListen(node *qln.LitNode, port uint16) {
 	}
 	defer listener.Close()
 
-	http.Serve(listener, http.HandlerFunc(JSONRPCoverHTTPHandler))
+	go http.Serve(listener, http.HandlerFunc(JSONRPCoverHTTPHandler))
 
 	/*
 		go func() {
