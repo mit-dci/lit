@@ -75,7 +75,6 @@ func RpcListen(node *qln.LitNode, port uint16) {
 	//	server.HandleHTTP(rpc.DefaultRPCPath, rpc.DefaultDebugPath)
 
 	http.Handle("/ws", websocket.Handler(serveWS))
-	go http.ListenAndServe("localhost:8000", nil)
 
 	portString := fmt.Sprintf(":%d", port)
 	listener, err := net.Listen("tcp", portString)
@@ -86,6 +85,12 @@ func RpcListen(node *qln.LitNode, port uint16) {
 	defer listener.Close()
 
 	//	go http.Serve(listener, http.HandlerFunc(JSONRPCoverHTTPHandler))
+
+	go func() {
+		for {
+			http.ListenAndServe("localhost:8000", nil)
+		}
+	}()
 
 	go func() {
 		for {
