@@ -4,12 +4,13 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"net"
 	"net/rpc"
 	"net/rpc/jsonrpc"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"golang.org/x/net/websocket"
 
 	"github.com/chzyer/readline"
 	"github.com/fatih/color"
@@ -55,7 +56,7 @@ type litAfClient struct {
 
 func setConfig(lc *litAfClient) {
 	hostptr := flag.String("node", "127.0.0.1", "host to connect to")
-	portptr := flag.Int("p", 9750, "port to connect to")
+	portptr := flag.Int("p", 8001, "port to connect to")
 	dirptr := flag.String("dir", filepath.Join(os.Getenv("HOME"), litHomeDirName), "directory to save settings")
 
 	flag.Parse()
@@ -71,15 +72,27 @@ func main() {
 	lc := new(litAfClient)
 	setConfig(lc)
 
-	dialString := fmt.Sprintf("%s:%d", lc.remote, lc.port)
+	//	dialString := fmt.Sprintf("%s:%d", lc.remote, lc.port)
 
-	client, err := net.Dial("tcp", dialString)
+	/*
+		client, err := net.Dial("tcp", dialString)
+		if err != nil {
+			log.Fatal("dialing:", err)
+		}
+		defer client.Close()
+	*/
+
+	//	dialString := fmt.Sprintf("%s:%d", lc.remote, lc.port)
+	origin := "http://127.0.0.1/"
+	urlString := fmt.Sprintf("ws://%s:%d/ws", lc.remote, lc.port)
+	//	url := "ws://127.0.0.1:8000/ws"
+	wsConn, err := websocket.Dial(urlString, "", origin)
 	if err != nil {
-		log.Fatal("dialing:", err)
+		log.Fatal(err)
 	}
-	defer client.Close()
+	defer wsConn.Close()
 
-	lc.rpccon = jsonrpc.NewClient(client)
+	lc.rpccon = jsonrpc.NewClient(wsConn)
 
 	go lc.RequestAsync()
 

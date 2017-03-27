@@ -2,8 +2,6 @@ package litrpc
 
 import (
 	"fmt"
-	"log"
-	"net"
 	"net/http"
 	"net/rpc"
 	"net/rpc/jsonrpc"
@@ -69,40 +67,39 @@ func RpcListen(node *qln.LitNode, port uint16) {
 	rpcl.Node = node
 	rpcl.OffButton = make(chan bool, 1)
 
-	server := rpc.NewServer()
-	server.Register(rpcl)
+	//	server := rpc.NewServer()
+	rpc.Register(rpcl)
 
 	//	server.HandleHTTP(rpc.DefaultRPCPath, rpc.DefaultDebugPath)
 
-	http.Handle("/ws", websocket.Handler(serveWS))
-
-	portString := fmt.Sprintf(":%d", port)
-	listener, err := net.Listen("tcp", portString)
-	if err != nil {
-		fmt.Printf(err.Error())
-		return
-	}
-	defer listener.Close()
-
-	//	go http.Serve(listener, http.HandlerFunc(JSONRPCoverHTTPHandler))
-
 	go func() {
 		for {
-			http.ListenAndServe("localhost:8000", nil)
+			http.Handle("/ws", websocket.Handler(serveWS))
+			http.ListenAndServe("localhost:8001", nil)
 		}
 	}()
 
-	go func() {
-		for {
-			conn, err := listener.Accept()
-			if err != nil {
-				log.Printf("listener error: " + err.Error())
-			} else {
-				log.Printf("new connection from %s\n", conn.RemoteAddr().String())
-				go server.ServeCodec(jsonrpc.NewServerCodec(conn))
-			}
-		}
-	}()
+	/*
+				portString := fmt.Sprintf(":%d", port)
+				listener, err := net.Listen("tcp", portString)
+				if err != nil {
+					fmt.Printf(err.Error())
+					return
+				}
+				defer listener.Close()
+
+		go func() {
+				for {
+					conn, err := listener.Accept()
+					if err != nil {
+						log.Printf("listener error: " + err.Error())
+					} else {
+						log.Printf("new connection from %s\n", conn.RemoteAddr().String())
+						go server.ServeCodec(jsonrpc.NewServerCodec(conn))
+					}
+				}
+			}()
+	*/
 
 	// ugly; add real synchronization here
 	<-rpcl.OffButton
