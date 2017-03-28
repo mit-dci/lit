@@ -1,8 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 
+	"io/ioutil"
+	"net/http"
+  
 	"github.com/fatih/color"
 	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/lnutil"
@@ -60,7 +64,7 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		return nil
 	}
 
-	// bal shows the current set of utxos, addresses and score
+	// ls shows the current set of utxos, addresses and score
 	if cmd == "ls" {
 		err = lc.Ls(args)
 		if err != nil {
@@ -155,74 +159,6 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		return nil
 	}
 
-	/*
-		if cmd == "msend" {
-			err = MSend(args)
-			if err != nil {
-				fmt.Fprintf(color.Output,"Msend error: %s\n", err)
-			}
-			return nil
-		}
-		if cmd == "rsend" {
-			err = RSend(args)
-			if err != nil {
-				fmt.Fprintf(color.Output,"Rsend error: %s\n", err)
-			}
-			return nil
-		}
-		if cmd == "nsend" {
-			err = NSend(args)
-			if err != nil {
-				fmt.Fprintf(color.Output,"Nsend error: %s\n", err)
-			}
-			return nil
-		}
-
-
-		if cmd == "txs" { // show all txs
-			err = Txs(args)
-			if err != nil {
-				fmt.Fprintf(color.Output,"txs error: %s\n", err)
-			}
-			return nil
-		}
-
-		if cmd == "wcon" { // connect to watch tower
-			err = WCon(args)
-			if err != nil {
-				fmt.Fprintf(color.Output,"wcon error: %s\n", err)
-			}
-			return nil
-		}
-
-		if cmd == "watch" { // connect to watch tower
-			err = Watch(args)
-			if err != nil {
-				fmt.Fprintf(color.Output,"watch error: %s\n", err)
-			}
-			return nil
-		}
-
-
-
-		// Peer to peer actions
-		// send text message
-		if cmd == "say" {
-			err = Say(args)
-			if err != nil {
-				fmt.Fprintf(color.Output,"say error: %s\n", err)
-			}
-			return nil
-		}
-
-		if cmd == "fix" {
-			err = Resume(args)
-			if err != nil {
-				fmt.Fprintf(color.Output,"fix error: %s\n", err)
-			}
-			return nil
-		}
-	*/
 	fmt.Fprintf(color.Output, "Command not recognized. type help for command list.\n")
 	return nil
 }
@@ -238,6 +174,23 @@ func (lc *litAfClient) Exit(textArgs []string) error {
 		return nil
 	}
 	return fmt.Errorf("User exit")
+}
+
+func (lc *litAfClient) Ls2(textArgs []string) error {
+	resp, err := http.Post("http://127.0.0.1:9750/lit",
+		"application/json",
+		bytes.NewBufferString(
+			`{"jsonrpc":"2.0","id":1,"method":"LitRPC.TxoList","params":[]}`))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("JSON over HTTP response: %s\n", string(b))
+	return nil
 }
 
 func (lc *litAfClient) Ls(textArgs []string) error {
