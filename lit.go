@@ -49,7 +49,7 @@ func setConfig(lc *LitConfig) {
 	bc2ptr := flag.Bool("bc2", false, "use bc2 network (not testnet3)")
 	resyncprt := flag.Bool("resync", false, "force resync from given tip")
 
-	rpcportptr := flag.Int("rpcport", 9750, "port to listen for RPC")
+	rpcportptr := flag.Int("rpcport", 8001, "port to listen for RPC")
 
 	litHomeDir := flag.String("dir", filepath.Join(os.Getenv("HOME"), litHomeDirName), "lit home directory")
 
