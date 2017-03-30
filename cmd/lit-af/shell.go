@@ -3,13 +3,38 @@ package main
 import (
 	"bytes"
 	"fmt"
+
 	"io/ioutil"
 	"net/http"
-
+  
 	"github.com/fatih/color"
 	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/lnutil"
 )
+
+var lsCommand = &Command{
+	Format:           lnutil.White("ls\n"),
+	Description:      "Show various information about our current state, such as connections, addresses, UTXO's, balances, etc.\n",
+	ShortDescription: "Show various information about our current state\n",
+}
+
+var exitCommand = &Command{
+	Format:           lnutil.White("exit\n"),
+	Description:      fmt.Sprintf("Alias: %s\nExit the interactive shell.\n", lnutil.White("quit")),
+	ShortDescription: fmt.Sprintf("Alias: %s\nExit the interactive shell.\n", lnutil.White("quit")),
+}
+
+var helpCommand = &Command{
+	Format:           fmt.Sprintf("%s%s\n", lnutil.White("help"), lnutil.OptColor("command")),
+	Description:      "Show information about a given command\n",
+	ShortDescription: "Show information about a given command\n",
+}
+
+var stopCommand = &Command{
+	Format:           lnutil.White("stop\n"),
+	Description:      "Shut down the lit node.\n",
+	ShortDescription: "Shut down the lit node.\n",
+}
 
 // Shellparse parses user input and hands it to command functions if matching
 func (lc *litAfClient) Shellparse(cmdslice []string) error {
@@ -30,11 +55,11 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		}
 		return nil
 	}
-	// adr generates a new address and displays it
-	if cmd == "adr" {
-		err = lc.Adr(args)
+	// address a new address and displays it
+	if cmd == "address" {
+		err = lc.Address(args)
 		if err != nil {
-			fmt.Fprintf(color.Output, "adr error: %s\n", err)
+			fmt.Fprintf(color.Output, "address error: %s\n", err)
 		}
 		return nil
 	}
@@ -44,15 +69,6 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		err = lc.Ls(args)
 		if err != nil {
 			fmt.Fprintf(color.Output, "ls error: %s\n", err)
-		}
-		return nil
-	}
-
-	// ls shows the current set of utxos, addresses and score
-	if cmd == "ls2" {
-		err = lc.Ls2(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "ls2 error: %s\n", err)
 		}
 		return nil
 	}
@@ -150,7 +166,8 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 func (lc *litAfClient) Exit(textArgs []string) error {
 	if len(textArgs) > 0 {
 		if len(textArgs) == 1 && textArgs[0] == "-h" {
-			fmt.Fprintf(color.Output, lnutil.White("exit")+"\nAlias: quit\nExit the interactive shell.\n")
+			fmt.Fprintf(color.Output, exitCommand.Format)
+			fmt.Fprintf(color.Output, exitCommand.Description)
 			return nil
 		}
 		fmt.Fprintf(color.Output, "Unexpected argument: "+textArgs[0])
@@ -178,15 +195,14 @@ func (lc *litAfClient) Ls2(textArgs []string) error {
 
 func (lc *litAfClient) Ls(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Fprintf(color.Output, lnutil.White("ls\n"))
-		fmt.Fprintf(color.Output, "Show various information about our current state, such as connections,\n")
-		fmt.Fprintf(color.Output, "addresses, UTXO's, balances, etc.\n")
+		fmt.Fprintf(color.Output, lsCommand.Format)
+		fmt.Fprintf(color.Output, lsCommand.Description)
 		return nil
 	}
 
 	pReply := new(litrpc.ListConnectionsReply)
 	cReply := new(litrpc.ChannelListReply)
-	aReply := new(litrpc.AdrReply)
+	aReply := new(litrpc.AddressReply)
 	tReply := new(litrpc.TxoListReply)
 	bReply := new(litrpc.BalReply)
 	sReply := new(litrpc.SyncHeightReply)
@@ -277,8 +293,8 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 
 func (lc *litAfClient) Stop(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Fprintf(color.Output, lnutil.White("stop\n"))
-		fmt.Fprintf(color.Output, "Shut down the lit node.\n")
+		fmt.Fprintf(color.Output, stopCommand.Format)
+		fmt.Fprintf(color.Output, stopCommand.Description)
 		return nil
 	}
 
@@ -298,12 +314,27 @@ func (lc *litAfClient) Stop(textArgs []string) error {
 func (lc *litAfClient) Help(textArgs []string) error {
 	if len(textArgs) == 0 {
 		fmt.Fprintf(color.Output, "commands:\n")
-		fmt.Fprintf(color.Output, "help say ls adr send fan sweep lis con fund push close break stop exit\n")
+		fmt.Fprintf(color.Output, "%s\t%s", helpCommand.Format, helpCommand.ShortDescription)
+		fmt.Fprintf(color.Output, "%s\t%s", sayCommand.Format, sayCommand.ShortDescription)
+		fmt.Fprintf(color.Output, "%s\t%s", lsCommand.Format, lsCommand.ShortDescription)
+		fmt.Fprintf(color.Output, "%s\t%s", addressCommand.Format, addressCommand.ShortDescription)
+		fmt.Fprintf(color.Output, "%s\t%s", sendCommand.Format, sendCommand.ShortDescription)
+		fmt.Fprintf(color.Output, "%s\t%s", fanCommand.Format, fanCommand.ShortDescription)
+		fmt.Fprintf(color.Output, "%s\t%s", sweepCommand.Format, sweepCommand.ShortDescription)
+		fmt.Fprintf(color.Output, "%s\t%s", lisCommand.Format, lisCommand.ShortDescription)
+		fmt.Fprintf(color.Output, "%s\t%s", conCommand.Format, conCommand.ShortDescription)
+		fmt.Fprintf(color.Output, "%s\t%s", fundCommand.Format, fundCommand.ShortDescription)
+		fmt.Fprintf(color.Output, "%s\t%s", pushCommand.Format, pushCommand.ShortDescription)
+		fmt.Fprintf(color.Output, "%s\t%s", closeCommand.Format, closeCommand.ShortDescription)
+		fmt.Fprintf(color.Output, "%s\t%s", breakCommand.Format, breakCommand.ShortDescription)
+		fmt.Fprintf(color.Output, "%s\t%s", stopCommand.Format, stopCommand.ShortDescription)
+		fmt.Fprintf(color.Output, "%s\t%s", exitCommand.Format, exitCommand.ShortDescription)
 		return nil
 	}
+
 	if textArgs[0] == "help" || textArgs[0] == "-h" {
-		fmt.Fprintf(color.Output, "%s%s\n", lnutil.White("help"), lnutil.OptColor("command"))
-		fmt.Fprintf(color.Output, "Show information about a given command\n")
+		fmt.Fprintf(color.Output, helpCommand.Format)
+		fmt.Fprintf(color.Output, helpCommand.Description)
 		return nil
 	}
 	res := make([]string, 0)
