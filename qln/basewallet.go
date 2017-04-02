@@ -81,7 +81,7 @@ type UWallet interface {
 
 	// ===== TESTING / SPAMMING ONLY, these funcs will not be in the real interface
 	// Sweep sends lots of txs (uint32 of them) to the specified address.
-	Sweep(btcutil.Address, uint32) ([]*chainhash.Hash, error)
+	Sweep([]byte, uint32) ([]*chainhash.Hash, error)
 }
 
 // GetUsePub gets a pubkey from the base wallet, but first modifies

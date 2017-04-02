@@ -71,6 +71,8 @@ func (w *Wallit) AddPorTxoAdr(kg portxo.KeyGen) error {
 }
 
 // AdrDump returns all the addresses in the wallit.
+// currently returns non-segwit p2pkh addresses, which
+// can then be converted somewhere else into bech32 addresses.
 func (w *Wallit) AdrDump() ([]btcutil.Address, error) {
 	var i, last uint32 // number of addresses made so far
 	var adrSlice []btcutil.Address
@@ -101,7 +103,7 @@ func (w *Wallit) AdrDump() ([]btcutil.Address, error) {
 			return nil, fmt.Errorf("NewAdr error: got nil h160")
 		}
 
-		wa, err := btcutil.NewAddressWitnessPubKeyHash(nAdr160, w.Param)
+		wa, err := btcutil.NewAddressPubKeyHash(nAdr160, w.Param)
 		if err != nil {
 			return nil, err
 		}

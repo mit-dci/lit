@@ -6,7 +6,7 @@ import (
 
 	"io/ioutil"
 	"net/http"
-  
+
 	"github.com/fatih/color"
 	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/lnutil"
@@ -56,10 +56,10 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		return nil
 	}
 	// address a new address and displays it
-	if cmd == "address" {
+	if cmd == "adr" {
 		err = lc.Address(args)
 		if err != nil {
-			fmt.Fprintf(color.Output, "address error: %s\n", err)
+			fmt.Fprintf(color.Output, "adr error: %s\n", err)
 		}
 		return nil
 	}
@@ -215,7 +215,8 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	if len(pReply.Connections) > 0 {
 		fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Peers:"))
 		for _, peer := range pReply.Connections {
-			fmt.Fprintf(color.Output, "%s %s\n", lnutil.White(peer.PeerNumber), peer.RemoteHost)
+			fmt.Fprintf(color.Output, "%s %s\n",
+				lnutil.White(peer.PeerNumber), peer.RemoteHost)
 		}
 	}
 
@@ -235,7 +236,8 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		}
 		fmt.Fprintf(color.Output, "%s (peer %d) %s\n\t cap: %s bal: %s h: %d state: %d\n",
 			lnutil.White(c.CIdx), c.PeerIdx, lnutil.OutPoint(c.OutPoint),
-			lnutil.SatoshiColor(c.Capacity), lnutil.SatoshiColor(c.MyBalance), c.Height, c.StateNum)
+			lnutil.SatoshiColor(c.Capacity), lnutil.SatoshiColor(c.MyBalance),
+			c.Height, c.StateNum)
 	}
 
 	err = lc.rpccon.Call("LitRPC.TxoList", nil, tReply)
@@ -247,7 +249,8 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	}
 	for i, t := range tReply.Txos {
 		fmt.Fprintf(color.Output, "%d %s h:%d amt:%s %s",
-			i, lnutil.OutPoint(t.OutPoint), t.Height, lnutil.SatoshiColor(t.Amt), t.KeyPath)
+			i, lnutil.OutPoint(t.OutPoint), t.Height,
+			lnutil.SatoshiColor(t.Amt), t.KeyPath)
 		if t.Delay != 0 {
 			fmt.Fprintf(color.Output, " delay: %d", t.Delay)
 		}
@@ -263,7 +266,9 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	}
 	if len(lReply.LisIpPorts) > 0 {
 		fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Listening Ports:"))
-		fmt.Fprintf(color.Output, "Listening for connections on port(s) %v with key %s\n", lnutil.White(lReply.LisIpPorts), lReply.Adr)
+		fmt.Fprintf(color.Output,
+			"Listening for connections on port(s) %v with key %s\n",
+			lnutil.White(lReply.LisIpPorts), lReply.Adr)
 	}
 
 	err = lc.rpccon.Call("LitRPC.Address", nil, aReply)
@@ -272,7 +277,8 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	}
 	fmt.Fprintf(color.Output, lnutil.Header("\tAddresses:\n"))
 	for i, a := range aReply.WitAddresses {
-		fmt.Fprintf(color.Output, "%d %s (%s)\n", i, lnutil.Address(a), lnutil.Address(aReply.LegacyAddresses[i]))
+		fmt.Fprintf(color.Output, "%d %s (%s)\n", i,
+			lnutil.Address(a), lnutil.Address(aReply.LegacyAddresses[i]))
 	}
 	err = lc.rpccon.Call("LitRPC.Bal", nil, bReply)
 	if err != nil {
@@ -280,13 +286,17 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	}
 
 	fmt.Fprintf(color.Output, "\t%s %s %s %s %s %s\n",
-		lnutil.Header("Utxo:"), lnutil.SatoshiColor(bReply.TxoTotal), lnutil.Header("Conf:"), lnutil.SatoshiColor(bReply.Mature), lnutil.Header("Channel:"), lnutil.SatoshiColor(bReply.ChanTotal))
+		lnutil.Header("Utxo:"), lnutil.SatoshiColor(bReply.TxoTotal),
+		lnutil.Header("Conf:"), lnutil.SatoshiColor(bReply.Mature),
+		lnutil.Header("Channel:"), lnutil.SatoshiColor(bReply.ChanTotal))
 
 	err = lc.rpccon.Call("LitRPC.SyncHeight", nil, sReply)
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(color.Output, "%s %d\n", lnutil.Header("Sync Height:"), sReply.SyncHeight)
+
+	fmt.Fprintf(color.Output, "%s %d\n",
+		lnutil.Header("Sync Height:"), sReply.SyncHeight)
 
 	return nil
 }

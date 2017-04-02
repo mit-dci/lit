@@ -171,20 +171,14 @@ func (lc *litAfClient) Address(textArgs []string) error {
 		return nil
 	}
 
-	if len(textArgs) < 1 {
-		return fmt.Errorf(addressCommand.Format)
-	}
-
 	args := new(litrpc.AddressArgs)
-	args.NumToMake = 1
 
-	for i, s := range textArgs {
-		switch i {
-		case 0:
-			num, _ := strconv.Atoi(s)
-			args.NumToMake = uint32(num)
-		default:
-		}
+	// if no arguments given, generate 1 new address.
+	if len(textArgs) < 1 {
+		args.NumToMake = 1
+	} else {
+		num, _ := strconv.Atoi(textArgs[0])
+		args.NumToMake = uint32(num)
 	}
 
 	reply := new(litrpc.AddressReply)
@@ -192,7 +186,8 @@ func (lc *litAfClient) Address(textArgs []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(color.Output, "new adr(s): %s\nold: %s\n", lnutil.Address(reply.WitAddresses), lnutil.Address(reply.LegacyAddresses))
+	fmt.Fprintf(color.Output, "new adr(s): %s\nold: %s\n",
+		lnutil.Address(reply.WitAddresses), lnutil.Address(reply.LegacyAddresses))
 	return nil
 
 }
