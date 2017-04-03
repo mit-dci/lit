@@ -8,8 +8,8 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/txsort"
+	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 )
 
@@ -187,13 +187,15 @@ func (w *Wallit) GrabAll() error {
 	for _, u := range utxos {
 		if u.Seq == 1 && u.Height > 0 { // grabbable
 			fmt.Printf("found %s to grab!\n", u.String())
-			adr160, err := w.NewAdr160()
+			adr160slice, err := w.NewAdr160()
 			if err != nil {
 				return err
 			}
-			nAdr, err := btcutil.NewAddressWitnessPubKeyHash(
-				adr160, w.Param)
-			tx, err := w.SendOne(*u, nAdr)
+			var adr160 [20]byte
+			copy(adr160[:], adr160slice)
+			outScript := lnutil.DirectWPKHScriptFromPKH(adr160)
+
+			tx, err := w.SendOne(*u, outScript)
 			if err != nil {
 				return err
 			}
@@ -305,7 +307,7 @@ func (w *Wallit) PickUtxos(
 
 // SendOne is for the sweep function, and doesn't do change.
 // Probably can get rid of this for real txs.
-func (w *Wallit) SendOne(u portxo.PorTxo, adr btcutil.Address) (*wire.MsgTx, error) {
+func (w *Wallit) SendOne(u portxo.PorTxo, outScript []byte) (*wire.MsgTx, error) {
 
 	w.FreezeMutex.Lock()
 	defer w.FreezeMutex.Unlock()
@@ -329,13 +331,8 @@ func (w *Wallit) SendOne(u portxo.PorTxo, adr btcutil.Address) (*wire.MsgTx, err
 
 	sendAmt := u.Value - fee
 
-	// add single output
-	outAdrScript, err := txscript.PayToAddrScript(adr)
-	if err != nil {
-		return nil, err
-	}
 	// make user specified txout and add to tx
-	txout := wire.NewTxOut(sendAmt, outAdrScript)
+	txout := wire.NewTxOut(sendAmt, outScript)
 
 	return w.BuildAndSign([]*portxo.PorTxo{&u}, []*wire.TxOut{txout})
 }
