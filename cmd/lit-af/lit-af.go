@@ -25,7 +25,7 @@ This is a text mode interface to lit.  It connects over jsonrpc to the a lit
 node and tells that lit node what to do.  The lit node also responds so that
 lit-af can tell what's going on.
 
-lit-gtk does most of the same things with a gtk interface, but there will be
+lit-qt does most of the same things with a gtk interface, but there will be
 some yet-undefined advanced functionality only available in lit-af.
 
 May end up using termbox-go

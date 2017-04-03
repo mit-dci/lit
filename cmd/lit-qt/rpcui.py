@@ -21,56 +21,53 @@ class rpcCom():
         self.conn.connect((addr, port))
 
     def getBal(self):
-        rpcCmd = {
-            "method": "LitRPC.Bal",
-            "params": [{
-            }]
-        }
-        #TODO: What is the purpose of this `id`
-        rpcCmd.update({"jsonrpc": "2.0", "id": "93"})
+        r = self.rpcCommand('Bal', {})
 
-        #print json.dumps(rpcCmd)
-        self.conn.sendall(json.dumps(rpcCmd))
-
-        r = json.loads(self.conn.recv(8000000))
-        #print r
-
-        return r["result"]["TxoTotal"]
+        return r['result']['TxoTotal']
 
     def getAdr(self):
-        rpcCmd = {
-		   "method": "LitRPC.Address",
-		   "params": [{"NumToMake": 0}]
-	}
+        r = self.rpcCommand('Address', {'NumToMake' : 0})
 
-	rpcCmd.update({"jsonrpc": "2.0", "id": "94"})
-
-	#print json.dumps(rpcCmd)
-	self.conn.sendall(json.dumps(rpcCmd))
-
-	r = json.loads(self.conn.recv(8000000))
-	#print r
-
-	return r["result"]["Addresses"][-1]
+	return r['result']['Addresses'][-1]
 
     def prSend(self, adr, amt):
-	rpcCmd = {
-		   "method": "LitRPC.Send",
-		   "params": [{"DestAddrs": [adr], "Amts": [amt]}]
-	}
+        r = self.rpcCommand('Send', {"DestAddrs": [adr], "Amts": [amt]})
 
-	rpcCmd.update({"jsonrpc": "2.0", "id": "95"})
+	return "Sent. TXID: " + r['result']['Txids'][0]
 
-	#print json.dumps(rpcCmd)
-	self.conn.sendall(json.dumps(rpcCmd))
+    #Makes an rpc call on a given, arbitrary `command` and its `params` in json (dict) format
+    # The `params` can be a dict or a string of dict-form as it is internally handled accordingly
+    #
+    #Ex: self.rpcCommand('Address', '{"NumToMake": 0}') and self.rpcCommand('Address', {"NumToMake": 0})
+    # are both equivalent and correct calls
+    def rpcCommand(self, command, params):
+        #Tentatively assign `json_params` for now, assuming it is a dict
+        json_params = params
+        
+        #If `params` is a string, load it as a json dict into `json_params`. Otherwise, it should
+        # be a dict for which can be directly plugged into the `rpcCmd`
+        if type(params) == str:
+            #Upon error, re-raise the error with a more meaningful message
+            try:
+                json_params = json.loads(params)
+            except:
+                raise RuntimeError("Poorly formatted input parameters: %s" % params)
+        
+        #Build the `rpcCmd`
+        rpcCmd = {
+            'method' : "LitRPC" + "." + command,
+            'params' : [json_params]
+        }
 
-	r = json.loads(self.conn.recv(8000000))
-	#print r
+        rpcCmd.update({'jsonrpc' : "2.0", 'id' : "96"})
 
-	if r["error"] != None:
-            raise RuntimeError(r["error"])
+        self.conn.sendall(json.dumps(rpcCmd))
+        r = json.loads(self.conn.recv(8000000))
 
-	return "Sent. TXID: " + r["result"]["Txids"][0]
+	if r['error'] != None:
+            raise RuntimeError(r['error'])
+
+        return r
 
 class mainWindow(QtGui.QMainWindow, rpcui_ui.Ui_MainWindow):
     def __init__(self, parent):
@@ -93,20 +90,48 @@ class mainWindow(QtGui.QMainWindow, rpcui_ui.Ui_MainWindow):
         bal = self.rpcCom.getBal()
         self.bal_label.setText(str(bal))
 
-    #The trigger for the send button being clicked
+    #Give the `statusbar` some text, usual error messages
+    def set_statusbar(self, text):
+        #Display the `text` for 10 seconds
+        self.statusbar.showMessage(text, 10 * 1000)
+
+    #The trigger handler for the send button being clicked
     def send_button_clicked(self):
         #TODO: Implement address validity verification
         to_addr = str(self.send_addr_line_edit.text())
         amt = self.send_amt_spin_box.value()
         
         try:
-            #TODO: Make this display something to the user that their input is poor
             if amt == 0:
                 raise RuntimeError("Invalid input send amount")
 
             self.rpcCom.prSend(to_addr, amt)
-        except RuntimeError as rterror:
-            print "Error: " + str(rterror)
+        except Exception as error:
+            self.set_statusbar("Error: " + str(error))
+
+    #The trigger handler for the rpc line edit field for when the return key is pressed
+    def rpc_line_edit_return_pressed(self):
+        rpc_cmd = str(self.rpc_line_edit.text())
+        rpc_split = rpc_cmd.split(" ", 1) #Split once around the first space
+
+        try:
+            #Assume that this is only a command w/o params
+            if len(rpc_split) == 1:
+                rpc_split.append('{}') #Append some empty params
+            elif len(rpc_split) != 2:
+                raise RuntimeError("Invalid input! Should be: Command {json-args}")
+
+            rpc_response = self.rpcCom.rpcCommand(*rpc_split)
+
+            #If the program made it this far, `rpc_split` and `rpc_response` should be valid. 
+            # Append the command, params, and respective response
+            fmt_cmd = rpc_split[0] + " " + rpc_split[1]
+            self.rpc_console_text_browser.append(fmt_cmd + " : " + str(rpc_response['result']))
+        except Exception as error:
+            self.set_statusbar("Error: " + str(error))
+        finally:
+            #Clear the line edit after appending the result
+            self.rpc_line_edit.clear()
 
     def setup_connections(self):
         #Populate the address label
@@ -122,6 +147,12 @@ class mainWindow(QtGui.QMainWindow, rpcui_ui.Ui_MainWindow):
         #Connect the trigger for the "Send" button
         self.send_button.clicked.connect(self.send_button_clicked)
 
+        #Connect the trigger for the rpc line edit return pressed
+        self.rpc_line_edit.returnPressed.connect(self.rpc_line_edit_return_pressed)
+
+        #Connect the trigger for the "Clear" button for the rpc console
+        # Simply clears the text browser
+        self.clear_button.clicked.connect(lambda x: self.rpc_console_text_browser.clear())
 
 def main(args):
     app = QtGui.QApplication(args)

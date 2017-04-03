@@ -56,7 +56,7 @@ func (r *LitRPC) ChannelList(args ChanArgs, reply *ChannelListReply) error {
 
 // ------------------------- fund
 type FundArgs struct {
-	Peer        uint32 // who to make the channel with
+	Peer        uint32 // with whom to make the channel
 	Capacity    int64  // later can be minimum capacity
 	Roundup     int64  // ignore for now; can be used to round-up capacity
 	InitialSend int64  // Initial send of -1 means "ALL"
