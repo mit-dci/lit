@@ -37,10 +37,9 @@ const (
 )
 
 type RevMsg struct {
-	outpoit wire.OutPoint
-	revelk  chainhash.Hash // 32 bytes
+	outpoit   wire.OutPoint
+	revelk    chainhash.Hash // 32 bytes
 	nextpoint [33]byte
-
 }
 
 //	msg = append(msg, opArr[:]...)

@@ -1,10 +1,10 @@
 package lnutil
 
 import (
-	"bytes"
+	"fmt"
 
 	"github.com/adiabat/bech32"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/fastsha256"
 )
 
 // Lit addresses use the bech32 format, but sometimes omit the checksum!
@@ -14,7 +14,8 @@ import (
 /* types:
 256 bit full pubkey? (58 char)
 
-less than 256-bit is the truncated double-sha256 of the 33 byte pubkey.
+less than 256-bit is the truncated sha256 of the 33 byte pubkey.
+(probably the easiest way is to drop the first 'q' character
 
 160-bit with checksum (38 char)
 LN1eyq3javh983xwlfvamh54r56v9ca6ck70dfrqz
@@ -37,57 +38,45 @@ being wildcard.  That should be ok to deal with.
 */
 
 func LitAdrFromPubkey(in [33]byte) string {
-	doubleSha := chainhash.DoubleHashB(in[:])
+	doubleSha := fastsha256.Sum256(in[:])
 	return bech32.Encode("ln", doubleSha[:20])
 }
 
-// tries to match a 95-bit truncated pkh string with a pubkey
-// returns false if anything goes wrong.
+// LitAdrOK make sure the address is OK.  Either it has a valid checksum, or
+// it's shortened and doesn't.
+func LitAdrOK(adr string) bool {
+	hrp, _, err := bech32.Decode(adr)
+	if hrp != "ln" {
+		return false
+	}
+	if err == nil || len(adr) == 22 {
+		return true
+	}
+	return false
+}
 
-func MatchPubkeyTruncAdr(adr string, pk [33]byte) bool {
+// LitAdrBytes takes a lit address string and returns either 20 or 12 bytes.
+// Or an error.
+func LitAdrBytes(adr string) ([]byte, error) {
+	if !LitAdrOK(adr) {
+		return nil, fmt.Errorf("invalid ln address %s", adr)
+	}
+
+	_, pkh, err := bech32.Decode(adr)
+	if err == nil {
+		return pkh, nil
+	}
+	// add a q for padding
+	adr = adr + "q"
+
 	truncSquashed, err := bech32.StringToSquashedBytes(adr[3:])
 	if err != nil {
-		return false
+		return nil, err
 	}
 
 	truncPKH, err := bech32.Bytes5to8(truncSquashed)
 	if err != nil {
-		return false
+		return nil, err
 	}
-
-	if len(truncPKH) != 12 {
-		return false
-	}
-
-	// double-hash the full pubkey
-	fullPKH := chainhash.DoubleHashB(pk[:])
-
-	// truncate to first 12 bytes of that
-	fullPKH = fullPKH[:12]
-	//de-assert lowest bit
-	fullPKH[11] = fullPKH[11] & 0xfe
-
-	// compare and return
-	return bytes.Equal(truncPKH, fullPKH)
-}
-
-func MatchPubkeyFullAdr(adr string, pk [33]byte) bool {
-
-	hrp, pkh, err := bech32.Decode(adr)
-	if err != nil {
-		return false
-	}
-
-	if hrp != "ln" || len(pkh) != 20 {
-		return false
-	}
-
-	// double-hash the full pubkey
-	fullPKH := chainhash.DoubleHashB(pk[:])
-
-	// truncate to first 20 bytes of that
-	fullPKH = fullPKH[:20]
-
-	// compare and return
-	return bytes.Equal(pkh, fullPKH)
+	return truncPKH, nil
 }

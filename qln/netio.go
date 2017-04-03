@@ -5,8 +5,6 @@ import (
 	"log"
 
 	"github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcutil"
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
@@ -15,43 +13,37 @@ import (
 // Gets the list of ports where LitNode is listening for incoming connections,
 // & the connection key
 func (nd *LitNode) GetLisAddressAndPorts() (
-	*btcutil.AddressWitnessPubKeyHash, []string, error) {
+	string, []string) {
 
 	idPriv := nd.IdKey()
-	myId := btcutil.Hash160(idPriv.PubKey().SerializeCompressed())
-	// litNode addresses transcend network parameters
-	lisAdr, err := btcutil.NewAddressWitnessPubKeyHash(myId,
-		&chaincfg.TestNet3Params)
-	if err != nil {
-		return nil, nil, err
-	}
+	var idPub [33]byte
+	copy(idPub[:], idPriv.PubKey().SerializeCompressed())
+
+	lisAdr := lnutil.LitAdrFromPubkey(idPub)
+
 	nd.RemoteMtx.Lock()
 	ports := nd.LisIpPorts
 	nd.RemoteMtx.Unlock()
-	return lisAdr, ports, nil
+
+	return lisAdr, ports
 }
 
 // TCPListener starts a litNode listening for incoming LNDC connections
 func (nd *LitNode) TCPListener(
-	lisIpPort string) (*btcutil.AddressWitnessPubKeyHash, error) {
+	lisIpPort string) (string, error) {
 	idPriv := nd.IdKey()
 	listener, err := lndc.NewListener(nd.IdKey(), lisIpPort)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	myId := btcutil.Hash160(idPriv.PubKey().SerializeCompressed())
 
-	// listening pubkey hash should be in a format independent of subwallets.
-	lisAdr, err := btcutil.NewAddressWitnessPubKeyHash(
-		myId, &chaincfg.TestNet3Params)
-	// Really we need to make LN-specific encodings here ^^
+	var idPub [33]byte
+	copy(idPub[:], idPriv.PubKey().SerializeCompressed())
 
-	if err != nil {
-		return nil, err
-	}
+	adr := lnutil.LitAdrFromPubkey(idPub)
+
 	fmt.Printf("Listening on %s\n", listener.Addr().String())
-	fmt.Printf("Listening with base58 address: %s lnid: %x\n",
-		lisAdr.String(), myId[:16])
+	fmt.Printf("Listening with ln address: %s \n", adr)
 
 	go func() {
 		for {
@@ -89,25 +81,27 @@ func (nd *LitNode) TCPListener(
 	nd.RemoteMtx.Lock()
 	nd.LisIpPorts = append(nd.LisIpPorts, lisIpPort)
 	nd.RemoteMtx.Unlock()
-	return lisAdr, nil
+	return adr, nil
 }
 
 // DialPeer makes an outgoing connection to another node.
-func (nd *LitNode) DialPeer(lnAdr *lndc.LNAdr) error {
+func (nd *LitNode) DialPeer(connectAdr string) error {
+
+	// parse address and get pkh / host / port
+	who, where := lndc.SplitAdrString(connectAdr)
+
+	// sanity check the "who" pkh string
+	if !lnutil.LitAdrOK(who) {
+		return fmt.Errorf("ln address %s invalid", who)
+	}
+
 	// get my private ID key
 	idPriv := nd.IdKey()
 
 	// Assign remote connection
 	newConn := new(lndc.LNDConn)
 
-	var id []byte
-	if lnAdr.PubKey != nil {
-		id = lnAdr.PubKey.SerializeCompressed()
-	} else {
-		id = lnAdr.Base58Adr.ScriptAddress()
-	}
-
-	err := newConn.Dial(idPriv, lnAdr.NetAddr.String(), id)
+	err := newConn.Dial(idPriv, where, who)
 	if err != nil {
 		return err
 	}
