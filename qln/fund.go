@@ -319,6 +319,10 @@ func (nd LitNode) PointRespHandler(lm *lnutil.LitMsg) error {
 	initPayBytes := lnutil.I64tB(nd.InProg.InitSend) // also will be an arg
 	capBytes := lnutil.I64tB(nd.InProg.Amt)
 
+	var initPay, capped [8]byte
+	copy(initPay[:], initPayBytes[:])
+	copy(capped[:], capBytes[:])
+
 	// description is outpoint (36), mypub(33), myrefund(33),
 	// myHAKDbase(33), capacity (8),
 	// initial payment (8), ElkPoint0,1,2 (99)
@@ -326,6 +330,7 @@ func (nd LitNode) PointRespHandler(lm *lnutil.LitMsg) error {
 
 	var msg []byte
 
+	/* RETRACTED
 	msg = append(msg, opArr[:]...)
 	msg = append(msg, qc.MyPub[:]...)
 	msg = append(msg, qc.MyRefundPub[:]...)
@@ -339,6 +344,14 @@ func (nd LitNode) PointRespHandler(lm *lnutil.LitMsg) error {
 	outMsg.MsgType = lnutil.MSGID_CHANDESC
 	outMsg.PeerIdx = lm.PeerIdx
 	outMsg.Data = msg
+	*/
+
+	outMsg := new(lnutil.LitMsg)
+	outMsg2 := lnutil.NewChanDescMsg(lm.PeerIdx, *nd.InProg.op, qc.MyPub, qc.MyRefundPub,
+		qc.MyHAKDBase, capped, initPay, elkPointZero, elkPointOne, elkPointTwo)
+
+	outMsg2.Bytes()
+
 	nd.OmniOut <- outMsg
 
 	return nil
@@ -466,6 +479,8 @@ func (nd *LitNode) QChanDescHandler(lm *lnutil.LitMsg) {
 	//	}
 	// ACK the channel address, which causes the funder to sign / broadcast
 	// ACK is outpoint (36), ElkPoint0,1,2 (99) and signature (64)
+
+	/* RETRACTED
 	var msg []byte
 
 	msg = append(msg, opArr[:]...)
@@ -478,6 +493,12 @@ func (nd *LitNode) QChanDescHandler(lm *lnutil.LitMsg) {
 	outMsg.MsgType = lnutil.MSGID_CHANACK
 	outMsg.PeerIdx = lm.PeerIdx
 	outMsg.Data = msg
+	*/
+
+	outMsg := new(lnutil.LitMsg)
+	outMsg2 := lnutil.NewChanAckMsg(lm.PeerIdx, *op, theirElkPointZero, theirElkPointOne, theirElkPointTwo, sig)
+	outMsg2.Bytes()
+
 	nd.OmniOut <- outMsg
 
 	return
@@ -588,10 +609,10 @@ func (nd *LitNode) QChanAckHandler(lm *lnutil.LitMsg, peer *RemotePeer) {
 
 	outMsg := new(lnutil.LitMsg)
 	//op = wire.NewOutpoint(hash, uint32) -> to use outpoint instead of opArray
-	outMsg2 = lnutil.NewSigProofMsg(lm.Peer(), lm.Outpoint, lm.Signature)
+	//outMsg2 = lnutil.NewSigProofMsg(lm.Peer, lm.Outpoint, lm.Signature)  -- fix to take from new struct
 
 	nd.OmniOut <- outMsg
-	outMsg2.Bytes()
+	//outMsg2.Bytes()
 
 	return
 }

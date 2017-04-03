@@ -10,49 +10,58 @@ import (
 // handles stuff that comes in over the wire.  Not user-initiated.
 func (nd *LitNode) PeerHandler(msg *lnutil.LitMsg, q *Qchan, peer *RemotePeer) error {
 
+	switch msg.MsgType() & 0xf0 { // in progress
+	case 0x00:
+	case 0x10:
+	case 0x20:
+	case 0x30:
+	case 0x40:
+	case 0x50:
+	case 0x60:
+	}
 	// TEXT MESSAGE.  SIMPLE
-	if msg.MsgType == lnutil.MSGID_TEXTCHAT { //it's text
+	if msg.MsgType() == lnutil.MSGID_TEXTCHAT { //it's text
 		nd.UserMessageBox <- fmt.Sprintf(
-			"\nmsg from %s: %s", lnutil.White(msg.PeerIdx), lnutil.Green(string(msg.Data[:])))
+			"\nmsg from %s: %s", lnutil.White(msg.PeerIdx()), lnutil.Green(string(msg.Bytes())))
 		return nil
 	}
 	// POINT REQUEST
-	if msg.MsgType == lnutil.MSGID_POINTREQ {
-		fmt.Printf("Got point request from %x\n", msg.PeerIdx)
-		nd.PointReqHandler(msg)
+	if msg.MsgType() == lnutil.MSGID_POINTREQ {
+		fmt.Printf("Got point request from %x\n", msg.PeerIdx())
+		nd.PointReqHandler(lnutil.PointReqMsg(msg))
 		return nil
 	}
 	// POINT RESPONSE
-	if msg.MsgType == lnutil.MSGID_POINTRESP {
-		fmt.Printf("Got point response from %x\n", msg.PeerIdx)
-		err := nd.PointRespHandler(msg)
+	if msg.MsgType() == lnutil.MSGID_POINTRESP {
+		fmt.Printf("Got point response from %x\n", msg.PeerIdx())
+		err := nd.PointRespHandler(lnutil.PointRespMsg(msg))
 		if err != nil {
 			log.Printf(err.Error())
 		}
 		return nil
 	}
 	// CHANNEL DESCRIPTION
-	if msg.MsgType == lnutil.MSGID_CHANDESC {
-		fmt.Printf("Got channel description from %x\n", msg.PeerIdx)
-		nd.QChanDescHandler(msg)
+	if msg.MsgType() == lnutil.MSGID_CHANDESC {
+		fmt.Printf("Got channel description from %x\n", msg.PeerIdx())
+		nd.QChanDescHandler(lnutil.ChanDescMsg(msg))
 		return nil
 	}
 	// CHANNEL ACKNOWLEDGE
-	if msg.MsgType == lnutil.MSGID_CHANACK {
-		fmt.Printf("Got channel acknowledgement from %x\n", msg.PeerIdx)
-		nd.QChanAckHandler(msg, peer)
+	if msg.MsgType() == lnutil.MSGID_CHANACK {
+		fmt.Printf("Got channel acknowledgement from %x\n", msg.PeerIdx())
+		nd.QChanAckHandler(lnutil.ChanAckMsg(msg), peer)
 		return nil
 	}
 	// HERE'S YOUR CHANNEL
 	if msg.MsgType == lnutil.MSGID_SIGPROOF {
-		fmt.Printf("Got channel proof from %x\n", msg.PeerIdx)
-		nd.SigProofHandler(msg, peer)
+		fmt.Printf("Got channel proof from %x\n", msg.PeerIdx())
+		nd.SigProofHandler(lnutil.SigProofMsg(msg), peer)
 		return nil
 	}
 	// CLOSE REQ
-	if msg.MsgType == lnutil.MSGID_CLOSEREQ {
-		fmt.Printf("Got close request from %x\n", msg.PeerIdx)
-		nd.CloseReqHandler(msg)
+	if msg.MsgType() == lnutil.MSGID_CLOSEREQ {
+		fmt.Printf("Got close request from %x\n", msg.PeerIdx())
+		nd.CloseReqHandler(lnutil.CloseReqMsg(msg))
 		return nil
 	}
 	// CLOSE RESP
@@ -63,7 +72,7 @@ func (nd *LitNode) PeerHandler(msg *lnutil.LitMsg, q *Qchan, peer *RemotePeer) e
 	//		}
 
 	// PUSH type messages are 0x7?, and get their own helper function
-	if msg.MsgType&0xf0 == 0x70 {
+	if msg.MsgType()&0xf0 == 0x30 {
 		if q == nil {
 			return fmt.Errorf("pushpull message but no matching channel")
 		}
@@ -72,15 +81,15 @@ func (nd *LitNode) PeerHandler(msg *lnutil.LitMsg, q *Qchan, peer *RemotePeer) e
 
 	// messages to hand to the watchtower all start with 0xa_
 	// don't strip the first byte before handing it over
-	if msg.MsgType&0xf0 == 0xa0 {
+	if msg.MsgType()&0xf0 == 0x60 {
 		if !nd.Tower.Accepting {
 			return fmt.Errorf("Error: Got tower msg from %x but tower disabled\n",
-				msg.PeerIdx)
+				msg.PeerIdx())
 		}
 		return nd.Tower.HandleMessage(msg)
 	}
 
-	return fmt.Errorf("Unknown message id byte %x &f0", msg.MsgType)
+	return fmt.Errorf("Unknown message id byte %x &f0", msg.MsgType())
 }
 
 // Every lndc has one of these running
@@ -153,6 +162,10 @@ func (nd *LitNode) PopulateQchanMap(peer *RemotePeer) error {
 		}
 	}
 	return nil
+}
+
+func (nd *LitNode) CloseHandler(msg *lnutil.LitMsg) error {
+
 }
 
 // need a go routine for each qchan.

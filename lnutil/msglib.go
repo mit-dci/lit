@@ -9,41 +9,47 @@ import (
 type Msg interface {
 	setData(...[]byte)
 }
+
+/*
 type LitMsg struct { // RETRACTED
 	PeerIdx uint32
 	ChanIdx uint32 // optional, may be 0
 	MsgType uint8
 	Data    []byte
 }
+*/
 
-type NewLitMsg interface {
+type LitMsg interface {
 	Peer() uint32
-	//ChanIdx() uint32 // optional, may be 0
 	MsgType() uint8
 	Bytes() []byte
 }
 
 const (
-	MSGID_POINTREQ  = 0x30
-	MSGID_POINTRESP = 0x31
-	MSGID_CHANDESC  = 0x32
-	MSGID_CHANACK   = 0x33
-	MSGID_SIGPROOF  = 0x34
+	MSGID_TEXTCHAT = 0x00 // send a text message
 
-	MSGID_CLOSEREQ  = 0x40 // close channel
-	MSGID_CLOSERESP = 0x41
+	MSGID_POINTREQ  = 0x10
+	MSGID_POINTRESP = 0x11
+	MSGID_CHANDESC  = 0x12
+	MSGID_CHANACK   = 0x13
+	MSGID_SIGPROOF  = 0x14
 
-	MSGID_TEXTCHAT = 0x60 // send a text message
+	MSGID_CLOSEREQ  = 0x20 // close channel
+	MSGID_CLOSERESP = 0x21
 
-	MSGID_DELTASIG  = 0x70 // pushing funds in channel; request to send
-	MSGID_SIGREV    = 0x72 // pulling funds; signing new state and revoking old
-	MSGID_GAPSIGREV = 0x73 // resolving collision
-	MSGID_REV       = 0x74 // pushing funds; revoking previous channel state
+	MSGID_DELTASIG  = 0x30 // pushing funds in channel; request to send
+	MSGID_SIGREV    = 0x31 // pulling funds; signing new state and revoking old
+	MSGID_GAPSIGREV = 0x32 // resolving collision
+	MSGID_REV       = 0x33 // pushing funds; revoking previous channel state
 
-	MSGID_FWDMSG     = 0x20
-	MSGID_FWDAUTHREQ = 0x21
+	MSGID_FWDMSG     = 0x40
+	MSGID_FWDAUTHREQ = 0x41
 
-	MSGID_SELFPUSH = 0x80
+	MSGID_SELFPUSH = 0x50
+
+	MSGID_WATCH_DESC   = 0x60 // desc describes a new channel
+	MSGID_WATCH_COMMSG = 0x61 // commsg is a single state in the channel
+	MSGID_WATCH_DELETE = 0x62 // Watch_clear marks a channel as ok to delete.  No further updates possible.
 )
 
 type DeltaSigMsg struct {
@@ -291,17 +297,76 @@ func (self *SigProofMsg) MsgType() uint32 { return MSGID_SIGPROOF }
 
 //----------
 
-type ChanAckMsg struct { //in construction
-	PeerIdx  uint32
-	Outpoint wire.OutPoint
-	// elkpointarray
+type ChanDescMsg struct { //in construction
+	PeerIdx   uint32
+	Outpoint  wire.OutPoint
+	PubKey    [33]byte
+	RefundPub [33]byte
+	HAKDbase  [33]byte
+
+	Capacity    [8]byte
+	InitPayment [8]byte
+
+	ElkZero   [33]byte //consider changing into array in future
+	ElkOne    [33]byte
+	ElkTwo    [33]byte
 	Signature [64]byte
 }
 
-func NewChanAckMsg(peerid uint32, OP wire.OutPoint, SIG [64]byte) *ChanAckMsg {
+func NewChanDescMsg(peerid uint32, OP wire.OutPoint, pubkey [33]byte, refund [33]byte, hakd [33]byte,
+	capacity [8]byte, payment [8]byte, ELKZero [33]byte, ELKOne [33]byte, ELKTwo [33]byte) *ChanDescMsg {
+
+	cd := new(ChanDescMsg)
+	cd.PeerIdx = peerid
+	cd.Outpoint = OP
+	cd.PubKey = pubkey
+	cd.RefundPub = refund
+	cd.HAKDbase = hakd
+	cd.Capacity = capacity
+	cd.InitPayment = payment
+	cd.ElkZero = ELKZero
+	cd.ElkOne = ELKOne
+	cd.ElkTwo = ELKTwo
+	return cd
+}
+
+func (self *ChanDescMsg) Bytes() []byte {
+	var msg []byte
+	opArr := OutPointToBytes(self.Outpoint)
+	msg = append(msg, opArr[:]...)
+	msg = append(msg, self.PubKey[:]...)
+	msg = append(msg, self.RefundPub[:]...)
+	msg = append(msg, self.HAKDbase[:]...)
+	msg = append(msg, self.Capacity[:]...)
+	msg = append(msg, self.InitPayment[:]...)
+	msg = append(msg, self.ElkZero[:]...)
+	msg = append(msg, self.ElkOne[:]...)
+	msg = append(msg, self.ElkTwo[:]...)
+	msg = append(msg, self.Signature[:]...)
+	return msg
+}
+
+func (self *ChanDescMsg) Peer() uint32    { return self.PeerIdx }
+func (self *ChanDescMsg) MsgType() uint32 { return MSGID_CHANDESC }
+
+//----------
+
+type ChanAckMsg struct {
+	PeerIdx   uint32
+	Outpoint  wire.OutPoint
+	ElkZero   [33]byte
+	ElkOne    [33]byte
+	ElkTwo    [33]byte
+	Signature [64]byte
+}
+
+func NewChanAckMsg(peerid uint32, OP wire.OutPoint, ELKZero [33]byte, ELKOne [33]byte, ELKTwo [33]byte, SIG [64]byte) *ChanAckMsg {
 	ca := new(ChanAckMsg)
 	ca.PeerIdx = peerid
 	ca.Outpoint = OP
+	ca.ElkZero = ELKZero
+	ca.ElkOne = ELKOne
+	ca.ElkTwo = ELKTwo
 	ca.Signature = SIG
 	return ca
 }
@@ -310,6 +375,9 @@ func (self *ChanAckMsg) Bytes() []byte {
 	var msg []byte
 	opArr := OutPointToBytes(self.Outpoint)
 	msg = append(msg, opArr[:]...)
+	msg = append(msg, self.ElkZero[:]...)
+	msg = append(msg, self.ElkOne[:]...)
+	msg = append(msg, self.ElkTwo[:]...)
 	msg = append(msg, self.Signature[:]...)
 	return msg
 }
@@ -318,3 +386,26 @@ func (self *ChanAckMsg) Peer() uint32    { return self.PeerIdx }
 func (self *ChanAckMsg) MsgType() uint32 { return MSGID_CHANACK }
 
 //----------
+
+// 2 structs that the watchtower gets from clients: Descriptors and Msgs
+
+// WatchannelDescriptor is the initial message setting up a Watchannel
+type WatchannelDescriptor struct {
+	PeerIdx       uint32
+	DestPKHScript [20]byte // PKH to grab to; main unique identifier.
+
+	Delay uint16 // timeout in blocks
+	Fee   int64  // fee to use for grab tx.  Or fee rate...?
+
+	CustomerBasePoint  [33]byte // client's HAKD key base point
+	AdversaryBasePoint [33]byte // potential attacker's timeout basepoint
+}
+
+// the message describing the next commitment tx, sent from the client to the watchtower
+type ComMsg struct {
+	PeerIdx uint32
+	DestPKH [20]byte       // identifier for channel; could be optimized away
+	Elk     chainhash.Hash // elkrem for this state index
+	ParTxid [16]byte       // 16 bytes of txid
+	Sig     [64]byte       // 64 bytes of sig
+}

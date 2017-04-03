@@ -4,18 +4,8 @@ import (
 	"fmt"
 
 	"github.com/boltdb/bolt"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/mit-dci/lit/lnutil"
-)
-
-const (
-	// desc describes a new channel
-	MSGID_WATCH_DESC = 0xA0
-	// commsg is a single state in the channel
-	MSGID_WATCH_COMMSG = 0xA1
-	// Watch_clear marks a channel as ok to delete.  No further updates possible.
-	MSGID_WATCH_DELETE = 0xA2
 )
 
 // The main watchtower struct
@@ -29,27 +19,6 @@ type WatchTower struct {
 	SyncHeight int32 // last block we've sync'd to.  Not needed?
 
 	OutBox chan *wire.MsgTx // where the tower sends its justice txs
-}
-
-// 2 structs that the watchtower gets from clients: Descriptors and Msgs
-
-// WatchannelDescriptor is the initial message setting up a Watchannel
-type WatchannelDescriptor struct {
-	DestPKHScript [20]byte // PKH to grab to; main unique identifier.
-
-	Delay uint16 // timeout in blocks
-	Fee   int64  // fee to use for grab tx.  Or fee rate...?
-
-	CustomerBasePoint  [33]byte // client's HAKD key base point
-	AdversaryBasePoint [33]byte // potential attacker's timeout basepoint
-}
-
-// the message describing the next commitment tx, sent from the client to the watchtower
-type ComMsg struct {
-	DestPKH [20]byte       // identifier for channel; could be optimized away
-	Elk     chainhash.Hash // elkrem for this state index
-	ParTxid [16]byte       // 16 bytes of txid
-	Sig     [64]byte       // 64 bytes of sig
 }
 
 // 2 structs used in the DB: IdxSigs and ChanStatic
