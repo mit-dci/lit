@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/adiabat/bech32"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
@@ -122,7 +123,7 @@ func (r *LitRPC) Send(args SendArgs, reply *TxidsReply) error {
 			return fmt.Errorf("Amt %d less than min 10000", args.Amts[i])
 		}
 
-		outScript, err := r.AdrStringToOutscript(s)
+		outScript, err := AdrStringToOutscript(s, r.Node.SubWallet.Params())
 		if err != nil {
 			return err
 		}
@@ -152,7 +153,7 @@ type SweepArgs struct {
 }
 
 // AdrStringToOutscript converts an address string into an output script byte slice
-func (r *LitRPC) AdrStringToOutscript(adr string) ([]byte, error) {
+func AdrStringToOutscript(adr string, p *chaincfg.Params) ([]byte, error) {
 	var err error
 	var outScript []byte
 	if adr[:3] == "tb1" || adr[:3] == "bc1" {
@@ -163,7 +164,7 @@ func (r *LitRPC) AdrStringToOutscript(adr string) ([]byte, error) {
 		}
 	} else {
 		// try for base58 address
-		adr, err := btcutil.DecodeAddress(adr, r.Node.SubWallet.Params())
+		adr, err := btcutil.DecodeAddress(adr, p)
 		if err != nil {
 			return nil, err
 		}
@@ -177,7 +178,7 @@ func (r *LitRPC) AdrStringToOutscript(adr string) ([]byte, error) {
 
 func (r *LitRPC) Sweep(args SweepArgs, reply *TxidsReply) error {
 
-	outScript, err := r.AdrStringToOutscript(args.DestAdr)
+	outScript, err := AdrStringToOutscript(args.DestAdr, r.Node.SubWallet.Params())
 	if err != nil {
 		return err
 	}
@@ -213,7 +214,7 @@ func (r *LitRPC) Fanout(args FanArgs, reply *TxidsReply) error {
 	if args.AmtPerOutput < 5000 {
 		return fmt.Errorf("Minimum 5000 per output")
 	}
-	outScript, err := r.AdrStringToOutscript(args.DestAdr)
+	outScript, err := AdrStringToOutscript(args.DestAdr, r.Node.SubWallet.Params())
 	if err != nil {
 		return err
 	}
