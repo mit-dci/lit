@@ -1,6 +1,9 @@
 package lnutil
 
 import (
+	"bytes"
+	"encoding/binary"
+
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 )
@@ -26,7 +29,7 @@ type LitMsg interface {
 }
 
 const (
-	MSGID_TEXTCHAT = 0x01 // send a text message
+	MSGID_TEXTCHAT = 0x00 // send a text message
 
 	MSGID_POINTREQ  = 0x10
 	MSGID_POINTRESP = 0x11
@@ -311,11 +314,6 @@ type ChanDescMsg struct { //in construction
 	ElkOne    [33]byte
 	ElkTwo    [33]byte
 	Signature [64]byte
-=======
-	outpoit   wire.OutPoint
-	revelk    chainhash.Hash // 32 bytes
-	nextpoint [33]byte
->>>>>>> 61b85e7e17e3ddf6dc0758318a8b6df8d9d50a22
 }
 
 func NewChanDescMsg(peerid uint32, OP wire.OutPoint, pubkey [33]byte, refund [33]byte, hakd [33]byte,
@@ -394,8 +392,16 @@ func (self *ChanAckMsg) MsgType() uint32 { return MSGID_CHANACK }
 
 // 2 structs that the watchtower gets from clients: Descriptors and Msgs
 
+// Descriptors are 128 bytes
+// PKH 20
+// Delay 2
+// Fee 8
+// HAKDbase 33
+// Timebase 33
+// Elk0 32
+
 // WatchannelDescriptor is the initial message setting up a Watchannel
-type WatchannelDescriptor struct {
+type WatchDescMsg struct {
 	PeerIdx       uint32
 	DestPKHScript [20]byte // PKH to grab to; main unique identifier.
 
@@ -406,7 +412,50 @@ type WatchannelDescriptor struct {
 	AdversaryBasePoint [33]byte // potential attacker's timeout basepoint
 }
 
+// NewWatchDescMsg turns 96 bytes into a WatchannelDescriptor
+// Silently fails with incorrect size input, watch out.
+func NewWatchDescMsg(b []byte, peerIDX uint32) *WatchDescMsg {
+	sd := new(WatchDescMsg)
+	if len(b) != 96 {
+		return sd
+		//		return sd, fmt.Errorf(
+		//			"WatchannelDescriptor %d bytes, expect 128 or 96", len(b))
+	}
+	sd.PeerIdx = peerIDX
+	buf := bytes.NewBuffer(b)
+
+	copy(sd.DestPKHScript[:], buf.Next(20))
+	_ = binary.Read(buf, binary.BigEndian, &sd.Delay)
+
+	_ = binary.Read(buf, binary.BigEndian, &sd.Fee)
+
+	copy(sd.CustomerBasePoint[:], buf.Next(33))
+	copy(sd.AdversaryBasePoint[:], buf.Next(33))
+
+	return sd
+}
+
+// Bytes turns a WatchannelDescriptor into 100 bytes
+func (sd *WatchDescMsg) Bytes() []byte {
+	var buf bytes.Buffer
+	buf.Write(sd.DestPKHScript[:])
+	binary.Write(&buf, binary.BigEndian, sd.Delay)
+	binary.Write(&buf, binary.BigEndian, sd.Fee)
+	buf.Write(sd.CustomerBasePoint[:])
+	buf.Write(sd.AdversaryBasePoint[:])
+	return buf.Bytes()
+}
+
+func (self *WatchDescMsg) Peer() uint32    { return self.PeerIdx }
+func (self *WatchDescMsg) MsgType() uint32 { return MSGID_WATCH_DESC }
+
 // the message describing the next commitment tx, sent from the client to the watchtower
+
+// ComMsg are 132 bytes.
+// PKH 20
+// txid 16
+// sig 64
+// elk 32
 type ComMsg struct {
 	PeerIdx uint32
 	DestPKH [20]byte       // identifier for channel; could be optimized away
@@ -414,3 +463,32 @@ type ComMsg struct {
 	ParTxid [16]byte       // 16 bytes of txid
 	Sig     [64]byte       // 64 bytes of sig
 }
+
+// ComMsgFromBytes turns 132 bytes into a SorceMsg
+// Silently fails with wrong size input.
+func NewComMsg(b []byte, peerIDX uint32) *ComMsg {
+	sm := new(ComMsg)
+	if len(b) != 132 {
+		return sm
+	}
+	sm.PeerIdx = peerIDX
+	copy(sm.DestPKH[:], b[:20])
+	copy(sm.ParTxid[:], b[20:36])
+	copy(sm.Sig[:], b[36:100])
+	copy(sm.Elk[:], b[100:])
+	return sm
+}
+
+// ToBytes turns a ComMsg into 132 bytes
+func (sm *ComMsg) Bytes() (b [132]byte) {
+	var buf bytes.Buffer
+	buf.Write(sm.DestPKH[:])
+	buf.Write(sm.ParTxid[:])
+	buf.Write(sm.Sig[:])
+	buf.Write(sm.Elk.CloneBytes())
+	copy(b[:], buf.Bytes())
+	return
+}
+
+func (self *ComMsg) Peer() uint32    { return self.PeerIdx }
+func (self *ComMsg) MsgType() uint32 { return MSGID_WATCH_COMMSG }

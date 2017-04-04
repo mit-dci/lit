@@ -8,88 +8,46 @@ import (
 )
 
 // handles stuff that comes in over the wire.  Not user-initiated.
-func (nd *LitNode) PeerHandler(msg *lnutil.LitMsg, q *Qchan, peer *RemotePeer) error {
-
+func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) error {
 	switch msg.MsgType() & 0xf0 { // in progress
-	case 0x00:
-	case 0x10:
-	case 0x20:
-	case 0x30:
-	case 0x40:
-	case 0x50:
-	case 0x60:
-	}
-	// TEXT MESSAGE.  SIMPLE
-	if msg.MsgType() == lnutil.MSGID_TEXTCHAT { //it's text
+	case 0x00: // TEXT MESSAGE.  SIMPLE
 		nd.UserMessageBox <- fmt.Sprintf(
 			"\nmsg from %s: %s", lnutil.White(msg.PeerIdx()), lnutil.Green(string(msg.Bytes())))
 		return nil
-	}
-	// POINT REQUEST
-	if msg.MsgType() == lnutil.MSGID_POINTREQ {
-		fmt.Printf("Got point request from %x\n", msg.PeerIdx())
-		nd.PointReqHandler(lnutil.PointReqMsg(msg))
-		return nil
-	}
-	// POINT RESPONSE
-	if msg.MsgType() == lnutil.MSGID_POINTRESP {
-		fmt.Printf("Got point response from %x\n", msg.PeerIdx())
-		err := nd.PointRespHandler(lnutil.PointRespMsg(msg))
-		if err != nil {
-			log.Printf(err.Error())
-		}
-		return nil
-	}
-	// CHANNEL DESCRIPTION
-	if msg.MsgType() == lnutil.MSGID_CHANDESC {
-		fmt.Printf("Got channel description from %x\n", msg.PeerIdx())
-		nd.QChanDescHandler(lnutil.ChanDescMsg(msg))
-		return nil
-	}
-	// CHANNEL ACKNOWLEDGE
-	if msg.MsgType() == lnutil.MSGID_CHANACK {
-		fmt.Printf("Got channel acknowledgement from %x\n", msg.PeerIdx())
-		nd.QChanAckHandler(lnutil.ChanAckMsg(msg), peer)
-		return nil
-	}
-	// HERE'S YOUR CHANNEL
-	if msg.MsgType == lnutil.MSGID_SIGPROOF {
-		fmt.Printf("Got channel proof from %x\n", msg.PeerIdx())
-		nd.SigProofHandler(lnutil.SigProofMsg(msg), peer)
-		return nil
-	}
-	// CLOSE REQ
-	if msg.MsgType() == lnutil.MSGID_CLOSEREQ {
-		fmt.Printf("Got close request from %x\n", msg.PeerIdx())
-		nd.CloseReqHandler(lnutil.CloseReqMsg(msg))
-		return nil
-	}
-	// CLOSE RESP
-	//		if msgid == uspv.MSGID_CLOSERESP {
-	//			fmt.Printf("Got close response from %x\n", from)
-	//			CloseRespHandler(from, msg[1:])
-	//			continue
-	//		}
 
-	// PUSH type messages are 0x7?, and get their own helper function
-	if msg.MsgType()&0xf0 == 0x30 {
+	case 0x10:
+		return nd.ChannelHandler(msg)
+
+	case 0x20:
+		return nd.CloseHandler(msg)
+
+	case 0x30:
 		if q == nil {
 			return fmt.Errorf("pushpull message but no matching channel")
 		}
 		return nd.PushPullHandler(msg, q)
-	}
 
-	// messages to hand to the watchtower all start with 0xa_
-	// don't strip the first byte before handing it over
-	if msg.MsgType()&0xf0 == 0x60 {
+	/* not yet implemented
+	case 0x40:
+		return nd.FWDHandler(msg)
+	*/
+	/* not yet implemented
+	case 0x50:
+		return nd.SelfPush(msg)
+	*/
+
+	case 0x60:
 		if !nd.Tower.Accepting {
 			return fmt.Errorf("Error: Got tower msg from %x but tower disabled\n",
 				msg.PeerIdx())
 		}
 		return nd.Tower.HandleMessage(msg)
+
+	default:
+		return fmt.Errorf("Unknown message id byte %x &f0", msg.MsgType())
+
 	}
 
-	return fmt.Errorf("Unknown message id byte %x &f0", msg.MsgType())
 }
 
 // Every lndc has one of these running
@@ -164,38 +122,102 @@ func (nd *LitNode) PopulateQchanMap(peer *RemotePeer) error {
 	return nil
 }
 
+func (nd *LitNode) ChannelHandler(msg *lnutil.LitMsg) error {
+	switch msg.MsgType() {
+	case lnutil.MSGID_POINTREQ: // POINT REQUEST
+		fmt.Printf("Got point request from %x\n", msg.PeerIdx())
+		nd.PointReqHandler(lnutil.PointReqMsg(msg))
+		return nil
+
+	case lnutil.MSGID_POINTRESP: // POINT RESPONSE
+		fmt.Printf("Got point response from %x\n", msg.PeerIdx())
+		err := nd.PointRespHandler(lnutil.PointRespMsg(msg))
+		if err != nil {
+			log.Printf(err.Error())
+		}
+		return nil
+
+	case lnutil.MSGID_CHANDESC: // CHANNEL DESCRIPTION
+		fmt.Printf("Got channel description from %x\n", msg.PeerIdx())
+		nd.QChanDescHandler(lnutil.ChanDescMsg(msg))
+		return nil
+
+	case lnutil.MSGID_CHANACK: // CHANNEL ACKNOWLEDGE
+		fmt.Printf("Got channel acknowledgement from %x\n", msg.PeerIdx())
+		nd.QChanAckHandler(lnutil.ChanAckMsg(msg), peer)
+		return nil
+
+	case lnutil.MSGID_SIGPROOF: // HERE'S YOUR CHANNEL
+		fmt.Printf("Got channel proof from %x\n", msg.PeerIdx())
+		nd.SigProofHandler(lnutil.SigProofMsg(msg), peer)
+		return nil
+
+	default:
+		return fmt.Errorf("Unknown message type %x", routedMsg.MsgType())
+	}
+
+}
+
 func (nd *LitNode) CloseHandler(msg *lnutil.LitMsg) error {
+	switch msg.MsgType() { // CLOSE REQ
+
+	case lnutil.MSGID_CLOSEREQ:
+		fmt.Printf("Got close request from %x\n", msg.PeerIdx())
+		nd.CloseReqHandler(lnutil.CloseReqMsg(msg))
+		return nil
+
+	/* - not yet implemented
+	case lnutil.MSGID_CLOSERESP: // CLOSE RESP
+		fmt.Printf("Got close response from %x\n", from)
+		nd.CloseRespHandler(from, msg[1:])
+		continue
+		return nil
+	*/
+	default:
+		return fmt.Errorf("Unknown message type %x", routedMsg.MsgType())
+	}
 
 }
 
 // need a go routine for each qchan.
 
 func (nd *LitNode) PushPullHandler(routedMsg *lnutil.LitMsg, q *Qchan) error {
+	switch routedMsg.MsgType() {
+	case lnutil.MSGID_DELTASIG:
+		fmt.Printf("Got DELTASIG from %x\n", routedMsg.PeerIdx())
+		return nd.DeltaSigHandler(lnutil.DeltaSigMsg(routedMsg), q)
 
-	if routedMsg.MsgType == lnutil.MSGID_DELTASIG {
-		fmt.Printf("Got DELTASIG from %x\n", routedMsg.PeerIdx)
-		return nd.DeltaSigHandler(routedMsg, q)
+	case lnutil.MSGID_SIGREV: // SIGNATURE AND REVOCATION
+		fmt.Printf("Got SIGREV from %x\n", routedMsg.PeerIdx())
+		return nd.SigRevHandler(lnutil.SigRevMsg(routedMsg), q)
+
+	case lnutil.MSGID_GAPSIGREV: // GAP SIGNATURE AND REVOCATION
+		fmt.Printf("Got GapSigRev from %x\n", routedMsg.PeerIdx())
+		return nd.GapSigRevHandler(lnutil.GapSigRevMsg(routedMsg), q)
+
+	case lnutil.MSGID_REV: // REVOCATION
+		fmt.Printf("Got REV from %x\n", routedMsg.PeerIdx())
+		return nd.RevHandler(lnutil.RevMsg(routedMsg), q)
+
+	default:
+		return fmt.Errorf("Unknown message type %x", routedMsg.MsgType())
+
 	}
 
-	// SIGNATURE AND REVOCATION
-	if routedMsg.MsgType == lnutil.MSGID_SIGREV {
-		fmt.Printf("Got SIGREV from %x\n", routedMsg.PeerIdx)
-		return nd.SigRevHandler(routedMsg, q)
-	}
+}
 
-	// GAP SIGNATURE AND REVOCATION
-	if routedMsg.MsgType == lnutil.MSGID_GAPSIGREV {
-		fmt.Printf("Got GapSigRev from %x\n", routedMsg.PeerIdx)
-		return nd.GapSigRevHandler(routedMsg, q)
+func (nd *LitNode) FWDHandler(msg *lnutil.LitMsg) error { // not yet implemented
+	switch msg.MsgType() {
+	default:
+		return fmt.Errorf("Unknown message type %x", routedMsg.MsgType())
 	}
+}
 
-	// REVOCATION
-	if routedMsg.MsgType == lnutil.MSGID_REV {
-		fmt.Printf("Got REV from %x\n", routedMsg.PeerIdx)
-		return nd.RevHandler(routedMsg, q)
+func (nd *LitNode) SelfPush(msg *lnutil.LitMsg) error { // not yet implemented
+	switch msg.MsgType() {
+	default:
+		return fmt.Errorf("Unknown message type %x", routedMsg.MsgType())
 	}
-
-	return fmt.Errorf("Unknown message type %x", routedMsg.MsgType)
 }
 
 // OPEventHandler gets outpoint events from the base wallet,

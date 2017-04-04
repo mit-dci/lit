@@ -30,25 +30,25 @@ type IdxSig struct {
 	Sig      [64]byte // What
 }
 
-func (w *WatchTower) HandleMessage(lm *lnutil.LitMsg) error {
-	fmt.Printf("got message from %x\n", lm.PeerIdx)
+func (w *WatchTower) HandleMessage(lm lnutil.LitMsg) error {
+	fmt.Printf("got message from %x\n", lm.Peer())
 
-	switch lm.MsgType {
-	case MSGID_WATCH_DESC:
+	switch lm.MsgType() {
+	case lnutil.MSGID_WATCH_DESC:
 		fmt.Printf("new channel to watch\n")
-		desc := WatchannelDescriptorFromBytes(lm.Data)
+		desc := *lnutil.NewWatchDescMsg(lm.Bytes(), lm.Peer())
 		return w.AddNewChannel(desc)
 
-	case MSGID_WATCH_COMMSG:
+	case lnutil.MSGID_WATCH_COMMSG:
 		fmt.Printf("new commsg\n")
-		commsg := ComMsgFromBytes(lm.Data)
+		commsg := *lnutil.NewComMsg(lm.Bytes(), lm.Peer())
 		return w.AddState(commsg)
 
-	case MSGID_WATCH_DELETE:
+	case lnutil.MSGID_WATCH_DELETE:
 		fmt.Printf("delete message\n")
 		// delete not yet implemented
 	default:
-		fmt.Printf("unknown message type %x\n", lm.MsgType)
+		fmt.Printf("unknown message type %x\n", lm.MsgType())
 	}
 	return nil
 }

@@ -21,7 +21,7 @@ func (w *WatchTower) BuildJusticeTx(badTx *wire.MsgTx) (*wire.MsgTx, error) {
 	var err error
 
 	// wd and elkRcv are the two things we need to get out of the db
-	var wd WatchannelDescriptor
+	var wd lnutil.WatchDescMsg
 	var elkRcv *elkrem.ElkremReceiver
 	var iSig *IdxSig
 
@@ -68,7 +68,7 @@ func (w *WatchTower) BuildJusticeTx(badTx *wire.MsgTx) (*wire.MsgTx, error) {
 			return fmt.Errorf("No static data for pkh %x", pkh)
 		}
 		// deserialize static watchDescriptor struct
-		wd = WatchannelDescriptorFromBytes(static)
+		wd = *lnutil.NewWatchDescMsg(static, 0) // second argument should be replaced by peerIdx
 
 		// get the elkrem receiver
 		elkBytes := pkhBucket.Get(KEYElkRcv)
