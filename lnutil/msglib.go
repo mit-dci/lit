@@ -26,7 +26,7 @@ type LitMsg interface {
 }
 
 const (
-	MSGID_TEXTCHAT = 0x00 // send a text message
+	MSGID_TEXTCHAT = 0x01 // send a text message
 
 	MSGID_POINTREQ  = 0x10
 	MSGID_POINTRESP = 0x11
