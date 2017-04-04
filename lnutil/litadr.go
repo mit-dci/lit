@@ -37,6 +37,32 @@ being wildcard.  That should be ok to deal with.
 
 */
 
+func LitFullAdrEncode(in [33]byte) string {
+	withq := bech32.Encode("ln", in[:])
+	// get rid of the q after the 1.  Pubkeys are always 0x02 or 0x03,
+	// so the first 5 bits are always 0.
+	withq = withq[:3] + withq[4:]
+	return withq
+}
+
+func LitFullAdrDecode(in string) ([33]byte, error) {
+	var pub [33]byte
+	if len(in) != 61 {
+		return pub, fmt.Errorf("Invalid length, got %d expect 33", len(in))
+	}
+	// add the q back in so it decodes
+	in = in[:3] + "q" + in[3:]
+	hrp, data, err := bech32.Decode(in)
+	if err != nil {
+		return pub, err
+	}
+	if hrp != "ln" {
+		return pub, fmt.Errorf("Not a ln address, prefix %s", hrp)
+	}
+	copy(pub[:], data)
+	return pub, nil
+}
+
 func LitAdrFromPubkey(in [33]byte) string {
 	doubleSha := fastsha256.Sum256(in[:])
 	return bech32.Encode("ln", doubleSha[:20])
