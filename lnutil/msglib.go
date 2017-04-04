@@ -311,6 +311,11 @@ type ChanDescMsg struct { //in construction
 	ElkOne    [33]byte
 	ElkTwo    [33]byte
 	Signature [64]byte
+=======
+	outpoit   wire.OutPoint
+	revelk    chainhash.Hash // 32 bytes
+	nextpoint [33]byte
+>>>>>>> 61b85e7e17e3ddf6dc0758318a8b6df8d9d50a22
 }
 
 func NewChanDescMsg(peerid uint32, OP wire.OutPoint, pubkey [33]byte, refund [33]byte, hakd [33]byte,
