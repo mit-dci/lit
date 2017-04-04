@@ -26,7 +26,7 @@ user@host:~/go/src/github.com/mit-dci/lit$ cd ../../btcsuite/btcd/
 
 user@host:~/go/src/github.com/btcsuite/btcd$ git remote add adiabat https://github.com/adiabat/btcd
 user@host:~/go/src/github.com/btcsuite/btcd$ git fetch adiabat
-user@host:~/go/src/github.com/btcsuite/btcd$ git checkout adiabat/master
+user@host:~/go/src/github.com/btcsuite/btcd$ git checkout adiabat/bc2
 
 user@host:~/go/src/github.com/btcsuite/btcd$ cd ../btcutil
 

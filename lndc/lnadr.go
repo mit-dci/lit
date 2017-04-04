@@ -38,6 +38,23 @@ func (l *LNAdr) String() string {
 	return fmt.Sprintf("%v@%v", encodedId, l.NetAddr)
 }
 
+// ParseAdrString splits a string like
+// "ln1yrvw48uc3atg8e2lzs43mh74m39vl785g4ehem@myhost.co:8191 into a separate
+// pkh part and network part, adding the network part if needed
+func SplitAdrString(adr string) (string, string) {
+
+	if !strings.ContainsRune(adr, '@') {
+		adr += "@localhost:2448"
+	}
+	if !strings.ContainsRune(adr, ':') {
+		adr += ":2448"
+	}
+
+	idHost := strings.Split(adr, "@")
+
+	return idHost[0], idHost[1]
+}
+
 // newLnAddr...
 func LnAddrFromString(encodedAddr string, param *chaincfg.Params) (*LNAdr, error) {
 	// The format of an lnaddr is "<pubkey or pkh>@host:port"

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/mit-dci/lit/lndc"
+	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/qln"
 )
 
@@ -24,7 +24,7 @@ func (r *LitRPC) Listen(args ListenArgs, reply *StatusReply) error {
 	}
 	// todo: say what port and what pubkey in status message
 	reply.Status = fmt.Sprintf("listening on %s with key %s",
-		args.Port, adr.String())
+		args.Port, adr)
 	return nil
 }
 
@@ -36,31 +36,23 @@ type ConnectArgs struct {
 func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
 
 	// first, see if the peer to connect to is referenced by peer index.
-	var connectAdr *lndc.LNAdr
-
+	var connectAdr string
 	// check if a peer number was supplied instead of a pubkeyhash
 	peerIdxint, err := strconv.Atoi(args.LNAddr)
 	// number will mean no error
 	if err == nil {
 		// get peer from address book
 		pubArr, host := r.Node.GetPubHostFromPeerIdx(uint32(peerIdxint))
-		adrString := fmt.Sprintf("%x", pubArr)
+
+		connectAdr = lnutil.LitAdrFromPubkey(pubArr)
 		if host != "" {
-			adrString += "@" + host
+			connectAdr += "@" + host
 		}
-		fmt.Printf("try string %s\n", adrString)
-		// pretty ugly to build the string here...
-		connectAdr, err = lndc.LnAddrFromString(adrString, r.Node.SubWallet.Params())
-		if err != nil {
-			return err
-		}
+		fmt.Printf("try string %s\n", connectAdr)
 
 	} else {
-		// use string as is
-		connectAdr, err = lndc.LnAddrFromString(args.LNAddr, r.Node.SubWallet.Params())
-		if err != nil {
-			return err
-		}
+		// use string as is, try to convert to ln address
+		connectAdr = args.LNAddr
 	}
 
 	err = r.Node.DialPeer(connectAdr)
@@ -68,7 +60,7 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
 		return err
 	}
 
-	reply.Status = fmt.Sprintf("connected to peer %s", connectAdr.String())
+	reply.Status = fmt.Sprintf("connected to peer %s", connectAdr)
 	return nil
 }
 
@@ -90,16 +82,12 @@ func (r *LitRPC) ListConnections(args NoArgs, reply *ListConnectionsReply) error
 
 type ListeningPortsReply struct {
 	LisIpPorts []string
-	Adr string
+	Adr        string
 }
 
 func (r *LitRPC) GetListeningPorts(args NoArgs, reply *ListeningPortsReply) error {
-	adr, lisIpPorts, err := r.Node.GetLisAddressAndPorts()
-	reply.LisIpPorts = lisIpPorts
-	reply.Adr = adr.String()
-	if err != nil {
-		return err
-	}
+	reply.Adr, reply.LisIpPorts = r.Node.GetLisAddressAndPorts()
+
 	return nil
 }
 
