@@ -122,7 +122,7 @@ func (nd *LitNode) PopulateQchanMap(peer *RemotePeer) error {
 	return nil
 }
 
-func (nd *LitNode) ChannelHandler(msg *lnutil.LitMsg) error {
+func (nd *LitNode) ChannelHandler(msg lnutil.LitMsg) error {
 	switch msg.MsgType() {
 	case lnutil.MSGID_POINTREQ: // POINT REQUEST
 		fmt.Printf("Got point request from %x\n", msg.PeerIdx())
@@ -158,7 +158,7 @@ func (nd *LitNode) ChannelHandler(msg *lnutil.LitMsg) error {
 
 }
 
-func (nd *LitNode) CloseHandler(msg *lnutil.LitMsg) error {
+func (nd *LitNode) CloseHandler(msg lnutil.LitMsg) error {
 	switch msg.MsgType() { // CLOSE REQ
 
 	case lnutil.MSGID_CLOSEREQ:
@@ -181,7 +181,7 @@ func (nd *LitNode) CloseHandler(msg *lnutil.LitMsg) error {
 
 // need a go routine for each qchan.
 
-func (nd *LitNode) PushPullHandler(routedMsg *lnutil.LitMsg, q *Qchan) error {
+func (nd *LitNode) PushPullHandler(routedMsg lnutil.LitMsg, q *Qchan) error {
 	switch routedMsg.MsgType() {
 	case lnutil.MSGID_DELTASIG:
 		fmt.Printf("Got DELTASIG from %x\n", routedMsg.PeerIdx())
@@ -206,14 +206,14 @@ func (nd *LitNode) PushPullHandler(routedMsg *lnutil.LitMsg, q *Qchan) error {
 
 }
 
-func (nd *LitNode) FWDHandler(msg *lnutil.LitMsg) error { // not yet implemented
+func (nd *LitNode) FWDHandler(msg lnutil.LitMsg) error { // not yet implemented
 	switch msg.MsgType() {
 	default:
 		return fmt.Errorf("Unknown message type %x", routedMsg.MsgType())
 	}
 }
 
-func (nd *LitNode) SelfPush(msg *lnutil.LitMsg) error { // not yet implemented
+func (nd *LitNode) SelfPush(msg lnutil.LitMsg) error { // not yet implemented
 	switch msg.MsgType() {
 	default:
 		return fmt.Errorf("Unknown message type %x", routedMsg.MsgType())

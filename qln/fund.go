@@ -153,7 +153,7 @@ func (nd *LitNode) FundChannel(peerIdx uint32, ccap, initSend int64) (uint32, er
 // and a refund pubkey hash. (currently makes pubkey hash, need to only make 1)
 // so if someone sends 10 pubkeyreqs, they'll get the same pubkey back 10 times.
 // they have to provide an actual tx before the next pubkey will come out.
-func (nd *LitNode) PointReqHandler(lm *lnutil.LitMsg) {
+func (nd *LitNode) PointReqHandler(msg lnutil.PointReqMsg) {
 
 	/* shouldn't be possible to get this error...
 	if nd.RemoteCon == nil || nd.RemoteCon.RemotePub == nil {
@@ -175,7 +175,7 @@ func (nd *LitNode) PointReqHandler(lm *lnutil.LitMsg) {
 	kg.Step[0] = 44 | 1<<31
 	kg.Step[1] = 0 | 1<<31
 	kg.Step[2] = UseChannelFund
-	kg.Step[3] = lm.PeerIdx | 1<<31
+	kg.Step[3] = msg.Peer() | 1<<31
 	kg.Step[4] = cIdx | 1<<31
 
 	myChanPub := nd.GetUsePub(kg, UseChannelFund)
@@ -195,8 +195,8 @@ func (nd *LitNode) PointReqHandler(lm *lnutil.LitMsg) {
 	outMsg.Data = msg
 	*/
 	outMsg := new(lnutil.LitMsg)
-	outMsg2 := lnutil.NewPointRespMsg(lm.PeerIdx, myChanPub, myRefundPub, myHAKDbase)
-	nd.OmniOut <- outMsg
+	outMsg2 := lnutil.NewPointRespMsg(msg.Peer(), myChanPub, myRefundPub, myHAKDbase)
+	nd.OmniOut <- outMsg2
 	outMsg2.Bytes()
 
 	return
@@ -204,7 +204,7 @@ func (nd *LitNode) PointReqHandler(lm *lnutil.LitMsg) {
 
 // FUNDER
 // PointRespHandler takes in a point response, and returns a channel description
-func (nd LitNode) PointRespHandler(lm *lnutil.LitMsg) error {
+func (nd LitNode) PointRespHandler(lm lnutil.LitMsg) error {
 
 	nd.InProg.mtx.Lock()
 	defer nd.InProg.mtx.Unlock()
@@ -360,7 +360,7 @@ func (nd LitNode) PointRespHandler(lm *lnutil.LitMsg) error {
 // RECIPIENT
 // QChanDescHandler takes in a description of a channel output.  It then
 // saves it to the local db, and returns a channel acknowledgement
-func (nd *LitNode) QChanDescHandler(lm *lnutil.LitMsg) {
+func (nd *LitNode) QChanDescHandler(lm lnutil.LitMsg) {
 	if len(lm.Data) < 250 || len(lm.Data) > 250 {
 		fmt.Printf("got %d byte channel description, expect 250", len(lm.Data))
 		return
@@ -507,7 +507,7 @@ func (nd *LitNode) QChanDescHandler(lm *lnutil.LitMsg) {
 // FUNDER
 // QChanAckHandler takes in an acknowledgement multisig description.
 // when a multisig outpoint is ackd, that causes the funder to sign and broadcast.
-func (nd *LitNode) QChanAckHandler(lm *lnutil.LitMsg, peer *RemotePeer) {
+func (nd *LitNode) QChanAckHandler(lm lnutil.LitMsg, peer *RemotePeer) {
 	if len(lm.Data) < 199 || len(lm.Data) > 199 {
 		fmt.Printf("got %d byte multiAck, expect 199", len(lm.Data))
 		return
@@ -620,7 +620,7 @@ func (nd *LitNode) QChanAckHandler(lm *lnutil.LitMsg, peer *RemotePeer) {
 // RECIPIENT
 // SigProofHandler saves the signature the recipent stores.
 // In some cases you don't need this message.
-func (nd *LitNode) SigProofHandler(lm *lnutil.LitMsg, peer *RemotePeer) {
+func (nd *LitNode) SigProofHandler(lm lnutil.LitMsg, peer *RemotePeer) {
 	if len(lm.Data) < 100 || len(lm.Data) > 100 {
 		fmt.Printf("got %d byte Sigproof, expect ~100\n", len(lm.Data))
 		return

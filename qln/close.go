@@ -78,18 +78,17 @@ func (nd *LitNode) CoopClose(qc *Qchan) error {
 // CloseReqHandler takes in a close request from a remote host, signs and
 // responds with a close response.  Obviously later there will be some judgment
 // over what to do, but for now it just signs whatever it's requested to.
-func (nd *LitNode) CloseReqHandler(lm *lnutil.LitMsg) {
-	if len(lm.Data) < 100 {
-		fmt.Printf("got %d byte closereq, expect 100ish\n", len(lm.Data))
+func (nd *LitNode) CloseReqHandler(cr lnutil.CloseReqMsg) {
+	if len(cr.Bytes()) < 100 {
+		fmt.Printf("got %d byte closereq, expect 100ish\n", len(cr.Bytes()))
 		return
 	}
 
 	// deserialize outpoint
-	var opArr [36]byte
-	copy(opArr[:], lm.Data[:36])
+	opArr := lnutil.OutPointToBytes(cr.Outpoint)
 
 	// find their sig
-	theirSig := lm.Data[36:]
+	theirSig := cr.Signature[:]
 
 	// get channel
 	qc, err := nd.GetQchan(opArr)
