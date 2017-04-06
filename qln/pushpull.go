@@ -258,7 +258,7 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 // DeltaSigHandler takes in a DeltaSig and responds with an SigRev (normally)
 // or a GapSigRev (if there's a collision)
 // Leaves the channel either expecting a Rev (normally) or a GapSigRev (collision)
-func (nd *LitNode) DeltaSigHandler(lm *lnutil.LitMsg, qc *Qchan) error {
+func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 
 	if len(lm.Data) != 104 {
 		return fmt.Errorf("got %d byte DeltaSig, expect 104", len(lm.Data))
@@ -488,7 +488,7 @@ func (nd *LitNode) SendSigRev(q *Qchan) error {
 
 // GapSigRevHandler takes in a GapSigRev, responds with a Rev, and
 // leaves the channel in a state expecting a Rev.
-func (nd *LitNode) GapSigRevHandler(lm *lnutil.LitMsg, q *Qchan) error {
+func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
 	if len(lm.Data) < 165 || len(lm.Data) > 165 {
 		return fmt.Errorf("got %d byte GAPSIGREV, expect 165", len(lm.Data))
 	}
@@ -569,7 +569,7 @@ func (nd *LitNode) GapSigRevHandler(lm *lnutil.LitMsg, q *Qchan) error {
 
 // SIGREVHandler takes in an SIGREV and responds with a REV (if everything goes OK)
 // Leaves the channel in a clear / rest state.
-func (nd *LitNode) SigRevHandler(lm *lnutil.LitMsg, qc *Qchan) error {
+func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 	if len(lm.Data) < 165 || len(lm.Data) > 165 {
 		return fmt.Errorf("got %d byte SIGREV, expect 165", len(lm.Data))
 	}
@@ -700,7 +700,7 @@ func (nd *LitNode) SendREV(q *Qchan) error {
 // REVHandler takes in an REV and clears the state's prev HAKD.  This is the
 // final message in the state update process and there is no response.
 // Leaves the channel in a clear / rest state.
-func (nd *LitNode) RevHandler(lm *lnutil.LitMsg, qc *Qchan) error {
+func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {
 	if len(lm.Data) != 101 {
 		return fmt.Errorf("got %d byte REV, expect 101", len(lm.Data))
 	}

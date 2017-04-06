@@ -80,8 +80,8 @@ func (self *DeltaSigMsg) Bytes() []byte {
 	return msg
 }
 
-func (self *DeltaSigMsg) Peer() uint32    { return self.PeerIdx }
-func (self *DeltaSigMsg) MsgType() uint32 { return MSGID_DELTASIG }
+func (self *DeltaSigMsg) Peer() uint32   { return self.PeerIdx }
+func (self *DeltaSigMsg) MsgType() uint8 { return MSGID_DELTASIG }
 
 //----------
 
@@ -113,8 +113,8 @@ func (self *SigRevMsg) Bytes() []byte {
 	return msg
 }
 
-func (self *SigRevMsg) Peer() uint32    { return self.PeerIdx }
-func (self *SigRevMsg) MsgType() uint32 { return MSGID_SIGREV }
+func (self *SigRevMsg) Peer() uint32   { return self.PeerIdx }
+func (self *SigRevMsg) MsgType() uint8 { return MSGID_SIGREV }
 
 //----------
 
@@ -146,8 +146,8 @@ func (self *GapSigRevMsg) Bytes() []byte {
 	return msg
 }
 
-func (self *GapSigRevMsg) Peer() uint32    { return self.PeerIdx }
-func (self *GapSigRevMsg) MsgType() uint32 { return MSGID_GAPSIGREV }
+func (self *GapSigRevMsg) Peer() uint32   { return self.PeerIdx }
+func (self *GapSigRevMsg) MsgType() uint8 { return MSGID_GAPSIGREV }
 
 //----------
 
@@ -176,8 +176,8 @@ func (self *RevMsg) Bytes() []byte {
 	return msg
 }
 
-func (self *RevMsg) Peer() uint32    { return self.PeerIdx }
-func (self *RevMsg) MsgType() uint32 { return MSGID_REV }
+func (self *RevMsg) Peer() uint32   { return self.PeerIdx }
+func (self *RevMsg) MsgType() uint8 { return MSGID_REV }
 
 //----------
 
@@ -203,8 +203,8 @@ func (self *CloseReqMsg) Bytes() []byte {
 	return msg
 }
 
-func (self *CloseReqMsg) Peer() uint32    { return self.PeerIdx }
-func (self *CloseReqMsg) MsgType() uint32 { return MSGID_CLOSEREQ }
+func (self *CloseReqMsg) Peer() uint32   { return self.PeerIdx }
+func (self *CloseReqMsg) MsgType() uint8 { return MSGID_CLOSEREQ }
 
 //----------
 
@@ -220,8 +220,8 @@ func NewPointReqMsg(peerid uint32) *PointReqMsg {
 
 func (self *PointReqMsg) Bytes() []byte { return nil } // no data in this type of message
 
-func (self *PointReqMsg) Peer() uint32    { return self.PeerIdx }
-func (self *PointReqMsg) MsgType() uint32 { return MSGID_POINTREQ }
+func (self *PointReqMsg) Peer() uint32   { return self.PeerIdx }
+func (self *PointReqMsg) MsgType() uint8 { return MSGID_POINTREQ }
 
 //----------
 
@@ -249,8 +249,8 @@ func (self *PointRespMsg) Bytes() []byte {
 	return msg
 }
 
-func (self *PointRespMsg) Peer() uint32    { return self.PeerIdx }
-func (self *PointRespMsg) MsgType() uint32 { return MSGID_POINTRESP }
+func (self *PointRespMsg) Peer() uint32   { return self.PeerIdx }
+func (self *PointRespMsg) MsgType() uint8 { return MSGID_POINTRESP }
 
 //----------
 
@@ -268,8 +268,8 @@ func NewChatMsg(peerid uint32, text string) *ChatMsg {
 
 func (self *ChatMsg) Bytes() []byte { return []byte(self.Text) } // no data in this type of message
 
-func (self *ChatMsg) Peer() uint32    { return self.PeerIdx }
-func (self *ChatMsg) MsgType() uint32 { return MSGID_TEXTCHAT }
+func (self *ChatMsg) Peer() uint32   { return self.PeerIdx }
+func (self *ChatMsg) MsgType() uint8 { return MSGID_TEXTCHAT }
 
 //----------
 
@@ -295,20 +295,20 @@ func (self *SigProofMsg) Bytes() []byte {
 	return msg
 }
 
-func (self *SigProofMsg) Peer() uint32    { return self.PeerIdx }
-func (self *SigProofMsg) MsgType() uint32 { return MSGID_SIGPROOF }
+func (self *SigProofMsg) Peer() uint32   { return self.PeerIdx }
+func (self *SigProofMsg) MsgType() uint8 { return MSGID_SIGPROOF }
 
 //----------
 
-type ChanDescMsg struct { //in construction
+type ChanDescMsg struct {
 	PeerIdx   uint32
 	Outpoint  wire.OutPoint
 	PubKey    [33]byte
 	RefundPub [33]byte
 	HAKDbase  [33]byte
 
-	Capacity    [8]byte
-	InitPayment [8]byte
+	Capacity    int64
+	InitPayment int64
 
 	ElkZero   [33]byte //consider changing into array in future
 	ElkOne    [33]byte
@@ -317,7 +317,7 @@ type ChanDescMsg struct { //in construction
 }
 
 func NewChanDescMsg(peerid uint32, OP wire.OutPoint, pubkey [33]byte, refund [33]byte, hakd [33]byte,
-	capacity [8]byte, payment [8]byte, ELKZero [33]byte, ELKOne [33]byte, ELKTwo [33]byte) *ChanDescMsg {
+	capacity int64, payment int64, ELKZero [33]byte, ELKOne [33]byte, ELKTwo [33]byte) *ChanDescMsg {
 
 	cd := new(ChanDescMsg)
 	cd.PeerIdx = peerid
@@ -334,14 +334,19 @@ func NewChanDescMsg(peerid uint32, OP wire.OutPoint, pubkey [33]byte, refund [33
 }
 
 func (self *ChanDescMsg) Bytes() []byte {
+	capBin := make([]byte, 8) // turn int64 to []byte
+	binary.LittleEndian.PutUint64(capBin, uint64(self.Capacity))
+	initBin := make([]byte, 8)
+	binary.LittleEndian.PutUint64(initBin, uint64(self.InitPayment))
+
 	var msg []byte
 	opArr := OutPointToBytes(self.Outpoint)
 	msg = append(msg, opArr[:]...)
 	msg = append(msg, self.PubKey[:]...)
 	msg = append(msg, self.RefundPub[:]...)
 	msg = append(msg, self.HAKDbase[:]...)
-	msg = append(msg, self.Capacity[:]...)
-	msg = append(msg, self.InitPayment[:]...)
+	msg = append(msg, capBin[:]...)
+	msg = append(msg, initBin[:]...)
 	msg = append(msg, self.ElkZero[:]...)
 	msg = append(msg, self.ElkOne[:]...)
 	msg = append(msg, self.ElkTwo[:]...)
@@ -349,8 +354,8 @@ func (self *ChanDescMsg) Bytes() []byte {
 	return msg
 }
 
-func (self *ChanDescMsg) Peer() uint32    { return self.PeerIdx }
-func (self *ChanDescMsg) MsgType() uint32 { return MSGID_CHANDESC }
+func (self *ChanDescMsg) Peer() uint32   { return self.PeerIdx }
+func (self *ChanDescMsg) MsgType() uint8 { return MSGID_CHANDESC }
 
 //----------
 
@@ -385,8 +390,8 @@ func (self *ChanAckMsg) Bytes() []byte {
 	return msg
 }
 
-func (self *ChanAckMsg) Peer() uint32    { return self.PeerIdx }
-func (self *ChanAckMsg) MsgType() uint32 { return MSGID_CHANACK }
+func (self *ChanAckMsg) Peer() uint32   { return self.PeerIdx }
+func (self *ChanAckMsg) MsgType() uint8 { return MSGID_CHANACK }
 
 //----------
 
@@ -446,8 +451,8 @@ func (sd *WatchDescMsg) Bytes() []byte {
 	return buf.Bytes()
 }
 
-func (self *WatchDescMsg) Peer() uint32    { return self.PeerIdx }
-func (self *WatchDescMsg) MsgType() uint32 { return MSGID_WATCH_DESC }
+func (self *WatchDescMsg) Peer() uint32   { return self.PeerIdx }
+func (self *WatchDescMsg) MsgType() uint8 { return MSGID_WATCH_DESC }
 
 // the message describing the next commitment tx, sent from the client to the watchtower
 
@@ -490,5 +495,5 @@ func (sm *ComMsg) Bytes() (b [132]byte) {
 	return
 }
 
-func (self *ComMsg) Peer() uint32    { return self.PeerIdx }
-func (self *ComMsg) MsgType() uint32 { return MSGID_WATCH_COMMSG }
+func (self *ComMsg) Peer() uint32   { return self.PeerIdx }
+func (self *ComMsg) MsgType() uint8 { return MSGID_WATCH_COMMSG }

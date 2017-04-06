@@ -64,31 +64,30 @@ func (nd *LitNode) CoopClose(qc *Qchan) error {
 	outMsg.PeerIdx = qc.Peer()
 	outMsg.Data = msg
 	*/
-	outMsg := new(lnutil.LitMsg)
+	//outMsg := new(lnutil.LitMsg)
 
 	var signature [64]byte
 	copy(signature[:], sig[:])
-	outMsg2 := lnutil.NewCloseReqMsg(qc.Peer(), qc.Op, signature)
+	outMsg := lnutil.NewCloseReqMsg(qc.Peer(), qc.Op, signature)
 
 	nd.OmniOut <- outMsg
-	outMsg2.Bytes()
 	return nil
 }
 
 // CloseReqHandler takes in a close request from a remote host, signs and
 // responds with a close response.  Obviously later there will be some judgment
 // over what to do, but for now it just signs whatever it's requested to.
-func (nd *LitNode) CloseReqHandler(cr lnutil.CloseReqMsg) {
-	if len(cr.Bytes()) < 100 {
-		fmt.Printf("got %d byte closereq, expect 100ish\n", len(cr.Bytes()))
+func (nd *LitNode) CloseReqHandler(msg lnutil.CloseReqMsg) {
+	if len(msg.Bytes()) < 100 {
+		fmt.Printf("got %d byte closereq, expect 100ish\n", len(msg.Bytes()))
 		return
 	}
 
 	// deserialize outpoint
-	opArr := lnutil.OutPointToBytes(cr.Outpoint)
+	opArr := lnutil.OutPointToBytes(msg.Outpoint)
 
 	// find their sig
-	theirSig := cr.Signature[:]
+	theirSig := msg.Signature[:]
 
 	// get channel
 	qc, err := nd.GetQchan(opArr)
