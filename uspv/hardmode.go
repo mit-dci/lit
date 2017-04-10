@@ -2,7 +2,6 @@ package uspv
 
 import (
 	"bytes"
-	"fmt"
 	"log"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -151,7 +150,7 @@ func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
 	*/
 	ok := BlockOK(*m) // check block self-consistency
 	if !ok {
-		fmt.Printf("block %s not OK!!11\n", m.BlockHash().String())
+		log.Printf("block %s not OK!!11\n", m.BlockHash().String())
 		return
 	}
 
@@ -173,7 +172,7 @@ func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
 	// iterate through all txs in the block, looking for matches.
 	for _, tx := range m.Transactions {
 		if s.MatchTx(tx) {
-			fmt.Printf("found matching tx %s\n", tx.TxHash().String())
+			log.Printf("found matching tx %s\n", tx.TxHash().String())
 			s.TxUpToWallit <- lnutil.TxAndHeight{tx, hah.height}
 		}
 	}
@@ -183,7 +182,7 @@ func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
 	// track our internal height
 	s.syncHeight = hah.height
 
-	fmt.Printf("ingested full block %s height %d OK\n",
+	log.Printf("ingested full block %s height %d OK\n",
 		m.Header.BlockHash().String(), hah.height)
 
 	if hah.final { // check sync end

@@ -3,6 +3,7 @@ package wallit
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"sort"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -20,7 +21,7 @@ import (
 // Bunch of redundancy with SendMany, maybe move that to a shared function...
 //NOTE this does not support multiple txouts with identical pkscripts in one tx.
 // The code would be trivial; it's not supported on purpose.  Use unique pkscripts.
-func (w *Wallit) MaybeSend(txos []*wire.TxOut) ([]*wire.OutPoint, error) {
+func (w *Wallit) MaybeSend(txos []*wire.TxOut, ow bool) ([]*wire.OutPoint, error) {
 	var err error
 	var totalSend int64
 	dustCutoff := int64(20000) // below this amount, just give to miners
@@ -46,7 +47,7 @@ func (w *Wallit) MaybeSend(txos []*wire.TxOut) ([]*wire.OutPoint, error) {
 	defer w.FreezeMutex.Unlock()
 	// get inputs for this tx.  Only segwit
 	// This might not be enough for the fee if the inputs line up right...
-	utxos, overshoot, err := w.PickUtxos(totalSend, true)
+	utxos, overshoot, err := w.PickUtxos(totalSend, ow)
 	if err != nil {
 		return nil, err
 	}
@@ -54,12 +55,12 @@ func (w *Wallit) MaybeSend(txos []*wire.TxOut) ([]*wire.OutPoint, error) {
 	// estimate needed fee with outputs, see if change should be truncated
 	fee := EstFee(utxos, txos, satPerByte)
 
-	fmt.Printf("MaybeSend has fee %d, %d inputs\n", fee, len(utxos))
+	log.Printf("MaybeSend has fee %d, %d inputs\n", fee, len(utxos))
 
 	// input sum is not enough, we need more inputs.
 	// keep doing this until fee is sufficient or PickUtxos errors out
 	for fee > overshoot {
-		utxos, overshoot, err = w.PickUtxos(totalSend+fee, true)
+		utxos, overshoot, err = w.PickUtxos(totalSend+fee, ow)
 		if err != nil {
 			return nil, err
 		}
@@ -114,7 +115,7 @@ func (w *Wallit) MaybeSend(txos []*wire.TxOut) ([]*wire.OutPoint, error) {
 // Sign and broadcast a tx previously built with MaybeSend.  This clears the freeze
 // on the utxos but they're not utxos anymore anyway.
 func (w *Wallit) ReallySend(txid *chainhash.Hash) error {
-	fmt.Printf("Reallysend %s\n", txid.String())
+	log.Printf("Reallysend %s\n", txid.String())
 	// start frozen set access
 	w.FreezeMutex.Lock()
 	defer w.FreezeMutex.Unlock()
@@ -125,7 +126,7 @@ func (w *Wallit) ReallySend(txid *chainhash.Hash) error {
 	}
 	// delete inputs from frozen set (they're gone anyway, but just to clean it up)
 	for _, txin := range frozenTx.Ins {
-		fmt.Printf("\t remove %s from frozen outpoints\n", txin.Op.String())
+		log.Printf("\t remove %s from frozen outpoints\n", txin.Op.String())
 		delete(w.FreezeSet, txin.Op)
 	}
 
@@ -146,7 +147,7 @@ func (w *Wallit) ReallySend(txid *chainhash.Hash) error {
 // Cancel the hold on a tx previously built with MaybeSend.  Clears freeze on
 // utxos so they can be used somewhere else.
 func (w *Wallit) NahDontSend(txid *chainhash.Hash) error {
-	fmt.Printf("Nahdontsend %s\n", txid.String())
+	log.Printf("Nahdontsend %s\n", txid.String())
 	// start frozen set access
 	w.FreezeMutex.Lock()
 	defer w.FreezeMutex.Unlock()
@@ -157,7 +158,7 @@ func (w *Wallit) NahDontSend(txid *chainhash.Hash) error {
 	}
 	// go through all its inputs, and remove those outpoints from the frozen set
 	for _, txin := range frozenTx.Ins {
-		fmt.Printf("\t remove %s from frozen outpoints\n", txin.Op.String())
+		log.Printf("\t remove %s from frozen outpoints\n", txin.Op.String())
 		delete(w.FreezeSet, txin.Op)
 	}
 	return nil
@@ -186,7 +187,7 @@ func (w *Wallit) GrabAll() error {
 	nothin := true
 	for _, u := range utxos {
 		if u.Seq == 1 && u.Height > 0 { // grabbable
-			fmt.Printf("found %s to grab!\n", u.String())
+			log.Printf("found %s to grab!\n", u.String())
 			adr160slice, err := w.NewAdr160()
 			if err != nil {
 				return err
@@ -207,7 +208,7 @@ func (w *Wallit) GrabAll() error {
 		}
 	}
 	if nothin {
-		fmt.Printf("Nothing to grab\n")
+		log.Printf("Nothing to grab\n")
 	}
 	return nil
 }
@@ -408,7 +409,7 @@ func (w *Wallit) BuildAndSign(
 	for i, _ := range tx.TxIn {
 		// get key
 		priv := w.PathPrivkey(utxos[i].KeyGen)
-		fmt.Printf("signing with privkey pub %x\n", priv.PubKey().SerializeCompressed())
+		log.Printf("signing with privkey pub %x\n", priv.PubKey().SerializeCompressed())
 
 		if priv == nil {
 			return nil, fmt.Errorf("SendCoins: nil privkey")
@@ -462,7 +463,7 @@ func (w *Wallit) BuildAndSign(
 		}
 	}
 
-	fmt.Printf("tx: %s", TxToString(tx))
+	log.Printf("tx: %s", TxToString(tx))
 	return tx, nil
 }
 
@@ -492,6 +493,6 @@ func EstFee(txins []*portxo.PorTxo, txouts []*wire.TxOut, spB int64) int64 {
 	for _, txout := range txouts {
 		size += 8 + int64(len(txout.PkScript))
 	}
-	fmt.Printf("%d spB, est vsize %d, fee %d\n", spB, size, size*spB)
+	log.Printf("%d spB, est vsize %d, fee %d\n", spB, size, size*spB)
 	return size * spB
 }

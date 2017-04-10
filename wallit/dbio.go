@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"log"
 
 	"github.com/boltdb/bolt"
 	"github.com/btcsuite/btcd/blockchain"
@@ -64,7 +65,7 @@ func (w *Wallit) AddPorTxoAdr(kg portxo.KeyGen) error {
 		}
 
 		adr160 := w.PathPubHash160(kg)
-		fmt.Printf("adding addr %x\n", adr160)
+		log.Printf("adding addr %x\n", adr160)
 		// add the 20-byte key-hash into the db
 		return adrb.Put(adr160, kg.Bytes())
 	})
@@ -142,7 +143,7 @@ func (w *Wallit) NewAdr160() ([]byte, error) {
 	if nAdr160 == nil {
 		return nil, fmt.Errorf("NewAdr error: got nil h160")
 	}
-	fmt.Printf("adr %d hash is %x\n", n, nAdr160)
+	log.Printf("adr %d hash is %x\n", n, nAdr160)
 
 	kgBytes := nKg.Bytes()
 
@@ -296,7 +297,7 @@ func (w *Wallit) RegisterWatchOP(op wire.OutPoint) error {
 // GainUtxo registers the utxo in the duffel bag
 // don't register address; they shouldn't be re-used ever anyway.
 func (w *Wallit) GainUtxo(u portxo.PorTxo) error {
-	fmt.Printf("gaining exported utxo %s at height %d\n",
+	log.Printf("gaining exported utxo %s at height %d\n",
 		u.Op.String(), u.Height)
 	// serialize porTxo
 	utxoBytes, err := u.Bytes()
@@ -497,7 +498,7 @@ func (w *Wallit) IngestMany(txs []*wire.MsgTx, height int32) (uint32, error) {
 					return err
 				}
 				// print lost portxo
-				fmt.Printf(lostTxo.String())
+				log.Printf(lostTxo.String())
 
 				// after marking for deletion, save stxo to old bucket
 				var st Stxo                               // generate spent txo
@@ -535,6 +536,6 @@ func (w *Wallit) IngestMany(txs []*wire.MsgTx, height int32) (uint32, error) {
 		return nil
 	})
 
-	fmt.Printf("ingest %d txs, %d hits\n", len(txs), hits)
+	log.Printf("ingest %d txs, %d hits\n", len(txs), hits)
 	return hits, err
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"log"
 	"sync"
 
 	"github.com/boltdb/bolt"
@@ -141,7 +142,7 @@ func StxoFromBytes(b []byte) (Stxo, error) {
 
 	u, err := portxo.PorTxoFromBytes(buf.Bytes())
 	if err != nil {
-		fmt.Printf(" eof? ")
+		log.Printf(" eof? ")
 		return s, err
 	}
 	s.PorTxo = *u // assign the utxo

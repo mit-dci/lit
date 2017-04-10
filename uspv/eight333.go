@@ -48,7 +48,7 @@ func (s *SPVCon) GimmeFilter() (*bloom.Filter, error) {
 	// send any to us, sometimes we don't see it and think the channel is still open.
 	// so not monitoring the channel outpoint properly?  here or in ingest()
 
-	fmt.Printf("made %d element filter\n", filterElements)
+	log.Printf("made %d element filter\n", filterElements)
 	return f, nil
 }
 
@@ -216,7 +216,7 @@ func (s *SPVCon) IngestMerkleBlock(m *wire.MsgMerkleBlock) {
 func (s *SPVCon) IngestHeaders(m *wire.MsgHeaders) (bool, error) {
 	gotNum := int64(len(m.Headers))
 	if gotNum > 0 {
-		fmt.Printf("got %d headers. Range:\n%s - %s\n",
+		log.Printf("got %d headers. Range:\n%s - %s\n",
 			gotNum, m.Headers[0].BlockHash().String(),
 			m.Headers[len(m.Headers)-1].BlockHash().String())
 	} else {
@@ -335,7 +335,7 @@ func (s *SPVCon) AskForHeaders() error {
 		return err
 	}
 
-	fmt.Printf("get headers message has %d header hashes, first one is %s\n",
+	log.Printf("get headers message has %d header hashes, first one is %s\n",
 		len(ghdr.BlockLocatorHashes), ghdr.BlockLocatorHashes[0].String())
 
 	s.outMsgQueue <- ghdr
@@ -356,14 +356,14 @@ func (s *SPVCon) AskForBlocks() error {
 	// move back 1 header length to read
 	headerTip := int32(endPos/80) + (s.headerStartHeight - 1)
 
-	fmt.Printf("blockTip to %d headerTip %d\n", s.syncHeight, headerTip)
+	log.Printf("blockTip to %d headerTip %d\n", s.syncHeight, headerTip)
 	if s.syncHeight > headerTip {
 		return fmt.Errorf("error- db longer than headers! shouldn't happen.")
 	}
 	if s.syncHeight == headerTip {
 		// nothing to ask for; set wait state and return
-		fmt.Printf("no blocks to request, entering wait state\n")
-		fmt.Printf("%d bytes received\n", s.RBytes)
+		log.Printf("no blocks to request, entering wait state\n")
+		log.Printf("%d bytes received\n", s.RBytes)
 		s.inWaitState <- true
 
 		// check if we can grab outputs
@@ -382,7 +382,7 @@ func (s *SPVCon) AskForBlocks() error {
 		return nil
 	}
 
-	fmt.Printf("will request blocks %d to %d\n", s.syncHeight+1, headerTip)
+	log.Printf("will request blocks %d to %d\n", s.syncHeight+1, headerTip)
 	reqHeight := s.syncHeight
 
 	// loop through all heights where we want merkleblocks.

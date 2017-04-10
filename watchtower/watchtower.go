@@ -1,7 +1,7 @@
 package watchtower
 
 import (
-	"fmt"
+	"log"
 
 	"github.com/boltdb/bolt"
 	"github.com/btcsuite/btcd/wire"
@@ -30,6 +30,7 @@ type IdxSig struct {
 	Sig      [64]byte // What
 }
 
+<<<<<<< HEAD
 func (w *WatchTower) HandleMessage(lm lnutil.LitMsg) error {
 	fmt.Printf("got message from %x\n", lm.Peer())
 
@@ -49,6 +50,27 @@ func (w *WatchTower) HandleMessage(lm lnutil.LitMsg) error {
 		// delete not yet implemented
 	default:
 		fmt.Printf("unknown message type %x\n", lm.MsgType())
+=======
+func (w *WatchTower) HandleMessage(lm *lnutil.LitMsg) error {
+	log.Printf("got message from %x\n", lm.PeerIdx)
+
+	switch lm.MsgType {
+	case MSGID_WATCH_DESC:
+		log.Printf("new channel to watch\n")
+		desc := WatchannelDescriptorFromBytes(lm.Data)
+		return w.AddNewChannel(desc)
+
+	case MSGID_WATCH_COMMSG:
+		log.Printf("new commsg\n")
+		commsg := ComMsgFromBytes(lm.Data)
+		return w.AddState(commsg)
+
+	case MSGID_WATCH_DELETE:
+		log.Printf("delete message\n")
+		// delete not yet implemented
+	default:
+		log.Printf("unknown message type %x\n", lm.MsgType)
+>>>>>>> a3bfc192a61950b0b4440d6bf429345db6c6b34f
 	}
 	return nil
 }
