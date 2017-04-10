@@ -9,8 +9,8 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/txsort"
+	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 )
 
@@ -21,7 +21,7 @@ import (
 // Bunch of redundancy with SendMany, maybe move that to a shared function...
 //NOTE this does not support multiple txouts with identical pkscripts in one tx.
 // The code would be trivial; it's not supported on purpose.  Use unique pkscripts.
-func (w *Wallit) MaybeSend(txos []*wire.TxOut) ([]*wire.OutPoint, error) {
+func (w *Wallit) MaybeSend(txos []*wire.TxOut, ow bool) ([]*wire.OutPoint, error) {
 	var err error
 	var totalSend int64
 	dustCutoff := int64(20000) // below this amount, just give to miners
@@ -47,7 +47,7 @@ func (w *Wallit) MaybeSend(txos []*wire.TxOut) ([]*wire.OutPoint, error) {
 	defer w.FreezeMutex.Unlock()
 	// get inputs for this tx.  Only segwit
 	// This might not be enough for the fee if the inputs line up right...
-	utxos, overshoot, err := w.PickUtxos(totalSend, true)
+	utxos, overshoot, err := w.PickUtxos(totalSend, ow)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +60,7 @@ func (w *Wallit) MaybeSend(txos []*wire.TxOut) ([]*wire.OutPoint, error) {
 	// input sum is not enough, we need more inputs.
 	// keep doing this until fee is sufficient or PickUtxos errors out
 	for fee > overshoot {
-		utxos, overshoot, err = w.PickUtxos(totalSend+fee, true)
+		utxos, overshoot, err = w.PickUtxos(totalSend+fee, ow)
 		if err != nil {
 			return nil, err
 		}
@@ -192,9 +192,11 @@ func (w *Wallit) GrabAll() error {
 			if err != nil {
 				return err
 			}
-			nAdr, err := btcutil.NewAddressWitnessPubKeyHash(
-				adr160, w.Param)
-			tx, err := w.SendOne(*u, nAdr)
+			var adr160 [20]byte
+			copy(adr160[:], adr160slice)
+			outScript := lnutil.DirectWPKHScriptFromPKH(adr160)
+
+			tx, err := w.SendOne(*u, outScript)
 			if err != nil {
 				return err
 			}
@@ -306,7 +308,7 @@ func (w *Wallit) PickUtxos(
 
 // SendOne is for the sweep function, and doesn't do change.
 // Probably can get rid of this for real txs.
-func (w *Wallit) SendOne(u portxo.PorTxo, adr btcutil.Address) (*wire.MsgTx, error) {
+func (w *Wallit) SendOne(u portxo.PorTxo, outScript []byte) (*wire.MsgTx, error) {
 
 	w.FreezeMutex.Lock()
 	defer w.FreezeMutex.Unlock()
@@ -330,13 +332,8 @@ func (w *Wallit) SendOne(u portxo.PorTxo, adr btcutil.Address) (*wire.MsgTx, err
 
 	sendAmt := u.Value - fee
 
-	// add single output
-	outAdrScript, err := txscript.PayToAddrScript(adr)
-	if err != nil {
-		return nil, err
-	}
 	// make user specified txout and add to tx
-	txout := wire.NewTxOut(sendAmt, outAdrScript)
+	txout := wire.NewTxOut(sendAmt, outScript)
 
 	return w.BuildAndSign([]*portxo.PorTxo{&u}, []*wire.TxOut{txout})
 }

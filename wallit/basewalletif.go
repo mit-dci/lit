@@ -132,7 +132,7 @@ func (w *Wallit) WatchThis(op wire.OutPoint) error {
 }
 
 // ********* sweep is for testing / spamming, remove for real use
-func (w *Wallit) Sweep(adr btcutil.Address, n uint32) ([]*chainhash.Hash, error) {
+func (w *Wallit) Sweep(outScript []byte, n uint32) ([]*chainhash.Hash, error) {
 	var err error
 	var txids []*chainhash.Hash
 
@@ -152,7 +152,7 @@ func (w *Wallit) Sweep(adr btcutil.Address, n uint32) ([]*chainhash.Hash, error)
 
 		// this doesn't really work with maybeSend huh...
 		if u.Height != 0 && u.Value > 20000 {
-			tx, err := w.SendOne(*u, adr)
+			tx, err := w.SendOne(*u, outScript)
 			if err != nil {
 				return nil, err
 			}

@@ -37,7 +37,7 @@ type UWallet interface {
 	// Retruns the txid, and then the txout indexes of the specified txos.
 	// The outpoints returned will all have the same hash (txid)
 	// So if you (as usual) just give one txo, you basically get back an outpoint.
-	MaybeSend(txos []*wire.TxOut) ([]*wire.OutPoint, error)
+	MaybeSend(txos []*wire.TxOut, onlyWit bool) ([]*wire.OutPoint, error)
 
 	// ReallySend really sends the transaction specified previously in MaybeSend.
 	// Underlying wallet does all needed signing.
@@ -60,11 +60,13 @@ type UWallet interface {
 	// Return current height the wallet is synced to
 	CurrentHeight() int32
 
+	// This is redundand... just use UtxoDump and figure it out yourself.
+	// Feels like helper functions shouldn't be in the interface.
 	// how much utxo the wallet has -- only confirmed segwit outputs
-	HowMuchWitConf() int64
+	//	HowMuchWitConf() int64
 
 	// How much utxo the sub wallet has, including non-segwit, unconfirmed, immature
-	HowMuchTotal() int64
+	//	HowMuchTotal() int64
 
 	// WatchThis tells the basewallet to watch an outpoint
 	WatchThis(wire.OutPoint) error
@@ -81,7 +83,7 @@ type UWallet interface {
 
 	// ===== TESTING / SPAMMING ONLY, these funcs will not be in the real interface
 	// Sweep sends lots of txs (uint32 of them) to the specified address.
-	Sweep(btcutil.Address, uint32) ([]*chainhash.Hash, error)
+	Sweep([]byte, uint32) ([]*chainhash.Hash, error)
 }
 
 // GetUsePub gets a pubkey from the base wallet, but first modifies

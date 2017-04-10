@@ -32,6 +32,7 @@ func (s TxoSliceByBip69) Less(i, j int) bool {
 }
 
 // txoSliceByAmt is a sortable txo slice.  Sorts by value, and puts unconfirmed last.
+// Also has sum functions for calculating balances
 type TxoSliceByAmt []*PorTxo
 
 func (s TxoSliceByAmt) Len() int      { return len(s) }
@@ -46,6 +47,27 @@ func (s TxoSliceByAmt) Less(i, j int) bool {
 		return false
 	}
 	return s[i].Value < s[j].Value
+}
+
+func (s TxoSliceByAmt) Sum() int64 {
+	var total int64
+	for _, txo := range s {
+		total += txo.Value
+	}
+	return total
+}
+
+func (s TxoSliceByAmt) SumWitness(currentHeight int32) int64 {
+	var total int64
+	for _, txo := range s {
+		// check that it's witness,
+		// then make sure it's confirmed, and any timeouts have passed
+		if txo.Mode&FlagTxoWitness != 0 &&
+			txo.Height > 0 && txo.Height+int32(txo.Seq) <= currentHeight {
+			total += txo.Value
+		}
+	}
+	return total
 }
 
 // KeyGenSortableSlice is a sortable slice of keygens. Shorter and lower numbers first.

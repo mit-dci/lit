@@ -22,7 +22,7 @@ const (
 	// this is my local testnet node, replace it with your own close by.
 	// Random internet testnet nodes usually work but sometimes don't, so
 	// maybe I should test against different versions out there.
-	hardHeight = 1063333 // height to start at if not specified
+	hardHeight = 1111111 // height to start at if not specified
 )
 
 // variables for a goodelivery session
@@ -48,7 +48,7 @@ func setConfig(lc *LitConfig) {
 	bc2ptr := flag.Bool("bc2", false, "use bc2 network (not testnet3)")
 	resyncprt := flag.Bool("resync", false, "force resync from given tip")
 
-	rpcportptr := flag.Int("rpcport", 9750, "port to listen for RPC")
+	rpcportptr := flag.Int("rpcport", 8001, "port to listen for RPC")
 
 	litHomeDir := flag.String("dir", filepath.Join(os.Getenv("HOME"), litHomeDirName), "lit home directory")
 

@@ -10,15 +10,14 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/fastsha256"
 	"github.com/codahale/chacha20poly1305"
+	"github.com/mit-dci/lit/lnutil"
 )
 
 // Conn...
 type LNDConn struct {
-	RemotePub  *btcec.PublicKey
-	RemoteLNId [16]byte
+	RemotePub *btcec.PublicKey
 
 	myNonceInt     uint64
 	remoteNonceInt uint64
@@ -53,38 +52,40 @@ func NewConn(conn net.Conn) *LNDConn {
 
 // Dial...
 func (c *LNDConn) Dial(
-	myId *btcec.PrivateKey, address string, remoteId []byte) error {
+	myId *btcec.PrivateKey, netAddress string, remotePKH string) error {
+
 	var err error
 	if myId == nil {
 		return fmt.Errorf("LNDConn Dial: nil myId")
 	}
+
 	if !c.ViaPbx {
 		if c.Conn != nil {
 			return fmt.Errorf("connection already established")
 		}
 
 		// First, open the TCP connection itself.
-		c.Conn, err = net.Dial("tcp", address)
+		c.Conn, err = net.Dial("tcp", netAddress)
 		if err != nil {
 			return err
 		}
 	}
 
-	// Before dialing out to the remote host, verify that remoteId is either
-	// a pubkey or a pubkey hash.
-	if len(remoteId) != 33 && len(remoteId) != 20 { //&& len(remoteId) != 16 {
-		return fmt.Errorf("must supply either remote pubkey or " +
-			"pubkey hash")
+	// check that remotePKH is ok
+	if !lnutil.LitAdrOK(remotePKH) {
+		return fmt.Errorf("invalid ln address %s", remotePKH)
 	}
 
 	// Calc remote LNId; need this for creating pbx connections just because
 	// LNid is in the struct does not mean it's authed!
-	if len(remoteId) == 20 || len(remoteId) == 16 {
-		copy(c.RemoteLNId[:], remoteId[:16])
-	} else {
-		theirAdr := btcutil.Hash160(remoteId)
-		copy(c.RemoteLNId[:], theirAdr[:16])
-	}
+	/*
+		if len(remoteId) == 20 || len(remoteId) == 16 {
+			copy(c.RemoteLNId[:], remoteId[:16])
+		} else {
+			theirAdr := btcutil.Hash160(remoteId)
+			copy(c.RemoteLNId[:], theirAdr[:16])
+		}
+	*/
 
 	// Make up an ephemeral keypair for this session.
 	ourEphemeralPriv, err := btcec.NewPrivateKey(btcec.S256())
@@ -99,7 +100,7 @@ func (c *LNDConn) Dial(
 		return err
 	}
 
-	// Read, then deserialize their ephemeral public key.
+	// Wait for theirs; Read, then deserialize their ephemeral public key.
 	theirEphPubBytes, err := readClear(c.Conn)
 	if err != nil {
 		return err
@@ -109,7 +110,7 @@ func (c *LNDConn) Dial(
 		return err
 	}
 
-	// Do non-interactive diffie with ephemeral pubkeys. Sha256 for good luck.
+	// Do diffie with ephemeral pubkeys. Sha256 for good luck.
 	sessionKey := fastsha256.Sum256(
 		btcec.GenerateSharedSecret(ourEphemeralPriv, theirEphPub))
 
@@ -132,25 +133,14 @@ func (c *LNDConn) Dial(
 
 	// Session is now open and confidential but not yet authenticated...
 	// So auth!
-	if len(remoteId) == 20 {
-		// Only know pubkey hash (20 bytes).
-		fmt.Printf("doing PKH auth\n")
-		err = c.authPKH(myId, remoteId, ourEphPubBytes)
-	} else {
-		// Must be 33 byte pubkey.
-		fmt.Printf("doing 33 byte PK auth\n")
-		err = c.authPubKey(myId, remoteId, ourEphPubBytes)
-	}
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return c.authPKH(myId, remotePKH, ourEphPubBytes)
 }
 
 // authPubKey...
+/*
 func (c *LNDConn) authPubKey(
-	myId *btcec.PrivateKey, remotePubBytes, localEphPubBytes []byte) error {
+	myId *btcec.PrivateKey, remotePKH string, localEphPubBytes []byte) error {
 	if c.Authed {
 		return fmt.Errorf("%s already authed", c.RemotePub)
 	}
@@ -196,32 +186,36 @@ func (c *LNDConn) authPubKey(
 
 	return nil
 }
+*/
 
 // authPKH...
 func (c *LNDConn) authPKH(
-	myId *btcec.PrivateKey, theirPKH, localEphPubBytes []byte) error {
+	myId *btcec.PrivateKey, remotePKH string, localEphPubBytes []byte) error {
 	if c.Authed {
 		return fmt.Errorf("%s already authed", c.RemotePub)
 	}
-	if len(theirPKH) != 20 {
-		return fmt.Errorf("remote PKH must be 20 bytes, got %d",
-			len(theirPKH))
+
+	theirPKH, err := lnutil.LitAdrBytes(remotePKH)
+	if err != nil {
+		return err
 	}
 
-	// Send 53 bytes: our pubkey, and the remote's pubkey hash.
-	var greetingMsg [53]byte
-	copy(greetingMsg[:33], myId.PubKey().SerializeCompressed())
-	copy(greetingMsg[33:], theirPKH)
-	if _, err := c.Conn.Write(greetingMsg[:]); err != nil {
+	// Send: our pubkey, and the remote's pubkey hash.
+	// remote pkh may be 20 or 12 bytes
+	greetingMsg := myId.PubKey().SerializeCompressed()
+	greetingMsg = append(greetingMsg, theirPKH...)
+	if _, err := c.Conn.Write(greetingMsg); err != nil {
 		return err
 	}
 
 	// Wait for their response.
 	// TODO(tadge): add timeout here
-	resp := make([]byte, 53)
+	resp := make([]byte, 65)
 	if _, err := c.Conn.Read(resp); err != nil {
 		return err
 	}
+
+	// read back 65 bytes; 33 for their pubkey, and 32 for their DH proof
 
 	// Parse their long-term public key, and generate the DH proof.
 	theirPub, err := btcec.ParsePubKey(resp[:33], btcec.S256())
@@ -230,23 +224,23 @@ func (c *LNDConn) authPKH(
 	}
 	idDH := fastsha256.Sum256(btcec.GenerateSharedSecret(myId, theirPub))
 	fmt.Printf("made idDH %x\n", idDH)
-	theirDHproof := btcutil.Hash160(append(localEphPubBytes, idDH[:]...))
+	theirDHproof := fastsha256.Sum256(append(localEphPubBytes, idDH[:]...))
 
 	// Verify that their DH proof matches the one we just generated.
-	if !hmac.Equal(resp[33:], theirDHproof) {
+	// use constant time comparison here
+	if !hmac.Equal(resp[33:], theirDHproof[:]) {
 		return fmt.Errorf("Invalid DH proof %x", theirDHproof)
 	}
 
 	// If their DH proof checks out, then send our own.
-	myDHproof := btcutil.Hash160(append(c.RemotePub.SerializeCompressed(), idDH[:]...))
-	if _, err = c.Conn.Write(myDHproof); err != nil {
+	myDHproof := fastsha256.Sum256(
+		append(c.RemotePub.SerializeCompressed(), idDH[:]...))
+	if _, err = c.Conn.Write(myDHproof[:]); err != nil {
 		return err
 	}
 
 	// Proof sent, auth complete.
 	c.RemotePub = theirPub
-	theirAdr := btcutil.Hash160(theirPub.SerializeCompressed())
-	copy(c.RemoteLNId[:], theirAdr[:16])
 	c.Authed = true
 
 	return nil
@@ -299,7 +293,7 @@ func (c *LNDConn) Read(b []byte) (n int, err error) {
 // Part of the net.Conn interface.
 func (c *LNDConn) Write(b []byte) (n int, err error) {
 	if b == nil {
-		return 0, fmt.Errorf("write to %x nil", c.RemoteLNId)
+		return 0, fmt.Errorf("write to %x nil", c.RemotePub.SerializeCompressed())
 	}
 	//	fmt.Printf("Encrypt %d byte plaintext to %x nonce %d\n",
 	//		len(b), c.RemoteLNId, c.myNonceInt)
@@ -315,7 +309,7 @@ func (c *LNDConn) Write(b []byte) (n int, err error) {
 	}
 	if len(ctext) > 65530 {
 		return 0, fmt.Errorf("Write to %x too long, %d bytes",
-			c.RemoteLNId, len(ctext))
+			c.RemotePub.SerializeCompressed(), len(ctext))
 	}
 
 	// use writeClear to prepend length / destination header

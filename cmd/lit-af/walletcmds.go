@@ -9,11 +9,37 @@ import (
 	"github.com/mit-dci/lit/lnutil"
 )
 
+var sendCommand = &Command{
+	Format:           fmt.Sprintf("%s%s\n", lnutil.White("send"), lnutil.ReqColor("address", "amount")),
+	Description:      "Send the given amount of satoshis to the given address.\n",
+	ShortDescription: "Send the given amount of satoshis to the given address.\n",
+}
+
+var addressCommand = &Command{
+	Format:           fmt.Sprintf("%s%s\n", lnutil.White("address"), lnutil.ReqColor("?amount")),
+	Description:      "Makes a new address.\n",
+	ShortDescription: "Makes a new address.\n",
+}
+
+var fanCommand = &Command{
+	Format:           fmt.Sprintf("%s%s\n", lnutil.White("fan"), lnutil.ReqColor("addr", "howmany", "howmuch")),
+	Description:      "\n",
+	ShortDescription: "\n",
+	// TODO: Add description.
+}
+
+var sweepCommand = &Command{
+	Format:      fmt.Sprintf("%s%s%s\n", lnutil.White("sweep"), lnutil.ReqColor("addr", "howmany"), lnutil.OptColor("drop")),
+	Description: "Move UTXOs with many 1-in-1-out txs.\n",
+	// TODO: Make this more clear.
+	ShortDescription: "Move UTXOs with many 1-in-1-out txs.\n",
+}
+
 // Send sends coins somewhere
 func (lc *litAfClient) Send(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Fprintf(color.Output, "%s%s\n", lnutil.White("send"), lnutil.ReqColor("addr", "amount"))
-		fmt.Fprintf(color.Output, "Send the given amount of satoshis to the given address.\n")
+		fmt.Fprintf(color.Output, sendCommand.Format)
+		fmt.Fprintf(color.Output, sendCommand.Description)
 		return nil
 	}
 
@@ -22,7 +48,7 @@ func (lc *litAfClient) Send(textArgs []string) error {
 
 	// need args, fail
 	if len(textArgs) < 2 {
-		return fmt.Errorf("need args: ssend address amount(satoshis) wit?")
+		return fmt.Errorf(sendCommand.Description)
 	}
 	/*
 		adr, err := btcutil.DecodeAddress(args[0], lc.Param)
@@ -55,9 +81,8 @@ func (lc *litAfClient) Send(textArgs []string) error {
 // Sweep moves utxos with many 1-in-1-out txs
 func (lc *litAfClient) Sweep(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Fprintf(color.Output, "%s%s%s\n", lnutil.White("sweep"), lnutil.ReqColor("addr", "howmany"), lnutil.OptColor("drop"))
-		fmt.Fprintf(color.Output, "Move UTXOs with many 1-in-1-out txs.\n")
-		// TODO: Make this more clear.
+		fmt.Fprintf(color.Output, sweepCommand.Format)
+		fmt.Fprintf(color.Output, sweepCommand.Description)
 		return nil
 	}
 
@@ -67,7 +92,7 @@ func (lc *litAfClient) Sweep(textArgs []string) error {
 	var err error
 
 	if len(textArgs) < 2 {
-		return fmt.Errorf("sweep syntax: sweep adr howmany (drop)")
+		return fmt.Errorf(sweepCommand.Format)
 	}
 
 	args.DestAdr = textArgs[0]
@@ -101,15 +126,15 @@ func (lc *litAfClient) Sweep(textArgs []string) error {
 
 func (lc *litAfClient) Fan(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Fprintf(color.Output, "%s%s\n", lnutil.White("fan"), lnutil.ReqColor("addr", "howmany", "howmuch"))
-		// TODO: Add description.
+		fmt.Fprintf(color.Output, fanCommand.Format)
+		fmt.Fprintf(color.Output, fanCommand.Description)
 		return nil
 	}
 
 	args := new(litrpc.FanArgs)
 	reply := new(litrpc.TxidsReply)
 	if len(textArgs) < 3 {
-		return fmt.Errorf("fan syntax: fan adr howmany howmuch")
+		return fmt.Errorf(fanCommand.Format)
 	}
 	var err error
 	args.DestAdr = textArgs[0]
@@ -138,22 +163,31 @@ func (lc *litAfClient) Fan(textArgs []string) error {
 	return nil
 }
 
-// Adr makes new addresses
-func (lc *litAfClient) Adr(textArgs []string) error {
+// Address makes new addresses
+func (lc *litAfClient) Address(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Fprintf(color.Output, lnutil.White("adr\n"))
-		fmt.Fprintf(color.Output, "Makes a new address.\n")
-		// TODO: Make this more clear.
+		fmt.Fprintf(color.Output, addressCommand.Format)
+		fmt.Fprintf(color.Output, addressCommand.Description)
 		return nil
 	}
 
-	args := new(litrpc.AdrArgs)
-	args.NumToMake = 1
-	reply := new(litrpc.AdrReply)
+	args := new(litrpc.AddressArgs)
+
+	// if no arguments given, generate 1 new address.
+	if len(textArgs) < 1 {
+		args.NumToMake = 1
+	} else {
+		num, _ := strconv.Atoi(textArgs[0])
+		args.NumToMake = uint32(num)
+	}
+
+	reply := new(litrpc.AddressReply)
 	err := lc.rpccon.Call("LitRPC.Address", args, reply)
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(color.Output, "new adr(s): %s\nold: %s\n", lnutil.Address(reply.WitAddresses), lnutil.Address(reply.LegacyAddresses))
+	fmt.Fprintf(color.Output, "new adr(s): %s\nold: %s\n",
+		lnutil.Address(reply.WitAddresses), lnutil.Address(reply.LegacyAddresses))
 	return nil
+
 }

@@ -1,12 +1,11 @@
 package lndc
 
 import (
-	"bytes"
+	"crypto/hmac"
 	"fmt"
 	"net"
 
 	"github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/fastsha256"
 	"github.com/codahale/chacha20poly1305"
 )
@@ -128,15 +127,29 @@ func (l *Listener) authenticateConnection(
 
 	fmt.Printf("read %d bytes\n", n)
 	authmsg := slice[:n]
-	if len(authmsg) != 53 && len(authmsg) != 73 {
+	if len(authmsg) != 53 && len(authmsg) != 45 {
 		return fmt.Errorf("got auth message of %d bytes, "+
-			"expect 53 or 73", len(authmsg))
+			"expect 53 or 45", len(authmsg))
 	}
 
-	myPKH := btcutil.Hash160(l.longTermPriv.PubKey().SerializeCompressed())
-	if !bytes.Equal(myPKH, authmsg[33:53]) {
-		return fmt.Errorf(
-			"remote host asking for PKH %x, that's not me", authmsg[33:53])
+	// get my pubkey hash
+	myPK := l.longTermPriv.PubKey().SerializeCompressed()
+	myPKH := fastsha256.Sum256(myPK[:])
+
+	if len(authmsg) == 53 {
+		// given 20 byte pkh, check
+		if !hmac.Equal(authmsg[33:], myPKH[:20]) {
+			return fmt.Errorf(
+				"remote host asking for PKH %x, i'm %x", authmsg[33:], myPKH)
+		}
+	} else {
+		// de-assert lsb of my pkh, byte 12
+		myPKH[11] = myPKH[11] & 0xfe
+		// check 95 bit truncated pkh
+		if !hmac.Equal(authmsg[33:], myPKH[:12]) {
+			return fmt.Errorf(
+				"remote host asking for PKH %x im %x", authmsg[33:], myPKH)
+		}
 	}
 
 	// do DH with id keys
@@ -147,47 +160,33 @@ func (l *Listener) authenticateConnection(
 	idDH :=
 		fastsha256.Sum256(btcec.GenerateSharedSecret(l.longTermPriv, theirPub))
 	fmt.Printf("made idDH %x\n", idDH)
-	myDHproof :=
-		btcutil.Hash160(append(lnConn.RemotePub.SerializeCompressed(), idDH[:]...))
-	theirDHproof := btcutil.Hash160(append(localEphPubBytes, idDH[:]...))
+	myDHproof := fastsha256.Sum256(
+		append(lnConn.RemotePub.SerializeCompressed(), idDH[:]...))
+	theirDHproof := fastsha256.Sum256(
+		append(localEphPubBytes, idDH[:]...))
 
 	// If they already know our public key, then execute the fast path.
 	// Verify their DH proof, and send our own.
-	if len(authmsg) == 73 {
-		// Verify their DH proof.
-		if !bytes.Equal(authmsg[53:], theirDHproof) {
-			return fmt.Errorf("invalid DH proof from %s",
-				lnConn.RemoteAddr().String())
-		}
 
-		// Their DH proof checks out, so send ours now.
-		if _, err = lnConn.Conn.Write(myDHproof); err != nil {
-			return err
-		}
-	} else {
-		// Otherwise, they don't yet know our public key. So we'll send
-		// it over to them, so we can both compute the DH proof.
-		msg := append(l.longTermPriv.PubKey().SerializeCompressed(), myDHproof...)
-		if _, err = lnConn.Conn.Write(msg); err != nil {
-			return err
-		}
-
-		resp := make([]byte, 20)
-
-		_, err = lnConn.Conn.Read(resp)
-		if err != nil {
-			fmt.Printf("here it dies ")
-			return err
-		}
-
-		// Verify their DH proof.
-		if bytes.Equal(resp, theirDHproof) == false {
-			return fmt.Errorf("Invalid DH proof %x", theirDHproof)
-		}
+	// Otherwise, they don't yet know our public key. So we'll send
+	// it over to them, so we can both compute the DH proof.
+	msg := append(l.longTermPriv.PubKey().SerializeCompressed(), myDHproof[:]...)
+	if _, err = lnConn.Conn.Write(msg); err != nil {
+		return err
 	}
 
-	theirAdr := btcutil.Hash160(theirPub.SerializeCompressed())
-	copy(lnConn.RemoteLNId[:], theirAdr[:16])
+	resp := make([]byte, 32)
+
+	_, err = lnConn.Conn.Read(resp)
+	if err != nil {
+		return err
+	}
+
+	// Verify their DH proof.
+	if hmac.Equal(resp, theirDHproof[:]) == false {
+		return fmt.Errorf("Invalid DH proof %x", theirDHproof)
+	}
+
 	lnConn.RemotePub = theirPub
 	lnConn.Authed = true
 
