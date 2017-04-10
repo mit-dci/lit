@@ -53,7 +53,8 @@ func setConfig(lc *LitConfig) {
 
 	rpcportptr := flag.Int("rpcport", 8001, "port to listen for RPC")
 
-	litHomeDir := flag.String("dir", filepath.Join(os.Getenv("HOME"), litHomeDirName), "lit home directory")
+	litHomeDir := flag.String("dir",
+		filepath.Join(os.Getenv("HOME"), litHomeDirName), "lit home directory")
 
 	flag.Parse()
 
