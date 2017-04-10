@@ -30,6 +30,7 @@ type LitConfig struct {
 	spvHost               string
 	regTest, reSync, hard bool // flag to set networks
 	bc2Net                bool
+	verbose               bool
 	birthblock            int32
 	rpcport               uint16
 	litHomeDir            string
@@ -43,6 +44,8 @@ func setConfig(lc *LitConfig) {
 	birthptr := flag.Int("tip", hardHeight, "height to begin db sync")
 
 	easyptr := flag.Bool("ez", false, "use easy mode (bloom filters)")
+
+	verbptr := flag.Bool("v", false, "verbose; print all logs to stdout")
 
 	regtestptr := flag.Bool("reg", false, "use regtest (not testnet3)")
 	bc2ptr := flag.Bool("bc2", false, "use bc2 network (not testnet3)")
@@ -61,6 +64,7 @@ func setConfig(lc *LitConfig) {
 	lc.bc2Net = *bc2ptr
 	lc.reSync = *resyncprt
 	lc.hard = !*easyptr
+	lc.verbose = *verbptr
 
 	lc.rpcport = uint16(*rpcportptr)
 
@@ -98,12 +102,8 @@ func setConfig(lc *LitConfig) {
 }
 
 func main() {
-	f, err := os.OpenFile("logfile", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	defer f.Close()
-	mw := io.MultiWriter(os.Stdout, f)
-	log.SetOutput(mw)
 
-	log.Printf("lit node v0.0\n")
+	log.Printf("lit node v0.1\n")
 	log.Printf("-h for list of options.\n")
 
 	conf := new(LitConfig)
@@ -112,6 +112,18 @@ func main() {
 	// create lit home directory if the diretory does not exist
 	if _, err := os.Stat(conf.litHomeDir); os.IsNotExist(err) {
 		os.Mkdir(conf.litHomeDir, 0700)
+	}
+
+	logFilePath := filepath.Join(conf.litHomeDir, "lit.log")
+
+	logfile, err := os.OpenFile(logFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	defer logfile.Close()
+
+	if conf.verbose {
+		logOutput := io.MultiWriter(os.Stdout, logfile)
+		log.SetOutput(logOutput)
+	} else {
+		log.SetOutput(logfile)
 	}
 
 	keyFilePath := filepath.Join(conf.litHomeDir, keyFileName)
