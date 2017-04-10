@@ -2,14 +2,13 @@ package main
 
 import (
 	"flag"
-	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/fatih/color"
 	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/qln"
@@ -99,8 +98,13 @@ func setConfig(lc *LitConfig) {
 }
 
 func main() {
-	fmt.Fprintf(color.Output, "lit node v0.0\n")
-	fmt.Fprintf(color.Output, "-h for list of options.\n")
+	f, err := os.OpenFile("logfile", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	defer f.Close()
+	mw := io.MultiWriter(os.Stdout, f)
+	log.SetOutput(mw)
+
+	log.Printf("lit node v0.0\n")
+	log.Printf("-h for list of options.\n")
 
 	conf := new(LitConfig)
 	setConfig(conf)

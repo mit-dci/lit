@@ -1,7 +1,7 @@
 package wallit
 
 import (
-	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -40,25 +40,25 @@ func NewWallit(
 	wallitdbname := filepath.Join(wallitpath, "utxo.db")
 	err = w.OpenDB(wallitdbname)
 	if err != nil {
-		fmt.Printf("NewWallit crash  %s ", err.Error())
+		log.Printf("NewWallit crash  %s ", err.Error())
 	}
 	// get height
 	height := w.CurrentHeight()
-	fmt.Printf("DB height %d\n", height)
+	log.Printf("DB height %d\n", height)
 	if height < birthHeight {
 		height = birthHeight
 	}
-	fmt.Printf("DB height %d\n", height)
+	log.Printf("DB height %d\n", height)
 	incomingTx, incomingBlockheight, err := w.Hook.Start(height, spvhost, wallitpath, p)
 	if err != nil {
-		fmt.Printf("NewWallit crash  %s ", err.Error())
+		log.Printf("NewWallit crash  %s ", err.Error())
 	}
 
 	// check if there are any addresses.  If there aren't (initial wallet setup)
 	// then make an address.
 	adrs, err := w.AdrDump()
 	if err != nil {
-		fmt.Printf("NewWallit crash  %s ", err.Error())
+		log.Printf("NewWallit crash  %s ", err.Error())
 	}
 	if len(adrs) == 0 {
 		_ = w.NewAdr()
@@ -77,7 +77,7 @@ func (w *Wallit) TxHandler(incomingTxAndHeight chan lnutil.TxAndHeight) {
 	for {
 		txah := <-incomingTxAndHeight
 		w.Ingest(txah.Tx, txah.Height)
-		fmt.Printf("got tx %s at height %d\n",
+		log.Printf("got tx %s at height %d\n",
 			txah.Tx.TxHash().String(), txah.Height)
 	}
 }
@@ -87,7 +87,7 @@ func (w *Wallit) HeightHandler(incomingHeight chan int32) {
 		h := <-incomingHeight
 		err := w.SetDBSyncHeight(h)
 		if err != nil {
-			fmt.Printf("HeightHandler crash  %s ", err.Error())
+			log.Printf("HeightHandler crash  %s ", err.Error())
 		}
 	}
 }
@@ -127,9 +127,9 @@ func (w *Wallit) OpenDB(filename string) error {
 		numKeysBytes := sta.Get(KEYNumKeys)
 		if numKeysBytes != nil { // NumKeys exists, read into uint32
 			numKeys = lnutil.BtU32(numKeysBytes)
-			fmt.Printf("db says %d keys\n", numKeys)
+			log.Printf("db says %d keys\n", numKeys)
 		} else { // no adrs yet, make it 0.  Then make an address.
-			fmt.Printf("NumKeys not in DB, must be new DB. 0 Keys\n")
+			log.Printf("NumKeys not in DB, must be new DB. 0 Keys\n")
 			numKeys = 0
 			b0 := lnutil.U32tB(numKeys)
 			err = sta.Put(KEYNumKeys, b0)
