@@ -23,7 +23,7 @@ const (
 	// this is my local testnet node, replace it with your own close by.
 	// Random internet testnet nodes usually work but sometimes don't, so
 	// maybe I should test against different versions out there.
-	hardHeight = 1063333 // height to start at if not specified
+	hardHeight = 1111111 // height to start at if not specified
 )
 
 // variables for a goodelivery session

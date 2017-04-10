@@ -28,16 +28,23 @@ type NoArgs struct {
 type BalReply struct {
 	ChanTotal   int64 // total balance in channels
 	TxoTotal    int64 // all utxos
-	Mature      int64 // confirmed and spendable
 	MatureWitty int64 // confirmed, spendable and witness
 }
 
 func (r *LitRPC) Bal(args *NoArgs, reply *BalReply) error {
+	var err error
+	var allTxos portxo.TxoSliceByAmt
 
-	// ash sub-wallet for balance
+	nowHeight := r.Node.SubWallet.CurrentHeight()
 
-	reply.TxoTotal = r.Node.SubWallet.HowMuchTotal()
-	reply.MatureWitty = r.Node.SubWallet.HowMuchWitConf()
+	allTxos, err = r.Node.SubWallet.UtxoDump()
+	if err != nil {
+		return err
+	}
+
+	// ask sub-wallet for balance
+	reply.TxoTotal = allTxos.Sum()
+	reply.MatureWitty = allTxos.SumWitness(nowHeight)
 
 	// get all channel states
 	qcs, err := r.Node.GetAllQchans()
@@ -131,7 +138,8 @@ func (r *LitRPC) Send(args SendArgs, reply *TxidsReply) error {
 		txOuts[i] = wire.NewTxOut(args.Amts[i], outScript)
 	}
 
-	ops, err := r.Node.SubWallet.MaybeSend(txOuts)
+	// we don't care if it's witness or not
+	ops, err := r.Node.SubWallet.MaybeSend(txOuts, false)
 	if err != nil {
 		return err
 	}
@@ -227,7 +235,8 @@ func (r *LitRPC) Fanout(args FanArgs, reply *TxidsReply) error {
 		txos[i].PkScript = outScript
 	}
 
-	ops, err := r.Node.SubWallet.MaybeSend(txos)
+	// don't care if inputs are witty or not
+	ops, err := r.Node.SubWallet.MaybeSend(txos, false)
 	if err != nil {
 		return err
 	}

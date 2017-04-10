@@ -287,7 +287,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 
 	fmt.Fprintf(color.Output, "\t%s %s %s %s %s %s\n",
 		lnutil.Header("Utxo:"), lnutil.SatoshiColor(bReply.TxoTotal),
-		lnutil.Header("Conf:"), lnutil.SatoshiColor(bReply.Mature),
+		lnutil.Header("WitConf:"), lnutil.SatoshiColor(bReply.MatureWitty),
 		lnutil.Header("Channel:"), lnutil.SatoshiColor(bReply.ChanTotal))
 
 	err = lc.rpccon.Call("LitRPC.SyncHeight", nil, sReply)

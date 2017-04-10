@@ -261,7 +261,8 @@ func (nd LitNode) PointRespHandler(lm *lnutil.LitMsg) error {
 	}
 
 	// call MaybeSend, freezing inputs and learning the txid of the channel
-	outPoints, err := nd.SubWallet.MaybeSend([]*wire.TxOut{txo})
+	// here, we require only witness inputs
+	outPoints, err := nd.SubWallet.MaybeSend([]*wire.TxOut{txo}, true)
 	if err != nil {
 		return err
 	}

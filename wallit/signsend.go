@@ -20,7 +20,7 @@ import (
 // Bunch of redundancy with SendMany, maybe move that to a shared function...
 //NOTE this does not support multiple txouts with identical pkscripts in one tx.
 // The code would be trivial; it's not supported on purpose.  Use unique pkscripts.
-func (w *Wallit) MaybeSend(txos []*wire.TxOut) ([]*wire.OutPoint, error) {
+func (w *Wallit) MaybeSend(txos []*wire.TxOut, ow bool) ([]*wire.OutPoint, error) {
 	var err error
 	var totalSend int64
 	dustCutoff := int64(20000) // below this amount, just give to miners
@@ -46,7 +46,7 @@ func (w *Wallit) MaybeSend(txos []*wire.TxOut) ([]*wire.OutPoint, error) {
 	defer w.FreezeMutex.Unlock()
 	// get inputs for this tx.  Only segwit
 	// This might not be enough for the fee if the inputs line up right...
-	utxos, overshoot, err := w.PickUtxos(totalSend, true)
+	utxos, overshoot, err := w.PickUtxos(totalSend, ow)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func (w *Wallit) MaybeSend(txos []*wire.TxOut) ([]*wire.OutPoint, error) {
 	// input sum is not enough, we need more inputs.
 	// keep doing this until fee is sufficient or PickUtxos errors out
 	for fee > overshoot {
-		utxos, overshoot, err = w.PickUtxos(totalSend+fee, true)
+		utxos, overshoot, err = w.PickUtxos(totalSend+fee, ow)
 		if err != nil {
 			return nil, err
 		}
