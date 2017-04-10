@@ -83,6 +83,8 @@ func (nd *LitNode) LNDCReader(peer *RemotePeer) error {
 			return peer.Con.Close()
 		}
 		msg = msg[:n]
+
+		/* RETRACTED
 		routedMsg := new(lnutil.LitMsg)
 		// if message is long enough, try to set channel index of message
 		if len(msg) > 38 {
@@ -95,11 +97,15 @@ func (nd *LitNode) LNDCReader(peer *RemotePeer) error {
 		routedMsg.PeerIdx = peer.Idx
 		routedMsg.MsgType = msg[0]
 		routedMsg.Data = msg[1:]
+
 		if routedMsg.ChanIdx != 0 {
 			err = nd.PeerHandler(routedMsg, peer.QCs[routedMsg.ChanIdx], peer)
 		} else {
 			err = nd.PeerHandler(routedMsg, nil, peer)
 		}
+		*/
+		routedMsg, err := lnutil.NewLitMsg(msg, peer.Idx)
+
 		if err != nil {
 			fmt.Printf("PeerHandler error with %d: %s\n", peer.Idx, err.Error())
 		}

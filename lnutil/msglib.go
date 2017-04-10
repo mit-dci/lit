@@ -44,7 +44,10 @@ type LitMsg interface {
 	Bytes() []byte
 }
 
-func NewLitMsg(peerid uint32, msgType uint8, b []byte) (LitMsg, error) {
+func LitMsgFromBytes(b []byte, peerid uint32) (LitMsg, error) {
+	msgType := b[0]
+	//b = b[1:] // get rid of type from byte slice
+
 	switch msgType {
 	case MSGID_TEXTCHAT:
 		return NewChatMsgFromBytes(b, peerid)
@@ -108,7 +111,12 @@ func NewChatMsg(peerid uint32, text string) *ChatMsg {
 	return t
 }
 
-func (self *ChatMsg) Bytes() []byte { return []byte(self.Text) } // no data in this type of message
+func (self *ChatMsg) Bytes() []byte {
+	var msg []byte
+	msg = append(msg, self.MsgType())
+	msg = append(msg, []byte(self.Text)...)
+	return msg
+}
 
 func (self *ChatMsg) Peer() uint32   { return self.PeerIdx }
 func (self *ChatMsg) MsgType() uint8 { return MSGID_TEXTCHAT }
@@ -125,7 +133,11 @@ func NewPointReqMsg(peerid uint32) *PointReqMsg {
 	return p
 }
 
-func (self *PointReqMsg) Bytes() []byte { return nil } // no data in this type of message
+func (self *PointReqMsg) Bytes() []byte {
+	var msg []byte
+	msg = append(msg, self.MsgType())
+	return msg
+}
 
 func (self *PointReqMsg) Peer() uint32   { return self.PeerIdx }
 func (self *PointReqMsg) MsgType() uint8 { return MSGID_POINTREQ }
@@ -148,6 +160,7 @@ func NewPointRespMsg(peerid uint32, chanpub [33]byte, refundpub [33]byte, HAKD [
 
 func (self *PointRespMsg) Bytes() []byte {
 	var msg []byte
+	msg = append(msg, self.MsgType())
 	msg = append(msg, self.ChannelPub[:]...)
 	msg = append(msg, self.RefundPub[:]...)
 	msg = append(msg, self.HAKDbase[:]...)
@@ -198,6 +211,7 @@ func (self *ChanDescMsg) Bytes() []byte {
 
 	var msg []byte
 	opArr := OutPointToBytes(self.Outpoint)
+	msg = append(msg, self.MsgType())
 	msg = append(msg, opArr[:]...)
 	msg = append(msg, self.PubKey[:]...)
 	msg = append(msg, self.RefundPub[:]...)
@@ -237,6 +251,7 @@ func NewChanAckMsg(peerid uint32, OP wire.OutPoint, ELKZero [33]byte, ELKOne [33
 func (self *ChanAckMsg) Bytes() []byte {
 	var msg []byte
 	opArr := OutPointToBytes(self.Outpoint)
+	msg = append(msg, self.MsgType())
 	msg = append(msg, opArr[:]...)
 	msg = append(msg, self.ElkZero[:]...)
 	msg = append(msg, self.ElkOne[:]...)
@@ -264,6 +279,7 @@ func NewSigProofMsg(peerid uint32, OP wire.OutPoint, SIG [64]byte) *SigProofMsg 
 
 func (self *SigProofMsg) Bytes() []byte {
 	var msg []byte
+	msg = append(msg, self.MsgType())
 	opArr := OutPointToBytes(self.Outpoint)
 	msg = append(msg, opArr[:]...)
 	msg = append(msg, self.Signature[:]...)
@@ -291,6 +307,7 @@ func NewCloseReqMsg(peerid uint32, OP wire.OutPoint, SIG [64]byte) *CloseReqMsg 
 
 func (self *CloseReqMsg) Bytes() []byte {
 	var msg []byte
+	msg = append(msg, self.MsgType())
 	opArr := OutPointToBytes(self.Outpoint)
 	msg = append(msg, opArr[:]...)
 	msg = append(msg, self.Signature[:]...)
@@ -338,6 +355,7 @@ func NewDeltaSigMsgFromBytes(b []byte, peerid uint32) (*DeltaSigMsg, error) {
 
 func (self *DeltaSigMsg) Bytes() []byte {
 	var msg []byte
+	msg = append(msg, self.MsgType())
 	opArr := OutPointToBytes(self.Outpoint)
 	msg = append(msg, opArr[:]...)
 	msg = append(msg, U32tB(self.Delta)...)
@@ -386,6 +404,7 @@ func NewSigRevFromBytes(b []byte, peerid uint32) (*SigRevMsg, error) {
 
 func (self *SigRevMsg) Bytes() []byte {
 	var msg []byte
+	msg = append(msg, self.MsgType())
 	opArr := OutPointToBytes(self.Outpoint)
 	msg = append(msg, opArr[:]...)
 	msg = append(msg, self.Signature[:]...)
@@ -417,6 +436,7 @@ func NewGapSigRev(peerid uint32, OP wire.OutPoint, SIG [64]byte, ELK chainhash.H
 
 func (self *GapSigRevMsg) Bytes() []byte {
 	var msg []byte
+	msg = append(msg, self.MsgType())
 	opArr := OutPointToBytes(self.Outpoint)
 	msg = append(msg, opArr[:]...)
 	msg = append(msg, self.Signature[:]...)
@@ -446,6 +466,7 @@ func NewRevMsg(peerid uint32, OP wire.OutPoint, ELK chainhash.Hash, N2ELK [33]by
 
 func (self *RevMsg) Bytes() []byte {
 	var msg []byte
+	msg = append(msg, self.MsgType())
 	opArr := OutPointToBytes(self.Outpoint)
 	msg = append(msg, opArr[:]...)
 	msg = append(msg, self.Elk[:]...)
@@ -516,6 +537,7 @@ func NewWatchDescMsgFromBytes(b []byte, peerIDX uint32) (*WatchDescMsg, error) {
 // Bytes turns a WatchannelDescriptor into 100 bytes
 func (sd *WatchDescMsg) Bytes() []byte {
 	var buf bytes.Buffer
+	buf.Write(sd.MsgType())
 	buf.Write(sd.DestPKHScript[:])
 	binary.Write(&buf, binary.BigEndian, sd.Delay)
 	binary.Write(&buf, binary.BigEndian, sd.Fee)
@@ -572,6 +594,7 @@ func NewComMsgFromBytes(b []byte, peerIDX uint32) (*ComMsg, error) {
 // ToBytes turns a ComMsg into 132 bytes
 func (sm *ComMsg) Bytes() []byte {
 	var buf bytes.Buffer
+	buf.Write(sm.MsgType())
 	buf.Write(sm.DestPKH[:])
 	buf.Write(sm.ParTxid[:])
 	buf.Write(sm.Sig[:])
