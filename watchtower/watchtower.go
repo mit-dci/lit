@@ -36,12 +36,12 @@ func (w *WatchTower) HandleMessage(lm lnutil.LitMsg) error {
 	switch lm.MsgType() {
 	case lnutil.MSGID_WATCH_DESC:
 		fmt.Printf("new channel to watch\n")
-		desc := *lnutil.NewWatchDescMsg(lm.Bytes(), lm.Peer())
+		desc := *lnutil.NewWatchDescMsgFromBytes(lm.Bytes(), lm.Peer())
 		return w.AddNewChannel(desc)
 
 	case lnutil.MSGID_WATCH_COMMSG:
 		fmt.Printf("new commsg\n")
-		commsg := *lnutil.NewComMsg(lm.Bytes(), lm.Peer())
+		commsg := *lnutil.NewComMsgFromBytes(lm.Bytes(), lm.Peer())
 		return w.AddState(commsg)
 
 	case lnutil.MSGID_WATCH_DELETE:

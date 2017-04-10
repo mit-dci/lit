@@ -3,30 +3,13 @@ package lnutil
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 )
 
 // all the messages to and from peers look like this internally
-type Msg interface {
-	setData(...[]byte)
-}
-
-/*
-type LitMsg struct { // RETRACTED
-	PeerIdx uint32
-	ChanIdx uint32 // optional, may be 0
-	MsgType uint8
-	Data    []byte
-}
-*/
-
-type LitMsg interface {
-	Peer() uint32
-	MsgType() uint8
-	Bytes() []byte
-}
 
 const (
 	MSGID_TEXTCHAT = 0x00 // send a text message
@@ -55,156 +38,80 @@ const (
 	MSGID_WATCH_DELETE = 0x62 // Watch_clear marks a channel as ok to delete.  No further updates possible.
 )
 
-type DeltaSigMsg struct {
-	PeerIdx   uint32
-	Outpoint  wire.OutPoint
-	Delta     int32
-	Signature [64]byte
+type LitMsg interface {
+	Peer() uint32
+	MsgType() uint8
+	Bytes() []byte
 }
 
-func NewDeltaSigMsg(peerid uint32, OP wire.OutPoint, DELTA int32, SIG [64]byte) *DeltaSigMsg {
-	d := new(DeltaSigMsg)
-	d.PeerIdx = peerid
-	d.Outpoint = OP
-	d.Delta = DELTA
-	d.Signature = SIG
-	return d
-}
+func NewLitMsg(peerid uint32, msgType uint8, b []byte) (LitMsg, error) {
+	switch msgType {
+	case MSGID_TEXTCHAT:
+		return NewChatMsgFromBytes(b, peerid)
+	case MSGID_POINTREQ:
+		return NewPointReqMsgFromBytes(b, peerid)
+	case MSGID_POINTRESP:
+		return NewPointRespMsgFromBytes(b, peerid)
+	case MSGID_CHANDESC:
+		return NewChanDescMsgFromBytes(b, peerid)
+	case MSGID_CHANACK:
+		return NewChanAckMsgFromBytes(b, peerid)
+	case MSGID_SIGPROOF:
+		return NewSigProofMsgFromBytes(b, peerid)
 
-func (self *DeltaSigMsg) Bytes() []byte {
-	var msg []byte
-	opArr := OutPointToBytes(self.Outpoint)
-	msg = append(msg, opArr[:]...)
-	msg = append(msg, I32tB(self.Delta)...)
-	msg = append(msg, self.Signature[:]...)
-	return msg
-}
+	case MSGID_CLOSEREQ:
+		return NewCloseReqMsgFromBytes(b, peerid)
+	/*
+		case MSGID_CLOSERESP:
+	*/
 
-func (self *DeltaSigMsg) Peer() uint32   { return self.PeerIdx }
-func (self *DeltaSigMsg) MsgType() uint8 { return MSGID_DELTASIG }
+	case MSGID_DELTASIG:
+		return NewDeltaSigMsgFromBytes(b, peerid)
+	case MSGID_SIGREV:
+		return NewSigRevFromBytes(b, peerid)
+	case MSGID_GAPSIGREV:
+		return NewGapSigRevFromBytes(b, peerid)
+	case MSGID_REV:
+		return NewRevMsgFromBytes(b, peerid)
+
+	/*
+		MSGID_FWDMSG     = 0x40
+		MSGID_FWDAUTHREQ = 0x41
+
+		MSGID_SELFPUSH = 0x50
+	*/
+
+	case MSGID_WATCH_DESC:
+		return NewWatchDescMsgFromBytes(b, peerid)
+	case MSGID_WATCH_COMMSG:
+		return NewComMsgFromBytes(b, peerid)
+	/*
+		case MSGID_WATCH_DELETE = 0x62
+	*/
+
+	default:
+		return nil, fmt.Errorf("Unknown message of type %d ", msgType) // should replace with some error
+	}
+}
 
 //----------
 
-type SigRevMsg struct {
-	PeerIdx    uint32
-	Outpoint   wire.OutPoint
-	Signature  [64]byte
-	Elk        chainhash.Hash
-	N2ElkPoint [33]byte
+type ChatMsg struct {
+	PeerIdx uint32
+	Text    string
 }
 
-func NewSigRev(peerid uint32, OP wire.OutPoint, SIG [64]byte, ELK chainhash.Hash, N2ELK [33]byte) *SigRevMsg {
-	s := new(SigRevMsg)
-	s.PeerIdx = peerid
-	s.Outpoint = OP
-	s.Signature = SIG
-	s.Elk = ELK
-	s.N2ElkPoint = N2ELK
-	return s
+func NewChatMsg(peerid uint32, text string) *ChatMsg {
+	t := new(ChatMsg)
+	t.PeerIdx = peerid
+	t.Text = text
+	return t
 }
 
-func (self *SigRevMsg) Bytes() []byte {
-	var msg []byte
-	opArr := OutPointToBytes(self.Outpoint)
-	msg = append(msg, opArr[:]...)
-	msg = append(msg, self.Signature[:]...)
-	msg = append(msg, self.Elk[:]...)
-	msg = append(msg, self.N2ElkPoint[:]...)
-	return msg
-}
+func (self *ChatMsg) Bytes() []byte { return []byte(self.Text) } // no data in this type of message
 
-func (self *SigRevMsg) Peer() uint32   { return self.PeerIdx }
-func (self *SigRevMsg) MsgType() uint8 { return MSGID_SIGREV }
-
-//----------
-
-type GapSigRevMsg struct {
-	PeerIdx    uint32
-	Outpoint   wire.OutPoint
-	Signature  [64]byte
-	Elk        chainhash.Hash
-	N2ElkPoint [33]byte
-}
-
-func NewGapSigRev(peerid uint32, OP wire.OutPoint, SIG [64]byte, ELK chainhash.Hash, N2ELK [33]byte) *GapSigRevMsg {
-	g := new(GapSigRevMsg)
-	g.PeerIdx = peerid
-	g.Outpoint = OP
-	g.Signature = SIG
-	g.Elk = ELK
-	g.N2ElkPoint = N2ELK
-	return g
-}
-
-func (self *GapSigRevMsg) Bytes() []byte {
-	var msg []byte
-	opArr := OutPointToBytes(self.Outpoint)
-	msg = append(msg, opArr[:]...)
-	msg = append(msg, self.Signature[:]...)
-	msg = append(msg, self.Elk[:]...)
-	msg = append(msg, self.N2ElkPoint[:]...)
-	return msg
-}
-
-func (self *GapSigRevMsg) Peer() uint32   { return self.PeerIdx }
-func (self *GapSigRevMsg) MsgType() uint8 { return MSGID_GAPSIGREV }
-
-//----------
-
-type RevMsg struct {
-	PeerIdx    uint32
-	Outpoint   wire.OutPoint
-	Elk        chainhash.Hash
-	N2ElkPoint [33]byte
-}
-
-func NewRevMsg(peerid uint32, OP wire.OutPoint, ELK chainhash.Hash, N2ELK [33]byte) *RevMsg {
-	r := new(RevMsg)
-	r.PeerIdx = peerid
-	r.Outpoint = OP
-	r.Elk = ELK
-	r.N2ElkPoint = N2ELK
-	return r
-}
-
-func (self *RevMsg) Bytes() []byte {
-	var msg []byte
-	opArr := OutPointToBytes(self.Outpoint)
-	msg = append(msg, opArr[:]...)
-	msg = append(msg, self.Elk[:]...)
-	msg = append(msg, self.N2ElkPoint[:]...)
-	return msg
-}
-
-func (self *RevMsg) Peer() uint32   { return self.PeerIdx }
-func (self *RevMsg) MsgType() uint8 { return MSGID_REV }
-
-//----------
-
-type CloseReqMsg struct {
-	PeerIdx   uint32
-	Outpoint  wire.OutPoint
-	Signature [64]byte
-}
-
-func NewCloseReqMsg(peerid uint32, OP wire.OutPoint, SIG [64]byte) *CloseReqMsg {
-	cr := new(CloseReqMsg)
-	cr.PeerIdx = peerid
-	cr.Outpoint = OP
-	cr.Signature = SIG
-	return cr
-}
-
-func (self *CloseReqMsg) Bytes() []byte {
-	var msg []byte
-	opArr := OutPointToBytes(self.Outpoint)
-	msg = append(msg, opArr[:]...)
-	msg = append(msg, self.Signature[:]...)
-	return msg
-}
-
-func (self *CloseReqMsg) Peer() uint32   { return self.PeerIdx }
-func (self *CloseReqMsg) MsgType() uint8 { return MSGID_CLOSEREQ }
+func (self *ChatMsg) Peer() uint32   { return self.PeerIdx }
+func (self *ChatMsg) MsgType() uint8 { return MSGID_TEXTCHAT }
 
 //----------
 
@@ -222,8 +129,6 @@ func (self *PointReqMsg) Bytes() []byte { return nil } // no data in this type o
 
 func (self *PointReqMsg) Peer() uint32   { return self.PeerIdx }
 func (self *PointReqMsg) MsgType() uint8 { return MSGID_POINTREQ }
-
-//----------
 
 type PointRespMsg struct {
 	PeerIdx    uint32
@@ -251,54 +156,6 @@ func (self *PointRespMsg) Bytes() []byte {
 
 func (self *PointRespMsg) Peer() uint32   { return self.PeerIdx }
 func (self *PointRespMsg) MsgType() uint8 { return MSGID_POINTRESP }
-
-//----------
-
-type ChatMsg struct {
-	PeerIdx uint32
-	Text    string
-}
-
-func NewChatMsg(peerid uint32, text string) *ChatMsg {
-	t := new(ChatMsg)
-	t.PeerIdx = peerid
-	t.Text = text
-	return t
-}
-
-func (self *ChatMsg) Bytes() []byte { return []byte(self.Text) } // no data in this type of message
-
-func (self *ChatMsg) Peer() uint32   { return self.PeerIdx }
-func (self *ChatMsg) MsgType() uint8 { return MSGID_TEXTCHAT }
-
-//----------
-
-type SigProofMsg struct {
-	PeerIdx   uint32
-	Outpoint  wire.OutPoint
-	Signature [64]byte
-}
-
-func NewSigProofMsg(peerid uint32, OP wire.OutPoint, SIG [64]byte) *SigProofMsg {
-	sp := new(SigProofMsg)
-	sp.PeerIdx = peerid
-	sp.Outpoint = OP
-	sp.Signature = SIG
-	return sp
-}
-
-func (self *SigProofMsg) Bytes() []byte {
-	var msg []byte
-	opArr := OutPointToBytes(self.Outpoint)
-	msg = append(msg, opArr[:]...)
-	msg = append(msg, self.Signature[:]...)
-	return msg
-}
-
-func (self *SigProofMsg) Peer() uint32   { return self.PeerIdx }
-func (self *SigProofMsg) MsgType() uint8 { return MSGID_SIGPROOF }
-
-//----------
 
 type ChanDescMsg struct {
 	PeerIdx   uint32
@@ -357,8 +214,6 @@ func (self *ChanDescMsg) Bytes() []byte {
 func (self *ChanDescMsg) Peer() uint32   { return self.PeerIdx }
 func (self *ChanDescMsg) MsgType() uint8 { return MSGID_CHANDESC }
 
-//----------
-
 type ChanAckMsg struct {
 	PeerIdx   uint32
 	Outpoint  wire.OutPoint
@@ -393,6 +248,214 @@ func (self *ChanAckMsg) Bytes() []byte {
 func (self *ChanAckMsg) Peer() uint32   { return self.PeerIdx }
 func (self *ChanAckMsg) MsgType() uint8 { return MSGID_CHANACK }
 
+type SigProofMsg struct {
+	PeerIdx   uint32
+	Outpoint  wire.OutPoint
+	Signature [64]byte
+}
+
+func NewSigProofMsg(peerid uint32, OP wire.OutPoint, SIG [64]byte) *SigProofMsg {
+	sp := new(SigProofMsg)
+	sp.PeerIdx = peerid
+	sp.Outpoint = OP
+	sp.Signature = SIG
+	return sp
+}
+
+func (self *SigProofMsg) Bytes() []byte {
+	var msg []byte
+	opArr := OutPointToBytes(self.Outpoint)
+	msg = append(msg, opArr[:]...)
+	msg = append(msg, self.Signature[:]...)
+	return msg
+}
+
+func (self *SigProofMsg) Peer() uint32   { return self.PeerIdx }
+func (self *SigProofMsg) MsgType() uint8 { return MSGID_SIGPROOF }
+
+//----------
+
+type CloseReqMsg struct {
+	PeerIdx   uint32
+	Outpoint  wire.OutPoint
+	Signature [64]byte
+}
+
+func NewCloseReqMsg(peerid uint32, OP wire.OutPoint, SIG [64]byte) *CloseReqMsg {
+	cr := new(CloseReqMsg)
+	cr.PeerIdx = peerid
+	cr.Outpoint = OP
+	cr.Signature = SIG
+	return cr
+}
+
+func (self *CloseReqMsg) Bytes() []byte {
+	var msg []byte
+	opArr := OutPointToBytes(self.Outpoint)
+	msg = append(msg, opArr[:]...)
+	msg = append(msg, self.Signature[:]...)
+	return msg
+}
+
+func (self *CloseReqMsg) Peer() uint32   { return self.PeerIdx }
+func (self *CloseReqMsg) MsgType() uint8 { return MSGID_CLOSEREQ }
+
+//----------
+
+type DeltaSigMsg struct {
+	PeerIdx   uint32
+	Outpoint  wire.OutPoint
+	Delta     uint32
+	Signature [64]byte
+}
+
+func NewDeltaSigMsg(peerid uint32, OP wire.OutPoint, DELTA uint32, SIG [64]byte) *DeltaSigMsg {
+	d := new(DeltaSigMsg)
+	d.PeerIdx = peerid
+	d.Outpoint = OP
+	d.Delta = DELTA
+	d.Signature = SIG
+	return d
+}
+
+func NewDeltaSigMsgFromBytes(b []byte, peerid uint32) (*DeltaSigMsg, error) {
+	ds := new(DeltaSigMsg)
+	ds.PeerIdx = peerid
+
+	if len(b) != 104 {
+		return ds, fmt.Errorf("got %d byte DeltaSig, expect 104", len(b))
+	}
+
+	var op [36]byte
+	copy(op[:], b[:36])
+	ds.Outpoint = *OutPointFromBytes(op)
+
+	// deserialize DeltaSig
+	ds.Delta = BtU32(b[36:40])
+	copy(ds.Signature[:], b[40:])
+	return ds, nil
+}
+
+func (self *DeltaSigMsg) Bytes() []byte {
+	var msg []byte
+	opArr := OutPointToBytes(self.Outpoint)
+	msg = append(msg, opArr[:]...)
+	msg = append(msg, U32tB(self.Delta)...)
+	msg = append(msg, self.Signature[:]...)
+	return msg
+}
+
+func (self *DeltaSigMsg) Peer() uint32   { return self.PeerIdx }
+func (self *DeltaSigMsg) MsgType() uint8 { return MSGID_DELTASIG }
+
+type SigRevMsg struct {
+	PeerIdx    uint32
+	Outpoint   wire.OutPoint
+	Signature  [64]byte
+	Elk        chainhash.Hash
+	N2ElkPoint [33]byte
+}
+
+func NewSigRev(peerid uint32, OP wire.OutPoint, SIG [64]byte, ELK chainhash.Hash, N2ELK [33]byte) *SigRevMsg {
+	s := new(SigRevMsg)
+	s.PeerIdx = peerid
+	s.Outpoint = OP
+	s.Signature = SIG
+	s.Elk = ELK
+	s.N2ElkPoint = N2ELK
+	return s
+}
+
+func NewSigRevFromBytes(b []byte, peerid uint32) (*SigRevMsg, error) {
+	sr := new(SigRevMsg)
+	sr.PeerIdx = peerid
+
+	if len(b) != 165 {
+		return nil, fmt.Errorf("got %d byte SIGREV, expect 165", len(b))
+	}
+
+	var op [36]byte
+	copy(op[:], b[:36])
+	sr.Outpoint = *OutPointFromBytes(op)
+	copy(sr.Signature[:], b[36:100])
+	elk, _ := chainhash.NewHash(b[100:132])
+	sr.Elk = *elk
+	copy(sr.N2ElkPoint[:], b[132:])
+	return sr, nil
+}
+
+func (self *SigRevMsg) Bytes() []byte {
+	var msg []byte
+	opArr := OutPointToBytes(self.Outpoint)
+	msg = append(msg, opArr[:]...)
+	msg = append(msg, self.Signature[:]...)
+	msg = append(msg, self.Elk[:]...)
+	msg = append(msg, self.N2ElkPoint[:]...)
+	return msg
+}
+
+func (self *SigRevMsg) Peer() uint32   { return self.PeerIdx }
+func (self *SigRevMsg) MsgType() uint8 { return MSGID_SIGREV }
+
+type GapSigRevMsg struct {
+	PeerIdx    uint32
+	Outpoint   wire.OutPoint
+	Signature  [64]byte
+	Elk        chainhash.Hash
+	N2ElkPoint [33]byte
+}
+
+func NewGapSigRev(peerid uint32, OP wire.OutPoint, SIG [64]byte, ELK chainhash.Hash, N2ELK [33]byte) *GapSigRevMsg {
+	g := new(GapSigRevMsg)
+	g.PeerIdx = peerid
+	g.Outpoint = OP
+	g.Signature = SIG
+	g.Elk = ELK
+	g.N2ElkPoint = N2ELK
+	return g
+}
+
+func (self *GapSigRevMsg) Bytes() []byte {
+	var msg []byte
+	opArr := OutPointToBytes(self.Outpoint)
+	msg = append(msg, opArr[:]...)
+	msg = append(msg, self.Signature[:]...)
+	msg = append(msg, self.Elk[:]...)
+	msg = append(msg, self.N2ElkPoint[:]...)
+	return msg
+}
+
+func (self *GapSigRevMsg) Peer() uint32   { return self.PeerIdx }
+func (self *GapSigRevMsg) MsgType() uint8 { return MSGID_GAPSIGREV }
+
+type RevMsg struct {
+	PeerIdx    uint32
+	Outpoint   wire.OutPoint
+	Elk        chainhash.Hash
+	N2ElkPoint [33]byte
+}
+
+func NewRevMsg(peerid uint32, OP wire.OutPoint, ELK chainhash.Hash, N2ELK [33]byte) *RevMsg {
+	r := new(RevMsg)
+	r.PeerIdx = peerid
+	r.Outpoint = OP
+	r.Elk = ELK
+	r.N2ElkPoint = N2ELK
+	return r
+}
+
+func (self *RevMsg) Bytes() []byte {
+	var msg []byte
+	opArr := OutPointToBytes(self.Outpoint)
+	msg = append(msg, opArr[:]...)
+	msg = append(msg, self.Elk[:]...)
+	msg = append(msg, self.N2ElkPoint[:]...)
+	return msg
+}
+
+func (self *RevMsg) Peer() uint32   { return self.PeerIdx }
+func (self *RevMsg) MsgType() uint8 { return MSGID_REV }
+
 //----------
 
 // 2 structs that the watchtower gets from clients: Descriptors and Msgs
@@ -419,14 +482,24 @@ type WatchDescMsg struct {
 
 // NewWatchDescMsg turns 96 bytes into a WatchannelDescriptor
 // Silently fails with incorrect size input, watch out.
-func NewWatchDescMsg(b []byte, peerIDX uint32) *WatchDescMsg {
+func NewWatchDescMsg(peeridx uint32, destScript [20]byte, delay uint16, fee int64, customerBase [33]byte, adversaryBase [33]byte) *WatchDescMsg {
+	wd := new(WatchDescMsg)
+	wd.PeerIdx = peeridx
+	wd.DestPKHScript = destScript
+	wd.Delay = delay
+	wd.Fee = fee
+	wd.CustomerBasePoint = customerBase
+	wd.AdversaryBasePoint = adversaryBase
+	return wd
+}
+
+func NewWatchDescMsgFromBytes(b []byte, peerIDX uint32) (*WatchDescMsg, error) {
 	sd := new(WatchDescMsg)
-	if len(b) != 96 {
-		return sd
-		//		return sd, fmt.Errorf(
-		//			"WatchannelDescriptor %d bytes, expect 128 or 96", len(b))
-	}
 	sd.PeerIdx = peerIDX
+	if len(b) != 96 && len(b) != 128 {
+		return sd, fmt.Errorf(
+			"WatchannelDescriptor %d bytes, expect 128 or 96", len(b))
+	}
 	buf := bytes.NewBuffer(b)
 
 	copy(sd.DestPKHScript[:], buf.Next(20))
@@ -437,7 +510,7 @@ func NewWatchDescMsg(b []byte, peerIDX uint32) *WatchDescMsg {
 	copy(sd.CustomerBasePoint[:], buf.Next(33))
 	copy(sd.AdversaryBasePoint[:], buf.Next(33))
 
-	return sd
+	return sd, nil
 }
 
 // Bytes turns a WatchannelDescriptor into 100 bytes
@@ -469,31 +542,44 @@ type ComMsg struct {
 	Sig     [64]byte       // 64 bytes of sig
 }
 
+func NewComMsg(peerIdx uint32, destPKH [20]byte, elk chainhash.Hash, parTxid [16]byte, sig [64]byte) *ComMsg {
+	cm := new(ComMsg)
+	cm.PeerIdx = peerIdx
+	cm.DestPKH = destPKH
+	cm.Elk = elk
+	cm.ParTxid = parTxid
+	cm.Sig = sig
+	return cm
+}
+
 // ComMsgFromBytes turns 132 bytes into a SorceMsg
 // Silently fails with wrong size input.
-func NewComMsg(b []byte, peerIDX uint32) *ComMsg {
+func NewComMsgFromBytes(b []byte, peerIDX uint32) (*ComMsg, error) {
 	sm := new(ComMsg)
-	if len(b) != 132 {
-		return sm
-	}
 	sm.PeerIdx = peerIDX
+	if len(b) != 132 {
+		return sm, fmt.Errorf(
+			"WatchComMsg %d bytes, expect 132", len(b))
+	}
+
 	copy(sm.DestPKH[:], b[:20])
 	copy(sm.ParTxid[:], b[20:36])
 	copy(sm.Sig[:], b[36:100])
 	copy(sm.Elk[:], b[100:])
-	return sm
+	return sm, nil
 }
 
 // ToBytes turns a ComMsg into 132 bytes
-func (sm *ComMsg) Bytes() (b [132]byte) {
+func (sm *ComMsg) Bytes() []byte {
 	var buf bytes.Buffer
 	buf.Write(sm.DestPKH[:])
 	buf.Write(sm.ParTxid[:])
 	buf.Write(sm.Sig[:])
 	buf.Write(sm.Elk.CloneBytes())
-	copy(b[:], buf.Bytes())
-	return
+	return buf.Bytes()
 }
 
 func (self *ComMsg) Peer() uint32   { return self.PeerIdx }
 func (self *ComMsg) MsgType() uint8 { return MSGID_WATCH_COMMSG }
+
+//----------

@@ -201,11 +201,10 @@ func (nd *LitNode) SendChat(peer uint32, chat string) error {
 	outMsg.PeerIdx = peer
 	outMsg.Data = []byte(chat)
 	*/
-	outMsg := new(lnutil.LitMsg)
-	outMsg2 := lnutil.NewChatMsg(peer, chat)
+	outMsg := lnutil.NewChatMsg(peer, chat)
 
 	nd.OmniOut <- outMsg
-	outMsg2.Bytes()
+	outMsg.Bytes()
 
 	return nil
 }

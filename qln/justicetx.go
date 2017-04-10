@@ -9,7 +9,6 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/sig64"
-	"github.com/mit-dci/lit/watchtower"
 )
 
 /*
@@ -201,15 +200,23 @@ func (nd *LitNode) SyncWatch(qc *Qchan) error {
 	}
 	// send initial description if we haven't sent anything yet
 	if qc.State.WatchUpTo == 0 {
+		var peerIdx uint32
+		peerIdx = 0 // should be replaced
+		desc := lnutil.NewWatchDescMsg(peerIdx, qc.WatchRefundAdr, qc.Delay, 5000, qc.TheirHAKDBase, qc.MyHAKDBase)
+
+		/* RETRACTED
 		desc := new(watchtower.WatchannelDescriptor)
 		desc.DestPKHScript = qc.WatchRefundAdr
 		desc.Delay = qc.Delay
 		desc.Fee = 5000 // fixed 5000 sat fee; make variable later
 		desc.AdversaryBasePoint = qc.TheirHAKDBase
 		desc.CustomerBasePoint = qc.MyHAKDBase
-		descBytes := desc.ToBytes()
+		*/
+
+		descBytes := desc.Bytes()
+
 		_, err := nd.WatchCon.Write(
-			append([]byte{watchtower.MSGID_WATCH_DESC}, descBytes[:]...))
+			append([]byte{lnutil.MSGID_WATCH_DESC}, descBytes[:]...))
 		if err != nil {
 			return err
 		}
@@ -249,17 +256,31 @@ func (nd *LitNode) SendWatchComMsg(qc *Qchan, idx uint64) error {
 	if err != nil {
 		return err
 	}
+
+	var peerIdx uint32
+	peerIdx = 0 // should be replaced
+
+	var parTx [16]byte
+	var sig [64]byte
+	copy(parTx[:], txidsig[:16])
+	copy(sig[:], txidsig[16:])
+
+	comMsg := lnutil.NewComMsg(peerIdx, qc.WatchRefundAdr, *elk, parTx, sig)
+
+	/* RETRACTED
 	commsg := new(watchtower.ComMsg)
 	commsg.DestPKH = qc.WatchRefundAdr
 	commsg.Elk = *elk
 	copy(commsg.ParTxid[:], txidsig[:16])
 	copy(commsg.Sig[:], txidsig[16:])
-	comBytes := commsg.ToBytes()
+	*/
+
+	comBytes := comMsg.Bytes()
 
 	// stash to send all?  or just send once each time?  probably should
 	// set up some output buffering
 
 	_, err = nd.WatchCon.Write(
-		append([]byte{watchtower.MSGID_WATCH_COMMSG}, comBytes[:]...))
+		append([]byte{lnutil.MSGID_WATCH_COMMSG}, comBytes[:]...))
 	return err
 }

@@ -12,7 +12,7 @@ func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) er
 	switch msg.MsgType() & 0xf0 { // in progress
 	case 0x00: // TEXT MESSAGE.  SIMPLE
 		nd.UserMessageBox <- fmt.Sprintf(
-			"\nmsg from %s: %s", lnutil.White(msg.PeerIdx()), lnutil.Green(string(msg.Bytes())))
+			"\nmsg from %s: %s", lnutil.White(msg.Peer()), lnutil.Green(string(msg.Bytes())))
 		return nil
 
 	case 0x10:
@@ -39,7 +39,7 @@ func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) er
 	case 0x60:
 		if !nd.Tower.Accepting {
 			return fmt.Errorf("Error: Got tower msg from %x but tower disabled\n",
-				msg.PeerIdx())
+				msg.Peer())
 		}
 		return nd.Tower.HandleMessage(msg)
 
@@ -125,8 +125,13 @@ func (nd *LitNode) PopulateQchanMap(peer *RemotePeer) error {
 func (nd *LitNode) ChannelHandler(msg lnutil.LitMsg) error {
 	switch msg.MsgType() {
 	case lnutil.MSGID_POINTREQ: // POINT REQUEST
-		fmt.Printf("Got point request from %x\n", msg.PeerIdx())
-		nd.PointReqHandler(lnutil.PointReqMsg(msg))
+		fmt.Printf("Got point request from %x\n", msg.Peer())
+		prm, ok := msg.(lnutil.PointReqMsg)
+		if !ok {
+			return fmt.Errorf("didn't work")
+		}
+
+		nd.PointReqHandler(prm)
 		return nil
 
 	case lnutil.MSGID_POINTRESP: // POINT RESPONSE

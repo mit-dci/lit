@@ -352,12 +352,9 @@ func (nd LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 // saves it to the local db, and returns a channel acknowledgement
 func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 
-	var opArr [36]byte
-
 	// deserialize desc
 	op := msg.Outpoint
-	str := op.String()
-	copy(opArr[:], str[:]) // RETRACTED
+	opArr := lnutil.OutPointToBytes(op)
 
 	theirPub := msg.PubKey
 	theirRefundPub := msg.RefundPub
@@ -495,9 +492,7 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 // QChanAckHandler takes in an acknowledgement multisig description.
 // when a multisig outpoint is ackd, that causes the funder to sign and broadcast.
 func (nd *LitNode) QChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePeer) {
-	var opArr [36]byte
-	str := msg.Outpoint.String()
-	copy(opArr[:], str[:]) //RETRACTED
+	opArr := lnutil.OutPointToBytes(msg.Outpoint)
 	elkPointZero := msg.ElkZero
 	elkPointOne := msg.ElkOne
 	elkPointTwo := msg.ElkTwo
@@ -599,11 +594,9 @@ func (nd *LitNode) QChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePeer) {
 // In some cases you don't need this message.
 func (nd *LitNode) SigProofHandler(msg lnutil.SigProofMsg, peer *RemotePeer) {
 
-	var opArr [36]byte
 	sig := msg.Signature
 	op := msg.Outpoint
-	str := op.String()
-	copy(opArr[:], str[:]) //RETRACTED
+	opArr := lnutil.OutPointToBytes(op)
 
 	qc, err := nd.GetQchan(opArr)
 	if err != nil {

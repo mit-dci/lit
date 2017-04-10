@@ -247,9 +247,8 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 	outMsg.PeerIdx = q.Peer()
 	outMsg.Data = msg
 	*/
-	outMsg := new(lnutil.LitMsg)
-	outMsg2 := lnutil.NewDeltaSigMsg(q.Peer(), q.Op, q.State.Delta, sig)
-	outMsg2.Bytes()
+
+	outMsg := lnutil.NewDeltaSigMsg(q.Peer(), q.Op, q.State.Delta, sig)
 	nd.OmniOut <- outMsg
 
 	return nil
@@ -260,16 +259,8 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 // Leaves the channel either expecting a Rev (normally) or a GapSigRev (collision)
 func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 
-	if len(lm.Data) != 104 {
-		return fmt.Errorf("got %d byte DeltaSig, expect 104", len(lm.Data))
-	}
-
 	var collision bool
-	var incomingDelta uint32
-	var incomingSig [64]byte
-	// deserialize DeltaSig
-	incomingDelta = lnutil.BtU32(lm.Data[36:40])
-	copy(incomingSig[:], lm.Data[40:])
+	incomingDelta := msg.Delta
 
 	// we should be clear to send when we get a deltaSig
 	select {
@@ -342,7 +333,7 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 	qc.State.MyAmt += int64(incomingDelta)
 
 	// verify sig for the next state. only save if this works
-	err = qc.VerifySig(incomingSig)
+	err = qc.VerifySig(msg.Signature)
 	if err != nil {
 		return fmt.Errorf("DeltaSigHandler err %s", err.Error())
 	}
@@ -425,11 +416,10 @@ func (nd *LitNode) SendGapSigRev(q *Qchan) error {
 	outMsg.PeerIdx = q.KeyGen.Step[3] & 0x7fffffff
 	outMsg.Data = msg
 	*/
-	outMsg := new(lnutil.LitMsg)
-	outMsg2 := lnutil.NewGapSigRev(q.KeyGen.Step[3]&0x7fffffff, q.Op, sig, *elk, n2ElkPoint)
+
+	outMsg := lnutil.NewGapSigRev(q.KeyGen.Step[3]&0x7fffffff, q.Op, sig, *elk, n2ElkPoint)
 
 	nd.OmniOut <- outMsg
-	outMsg2.Bytes()
 
 	return nil
 }
@@ -478,11 +468,10 @@ func (nd *LitNode) SendSigRev(q *Qchan) error {
 	outMsg.PeerIdx = q.KeyGen.Step[3] & 0x7fffffff
 	outMsg.Data = msg
 	*/
-	outMsg := new(lnutil.LitMsg)
-	outMsg2 := lnutil.NewSigRev(q.KeyGen.Step[3]&0x7fffffff, q.Op, sig, *elk, n2ElkPoint)
+
+	outMsg := lnutil.NewSigRev(q.KeyGen.Step[3]&0x7fffffff, q.Op, sig, *elk, n2ElkPoint)
 
 	nd.OmniOut <- outMsg
-	outMsg2.Bytes()
 	return nil
 }
 
@@ -570,16 +559,6 @@ func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
 // SIGREVHandler takes in an SIGREV and responds with a REV (if everything goes OK)
 // Leaves the channel in a clear / rest state.
 func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
-	if len(lm.Data) < 165 || len(lm.Data) > 165 {
-		return fmt.Errorf("got %d byte SIGREV, expect 165", len(lm.Data))
-	}
-
-	var sig [64]byte
-	var n2elkPoint [33]byte
-	// deserialize SIGREV
-	copy(sig[:], lm.Data[36:100])
-	revElk, _ := chainhash.NewHash(lm.Data[100:132])
-	copy(n2elkPoint[:], lm.Data[132:])
 
 	// load qchan & state from DB
 	err := nd.ReloadQchan(qc)
@@ -612,13 +591,13 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 
 	// first verify sig.
 	// (if elkrem ingest fails later, at least we close out with a bit more money)
-	err = qc.VerifySig(sig)
+	err = qc.VerifySig(msg.Signature)
 	if err != nil {
 		return fmt.Errorf("SIGREVHandler err %s", err.Error())
 	}
 
 	// verify elkrem and save it in ram
-	err = qc.AdvanceElkrem(revElk, n2elkPoint)
+	err = qc.AdvanceElkrem(msg.Elk, msg.N2ElkPoint)
 	if err != nil {
 		return fmt.Errorf("SIGREVHandler err %s", err.Error())
 		// ! non-recoverable error, need to close the channel here.
