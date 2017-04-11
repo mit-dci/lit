@@ -56,7 +56,7 @@ def getaddress():
 	ws.send(json.dumps(rpc2))
 	result = json.loads(ws.recv())
 	print(result)
-		
+	 
 
 def main(args):
 	mineblock()
