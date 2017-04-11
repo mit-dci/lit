@@ -211,12 +211,6 @@ func (nd LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 	if nd.InProg.PeerIdx == 0 {
 		return fmt.Errorf("Got point response but no channel creation in progress")
 	}
-	/* message will always be this length
-	if len(msg.Bytes()) != 99 {
-		return fmt.Errorf("PointRespHandler err: msg %d bytes, expect 99\n",
-			len(lm.Data))
-	}
-	*/
 
 	if nd.InProg.PeerIdx != msg.Peer() {
 		return fmt.Errorf(
@@ -287,10 +281,6 @@ func (nd LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 	// also set outpoint in channel
 	qc.Op = *nd.InProg.op
 
-	// should watch for this tx.  Maybe after broadcasting
-
-	opArr := lnutil.OutPointToBytes(*nd.InProg.op)
-
 	// create initial state for elkrem points
 	qc.State = new(StatCom)
 	qc.State.StateIdx = 0
@@ -323,6 +313,7 @@ func (nd LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 	// total length 250
 
 	/* RETRACTED
+	opArr := lnutil.OutPointToBytes(*nd.InProg.op)
 	var msg []byte
 
 	msg = append(msg, opArr[:]...)
@@ -356,15 +347,7 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 	// deserialize desc
 	op := msg.Outpoint
 	opArr := lnutil.OutPointToBytes(op)
-
-	theirPub := msg.PubKey
-	theirRefundPub := msg.RefundPub
-	theirHAKDbase := msg.HAKDbase
 	amt := msg.Capacity
-	initPay := msg.InitPayment
-	elkPointZero := msg.ElkZero
-	elkPointOne := msg.ElkOne
-	elkPointTwo := msg.ElkTwo
 
 	cIdx, err := nd.NextChannelIdx()
 	if err != nil {
@@ -383,12 +366,12 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 	qc.KeyGen.Step[4] = cIdx | 1<<31
 	qc.Value = amt
 	qc.Mode = portxo.TxoP2WSHComp
-	qc.Op = msg.Outpoint
+	qc.Op = op
 
 	qc.MyPub = nd.GetUsePub(qc.KeyGen, UseChannelFund)
-	qc.TheirPub = theirPub
-	qc.TheirRefundPub = theirRefundPub
-	qc.TheirHAKDBase = theirHAKDbase
+	qc.TheirPub = msg.PubKey
+	qc.TheirRefundPub = msg.RefundPub
+	qc.TheirHAKDBase = msg.HAKDbase
 	qc.MyRefundPub = nd.GetUsePub(qc.KeyGen, UseChannelRefund)
 	qc.MyHAKDBase = nd.GetUsePub(qc.KeyGen, UseChannelHAKDBase)
 
@@ -405,12 +388,12 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 	// create initial state
 	qc.State = new(StatCom)
 	// similar to SIGREV in pushpull
-	qc.State.MyAmt = initPay
+	qc.State.MyAmt = msg.InitPayment
 	qc.State.StateIdx = 0
 	// use new ElkPoint for signing
-	qc.State.ElkPoint = elkPointZero
-	qc.State.NextElkPoint = elkPointOne
-	qc.State.N2ElkPoint = elkPointTwo
+	qc.State.ElkPoint = msg.ElkZero
+	qc.State.NextElkPoint = msg.ElkOne
+	qc.State.N2ElkPoint = msg.ElkTwo
 
 	// create empty elkrem receiver to save
 	//	qc.ElkRcv = new(elkrem.ElkremReceiver)
@@ -494,9 +477,6 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 // when a multisig outpoint is ackd, that causes the funder to sign and broadcast.
 func (nd *LitNode) QChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePeer) {
 	opArr := lnutil.OutPointToBytes(msg.Outpoint)
-	elkPointZero := msg.ElkZero
-	elkPointOne := msg.ElkOne
-	elkPointTwo := msg.ElkTwo
 	sig := msg.Signature
 
 	// load channel to save their refund address
@@ -511,9 +491,9 @@ func (nd *LitNode) QChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePeer) {
 	//		fmt.Printf("QChanAckHandler IngestElkrem err %s", err.Error())
 	//		return
 	//	}
-	qc.State.ElkPoint = elkPointZero
-	qc.State.NextElkPoint = elkPointOne
-	qc.State.N2ElkPoint = elkPointTwo
+	qc.State.ElkPoint = msg.ElkZero
+	qc.State.NextElkPoint = msg.ElkOne
+	qc.State.N2ElkPoint = msg.ElkTwo
 
 	err = qc.VerifySig(sig)
 	if err != nil {
@@ -595,7 +575,6 @@ func (nd *LitNode) QChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePeer) {
 // In some cases you don't need this message.
 func (nd *LitNode) SigProofHandler(msg lnutil.SigProofMsg, peer *RemotePeer) {
 
-	sig := msg.Signature
 	op := msg.Outpoint
 	opArr := lnutil.OutPointToBytes(op)
 
@@ -605,7 +584,7 @@ func (nd *LitNode) SigProofHandler(msg lnutil.SigProofMsg, peer *RemotePeer) {
 		return
 	}
 
-	err = qc.VerifySig(sig)
+	err = qc.VerifySig(msg.Signature)
 	if err != nil {
 		fmt.Printf("SigProofHandler err %s", err.Error())
 		return

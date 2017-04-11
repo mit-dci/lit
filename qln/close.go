@@ -78,12 +78,6 @@ func (nd *LitNode) CoopClose(qc *Qchan) error {
 // responds with a close response.  Obviously later there will be some judgment
 // over what to do, but for now it just signs whatever it's requested to.
 func (nd *LitNode) CloseReqHandler(msg lnutil.CloseReqMsg) {
-	if len(msg.Bytes()) < 100 {
-		fmt.Printf("got %d byte closereq, expect 100ish\n", len(msg.Bytes()))
-		return
-	}
-
-	// deserialize outpoint
 	opArr := lnutil.OutPointToBytes(msg.Outpoint)
 
 	// find their sig

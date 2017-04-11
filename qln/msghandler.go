@@ -11,12 +11,16 @@ import (
 func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) error {
 	switch msg.MsgType() & 0xf0 { // in progress
 	case 0x00: // TEXT MESSAGE.  SIMPLE
+		chat, ok := msg.(lnutil.ChatMsg)
+		if !ok {
+			return fmt.Errorf("didn't work")
+		}
 		nd.UserMessageBox <- fmt.Sprintf(
-			"\nmsg from %s: %s", lnutil.White(msg.Peer()), lnutil.Green(string(msg.Bytes())))
-		return nil
+			"\nmsg from %s: %s", lnutil.White(msg.Peer()), lnutil.Green(chat.Text))
+		return nil // no error
 
 	case 0x10:
-		return nd.ChannelHandler(msg)
+		return nd.ChannelHandler(msg, peer)
 
 	case 0x20:
 		return nd.CloseHandler(msg)
@@ -104,7 +108,24 @@ func (nd *LitNode) LNDCReader(peer *RemotePeer) error {
 			err = nd.PeerHandler(routedMsg, nil, peer)
 		}
 		*/
-		routedMsg, err := lnutil.NewLitMsg(msg, peer.Idx)
+		var routedMsg lnutil.LitMsg
+		routedMsg, err = lnutil.LitMsgFromBytes(msg, peer.Idx)
+
+		var chanIdx uint32
+		chanIdx = 0
+		if len(msg) > 38 {
+			copy(opArr[:], msg[1:37])
+			chanCheck, ok := peer.OpMap[opArr]
+			if ok {
+				chanIdx = chanCheck
+			}
+		}
+
+		if chanIdx != 0 {
+			err = nd.PeerHandler(routedMsg, peer.QCs[chanIdx], peer)
+		} else {
+			err = nd.PeerHandler(routedMsg, nil, peer)
+		}
 
 		if err != nil {
 			fmt.Printf("PeerHandler error with %d: %s\n", peer.Idx, err.Error())
@@ -128,43 +149,63 @@ func (nd *LitNode) PopulateQchanMap(peer *RemotePeer) error {
 	return nil
 }
 
-func (nd *LitNode) ChannelHandler(msg lnutil.LitMsg) error {
+func (nd *LitNode) ChannelHandler(msg lnutil.LitMsg, peer *RemotePeer) error {
 	switch msg.MsgType() {
 	case lnutil.MSGID_POINTREQ: // POINT REQUEST
 		fmt.Printf("Got point request from %x\n", msg.Peer())
-		prm, ok := msg.(lnutil.PointReqMsg)
+		message, ok := msg.(lnutil.PointReqMsg)
 		if !ok {
 			return fmt.Errorf("didn't work")
 		}
 
-		nd.PointReqHandler(prm)
+		nd.PointReqHandler(message)
 		return nil
 
 	case lnutil.MSGID_POINTRESP: // POINT RESPONSE
-		fmt.Printf("Got point response from %x\n", msg.PeerIdx())
-		err := nd.PointRespHandler(lnutil.PointRespMsg(msg))
+		fmt.Printf("Got point response from %x\n", msg.Peer())
+		message, ok := msg.(lnutil.PointRespMsg)
+		if !ok {
+			return fmt.Errorf("didn't work")
+		}
+
+		err := nd.PointRespHandler(message)
 		if err != nil {
 			log.Printf(err.Error())
 		}
 		return nil
 
 	case lnutil.MSGID_CHANDESC: // CHANNEL DESCRIPTION
-		fmt.Printf("Got channel description from %x\n", msg.PeerIdx())
-		nd.QChanDescHandler(lnutil.ChanDescMsg(msg))
+		fmt.Printf("Got channel description from %x\n", msg.Peer())
+		message, ok := msg.(lnutil.ChanDescMsg)
+		if !ok {
+			return fmt.Errorf("didn't work")
+		}
+
+		nd.QChanDescHandler(message)
 		return nil
 
 	case lnutil.MSGID_CHANACK: // CHANNEL ACKNOWLEDGE
-		fmt.Printf("Got channel acknowledgement from %x\n", msg.PeerIdx())
-		nd.QChanAckHandler(lnutil.ChanAckMsg(msg), peer)
+		fmt.Printf("Got channel acknowledgement from %x\n", msg.Peer())
+		message, ok := msg.(lnutil.ChanAckMsg)
+		if !ok {
+			return fmt.Errorf("didn't work")
+		}
+
+		nd.QChanAckHandler(message, peer)
 		return nil
 
 	case lnutil.MSGID_SIGPROOF: // HERE'S YOUR CHANNEL
-		fmt.Printf("Got channel proof from %x\n", msg.PeerIdx())
-		nd.SigProofHandler(lnutil.SigProofMsg(msg), peer)
+		fmt.Printf("Got channel proof from %x\n", msg.Peer())
+		message, ok := msg.(lnutil.SigProofMsg)
+		if !ok {
+			return fmt.Errorf("didn't work")
+		}
+
+		nd.SigProofHandler(message, peer)
 		return nil
 
 	default:
-		return fmt.Errorf("Unknown message type %x", routedMsg.MsgType())
+		return fmt.Errorf("Unknown message type %x", msg.MsgType())
 	}
 
 }
@@ -173,8 +214,13 @@ func (nd *LitNode) CloseHandler(msg lnutil.LitMsg) error {
 	switch msg.MsgType() { // CLOSE REQ
 
 	case lnutil.MSGID_CLOSEREQ:
-		fmt.Printf("Got close request from %x\n", msg.PeerIdx())
-		nd.CloseReqHandler(lnutil.CloseReqMsg(msg))
+		fmt.Printf("Got close request from %x\n", msg.Peer())
+		message, ok := msg.(lnutil.CloseReqMsg)
+		if !ok {
+			return fmt.Errorf("didn't work")
+		}
+
+		nd.CloseReqHandler(message)
 		return nil
 
 	/* - not yet implemented
@@ -185,7 +231,7 @@ func (nd *LitNode) CloseHandler(msg lnutil.LitMsg) error {
 		return nil
 	*/
 	default:
-		return fmt.Errorf("Unknown message type %x", routedMsg.MsgType())
+		return fmt.Errorf("Unknown message type %x", msg.MsgType())
 	}
 
 }
@@ -195,20 +241,40 @@ func (nd *LitNode) CloseHandler(msg lnutil.LitMsg) error {
 func (nd *LitNode) PushPullHandler(routedMsg lnutil.LitMsg, q *Qchan) error {
 	switch routedMsg.MsgType() {
 	case lnutil.MSGID_DELTASIG:
-		fmt.Printf("Got DELTASIG from %x\n", routedMsg.PeerIdx())
-		return nd.DeltaSigHandler(lnutil.DeltaSigMsg(routedMsg), q)
+		fmt.Printf("Got DELTASIG from %x\n", routedMsg.Peer())
+		message, ok := routedMsg.(lnutil.DeltaSigMsg)
+		if !ok {
+			return fmt.Errorf("didn't work")
+		}
+
+		return nd.DeltaSigHandler(message, q)
 
 	case lnutil.MSGID_SIGREV: // SIGNATURE AND REVOCATION
-		fmt.Printf("Got SIGREV from %x\n", routedMsg.PeerIdx())
-		return nd.SigRevHandler(lnutil.SigRevMsg(routedMsg), q)
+		fmt.Printf("Got SIGREV from %x\n", routedMsg.Peer())
+		message, ok := routedMsg.(lnutil.SigRevMsg)
+		if !ok {
+			return fmt.Errorf("didn't work")
+		}
+
+		return nd.SigRevHandler(message, q)
 
 	case lnutil.MSGID_GAPSIGREV: // GAP SIGNATURE AND REVOCATION
-		fmt.Printf("Got GapSigRev from %x\n", routedMsg.PeerIdx())
-		return nd.GapSigRevHandler(lnutil.GapSigRevMsg(routedMsg), q)
+		fmt.Printf("Got GapSigRev from %x\n", routedMsg.Peer())
+		message, ok := routedMsg.(lnutil.GapSigRevMsg)
+		if !ok {
+			return fmt.Errorf("didn't work")
+		}
+
+		return nd.GapSigRevHandler(message, q)
 
 	case lnutil.MSGID_REV: // REVOCATION
-		fmt.Printf("Got REV from %x\n", routedMsg.PeerIdx())
-		return nd.RevHandler(lnutil.RevMsg(routedMsg), q)
+		fmt.Printf("Got REV from %x\n", routedMsg.Peer())
+		message, ok := routedMsg.(lnutil.RevMsg)
+		if !ok {
+			return fmt.Errorf("didn't work")
+		}
+
+		return nd.RevHandler(message, q)
 
 	default:
 		return fmt.Errorf("Unknown message type %x", routedMsg.MsgType())
@@ -220,14 +286,14 @@ func (nd *LitNode) PushPullHandler(routedMsg lnutil.LitMsg, q *Qchan) error {
 func (nd *LitNode) FWDHandler(msg lnutil.LitMsg) error { // not yet implemented
 	switch msg.MsgType() {
 	default:
-		return fmt.Errorf("Unknown message type %x", routedMsg.MsgType())
+		return fmt.Errorf("Unknown message type %x", msg.MsgType())
 	}
 }
 
 func (nd *LitNode) SelfPush(msg lnutil.LitMsg) error { // not yet implemented
 	switch msg.MsgType() {
 	default:
-		return fmt.Errorf("Unknown message type %x", routedMsg.MsgType())
+		return fmt.Errorf("Unknown message type %x", msg.MsgType())
 	}
 }
 

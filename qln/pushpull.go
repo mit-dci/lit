@@ -5,7 +5,6 @@ import (
 
 	"github.com/mit-dci/lit/lnutil"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 )
 
@@ -248,7 +247,7 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 	outMsg.Data = msg
 	*/
 
-	outMsg := lnutil.NewDeltaSigMsg(q.Peer(), q.Op, q.State.Delta, sig)
+	outMsg := lnutil.NewDeltaSigMsg(q.Peer(), q.Op, uint32(q.State.Delta), sig)
 	nd.OmniOut <- outMsg
 
 	return nil
@@ -478,16 +477,6 @@ func (nd *LitNode) SendSigRev(q *Qchan) error {
 // GapSigRevHandler takes in a GapSigRev, responds with a Rev, and
 // leaves the channel in a state expecting a Rev.
 func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
-	if len(lm.Data) < 165 || len(lm.Data) > 165 {
-		return fmt.Errorf("got %d byte GAPSIGREV, expect 165", len(lm.Data))
-	}
-
-	var sig [64]byte
-	var n2elkPoint [33]byte
-	// deserialize GapSigRev
-	copy(sig[:], lm.Data[36:100])
-	revElk, _ := chainhash.NewHash(lm.Data[100:132])
-	copy(n2elkPoint[:], lm.Data[132:])
 
 	// load qchan & state from DB
 	err := nd.ReloadQchan(q)
@@ -510,7 +499,7 @@ func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
 	q.State.Collision = 0
 
 	// verify elkrem and save it in ram
-	err = q.AdvanceElkrem(revElk, n2elkPoint)
+	err = q.AdvanceElkrem(&msg.Elk, msg.N2ElkPoint)
 	if err != nil {
 		return fmt.Errorf("GapSigRevHandler err %s", err.Error())
 		// ! non-recoverable error, need to close the channel here.
@@ -525,7 +514,7 @@ func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
 	q.State.StateIdx++
 
 	// verify the sig
-	err = q.VerifySig(sig)
+	err = q.VerifySig(msg.Signature)
 	if err != nil {
 		return fmt.Errorf("GapSigRevHandler err %s", err.Error())
 	}
@@ -597,7 +586,7 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 	}
 
 	// verify elkrem and save it in ram
-	err = qc.AdvanceElkrem(msg.Elk, msg.N2ElkPoint)
+	err = qc.AdvanceElkrem(&msg.Elk, msg.N2ElkPoint)
 	if err != nil {
 		return fmt.Errorf("SIGREVHandler err %s", err.Error())
 		// ! non-recoverable error, need to close the channel here.
@@ -667,11 +656,9 @@ func (nd *LitNode) SendREV(q *Qchan) error {
 	outMsg.Data = msg
 	*/
 
-	outMsg := new(lnutil.LitMsg)
-	outMsg2 := lnutil.NewRevMsg(q.Peer(), q.Op, *elk, n2ElkPoint)
+	outMsg := lnutil.NewRevMsg(q.Peer(), q.Op, *elk, n2ElkPoint)
 
 	nd.OmniOut <- outMsg
-	outMsg2.Bytes()
 
 	return err
 }
@@ -680,14 +667,6 @@ func (nd *LitNode) SendREV(q *Qchan) error {
 // final message in the state update process and there is no response.
 // Leaves the channel in a clear / rest state.
 func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {
-	if len(lm.Data) != 101 {
-		return fmt.Errorf("got %d byte REV, expect 101", len(lm.Data))
-	}
-
-	var n2elkPoint [33]byte
-	// deserialize SigRev
-	revElk, _ := chainhash.NewHash(lm.Data[36:68])
-	copy(n2elkPoint[:], lm.Data[68:])
 
 	// load qchan & state from DB
 	err := nd.ReloadQchan(qc)
@@ -706,7 +685,7 @@ func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {
 	}
 
 	// verify elkrem
-	err = qc.AdvanceElkrem(revElk, n2elkPoint)
+	err = qc.AdvanceElkrem(&msg.Elk, msg.N2ElkPoint)
 	if err != nil {
 		fmt.Printf(" ! non-recoverable error, need to close the channel here.\n")
 		return fmt.Errorf("REVHandler err %s", err.Error())
