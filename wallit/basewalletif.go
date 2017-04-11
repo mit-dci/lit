@@ -77,7 +77,7 @@ func (w *Wallit) NewAdr() btcutil.Address {
 		return a
 	}
 
-	a, err = btcutil.NewAddressWitnessPubKeyHash(adr160, w.Param)
+	a, err = btcutil.NewAddressPubKeyHash(adr160, w.Param)
 	if err != nil {
 		// should have an error here..?  Return empty address...
 		log.Printf("can't make address: %s\n", err.Error())
