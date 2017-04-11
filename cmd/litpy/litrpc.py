@@ -4,12 +4,31 @@
 import websocket
 import json
 import sys
+import requests
 
 
-
-
-def main(args):
+def mineblock():
+	rpcCmd = {
+			"method": "getinfo",
+			"params": []
+	}
 	
+	rpcCmd.update({"jsonrpc": "2.0", "id": "99"})
+	
+	rpcuser = "regtestuser"
+	rpcpass = "regtestpass"
+	rpcport = 18332
+	serverURL = "http://" + rpcuser + ":" + rpcpass + "@127.0.0.1:" + str(rpcport)
+	
+	header = {"Content-type": "application/json"}
+	payload = json.dumps(rpcCmd)
+	print(payload)
+	response = requests.post(serverURL, headers=header, data=payload)
+	print(response.json())
+
+
+
+def getaddress():
 	rpcCmd = {
 	   "method": "LitRPC.Address",
 	   "params": [{"NumToMake": 0}]
@@ -23,8 +42,8 @@ def main(args):
 	ws.send(json.dumps(rpcCmd))
 	result = json.loads(ws.recv())
 	
-	#~ result = ws.recv()
-	print("got a result")
+	result = ws.recv()
+	#~ print("got a result")
 	#~ print(result)
 	print(result["result"]["WitAddresses"][2])
 	
@@ -37,6 +56,11 @@ def main(args):
 	ws.send(json.dumps(rpc2))
 	result = json.loads(ws.recv())
 	print(result)
-	
+		
+
+def main(args):
+	mineblock()
+	getaddress()
+
 if __name__ == '__main__':
     main(sys.argv)
