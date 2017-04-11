@@ -5,6 +5,7 @@ import websocket
 import json
 import sys
 import requests
+import random
 
 
 def mineblock():
@@ -26,7 +27,39 @@ def mineblock():
 	response = requests.post(serverURL, headers=header, data=payload)
 	print(response.json())
 
+def litNewAddr(wsconn):
+	rpcCmd = {
+	   "method": "LitRPC.Address",
+	   "params": [{"NumToMake": 0}]
+	}
 
+	rid = random.randint(0,9999)
+	rpcCmd.update({"jsonrpc": "2.0", "id": str(rid)})
+		
+	wsconn.send(json.dumps(rpcCmd))
+	resp = json.loads(wsconn.recv())
+	return resp["result"]["WitAddresses"][0]
+	
+def litSend(wsconn, adr, amt):
+	rpcCmd = {
+	   "method": "LitRPC.Send",
+	   "params": [
+	   {"DestAddrs": adr},
+	   {"Amts": amt},	   
+	   ]
+	}
+	
+	rid = random.randint(0,9999)
+	rpcCmd.update({"jsonrpc": "2.0", "id": str(rid)})
+	wsconn.send(json.dumps(rpcCmd))
+	resp = json.loads(wsconn.recv())
+	return resp
+	
+def litconnect():
+	ws = websocket.WebSocket()
+	ws.connect("ws://127.0.0.1:8001/ws")
+	return ws
+	
 
 def getaddress():
 	rpcCmd = {
@@ -59,8 +92,11 @@ def getaddress():
 		
 
 def main(args):
-	mineblock()
-	getaddress()
+	ws = litconnect()
+	resp = litNewAddr(ws)
+	print(resp)
+	#~ mineblock()
+	#~ getaddress()
 
 if __name__ == '__main__':
     main(sys.argv)
