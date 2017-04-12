@@ -30,8 +30,11 @@ type SPVCon struct {
 
 	// TrackingAdrs and OPs are slices of addresses and outpoints to watch for.
 	// Using struct{} saves a byte of RAM but is ugly so I'll use bool.
-	TrackingAdrs map[[20]byte]bool
-	TrackingOPs  map[wire.OutPoint]bool
+	TrackingAdrs    map[[20]byte]bool
+	TrackingAdrsMtx sync.Mutex
+
+	TrackingOPs    map[wire.OutPoint]bool
+	TrackingOPsMtx sync.Mutex
 
 	// TxMap is an in-memory map of all the Txs the SPVCon knows about
 	TxMap map[chainhash.Hash]*wire.MsgTx
