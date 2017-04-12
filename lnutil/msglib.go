@@ -675,7 +675,7 @@ func NewWatchDescMsgFromBytes(b []byte, peerIDX uint32) (*WatchDescMsg, error) {
 }
 
 // Bytes turns a WatchannelDescriptor into 100 bytes
-func (sd *WatchDescMsg) Bytes() []byte {
+func (sd WatchDescMsg) Bytes() []byte {
 	var buf bytes.Buffer
 	msgType := U32tB(uint32(sd.MsgType()))
 	buf.Write(msgType)
@@ -734,7 +734,7 @@ func NewComMsgFromBytes(b []byte, peerIDX uint32) (*ComMsg, error) {
 }
 
 // ToBytes turns a ComMsg into 132 bytes
-func (sm *ComMsg) Bytes() []byte {
+func (sm ComMsg) Bytes() []byte {
 	var buf bytes.Buffer
 	msgType := U32tB(uint32(sm.MsgType()))
 	buf.Write(msgType)

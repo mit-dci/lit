@@ -132,12 +132,6 @@ func (nd *LitNode) FundChannel(peerIdx uint32, ccap, initSend int64) (uint32, er
 	nd.InProg.InitSend = initSend
 	nd.InProg.mtx.Unlock()
 
-	/* RETRACTED
-	outMsg := new(lnutil.LitMsg)
-	outMsg.MsgType = lnutil.MSGID_POINTREQ
-	outMsg.PeerIdx = peerIdx
-	*/
-
 	outMsg := lnutil.NewPointReqMsg(peerIdx)
 
 	nd.OmniOut <- outMsg
@@ -161,7 +155,7 @@ func (nd *LitNode) PointReqHandler(msg lnutil.PointReqMsg) {
 	}*/
 
 	// pub req; check that idx matches next idx of ours and create pubkey
-	// peerArr, _ := nd.GetPubHostFromPeerIdx(lm.PeerIdx)
+	// peerArr, _ := nd.GetPubHostFromPeerIdx(msg.Peer())
 
 	cIdx, err := nd.NextChannelIdx()
 	if err != nil {
@@ -181,18 +175,6 @@ func (nd *LitNode) PointReqHandler(msg lnutil.PointReqMsg) {
 	myRefundPub := nd.GetUsePub(kg, UseChannelRefund)
 	myHAKDbase := nd.GetUsePub(kg, UseChannelHAKDBase)
 	fmt.Printf("Generated channel pubkey %x\n", myChanPub)
-
-	/* RETRACTED
-	var msg []byte
-	msg = append(msg, myChanPub[:]...)
-	msg = append(msg, myRefundPub[:]...)
-	msg = append(msg, myHAKDbase[:]...)
-
-	outMsg := new(lnutil.LitMsg)
-	outMsg.MsgType = lnutil.MSGID_POINTRESP
-	outMsg.PeerIdx = lm.PeerIdx
-	outMsg.Data = msg
-	*/
 
 	outMsg := lnutil.NewPointRespMsg(msg.Peer(), myChanPub, myRefundPub, myHAKDbase)
 	nd.OmniOut <- outMsg
@@ -312,25 +294,6 @@ func (nd LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 	// initial payment (8), ElkPoint0,1,2 (99)
 	// total length 250
 
-	/* RETRACTED
-	opArr := lnutil.OutPointToBytes(*nd.InProg.op)
-	var msg []byte
-
-	msg = append(msg, opArr[:]...)
-	msg = append(msg, qc.MyPub[:]...)
-	msg = append(msg, qc.MyRefundPub[:]...)
-	msg = append(msg, qc.MyHAKDBase[:]...)
-	msg = append(msg, capBytes...)
-	msg = append(msg, initPayBytes...)
-	msg = append(msg, elkPointZero[:]...)
-	msg = append(msg, elkPointOne[:]...)
-	msg = append(msg, elkPointTwo[:]...)
-	outMsg := new(lnutil.LitMsg)
-	outMsg.MsgType = lnutil.MSGID_CHANDESC
-	outMsg.PeerIdx = lm.PeerIdx
-	outMsg.Data = msg
-	*/
-
 	outMsg := lnutil.NewChanDescMsg(msg.Peer(), *nd.InProg.op, qc.MyPub, qc.MyRefundPub,
 		qc.MyHAKDBase, nd.InProg.Amt, nd.InProg.InitSend, elkPointZero, elkPointOne, elkPointTwo)
 
@@ -449,21 +412,6 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 	// ACK the channel address, which causes the funder to sign / broadcast
 	// ACK is outpoint (36), ElkPoint0,1,2 (99) and signature (64)
 
-	/* RETRACTED
-	var msg []byte
-
-	msg = append(msg, opArr[:]...)
-	msg = append(msg, theirElkPointZero[:]...)
-	msg = append(msg, theirElkPointOne[:]...)
-	msg = append(msg, theirElkPointTwo[:]...)
-	msg = append(msg, sig[:]...)
-
-	outMsg := new(lnutil.LitMsg)
-	outMsg.MsgType = lnutil.MSGID_CHANACK
-	outMsg.PeerIdx = lm.PeerIdx
-	outMsg.Data = msg
-	*/
-
 	outMsg := lnutil.NewChanAckMsg(msg.Peer(), op, theirElkPointZero, theirElkPointOne, theirElkPointTwo, sig)
 	outMsg.Bytes()
 
@@ -551,17 +499,6 @@ func (nd *LitNode) QChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePeer) {
 	// sig proof should be sent later once there are confirmations.
 	// it'll have an spv proof of the fund tx.
 	// but for now just send the sig.
-
-	/* RETRACTED
-	var msg []byte
-	msg = append(msg, opArr[:]...)
-	msg = append(msg, sig[:]...)
-
-	outMsg := new(lnutil.LitMsg)
-	outMsg.MsgType = lnutil.MSGID_SIGPROOF
-	outMsg.PeerIdx = lm.PeerIdx
-	outMsg.Data = msg
-	*/
 
 	outMsg := lnutil.NewSigProofMsg(msg.Peer(), msg.Outpoint, sig)
 

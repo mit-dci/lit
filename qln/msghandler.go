@@ -37,7 +37,7 @@ func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) er
 	*/
 	/* not yet implemented
 	case 0x50:
-		return nd.SelfPush(msg)
+		return nd.SelfPushHandler(msg)
 	*/
 
 	case 0x60:
@@ -88,26 +88,6 @@ func (nd *LitNode) LNDCReader(peer *RemotePeer) error {
 		}
 		msg = msg[:n]
 
-		/* RETRACTED
-		routedMsg := new(lnutil.LitMsg)
-		// if message is long enough, try to set channel index of message
-		if len(msg) > 38 {
-			copy(opArr[:], msg[1:37])
-			chanIdx, ok := peer.OpMap[opArr]
-			if ok {
-				routedMsg.ChanIdx = chanIdx
-			}
-		}
-		routedMsg.PeerIdx = peer.Idx
-		routedMsg.MsgType = msg[0]
-		routedMsg.Data = msg[1:]
-
-		if routedMsg.ChanIdx != 0 {
-			err = nd.PeerHandler(routedMsg, peer.QCs[routedMsg.ChanIdx], peer)
-		} else {
-			err = nd.PeerHandler(routedMsg, nil, peer)
-		}
-		*/
 		var routedMsg lnutil.LitMsg
 		routedMsg, err = lnutil.LitMsgFromBytes(msg, peer.Idx)
 
@@ -290,7 +270,7 @@ func (nd *LitNode) FWDHandler(msg lnutil.LitMsg) error { // not yet implemented
 	}
 }
 
-func (nd *LitNode) SelfPush(msg lnutil.LitMsg) error { // not yet implemented
+func (nd *LitNode) SelfPushHandler(msg lnutil.LitMsg) error { // not yet implemented
 	switch msg.MsgType() {
 	default:
 		return fmt.Errorf("Unknown message type %x", msg.MsgType())

@@ -204,19 +204,7 @@ func (nd *LitNode) SyncWatch(qc *Qchan) error {
 		peerIdx = 0 // should be replaced
 		desc := lnutil.NewWatchDescMsg(peerIdx, qc.WatchRefundAdr, qc.Delay, 5000, qc.TheirHAKDBase, qc.MyHAKDBase)
 
-		/* RETRACTED
-		desc := new(watchtower.WatchannelDescriptor)
-		desc.DestPKHScript = qc.WatchRefundAdr
-		desc.Delay = qc.Delay
-		desc.Fee = 5000 // fixed 5000 sat fee; make variable later
-		desc.AdversaryBasePoint = qc.TheirHAKDBase
-		desc.CustomerBasePoint = qc.MyHAKDBase
-		*/
-
-		descBytes := desc.Bytes()
-
-		_, err := nd.WatchCon.Write(
-			append([]byte{lnutil.MSGID_WATCH_DESC}, descBytes[:]...))
+		_, err := nd.WatchCon.Write(desc.Bytes())
 		if err != nil {
 			return err
 		}
@@ -267,20 +255,9 @@ func (nd *LitNode) SendWatchComMsg(qc *Qchan, idx uint64) error {
 
 	comMsg := lnutil.NewComMsg(peerIdx, qc.WatchRefundAdr, *elk, parTx, sig)
 
-	/* RETRACTED
-	commsg := new(watchtower.ComMsg)
-	commsg.DestPKH = qc.WatchRefundAdr
-	commsg.Elk = *elk
-	copy(commsg.ParTxid[:], txidsig[:16])
-	copy(commsg.Sig[:], txidsig[16:])
-	*/
-
-	comBytes := comMsg.Bytes()
-
 	// stash to send all?  or just send once each time?  probably should
 	// set up some output buffering
 
-	_, err = nd.WatchCon.Write(
-		append([]byte{lnutil.MSGID_WATCH_COMMSG}, comBytes[:]...))
+	_, err = nd.WatchCon.Write(comMsg.Bytes())
 	return err
 }

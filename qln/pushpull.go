@@ -230,22 +230,6 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 	if err != nil {
 		return err
 	}
-	/* RETRACTED
-	opArr := lnutil.OutPointToBytes(q.Op)
-
-	var msg []byte
-
-	// DeltaSig is op (36), Delta (4),  sig (64)
-	// total length 104
-	msg = append(msg, opArr[:]...)
-	msg = append(msg, lnutil.I32tB(-q.State.Delta)...)
-	msg = append(msg, sig[:]...)
-
-	outMsg := new(lnutil.LitMsg)
-	outMsg.MsgType = lnutil.MSGID_DELTASIG
-	outMsg.PeerIdx = q.Peer()
-	outMsg.Data = msg
-	*/
 
 	outMsg := lnutil.NewDeltaSigMsg(q.Peer(), q.Op, uint32(q.State.Delta), sig)
 	nd.OmniOut <- outMsg
@@ -398,24 +382,6 @@ func (nd *LitNode) SendGapSigRev(q *Qchan) error {
 	// GapSigRev is op (36), sig (64), ElkHash (32), NextElkPoint (33)
 	// total length 165
 
-	/* RETRACTED
-	opArr := lnutil.OutPointToBytes(q.Op)
-
-	var msg []byte
-
-	// SigRev is op (36), sig (64), ElkHash (32), NextElkPoint (33)
-	// total length 165
-	msg = append(msg, opArr[:]...)
-	msg = append(msg, sig[:]...)
-	msg = append(msg, elk[:]...)
-	msg = append(msg, n2ElkPoint[:]...)
-
-	outMsg := new(lnutil.LitMsg)
-	outMsg.MsgType = lnutil.MSGID_GAPSIGREV
-	outMsg.PeerIdx = q.KeyGen.Step[3] & 0x7fffffff
-	outMsg.Data = msg
-	*/
-
 	outMsg := lnutil.NewGapSigRev(q.KeyGen.Step[3]&0x7fffffff, q.Op, sig, *elk, n2ElkPoint)
 
 	nd.OmniOut <- outMsg
@@ -449,24 +415,6 @@ func (nd *LitNode) SendSigRev(q *Qchan) error {
 	if err != nil {
 		return err
 	}
-
-	/* RETRACTED
-	opArr := lnutil.OutPointToBytes(q.Op)
-
-	var msg []byte
-
-	// SigRev is op (36), sig (64), ElkHash (32), NextElkPoint (33)
-	// total length 165
-	msg = append(msg, opArr[:]...)
-	msg = append(msg, sig[:]...)
-	msg = append(msg, elk[:]...)
-	msg = append(msg, n2ElkPoint[:]...)
-
-	outMsg := new(lnutil.LitMsg)
-	outMsg.MsgType = lnutil.MSGID_SIGREV
-	outMsg.PeerIdx = q.KeyGen.Step[3] & 0x7fffffff
-	outMsg.Data = msg
-	*/
 
 	outMsg := lnutil.NewSigRev(q.KeyGen.Step[3]&0x7fffffff, q.Op, sig, *elk, n2ElkPoint)
 
@@ -639,22 +587,6 @@ func (nd *LitNode) SendREV(q *Qchan) error {
 	if err != nil {
 		return err
 	}
-
-	/* RETRACTED
-	opArr := lnutil.OutPointToBytes(q.Op)
-
-	var msg []byte
-	// REV is op (36), elk hash (32), n2 elk point (33)
-	// total length 101
-	msg = append(msg, opArr[:]...)
-	msg = append(msg, elk[:]...)
-	msg = append(msg, n2ElkPoint[:]...)
-
-	outMsg := new(lnutil.LitMsg)
-	outMsg.MsgType = lnutil.MSGID_REV
-	outMsg.PeerIdx = q.Peer()
-	outMsg.Data = msg
-	*/
 
 	outMsg := lnutil.NewRevMsg(q.Peer(), q.Op, *elk, n2ElkPoint)
 

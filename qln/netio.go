@@ -140,8 +140,8 @@ func (nd *LitNode) OutMessager() {
 		}
 
 		//rawmsg := append([]byte{msg.MsgType()}, msg.Data...)
-		rawmsg := msg.Bytes()
-		nd.RemoteMtx.Lock() // not sure this is needed...
+		rawmsg := msg.Bytes() // automatically includes messageType
+		nd.RemoteMtx.Lock()   // not sure this is needed...
 		n, err := nd.RemoteCons[msg.Peer()].Con.Write(rawmsg)
 		if err != nil {
 			fmt.Printf("error writing to peer %d: %s\n", msg.Peer(), err.Error())
@@ -196,16 +196,9 @@ func (nd *LitNode) SendChat(peer uint32, chat string) error {
 		return fmt.Errorf("Not connected to peer %d", peer)
 	}
 
-	/* RETRACTED
-	outMsg := new(lnutil.LitMsg)
-	outMsg.MsgType = lnutil.MSGID_TEXTCHAT
-	outMsg.PeerIdx = peer
-	outMsg.Data = []byte(chat)
-	*/
 	outMsg := lnutil.NewChatMsg(peer, chat)
 
 	nd.OmniOut <- outMsg
-	outMsg.Bytes()
 
 	return nil
 }
