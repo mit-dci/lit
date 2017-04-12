@@ -9,43 +9,51 @@ import (
 	"github.com/btcsuite/btcd/wire"
 )
 
-// all the messages to and from peers look like this internally
-
+//id numbers for messages, semi-arbitrary
 const (
 	MSGID_TEXTCHAT = 0x00 // send a text message
 
+	//Channel creation messages
 	MSGID_POINTREQ  = 0x10
 	MSGID_POINTRESP = 0x11
 	MSGID_CHANDESC  = 0x12
 	MSGID_CHANACK   = 0x13
 	MSGID_SIGPROOF  = 0x14
 
+	//Channel destruction messages
 	MSGID_CLOSEREQ  = 0x20 // close channel
 	MSGID_CLOSERESP = 0x21
 
+	//Push Pull Messages
 	MSGID_DELTASIG  = 0x30 // pushing funds in channel; request to send
 	MSGID_SIGREV    = 0x31 // pulling funds; signing new state and revoking old
 	MSGID_GAPSIGREV = 0x32 // resolving collision
 	MSGID_REV       = 0x33 // pushing funds; revoking previous channel state
 
+	//not implemented
 	MSGID_FWDMSG     = 0x40
 	MSGID_FWDAUTHREQ = 0x41
 
+	//not implemented
 	MSGID_SELFPUSH = 0x50
 
+	//Tower Messages
 	MSGID_WATCH_DESC   = 0x60 // desc describes a new channel
 	MSGID_WATCH_COMMSG = 0x61 // commsg is a single state in the channel
 	MSGID_WATCH_DELETE = 0x62 // Watch_clear marks a channel as ok to delete.  No further updates possible.
 )
 
+//interface that all messages follow, for easy use
 type LitMsg interface {
-	Peer() uint32
-	MsgType() uint8
-	Bytes() []byte
+	Peer() uint32   //return PeerIdx
+	MsgType() uint8 //returns Message Type (see constants above)
+	Bytes() []byte  //returnns data of message as []byte with the MsgType() preceeding it
 }
 
+//method for finding what type of message a generic []byte is
+
 func LitMsgFromBytes(b []byte, peerid uint32) (LitMsg, error) {
-	msgType := b[0]
+	msgType := b[0] // first byte signifies what type of message is
 
 	switch msgType {
 	case MSGID_TEXTCHAT:
@@ -63,8 +71,8 @@ func LitMsgFromBytes(b []byte, peerid uint32) (LitMsg, error) {
 
 	case MSGID_CLOSEREQ:
 		return NewCloseReqMsgFromBytes(b, peerid)
-	/*
-		case MSGID_CLOSERESP:
+	/* not implemented
+	case MSGID_CLOSERESP:
 	*/
 
 	case MSGID_DELTASIG:
@@ -98,6 +106,7 @@ func LitMsgFromBytes(b []byte, peerid uint32) (LitMsg, error) {
 
 //----------
 
+//text message
 type ChatMsg struct {
 	PeerIdx uint32
 	Text    string
@@ -131,6 +140,7 @@ func (self ChatMsg) MsgType() uint8 { return MSGID_TEXTCHAT }
 
 //----------
 
+//message with no information, just shows a point is requested
 type PointReqMsg struct {
 	PeerIdx uint32
 }
@@ -154,6 +164,7 @@ func (self PointReqMsg) Bytes() []byte {
 func (self PointReqMsg) Peer() uint32   { return self.PeerIdx }
 func (self PointReqMsg) MsgType() uint8 { return MSGID_POINTREQ }
 
+//message to be used for reply to point request
 type PointRespMsg struct {
 	PeerIdx    uint32
 	ChannelPub [33]byte
@@ -198,6 +209,7 @@ func (self PointRespMsg) Bytes() []byte {
 func (self PointRespMsg) Peer() uint32   { return self.PeerIdx }
 func (self PointRespMsg) MsgType() uint8 { return MSGID_POINTRESP }
 
+//message with a channel's description
 type ChanDescMsg struct {
 	PeerIdx   uint32
 	Outpoint  wire.OutPoint
@@ -279,6 +291,7 @@ func (self ChanDescMsg) Bytes() []byte {
 func (self ChanDescMsg) Peer() uint32   { return self.PeerIdx }
 func (self ChanDescMsg) MsgType() uint8 { return MSGID_CHANDESC }
 
+//message for channel acknowledgement after description message
 type ChanAckMsg struct {
 	PeerIdx   uint32
 	Outpoint  wire.OutPoint
@@ -333,6 +346,7 @@ func (self ChanAckMsg) Bytes() []byte {
 func (self ChanAckMsg) Peer() uint32   { return self.PeerIdx }
 func (self ChanAckMsg) MsgType() uint8 { return MSGID_CHANACK }
 
+//message for proof for a signature
 type SigProofMsg struct {
 	PeerIdx   uint32
 	Outpoint  wire.OutPoint
@@ -377,6 +391,7 @@ func (self SigProofMsg) MsgType() uint8 { return MSGID_SIGPROOF }
 
 //----------
 
+//message for closing a channel
 type CloseReqMsg struct {
 	PeerIdx   uint32
 	Outpoint  wire.OutPoint
@@ -422,6 +437,7 @@ func (self CloseReqMsg) MsgType() uint8 { return MSGID_CLOSEREQ }
 
 //----------
 
+//message for sending an amount with the signature
 type DeltaSigMsg struct {
 	PeerIdx   uint32
 	Outpoint  wire.OutPoint
@@ -470,6 +486,7 @@ func (self DeltaSigMsg) Bytes() []byte {
 func (self DeltaSigMsg) Peer() uint32   { return self.PeerIdx }
 func (self DeltaSigMsg) MsgType() uint8 { return MSGID_DELTASIG }
 
+//a message that pushes using channel information
 type SigRevMsg struct {
 	PeerIdx    uint32
 	Outpoint   wire.OutPoint
@@ -521,6 +538,7 @@ func (self SigRevMsg) Bytes() []byte {
 func (self SigRevMsg) Peer() uint32   { return self.PeerIdx }
 func (self SigRevMsg) MsgType() uint8 { return MSGID_SIGREV }
 
+//message for signaling state has moved, revoking old state
 type GapSigRevMsg struct {
 	PeerIdx    uint32
 	Outpoint   wire.OutPoint
@@ -571,6 +589,7 @@ func (self GapSigRevMsg) Bytes() []byte {
 func (self GapSigRevMsg) Peer() uint32   { return self.PeerIdx }
 func (self GapSigRevMsg) MsgType() uint8 { return MSGID_GAPSIGREV }
 
+//send message accross channel using Elk info
 type RevMsg struct {
 	PeerIdx    uint32
 	Outpoint   wire.OutPoint
@@ -675,15 +694,15 @@ func NewWatchDescMsgFromBytes(b []byte, peerIDX uint32) (*WatchDescMsg, error) {
 }
 
 // Bytes turns a WatchannelDescriptor into 100 bytes
-func (sd WatchDescMsg) Bytes() []byte {
+func (self WatchDescMsg) Bytes() []byte {
 	var buf bytes.Buffer
-	msgType := U32tB(uint32(sd.MsgType()))
+	msgType := U32tB(uint32(self.MsgType()))
 	buf.Write(msgType)
-	buf.Write(sd.DestPKHScript[:])
-	binary.Write(&buf, binary.BigEndian, sd.Delay)
-	binary.Write(&buf, binary.BigEndian, sd.Fee)
-	buf.Write(sd.CustomerBasePoint[:])
-	buf.Write(sd.AdversaryBasePoint[:])
+	buf.Write(self.DestPKHScript[:])
+	binary.Write(&buf, binary.BigEndian, self.Delay)
+	binary.Write(&buf, binary.BigEndian, self.Fee)
+	buf.Write(self.CustomerBasePoint[:])
+	buf.Write(self.AdversaryBasePoint[:])
 	return buf.Bytes()
 }
 
@@ -734,14 +753,14 @@ func NewComMsgFromBytes(b []byte, peerIDX uint32) (*ComMsg, error) {
 }
 
 // ToBytes turns a ComMsg into 132 bytes
-func (sm ComMsg) Bytes() []byte {
+func (self ComMsg) Bytes() []byte {
 	var buf bytes.Buffer
-	msgType := U32tB(uint32(sm.MsgType()))
+	msgType := U32tB(uint32(self.MsgType()))
 	buf.Write(msgType)
-	buf.Write(sm.DestPKH[:])
-	buf.Write(sm.ParTxid[:])
-	buf.Write(sm.Sig[:])
-	buf.Write(sm.Elk.CloneBytes())
+	buf.Write(self.DestPKH[:])
+	buf.Write(self.ParTxid[:])
+	buf.Write(self.Sig[:])
+	buf.Write(self.Elk.CloneBytes())
 	return buf.Bytes()
 }
 

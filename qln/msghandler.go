@@ -9,7 +9,7 @@ import (
 
 // handles stuff that comes in over the wire.  Not user-initiated.
 func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) error {
-	switch msg.MsgType() & 0xf0 { // in progress
+	switch msg.MsgType() & 0xf0 {
 	case 0x00: // TEXT MESSAGE.  SIMPLE
 		chat, ok := msg.(lnutil.ChatMsg)
 		if !ok {
@@ -19,13 +19,13 @@ func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) er
 			"\nmsg from %s: %s", lnutil.White(msg.Peer()), lnutil.Green(chat.Text))
 		return nil // no error
 
-	case 0x10:
+	case 0x10: //Making Channel, or using
 		return nd.ChannelHandler(msg, peer)
 
-	case 0x20:
+	case 0x20: //Closing
 		return nd.CloseHandler(msg)
 
-	case 0x30:
+	case 0x30: //PushPull
 		if q == nil {
 			return fmt.Errorf("pushpull message but no matching channel")
 		}
@@ -40,7 +40,7 @@ func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) er
 		return nd.SelfPushHandler(msg)
 	*/
 
-	case 0x60:
+	case 0x60: //Tower Messages
 		if !nd.Tower.Accepting {
 			return fmt.Errorf("Error: Got tower msg from %x but tower disabled\n",
 				msg.Peer())
