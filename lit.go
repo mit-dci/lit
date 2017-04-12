@@ -2,13 +2,17 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/fatih/color"
 	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/qln"
@@ -33,32 +37,131 @@ type LitConfig struct {
 	verbose               bool
 	birthblock            int32
 	rpcport               uint16
+	bamfport              uint16
 	litHomeDir            string
 
 	Params *chaincfg.Params
 }
 
+type arguments struct {
+	name         string
+	ptrName      string
+	defaultValue interface{}
+	description  string
+}
+
+var verbArg = &arguments{
+	name:         "v",
+	defaultValue: false,
+	description:  "verbose: print all logs to stdout",
+}
+
+var spvHostArg = &arguments{
+	name:         "spv",
+	ptrName:      "hostname/address",
+	defaultValue: "127.0.0.1",
+	description:  "full node to connect to",
+}
+
+var birthArg = &arguments{
+	name:         "tip",
+	ptrName:      "block",
+	defaultValue: hardHeight,
+	description:  "height to begin db sync",
+}
+var easyArg = &arguments{
+	name:        "ez",
+	description: "use easy mode (bloom filters)",
+}
+var regtestArg = &arguments{
+	name:        "reg",
+	description: "use regtest (not testnet3)",
+}
+var bc2Arg = &arguments{
+	name:        "bc2",
+	description: "use bc2 network (not testnet3)",
+}
+var resyncArg = &arguments{
+	name:        "resync",
+	description: "force resync from given tip",
+}
+var rpcportArg = &arguments{
+	name:         "rpcport",
+	ptrName:      "port",
+	defaultValue: 8001,
+	description:  "port to listen for RPC",
+}
+var bamfportArg = &arguments{
+	name:         "bamfport",
+	ptrName:      "port",
+	defaultValue: 8001,
+	description:  "port to listen for Lit-BAMF",
+}
+var dirArg = &arguments{
+	name:         "dir",
+	ptrName:      "directory",
+	defaultValue: filepath.Join(os.Getenv("HOME"), litHomeDirName),
+	description:  "lit home directory",
+}
+
 func setConfig(lc *LitConfig) {
-	spvhostptr := flag.String("spv", "na", "full node to connect to")
 
-	birthptr := flag.Int("tip", hardHeight, "height to begin db sync")
+	verbptr := flag.Bool(
+		verbArg.name, verbArg.defaultValue.(bool), verbArg.description)
+	spvHostptr := flag.String(
+		spvHostArg.name, spvHostArg.defaultValue.(string), spvHostArg.description)
+	birthptr := flag.Int(birthArg.name, birthArg.defaultValue.(int), birthArg.description)
+	easyptr := flag.Bool(easyArg.name, false, easyArg.description)
 
-	easyptr := flag.Bool("ez", false, "use easy mode (bloom filters)")
+	regtestptr := flag.Bool(regtestArg.name, false, regtestArg.description)
+	bc2ptr := flag.Bool(bc2Arg.name, false, bc2Arg.description)
+	resyncprt := flag.Bool(resyncArg.name, false, resyncArg.description)
 
-	verbptr := flag.Bool("v", false, "verbose; print all logs to stdout")
+	rpcportptr := flag.Int(
+		rpcportArg.name, rpcportArg.defaultValue.(int), rpcportArg.description)
+	bamfportptr := flag.Int(
+		bamfportArg.name, bamfportArg.defaultValue.(int), bamfportArg.description)
 
-	regtestptr := flag.Bool("reg", false, "use regtest (not testnet3)")
-	bc2ptr := flag.Bool("bc2", false, "use bc2 network (not testnet3)")
-	resyncprt := flag.Bool("resync", false, "force resync from given tip")
+	litHomeDir := flag.String(dirArg.name, dirArg.defaultValue.(string), dirArg.description)
 
-	rpcportptr := flag.Int("rpcport", 8001, "port to listen for RPC")
+	ptrs := []arguments{*spvHostArg, *birthArg, *easyArg, *regtestArg, *bc2Arg, *resyncArg,
+		*rpcportArg, *bamfportArg, *dirArg, *verbArg}
+	flag.Usage = func() {
+		file, err := os.Open("lit.ascii")
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer file.Close()
 
-	litHomeDir := flag.String("dir",
-		filepath.Join(os.Getenv("HOME"), litHomeDirName), "lit home directory")
+		b, _ := ioutil.ReadAll(file)
+		fmt.Print(string(b))
+
+		bolderline := color.New(color.Bold).Add(color.Underline).SprintFunc()
+		fmt.Fprintln(os.Stderr, bolderline("Usage"))
+
+		w := tabwriter.NewWriter(os.Stderr, 3, 4, 1, ' ', 0)
+		bold := color.New(color.Bold).SprintFunc()
+		underline := color.New(color.Underline).SprintFunc()
+		for _, ptr := range ptrs {
+			ptrName := ""
+			if ptr.ptrName != "" {
+				ptrName = ptr.ptrName
+			}
+
+			description := ptr.description
+			if ptr.defaultValue != nil {
+				description = fmt.Sprintf("%s (default \"%v\")", description, ptr.defaultValue)
+			}
+
+			ptrOutput := fmt.Sprintf("\t%s\t%s\t\t%s", bold("--"+ptr.name), underline(ptrName), description)
+			fmt.Fprintln(w, ptrOutput)
+		}
+		w.Flush()
+	}
 
 	flag.Parse()
 
-	lc.spvHost = *spvhostptr
+	lc.spvHost = *spvHostptr
 	lc.birthblock = int32(*birthptr)
 
 	lc.regTest = *regtestptr
@@ -68,6 +171,7 @@ func setConfig(lc *LitConfig) {
 	lc.verbose = *verbptr
 
 	lc.rpcport = uint16(*rpcportptr)
+	lc.bamfport = uint16(*bamfportptr)
 
 	lc.litHomeDir = *litHomeDir
 
