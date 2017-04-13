@@ -188,12 +188,11 @@ func (w *Wallit) GrabAll() error {
 	for _, u := range utxos {
 		if u.Seq == 1 && u.Height > 0 { // grabbable
 			log.Printf("found %s to grab!\n", u.String())
-			adr160slice, err := w.NewAdr160()
+			adr160, err := w.NewAdr160()
 			if err != nil {
 				return err
 			}
-			var adr160 [20]byte
-			copy(adr160[:], adr160slice)
+
 			outScript := lnutil.DirectWPKHScriptFromPKH(adr160)
 
 			tx, err := w.SendOne(*u, outScript)

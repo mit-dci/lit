@@ -77,7 +77,7 @@ func (w *Wallit) NewAdr() btcutil.Address {
 		return a
 	}
 
-	a, err = btcutil.NewAddressPubKeyHash(adr160, w.Param)
+	a, err = btcutil.NewAddressPubKeyHash(adr160[:], w.Param)
 	if err != nil {
 		// should have an error here..?  Return empty address...
 		log.Printf("can't make address: %s\n", err.Error())
@@ -104,8 +104,7 @@ func (w *Wallit) ExportUtxo(u *portxo.PorTxo) {
 	}
 
 	// Register new address with chainhook
-	var adr160 [20]byte
-	copy(adr160[:], w.PathPubHash160(u.KeyGen))
+	adr160 := w.PathPubHash160(u.KeyGen)
 	err := w.Hook.RegisterAddress(adr160)
 	if err != nil {
 		log.Printf(err.Error())
