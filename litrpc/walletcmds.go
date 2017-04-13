@@ -263,7 +263,7 @@ func (r *LitRPC) Address(args *AddressArgs, reply *AddressReply) error {
 	// If you tell it to make 0 new addresses, it sends a list of all the old ones
 	if args.NumToMake == 0 {
 
-		// this gets old p2pkh addresses; need to convert them to bech32
+		// this gets 20 byte addresses; need to convert them to bech32 / base58
 		allAdr, err := r.Node.SubWallet.AdrDump()
 		if err != nil {
 			return err
@@ -272,10 +272,16 @@ func (r *LitRPC) Address(args *AddressArgs, reply *AddressReply) error {
 		reply.WitAddresses = make([]string, len(allAdr))
 		reply.LegacyAddresses = make([]string, len(allAdr))
 		for i, a := range allAdr {
-			// add old address
-			reply.LegacyAddresses[i] = a.String()
-			// take 20-byte PKH out and convert to a bech32 segwit v0 address
-			bech32adr, err := bech32.Tb1AdrFromPKH(a.ScriptAddress())
+			// convert 20 byte array to old address
+			oldadr, err := btcutil.NewAddressPubKeyHash(
+				a[:], r.Node.SubWallet.Params())
+			if err != nil {
+				return err
+			}
+			reply.LegacyAddresses[i] = oldadr.String()
+
+			// convert 20-byte PKH to a bech32 segwit v0 address
+			bech32adr, err := bech32.Tb1AdrFromPKH(a[:])
 			if err != nil {
 				return err
 			}

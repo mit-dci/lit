@@ -64,6 +64,14 @@ func NewWallit(
 		_ = w.NewAdr()
 	}
 
+	// send all those adrs to the hook
+	for _, a := range adrs {
+		err = w.Hook.RegisterAddress(a)
+		if err != nil {
+			log.Printf("NewWallit RegisterAddress crash %s ", err.Error())
+		}
+	}
+
 	// deal with the incoming txs
 	go w.TxHandler(incomingTx)
 
