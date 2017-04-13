@@ -55,7 +55,7 @@ type UWallet interface {
 	UtxoDump() ([]*portxo.PorTxo, error)
 
 	// Dump all the addresses the sub wallet is watching
-	AdrDump() ([]btcutil.Address, error)
+	AdrDump() ([][20]byte, error)
 
 	// Return current height the wallet is synced to
 	CurrentHeight() int32

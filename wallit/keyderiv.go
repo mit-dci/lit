@@ -46,12 +46,15 @@ func (w *Wallit) PathPubkey(kg portxo.KeyGen) *btcec.PublicKey {
 
 // PathPubHash160 returns a 20 byte pubkey hash for the given path
 // It'll always return 20 bytes, or a nil if there's an error.
-func (w *Wallit) PathPubHash160(kg portxo.KeyGen) []byte {
+func (w *Wallit) PathPubHash160(kg portxo.KeyGen) [20]byte {
+	var pkh [20]byte
 	pub := w.PathPubkey(kg)
 	if pub == nil {
-		return nil
+		return pkh
 	}
-	return btcutil.Hash160(pub.SerializeCompressed())
+	copy(pkh[:], btcutil.Hash160(pub.SerializeCompressed()))
+
+	return pkh
 }
 
 // ------------- end of 2 main key deriv functions
