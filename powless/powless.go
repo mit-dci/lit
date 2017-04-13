@@ -2,6 +2,7 @@ package powless
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	"github.com/mit-dci/lit/lnutil"
@@ -119,6 +121,26 @@ type AdrResponse struct {
 	Unspent []jsutxo
 }
 
+type TxResponse struct {
+	Success     bool
+	Transaction []TxJson
+}
+
+type TxJson struct {
+	Block int32
+	Txid  string
+}
+
+type TxHexResponse struct {
+	Success bool
+	Hex     []TxHexString
+}
+
+type TxHexString struct {
+	Txid string
+	Hex  string
+}
+
 type jsutxo struct {
 	Value_int int64
 	Txid      string
@@ -127,7 +149,7 @@ type jsutxo struct {
 }
 
 func (a *APILink) GetAdrTxos() error {
-	apiurl := "https://testnet-api.smartbit.com.au/v1/blockchain/address/"
+	apitxourl := "https://testnet-api.smartbit.com.au/v1/blockchain/address/"
 	// make a comma-separated list of base58 addresses
 	var adrlist string
 
@@ -144,7 +166,7 @@ func (a *APILink) GetAdrTxos() error {
 	// chop off last comma
 	adrlist = adrlist[:len(adrlist)-1] + "/unspent"
 
-	response, err := http.Get(apiurl + adrlist)
+	response, err := http.Get(apitxourl + adrlist)
 	if err != nil {
 		return err
 	}
@@ -157,33 +179,52 @@ func (a *APILink) GetAdrTxos() error {
 	}
 
 	if !ar.Success {
-		return fmt.Errorf("success = false...")
+		return fmt.Errorf("ar success = false...")
 	}
-	//	if len(ar.unspent) == 0 {
-	//		fmt.Printf("didn't work")
-	//	}
-	/*
-		dec := json.NewDecoder(response.Body)
-		err = dec.Decode(ar)
+
+	var txidlist string
+
+	// go through all unspent txos.  All we want is the txids, to request the
+	// full txs.
+	for i, txo := range ar.Unspent {
+		txidlist += txo.Txid + ","
+	}
+	txidlist = txidlist[:len(txidlist)-1] + "/hex"
+	// now request all those txids
+	// need to request twice! To find height.  Blah.
+
+	apitxurl := "https://testnet-api.smartbit.com.au/v1/blockchain/tx/"
+
+	response, err = http.Get(apitxurl + txidlist)
+	if err != nil {
+		return err
+	}
+
+	tr := new(TxResponse)
+
+	err = json.NewDecoder(response.Body).Decode(tr)
+	if err != nil {
+		return err
+	}
+
+	if !tr.Success {
+		return fmt.Errorf("tr success = false...")
+	}
+
+	chainhash.NewHashFromStr()
+	for _, txjson := range tr.Hex {
+		buf, err := hex.DecodeString(txjson.Hex)
 		if err != nil {
 			return err
 		}
-		if dec.More() {
-			return fmt.Errorf("there's still more")
+		buf := bytes.NewBuffer(buf)
+		tx := wire.NewMsgTx()
+		err = tx.Deserialize(buf)
+		if err != nil {
+			return err
 		}
-		if !ar.success {
-			return fmt.Errorf("success = false...")
-		}
-		if len(ar.unspent) == 0 {
-			fmt.Printf("didn't work")
-		}
-	*/
-
-	fmt.Printf("got a txid %s\n", ar.Unspent[0].Txid)
-
-	//	fmt.Printf("\nresponse : sat: %d outpoint: %s;%d\n", ar.value_int, ar.txid, ar.n)
-
-	//	_, err = io.Copy(os.Stdout, response.Body)
+		//		a.TxUpToWallit
+	}
 
 	return nil
 }
