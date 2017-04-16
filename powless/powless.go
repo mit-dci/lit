@@ -12,10 +12,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/adiabat/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
 	"github.com/mit-dci/lit/lnutil"
 )
 
@@ -115,10 +114,99 @@ func (a *APILink) RegisterOutPoint(op wire.OutPoint) error {
 
 // ARGHGH all fields have to be exported (caps) or the json unmarshaller won't
 // populate them !
+type AdrUtxoResponse struct {
+	Txid     string
+	Height   int32
+	Satoshis int64
+}
+
+// do you even need a struct here..?
+type RawTxResponse struct {
+	RawTx string
+}
+
+// use insight api.  at least that's open source, can run yourself, seems to have
+// some dev activity behind it.
+
+func (a *APILink) GetAdrTxos() error {
+
+	apitxourl := "https://testnet.blockexplorer.com/api"
+	// make a comma-separated list of base58 addresses
+	var adrlist string
+
+	a.TrackingAdrsMtx.Lock()
+	for adr160, _ := range a.TrackingAdrs {
+		adr58, err := btcutil.NewAddressPubKeyHash(adr160[:], a.p)
+		if err != nil {
+			return err
+		}
+		adrlist += adr58.String()
+		adrlist += ","
+	}
+
+	// chop off last comma, and add /utxo
+	adrlist = adrlist[:len(adrlist)-1] + "/utxo"
+
+	response, err := http.Get(apitxourl + "/addrs/" + adrlist)
+	if err != nil {
+		return err
+	}
+
+	ars := new([]AdrUtxoResponse)
+
+	err = json.NewDecoder(response.Body).Decode(ars)
+	if err != nil {
+		return err
+	}
+
+	if len(*ars) == 0 {
+		return fmt.Errorf("no ars \n")
+	}
+
+	// go through txids, request hex tx, build txahdheight and send that up
+	for _, ad := range *ars {
+
+		response, err := http.Get(apitxourl + "/rawtx/" + ad.Txid)
+		if err != nil {
+			return err
+		}
+
+		var rtx RawTxResponse
+
+		err = json.NewDecoder(response.Body).Decode(&rtx)
+		if err != nil {
+			return err
+		}
+
+		txBytes, err := hex.DecodeString(rtx.RawTx)
+		if err != nil {
+			return err
+		}
+		buf := bytes.NewBuffer(txBytes)
+		tx := wire.NewMsgTx()
+		err = tx.Deserialize(buf)
+		if err != nil {
+			return err
+		}
+
+		var txah lnutil.TxAndHeight
+		txah.Height = int32(ad.Height)
+		txah.Tx = tx
+
+		fmt.Printf("tx %s at height %d\n", txah.Tx.TxHash().String(), txah.Height)
+
+		a.TxUpToWallit <- txah
+
+	}
+
+	return nil
+}
+
+/* smartbit structs
 type AdrResponse struct {
 	Success bool
 	//	Paging  interface{}
-	Unspent []jsutxo
+	Unspent []JsUtxo
 }
 
 type TxResponse struct {
@@ -141,14 +229,18 @@ type TxHexString struct {
 	Hex  string
 }
 
-type jsutxo struct {
+type JsUtxo struct {
 	Value_int int64
 	Txid      string
 	N         uint32
-	Addresses []string // why more than 1 ..?
+	Addresses []string // why more than 1 ..? always 1.
 }
 
-func (a *APILink) GetAdrTxos() error {
+*/
+
+/*
+func (a *APILink) GetAdrTxosSmartBit() error {
+
 	apitxourl := "https://testnet-api.smartbit.com.au/v1/blockchain/address/"
 	// make a comma-separated list of base58 addresses
 	var adrlist string
@@ -190,9 +282,9 @@ func (a *APILink) GetAdrTxos() error {
 		txidlist += txo.Txid + ","
 	}
 	txidlist = txidlist[:len(txidlist)-1] + "/hex"
+
 	// now request all those txids
 	// need to request twice! To find height.  Blah.
-
 	apitxurl := "https://testnet-api.smartbit.com.au/v1/blockchain/tx/"
 
 	response, err = http.Get(apitxurl + txidlist)
@@ -211,7 +303,8 @@ func (a *APILink) GetAdrTxos() error {
 		return fmt.Errorf("tr success = false...")
 	}
 
-	chainhash.NewHashFromStr()
+	//	chainhash.NewHashFromStr()
+
 	for _, txjson := range tr.Hex {
 		buf, err := hex.DecodeString(txjson.Hex)
 		if err != nil {
@@ -228,7 +321,56 @@ func (a *APILink) GetAdrTxos() error {
 
 	return nil
 }
+*/
 
+/*
+// for blockcypher thing.  these are all crummy.
+func (a *APILink) GetAdrTxos() error {
+	api := gobcy.API{"", "btc", "test3"}
+
+	// make 1 request per address; insta-get the tx hex in the first call.
+
+	a.TrackingAdrsMtx.Lock()
+	defer a.TrackingAdrsMtx.Unlock()
+
+	for adr160, _ := range a.TrackingAdrs {
+		adr58, err := btcutil.NewAddressPubKeyHash(adr160[:], a.p)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("making request for %s\n", adr58.String())
+		adrResp, err := api.GetAddrFull(
+			adr58.String(), nil) // map[string]string{"includeHex": "true"})
+		if err != nil {
+			fmt.Printf("got err %s\n", err.Error())
+			return err
+		}
+		fmt.Printf("done addr %s\n", adrResp.Address)
+		fmt.Printf("got %d txs\n", len(adrResp.TXs))
+
+		for _, txResp := range adrResp.TXs {
+
+			txBytes, err := hex.DecodeString(txResp.Hex)
+			if err != nil {
+				return err
+			}
+			buf := bytes.NewBuffer(txBytes)
+			tx := wire.NewMsgTx()
+			err = tx.Deserialize(buf)
+			if err != nil {
+				return err
+			}
+
+			var txah lnutil.TxAndHeight
+			txah.Height = int32(txResp.BlockHeight)
+			txah.Tx = tx
+			a.TxUpToWallit <- txah
+		}
+
+	}
+	return nil
+}
+*/
 func (a *APILink) PushTx(tx *wire.MsgTx) error {
 	if tx == nil {
 		return fmt.Errorf("tx is nil")
