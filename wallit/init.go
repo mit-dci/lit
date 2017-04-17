@@ -62,7 +62,10 @@ func NewWallit(
 		log.Printf("NewWallit crash  %s ", err.Error())
 	}
 	if len(adrs) == 0 {
-		_ = w.NewAdr()
+		_, err := w.NewAdr()
+		if err != nil {
+			log.Printf("NewWallit crash  %s ", err.Error())
+		}
 	}
 
 	// send all those adrs to the hook

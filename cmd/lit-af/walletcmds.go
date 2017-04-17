@@ -182,10 +182,12 @@ func (lc *litAfClient) Address(textArgs []string) error {
 	}
 
 	reply := new(litrpc.AddressReply)
+	fmt.Printf("call here\n")
 	err := lc.rpccon.Call("LitRPC.Address", args, reply)
 	if err != nil {
 		return err
 	}
+
 	fmt.Fprintf(color.Output, "new adr(s): %s\nold: %s\n",
 		lnutil.Address(reply.WitAddresses), lnutil.Address(reply.LegacyAddresses))
 	return nil

@@ -12,15 +12,48 @@ import (
 	"sync"
 	"time"
 
-	"github.com/adiabat/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcutil"
 	"github.com/mit-dci/lit/lnutil"
 )
 
 // powless is a couple steps below uspv in that it doesn't check
 // proof of work.  It just asks some web API thing about if it has
 // received money or not.
+
+/*
+Here are the inefficiencies of the block explorer model.
+The 2 things you want to support are gaining and losing money.
+Gaining is done by watching for new txs with outputs to an address.
+Losing is done by watching for new txs with inputs from an outpoint.
+
+Insight does allow us to query UTXOs for an address, but not above a
+specified height.  So we end up re-downloading all the utxos we already know
+about.  But we don't have to send those to the wallit.
+
+Watching for outpoints is easier; they disappear.  We just keep checking the
+tx of the outpoint and see if the outpoint index is spent.
+
+To make an optimal web-explorer api, here are the api calls you'd want:
+
+/utxoAboveHeight/[address]/[height]
+
+returns the raw hex (and other json if you want) of all txs sending to [address]
+which are confirmed at [height] or above
+
+/outPointSpend/[txid]/[index]
+
+returns either null, or the raw hex (& json if you want) of the transaction
+spending outpoint [txid]:[index].
+
+Those two calls get you basically everything you need for a wallet, in a pretty
+efficient way.
+
+(but yeah re-orgs and stuff, right?  None of this deals with that yet.  That's
+going to be a pain.)
+
+*/
 
 /*
 implement this:
@@ -54,6 +87,8 @@ type APILink struct {
 
 	CurrentHeightChan chan int32
 
+	// we've "synced" up to this height; older txs won't get pushed up to wallit
+	height int32
 	// time based polling
 	dirtybool bool
 
@@ -127,7 +162,6 @@ type RawTxResponse struct {
 
 // use insight api.  at least that's open source, can run yourself, seems to have
 // some dev activity behind it.
-
 func (a *APILink) GetAdrTxos() error {
 
 	apitxourl := "https://testnet.blockexplorer.com/api"
@@ -143,6 +177,7 @@ func (a *APILink) GetAdrTxos() error {
 		adrlist += adr58.String()
 		adrlist += ","
 	}
+	a.TrackingAdrsMtx.Unlock()
 
 	// chop off last comma, and add /utxo
 	adrlist = adrlist[:len(adrlist)-1] + "/utxo"
@@ -165,26 +200,7 @@ func (a *APILink) GetAdrTxos() error {
 
 	// go through txids, request hex tx, build txahdheight and send that up
 	for _, ad := range *ars {
-
-		response, err := http.Get(apitxourl + "/rawtx/" + ad.Txid)
-		if err != nil {
-			return err
-		}
-
-		var rtx RawTxResponse
-
-		err = json.NewDecoder(response.Body).Decode(&rtx)
-		if err != nil {
-			return err
-		}
-
-		txBytes, err := hex.DecodeString(rtx.RawTx)
-		if err != nil {
-			return err
-		}
-		buf := bytes.NewBuffer(txBytes)
-		tx := wire.NewMsgTx()
-		err = tx.Deserialize(buf)
+		tx, err := GetRawTx(ad.Txid)
 		if err != nil {
 			return err
 		}
@@ -194,12 +210,96 @@ func (a *APILink) GetAdrTxos() error {
 		txah.Tx = tx
 
 		fmt.Printf("tx %s at height %d\n", txah.Tx.TxHash().String(), txah.Height)
-
 		a.TxUpToWallit <- txah
-
 	}
 
 	return nil
+}
+
+func (a *APILink) GetOPTxs() error {
+	apitxourl := "https://testnet.blockexplorer.com/api/"
+
+	var oplist []wire.OutPoint
+
+	// copy registered ops here to minimize time mutex is locked
+	a.TrackingOPsMtx.Lock()
+	for op, _ := range a.TrackingOPs {
+		oplist = append(oplist, op)
+	}
+	a.TrackingOPsMtx.Unlock()
+
+	// need to query each txid with a different http request
+	for _, op := range oplist {
+		// get full tx info for the outpoint's tx
+		// (if we have 2 outpoints with the same txid we query twice...)
+		response, err := http.Get(apitxourl + "tx/" + op.Hash.String())
+		if err != nil {
+			return err
+		}
+
+		var txr TxResponse
+		// parse the response to get the spending txid
+		err = json.NewDecoder(response.Body).Decode(&txr)
+		if err != nil {
+			return err
+		}
+
+		// what is the "v" for here?
+		for _, txout := range txr.Vout {
+			if op.Index == txout.N { // hit; request this one
+				tx, err := GetRawTx(op.Hash.String())
+				if err != nil {
+					return err
+				}
+
+				var txah lnutil.TxAndHeight
+				txah.Tx = tx
+				txah.Height = txout.SpentHeight
+				a.TxUpToWallit <- txah
+			}
+		}
+	}
+
+	return nil
+}
+
+type TxResponse struct {
+	Vout []VoutJson
+}
+
+// Get txid of spending tx
+type VoutJson struct {
+	N           uint32
+	SpentTxId   string
+	SpentHeight int32
+}
+
+func GetRawTx(txid string) (*wire.MsgTx, error) {
+	rawTxURL := "https://testnet.blockexplorer.com/api/rawtx/"
+	response, err := http.Get(rawTxURL + txid)
+	if err != nil {
+		return nil, err
+	}
+
+	var rtx RawTxResponse
+
+	err = json.NewDecoder(response.Body).Decode(&rtx)
+	if err != nil {
+		return nil, err
+	}
+
+	txBytes, err := hex.DecodeString(rtx.RawTx)
+	if err != nil {
+		return nil, err
+	}
+	buf := bytes.NewBuffer(txBytes)
+	tx := wire.NewMsgTx()
+	err = tx.Deserialize(buf)
+	if err != nil {
+		return nil, err
+	}
+
+	return tx, nil
 }
 
 /* smartbit structs
@@ -238,139 +338,6 @@ type JsUtxo struct {
 
 */
 
-/*
-func (a *APILink) GetAdrTxosSmartBit() error {
-
-	apitxourl := "https://testnet-api.smartbit.com.au/v1/blockchain/address/"
-	// make a comma-separated list of base58 addresses
-	var adrlist string
-
-	a.TrackingAdrsMtx.Lock()
-	for adr160, _ := range a.TrackingAdrs {
-		adr58, err := btcutil.NewAddressPubKeyHash(adr160[:], a.p)
-		if err != nil {
-			return err
-		}
-		adrlist += adr58.String()
-		adrlist += ","
-	}
-
-	// chop off last comma
-	adrlist = adrlist[:len(adrlist)-1] + "/unspent"
-
-	response, err := http.Get(apitxourl + adrlist)
-	if err != nil {
-		return err
-	}
-
-	ar := new(AdrResponse)
-
-	err = json.NewDecoder(response.Body).Decode(ar)
-	if err != nil {
-		return err
-	}
-
-	if !ar.Success {
-		return fmt.Errorf("ar success = false...")
-	}
-
-	var txidlist string
-
-	// go through all unspent txos.  All we want is the txids, to request the
-	// full txs.
-	for i, txo := range ar.Unspent {
-		txidlist += txo.Txid + ","
-	}
-	txidlist = txidlist[:len(txidlist)-1] + "/hex"
-
-	// now request all those txids
-	// need to request twice! To find height.  Blah.
-	apitxurl := "https://testnet-api.smartbit.com.au/v1/blockchain/tx/"
-
-	response, err = http.Get(apitxurl + txidlist)
-	if err != nil {
-		return err
-	}
-
-	tr := new(TxResponse)
-
-	err = json.NewDecoder(response.Body).Decode(tr)
-	if err != nil {
-		return err
-	}
-
-	if !tr.Success {
-		return fmt.Errorf("tr success = false...")
-	}
-
-	//	chainhash.NewHashFromStr()
-
-	for _, txjson := range tr.Hex {
-		buf, err := hex.DecodeString(txjson.Hex)
-		if err != nil {
-			return err
-		}
-		buf := bytes.NewBuffer(buf)
-		tx := wire.NewMsgTx()
-		err = tx.Deserialize(buf)
-		if err != nil {
-			return err
-		}
-		//		a.TxUpToWallit
-	}
-
-	return nil
-}
-*/
-
-/*
-// for blockcypher thing.  these are all crummy.
-func (a *APILink) GetAdrTxos() error {
-	api := gobcy.API{"", "btc", "test3"}
-
-	// make 1 request per address; insta-get the tx hex in the first call.
-
-	a.TrackingAdrsMtx.Lock()
-	defer a.TrackingAdrsMtx.Unlock()
-
-	for adr160, _ := range a.TrackingAdrs {
-		adr58, err := btcutil.NewAddressPubKeyHash(adr160[:], a.p)
-		if err != nil {
-			return err
-		}
-		fmt.Printf("making request for %s\n", adr58.String())
-		adrResp, err := api.GetAddrFull(
-			adr58.String(), nil) // map[string]string{"includeHex": "true"})
-		if err != nil {
-			fmt.Printf("got err %s\n", err.Error())
-			return err
-		}
-		fmt.Printf("done addr %s\n", adrResp.Address)
-		fmt.Printf("got %d txs\n", len(adrResp.TXs))
-
-		for _, txResp := range adrResp.TXs {
-
-			txBytes, err := hex.DecodeString(txResp.Hex)
-			if err != nil {
-				return err
-			}
-			buf := bytes.NewBuffer(txBytes)
-			tx := wire.NewMsgTx()
-			err = tx.Deserialize(buf)
-			if err != nil {
-				return err
-			}
-
-			var txah lnutil.TxAndHeight
-			txah.Height = int32(txResp.BlockHeight)
-			txah.Tx = tx
-			a.TxUpToWallit <- txah
-		}
-
-	}
-	return nil
-}
-*/
 func (a *APILink) PushTx(tx *wire.MsgTx) error {
 	if tx == nil {
 		return fmt.Errorf("tx is nil")
