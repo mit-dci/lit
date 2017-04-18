@@ -90,8 +90,8 @@ type APILink struct {
 
 	// we've "synced" up to this height; older txs won't get pushed up to wallit
 	height int32
+
 	// time based polling
-	dirtyMtx  sync.Mutex
 	dirtybool bool
 
 	p *chaincfg.Params
@@ -120,10 +120,7 @@ func (a *APILink) Start(
 func (a *APILink) ClockLoop() {
 
 	for {
-		a.dirtyMtx.Lock()
 		if a.dirtybool {
-			a.dirtybool = false
-			a.dirtyMtx.Unlock()
 			err := a.GetAdrTxos()
 			if err != nil {
 				log.Printf(err.Error())
@@ -132,12 +129,14 @@ func (a *APILink) ClockLoop() {
 			if err != nil {
 				log.Printf(err.Error())
 			}
-		} else {
-			a.dirtyMtx.Unlock()
-			fmt.Printf("clean, sleep 5 sec\n")
-			time.Sleep(time.Second * 5)
-			// some kind of long range refresh for blocks...?
+			time.Sleep(time.Second * 1)
+			a.dirtybool = false
 		}
+		fmt.Printf("clean, sleep 5 sec\n")
+		time.Sleep(time.Second * 5)
+
+		// some kind of long range refresh for blocks...?
+
 	}
 
 	return
@@ -149,9 +148,7 @@ func (a *APILink) RegisterAddress(adr160 [20]byte) error {
 	a.TrackingAdrs[adr160] = true
 	a.TrackingAdrsMtx.Unlock()
 
-	a.dirtyMtx.Lock()
 	a.dirtybool = true
-	a.dirtyMtx.Unlock()
 
 	fmt.Printf("dirty %v\n", a.dirtybool)
 	return nil
@@ -163,9 +160,7 @@ func (a *APILink) RegisterOutPoint(op wire.OutPoint) error {
 	a.TrackingOPs[op] = true
 	a.TrackingOPsMtx.Unlock()
 
-	a.dirtyMtx.Lock()
 	a.dirtybool = true
-	a.dirtyMtx.Unlock()
 	return nil
 }
 
@@ -347,6 +342,7 @@ type VoutJson struct {
 func (a *APILink) UpdateHeight(height int32) {
 	if height > a.height {
 		a.height = height
+		a.CurrentHeightChan <- height
 	}
 }
 
