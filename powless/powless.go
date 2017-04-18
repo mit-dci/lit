@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -120,11 +121,16 @@ func (a *APILink) ClockLoop() {
 			a.dirtybool = false
 			err := a.GetAdrTxos()
 			if err != nil {
-				fmt.Printf(err.Error())
+				log.Printf(err.Error())
+			}
+			err = a.GetOPTxs()
+			if err != nil {
+				log.Printf(err.Error())
 			}
 		} else {
 			fmt.Printf("clean, sleep 5 sec\n")
 			time.Sleep(time.Second * 5)
+			// some kind of long range refresh for blocks...?
 		}
 	}
 
