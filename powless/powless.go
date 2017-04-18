@@ -91,6 +91,7 @@ type APILink struct {
 	// we've "synced" up to this height; older txs won't get pushed up to wallit
 	height int32
 	// time based polling
+	dirtyMtx  sync.Mutex
 	dirtybool bool
 
 	p *chaincfg.Params
@@ -109,6 +110,8 @@ func (a *APILink) Start(
 	a.TxUpToWallit = make(chan lnutil.TxAndHeight, 1)
 	a.CurrentHeightChan = make(chan int32, 1)
 
+	a.height = startHeight
+
 	go a.ClockLoop()
 
 	return a.TxUpToWallit, a.CurrentHeightChan, nil
@@ -117,8 +120,10 @@ func (a *APILink) Start(
 func (a *APILink) ClockLoop() {
 
 	for {
+		a.dirtyMtx.Lock()
 		if a.dirtybool {
 			a.dirtybool = false
+			a.dirtyMtx.Unlock()
 			err := a.GetAdrTxos()
 			if err != nil {
 				log.Printf(err.Error())
@@ -128,6 +133,7 @@ func (a *APILink) ClockLoop() {
 				log.Printf(err.Error())
 			}
 		} else {
+			a.dirtyMtx.Unlock()
 			fmt.Printf("clean, sleep 5 sec\n")
 			time.Sleep(time.Second * 5)
 			// some kind of long range refresh for blocks...?
@@ -138,18 +144,28 @@ func (a *APILink) ClockLoop() {
 }
 
 func (a *APILink) RegisterAddress(adr160 [20]byte) error {
+	fmt.Printf("register %x\n", adr160)
 	a.TrackingAdrsMtx.Lock()
 	a.TrackingAdrs[adr160] = true
 	a.TrackingAdrsMtx.Unlock()
+
+	a.dirtyMtx.Lock()
 	a.dirtybool = true
+	a.dirtyMtx.Unlock()
+
+	fmt.Printf("dirty %v\n", a.dirtybool)
 	return nil
 }
 
 func (a *APILink) RegisterOutPoint(op wire.OutPoint) error {
+	fmt.Printf("register %s\n", op.String())
 	a.TrackingOPsMtx.Lock()
 	a.TrackingOPs[op] = true
 	a.TrackingOPsMtx.Unlock()
+
+	a.dirtyMtx.Lock()
 	a.dirtybool = true
+	a.dirtyMtx.Unlock()
 	return nil
 }
 
@@ -205,18 +221,29 @@ func (a *APILink) GetAdrTxos() error {
 	}
 
 	// go through txids, request hex tx, build txahdheight and send that up
-	for _, ad := range *ars {
-		tx, err := GetRawTx(ad.Txid)
+	for _, adrUtxo := range *ars {
+
+		// only request if higher than current 'sync' height
+		if adrUtxo.Height < a.height {
+			// skip this address; it's lower than we've already seen
+			continue
+		}
+
+		tx, err := GetRawTx(adrUtxo.Txid)
 		if err != nil {
 			return err
 		}
 
 		var txah lnutil.TxAndHeight
-		txah.Height = int32(ad.Height)
+		txah.Height = int32(adrUtxo.Height)
 		txah.Tx = tx
 
 		fmt.Printf("tx %s at height %d\n", txah.Tx.TxHash().String(), txah.Height)
 		a.TxUpToWallit <- txah
+
+		// don't know what order we get these in, so update APILink height at the end
+		// I think it's OK to do this?  Seems OK but haven't seen this use of defer()
+		defer a.UpdateHeight(adrUtxo.Height)
 	}
 
 	return nil
@@ -236,6 +263,7 @@ func (a *APILink) GetOPTxs() error {
 
 	// need to query each txid with a different http request
 	for _, op := range oplist {
+		fmt.Printf("asking for %s\n", op.String())
 		// get full tx info for the outpoint's tx
 		// (if we have 2 outpoints with the same txid we query twice...)
 		response, err := http.Get(apitxourl + "tx/" + op.Hash.String())
@@ -247,13 +275,21 @@ func (a *APILink) GetOPTxs() error {
 		// parse the response to get the spending txid
 		err = json.NewDecoder(response.Body).Decode(&txr)
 		if err != nil {
-			return err
+			fmt.Printf("json decode error; op %s not found\n", op.String())
+			continue
 		}
 
 		// what is the "v" for here?
 		for _, txout := range txr.Vout {
-			if op.Index == txout.N { // hit; request this one
-				tx, err := GetRawTx(op.Hash.String())
+			if op.Index == txout.N { // hit; request this outpoint's spend tx
+				// see if it's been spent
+				if txout.SpentTxId == "" {
+					fmt.Printf("%s has nil spenttxid\n", op.String())
+					// this outpoint is not yet spent, can't request
+					continue
+				}
+
+				tx, err := GetRawTx(txout.SpentTxId)
 				if err != nil {
 					return err
 				}
@@ -262,15 +298,43 @@ func (a *APILink) GetOPTxs() error {
 				txah.Tx = tx
 				txah.Height = txout.SpentHeight
 				a.TxUpToWallit <- txah
+
+				a.UpdateHeight(txout.SpentHeight)
 			}
 		}
+
+		// TODO -- REMOVE once there is any API support for segwit addresses.
+		// This queries the outpoints we already have and re-downloads them to
+		// update their height. (IF the height is non-zero)  It's a huge hack
+		// and not scalable.  But allows segwit outputs to be confirmed now.
+		//if txr.
+
+		if txr.Blockheight > 1 {
+			// this outpoint is confirmed; redownload it and send to wallit
+			tx, err := GetRawTx(txr.Txid)
+			if err != nil {
+				return err
+			}
+
+			var txah lnutil.TxAndHeight
+			txah.Tx = tx
+			txah.Height = txr.Blockheight
+			a.TxUpToWallit <- txah
+
+			a.UpdateHeight(txr.Blockheight)
+		}
+
+		// TODO -- end REMOVE section
+
 	}
 
 	return nil
 }
 
 type TxResponse struct {
-	Vout []VoutJson
+	Txid        string
+	Blockheight int32
+	Vout        []VoutJson
 }
 
 // Get txid of spending tx
@@ -278,6 +342,12 @@ type VoutJson struct {
 	N           uint32
 	SpentTxId   string
 	SpentHeight int32
+}
+
+func (a *APILink) UpdateHeight(height int32) {
+	if height > a.height {
+		a.height = height
+	}
 }
 
 func GetRawTx(txid string) (*wire.MsgTx, error) {
