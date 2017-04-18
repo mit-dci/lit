@@ -72,6 +72,18 @@ func NewWallit(
 		}
 	}
 
+	// send outpoints (if any) to the hook
+	utxos, err := w.UtxoDump()
+	if err != nil {
+		log.Printf("NewWallit crash  %s ", err.Error())
+	}
+	for _, utxo := range utxos {
+		err = w.Hook.RegisterOutPoint(utxo.Op)
+		if err != nil {
+			log.Printf("NewWallit crash  %s ", err.Error())
+		}
+	}
+
 	// deal with the incoming txs
 	go w.TxHandler(incomingTx)
 
