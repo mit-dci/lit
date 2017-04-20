@@ -5,7 +5,6 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 )
@@ -49,7 +48,7 @@ type UWallet interface {
 	NahDontSend(txid *chainhash.Hash) error
 
 	// Return a new address
-	NewAdr() btcutil.Address
+	NewAdr() ([20]byte, error)
 
 	// Dump all the utxos in the sub wallet
 	UtxoDump() ([]*portxo.PorTxo, error)
