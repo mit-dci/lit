@@ -35,6 +35,7 @@ func NewWallit(
 	// chainhook about all our addresses.
 
 	u := new(uspv.SPVCon)
+	//	u := new(powless.APILink)
 	w.Hook = u
 
 	wallitdbname := filepath.Join(wallitpath, "utxo.db")
@@ -61,7 +62,10 @@ func NewWallit(
 		log.Printf("NewWallit crash  %s ", err.Error())
 	}
 	if len(adrs) == 0 {
-		_ = w.NewAdr()
+		_, err := w.NewAdr()
+		if err != nil {
+			log.Printf("NewWallit crash  %s ", err.Error())
+		}
 	}
 
 	// send all those adrs to the hook

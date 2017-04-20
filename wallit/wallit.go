@@ -83,11 +83,11 @@ func TxToString(tx *wire.MsgTx) string {
 
 /*----- serialization for stxos ------- */
 /* Stxo serialization:
-byte length   desc   at offset
+bytelength   desc   at offset
 
-53	utxo		0
-4	sheight	53
-32	stxid	57
+53			portxo		0
+4			sheight		53
+32			stxid		57
 
 end len 	89
 */
@@ -97,16 +97,6 @@ end len 	89
 func (s *Stxo) ToBytes() ([]byte, error) {
 	var buf bytes.Buffer
 
-	// write 4 byte height where the txo was spent
-	err := binary.Write(&buf, binary.BigEndian, s.SpendHeight)
-	if err != nil {
-		return nil, err
-	}
-	// write 32 byte txid of the spending transaction
-	_, err = buf.Write(s.SpendTxid.CloneBytes())
-	if err != nil {
-		return nil, err
-	}
 	// serialize the utxo part
 	uBytes, err := s.PorTxo.Bytes()
 	if err != nil {
@@ -118,9 +108,21 @@ func (s *Stxo) ToBytes() ([]byte, error) {
 		return nil, err
 	}
 
+	// write 4 byte height where the txo was spent
+	err = binary.Write(&buf, binary.BigEndian, s.SpendHeight)
+	if err != nil {
+		return nil, err
+	}
+	// write 32 byte txid of the spending transaction
+	_, err = buf.Write(s.SpendTxid.CloneBytes())
+	if err != nil {
+		return nil, err
+	}
+
 	return buf.Bytes(), nil
 }
 
+// Doesn't work
 // StxoFromBytes turns bytes into a Stxo.
 // first 36 bytes are how it's spent, after that is portxo
 func StxoFromBytes(b []byte) (Stxo, error) {
