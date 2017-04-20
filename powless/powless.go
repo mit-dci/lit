@@ -73,6 +73,7 @@ ChainHook interface
 
 */
 
+// APILink is a link to a web API that can tell you about blockchain data.
 type APILink struct {
 	apiCon net.Conn
 
@@ -97,6 +98,7 @@ type APILink struct {
 	p *chaincfg.Params
 }
 
+// Start starts the APIlink
 func (a *APILink) Start(
 	startHeight int32, host, path string, params *chaincfg.Params) (
 	chan lnutil.TxAndHeight, chan int32, error) {
@@ -142,6 +144,8 @@ func (a *APILink) ClockLoop() {
 	return
 }
 
+// RegisterAddress gets a 20 byte address from the wallit and starts
+// watching for utxos at that address.
 func (a *APILink) RegisterAddress(adr160 [20]byte) error {
 	fmt.Printf("register %x\n", adr160)
 	a.TrackingAdrsMtx.Lock()
@@ -154,6 +158,8 @@ func (a *APILink) RegisterAddress(adr160 [20]byte) error {
 	return nil
 }
 
+// RegisterOutPoint gets an outpoint from the wallit and starts looking
+// for txins that spend it.
 func (a *APILink) RegisterOutPoint(op wire.OutPoint) error {
 	fmt.Printf("register %s\n", op.String())
 	a.TrackingOPsMtx.Lock()
@@ -177,7 +183,8 @@ type RawTxResponse struct {
 	RawTx string
 }
 
-// use insight api.  at least that's open source, can run yourself, seems to have
+// GetAdrTxos
+// ...use insight api.  at least that's open source, can run yourself, seems to have
 // some dev activity behind it.
 func (a *APILink) GetAdrTxos() error {
 
@@ -340,12 +347,16 @@ type VoutJson struct {
 }
 
 func (a *APILink) UpdateHeight(height int32) {
+	// if it's an increment (note reorgs are still... not a thing yet)
 	if height > a.height {
+		// update internal height
 		a.height = height
+		// send that back up to the wallit
 		a.CurrentHeightChan <- height
 	}
 }
 
+// GetRawTx is a helper function to get a tx from the insight api
 func GetRawTx(txid string) (*wire.MsgTx, error) {
 	rawTxURL := "https://testnet.blockexplorer.com/api/rawtx/"
 	response, err := http.Get(rawTxURL + txid)
@@ -410,6 +421,8 @@ type JsUtxo struct {
 
 */
 
+// PushTx pushes a tx to the network via the smartbit site / api
+// smartbit supports segwit so
 func (a *APILink) PushTx(tx *wire.MsgTx) error {
 	if tx == nil {
 		return fmt.Errorf("tx is nil")

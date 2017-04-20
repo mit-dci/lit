@@ -413,12 +413,21 @@ func (w *Wallit) IngestMany(txs []*wire.MsgTx, height int32) (uint32, error) {
 				// Don't try to Get() a nil.  I think? works ok though?
 				keygenBytes := adrb.Get(lnutil.KeyHashFromPkScript(out.PkScript))
 				if keygenBytes != nil {
+					// address matches something we're watching, cool.
 					// fmt.Printf("txout script:%x matched kg: %x\n", out.PkScript, keygenBytes)
-					// build new portxo
 
+					// build new portxo
 					txob, err := NewPorTxoBytesFromKGBytes(tx, uint32(j), height, keygenBytes)
 					if err != nil {
 						return err
+					}
+
+					// Make sure this isn't a duplicate / already been spent
+					// the first 36 bytes of the serialized portxo is the outpoint
+					spendTx := old.Get(txob[:36])
+					if spendTx != nil {
+						// this outpoint has already been spent
+						continue
 					}
 
 					err = w.Hook.RegisterOutPoint(wire.OutPoint{tx.TxHash(), uint32(j)})
