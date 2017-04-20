@@ -1,0 +1,7 @@
+language: go
+go:
+  - 1.8
+sudo: false
+script:
+  - go get -v ./...
+  - go test ./...
