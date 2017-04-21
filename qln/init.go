@@ -108,11 +108,17 @@ func (nd *LitNode) LinkBaseWallet(
 		// there are; assert multiwallet (may already be asserted)
 		nd.MultiWallet = true
 	}
+	// if there aren't, Multiwallet will still be false; set new wallit to
+	// the default
 
 	nd.SubWallet[WallitIdx] = wallit.NewWallit(
 		rootpriv, birthHeight, host, nd.LitFolder, param)
 
 	go nd.OPEventHandler(nd.SubWallet[WallitIdx].LetMeKnow())
+
+	if !nd.MultiWallet {
+		nd.DefaultWallet = nd.SubWallet[WallitIdx]
+	}
 
 	return nil
 }

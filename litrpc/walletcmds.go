@@ -28,43 +28,54 @@ type CoinArgs struct {
 
 // ------------------------- balance
 // BalReply is the reply when the user asks about their balance.
-// This is a Non-Channel
-type BalReply struct {
+type CoinBalReply struct {
+	CoinType    uint32
 	ChanTotal   int64 // total balance in channels
 	TxoTotal    int64 // all utxos
 	MatureWitty int64 // confirmed, spendable and witness
 }
 
-func (r *LitRPC) Bal(args *CoinArgs, reply *BalReply) error {
-	var err error
+type BalReply struct {
+	Balances []CoinBalReply
+}
+
+func (r *LitRPC) Bal(args *NoArgs, reply *BalReply) error {
+
 	var allTxos portxo.TxoSliceByAmt
 
-	wal := r.Node.SubWallet[args.CoinType]
-	if wal == nil {
-		return fmt.Errorf("No wallet of cointype %d linked", args.CoinType)
-	}
-
-	nowHeight := wal.CurrentHeight()
-
-	allTxos, err = wal.UtxoDump()
-	if err != nil {
-		return err
-	}
-
-	// ask sub-wallet for balance
-	reply.TxoTotal = allTxos.Sum()
-	reply.MatureWitty = allTxos.SumWitness(nowHeight)
-
-	// get all channel states
+	// get all channels
 	qcs, err := r.Node.GetAllQchans()
 	if err != nil {
 		return err
 	}
-	// iterate through channels to figure out how much we have
-	for _, q := range qcs {
-		reply.ChanTotal += q.State.MyAmt
-	}
 
+	for cointype, wal := range r.Node.SubWallet {
+		// will add the balance for this wallet to the full reply
+		var cbr CoinBalReply
+
+		cbr.CoinType = cointype
+
+		nowHeight := wal.CurrentHeight()
+
+		allTxos, err = wal.UtxoDump()
+		if err != nil {
+			return err
+		}
+
+		// ask sub-wallet for balance
+		cbr.TxoTotal = allTxos.Sum()
+		cbr.MatureWitty = allTxos.SumWitness(nowHeight)
+
+		// iterate through channels to figure out how much we have
+		for _, q := range qcs {
+			if q.Coin() == cointype {
+				cbr.ChanTotal += q.State.MyAmt
+			}
+		}
+		// I thought slices were pointery enough that I could put this line
+		// near the top.  Guess not.
+		reply.Balances = append(reply.Balances, cbr)
+	}
 	return nil
 }
 
@@ -116,12 +127,11 @@ type SyncHeightReply struct {
 	HeaderHeight int32
 }
 
-func (r *LitRPC) SyncHeight(args *CoinArgs, reply *SyncHeightReply) error {
-	wal := r.Node.SubWallet[args.CoinType]
-	if wal == nil {
-		return fmt.Errorf("No wallet of cointype %d linked", args.CoinType)
+func (r *LitRPC) SyncHeight(args *NoArgs, reply *SyncHeightReply) error {
+	if r.Node.DefaultWallet == nil {
+		return fmt.Errorf("no default wallet")
 	}
-	reply.SyncHeight = wal.CurrentHeight()
+	reply.SyncHeight = r.Node.DefaultWallet.CurrentHeight()
 	return nil
 }
 
@@ -282,22 +292,32 @@ type AddressReply struct {
 }
 
 func (r *LitRPC) Address(args *AddressArgs, reply *AddressReply) error {
-	var err error
 	var allAdr [][20]byte
-
-	wal := r.Node.SubWallet[args.CoinType]
-	if wal == nil {
-		return fmt.Errorf("No wallet of cointype %d linked", args.CoinType)
-	}
+	var ctypesPerAdr []uint32
 
 	// If you tell it to make 0 new addresses, it sends a list of all the old ones
+	// (from every wallet)
 	if args.NumToMake == 0 {
 		// this gets 20 byte addresses; need to convert them to bech32 / base58
-		allAdr, err = wal.AdrDump()
-		if err != nil {
-			return err
+		// iterate through every wallet
+		for cointype, wal := range r.Node.SubWallet {
+			walAdr, err := wal.AdrDump()
+			if err != nil {
+				return err
+			}
+
+			for _, _ = range walAdr {
+				ctypesPerAdr = append(ctypesPerAdr, cointype)
+			}
+			allAdr = append(allAdr, walAdr...)
 		}
 	} else {
+		// if you have non-zero NumToMake, then cointype matters
+		wal := r.Node.SubWallet[args.CoinType]
+		if wal == nil {
+			return fmt.Errorf("No wallet of cointype %d linked", args.CoinType)
+		}
+
 		// call NewAdr a bunch of times
 		remaining := args.NumToMake
 		for remaining > 0 {
@@ -306,21 +326,26 @@ func (r *LitRPC) Address(args *AddressArgs, reply *AddressReply) error {
 				return err
 			}
 			allAdr = append(allAdr, adr)
+			ctypesPerAdr = append(ctypesPerAdr, args.CoinType)
 			remaining--
 		}
 	}
+
 	reply.WitAddresses = make([]string, len(allAdr))
 	reply.LegacyAddresses = make([]string, len(allAdr))
 
 	for i, a := range allAdr {
 		// convert 20 byte array to old address
-		oldadr, err := btcutil.NewAddressPubKeyHash(a[:], wal.Params())
+		// this is real ugly.
+		oldadr, err := btcutil.NewAddressPubKeyHash(a[:],
+			r.Node.SubWallet[ctypesPerAdr[i]].Params())
 		if err != nil {
 			return err
 		}
 		reply.LegacyAddresses[i] = oldadr.String()
 
 		// convert 20-byte PKH to a bech32 segwit v0 address
+		// TODO add prefixes for different coin types
 		bech32adr, err := bech32.Tb1AdrFromPKH(a[:])
 		if err != nil {
 			return err

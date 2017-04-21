@@ -285,10 +285,12 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		return err
 	}
 
-	fmt.Fprintf(color.Output, "\t%s %s %s %s %s %s\n",
-		lnutil.Header("Utxo:"), lnutil.SatoshiColor(bReply.TxoTotal),
-		lnutil.Header("WitConf:"), lnutil.SatoshiColor(bReply.MatureWitty),
-		lnutil.Header("Channel:"), lnutil.SatoshiColor(bReply.ChanTotal))
+	for _, walBal := range bReply.Balances {
+		fmt.Fprintf(color.Output, "\t%s %s %s %s %s %s\n",
+			lnutil.Header("Utxo:"), lnutil.SatoshiColor(walBal.TxoTotal),
+			lnutil.Header("WitConf:"), lnutil.SatoshiColor(walBal.MatureWitty),
+			lnutil.Header("Channel:"), lnutil.SatoshiColor(walBal.ChanTotal))
+	}
 
 	err = lc.rpccon.Call("LitRPC.SyncHeight", nil, sReply)
 	if err != nil {
