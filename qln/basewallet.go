@@ -88,15 +88,14 @@ type UWallet interface {
 // GetUsePub gets a pubkey from the base wallet, but first modifies
 // the "use" step
 func (nd *LitNode) GetUsePub(k portxo.KeyGen, use uint32) (pubArr [33]byte) {
+	coin := k.Step[1]
+	if nd.SubWallet[coin] == nil {
+		return // fail silently if that wallet isn't attached
+	}
 	k.Step[2] = use
-	pub := nd.SubWallet.GetPub(k)
+	pub := nd.SubWallet[coin].GetPub(k)
 	copy(pubArr[:], pub.SerializeCompressed())
 	return
-}
-
-// Get rid of this function soon and replace with signing function
-func (nd *LitNode) GetPriv(k portxo.KeyGen) *btcec.PrivateKey {
-	return nd.SubWallet.GetPriv(k)
 }
 
 // GetElkremRoot returns the Elkrem root for a given key path

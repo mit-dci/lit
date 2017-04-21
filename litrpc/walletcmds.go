@@ -22,6 +22,10 @@ type NoArgs struct {
 	// nothin
 }
 
+type CoinArgs struct {
+	CoinType uint32
+}
+
 // ------------------------- balance
 // BalReply is the reply when the user asks about their balance.
 // This is a Non-Channel
@@ -31,13 +35,18 @@ type BalReply struct {
 	MatureWitty int64 // confirmed, spendable and witness
 }
 
-func (r *LitRPC) Bal(args *NoArgs, reply *BalReply) error {
+func (r *LitRPC) Bal(args *CoinArgs, reply *BalReply) error {
 	var err error
 	var allTxos portxo.TxoSliceByAmt
 
-	nowHeight := r.Node.SubWallet.CurrentHeight()
+	wal := r.Node.SubWallet[args.CoinType]
+	if wal == nil {
+		return fmt.Errorf("No wallet of cointype %d linked", args.CoinType)
+	}
 
-	allTxos, err = r.Node.SubWallet.UtxoDump()
+	nowHeight := wal.CurrentHeight()
+
+	allTxos, err = wal.UtxoDump()
 	if err != nil {
 		return err
 	}
@@ -74,24 +83,30 @@ type TxoListReply struct {
 
 // TxoList sends back a list of all non-channel utxos
 func (r *LitRPC) TxoList(args *NoArgs, reply *TxoListReply) error {
-	allTxos, err := r.Node.SubWallet.UtxoDump()
-	if err != nil {
-		return err
-	}
 
-	syncHeight := r.Node.SubWallet.CurrentHeight()
+	for _, wal := range r.Node.SubWallet {
 
-	reply.Txos = make([]TxoInfo, len(allTxos))
-	for i, u := range allTxos {
-		reply.Txos[i].OutPoint = u.Op.String()
-		reply.Txos[i].Amt = u.Value
-		reply.Txos[i].Height = u.Height
-		// show delay before utxo can be spent
-		if u.Seq != 0 {
-			reply.Txos[i].Delay = u.Height + int32(u.Seq) - syncHeight
+		walTxos, err := wal.UtxoDump()
+		if err != nil {
+			return err
 		}
-		reply.Txos[i].Witty = u.Mode&portxo.FlagTxoWitness != 0
-		reply.Txos[i].KeyPath = u.KeyGen.String()
+
+		syncHeight := wal.CurrentHeight()
+
+		theseTxos := make([]TxoInfo, len(walTxos))
+		for i, u := range walTxos {
+			theseTxos[i].OutPoint = u.Op.String()
+			theseTxos[i].Amt = u.Value
+			theseTxos[i].Height = u.Height
+			// show delay before utxo can be spent
+			if u.Seq != 0 {
+				reply.Txos[i].Delay = u.Height + int32(u.Seq) - syncHeight
+			}
+			theseTxos[i].Witty = u.Mode&portxo.FlagTxoWitness != 0
+			theseTxos[i].KeyPath = u.KeyGen.String()
+		}
+
+		reply.Txos = append(reply.Txos, theseTxos...)
 	}
 	return nil
 }
@@ -101,8 +116,12 @@ type SyncHeightReply struct {
 	HeaderHeight int32
 }
 
-func (r *LitRPC) SyncHeight(args *NoArgs, reply *SyncHeightReply) error {
-	reply.SyncHeight = r.Node.SubWallet.CurrentHeight()
+func (r *LitRPC) SyncHeight(args *CoinArgs, reply *SyncHeightReply) error {
+	wal := r.Node.SubWallet[args.CoinType]
+	if wal == nil {
+		return fmt.Errorf("No wallet of cointype %d linked", args.CoinType)
+	}
+	reply.SyncHeight = wal.CurrentHeight()
 	return nil
 }
 
@@ -130,7 +149,9 @@ func (r *LitRPC) Send(args SendArgs, reply *TxidsReply) error {
 			return fmt.Errorf("Amt %d less than min 10000", args.Amts[i])
 		}
 
-		outScript, err := AdrStringToOutscript(s, r.Node.SubWallet.Params())
+		// TODO - figure out network parameters based on address
+
+		outScript, err := AdrStringToOutscript(s, r.Node.DefaultWallet.Params())
 		if err != nil {
 			return err
 		}
@@ -139,12 +160,12 @@ func (r *LitRPC) Send(args SendArgs, reply *TxidsReply) error {
 	}
 
 	// we don't care if it's witness or not
-	ops, err := r.Node.SubWallet.MaybeSend(txOuts, false)
+	ops, err := r.Node.DefaultWallet.MaybeSend(txOuts, false)
 	if err != nil {
 		return err
 	}
 
-	err = r.Node.SubWallet.ReallySend(&ops[0].Hash)
+	err = r.Node.DefaultWallet.ReallySend(&ops[0].Hash)
 	if err != nil {
 		return err
 	}
@@ -185,8 +206,8 @@ func AdrStringToOutscript(adr string, p *chaincfg.Params) ([]byte, error) {
 }
 
 func (r *LitRPC) Sweep(args SweepArgs, reply *TxidsReply) error {
-
-	outScript, err := AdrStringToOutscript(args.DestAdr, r.Node.SubWallet.Params())
+	// TODO - figure out network parameters based on address
+	outScript, err := AdrStringToOutscript(args.DestAdr, r.Node.DefaultWallet.Params())
 	if err != nil {
 		return err
 	}
@@ -196,7 +217,7 @@ func (r *LitRPC) Sweep(args SweepArgs, reply *TxidsReply) error {
 		return fmt.Errorf("can't send %d txs", args.NumTx)
 	}
 
-	txids, err := r.Node.SubWallet.Sweep(outScript, args.NumTx)
+	txids, err := r.Node.DefaultWallet.Sweep(outScript, args.NumTx)
 	if err != nil {
 		return err
 	}
@@ -222,7 +243,8 @@ func (r *LitRPC) Fanout(args FanArgs, reply *TxidsReply) error {
 	if args.AmtPerOutput < 5000 {
 		return fmt.Errorf("Minimum 5000 per output")
 	}
-	outScript, err := AdrStringToOutscript(args.DestAdr, r.Node.SubWallet.Params())
+	// TODO - figure out network parameters based on address
+	outScript, err := AdrStringToOutscript(args.DestAdr, r.Node.DefaultWallet.Params())
 	if err != nil {
 		return err
 	}
@@ -236,11 +258,11 @@ func (r *LitRPC) Fanout(args FanArgs, reply *TxidsReply) error {
 	}
 
 	// don't care if inputs are witty or not
-	ops, err := r.Node.SubWallet.MaybeSend(txos, false)
+	ops, err := r.Node.DefaultWallet.MaybeSend(txos, false)
 	if err != nil {
 		return err
 	}
-	err = r.Node.SubWallet.ReallySend(&ops[0].Hash)
+	err = r.Node.DefaultWallet.ReallySend(&ops[0].Hash)
 	if err != nil {
 		return err
 	}
@@ -252,6 +274,7 @@ func (r *LitRPC) Fanout(args FanArgs, reply *TxidsReply) error {
 // ------------------------- address
 type AddressArgs struct {
 	NumToMake uint32
+	CoinType  uint32
 }
 type AddressReply struct {
 	WitAddresses    []string
@@ -262,10 +285,15 @@ func (r *LitRPC) Address(args *AddressArgs, reply *AddressReply) error {
 	var err error
 	var allAdr [][20]byte
 
+	wal := r.Node.SubWallet[args.CoinType]
+	if wal == nil {
+		return fmt.Errorf("No wallet of cointype %d linked", args.CoinType)
+	}
+
 	// If you tell it to make 0 new addresses, it sends a list of all the old ones
 	if args.NumToMake == 0 {
 		// this gets 20 byte addresses; need to convert them to bech32 / base58
-		allAdr, err = r.Node.SubWallet.AdrDump()
+		allAdr, err = wal.AdrDump()
 		if err != nil {
 			return err
 		}
@@ -273,7 +301,7 @@ func (r *LitRPC) Address(args *AddressArgs, reply *AddressReply) error {
 		// call NewAdr a bunch of times
 		remaining := args.NumToMake
 		for remaining > 0 {
-			adr, err := r.Node.SubWallet.NewAdr()
+			adr, err := wal.NewAdr()
 			if err != nil {
 				return err
 			}
@@ -286,8 +314,7 @@ func (r *LitRPC) Address(args *AddressArgs, reply *AddressReply) error {
 
 	for i, a := range allAdr {
 		// convert 20 byte array to old address
-		oldadr, err := btcutil.NewAddressPubKeyHash(
-			a[:], r.Node.SubWallet.Params())
+		oldadr, err := btcutil.NewAddressPubKeyHash(a[:], wal.Params())
 		if err != nil {
 			return err
 		}

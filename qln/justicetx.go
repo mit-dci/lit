@@ -24,6 +24,10 @@ anymore.  We can hand over 1 point per commit & figure everything out from that.
 // be exported to the watchtower.
 // This get a channel that is 1 state old.  So we can produce a signature.
 func (nd *LitNode) BuildJusticeSig(q *Qchan) error {
+
+	if nd.SubWallet[q.Coin()] == nil {
+		return fmt.Errorf("Not connected to coin type %d\n", q.Coin())
+	}
 	// justice-ing should be done in the background...
 	var parTxidSig [80]byte // 16 byte txid and 64 byte signature stuck together
 
@@ -77,7 +81,7 @@ func (nd *LitNode) BuildJusticeSig(q *Qchan) error {
 	kg := q.KeyGen
 	kg.Step[2] = UseChannelHAKDBase
 	// get HAKD base scalar
-	privBase := nd.SubWallet.GetPriv(kg)
+	privBase := nd.SubWallet[q.Coin()].GetPriv(kg)
 	// combine elk & HAKD base to make signing key
 	combinedPrivKey := lnutil.CombinePrivKeyWithBytes(privBase, elkScalar[:])
 

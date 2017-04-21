@@ -99,6 +99,11 @@ func (nd *LitNode) CloseReqHandler(lm *lnutil.LitMsg) {
 		log.Printf("CloseReqHandler GetQchan err %s", err.Error())
 		return
 	}
+
+	if nd.SubWallet[q.Coin()] == nil {
+		log.Printf("Not connected to coin type %d\n", q.Coin())
+	}
+
 	// verify their sig?  should do that before signing our side just to be safe
 
 	// build close tx
@@ -138,7 +143,7 @@ func (nd *LitNode) CloseReqHandler(lm *lnutil.LitMsg) {
 	}
 
 	// broadcast
-	err = nd.SubWallet.PushTx(tx)
+	err = nd.SubWallet[q.Coin()].PushTx(tx)
 	if err != nil {
 		log.Printf("CloseReqHandler NewOutgoingTx err %s", err.Error())
 		return

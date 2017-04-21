@@ -127,6 +127,10 @@ func main() {
 		log.SetOutput(logfile)
 	}
 
+	// Keys: the litNode, and wallits, all get 32 byte keys.
+	// Right now though, they all get the *same* key.  For lit as a single binary
+	// now, all using the same key makes sense; could split up later.
+
 	keyFilePath := filepath.Join(conf.litHomeDir, keyFileName)
 
 	// read key file (generate if not found)

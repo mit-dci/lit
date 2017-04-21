@@ -55,6 +55,27 @@ at a time, which for super high thoughput could be too slow.
 Later on we can chop it up so that each channel gets it's own db file.
 
 
+MultiWallit:
+
+One LitNode can have a bunch of SubWallets.  This is useful if you want to
+have both testnet3 and regtest channels active simultaneously.
+The SubWallet is a map of uint32s to Uwallet interfaces.  The identifier for the
+channel is the coin's HDCoinType, which is available from the params.
+
+I said regtest is 257 because it's not defined in a BIP, and set to 1
+(collision w/ testnet3) in the btcsuite code.
+
+Other coins could use SLIP-44, which will be IPV4 all over again as people
+make millions of pointless altcoins to grab that address space.
+
+Since usually there is only 1 wallit connected, there is a DefaultWallet
+which functions can use if the wallet is not specified.  The first wallet
+to get attached to DefaultWallet.  There is also a bool MultiWallet which is
+false while there is only 1 wallet, and true once there are more than one
+wallets connected.
+
+You can't remove wallets once they're attached; just restart instead.
+
 */
 
 // LnNode is the main struct for the node, keeping track of all channel state and
@@ -64,12 +85,16 @@ type LitNode struct {
 
 	LitFolder string // path to save stuff
 
+	IdentityKey *btcec.PrivateKey
+
 	// all nodes have a watchtower.  but could have a tower without a node
 	Tower watchtower.WatchTower
 
 	// BaseWallet is the underlying wallet which keeps track of utxos, secrets,
 	// and network i/o
-	SubWallet []UWallet
+	SubWallet     map[uint32]UWallet
+	DefaultWallet UWallet
+	MultiWallet   bool
 
 	RemoteCons map[uint32]*RemotePeer
 	RemoteMtx  sync.Mutex
@@ -104,8 +129,8 @@ type RemotePeer struct {
 
 // InFlightFund is a funding transaction that has not yet been broadcast
 type InFlightFund struct {
-	PeerIdx, ChanIdx uint32
-	Amt, InitSend    int64
+	PeerIdx, ChanIdx, Coin uint32
+	Amt, InitSend          int64
 
 	op *wire.OutPoint
 

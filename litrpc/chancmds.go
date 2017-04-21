@@ -58,6 +58,7 @@ func (r *LitRPC) ChannelList(args ChanArgs, reply *ChannelListReply) error {
 // ------------------------- fund
 type FundArgs struct {
 	Peer        uint32 // who to make the channel with
+	CoinType    uint32 // what coin to use
 	Capacity    int64  // later can be minimum capacity
 	Roundup     int64  // ignore for now; can be used to round-up capacity
 	InitialSend int64  // Initial send of -1 means "ALL"
@@ -80,13 +81,18 @@ func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
 			args.InitialSend, args.Capacity)
 	}
 
-	nowHeight := r.Node.SubWallet.CurrentHeight()
+	wal := r.Node.SubWallet[args.CoinType]
+	if wal == nil {
+		return fmt.Errorf("No wallet of cointype %d linked", args.CoinType)
+	}
+
+	nowHeight := wal.CurrentHeight()
 
 	// see if we have enough money before calling the funding function.  Not
 	// strictly required but it's better to fail here instead of after net traffic.
 	// also assume a fee of like 50K sat just to be safe
 	var allPorTxos portxo.TxoSliceByAmt
-	allPorTxos, err = r.Node.SubWallet.UtxoDump()
+	allPorTxos, err = wal.UtxoDump()
 	if err != nil {
 		return err
 	}
