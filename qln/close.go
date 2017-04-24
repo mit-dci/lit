@@ -67,7 +67,7 @@ func (nd *LitNode) CoopClose(q *Qchan) error {
 	// Should save something, just so the UI marks it as closed, and
 	// we don't accept payments on this channel anymore.
 
-	outMsg := lnutil.NewCloseReqMsg(qc.Peer(), qc.Op, signature)
+	outMsg := lnutil.NewCloseReqMsg(q.Peer(), q.Op, signature)
 
 	nd.OmniOut <- outMsg
 	return nil
