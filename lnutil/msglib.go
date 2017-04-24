@@ -53,6 +53,9 @@ type LitMsg interface {
 //method for finding what type of message a generic []byte is
 
 func LitMsgFromBytes(b []byte, peerid uint32) (LitMsg, error) {
+	if len(b) < 1 {
+		return nil, fmt.Errorf("The byte slice sent is empty")
+	}
 	msgType := b[0] // first byte signifies what type of message is
 
 	switch msgType {
@@ -120,12 +123,17 @@ func NewChatMsg(peerid uint32, text string) *ChatMsg {
 }
 
 func NewChatMsgFromBytes(b []byte, peerid uint32) (*ChatMsg, error) {
+	if len(b) <= 1 {
+		return nil, fmt.Errorf("got %d bytes, expect 2 or more", len(b))
+	}
+
 	c := new(ChatMsg)
 	c.PeerIdx = peerid
+
 	b = b[1:]
 	c.Text = string(b)
 
-	return c, nil // no way to error
+	return c, nil
 }
 
 func (self ChatMsg) Bytes() []byte {
@@ -182,13 +190,13 @@ func NewPointRespMsg(peerid uint32, chanpub [33]byte, refundpub [33]byte, HAKD [
 }
 
 func NewPointRespMsgFromBytes(b []byte, peerid uint32) (*PointRespMsg, error) {
+	if len(b) != 100 {
+		return nil, fmt.Errorf("PointRespHandler err: msg %d bytes, expect 100\n", len(b))
+	}
+
 	pm := new(PointRespMsg)
 	b = b[1:] // get rid of messageType
 	pm.PeerIdx = peerid
-
-	if len(b) != 99 {
-		return nil, fmt.Errorf("PointRespHandler err: msg %d bytes, expect 99\n", len(b))
-	}
 
 	copy(pm.ChannelPub[:], b[:33])
 	copy(pm.RefundPub[:], b[33:36])
@@ -244,13 +252,13 @@ func NewChanDescMsg(peerid uint32, OP wire.OutPoint, pubkey [33]byte, refund [33
 }
 
 func NewChanDescMsgFromBytes(b []byte, peerid uint32) (*ChanDescMsg, error) {
+	if len(b) != 251 {
+		return nil, fmt.Errorf("got %d byte channel description, expect 251", len(b))
+	}
+
 	cm := new(ChanDescMsg)
 	b = b[1:] // get rid of messageType
 	cm.PeerIdx = peerid
-
-	if len(b) != 250 {
-		return nil, fmt.Errorf("got %d byte channel description, expect 250", len(b))
-	}
 
 	var op [36]byte
 	copy(op[:], b[:36])
@@ -313,13 +321,13 @@ func NewChanAckMsg(peerid uint32, OP wire.OutPoint, ELKZero [33]byte, ELKOne [33
 }
 
 func NewChanAckMsgFromBytes(b []byte, peerid uint32) (*ChanAckMsg, error) {
+	if len(b) != 200 {
+		return nil, fmt.Errorf("got %d byte multiAck, expect 200", len(b))
+	}
+
 	cm := new(ChanAckMsg)
 	b = b[1:] // get rid of messageType
 	cm.PeerIdx = peerid
-
-	if len(b) != 199 {
-		return nil, fmt.Errorf("got %d byte multiAck, expect 199", len(b))
-	}
 
 	var op [36]byte
 	copy(op[:], b[:36])
@@ -362,13 +370,13 @@ func NewSigProofMsg(peerid uint32, OP wire.OutPoint, SIG [64]byte) *SigProofMsg 
 }
 
 func NewSigProofMsgFromBytes(b []byte, peerid uint32) (*SigProofMsg, error) {
+	if len(b) != 101 {
+		return nil, fmt.Errorf("got %d byte Sigproof, expect ~101\n", len(b))
+	}
+
 	sm := new(SigProofMsg)
 	b = b[1:] // get rid of messageType
 	sm.PeerIdx = peerid
-
-	if len(b) != 100 {
-		return nil, fmt.Errorf("got %d byte Sigproof, expect ~100\n", len(b))
-	}
 
 	var op [36]byte
 	copy(op[:], b[:36])
@@ -407,13 +415,13 @@ func NewCloseReqMsg(peerid uint32, OP wire.OutPoint, SIG [64]byte) *CloseReqMsg 
 }
 
 func NewCloseReqMsgFromBytes(b []byte, peerid uint32) (*DeltaSigMsg, error) {
+	if len(b) != 101 {
+		return nil, fmt.Errorf("got %d byte closereq, expect 101ish\n", len(b))
+	}
+
 	crm := new(DeltaSigMsg)
 	b = b[1:] // get rid of messageType
 	crm.PeerIdx = peerid
-
-	if len(b) != 100 {
-		return crm, fmt.Errorf("got %d byte closereq, expect 100ish\n", len(b))
-	}
 
 	var op [36]byte
 	copy(op[:], b[:36])
@@ -455,13 +463,13 @@ func NewDeltaSigMsg(peerid uint32, OP wire.OutPoint, DELTA uint32, SIG [64]byte)
 }
 
 func NewDeltaSigMsgFromBytes(b []byte, peerid uint32) (*DeltaSigMsg, error) {
+	if len(b) != 105 {
+		return nil, fmt.Errorf("got %d byte DeltaSig, expect 105", len(b))
+	}
+
 	ds := new(DeltaSigMsg)
 	b = b[1:] // get rid of messageType
 	ds.PeerIdx = peerid
-
-	if len(b) != 104 {
-		return ds, fmt.Errorf("got %d byte DeltaSig, expect 104", len(b))
-	}
 
 	var op [36]byte
 	copy(op[:], b[:36])
@@ -506,13 +514,13 @@ func NewSigRev(peerid uint32, OP wire.OutPoint, SIG [64]byte, ELK chainhash.Hash
 }
 
 func NewSigRevFromBytes(b []byte, peerid uint32) (*SigRevMsg, error) {
+	if len(b) != 166 {
+		return nil, fmt.Errorf("got %d byte SIGREV, expect 166", len(b))
+	}
+
 	sr := new(SigRevMsg)
 	b = b[1:] // get rid of messageType
 	sr.PeerIdx = peerid
-
-	if len(b) != 165 {
-		return nil, fmt.Errorf("got %d byte SIGREV, expect 165", len(b))
-	}
 
 	var op [36]byte
 	copy(op[:], b[:36])
@@ -558,12 +566,13 @@ func NewGapSigRev(peerid uint32, OP wire.OutPoint, SIG [64]byte, ELK chainhash.H
 }
 
 func NewGapSigRevFromBytes(b []byte, peerId uint32) (*GapSigRevMsg, error) {
+	if len(b) != 166 {
+		return nil, fmt.Errorf("got %d byte GAPSIGREV, expect 166", len(b))
+	}
+
 	gs := new(GapSigRevMsg)
 	gs.PeerIdx = peerId
 	b = b[1:] // get rid of messageType
-	if len(b) != 165 {
-		return nil, fmt.Errorf("got %d byte GAPSIGREV, expect 165", len(b))
-	}
 
 	var op [36]byte
 	copy(op[:], b[:36])
@@ -607,12 +616,13 @@ func NewRevMsg(peerid uint32, OP wire.OutPoint, ELK chainhash.Hash, N2ELK [33]by
 }
 
 func NewRevMsgFromBytes(b []byte, peerId uint32) (*RevMsg, error) {
+	if len(b) != 102 {
+		return nil, fmt.Errorf("got %d byte REV, expect 102", len(b))
+	}
+
 	rv := new(RevMsg)
 	rv.PeerIdx = peerId
 	b = b[1:] // get rid of messageType
-	if len(b) != 101 {
-		return nil, fmt.Errorf("got %d byte REV, expect 101", len(b))
-	}
 
 	var op [36]byte
 	copy(op[:], b[:36])
@@ -674,12 +684,14 @@ func NewWatchDescMsg(peeridx uint32, destScript [20]byte, delay uint16, fee int6
 }
 
 func NewWatchDescMsgFromBytes(b []byte, peerIDX uint32) (*WatchDescMsg, error) {
+	if len(b) != 97 {
+		return nil, fmt.Errorf("WatchannelDescriptor %d bytes, expect 97", len(b))
+	}
+
 	sd := new(WatchDescMsg)
 	b = b[1:] // get rid of messageType
 	sd.PeerIdx = peerIDX
-	if len(b) != 96 && len(b) != 128 {
-		return sd, fmt.Errorf("WatchannelDescriptor %d bytes, expect 128 or 96", len(b))
-	}
+
 	buf := bytes.NewBuffer(b)
 
 	copy(sd.DestPKHScript[:], buf.Next(20))
@@ -737,13 +749,13 @@ func NewComMsg(peerIdx uint32, destPKH [20]byte, elk chainhash.Hash, parTxid [16
 // ComMsgFromBytes turns 132 bytes into a SorceMsg
 // Silently fails with wrong size input.
 func NewComMsgFromBytes(b []byte, peerIDX uint32) (*ComMsg, error) {
+	if len(b) != 133 {
+		return nil, fmt.Errorf("WatchComMsg %d bytes, expect 133", len(b))
+	}
+
 	sm := new(ComMsg)
 	b = b[1:] // get rid of messageType
 	sm.PeerIdx = peerIDX
-	if len(b) != 132 {
-		return sm, fmt.Errorf(
-			"WatchComMsg %d bytes, expect 132", len(b))
-	}
 
 	copy(sm.DestPKH[:], b[:20])
 	copy(sm.ParTxid[:], b[20:36])
