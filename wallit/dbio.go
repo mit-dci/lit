@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"log"
 
 	"github.com/boltdb/bolt"
 	"github.com/btcsuite/btcd/blockchain"
@@ -41,7 +42,7 @@ func (w *Wallit) NewChangeOut(amt int64) (*wire.TxOut, error) {
 		return nil, err
 	}
 	changeAdr, err := btcutil.NewAddressWitnessPubKeyHash(
-		change160, w.Param)
+		change160[:], w.Param)
 	if err != nil {
 		return nil, err
 	}
@@ -64,16 +65,18 @@ func (w *Wallit) AddPorTxoAdr(kg portxo.KeyGen) error {
 		}
 
 		adr160 := w.PathPubHash160(kg)
-		fmt.Printf("adding addr %x\n", adr160)
+		log.Printf("adding addr %x\n", adr160)
 		// add the 20-byte key-hash into the db
-		return adrb.Put(adr160, kg.Bytes())
+		return adrb.Put(adr160[:], kg.Bytes())
 	})
 }
 
 // AdrDump returns all the addresses in the wallit.
-func (w *Wallit) AdrDump() ([]btcutil.Address, error) {
+// currently returns 20 byte arrays, which
+// can then be converted somewhere else into bech32 addresses (or old base58)
+func (w *Wallit) AdrDump() ([][20]byte, error) {
 	var i, last uint32 // number of addresses made so far
-	var adrSlice []btcutil.Address
+	var adrSlice [][20]byte
 
 	err := w.StateDB.View(func(btx *bolt.Tx) error {
 		sta := btx.Bucket(BKTState)
@@ -97,25 +100,19 @@ func (w *Wallit) AdrDump() ([]btcutil.Address, error) {
 	for i = 0; i < last; i++ {
 		nKg := GetWalletKeygen(i)
 		nAdr160 := w.PathPubHash160(nKg)
-		if nAdr160 == nil {
-			return nil, fmt.Errorf("NewAdr error: got nil h160")
-		}
 
-		wa, err := btcutil.NewAddressWitnessPubKeyHash(nAdr160, w.Param)
-		if err != nil {
-			return nil, err
-		}
-		adrSlice = append(adrSlice, btcutil.Address(wa))
+		adrSlice = append(adrSlice, nAdr160)
 	}
 	return adrSlice, nil
 }
 
 // NewAdr creates a new, never before seen address, and increments the
 // DB counter, and returns the hash160 of the pubkey.
-func (w *Wallit) NewAdr160() ([]byte, error) {
+func (w *Wallit) NewAdr160() ([20]byte, error) {
 	var err error
+	var empty160 [20]byte
 	if w.Param == nil {
-		return nil, fmt.Errorf("NewAdr error: nil param")
+		return empty160, fmt.Errorf("NewAdr error: nil param")
 	}
 
 	var n uint32 // number of addresses made so far
@@ -132,15 +129,16 @@ func (w *Wallit) NewAdr160() ([]byte, error) {
 		return nil
 	})
 	if n > 1<<30 {
-		return nil, fmt.Errorf("Got %d keys stored, expect something reasonable", n)
+		return empty160, fmt.Errorf("Got %d keys stored, expect something reasonable", n)
 	}
 
 	nKg := GetWalletKeygen(n)
 	nAdr160 := w.PathPubHash160(nKg)
-	if nAdr160 == nil {
-		return nil, fmt.Errorf("NewAdr error: got nil h160")
+
+	if nAdr160 == empty160 {
+		return empty160, fmt.Errorf("NewAdr error: got nil h160")
 	}
-	fmt.Printf("adr %d hash is %x\n", n, nAdr160)
+	log.Printf("adr %d hash is %x\n", n, nAdr160)
 
 	kgBytes := nKg.Bytes()
 
@@ -159,7 +157,7 @@ func (w *Wallit) NewAdr160() ([]byte, error) {
 		}
 
 		// add the 20-byte key-hash into the db
-		err = adrb.Put(nAdr160, kgBytes)
+		err = adrb.Put(nAdr160[:], kgBytes)
 		if err != nil {
 			return err
 		}
@@ -168,13 +166,12 @@ func (w *Wallit) NewAdr160() ([]byte, error) {
 		return sta.Put(KEYNumKeys, nKeyNumBytes)
 	})
 	if err != nil {
-		return nil, err
+		return empty160, err
 	}
-	var adr20 [20]byte
-	copy(adr20[:], nAdr160)
-	err = w.Hook.RegisterAddress(adr20)
+
+	err = w.Hook.RegisterAddress(nAdr160)
 	if err != nil {
-		return nil, err
+		return empty160, err
 	}
 
 	return nAdr160, nil
@@ -294,7 +291,7 @@ func (w *Wallit) RegisterWatchOP(op wire.OutPoint) error {
 // GainUtxo registers the utxo in the duffel bag
 // don't register address; they shouldn't be re-used ever anyway.
 func (w *Wallit) GainUtxo(u portxo.PorTxo) error {
-	fmt.Printf("gaining exported utxo %s at height %d\n",
+	log.Printf("gaining exported utxo %s at height %d\n",
 		u.Op.String(), u.Height)
 	// serialize porTxo
 	utxoBytes, err := u.Bytes()
@@ -416,10 +413,24 @@ func (w *Wallit) IngestMany(txs []*wire.MsgTx, height int32) (uint32, error) {
 				// Don't try to Get() a nil.  I think? works ok though?
 				keygenBytes := adrb.Get(lnutil.KeyHashFromPkScript(out.PkScript))
 				if keygenBytes != nil {
+					// address matches something we're watching, cool.
 					// fmt.Printf("txout script:%x matched kg: %x\n", out.PkScript, keygenBytes)
-					// build new portxo
 
+					// build new portxo
 					txob, err := NewPorTxoBytesFromKGBytes(tx, uint32(j), height, keygenBytes)
+					if err != nil {
+						return err
+					}
+
+					// Make sure this isn't a duplicate / already been spent
+					// the first 36 bytes of the serialized portxo is the outpoint
+					spendTx := old.Get(txob[:36])
+					if spendTx != nil {
+						// this outpoint has already been spent
+						continue
+					}
+
+					err = w.Hook.RegisterOutPoint(wire.OutPoint{tx.TxHash(), uint32(j)})
 					if err != nil {
 						return err
 					}
@@ -495,7 +506,7 @@ func (w *Wallit) IngestMany(txs []*wire.MsgTx, height int32) (uint32, error) {
 					return err
 				}
 				// print lost portxo
-				fmt.Printf(lostTxo.String())
+				log.Printf(lostTxo.String())
 
 				// after marking for deletion, save stxo to old bucket
 				var st Stxo                               // generate spent txo
@@ -533,6 +544,6 @@ func (w *Wallit) IngestMany(txs []*wire.MsgTx, height int32) (uint32, error) {
 		return nil
 	})
 
-	fmt.Printf("ingest %d txs, %d hits\n", len(txs), hits)
+	log.Printf("ingest %d txs, %d hits\n", len(txs), hits)
 	return hits, err
 }

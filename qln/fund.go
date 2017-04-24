@@ -102,6 +102,7 @@ an exact timing for the payment.
 func (nd *LitNode) FundChannel(peerIdx uint32, ccap, initSend int64) (uint32, error) {
 
 	nd.InProg.mtx.Lock()
+	defer nd.InProg.mtx.Lock()
 	if nd.InProg.PeerIdx != 0 {
 		return 0, fmt.Errorf("fund with peer %d not done yet", nd.InProg.PeerIdx)
 	}
@@ -130,7 +131,7 @@ func (nd *LitNode) FundChannel(peerIdx uint32, ccap, initSend int64) (uint32, er
 	nd.InProg.PeerIdx = peerIdx
 	nd.InProg.Amt = ccap
 	nd.InProg.InitSend = initSend
-	nd.InProg.mtx.Unlock()
+	//	nd.InProg.mtx.Unlock() // switch to defer
 
 	outMsg := new(lnutil.LitMsg)
 	outMsg.MsgType = lnutil.MSGID_POINTREQ
@@ -261,7 +262,8 @@ func (nd LitNode) PointRespHandler(lm *lnutil.LitMsg) error {
 	}
 
 	// call MaybeSend, freezing inputs and learning the txid of the channel
-	outPoints, err := nd.SubWallet.MaybeSend([]*wire.TxOut{txo})
+	// here, we require only witness inputs
+	outPoints, err := nd.SubWallet.MaybeSend([]*wire.TxOut{txo}, true)
 	if err != nil {
 		return err
 	}

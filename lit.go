@@ -158,7 +158,7 @@ func main() {
 	rpcl.OffButton = make(chan bool, 1)
 
 	litrpc.RPCListen(rpcl, conf.rpcport)
-	litbamf.BamfListen(conf.bamfport)
+	litbamf.BamfListen(conf.bamfport, conf.litHomeDir)
 
 	<-rpcl.OffButton
 	fmt.Printf("Got stop request\n")

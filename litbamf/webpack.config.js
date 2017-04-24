@@ -1,13 +1,16 @@
+var fs = require('fs-extra');
 var ExtractTextPlugin = require('extract-text-webpack-plugin');
 var UglifyJsPlugin = require('webpack-uglify-js-plugin');
 var debug = process.env.NODE_ENV === 'debug';
+var publicDir = process.env.HOME + '/.lit/litbamf'
 
 module.exports = {
   entry: {
     main:  './client/js/main.js',
   },
   output: {
-    path:     './public/',
+    path: debug ? publicDir
+    : './public/',
     filename: 'js/[name].js' //Template based on keys in entry above
   },
   module: {
@@ -47,3 +50,8 @@ module.exports = {
     })
   ]
 };
+
+fs.copy('./public', publicDir, function (err) {
+  if(err)return console.error(err);
+  return null;
+});

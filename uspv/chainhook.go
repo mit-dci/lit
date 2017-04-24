@@ -66,12 +66,16 @@ func (s *SPVCon) Start(
 }
 
 func (s *SPVCon) RegisterAddress(adr160 [20]byte) error {
+	s.TrackingAdrsMtx.Lock()
 	s.TrackingAdrs[adr160] = true
+	s.TrackingAdrsMtx.Unlock()
 	return nil
 }
 
 func (s *SPVCon) RegisterOutPoint(op wire.OutPoint) error {
+	s.TrackingOPsMtx.Lock()
 	s.TrackingOPs[op] = true
+	s.TrackingOPsMtx.Unlock()
 	return nil
 }
 

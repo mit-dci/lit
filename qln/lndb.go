@@ -219,6 +219,7 @@ func (nd *LitNode) GetPeerIdx(pub *btcec.PublicKey, host string) (uint32, error)
 	return idx, err
 }
 
+// SaveQchanUtxoData saves utxo data such as outpoint and close tx / status
 func (nd *LitNode) SaveQchanUtxoData(q *Qchan) error {
 	return nd.LitDB.Update(func(btx *bolt.Tx) error {
 		cbk := btx.Bucket(BKTChannel)
@@ -339,18 +340,11 @@ func (nd *LitNode) SaveQChan(q *Qchan) error {
 // RestoreQchanFromBucket loads the full qchan into memory from the
 // bucket where it's stored.  Loads the channel info, the elkrems,
 // and the current state.
-// You have to tell it the peer index because that comes from 1 level
-// up in the db.  Also the peer's id pubkey.
 // restore happens all at once, but saving to the db can happen
 // incrementally (updating states)
 // This should populate everything int he Qchan struct: the elkrems and the states.
 // Elkrem sender always works; is derived from local key data.
 // Elkrem receiver can be "empty" with nothing in it (no data in db)
-// Current state can also be not in the DB, which results in
-// State *0* for either.  State 0 is no a valid state and states start at
-// state index 1.  Data errors within the db will return errors, but having
-// *no* data for states or elkrem receiver is not considered an error, and will
-// populate with a state 0 / empty elkrem receiver and return that.
 func (nd *LitNode) RestoreQchanFromBucket(bkt *bolt.Bucket) (*Qchan, error) {
 	if bkt == nil { // can't do anything without a bucket
 		return nil, fmt.Errorf("empty qchan bucket ")
@@ -417,7 +411,8 @@ func (nd *LitNode) RestoreQchanFromBucket(bkt *bolt.Bucket) (*Qchan, error) {
 
 // ReloadQchan loads updated data from the db into the qchan.  Loads elkrem
 // and state, but does not change qchan info itself.  Faster than GetQchan()
-func (nd *LitNode) ReloadQchan(q *Qchan) error {
+// also reload the channel close state
+func (nd *LitNode) ReloadQchanState(q *Qchan) error {
 	var err error
 	opArr := lnutil.OutPointToBytes(q.Op)
 
@@ -439,6 +434,11 @@ func (nd *LitNode) ReloadQchan(q *Qchan) error {
 			return fmt.Errorf("state value empty")
 		}
 		q.State, err = StatComFromBytes(stBytes)
+		if err != nil {
+			return err
+		}
+
+		q.CloseData, err = QCloseFromBytes(qcBucket.Get(KEYqclose))
 		if err != nil {
 			return err
 		}
@@ -617,55 +617,4 @@ func (nd *LitNode) GetQchanByIdx(cIdx uint32) (*Qchan, error) {
 		return nil, err
 	}
 	return qc, nil
-}
-
-// SetChanClose sets the address to close to.
-func (nd *LitNode) SetChanClose(opArr [36]byte, adrArr [20]byte) error {
-
-	return nd.LitDB.Update(func(btx *bolt.Tx) error {
-		cbk := btx.Bucket(BKTChannel)
-		if cbk == nil {
-			return fmt.Errorf("no channels")
-		}
-
-		qBkt := cbk.Bucket(opArr[:])
-		if qBkt == nil {
-			return fmt.Errorf("outpoint %s not in db", opArr)
-		}
-		err := qBkt.Put(KEYCladr, adrArr[:])
-		if err != nil {
-			return err
-		}
-		return nil
-	})
-}
-
-// GetChanClose recalls the address the multisig/channel has been requested to
-// close to.  If there's nothing there it returns a nil slice and an error.
-func (nd *LitNode) GetChanClose(peerBytes []byte, opArr [36]byte) ([]byte, error) {
-	adrBytes := make([]byte, 20)
-
-	err := nd.LitDB.View(func(btx *bolt.Tx) error {
-		cbk := btx.Bucket(BKTChannel)
-		if cbk == nil {
-			return fmt.Errorf("no channels")
-		}
-
-		qBkt := cbk.Bucket(opArr[:])
-		if qBkt == nil {
-			return fmt.Errorf("outpoint (reversed) %x not in db under peer %x",
-				opArr, peerBytes)
-		}
-		adrToxicBytes := qBkt.Get(KEYCladr)
-		if adrToxicBytes == nil {
-			return fmt.Errorf("%x in peer %x has no close address",
-				opArr, peerBytes)
-		}
-		copy(adrBytes, adrToxicBytes)
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return adrBytes, nil
 }
