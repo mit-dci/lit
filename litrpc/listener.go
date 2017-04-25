@@ -1,11 +1,13 @@
 package litrpc
 
 import (
+	"bytes"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"net/http"
 	"net/rpc"
 	"net/rpc/jsonrpc"
-	"time"
 
 	"golang.org/x/net/websocket"
 
@@ -28,24 +30,24 @@ type LitRPC struct {
 }
 
 func serveWS(ws *websocket.Conn) {
+	body, err := ioutil.ReadAll(ws.Request().Body)
+	if err != nil {
+		log.Printf("Error reading body: %v", err)
+		return
+	}
+
+	log.Printf(string(body))
+	ws.Request().Body = ioutil.NopCloser(bytes.NewBuffer(body))
+
 	jsonrpc.ServeConn(ws)
 }
 
-func RpcListen(node *qln.LitNode, port uint16) {
-	rpcl := new(LitRPC)
-	rpcl.Node = node
-	rpcl.OffButton = make(chan bool, 1)
+func RPCListen(rpcl *LitRPC, port uint16) {
 
 	rpc.Register(rpcl)
 
-	listenString := fmt.Sprintf("0.0.0.0:%d", port)
+	listenString := fmt.Sprintf("127.0.0.1:%d", port)
 
 	http.Handle("/ws", websocket.Handler(serveWS))
 	go http.ListenAndServe(listenString, nil)
-
-	// ugly; add real synchronization here
-	<-rpcl.OffButton
-	fmt.Printf("Got stop request\n")
-	time.Sleep(time.Second)
-	return
 }
