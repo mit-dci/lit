@@ -1,9 +1,10 @@
 package lnutil
 
 import (
-	"bytes"
 	"math/rand"
 	"testing"
+
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
 func TestChatMsg(t *testing.T) {
@@ -19,14 +20,25 @@ func TestChatMsg(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !bytes.Equal(b, msg2.Bytes()) {
-		t.Fatalf("bytes mismatch:\n%x\n%x\n", b, msg2.Bytes())
+	if !LitMsgEqual(msg, msg2) {
+		t.Fatalf("from bytes mismatch:\n%x\n%x\n", msg.Bytes(), msg2.Bytes())
 	}
 
-	if msg.Peer() != msg2.Peer() {
-		t.Fatalf("peer mismatch:\n%x\n%x\n", msg.Peer(), msg2.Peer())
+	msg3, err := LitMsgFromBytes(b, peerid)
+
+	if err != nil {
+		t.Fatal(err)
 	}
 
+	if !LitMsgEqual(msg2, msg3) {
+		t.Fatalf("interface mismatch:\n%x\n%x\n", msg2.Bytes(), msg3.Bytes())
+	}
+
+	_, err = LitMsgFromBytes(b[:1], peerid) //purposely error to check working
+
+	if err == nil {
+		t.Fatalf("Should have errored Chat Msg, but didn't")
+	}
 }
 
 func TestPointRespMsg(t *testing.T) {
@@ -38,7 +50,14 @@ func TestPointRespMsg(t *testing.T) {
 	_, _ = rand.Read(refundPub)
 	_, _ = rand.Read(HAKDbase)
 
-	msg := NewPointRespMsg(peerid, channelPub, refundPub, HAKDbase)
+	var cp [33]byte
+	copy(cp[:], channelPub[:])
+	var rp [33]byte
+	copy(rp[:], refundPub[:])
+	var hb [33]byte
+	copy(hb[:], HAKDbase[:])
+
+	msg := NewPointRespMsg(peerid, cp, rp, hb)
 	b := msg.Bytes()
 
 	msg2, err := NewPointRespMsgFromBytes(b, peerid)
@@ -47,12 +66,334 @@ func TestPointRespMsg(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !bytes.Equal(b, msg2.Bytes()) {
-		t.Fatalf("bytes mismatch:\n%x\n%x\n", b, msg2.Bytes())
+	if !LitMsgEqual(msg, msg2) {
+		t.Fatalf("from bytes mismatch:\n%x\n%x\n", msg.Bytes(), msg2.Bytes())
 	}
 
-	if msg.Peer() != msg2.Peer() {
-		t.Fatalf("peer mismatch:\n%x\n%x\n", msg.Peer(), msg2.Peer())
+	msg3, err := LitMsgFromBytes(b, peerid)
+
+	if err != nil {
+		t.Fatal(err)
 	}
 
+	if !LitMsgEqual(msg2, msg3) {
+		t.Fatalf("interface mismatch:\n%x\n%x\n", msg2.Bytes(), msg3.Bytes())
+	}
+
+	_, err = LitMsgFromBytes(b[:98], peerid) //purposely error to check working
+
+	if err == nil {
+		t.Fatalf("Should have errored, but didn't")
+	}
+}
+
+func TestChanDescMsg(t *testing.T) {
+	peerid := rand.Uint32()
+	var outPoint [36]byte
+	var pubKey [33]byte
+	var refundPub [33]byte
+	var hakd [33]byte
+	capacity := rand.Int63()
+	payment := rand.Int63()
+	var elkZero [33]byte
+	var elkOne [33]byte
+	var elkTwo [33]byte
+
+	_, _ = rand.Read(outPoint[:])
+	_, _ = rand.Read(pubKey[:])
+	_, _ = rand.Read(refundPub[:])
+	_, _ = rand.Read(hakd[:])
+	_, _ = rand.Read(elkZero[:])
+	_, _ = rand.Read(elkOne[:])
+	_, _ = rand.Read(elkTwo[:])
+
+	op := *OutPointFromBytes(outPoint)
+
+	msg := NewChanDescMsg(peerid, op, pubKey, refundPub, hakd,
+		capacity, payment, elkZero, elkOne, elkTwo)
+	b := msg.Bytes()
+
+	msg2, err := NewChanDescMsgFromBytes(b, peerid)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !LitMsgEqual(msg, msg2) {
+		t.Fatalf("from bytes mismatch:\n%x\n%x\n", msg.Bytes(), msg2.Bytes())
+	}
+
+	msg3, err := LitMsgFromBytes(b, peerid)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !LitMsgEqual(msg2, msg3) {
+		t.Fatalf("interface mismatch:\n%x\n%x\n", msg2.Bytes(), msg3.Bytes())
+	}
+
+	_, err = LitMsgFromBytes(b[:250], peerid) //purposely error to check working
+
+	if err == nil {
+		t.Fatalf("Should have errored, but didn't")
+	}
+
+}
+
+func TestChanAckMsg(t *testing.T) {
+	peerid := rand.Uint32()
+	var outPoint [36]byte
+	var elkZero [33]byte
+	var elkOne [33]byte
+	var elkTwo [33]byte
+	var sig [64]byte
+
+	_, _ = rand.Read(outPoint[:])
+	_, _ = rand.Read(sig[:])
+	_, _ = rand.Read(elkZero[:])
+	_, _ = rand.Read(elkOne[:])
+	_, _ = rand.Read(elkTwo[:])
+
+	op := *OutPointFromBytes(outPoint)
+
+	msg := NewChanAckMsg(peerid, op, elkZero, elkOne, elkTwo, sig)
+	b := msg.Bytes()
+
+	msg2, err := NewChanAckMsgFromBytes(b, peerid)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !LitMsgEqual(msg, msg2) {
+		t.Fatalf("from bytes mismatch:\n%x\n%x\n", msg.Bytes(), msg2.Bytes())
+	}
+
+	msg3, err := LitMsgFromBytes(b, peerid)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !LitMsgEqual(msg2, msg3) {
+		t.Fatalf("interface mismatch:\n%x\n%x\n", msg2.Bytes(), msg3.Bytes())
+	}
+
+	_, err = LitMsgFromBytes(b[:98], peerid) //purposely error to check working by not sending enough bytes
+
+	if err == nil {
+		t.Fatalf("Should have errored, but didn't")
+	}
+}
+
+func TestSigProofMsg(t *testing.T) {
+	peerid := rand.Uint32()
+	var outPoint [36]byte
+	var sig [64]byte
+
+	_, _ = rand.Read(outPoint[:])
+	_, _ = rand.Read(sig[:])
+
+	op := *OutPointFromBytes(outPoint)
+
+	msg := NewSigProofMsg(peerid, op, sig)
+	b := msg.Bytes()
+
+	msg2, err := NewSigProofMsgFromBytes(b, peerid)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !LitMsgEqual(msg, msg2) {
+		t.Fatalf("from bytes mismatch:\n%x\n%x\n", msg.Bytes(), msg2.Bytes())
+	}
+
+	msg3, err := LitMsgFromBytes(b, peerid)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !LitMsgEqual(msg2, msg3) {
+		t.Fatalf("interface mismatch:\n%x\n%x\n", msg2.Bytes(), msg3.Bytes())
+	}
+
+	_, err = LitMsgFromBytes(b[:99], peerid) //purposely error to check working by not sending enough bytes
+
+	if err == nil {
+		t.Fatalf("Should have errored, but didn't")
+	}
+}
+
+func TestCloseReqMsg(t *testing.T) {
+	peerid := rand.Uint32()
+	var outPoint [36]byte
+	var sig [64]byte
+
+	_, _ = rand.Read(outPoint[:])
+	_, _ = rand.Read(sig[:])
+
+	op := *OutPointFromBytes(outPoint)
+
+	msg := NewCloseReqMsg(peerid, op, sig)
+	b := msg.Bytes()
+
+	msg2, err := NewCloseReqMsgFromBytes(b, peerid)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !LitMsgEqual(msg, msg2) {
+		t.Fatalf("from bytes mismatch:\n%x\n%x\n", msg.Bytes(), msg2.Bytes())
+	}
+
+	msg3, err := LitMsgFromBytes(b, peerid)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !LitMsgEqual(msg2, msg3) {
+		t.Fatalf("interface mismatch:\n%x\n%x\n", msg2.Bytes(), msg3.Bytes())
+	}
+
+	_, err = LitMsgFromBytes(b[:99], peerid) //purposely error to check working by not sending enough bytes
+
+	if err == nil {
+		t.Fatalf("Should have errored, but didn't")
+	}
+}
+
+func TestDeltaSigMsg(t *testing.T) {
+	peerid := rand.Uint32()
+	var outPoint [36]byte
+	delta := rand.Int31()
+	var sig [64]byte
+
+	_, _ = rand.Read(outPoint[:])
+	_, _ = rand.Read(sig[:])
+
+	op := *OutPointFromBytes(outPoint)
+
+	msg := NewDeltaSigMsg(peerid, op, delta, sig)
+	b := msg.Bytes()
+
+	msg2, err := NewDeltaSigMsgFromBytes(b, peerid)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !LitMsgEqual(msg, msg2) {
+		t.Fatalf("from bytes mismatch:\n%x\n%x\n", msg.Bytes(), msg2.Bytes())
+	}
+
+	msg3, err := LitMsgFromBytes(b, peerid)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !LitMsgEqual(msg2, msg3) {
+		t.Fatalf("interface mismatch:\n%x\n%x\n", msg2.Bytes(), msg3.Bytes())
+	}
+
+	_, err = LitMsgFromBytes(b[:99], peerid) //purposely error to check working by not sending enough bytes
+
+	if err == nil {
+		t.Fatalf("Should have errored, but didn't")
+	}
+}
+
+func TestSigRevMsg(t *testing.T) {
+	peerid := rand.Uint32()
+	var outPoint [36]byte
+	var sig [64]byte
+	var elk [32]byte
+	var n2elk [33]byte
+
+	_, _ = rand.Read(outPoint[:])
+	_, _ = rand.Read(sig[:])
+	_, _ = rand.Read(elk[:])
+	_, _ = rand.Read(n2elk[:])
+
+	op := *OutPointFromBytes(outPoint)
+	Elk, _ := chainhash.NewHash(elk[:])
+
+	msg := NewSigRev(peerid, op, sig, *Elk, n2elk)
+	b := msg.Bytes()
+
+	msg2, err := NewSigRevFromBytes(b, peerid)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !LitMsgEqual(msg, msg2) {
+		t.Fatalf("from bytes mismatch:\n%x\n%x\n", msg.Bytes(), msg2.Bytes())
+	}
+
+	msg3, err := LitMsgFromBytes(b, peerid)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !LitMsgEqual(msg2, msg3) {
+		t.Fatalf("interface mismatch:\n%x\n%x\n", msg2.Bytes(), msg3.Bytes())
+	}
+
+	_, err = LitMsgFromBytes(b[:99], peerid) //purposely error to check working by not sending enough bytes
+
+	if err == nil {
+		t.Fatalf("Should have errored, but didn't")
+	}
+}
+
+func TestGapSigRevMsg(t *testing.T) {
+	peerid := rand.Uint32()
+	var outPoint [36]byte
+	var sig [64]byte
+	var elk [32]byte
+	var n2elk [33]byte
+
+	_, _ = rand.Read(outPoint[:])
+	_, _ = rand.Read(sig[:])
+	_, _ = rand.Read(elk[:])
+	_, _ = rand.Read(n2elk[:])
+
+	op := *OutPointFromBytes(outPoint)
+	Elk, _ := chainhash.NewHash(elk[:])
+
+	msg := NewSigRev(peerid, op, sig, *Elk, n2elk)
+	b := msg.Bytes()
+
+	msg2, err := NewSigRevFromBytes(b, peerid)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !LitMsgEqual(msg, msg2) {
+		t.Fatalf("from bytes mismatch:\n%x\n%x\n", msg.Bytes(), msg2.Bytes())
+	}
+
+	msg3, err := LitMsgFromBytes(b, peerid)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !LitMsgEqual(msg2, msg3) {
+		t.Fatalf("interface mismatch:\n%x\n%x\n", msg2.Bytes(), msg3.Bytes())
+	}
+
+	_, err = LitMsgFromBytes(b[:99], peerid) //purposely error to check working by not sending enough bytes
+
+	if err == nil {
+		t.Fatalf("Should have errored, but didn't")
+	}
 }

@@ -235,7 +235,7 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 		return err
 	}
 
-	outMsg := lnutil.NewDeltaSigMsg(q.Peer(), q.Op, uint32(q.State.Delta), sig)
+	outMsg := lnutil.NewDeltaSigMsg(q.Peer(), q.Op, q.State.Delta, sig)
 	nd.OmniOut <- outMsg
 
 	return nil

@@ -75,7 +75,7 @@ func (w *WatchTower) BuildJusticeTx(badTx *wire.MsgTx) (*wire.MsgTx, error) {
 		if err2 != nil {
 			return err2
 		} else {
-			wd = *wd2
+			wd = wd2
 		}
 
 		// get the elkrem receiver

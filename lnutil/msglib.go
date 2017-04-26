@@ -50,8 +50,14 @@ type LitMsg interface {
 	Bytes() []byte  //returnns data of message as []byte with the MsgType() preceeding it
 }
 
-//method for finding what type of message a generic []byte is
+func LitMsgEqual(msg LitMsg, msg2 LitMsg) bool {
+	if msg.Peer() != msg2.Peer() || msg.MsgType() != msg2.MsgType() || !bytes.Equal(msg.Bytes(), msg2.Bytes()) {
+		return false
+	}
+	return true
+}
 
+//method for finding what type of message a generic []byte is
 func LitMsgFromBytes(b []byte, peerid uint32) (LitMsg, error) {
 	if len(b) < 1 {
 		return nil, fmt.Errorf("The byte slice sent is empty")
@@ -192,16 +198,15 @@ func NewPointRespMsg(peerid uint32, chanpub [33]byte, refundpub [33]byte, HAKD [
 func NewPointRespMsgFromBytes(b []byte, peerid uint32) (PointRespMsg, error) {
 	pm := new(PointRespMsg)
 
-	if len(b) != 100 {
+	if len(b) < 100 {
 		return *pm, fmt.Errorf("PointRespHandler err: msg %d bytes, expect 100\n", len(b))
 	}
 
-	b = b[1:] // get rid of messageType
 	pm.PeerIdx = peerid
-
-	copy(pm.ChannelPub[:], b[:33])
-	copy(pm.RefundPub[:], b[33:36])
-	copy(pm.HAKDbase[:], b[36:])
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
+	copy(pm.ChannelPub[:], buf.Next(33))
+	copy(pm.RefundPub[:], buf.Next(33))
+	copy(pm.HAKDbase[:], buf.Next(33))
 
 	return *pm, nil
 }
@@ -229,10 +234,9 @@ type ChanDescMsg struct {
 	Capacity    int64
 	InitPayment int64
 
-	ElkZero   [33]byte //consider changing into array in future
-	ElkOne    [33]byte
-	ElkTwo    [33]byte
-	Signature [64]byte
+	ElkZero [33]byte //consider changing into array in future
+	ElkOne  [33]byte
+	ElkTwo  [33]byte
 }
 
 func NewChanDescMsg(peerid uint32, OP wire.OutPoint, pubkey [33]byte, refund [33]byte, hakd [33]byte,
@@ -254,33 +258,31 @@ func NewChanDescMsg(peerid uint32, OP wire.OutPoint, pubkey [33]byte, refund [33
 
 func NewChanDescMsgFromBytes(b []byte, peerid uint32) (ChanDescMsg, error) {
 	cm := new(ChanDescMsg)
+	cm.PeerIdx = peerid
 
-	if len(b) != 251 {
+	if len(b) < 251 {
 		return *cm, fmt.Errorf("got %d byte channel description, expect 251", len(b))
 	}
 
-	b = b[1:] // get rid of messageType
-	cm.PeerIdx = peerid
-
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
 	var op [36]byte
-	copy(op[:], b[:36])
+	copy(op[:], buf.Next(36))
 	cm.Outpoint = *OutPointFromBytes(op)
-	copy(cm.PubKey[:], b[36:69])
-	copy(cm.RefundPub[:], b[69:102])
-	copy(cm.HAKDbase[:], b[102:135])
-	cm.Capacity = BtI64(b[135:143])
-	cm.InitPayment = BtI64(b[143:151])
-	copy(cm.ElkZero[:], b[151:184])
-	copy(cm.ElkOne[:], b[184:217])
-	copy(cm.ElkTwo[:], b[217:])
+	copy(cm.PubKey[:], buf.Next(33))
+	copy(cm.RefundPub[:], buf.Next(33))
+	copy(cm.HAKDbase[:], buf.Next(33))
+	cm.Capacity = BtI64(buf.Next(8))
+	cm.InitPayment = BtI64(buf.Next(8))
+	copy(cm.ElkZero[:], buf.Next(33))
+	copy(cm.ElkOne[:], buf.Next(33))
+	copy(cm.ElkTwo[:], buf.Next(33))
+
 	return *cm, nil
 }
 
 func (self ChanDescMsg) Bytes() []byte {
-	capBin := make([]byte, 8) // turn int64 to []byte
-	binary.LittleEndian.PutUint64(capBin, uint64(self.Capacity))
-	initBin := make([]byte, 8)
-	binary.LittleEndian.PutUint64(initBin, uint64(self.InitPayment))
+	capBin := I64tB(self.Capacity)
+	initBin := I64tB(self.InitPayment)
 
 	var msg []byte
 	opArr := OutPointToBytes(self.Outpoint)
@@ -294,7 +296,6 @@ func (self ChanDescMsg) Bytes() []byte {
 	msg = append(msg, self.ElkZero[:]...)
 	msg = append(msg, self.ElkOne[:]...)
 	msg = append(msg, self.ElkTwo[:]...)
-	msg = append(msg, self.Signature[:]...)
 	return msg
 }
 
@@ -324,20 +325,21 @@ func NewChanAckMsg(peerid uint32, OP wire.OutPoint, ELKZero [33]byte, ELKOne [33
 
 func NewChanAckMsgFromBytes(b []byte, peerid uint32) (ChanAckMsg, error) {
 	cm := new(ChanAckMsg)
-	if len(b) != 200 {
+	cm.PeerIdx = peerid
+
+	if len(b) < 200 {
 		return *cm, fmt.Errorf("got %d byte multiAck, expect 200", len(b))
 	}
 
-	b = b[1:] // get rid of messageType
-	cm.PeerIdx = peerid
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
 
 	var op [36]byte
-	copy(op[:], b[:36])
+	copy(op[:], buf.Next(36))
 	cm.Outpoint = *OutPointFromBytes(op)
-	copy(cm.ElkZero[:], b[36:69])
-	copy(cm.ElkOne[:], b[69:102])
-	copy(cm.ElkTwo[:], b[102:135])
-	copy(cm.Signature[:], b[135:])
+	copy(cm.ElkZero[:], buf.Next(33))
+	copy(cm.ElkOne[:], buf.Next(33))
+	copy(cm.ElkTwo[:], buf.Next(33))
+	copy(cm.Signature[:], buf.Next(64))
 	return *cm, nil
 }
 
@@ -373,17 +375,18 @@ func NewSigProofMsg(peerid uint32, OP wire.OutPoint, SIG [64]byte) SigProofMsg {
 
 func NewSigProofMsgFromBytes(b []byte, peerid uint32) (SigProofMsg, error) {
 	sm := new(SigProofMsg)
-	if len(b) != 101 {
+	sm.PeerIdx = peerid
+
+	if len(b) < 101 {
 		return *sm, fmt.Errorf("got %d byte Sigproof, expect ~101\n", len(b))
 	}
 
-	b = b[1:] // get rid of messageType
-	sm.PeerIdx = peerid
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
 
 	var op [36]byte
-	copy(op[:], b[:36])
+	copy(op[:], buf.Next(36))
 	sm.Outpoint = *OutPointFromBytes(op)
-	copy(sm.Signature[:], b[36:])
+	copy(sm.Signature[:], buf.Next(64))
 	return *sm, nil
 }
 
@@ -418,18 +421,19 @@ func NewCloseReqMsg(peerid uint32, OP wire.OutPoint, SIG [64]byte) CloseReqMsg {
 
 func NewCloseReqMsgFromBytes(b []byte, peerid uint32) (CloseReqMsg, error) {
 	crm := new(CloseReqMsg)
-	if len(b) != 101 {
+	crm.PeerIdx = peerid
+
+	if len(b) < 101 {
 		return *crm, fmt.Errorf("got %d byte closereq, expect 101ish\n", len(b))
 	}
 
-	b = b[1:] // get rid of messageType
-	crm.PeerIdx = peerid
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
 
 	var op [36]byte
-	copy(op[:], b[:36])
+	copy(op[:], buf.Next(36))
 	crm.Outpoint = *OutPointFromBytes(op)
 
-	copy(crm.Signature[:], b[36:])
+	copy(crm.Signature[:], buf.Next(64))
 	return *crm, nil
 }
 
@@ -451,11 +455,11 @@ func (self CloseReqMsg) MsgType() uint8 { return MSGID_CLOSEREQ }
 type DeltaSigMsg struct {
 	PeerIdx   uint32
 	Outpoint  wire.OutPoint
-	Delta     uint32
+	Delta     int32
 	Signature [64]byte
 }
 
-func NewDeltaSigMsg(peerid uint32, OP wire.OutPoint, DELTA uint32, SIG [64]byte) DeltaSigMsg {
+func NewDeltaSigMsg(peerid uint32, OP wire.OutPoint, DELTA int32, SIG [64]byte) DeltaSigMsg {
 	d := new(DeltaSigMsg)
 	d.PeerIdx = peerid
 	d.Outpoint = OP
@@ -466,20 +470,21 @@ func NewDeltaSigMsg(peerid uint32, OP wire.OutPoint, DELTA uint32, SIG [64]byte)
 
 func NewDeltaSigMsgFromBytes(b []byte, peerid uint32) (DeltaSigMsg, error) {
 	ds := new(DeltaSigMsg)
-	if len(b) != 105 {
+	ds.PeerIdx = peerid
+
+	if len(b) < 105 {
 		return *ds, fmt.Errorf("got %d byte DeltaSig, expect 105", len(b))
 	}
 
-	b = b[1:] // get rid of messageType
-	ds.PeerIdx = peerid
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
 
 	var op [36]byte
-	copy(op[:], b[:36])
+	copy(op[:], buf.Next(36))
 	ds.Outpoint = *OutPointFromBytes(op)
 
 	// deserialize DeltaSig
-	ds.Delta = BtU32(b[36:40])
-	copy(ds.Signature[:], b[40:])
+	ds.Delta = BtI32(buf.Next(4))
+	copy(ds.Signature[:], buf.Next(64))
 	return *ds, nil
 }
 
@@ -488,7 +493,7 @@ func (self DeltaSigMsg) Bytes() []byte {
 	msg = append(msg, self.MsgType())
 	opArr := OutPointToBytes(self.Outpoint)
 	msg = append(msg, opArr[:]...)
-	msg = append(msg, U32tB(self.Delta)...)
+	msg = append(msg, I32tB(self.Delta)...)
 	msg = append(msg, self.Signature[:]...)
 	return msg
 }
@@ -517,20 +522,21 @@ func NewSigRev(peerid uint32, OP wire.OutPoint, SIG [64]byte, ELK chainhash.Hash
 
 func NewSigRevFromBytes(b []byte, peerid uint32) (SigRevMsg, error) {
 	sr := new(SigRevMsg)
-	if len(b) != 166 {
+	sr.PeerIdx = peerid
+
+	if len(b) < 166 {
 		return *sr, fmt.Errorf("got %d byte SIGREV, expect 166", len(b))
 	}
 
-	b = b[1:] // get rid of messageType
-	sr.PeerIdx = peerid
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
 
 	var op [36]byte
-	copy(op[:], b[:36])
+	copy(op[:], buf.Next(36))
 	sr.Outpoint = *OutPointFromBytes(op)
-	copy(sr.Signature[:], b[36:100])
-	elk, _ := chainhash.NewHash(b[100:132])
+	copy(sr.Signature[:], buf.Next(64))
+	elk, _ := chainhash.NewHash(buf.Next(32))
 	sr.Elk = *elk
-	copy(sr.N2ElkPoint[:], b[132:])
+	copy(sr.N2ElkPoint[:], buf.Next(33))
 	return *sr, nil
 }
 
@@ -569,20 +575,21 @@ func NewGapSigRev(peerid uint32, OP wire.OutPoint, SIG [64]byte, ELK chainhash.H
 
 func NewGapSigRevFromBytes(b []byte, peerId uint32) (GapSigRevMsg, error) {
 	gs := new(GapSigRevMsg)
-	if len(b) != 166 {
+	gs.PeerIdx = peerId
+
+	if len(b) < 166 {
 		return *gs, fmt.Errorf("got %d byte GAPSIGREV, expect 166", len(b))
 	}
 
-	gs.PeerIdx = peerId
-	b = b[1:] // get rid of messageType
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
 
 	var op [36]byte
-	copy(op[:], b[:36])
+	copy(op[:], buf.Next(36))
 	gs.Outpoint = *OutPointFromBytes(op)
-	copy(gs.Signature[:], b[36:100])
-	elk, _ := chainhash.NewHash(b[100:132])
+	copy(gs.Signature[:], buf.Next(64))
+	elk, _ := chainhash.NewHash(buf.Next(32))
 	gs.Elk = *elk
-	copy(gs.N2ElkPoint[:], b[132:])
+	copy(gs.N2ElkPoint[:], buf.Next(33))
 	return *gs, nil
 }
 
