@@ -24,6 +24,11 @@ const (
 // GimmeFilter ... or I'm gonna fade away
 func (s *SPVCon) GimmeFilter() (*bloom.Filter, error) {
 
+	s.TrackingAdrsMtx.Lock()
+	defer s.TrackingAdrsMtx.Unlock()
+	s.TrackingOPsMtx.Lock()
+	defer s.TrackingOPsMtx.Unlock()
+
 	filterElements := uint32(len(s.TrackingAdrs) + (len(s.TrackingOPs)))
 
 	f := bloom.NewFilter(filterElements, 0, 0.000001, wire.BloomUpdateAll)
@@ -56,6 +61,13 @@ func (s *SPVCon) GimmeFilter() (*bloom.Filter, error) {
 func (s *SPVCon) MatchTx(tx *wire.MsgTx) bool {
 	gain := false
 	txid := tx.TxHash()
+
+	// get lock for adrs / outpoints
+	s.TrackingAdrsMtx.Lock()
+	defer s.TrackingAdrsMtx.Unlock()
+	s.TrackingOPsMtx.Lock()
+	defer s.TrackingOPsMtx.Unlock()
+
 	// start with optimism.  We may gain money.  Iterate through all output scripts.
 	for i, out := range tx.TxOut {
 		// create outpoint of what we're looking at

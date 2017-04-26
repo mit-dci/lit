@@ -8,7 +8,6 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 )
@@ -68,22 +67,8 @@ func (w *Wallit) CurrentHeight() int32 {
 	return h
 }
 
-func (w *Wallit) NewAdr() btcutil.Address {
-	var a btcutil.Address
-	adr160, err := w.NewAdr160()
-	if err != nil {
-		// should have an error here..?  Return empty address...
-		log.Printf("can't make address: %s\n", err.Error())
-		return a
-	}
-
-	a, err = btcutil.NewAddressPubKeyHash(adr160, w.Param)
-	if err != nil {
-		// should have an error here..?  Return empty address...
-		log.Printf("can't make address: %s\n", err.Error())
-	}
-
-	return a
+func (w *Wallit) NewAdr() ([20]byte, error) {
+	return w.NewAdr160()
 }
 
 // ExportUtxo is really *IM*port utxo on this side.
@@ -104,8 +89,7 @@ func (w *Wallit) ExportUtxo(u *portxo.PorTxo) {
 	}
 
 	// Register new address with chainhook
-	var adr160 [20]byte
-	copy(adr160[:], w.PathPubHash160(u.KeyGen))
+	adr160 := w.PathPubHash160(u.KeyGen)
 	err := w.Hook.RegisterAddress(adr160)
 	if err != nil {
 		log.Printf(err.Error())

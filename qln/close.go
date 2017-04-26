@@ -3,6 +3,7 @@ package qln
 import (
 	"bytes"
 	"fmt"
+	"log"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
@@ -23,35 +24,43 @@ doesn't reply, as the channel is closed.
 */
 
 // CoopClose requests a cooperative close of the channel
-func (nd *LitNode) CoopClose(qc *Qchan) error {
+func (nd *LitNode) CoopClose(q *Qchan) error {
 
 	nd.RemoteMtx.Lock()
-	_, ok := nd.RemoteCons[qc.Peer()]
+	_, ok := nd.RemoteCons[q.Peer()]
 	nd.RemoteMtx.Unlock()
 	if !ok {
-		return fmt.Errorf("not connected to peer %d ", qc.Peer())
+		return fmt.Errorf("not connected to peer %d ", q.Peer())
 	}
 
-	if qc.CloseData.Closed {
+	if q.CloseData.Closed {
 		return fmt.Errorf("can't close (%d,%d): already closed",
-			qc.KeyGen.Step[3]&0x7fffffff, qc.KeyGen.Step[4]&0x7fffffff)
+			q.KeyGen.Step[3]&0x7fffffff, q.KeyGen.Step[4]&0x7fffffff)
 	}
 
-	tx, err := qc.SimpleCloseTx()
+	tx, err := q.SimpleCloseTx()
 	if err != nil {
 		return err
 	}
 
-	sig, err := nd.SignSimpleClose(qc, tx)
+	sig, err := nd.SignSimpleClose(q, tx)
 	if err != nil {
 		return err
 	}
 
-	// Save something to db... TODO
-	// Should save something, just so the UI marks it as closed, and
+	// Save something, just so the UI marks it as closed, and
 	// we don't accept payments on this channel anymore.
 
-	opArr := lnutil.OutPointToBytes(qc.Op)
+	// save channel state as closed.  We know the txid... even though that
+	// txid may not actually happen.
+	q.CloseData.Closed = true
+	q.CloseData.CloseTxid = tx.TxHash()
+	err = nd.SaveQchanUtxoData(q)
+	if err != nil {
+		return err
+	}
+
+	opArr := lnutil.OutPointToBytes(q.Op)
 
 	var msg []byte
 	// close request is just the op, sig
@@ -60,7 +69,7 @@ func (nd *LitNode) CoopClose(qc *Qchan) error {
 
 	outMsg := new(lnutil.LitMsg)
 	outMsg.MsgType = lnutil.MSGID_CLOSEREQ
-	outMsg.PeerIdx = qc.Peer()
+	outMsg.PeerIdx = q.Peer()
 	outMsg.Data = msg
 
 	nd.OmniOut <- outMsg
@@ -73,7 +82,7 @@ func (nd *LitNode) CoopClose(qc *Qchan) error {
 // over what to do, but for now it just signs whatever it's requested to.
 func (nd *LitNode) CloseReqHandler(lm *lnutil.LitMsg) {
 	if len(lm.Data) < 100 {
-		fmt.Printf("got %d byte closereq, expect 100ish\n", len(lm.Data))
+		log.Printf("got %d byte closereq, expect 100ish\n", len(lm.Data))
 		return
 	}
 
@@ -85,29 +94,29 @@ func (nd *LitNode) CloseReqHandler(lm *lnutil.LitMsg) {
 	theirSig := lm.Data[36:]
 
 	// get channel
-	qc, err := nd.GetQchan(opArr)
+	q, err := nd.GetQchan(opArr)
 	if err != nil {
-		fmt.Printf("CloseReqHandler GetQchan err %s", err.Error())
+		log.Printf("CloseReqHandler GetQchan err %s", err.Error())
 		return
 	}
 	// verify their sig?  should do that before signing our side just to be safe
 
 	// build close tx
-	tx, err := qc.SimpleCloseTx()
+	tx, err := q.SimpleCloseTx()
 	if err != nil {
-		fmt.Printf("CloseReqHandler SimpleCloseTx err %s", err.Error())
+		log.Printf("CloseReqHandler SimpleCloseTx err %s", err.Error())
 		return
 	}
 
 	// sign close
-	mySig, err := nd.SignSimpleClose(qc, tx)
+	mySig, err := nd.SignSimpleClose(q, tx)
 	if err != nil {
-		fmt.Printf("CloseReqHandler SignSimpleClose err %s", err.Error())
+		log.Printf("CloseReqHandler SignSimpleClose err %s", err.Error())
 		return
 	}
-	pre, swap, err := lnutil.FundTxScript(qc.MyPub, qc.TheirPub)
+	pre, swap, err := lnutil.FundTxScript(q.MyPub, q.TheirPub)
 	if err != nil {
-		fmt.Printf("CloseReqHandler FundTxScript err %s", err.Error())
+		log.Printf("CloseReqHandler FundTxScript err %s", err.Error())
 		return
 	}
 
@@ -117,11 +126,21 @@ func (nd *LitNode) CloseReqHandler(lm *lnutil.LitMsg) {
 	} else {
 		tx.TxIn[0].Witness = SpendMultiSigWitStack(pre, mySig, theirSig)
 	}
-	fmt.Printf(lnutil.TxToString(tx))
+	log.Printf(lnutil.TxToString(tx))
+
+	// save channel state to db as closed.
+	q.CloseData.Closed = true
+	q.CloseData.CloseTxid = tx.TxHash()
+	err = nd.SaveQchanUtxoData(q)
+	if err != nil {
+		log.Printf("CloseReqHandler SaveQchanUtxoData err %s", err.Error())
+		return
+	}
+
 	// broadcast
 	err = nd.SubWallet.PushTx(tx)
 	if err != nil {
-		fmt.Printf("CloseReqHandler NewOutgoingTx err %s", err.Error())
+		log.Printf("CloseReqHandler NewOutgoingTx err %s", err.Error())
 		return
 	}
 

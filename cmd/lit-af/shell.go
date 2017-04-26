@@ -30,8 +30,8 @@ var helpCommand = &Command{
 	ShortDescription: "Show information about a given command\n",
 }
 
-var stopCommand = &Command{
-	Format:           lnutil.White("stop\n"),
+var offCommand = &Command{
+	Format:           lnutil.White("off"),
 	Description:      "Shut down the lit node.\n",
 	ShortDescription: "Shut down the lit node.\n",
 }
@@ -90,7 +90,7 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		return nil
 	}
 
-	if cmd == "stop" { // stop remote node
+	if cmd == "off" { // stop remote node
 		// actually returns an error
 		return lc.Stop(args)
 	}
@@ -303,8 +303,8 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 
 func (lc *litAfClient) Stop(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Fprintf(color.Output, stopCommand.Format)
-		fmt.Fprintf(color.Output, stopCommand.Description)
+		fmt.Fprintf(color.Output, offCommand.Format)
+		fmt.Fprintf(color.Output, offCommand.Description)
 		return nil
 	}
 
@@ -337,7 +337,7 @@ func (lc *litAfClient) Help(textArgs []string) error {
 		fmt.Fprintf(color.Output, "%s\t%s", pushCommand.Format, pushCommand.ShortDescription)
 		fmt.Fprintf(color.Output, "%s\t%s", closeCommand.Format, closeCommand.ShortDescription)
 		fmt.Fprintf(color.Output, "%s\t%s", breakCommand.Format, breakCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", stopCommand.Format, stopCommand.ShortDescription)
+		fmt.Fprintf(color.Output, "%s\t%s", offCommand.Format, offCommand.ShortDescription)
 		fmt.Fprintf(color.Output, "%s\t%s", exitCommand.Format, exitCommand.ShortDescription)
 		return nil
 	}

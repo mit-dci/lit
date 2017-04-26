@@ -42,7 +42,7 @@ func (w *Wallit) NewChangeOut(amt int64) (*wire.TxOut, error) {
 		return nil, err
 	}
 	changeAdr, err := btcutil.NewAddressWitnessPubKeyHash(
-		change160, w.Param)
+		change160[:], w.Param)
 	if err != nil {
 		return nil, err
 	}
@@ -67,16 +67,16 @@ func (w *Wallit) AddPorTxoAdr(kg portxo.KeyGen) error {
 		adr160 := w.PathPubHash160(kg)
 		log.Printf("adding addr %x\n", adr160)
 		// add the 20-byte key-hash into the db
-		return adrb.Put(adr160, kg.Bytes())
+		return adrb.Put(adr160[:], kg.Bytes())
 	})
 }
 
 // AdrDump returns all the addresses in the wallit.
-// currently returns non-segwit p2pkh addresses, which
-// can then be converted somewhere else into bech32 addresses.
-func (w *Wallit) AdrDump() ([]btcutil.Address, error) {
+// currently returns 20 byte arrays, which
+// can then be converted somewhere else into bech32 addresses (or old base58)
+func (w *Wallit) AdrDump() ([][20]byte, error) {
 	var i, last uint32 // number of addresses made so far
-	var adrSlice []btcutil.Address
+	var adrSlice [][20]byte
 
 	err := w.StateDB.View(func(btx *bolt.Tx) error {
 		sta := btx.Bucket(BKTState)
@@ -100,25 +100,19 @@ func (w *Wallit) AdrDump() ([]btcutil.Address, error) {
 	for i = 0; i < last; i++ {
 		nKg := GetWalletKeygen(i)
 		nAdr160 := w.PathPubHash160(nKg)
-		if nAdr160 == nil {
-			return nil, fmt.Errorf("NewAdr error: got nil h160")
-		}
 
-		wa, err := btcutil.NewAddressPubKeyHash(nAdr160, w.Param)
-		if err != nil {
-			return nil, err
-		}
-		adrSlice = append(adrSlice, btcutil.Address(wa))
+		adrSlice = append(adrSlice, nAdr160)
 	}
 	return adrSlice, nil
 }
 
 // NewAdr creates a new, never before seen address, and increments the
 // DB counter, and returns the hash160 of the pubkey.
-func (w *Wallit) NewAdr160() ([]byte, error) {
+func (w *Wallit) NewAdr160() ([20]byte, error) {
 	var err error
+	var empty160 [20]byte
 	if w.Param == nil {
-		return nil, fmt.Errorf("NewAdr error: nil param")
+		return empty160, fmt.Errorf("NewAdr error: nil param")
 	}
 
 	var n uint32 // number of addresses made so far
@@ -135,13 +129,14 @@ func (w *Wallit) NewAdr160() ([]byte, error) {
 		return nil
 	})
 	if n > 1<<30 {
-		return nil, fmt.Errorf("Got %d keys stored, expect something reasonable", n)
+		return empty160, fmt.Errorf("Got %d keys stored, expect something reasonable", n)
 	}
 
 	nKg := GetWalletKeygen(n)
 	nAdr160 := w.PathPubHash160(nKg)
-	if nAdr160 == nil {
-		return nil, fmt.Errorf("NewAdr error: got nil h160")
+
+	if nAdr160 == empty160 {
+		return empty160, fmt.Errorf("NewAdr error: got nil h160")
 	}
 	log.Printf("adr %d hash is %x\n", n, nAdr160)
 
@@ -162,7 +157,7 @@ func (w *Wallit) NewAdr160() ([]byte, error) {
 		}
 
 		// add the 20-byte key-hash into the db
-		err = adrb.Put(nAdr160, kgBytes)
+		err = adrb.Put(nAdr160[:], kgBytes)
 		if err != nil {
 			return err
 		}
@@ -171,13 +166,12 @@ func (w *Wallit) NewAdr160() ([]byte, error) {
 		return sta.Put(KEYNumKeys, nKeyNumBytes)
 	})
 	if err != nil {
-		return nil, err
+		return empty160, err
 	}
-	var adr20 [20]byte
-	copy(adr20[:], nAdr160)
-	err = w.Hook.RegisterAddress(adr20)
+
+	err = w.Hook.RegisterAddress(nAdr160)
 	if err != nil {
-		return nil, err
+		return empty160, err
 	}
 
 	return nAdr160, nil
@@ -419,10 +413,24 @@ func (w *Wallit) IngestMany(txs []*wire.MsgTx, height int32) (uint32, error) {
 				// Don't try to Get() a nil.  I think? works ok though?
 				keygenBytes := adrb.Get(lnutil.KeyHashFromPkScript(out.PkScript))
 				if keygenBytes != nil {
+					// address matches something we're watching, cool.
 					// fmt.Printf("txout script:%x matched kg: %x\n", out.PkScript, keygenBytes)
-					// build new portxo
 
+					// build new portxo
 					txob, err := NewPorTxoBytesFromKGBytes(tx, uint32(j), height, keygenBytes)
+					if err != nil {
+						return err
+					}
+
+					// Make sure this isn't a duplicate / already been spent
+					// the first 36 bytes of the serialized portxo is the outpoint
+					spendTx := old.Get(txob[:36])
+					if spendTx != nil {
+						// this outpoint has already been spent
+						continue
+					}
+
+					err = w.Hook.RegisterOutPoint(wire.OutPoint{tx.TxHash(), uint32(j)})
 					if err != nil {
 						return err
 					}

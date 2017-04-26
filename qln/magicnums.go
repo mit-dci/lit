@@ -29,7 +29,6 @@ var (
 	KEYhost = []byte("hst") // hostname where peer lives
 
 	KEYutxo    = []byte("utx") // serialized utxo for the channel
-	KEYCladr   = []byte("cdr") // coop close address (Don't make fun of my lisp)
 	KEYState   = []byte("now") // channel state
 	KEYElkRecv = []byte("elk") // elkrem receiver
 	KEYqclose  = []byte("cls") // channel close outpoint & height

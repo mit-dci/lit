@@ -157,16 +157,6 @@ func (nd LitNode) PushChannel(qc *Qchan, amt uint32) error {
 	if amt == 0 {
 		return fmt.Errorf("have to send non-zero amount")
 	}
-	// check if this push would lower my balance below minBal
-	if int64(amt)+minBal > qc.State.MyAmt {
-		return fmt.Errorf("want to push %s but %s available, %s minBal",
-			lnutil.SatoshiColor(int64(amt)), lnutil.SatoshiColor(qc.State.MyAmt), lnutil.SatoshiColor(minBal))
-	}
-	// check if this push is sufficient to get them above minBal
-	if int64(amt)+(qc.Value-qc.State.MyAmt) < minBal {
-		return fmt.Errorf("pushing %s insufficient; counterparty minBal %s",
-			lnutil.SatoshiColor(int64(amt)), lnutil.SatoshiColor(minBal))
-	}
 
 	// see if channel is busy, error if so, lock if not
 	// lock this channel
@@ -180,9 +170,23 @@ func (nd LitNode) PushChannel(qc *Qchan, amt uint32) error {
 	// ClearToSend is now empty
 
 	// reload from disk here, after unlock
-	err := nd.ReloadQchan(qc)
+	err := nd.ReloadQchanState(qc)
 	if err != nil {
 		return err
+	}
+
+	// perform minbal checks after reload
+	// check if this push would lower my balance below minBal
+	if int64(amt)+minBal > qc.State.MyAmt {
+		return fmt.Errorf("want to push %s but %s available, %s minBal",
+			lnutil.SatoshiColor(int64(amt)), lnutil.SatoshiColor(qc.State.MyAmt), lnutil.SatoshiColor(minBal))
+	}
+	// check if this push is sufficient to get them above minBal
+	if int64(amt)+(qc.Value-qc.State.MyAmt) < minBal {
+		return fmt.Errorf("pushing %s insufficient; counterparty bal %s minBal %s",
+			lnutil.SatoshiColor(int64(amt)),
+			lnutil.SatoshiColor(qc.Value-qc.State.MyAmt),
+			lnutil.SatoshiColor(minBal))
 	}
 
 	// if we got here, but channel is not in rest state, try to fix it.
@@ -277,7 +281,7 @@ func (nd *LitNode) DeltaSigHandler(lm *lnutil.LitMsg, qc *Qchan) error {
 	}
 
 	// load state from disk
-	err := nd.ReloadQchan(qc)
+	err := nd.ReloadQchanState(qc)
 	if err != nil {
 		return fmt.Errorf("DeltaSigHandler ReloadQchan err %s", err.Error())
 	}
@@ -485,7 +489,7 @@ func (nd *LitNode) GapSigRevHandler(lm *lnutil.LitMsg, q *Qchan) error {
 	copy(n2elkPoint[:], lm.Data[132:])
 
 	// load qchan & state from DB
-	err := nd.ReloadQchan(q)
+	err := nd.ReloadQchanState(q)
 	if err != nil {
 		return fmt.Errorf("GapSigRevHandler err %s", err.Error())
 	}
@@ -566,7 +570,7 @@ func (nd *LitNode) SigRevHandler(lm *lnutil.LitMsg, qc *Qchan) error {
 	copy(n2elkPoint[:], lm.Data[132:])
 
 	// load qchan & state from DB
-	err := nd.ReloadQchan(qc)
+	err := nd.ReloadQchanState(qc)
 	if err != nil {
 		return fmt.Errorf("SIGREVHandler err %s", err.Error())
 	}
@@ -688,7 +692,7 @@ func (nd *LitNode) RevHandler(lm *lnutil.LitMsg, qc *Qchan) error {
 	copy(n2elkPoint[:], lm.Data[68:])
 
 	// load qchan & state from DB
-	err := nd.ReloadQchan(qc)
+	err := nd.ReloadQchanState(qc)
 	if err != nil {
 		return fmt.Errorf("REVHandler err %s", err.Error())
 	}

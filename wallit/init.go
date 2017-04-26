@@ -35,6 +35,7 @@ func NewWallit(
 	// chainhook about all our addresses.
 
 	u := new(uspv.SPVCon)
+	//	u := new(powless.APILink)
 	w.Hook = u
 
 	wallitdbname := filepath.Join(wallitpath, "utxo.db")
@@ -61,7 +62,30 @@ func NewWallit(
 		log.Printf("NewWallit crash  %s ", err.Error())
 	}
 	if len(adrs) == 0 {
-		_ = w.NewAdr()
+		_, err := w.NewAdr()
+		if err != nil {
+			log.Printf("NewWallit crash  %s ", err.Error())
+		}
+	}
+
+	// send all those adrs to the hook
+	for _, a := range adrs {
+		err = w.Hook.RegisterAddress(a)
+		if err != nil {
+			log.Printf("NewWallit RegisterAddress crash %s ", err.Error())
+		}
+	}
+
+	// send outpoints (if any) to the hook
+	utxos, err := w.UtxoDump()
+	if err != nil {
+		log.Printf("NewWallit crash  %s ", err.Error())
+	}
+	for _, utxo := range utxos {
+		err = w.Hook.RegisterOutPoint(utxo.Op)
+		if err != nil {
+			log.Printf("NewWallit crash  %s ", err.Error())
+		}
 	}
 
 	// deal with the incoming txs

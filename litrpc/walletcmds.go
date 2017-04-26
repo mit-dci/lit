@@ -259,49 +259,46 @@ type AddressReply struct {
 }
 
 func (r *LitRPC) Address(args *AddressArgs, reply *AddressReply) error {
+	var err error
+	var allAdr [][20]byte
 
 	// If you tell it to make 0 new addresses, it sends a list of all the old ones
 	if args.NumToMake == 0 {
-
-		// this gets old p2pkh addresses; need to convert them to bech32
-		allAdr, err := r.Node.SubWallet.AdrDump()
+		// this gets 20 byte addresses; need to convert them to bech32 / base58
+		allAdr, err = r.Node.SubWallet.AdrDump()
 		if err != nil {
 			return err
 		}
-
-		reply.WitAddresses = make([]string, len(allAdr))
-		reply.LegacyAddresses = make([]string, len(allAdr))
-		for i, a := range allAdr {
-			// add old address
-			reply.LegacyAddresses[i] = a.String()
-			// take 20-byte PKH out and convert to a bech32 segwit v0 address
-			bech32adr, err := bech32.Tb1AdrFromPKH(a.ScriptAddress())
+	} else {
+		// call NewAdr a bunch of times
+		remaining := args.NumToMake
+		for remaining > 0 {
+			adr, err := r.Node.SubWallet.NewAdr()
 			if err != nil {
 				return err
 			}
-			reply.WitAddresses[i] = bech32adr
+			allAdr = append(allAdr, adr)
+			remaining--
 		}
-
-		return nil
 	}
+	reply.WitAddresses = make([]string, len(allAdr))
+	reply.LegacyAddresses = make([]string, len(allAdr))
 
-	reply.WitAddresses = make([]string, args.NumToMake)
-	reply.LegacyAddresses = make([]string, args.NumToMake)
-
-	remaining := args.NumToMake
-	for remaining > 0 {
-		adr := r.Node.SubWallet.NewAdr()
-
-		reply.LegacyAddresses[remaining-1] = adr.String()
-
-		// take 20-byte PKH out and convert to bech32 address
-		bech32adr, err := bech32.Tb1AdrFromPKH(adr.ScriptAddress())
+	for i, a := range allAdr {
+		// convert 20 byte array to old address
+		oldadr, err := btcutil.NewAddressPubKeyHash(
+			a[:], r.Node.SubWallet.Params())
 		if err != nil {
 			return err
 		}
+		reply.LegacyAddresses[i] = oldadr.String()
 
-		reply.WitAddresses[remaining-1] = bech32adr
-		remaining--
+		// convert 20-byte PKH to a bech32 segwit v0 address
+		bech32adr, err := bech32.Tb1AdrFromPKH(a[:])
+		if err != nil {
+			return err
+		}
+		reply.WitAddresses[i] = bech32adr
 	}
 
 	return nil

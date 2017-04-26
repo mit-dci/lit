@@ -5,9 +5,8 @@ Under development, not for use with real money.
 
 ## Installing on Linux 
 
-1. Start by installing Go v1.6. 
+1. Start by installing Go 
  * Check this tutorial out: <https://www.digitalocean.com/community/tutorials/how-to-install-go-1-6-on-ubuntu-14-04>
-  * TIP: You may want to install Go in a more localized place to keep your system cleaner from stray files.
 
 2. Make sure your Go paths are set correctly: the `.../go/bin` path is in `$PATH`, `$GOROOT` is set to `.../go/`, and `$GOPATH` is the location of where you want lit to be. 
 
@@ -35,7 +34,12 @@ user@host:~/go/src/github.com/btcsuite/btcutil$ git fetch adiabat
 user@host:~/go/src/github.com/btcsuite/btcutil$ git checkout adiabat/master
 ```
 
-5. Build, compile, and install: `go get install`
+5. compile lit, then run it: 
+```
+user@host:~/go/src/github.com/btcsuite/btcutil$ cd ../../mit-dci/lit
+user@host:~/go/src/github.com/mit-dci/lit$ go build -v
+user@host:~/go/src/github.com/mit-dci/lit$ ./lit -spv my.testnet.node.tld
+```
 
 ## Folders:
 

@@ -203,32 +203,5 @@ func (r *LitRPC) BreakChannel(args ChanArgs, reply *StatusReply) error {
 	if err != nil {
 		return err
 	}
-
-	if qc.CloseData.Closed {
-		return fmt.Errorf("Can't break (%d,%d), already closed\n",
-			qc.KeyGen.Step[3]&0x7fffffff, qc.KeyGen.Step[4]&0x7fffffff)
-	}
-
-	fmt.Printf("breaking (%d,%d)\n",
-		qc.KeyGen.Step[3]&0x7fffffff, qc.KeyGen.Step[4]&0x7fffffff)
-	z, err := qc.ElkSnd.AtIndex(0)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("elk send 0: %s\n", z.String())
-	z, err = qc.ElkRcv.AtIndex(0)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("elk recv 0: %s\n", z.String())
-	// set delta to 0...
-	qc.State.Delta = 0
-	tx, err := r.Node.SignBreakTx(qc)
-	if err != nil {
-		return err
-	}
-	reply.Status = fmt.Sprintf("Broke channel %d with tx %s",
-		args.ChanIdx, tx.TxHash().String())
-	// broadcast
-	return r.Node.SubWallet.PushTx(tx)
+	return r.Node.BreakChannel(qc)
 }

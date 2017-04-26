@@ -4,6 +4,7 @@ import websocket
 import json
 import sys
 import requests
+import random
 
 class RegtestConn:
 	rpcuser = "regtestuser"
@@ -11,7 +12,8 @@ class RegtestConn:
 	rpcport = 18332
 	serverURL = "http://" + rpcuser + ":" + rpcpass + "@127.0.0.1:" + str(rpcport)
 	header = {"Content-type": "application/json"}
-	
+
+
 	def __init__(self):
 		self.id = 0
 	
@@ -59,6 +61,34 @@ class LitConn:
 		self.id = 0
 		self.ws = websocket.WebSocket()
 		self.ws.connect("ws://127.0.0.1:8001/ws")
+
+	def litNewAddr(self):
+		self.id += 1
+		rpcCmd = {
+		   "method": "LitRPC.Address",
+		   "params": [{"NumToMake": 0}],
+		   "jsonrpc": "2.0",
+		   "id": str(self.id)
+		}
+			
+		self.ws.send(json.dumps(rpcCmd))
+		resp = json.loads(self.ws.recv())
+		return resp["result"]["WitAddresses"][0]
+
+	def litSend(self, adr, amt):
+		self.id += 1
+		rpcCmd = {
+		   "method": "LitRPC.Send",
+		   "params": [{
+		   		"DestAddrs": adr,
+		   		"Amts": amt}	   
+		   		],
+		   	"jsonrpc": "2.0",
+		   	"id": str(self.id)
+		}
+		self.ws.send(json.dumps(rpcCmd))
+		resp = json.loads(self.ws.recv())
+		return resp
 	
 	def getAddress(self):
 		self.id += 1
@@ -69,8 +99,8 @@ class LitConn:
 			"id": str(self.id)
 		}
 		self.ws.send(json.dumps(rpcCmd))
-		result = json.loads(self.ws.recv())
-		print(result)
+		resp = json.loads(self.ws.recv())
+		return resp["result"]["WitAddresses"][0]
 	
 	def getBal(self):
 		self.id += 1
@@ -81,8 +111,9 @@ class LitConn:
 			"id": str(self.id)
 		}
 		self.ws.send(json.dumps(rpcCmd))
-		result = json.loads(self.ws.recv())
-		print(result)
+		resp = json.loads(self.ws.recv())
+		#TODO: get different kinds of balances
+		return resp["result"]["ChanTotal"]
 
 def main(args):
 	newConn = RegtestConn()
@@ -90,8 +121,14 @@ def main(args):
 	#newConn.getinfo()
 	
 	litConn = LitConn()
-	litConn.getAddress()
-	litConn.getBal()
+	bal = litConn.getBal()
+	print(bal)
+	addr = litConn.getAddress()
+	print(addr)
+	resp0 = litConn.litSend([addr], [10000])
+	print(resp0)
+	resp = litConn.litNewAddr()
+	print(resp)
 
 if __name__ == '__main__':
     main(sys.argv)
