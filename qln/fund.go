@@ -104,26 +104,32 @@ func (nd *LitNode) FundChannel(peerIdx uint32, ccap, initSend int64) (uint32, er
 	nd.InProg.mtx.Lock()
 	//	defer nd.InProg.mtx.Lock()
 	if nd.InProg.PeerIdx != 0 {
+		nd.InProg.mtx.Unlock()
 		return 0, fmt.Errorf("fund with peer %d not done yet", nd.InProg.PeerIdx)
 	}
 
 	if initSend < 0 || ccap < 0 {
+		nd.InProg.mtx.Unlock()
 		return 0, fmt.Errorf("Can't have negative send or capacity")
 	}
 	if ccap < 1000000 { // limit for now
+		nd.InProg.mtx.Unlock()
 		return 0, fmt.Errorf("Min channel capacity 1M sat")
 	}
 	if initSend > ccap {
+		nd.InProg.mtx.Unlock()
 		return 0, fmt.Errorf("Cant send %d in %d capacity channel", initSend, ccap)
 	}
 
 	// TODO - would be convenient if it auto connected to the peer huh
 	if !nd.ConnectedToPeer(peerIdx) {
+		nd.InProg.mtx.Unlock()
 		return 0, fmt.Errorf("Not connected to peer %d. Do that yourself.", peerIdx)
 	}
 
 	cIdx, err := nd.NextChannelIdx()
 	if err != nil {
+		nd.InProg.mtx.Unlock()
 		return 0, err
 	}
 
