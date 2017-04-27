@@ -2,13 +2,16 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/mit-dci/lit/litbamf"
 	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/qln"
@@ -33,6 +36,7 @@ type LitConfig struct {
 	verbose               bool
 	birthblock            int32
 	rpcport               uint16
+	bamfport              uint16
 	litHomeDir            string
 
 	Params *chaincfg.Params
@@ -52,6 +56,7 @@ func setConfig(lc *LitConfig) {
 	resyncprt := flag.Bool("resync", false, "force resync from given tip")
 
 	rpcportptr := flag.Int("rpcport", 8001, "port to listen for RPC")
+	bamfportptr := flag.Int("bamfport", 8001, "port to listen for Lit-BAMF")
 
 	litHomeDir := flag.String("dir",
 		filepath.Join(os.Getenv("HOME"), litHomeDirName), "lit home directory")
@@ -68,6 +73,7 @@ func setConfig(lc *LitConfig) {
 	lc.verbose = *verbptr
 
 	lc.rpcport = uint16(*rpcportptr)
+	lc.bamfport = uint16(*bamfportptr)
 
 	lc.litHomeDir = *litHomeDir
 
@@ -151,7 +157,16 @@ func main() {
 		log.Fatal(err)
 	}
 
-	litrpc.RpcListen(node, conf.rpcport)
+	rpcl := new(litrpc.LitRPC)
+	rpcl.Node = node
+	rpcl.OffButton = make(chan bool, 1)
+
+	litrpc.RPCListen(rpcl, conf.rpcport)
+	litbamf.BamfListen(conf.bamfport, conf.litHomeDir)
+
+	<-rpcl.OffButton
+	fmt.Printf("Got stop request\n")
+	time.Sleep(time.Second)
 
 	return
 }
