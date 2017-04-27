@@ -174,15 +174,36 @@ func (lc *litAfClient) Address(textArgs []string) error {
 	args := new(litrpc.AddressArgs)
 
 	// if no arguments given, generate 1 new address.
-	if len(textArgs) < 1 {
+	// if no cointype given, assume type 1 (testnet)
+
+	switch len(textArgs) {
+	case 0:
+		// default one new address
 		args.NumToMake = 1
-	} else {
-		num, _ := strconv.Atoi(textArgs[0])
+		args.CoinType = 1
+	case 1:
+		// default testnet
+		args.CoinType = 1
+		num, err := strconv.Atoi(textArgs[0])
+		if err != nil {
+			return err
+		}
 		args.NumToMake = uint32(num)
+	default:
+		num, err := strconv.Atoi(textArgs[0])
+		if err != nil {
+			return err
+		}
+		args.NumToMake = uint32(num)
+		cnum, err := strconv.Atoi(textArgs[1])
+		if err != nil {
+			return err
+		}
+		args.CoinType = uint32(cnum)
 	}
 
 	reply := new(litrpc.AddressReply)
-	fmt.Printf("call here\n")
+	fmt.Printf("args: %v\n", args)
 	err := lc.rpccon.Call("LitRPC.Address", args, reply)
 	if err != nil {
 		return err

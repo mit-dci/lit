@@ -14,8 +14,8 @@ import (
 )
 
 func NewWallit(
-	rootkey *hdkeychain.ExtendedKey,
-	birthHeight int32, spvhost, path string, p *chaincfg.Params) *Wallit {
+	rootkey *hdkeychain.ExtendedKey, birthHeight int32, resync bool,
+	spvhost, path string, p *chaincfg.Params) *Wallit {
 
 	var w Wallit
 	w.rootPrivKey = rootkey
@@ -46,7 +46,7 @@ func NewWallit(
 	// get height
 	height := w.CurrentHeight()
 	log.Printf("DB height %d\n", height)
-	if height < birthHeight {
+	if height < birthHeight || resync {
 		height = birthHeight
 	}
 	log.Printf("DB height %d\n", height)

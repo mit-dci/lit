@@ -88,7 +88,7 @@ func NewLitNode(privKey *[32]byte, path string, tower bool) (*LitNode, error) {
 
 // LinkBaseWallet activates a wallet and hooks it into the litnode.
 func (nd *LitNode) LinkBaseWallet(
-	privKey *[32]byte, birthHeight int32,
+	privKey *[32]byte, birthHeight int32, resync bool,
 	host string, param *chaincfg.Params) error {
 
 	rootpriv, err := hdkeychain.NewMaster(privKey[:], param)
@@ -112,7 +112,7 @@ func (nd *LitNode) LinkBaseWallet(
 	// the default
 
 	nd.SubWallet[WallitIdx] = wallit.NewWallit(
-		rootpriv, birthHeight, host, nd.LitFolder, param)
+		rootpriv, birthHeight, resync, host, nd.LitFolder, param)
 
 	go nd.OPEventHandler(nd.SubWallet[WallitIdx].LetMeKnow())
 

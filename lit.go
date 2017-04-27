@@ -152,7 +152,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = node.LinkBaseWallet(key, conf.birthblock, conf.spvHost, conf.Params)
+	err = node.LinkBaseWallet(
+		key, conf.birthblock, conf.reSync, conf.spvHost, conf.Params)
 	if err != nil {
 		log.Fatal(err)
 	}
