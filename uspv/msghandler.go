@@ -3,8 +3,8 @@ package uspv
 import (
 	"log"
 
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil/bloom"
+	"github.com/adiabat/btcd/wire"
+	"github.com/adiabat/btcutil/bloom"
 	"github.com/mit-dci/lit/lnutil"
 )
 

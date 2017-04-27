@@ -5,8 +5,8 @@ import (
 
 	"github.com/mit-dci/lit/lnutil"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/adiabat/btcd/chaincfg/chainhash"
+	"github.com/adiabat/btcd/wire"
 )
 
 const minBal = 10000 // channels have to have 10K sat in them; can make variable later.

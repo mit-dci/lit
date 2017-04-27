@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/btcsuite/btcd/wire"
+	"github.com/adiabat/btcd/wire"
 )
 
 type TxoMode uint8

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/btcsuite/btcd/btcec"
+	"github.com/adiabat/btcd/btcec"
 	"github.com/btcsuite/fastsha256"
 	"github.com/codahale/chacha20poly1305"
 )
