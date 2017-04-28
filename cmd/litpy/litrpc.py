@@ -14,7 +14,6 @@ class RegtestConn:
 	serverURL = "http://" + rpcuser + ":" + rpcpass + "@127.0.0.1:" + str(rpcport)
 	header = {"Content-type": "application/json"}
 
-
 	def __init__(self):
 		self.id = 0
 	
@@ -144,8 +143,6 @@ def main(args):
 	newConn.sendTo(addr, 10.00)
 	resp0 = litConn.litSend([addr], [1000000])
 	print(resp0)
-	resp = litConn.litNewAddr()
-	print(resp)
 
 if __name__ == '__main__':
     main(sys.argv)
