@@ -15,7 +15,7 @@ func TestAdr(t *testing.T) {
 
 		h := chainhash.DoubleHashH(data)
 		pub := PubFromHash(h)
-		adr := LitFullAdrEncode(pub)
+		adr := LitFullKeyAdrEncode(pub)
 		t.Logf("%d\tadr %s\n", i, adr)
 		rePub, err := LitFullAdrDecode(adr)
 		if err != nil {
