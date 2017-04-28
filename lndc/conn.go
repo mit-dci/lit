@@ -9,7 +9,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/btcsuite/btcd/btcec"
+	"github.com/adiabat/btcd/btcec"
 	"github.com/btcsuite/fastsha256"
 	"github.com/codahale/chacha20poly1305"
 	"github.com/mit-dci/lit/lnutil"

@@ -3,8 +3,8 @@ package wallit
 import (
 	"fmt"
 
-	"github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcutil"
+	"github.com/adiabat/btcd/btcec"
+	"github.com/adiabat/btcutil"
 	"github.com/mit-dci/lit/portxo"
 )
 

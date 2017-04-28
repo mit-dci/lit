@@ -12,9 +12,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/adiabat/btcd/blockchain"
+	"github.com/adiabat/btcd/chaincfg"
+	"github.com/adiabat/btcd/wire"
 )
 
 // blockchain settings.  These are kindof bitcoin specific, but not contained in

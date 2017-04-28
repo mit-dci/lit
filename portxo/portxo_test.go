@@ -3,7 +3,7 @@ package portxo
 import (
 	"testing"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/adiabat/btcd/chaincfg/chainhash"
 )
 
 // TestHardCoded tests serializing / deserializing a portxo
