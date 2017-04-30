@@ -99,6 +99,7 @@ func setConfig(lc *LitConfig) {
 
 	if lc.lt4Net {
 		lc.Params = &chaincfg.LiteCoinTestNet4Params
+		lc.birthblock = 47295
 		if !strings.Contains(lc.spvHost, ":") {
 			lc.spvHost = lc.spvHost + ":19335"
 		}

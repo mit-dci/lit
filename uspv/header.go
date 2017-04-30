@@ -33,6 +33,11 @@ const (
 /* checkProofOfWork verifies the header hashes into something
 lower than specified by the 4-byte bits field. */
 func checkProofOfWork(header wire.BlockHeader, p *chaincfg.Params) bool {
+	// litecoin PoW not yet implemented; just accept anything for now
+	if p.Name == "litetest" {
+		return true
+	}
+
 	target := blockchain.CompactToBig(header.Bits)
 
 	// The target must more than 0.  Why can you even encode negative...
