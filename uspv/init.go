@@ -125,7 +125,7 @@ func (s *SPVCon) openHeaderFile(hfn string) error {
 				if err != nil {
 					return err
 				}
-			} else if s.Param.Name == "litetest" {
+			} else if s.Param.Name == "litetest4" {
 				// hard-coded litecoin block header
 				// because I don't want to deal with the different genesis block
 				hdr, err := hex.DecodeString("010000000000000000000000000000000000000000000000000000000000000000000000d9ced4ed1130f7b7faad9be25323ffafa33232a17c3edf6cfd97bee6bafbdd97f60ba158f0ff0f1ee1790400")

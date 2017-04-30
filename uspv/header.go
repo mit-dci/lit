@@ -34,7 +34,7 @@ const (
 lower than specified by the 4-byte bits field. */
 func checkProofOfWork(header wire.BlockHeader, p *chaincfg.Params) bool {
 	// litecoin PoW not yet implemented; just accept anything for now
-	if p.Name == "litetest" {
+	if p.Name == "litetest4" {
 		return true
 	}
 
