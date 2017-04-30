@@ -6,12 +6,11 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/boltdb/bolt"
 	"github.com/adiabat/btcd/blockchain"
 	"github.com/adiabat/btcd/chaincfg/chainhash"
-	"github.com/adiabat/btcd/txscript"
 	"github.com/adiabat/btcd/wire"
 	"github.com/adiabat/btcutil"
+	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 )
@@ -41,15 +40,8 @@ func (w *Wallit) NewChangeOut(amt int64) (*wire.TxOut, error) {
 	if err != nil {
 		return nil, err
 	}
-	changeAdr, err := btcutil.NewAddressWitnessPubKeyHash(
-		change160[:], w.Param)
-	if err != nil {
-		return nil, err
-	}
-	changeScript, err := txscript.PayToAddrScript(changeAdr)
-	if err != nil {
-		return nil, err
-	}
+
+	changeScript := lnutil.DirectWPKHScriptFromPKH(change160)
 	changeOut := wire.NewTxOut(amt, changeScript)
 	return changeOut, nil
 }

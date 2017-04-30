@@ -327,7 +327,7 @@ func (w *Wallit) SendOne(u portxo.PorTxo, outScript []byte) (*wire.MsgTx, error)
 		return nil, fmt.Errorf("Can't spend, immature")
 	}
 	// fixed fee
-	fee := int64(5000)
+	fee := int64(10000)
 
 	sendAmt := u.Value - fee
 
