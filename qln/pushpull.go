@@ -234,7 +234,7 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 		return err
 	}
 
-	outMsg := lnutil.NewDeltaSigMsg(q.Peer(), q.Op, q.State.Delta, sig)
+	outMsg := lnutil.NewDeltaSigMsg(q.Peer(), q.Op, -q.State.Delta, sig)
 	nd.OmniOut <- outMsg
 
 	return nil
@@ -246,7 +246,7 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 
 	var collision bool
-	incomingDelta := msg.Delta
+	incomingDelta := msg.Delta //int32 (may be negative, but should not be)
 
 	// we should be clear to send when we get a deltaSig
 	select {
@@ -271,7 +271,7 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 	if collision {
 		// incoming delta saved as collision value,
 		// existing (negative) delta value retained.
-		qc.State.Collision = int32(incomingDelta)
+		qc.State.Collision = incomingDelta
 		fmt.Printf("delta sig COLLISION (%d)\n", qc.State.Collision)
 	}
 
@@ -299,7 +299,7 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 
 	if !collision {
 		// no collision, incoming (positive) delta saved.
-		qc.State.Delta = int32(incomingDelta)
+		qc.State.Delta = incomingDelta
 	}
 
 	// they have to actually send you money
