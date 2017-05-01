@@ -4,7 +4,7 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/adiabat/btcd/chaincfg/chainhash"
 )
 
 func TestChatMsg(t *testing.T) {
