@@ -42,6 +42,7 @@ func (w *Wallit) NewChangeOut(amt int64) (*wire.TxOut, error) {
 	}
 
 	changeScript := lnutil.DirectWPKHScriptFromPKH(change160)
+
 	changeOut := wire.NewTxOut(amt, changeScript)
 	return changeOut, nil
 }
