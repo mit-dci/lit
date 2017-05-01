@@ -3,9 +3,8 @@ package qln
 import (
 	"fmt"
 
-	"github.com/mit-dci/lit/lnutil"
-	"github.com/adiabat/btcd/chaincfg/chainhash"
 	"github.com/adiabat/btcd/wire"
+	"github.com/mit-dci/lit/lnutil"
 )
 
 const minBal = 10000 // channels have to have 10K sat in them; can make variable later.
