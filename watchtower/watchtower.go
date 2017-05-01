@@ -3,9 +3,8 @@ package watchtower
 import (
 	"fmt"
 
-	"github.com/boltdb/bolt"
-	"github.com/adiabat/btcd/chaincfg/chainhash"
 	"github.com/adiabat/btcd/wire"
+	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/lnutil"
 )
 
