@@ -52,6 +52,9 @@ type StatCom struct {
 	WatchUpTo uint64 // have sent out to watchtowers up to this state  ( < stateidx)
 
 	MyAmt int64 // my channel allocation
+
+	Fee int64 // symmetric fee in absolute satoshis
+
 	// their Amt is the utxo.Value minus this
 	Delta int32 // fund amount in-transit; is negative for the pusher
 	// Delta for when the channel is in a collision state which needs to be resolved

@@ -7,13 +7,13 @@ import (
 	"log"
 	"sync"
 
-	"github.com/boltdb/bolt"
 	"github.com/adiabat/btcd/blockchain"
 	"github.com/adiabat/btcd/chaincfg"
 	"github.com/adiabat/btcd/chaincfg/chainhash"
 	"github.com/adiabat/btcd/wire"
 	"github.com/adiabat/btcutil"
 	"github.com/adiabat/btcutil/hdkeychain"
+	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 )
@@ -37,6 +37,9 @@ type Wallit struct {
 
 	// Hook is the connection to a blockchain.
 	Hook ChainHook
+
+	// current fee per byte
+	FeeRate int64
 
 	// From here, comes everything. It's a secret to everybody.
 	rootPrivKey *hdkeychain.ExtendedKey

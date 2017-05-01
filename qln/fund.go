@@ -292,6 +292,7 @@ func (nd LitNode) PointRespHandler(lm *lnutil.LitMsg) error {
 	qc.State = new(StatCom)
 	qc.State.StateIdx = 0
 	qc.State.MyAmt = nd.InProg.Amt - nd.InProg.InitSend
+	qc.State.Fee = 10000 // fixed fee for now here.
 
 	// save channel to db
 	err = nd.SaveQChan(qc)
@@ -405,6 +406,7 @@ func (nd *LitNode) QChanDescHandler(lm *lnutil.LitMsg) {
 	qc.State = new(StatCom)
 	// similar to SIGREV in pushpull
 	qc.State.MyAmt = initPay
+	qc.State.Fee = 10000
 	qc.State.StateIdx = 0
 	// use new ElkPoint for signing
 	qc.State.ElkPoint = elkPointZero

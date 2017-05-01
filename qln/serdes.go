@@ -51,6 +51,12 @@ func (s *StatCom) ToBytes() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	// write 8 byte absolute fee
+	err = binary.Write(&buf, binary.BigEndian, s.Fee)
+	if err != nil {
+		return nil, err
+	}
+
 	// write 4 byte delta.  At steady state it's 0.
 	err = binary.Write(&buf, binary.BigEndian, s.Delta)
 	if err != nil {
@@ -89,8 +95,8 @@ func (s *StatCom) ToBytes() ([]byte, error) {
 // StatComFromBytes turns 192 bytes into a StatCom
 func StatComFromBytes(b []byte) (*StatCom, error) {
 	var s StatCom
-	if len(b) < 195 || len(b) > 195 {
-		return nil, fmt.Errorf("StatComFromBytes got %d bytes, expect 195",
+	if len(b) < 203 || len(b) > 203 {
+		return nil, fmt.Errorf("StatComFromBytes got %d bytes, expect 203",
 			len(b))
 	}
 	buf := bytes.NewBuffer(b)
@@ -107,6 +113,11 @@ func StatComFromBytes(b []byte) (*StatCom, error) {
 
 	// read 8 byte amount of my allocation in the channel
 	err = binary.Read(buf, binary.BigEndian, &s.MyAmt)
+	if err != nil {
+		return nil, err
+	}
+	// read 8 byte absolute fee
+	err = binary.Read(buf, binary.BigEndian, &s.Fee)
 	if err != nil {
 		return nil, err
 	}

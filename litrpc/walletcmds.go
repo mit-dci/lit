@@ -8,6 +8,7 @@ import (
 	"github.com/adiabat/btcd/txscript"
 	"github.com/adiabat/btcd/wire"
 	"github.com/adiabat/btcutil"
+	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 )
 
@@ -130,7 +131,7 @@ func (r *LitRPC) Send(args SendArgs, reply *TxidsReply) error {
 			return fmt.Errorf("Amt %d less than min 10000", args.Amts[i])
 		}
 
-		outScript, err := AdrStringToOutscript(s, r.Node.SubWallet.Params())
+		outScript, err := AdrStringToOutscript(s)
 		if err != nil {
 			return err
 		}
@@ -161,21 +162,31 @@ type SweepArgs struct {
 }
 
 // AdrStringToOutscript converts an address string into an output script byte slice
-func AdrStringToOutscript(adr string, p *chaincfg.Params) ([]byte, error) {
+func AdrStringToOutscript(adr string) ([]byte, error) {
 	var err error
 	var outScript []byte
-	if adr[:3] == "tb1" || adr[:3] == "bc1" {
-		// try bech32 address
-		outScript, err = bech32.SegWitAddressDecode(adr)
-		if err != nil {
-			return nil, err
+
+	// use HRP to determine network / wallet to use
+	_, adrData, err := bech32.Decode(adr)
+	if err == nil { // valid bech32 string
+		if len(adrData) != 20 {
+			return nil, fmt.Errorf("Address %s has %d byte payload, expect 20",
+				adr, len(adrData))
 		}
+		var adr160 [20]byte
+		copy(adr160[:], adrData)
+
+		outScript = lnutil.DirectWPKHScriptFromPKH(adr160)
 	} else {
 		// try for base58 address
-		adr, err := btcutil.DecodeAddress(adr, p)
+		// btcutil addresses don't really work as they won't tell you the
+		// network; you have to tell THEM the network, which defeats the point
+		// of having an address.  default to testnet only here
+		adr, err := btcutil.DecodeAddress(adr, &chaincfg.TestNet3Params)
 		if err != nil {
 			return nil, err
 		}
+
 		outScript, err = txscript.PayToAddrScript(adr)
 		if err != nil {
 			return nil, err
@@ -184,9 +195,13 @@ func AdrStringToOutscript(adr string, p *chaincfg.Params) ([]byte, error) {
 	return outScript, nil
 }
 
+func CoinTypeFromBechAdr(adr string) (uint32, error) {
+	return 0, nil
+}
+
 func (r *LitRPC) Sweep(args SweepArgs, reply *TxidsReply) error {
 
-	outScript, err := AdrStringToOutscript(args.DestAdr, r.Node.SubWallet.Params())
+	outScript, err := AdrStringToOutscript(args.DestAdr)
 	if err != nil {
 		return err
 	}
@@ -222,7 +237,7 @@ func (r *LitRPC) Fanout(args FanArgs, reply *TxidsReply) error {
 	if args.AmtPerOutput < 5000 {
 		return fmt.Errorf("Minimum 5000 per output")
 	}
-	outScript, err := AdrStringToOutscript(args.DestAdr, r.Node.SubWallet.Params())
+	outScript, err := AdrStringToOutscript(args.DestAdr)
 	if err != nil {
 		return err
 	}

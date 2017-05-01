@@ -25,7 +25,8 @@ func (w *Wallit) MaybeSend(txos []*wire.TxOut, ow bool) ([]*wire.OutPoint, error
 	var err error
 	var totalSend int64
 	dustCutoff := int64(20000) // below this amount, just give to miners
-	satPerByte := int64(80)    // satoshis per byte fee; have as arg later
+
+	feePerByte := w.FeeRate
 
 	// make an initial txo copy so we can find where the outputs end up in final tx
 
@@ -47,24 +48,24 @@ func (w *Wallit) MaybeSend(txos []*wire.TxOut, ow bool) ([]*wire.OutPoint, error
 	defer w.FreezeMutex.Unlock()
 	// get inputs for this tx.  Only segwit
 	// This might not be enough for the fee if the inputs line up right...
-	utxos, overshoot, err := w.PickUtxos(totalSend, ow)
+	utxos, overshoot, err := w.PickUtxos(totalSend, feePerByte, ow)
 	if err != nil {
 		return nil, err
 	}
 
 	// estimate needed fee with outputs, see if change should be truncated
-	fee := EstFee(utxos, txos, satPerByte)
+	fee := EstFee(utxos, txos, feePerByte)
 
 	log.Printf("MaybeSend has fee %d, %d inputs\n", fee, len(utxos))
 
 	// input sum is not enough, we need more inputs.
 	// keep doing this until fee is sufficient or PickUtxos errors out
 	for fee > overshoot {
-		utxos, overshoot, err = w.PickUtxos(totalSend+fee, ow)
+		utxos, overshoot, err = w.PickUtxos(totalSend+fee, feePerByte, ow)
 		if err != nil {
 			return nil, err
 		}
-		fee = EstFee(utxos, txos, satPerByte)
+		fee = EstFee(utxos, txos, feePerByte)
 	}
 
 	// add a change output if we have enough extra
@@ -231,8 +232,9 @@ func (w *Wallit) NewOutgoingTx(tx *wire.MsgTx) error {
 // It returns a tx-sortable utxoslice, and the overshoot amount.  Also errors.
 // if "ow" is true, only gives witness utxos (for channel funding)
 func (w *Wallit) PickUtxos(
-	amtWanted int64, ow bool) (portxo.TxoSliceByBip69, int64, error) {
-	satPerByte := int64(80) // satoshis per byte fee; have as arg later
+	amtWanted int64, feePerByte int64,
+	ow bool) (portxo.TxoSliceByBip69, int64, error) {
+
 	curHeight, err := w.GetDBSyncHeight()
 	if err != nil {
 		return nil, 0, err
@@ -290,7 +292,7 @@ func (w *Wallit) PickUtxos(
 					byteSize += 130 // vsize of non-wit input is ~130
 				}
 			}
-			fee := byteSize * satPerByte
+			fee := byteSize * feePerByte
 			if nokori < -fee { // done adding utxos: nokori below negative est fee
 				break
 			}
@@ -327,7 +329,7 @@ func (w *Wallit) SendOne(u portxo.PorTxo, outScript []byte) (*wire.MsgTx, error)
 		return nil, fmt.Errorf("Can't spend, immature")
 	}
 	// fixed fee
-	fee := int64(10000)
+	fee := w.FeeRate * 200
 
 	sendAmt := u.Value - fee
 
