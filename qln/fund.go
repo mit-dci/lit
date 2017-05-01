@@ -3,8 +3,8 @@ package qln
 import (
 	"fmt"
 
-	"github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/adiabat/btcd/btcec"
+	"github.com/adiabat/btcd/wire"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
@@ -102,28 +102,34 @@ an exact timing for the payment.
 func (nd *LitNode) FundChannel(peerIdx uint32, ccap, initSend int64) (uint32, error) {
 
 	nd.InProg.mtx.Lock()
-	defer nd.InProg.mtx.Lock()
+	//	defer nd.InProg.mtx.Lock()
 	if nd.InProg.PeerIdx != 0 {
+		nd.InProg.mtx.Unlock()
 		return 0, fmt.Errorf("fund with peer %d not done yet", nd.InProg.PeerIdx)
 	}
 
 	if initSend < 0 || ccap < 0 {
+		nd.InProg.mtx.Unlock()
 		return 0, fmt.Errorf("Can't have negative send or capacity")
 	}
 	if ccap < 1000000 { // limit for now
+		nd.InProg.mtx.Unlock()
 		return 0, fmt.Errorf("Min channel capacity 1M sat")
 	}
 	if initSend > ccap {
+		nd.InProg.mtx.Unlock()
 		return 0, fmt.Errorf("Cant send %d in %d capacity channel", initSend, ccap)
 	}
 
 	// TODO - would be convenient if it auto connected to the peer huh
 	if !nd.ConnectedToPeer(peerIdx) {
+		nd.InProg.mtx.Unlock()
 		return 0, fmt.Errorf("Not connected to peer %d. Do that yourself.", peerIdx)
 	}
 
 	cIdx, err := nd.NextChannelIdx()
 	if err != nil {
+		nd.InProg.mtx.Unlock()
 		return 0, err
 	}
 
@@ -131,7 +137,7 @@ func (nd *LitNode) FundChannel(peerIdx uint32, ccap, initSend int64) (uint32, er
 	nd.InProg.PeerIdx = peerIdx
 	nd.InProg.Amt = ccap
 	nd.InProg.InitSend = initSend
-	//	nd.InProg.mtx.Unlock() // switch to defer
+	nd.InProg.mtx.Unlock() // switch to defer
 
 	outMsg := lnutil.NewPointReqMsg(peerIdx)
 

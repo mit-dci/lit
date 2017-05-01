@@ -6,7 +6,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/btcsuite/btcd/btcec"
+	"github.com/adiabat/btcd/btcec"
+	"github.com/mit-dci/lit/lnutil"
 )
 
 func TestConnectionCorrectness(t *testing.T) {
@@ -31,6 +32,9 @@ func TestConnectionCorrectness(t *testing.T) {
 		t.Fatalf("unable to create listener: %v", err)
 	}
 	conn := NewConn(nil)
+	var myPub [33]byte
+	copy(myPub[:], localPriv.PubKey().SerializeCompressed())
+	myAddress := lnutil.LitAdrFromPubkey(myPub)
 
 	var wg sync.WaitGroup
 	var dialErr error
@@ -39,8 +43,7 @@ func TestConnectionCorrectness(t *testing.T) {
 	// main one. If both errors are nil, then encryption+auth was succesful.
 	wg.Add(1)
 	go func() {
-		dialErr = conn.Dial(remotePriv, listener.Addr().String(),
-			localPriv.PubKey().SerializeCompressed())
+		dialErr = conn.Dial(remotePriv, listener.Addr().String(), myAddress)
 		wg.Done()
 	}()
 

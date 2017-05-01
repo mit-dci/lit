@@ -6,8 +6,8 @@ import (
 	"log"
 
 	"github.com/boltdb/bolt"
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/adiabat/btcd/txscript"
+	"github.com/adiabat/btcd/wire"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/sig64"

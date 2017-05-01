@@ -4,10 +4,10 @@ import (
 	"fmt"
 
 	"github.com/adiabat/bech32"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
+	"github.com/adiabat/btcd/chaincfg"
+	"github.com/adiabat/btcd/txscript"
+	"github.com/adiabat/btcd/wire"
+	"github.com/adiabat/btcutil"
 	"github.com/mit-dci/lit/portxo"
 )
 
@@ -294,7 +294,7 @@ func (r *LitRPC) Address(args *AddressArgs, reply *AddressReply) error {
 		reply.LegacyAddresses[i] = oldadr.String()
 
 		// convert 20-byte PKH to a bech32 segwit v0 address
-		bech32adr, err := bech32.Tb1AdrFromPKH(a[:])
+		bech32adr := bech32.Encode(r.Node.SubWallet.Params().Bech32Prefix, a[:])
 		if err != nil {
 			return err
 		}

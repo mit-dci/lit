@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/adiabat/btcd/txscript"
+	"github.com/adiabat/btcd/wire"
 )
 
 // CommitScript is the script for 0.13.1: OP_CHECKSIG turned into OP_CHECSIGVERIFY

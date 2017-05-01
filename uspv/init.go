@@ -8,7 +8,7 @@ import (
 	"net"
 	"os"
 
-	"github.com/btcsuite/btcd/wire"
+	"github.com/adiabat/btcd/wire"
 )
 
 // Connect dials out and connects to full nodes.

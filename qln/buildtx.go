@@ -5,8 +5,8 @@ import (
 
 	"github.com/mit-dci/lit/lnutil"
 
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil/txsort"
+	"github.com/adiabat/btcd/wire"
+	"github.com/adiabat/btcutil/txsort"
 )
 
 // GetStateIdxFromTx returns the state index from a commitment transaction.
