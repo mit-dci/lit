@@ -368,10 +368,139 @@ func TestGapSigRevMsg(t *testing.T) {
 	op := *OutPointFromBytes(outPoint)
 	Elk, _ := chainhash.NewHash(elk[:])
 
-	msg := NewSigRev(peerid, op, sig, *Elk, n2elk)
+	msg := NewGapSigRev(peerid, op, sig, *Elk, n2elk)
 	b := msg.Bytes()
 
-	msg2, err := NewSigRevFromBytes(b, peerid)
+	msg2, err := NewGapSigRevFromBytes(b, peerid)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !LitMsgEqual(msg, msg2) {
+		t.Fatalf("from bytes mismatch:\n%x\n%x\n", msg.Bytes(), msg2.Bytes())
+	}
+
+	msg3, err := LitMsgFromBytes(b, peerid)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !LitMsgEqual(msg2, msg3) {
+		t.Fatalf("interface mismatch:\n%x\n%x\n", msg2.Bytes(), msg3.Bytes())
+	}
+
+	_, err = LitMsgFromBytes(b[:99], peerid) //purposely error to check working by not sending enough bytes
+
+	if err == nil {
+		t.Fatalf("Should have errored, but didn't")
+	}
+}
+
+func TestRevMsg(t *testing.T) {
+	peerid := rand.Uint32()
+	var outPoint [36]byte
+	var elk [32]byte
+	var n2elk [33]byte
+
+	_, _ = rand.Read(outPoint[:])
+	_, _ = rand.Read(elk[:])
+	_, _ = rand.Read(n2elk[:])
+
+	op := *OutPointFromBytes(outPoint)
+	Elk, _ := chainhash.NewHash(elk[:])
+
+	msg := NewRevMsg(peerid, op, *Elk, n2elk)
+	b := msg.Bytes()
+
+	msg2, err := NewRevMsgFromBytes(b, peerid)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !LitMsgEqual(msg, msg2) {
+		t.Fatalf("from bytes mismatch:\n%x\n%x\n", msg.Bytes(), msg2.Bytes())
+	}
+
+	msg3, err := LitMsgFromBytes(b, peerid)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !LitMsgEqual(msg2, msg3) {
+		t.Fatalf("interface mismatch:\n%x\n%x\n", msg2.Bytes(), msg3.Bytes())
+	}
+
+	_, err = LitMsgFromBytes(b[:99], peerid) //purposely error to check working by not sending enough bytes
+
+	if err == nil {
+		t.Fatalf("Should have errored, but didn't")
+	}
+}
+
+func TestWatchDescMsg(t *testing.T) {
+	peerid := rand.Uint32()
+	var pkh [20]byte
+	delay := uint16(rand.Int())
+	fee := rand.Int63()
+	var customerBP [33]byte
+	var adBP [33]byte
+
+	_, _ = rand.Read(pkh[:])
+	_, _ = rand.Read(customerBP[:])
+	_, _ = rand.Read(adBP[:])
+
+	msg := NewWatchDescMsg(peerid, pkh, delay, fee, customerBP, adBP)
+	b := msg.Bytes()
+
+	msg2, err := NewWatchDescMsgFromBytes(b, peerid)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !LitMsgEqual(msg, msg2) {
+		t.Fatalf("from bytes mismatch:\n%x\n%x\n", msg.Bytes(), msg2.Bytes())
+	}
+
+	msg3, err := LitMsgFromBytes(b, peerid)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !LitMsgEqual(msg2, msg3) {
+		t.Fatalf("interface mismatch:\n%x\n%x\n", msg2.Bytes(), msg3.Bytes())
+	}
+
+	_, err = LitMsgFromBytes(b[:95], peerid) //purposely error to check working by not sending enough bytes
+
+	if err == nil {
+		t.Fatalf("Should have errored, but didn't")
+	}
+}
+
+func TestComMsg(t *testing.T) {
+	peerid := rand.Uint32()
+	var parTxid [16]byte
+	var pkh [20]byte
+	var elk [32]byte
+	var sig [64]byte
+
+	_, _ = rand.Read(parTxid[:])
+	_, _ = rand.Read(elk[:])
+	_, _ = rand.Read(pkh[:])
+	_, _ = rand.Read(sig[:])
+
+	Elk, _ := chainhash.NewHash(elk[:])
+
+	msg := NewComMsg(peerid, pkh, *Elk, parTxid, sig)
+	b := msg.Bytes()
+
+	msg2, err := NewComMsgFromBytes(b, peerid)
 
 	if err != nil {
 		t.Fatal(err)

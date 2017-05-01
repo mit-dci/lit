@@ -626,19 +626,20 @@ func NewRevMsg(peerid uint32, OP wire.OutPoint, ELK chainhash.Hash, N2ELK [33]by
 
 func NewRevMsgFromBytes(b []byte, peerId uint32) (RevMsg, error) {
 	rv := new(RevMsg)
-	if len(b) != 102 {
-		return *rv, fmt.Errorf("got %d byte REV, expect 102", len(b))
+	rv.PeerIdx = peerId
+
+	if len(b) < 102 {
+		return *rv, fmt.Errorf("got %d b yte REV, expect 102", len(b))
 	}
 
-	rv.PeerIdx = peerId
-	b = b[1:] // get rid of messageType
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
 
 	var op [36]byte
-	copy(op[:], b[:36])
+	copy(op[:], buf.Next(36))
 	rv.Outpoint = *OutPointFromBytes(op)
-	elk, _ := chainhash.NewHash(b[36:68])
+	elk, _ := chainhash.NewHash(buf.Next(32))
 	rv.Elk = *elk
-	copy(rv.N2ElkPoint[:], b[68:])
+	copy(rv.N2ElkPoint[:], buf.Next(33))
 	return *rv, nil
 }
 
@@ -694,14 +695,13 @@ func NewWatchDescMsg(peeridx uint32, destScript [20]byte, delay uint16, fee int6
 
 func NewWatchDescMsgFromBytes(b []byte, peerIDX uint32) (WatchDescMsg, error) {
 	sd := new(WatchDescMsg)
-	if len(b) != 97 {
+	sd.PeerIdx = peerIDX
+
+	if len(b) < 97 {
 		return *sd, fmt.Errorf("WatchannelDescriptor %d bytes, expect 97", len(b))
 	}
 
-	b = b[1:] // get rid of messageType
-	sd.PeerIdx = peerIDX
-
-	buf := bytes.NewBuffer(b)
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
 
 	copy(sd.DestPKHScript[:], buf.Next(20))
 	_ = binary.Read(buf, binary.BigEndian, &sd.Delay)
@@ -717,8 +717,7 @@ func NewWatchDescMsgFromBytes(b []byte, peerIDX uint32) (WatchDescMsg, error) {
 // Bytes turns a WatchannelDescriptor into 100 bytes
 func (self WatchDescMsg) Bytes() []byte {
 	var buf bytes.Buffer
-	msgType := U32tB(uint32(self.MsgType()))
-	buf.Write(msgType)
+	buf.WriteByte(self.MsgType())
 	buf.Write(self.DestPKHScript[:])
 	binary.Write(&buf, binary.BigEndian, self.Delay)
 	binary.Write(&buf, binary.BigEndian, self.Fee)
@@ -759,25 +758,32 @@ func NewComMsg(peerIdx uint32, destPKH [20]byte, elk chainhash.Hash, parTxid [16
 // Silently fails with wrong size input.
 func NewComMsgFromBytes(b []byte, peerIDX uint32) (ComMsg, error) {
 	sm := new(ComMsg)
-	if len(b) != 133 {
+	sm.PeerIdx = peerIDX
+
+	if len(b) < 133 {
 		return *sm, fmt.Errorf("WatchComMsg %d bytes, expect 133", len(b))
 	}
 
-	b = b[1:] // get rid of messageType
-	sm.PeerIdx = peerIDX
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
 
-	copy(sm.DestPKH[:], b[:20])
-	copy(sm.ParTxid[:], b[20:36])
-	copy(sm.Sig[:], b[36:100])
-	copy(sm.Elk[:], b[100:])
+	copy(sm.DestPKH[:], buf.Next(20))
+	copy(sm.ParTxid[:], buf.Next(16))
+	copy(sm.Sig[:], buf.Next(64))
+	copy(sm.Elk[:], buf.Next(32))
+
+	/*
+		copy(sm.DestPKH[:], b[:20])
+		copy(sm.ParTxid[:], b[20:36])
+		copy(sm.Sig[:], b[36:100])
+		copy(sm.Elk[:], b[100:])
+	*/
 	return *sm, nil
 }
 
 // ToBytes turns a ComMsg into 132 bytes
 func (self ComMsg) Bytes() []byte {
 	var buf bytes.Buffer
-	msgType := U32tB(uint32(self.MsgType()))
-	buf.Write(msgType)
+	buf.WriteByte(self.MsgType())
 	buf.Write(self.DestPKH[:])
 	buf.Write(self.ParTxid[:])
 	buf.Write(self.Sig[:])
