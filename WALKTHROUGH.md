@@ -96,14 +96,12 @@ n1ozwFWDbZXKYjqwySv3VaTxNZvdVmQcam is Alice's node-ID (This format will change s
 Bob can connect to Alice:
 
 ```
+lit-af# con n1ozwFWDbZXKYjqwySv3VaTxNZvdVmQcam@pi2
 entered command: con n1ozwFWDbZXKYjqwySv3VaTxNZvdVmQcam@pi2
 
 connected to peer 1
 lit-af# say 1 Hi Alice!
-entered command: say 2 Hi Alice!
-
-
-lit-af# 
+entered command: say 1 Hi Alice!
 ```
 
 Bob puts the pubkey@hostname for Alice and connects.  Then he says hi to Alice.
@@ -138,4 +136,4 @@ You can close the channel cooperatively or non-cooperatively.  Uncooperative is 
 lit-af# break 1
 ```
 
-to non-cooperatively close the channel at the current state.  The node who breaks the channel has to wait 5 blocks before they can use their money.  The other node can spend immediately.  After a cooperative close, they can both spend imediately.  The `break` command does net need a connection to the other node.
+to non-cooperatively close the channel at the current state.  The node who breaks the channel has to wait 5 blocks before they can use their money.  The other node can spend immediately.  After a cooperative close, they can both spend immediately.  The `break` command does not need a connection to the other node.
