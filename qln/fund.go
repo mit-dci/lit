@@ -139,7 +139,8 @@ func (nd *LitNode) FundChannel(peerIdx uint32, ccap, initSend int64) (uint32, er
 	nd.InProg.InitSend = initSend
 	nd.InProg.mtx.Unlock() // switch to defer
 
-	outMsg := lnutil.NewPointReqMsg(peerIdx)
+	cointype := uint32(0)
+	outMsg := lnutil.NewPointReqMsg(peerIdx, cointype)
 
 	nd.OmniOut <- outMsg
 

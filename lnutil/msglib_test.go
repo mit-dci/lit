@@ -41,6 +41,40 @@ func TestChatMsg(t *testing.T) {
 	}
 }
 
+func TestPointReqMsg(t *testing.T) {
+	peerid := rand.Uint32()
+	cointype := rand.Uint32()
+
+	msg := NewPointReqMsg(peerid, cointype)
+	b := msg.Bytes()
+
+	msg2, err := NewPointReqMsgFromBytes(b, peerid)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !LitMsgEqual(msg, msg2) {
+		t.Fatalf("from bytes mismatch:\n%x\n%x\n", msg.Bytes(), msg2.Bytes())
+	}
+
+	msg3, err := LitMsgFromBytes(b, peerid)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !LitMsgEqual(msg2, msg3) {
+		t.Fatalf("interface mismatch:\n%x\n%x\n", msg2.Bytes(), msg3.Bytes())
+	}
+
+	_, err = LitMsgFromBytes(b[:3], peerid) //purposely error to check working
+
+	if err == nil {
+		t.Fatalf("Should have errored, but didn't")
+	}
+}
+
 func TestPointRespMsg(t *testing.T) {
 	peerid := rand.Uint32()
 	channelPub := make([]byte, 33)

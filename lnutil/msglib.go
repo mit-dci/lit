@@ -7,7 +7,6 @@ import (
 
 	"github.com/adiabat/btcd/chaincfg/chainhash"
 	"github.com/adiabat/btcd/wire"
-
 )
 
 //id numbers for messages, semi-arbitrary
@@ -69,7 +68,7 @@ func LitMsgFromBytes(b []byte, peerid uint32) (LitMsg, error) {
 	case MSGID_TEXTCHAT:
 		return NewChatMsgFromBytes(b, peerid)
 	case MSGID_POINTREQ:
-		return NewPointReqMsgFromBytes(peerid)
+		return NewPointReqMsgFromBytes(b, peerid)
 	case MSGID_POINTRESP:
 		return NewPointRespMsgFromBytes(b, peerid)
 	case MSGID_CHANDESC:
@@ -157,22 +156,38 @@ func (self ChatMsg) MsgType() uint8 { return MSGID_TEXTCHAT }
 
 //message with no information, just shows a point is requested
 type PointReqMsg struct {
-	PeerIdx uint32
+	PeerIdx  uint32
+	Cointype uint32
 }
 
-func NewPointReqMsg(peerid uint32) PointReqMsg {
+func NewPointReqMsg(peerid uint32, cointype uint32) PointReqMsg {
 	p := new(PointReqMsg)
 	p.PeerIdx = peerid
+	p.Cointype = cointype
 	return *p
 }
 
-func NewPointReqMsgFromBytes(peerid uint32) (PointReqMsg, error) {
-	return NewPointReqMsg(peerid), nil // no way to have error
+func NewPointReqMsgFromBytes(b []byte, peerid uint32) (PointReqMsg, error) {
+
+	pr := new(PointReqMsg)
+	pr.PeerIdx = peerid
+
+	if len(b) < 5 {
+		return *pr, fmt.Errorf("PointReq msg %d bytes, expect 5\n", len(b))
+	}
+
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
+	coin := buf.Next(4)
+	pr.Cointype = BtU32(coin)
+
+	return *pr, nil
 }
 
 func (self PointReqMsg) Bytes() []byte {
 	var msg []byte
 	msg = append(msg, self.MsgType())
+	coin := U32tB(self.Cointype)
+	msg = append(msg, coin[:]...)
 	return msg
 }
 
@@ -200,7 +215,7 @@ func NewPointRespMsgFromBytes(b []byte, peerid uint32) (PointRespMsg, error) {
 	pm := new(PointRespMsg)
 
 	if len(b) < 100 {
-		return *pm, fmt.Errorf("PointRespHandler err: msg %d bytes, expect 100\n", len(b))
+		return *pm, fmt.Errorf("PointResp err: msg %d bytes, expect 100\n", len(b))
 	}
 
 	pm.PeerIdx = peerid
