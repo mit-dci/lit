@@ -128,12 +128,17 @@ lit-af# push 1 200000
 
 This pushes 200,000 satoshis to the other side of the channel.  You can do this 200 trillion times before the channel needs to be closed.  (Actually, since I don't think you can send that many payments, the software will probably crash if you do manage to exceed 2^48)
 
-### Step 6: Break the channel
+### Step 6: Close/Break the channel
 
-You can close the channel cooperatively or non-cooperatively.  Uncooperative is maybe more fun.  Type:
+You can close the channel cooperatively using:
+
+```
+lit-af# close 1
+```
+or non-cooperatively with:
 
 ```
 lit-af# break 1
 ```
 
-to non-cooperatively close the channel at the current state.  The node who breaks the channel has to wait 5 blocks before they can use their money.  The other node can spend immediately.  After a cooperative close, they can both spend immediately.  The `break` command does not need a connection to the other node.
+to close the channel at the current state. Uncooperative is maybe more fun because the node who breaks the channel has to wait 5 blocks before they can use their money.  The other node can spend immediately.  After a cooperative close, they can both spend immediately.  The `break` command does not need a connection to the other node.
