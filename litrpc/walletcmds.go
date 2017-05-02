@@ -164,22 +164,21 @@ type SweepArgs struct {
 func AdrStringToOutscript(adr string, p *chaincfg.Params) ([]byte, error) {
 	var err error
 	var outScript []byte
-	if adr[:3] == "tb1" || adr[:3] == "bc1" {
-		// try bech32 address
-		outScript, err = bech32.SegWitAddressDecode(adr)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		// try for base58 address
-		adr, err := btcutil.DecodeAddress(adr, p)
-		if err != nil {
-			return nil, err
-		}
-		outScript, err = txscript.PayToAddrScript(adr)
-		if err != nil {
-			return nil, err
-		}
+
+	// try bech32 address
+	_, outScript, err = bech32.Decode(adr)
+	if err == nil {
+		return outScript, nil
+	}
+
+	// try for base58 address
+	oadr, err := btcutil.DecodeAddress(adr, p)
+	if err != nil {
+		return nil, err
+	}
+	outScript, err = txscript.PayToAddrScript(oadr)
+	if err != nil {
+		return nil, err
 	}
 	return outScript, nil
 }
