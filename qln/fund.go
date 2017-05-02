@@ -3,8 +3,8 @@ package qln
 import (
 	"fmt"
 
-	"github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/adiabat/btcd/btcec"
+	"github.com/adiabat/btcd/wire"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
@@ -303,6 +303,7 @@ func (nd LitNode) PointRespHandler(lm *lnutil.LitMsg) error {
 	q.State = new(StatCom)
 	q.State.StateIdx = 0
 	q.State.MyAmt = nd.InProg.Amt - nd.InProg.InitSend
+	q.State.Fee = 10000 // fixed fee for now here.
 
 	// save channel to db
 	err = nd.SaveQChan(q)
@@ -416,6 +417,7 @@ func (nd *LitNode) QChanDescHandler(lm *lnutil.LitMsg) {
 	qc.State = new(StatCom)
 	// similar to SIGREV in pushpull
 	qc.State.MyAmt = initPay
+	qc.State.Fee = 10000
 	qc.State.StateIdx = 0
 	// use new ElkPoint for signing
 	qc.State.ElkPoint = elkPointZero

@@ -12,9 +12,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/adiabat/btcd/blockchain"
+	"github.com/adiabat/btcd/chaincfg"
+	"github.com/adiabat/btcd/wire"
 )
 
 // blockchain settings.  These are kindof bitcoin specific, but not contained in
@@ -33,6 +33,11 @@ const (
 /* checkProofOfWork verifies the header hashes into something
 lower than specified by the 4-byte bits field. */
 func checkProofOfWork(header wire.BlockHeader, p *chaincfg.Params) bool {
+	// litecoin PoW not yet implemented; just accept anything for now
+	if p.Name == "litetest4" {
+		return true
+	}
+
 	target := blockchain.CompactToBig(header.Bits)
 
 	// The target must more than 0.  Why can you even encode negative...

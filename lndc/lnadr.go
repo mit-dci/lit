@@ -8,9 +8,9 @@ import (
 	"net"
 	"strings"
 
-	"github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcutil"
+	"github.com/adiabat/btcd/btcec"
+	"github.com/adiabat/btcd/chaincfg"
+	"github.com/adiabat/btcutil"
 )
 
 // lnAddr...

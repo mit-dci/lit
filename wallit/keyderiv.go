@@ -3,8 +3,8 @@ package wallit
 import (
 	"fmt"
 
-	"github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcutil"
+	"github.com/adiabat/btcd/btcec"
+	"github.com/adiabat/btcutil"
 	"github.com/mit-dci/lit/portxo"
 )
 
@@ -81,26 +81,6 @@ func GetWalletKeygen(idx uint32) portxo.KeyGen {
 	kg.Step[3] = 0 | 1<<31
 	kg.Step[4] = idx | 1<<31
 	return kg
-}
-
-// get a public key from the regular wallet
-func (w *Wallit) GetWalletAddress(idx uint32) *btcutil.AddressWitnessPubKeyHash {
-	if w == nil {
-		fmt.Printf("GetAddress %d nil txstore\n", idx)
-		return nil
-	}
-	priv := w.GetWalletPrivkey(idx)
-	if priv == nil {
-		fmt.Printf("GetAddress %d made nil pub\n", idx)
-		return nil
-	}
-	adr, err := btcutil.NewAddressWitnessPubKeyHash(
-		btcutil.Hash160(priv.PubKey().SerializeCompressed()), w.Param)
-	if err != nil {
-		fmt.Printf("GetAddress %d made nil pub\n", idx)
-		return nil
-	}
-	return adr
 }
 
 // GetUsePrive generates a private key for the given use case & keypath

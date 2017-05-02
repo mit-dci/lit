@@ -37,7 +37,7 @@ being wildcard.  That should be ok to deal with.
 
 */
 
-func LitFullAdrEncode(in [33]byte) string {
+func LitFullKeyAdrEncode(in [33]byte) string {
 	withq := bech32.Encode("ln", in[:])
 	// get rid of the q after the 1.  Pubkeys are always 0x02 or 0x03,
 	// so the first 5 bits are always 0.

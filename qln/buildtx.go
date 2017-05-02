@@ -5,8 +5,8 @@ import (
 
 	"github.com/mit-dci/lit/lnutil"
 
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil/txsort"
+	"github.com/adiabat/btcd/wire"
+	"github.com/adiabat/btcutil/txsort"
 )
 
 // GetStateIdxFromTx returns the state index from a commitment transaction.
@@ -72,7 +72,7 @@ func (q *Qchan) SimpleCloseTx() (*wire.MsgTx, error) {
 	if q == nil || q.State == nil {
 		return nil, fmt.Errorf("SimpleCloseTx: nil chan / state")
 	}
-	fee := int64(5000) // fixed fee for now (on both sides)
+	fee := q.State.Fee // symmetric fee
 
 	// make my output
 	myScript := lnutil.DirectWPKHScript(q.MyRefundPub)
@@ -112,7 +112,8 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
 	var fancyAmt, pkhAmt int64   // output amounts
 	var revPub, timePub [33]byte // pubkeys
 	var pkhPub [33]byte          // the simple output's pub key hash
-	fee := int64(5000)           // fixed fee for now
+
+	fee := s.Fee // fixed fee for now
 
 	// the PKH clear refund also has elkrem points added to mask the PKH.
 	// this changes the txouts at each state to blind sorceror better.

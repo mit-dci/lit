@@ -8,8 +8,8 @@ import (
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 
-	"github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/adiabat/btcd/btcec"
+	"github.com/adiabat/btcd/chaincfg/chainhash"
 )
 
 // Uhh, quick channel.  For now.  Once you get greater spire it upgrades to
@@ -52,6 +52,9 @@ type StatCom struct {
 	WatchUpTo uint64 // have sent out to watchtowers up to this state  ( < stateidx)
 
 	MyAmt int64 // my channel allocation
+
+	Fee int64 // symmetric fee in absolute satoshis
+
 	// their Amt is the utxo.Value minus this
 	Delta int32 // fund amount in-transit; is negative for the pusher
 	// Delta for when the channel is in a collision state which needs to be resolved

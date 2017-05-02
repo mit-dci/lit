@@ -5,10 +5,10 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/adiabat/btcd/chaincfg"
+	"github.com/adiabat/btcd/wire"
+	"github.com/adiabat/btcutil/hdkeychain"
 	"github.com/boltdb/bolt"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil/hdkeychain"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/uspv"
 )
@@ -21,6 +21,11 @@ func NewWallit(
 	w.rootPrivKey = rootkey
 	w.Param = p
 	w.FreezeSet = make(map[wire.OutPoint]*FrozenTx)
+
+	w.FeeRate = 80
+	if w.Param.HDCoinType == 65537 { // litecoin testnet4 has high fee
+		w.FeeRate = 800
+	}
 
 	wallitpath := filepath.Join(path, p.Name)
 

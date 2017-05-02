@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcutil/hdkeychain"
+	"github.com/adiabat/btcd/btcec"
+	"github.com/adiabat/btcutil/hdkeychain"
 )
 
 // DerivePrivateKey returns the private key for a utxo based on a master key
