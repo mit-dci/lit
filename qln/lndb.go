@@ -78,8 +78,8 @@ type LitNode struct {
 	WatchCon *lndc.LNDConn // merge these later
 
 	// OmniChan is the channel for the OmniHandler
-	OmniIn  chan *lnutil.LitMsg
-	OmniOut chan *lnutil.LitMsg
+	OmniIn  chan lnutil.LitMsg
+	OmniOut chan lnutil.LitMsg
 
 	// the current channel that in the process of being created
 	// (1 at a time for now)

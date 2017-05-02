@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-
+  
 	"github.com/adiabat/btcd/wire"
 )
 

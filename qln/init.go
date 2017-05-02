@@ -63,8 +63,8 @@ func NewLitNode(path string, tower bool) (*LitNode, error) {
 
 	nd.RemoteCons = make(map[uint32]*RemotePeer)
 
-	nd.OmniOut = make(chan *lnutil.LitMsg, 10)
-	nd.OmniIn = make(chan *lnutil.LitMsg, 10)
+	nd.OmniOut = make(chan lnutil.LitMsg, 10)
+	nd.OmniIn = make(chan lnutil.LitMsg, 10)
 	//	go nd.OmniHandler()
 	go nd.OutMessager()
 
