@@ -4,11 +4,8 @@ import (
 	"fmt"
 
 	"github.com/adiabat/bech32"
-	"github.com/adiabat/btcd/chaincfg"
-	"github.com/adiabat/btcd/txscript"
 	"github.com/adiabat/btcd/wire"
 	"github.com/adiabat/btcutil"
-	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 )
 
@@ -153,6 +150,22 @@ func (r *LitRPC) Send(args SendArgs, reply *TxidsReply) error {
 		return fmt.Errorf("%d addresses but %d amounts specified",
 			nOutputs, len(args.Amts))
 	}
+	// get cointype for first address.
+	coinType := CoinTypeFromAdr(args.DestAddrs[0])
+	// make sure we support that coin type
+	wal, ok := r.Node.SubWallet[coinType]
+	if !ok {
+		return fmt.Errorf("no connnected wallet for address %s type %d",
+			args.DestAddrs[0], coinType)
+	}
+	// All addresses must have the same cointype as they all
+	// must to be in the same tx.
+	for _, a := range args.DestAddrs {
+		if CoinTypeFromAdr(a) != coinType {
+			return fmt.Errorf("Coin type mismatch for address %s, %s",
+				a, args.DestAddrs[0])
+		}
+	}
 
 	txOuts := make([]*wire.TxOut, nOutputs)
 	for i, s := range args.DestAddrs {
@@ -169,12 +182,12 @@ func (r *LitRPC) Send(args SendArgs, reply *TxidsReply) error {
 	}
 
 	// we don't care if it's witness or not
-	ops, err := r.Node.DefaultWallet.MaybeSend(txOuts, false)
+	ops, err := wal.MaybeSend(txOuts, false)
 	if err != nil {
 		return err
 	}
 
-	err = r.Node.DefaultWallet.ReallySend(&ops[0].Hash)
+	err = wal.ReallySend(&ops[0].Hash)
 	if err != nil {
 		return err
 	}
@@ -190,45 +203,15 @@ type SweepArgs struct {
 	Drop    bool
 }
 
-// AdrStringToOutscript converts an address string into an output script byte slice
-func AdrStringToOutscript(adr string) ([]byte, error) {
-	var err error
-	var outScript []byte
-
-	// use HRP to determine network / wallet to use
-	_, adrData, err := bech32.Decode(adr)
-	if err == nil { // valid bech32 string
-		if len(adrData) != 20 {
-			return nil, fmt.Errorf("Address %s has %d byte payload, expect 20",
-				adr, len(adrData))
-		}
-		var adr160 [20]byte
-		copy(adr160[:], adrData)
-
-		outScript = lnutil.DirectWPKHScriptFromPKH(adr160)
-	} else {
-		// try for base58 address
-		// btcutil addresses don't really work as they won't tell you the
-		// network; you have to tell THEM the network, which defeats the point
-		// of having an address.  default to testnet only here
-		adr, err := btcutil.DecodeAddress(adr, &chaincfg.TestNet3Params)
-		if err != nil {
-			return nil, err
-		}
-
-		outScript, err = txscript.PayToAddrScript(adr)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return outScript, nil
-}
-
-func CoinTypeFromBechAdr(adr string) (uint32, error) {
-	return 0, nil
-}
-
 func (r *LitRPC) Sweep(args SweepArgs, reply *TxidsReply) error {
+	// get cointype for first address.
+	coinType := CoinTypeFromAdr(args.DestAdr)
+	// make sure we support that coin type
+	wal, ok := r.Node.SubWallet[coinType]
+	if !ok {
+		return fmt.Errorf("no connnected wallet for address %s type %d",
+			args.DestAdr, coinType)
+	}
 
 	outScript, err := AdrStringToOutscript(args.DestAdr)
 	if err != nil {
@@ -240,7 +223,7 @@ func (r *LitRPC) Sweep(args SweepArgs, reply *TxidsReply) error {
 		return fmt.Errorf("can't send %d txs", args.NumTx)
 	}
 
-	txids, err := r.Node.DefaultWallet.Sweep(outScript, args.NumTx)
+	txids, err := wal.Sweep(outScript, args.NumTx)
 	if err != nil {
 		return err
 	}
@@ -267,6 +250,15 @@ func (r *LitRPC) Fanout(args FanArgs, reply *TxidsReply) error {
 		return fmt.Errorf("Minimum 5000 per output")
 	}
 
+	// get cointype for first address.
+	coinType := CoinTypeFromAdr(args.DestAdr)
+	// make sure we support that coin type
+	wal, ok := r.Node.SubWallet[coinType]
+	if !ok {
+		return fmt.Errorf("no connnected wallet for address %s type %d",
+			args.DestAdr, coinType)
+	}
+
 	outScript, err := AdrStringToOutscript(args.DestAdr)
 	if err != nil {
 		return err
@@ -281,11 +273,11 @@ func (r *LitRPC) Fanout(args FanArgs, reply *TxidsReply) error {
 	}
 
 	// don't care if inputs are witty or not
-	ops, err := r.Node.DefaultWallet.MaybeSend(txos, false)
+	ops, err := wal.MaybeSend(txos, false)
 	if err != nil {
 		return err
 	}
-	err = r.Node.DefaultWallet.ReallySend(&ops[0].Hash)
+	err = wal.ReallySend(&ops[0].Hash)
 	if err != nil {
 		return err
 	}
