@@ -246,7 +246,8 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 
 	var collision bool
-	incomingDelta := msg.Delta //int32 (may be negative, but should not be)
+	//incomingDelta := uint32(math.Abs(float64(msg.Delta))) //int32 (may be negative, but should not be)
+	incomingDelta := msg.Delta
 
 	// we should be clear to send when we get a deltaSig
 	select {
@@ -256,6 +257,8 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 		// collision
 		collision = true
 	}
+
+	fmt.Printf("COLLISION is (%s)\n", collision)
 
 	// load state from disk
 	err := nd.ReloadQchanState(qc)
@@ -271,7 +274,7 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 	if collision {
 		// incoming delta saved as collision value,
 		// existing (negative) delta value retained.
-		qc.State.Collision = incomingDelta
+		qc.State.Collision = int32(incomingDelta)
 		fmt.Printf("delta sig COLLISION (%d)\n", qc.State.Collision)
 	}
 
@@ -299,7 +302,7 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 
 	if !collision {
 		// no collision, incoming (positive) delta saved.
-		qc.State.Delta = incomingDelta
+		qc.State.Delta = int32(incomingDelta)
 	}
 
 	// they have to actually send you money

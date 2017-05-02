@@ -95,15 +95,10 @@ func (nd *LitNode) LNDCReader(peer *RemotePeer) error {
 			return err
 		}
 
-		fmt.Printf("peer is %d\n", routedMsg.Peer())
+		fmt.Printf("peerIdx is %d\n", routedMsg.Peer())
 		fmt.Printf("routed bytes %x\n", routedMsg.Bytes())
 
-		fmt.Printf("message type %d\n", routedMsg.MsgType())
-
-		_, ok := routedMsg.(lnutil.PointReqMsg)
-		if !ok {
-			fmt.Printf("it's not a point request\n")
-		}
+		fmt.Printf("message type %x\n", routedMsg.MsgType())
 
 		var chanIdx uint32
 		chanIdx = 0
@@ -114,6 +109,8 @@ func (nd *LitNode) LNDCReader(peer *RemotePeer) error {
 				chanIdx = chanCheck
 			}
 		}
+
+		fmt.Printf("chanIdx is %x\n", chanIdx)
 
 		if chanIdx != 0 {
 			err = nd.PeerHandler(routedMsg, peer.QCs[chanIdx], peer)
