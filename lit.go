@@ -30,31 +30,31 @@ const (
 
 // variables for a goodelivery session
 type LitConfig struct {
-	spvHost               string
-	regTest, reSync, hard bool // flag to set networks
-	bc2Net                bool
-	lt4Net                bool
-	verbose               bool
-	birthblock            int32
-	rpcport               uint16
-	bamfport              uint16
-	litHomeDir            string
+	reSync, hard bool // flag to set networks
+
+	// hostnames to connect to for different networks
+	tn3host, bc2host, lt4host, reghost string
+
+	verbose    bool
+	birthblock int32
+	rpcport    uint16
+	bamfport   uint16
+	litHomeDir string
 
 	Params *chaincfg.Params
 }
 
 func setConfig(lc *LitConfig) {
-	spvhostptr := flag.String("spv", "na", "full node to connect to")
-
 	birthptr := flag.Int("tip", hardHeight, "height to begin db sync")
 
 	easyptr := flag.Bool("ez", false, "use easy mode (bloom filters)")
 
 	verbptr := flag.Bool("v", false, "verbose; print all logs to stdout")
 
-	regtestptr := flag.Bool("reg", false, "use regtest (not testnet3)")
-	bc2ptr := flag.Bool("bc2", false, "use bc2 network (not testnet3)")
-	lt4ptr := flag.Bool("lt4", false, "use litecoin-testnet 4 (not testnet3)")
+	tn3ptr := flag.String("tn3", "", "testnet3 full node")
+	regptr := flag.String("reg", "", "regtest full node")
+	bc2ptr := flag.String("bc2", "", "bc2 full node")
+	lt4ptr := flag.String("lt4", "", "litecoin testnet4 full node")
 
 	resyncprt := flag.Bool("resync", false, "force resync from given tip")
 
@@ -66,12 +66,11 @@ func setConfig(lc *LitConfig) {
 
 	flag.Parse()
 
-	lc.spvHost = *spvhostptr
 	lc.birthblock = int32(*birthptr)
 
-	lc.regTest = *regtestptr
-	lc.bc2Net = *bc2ptr
-	lc.lt4Net = *lt4ptr
+	lc.tn3host, lc.bc2host, lc.lt4host, lc.reghost =
+		*tn3ptr, *bc2ptr, *lt4ptr, *regptr
+
 	lc.reSync = *resyncprt
 	lc.hard = !*easyptr
 	lc.verbose = *verbptr
@@ -87,43 +86,42 @@ func setConfig(lc *LitConfig) {
 
 	// soon clean this up into multi-wallet
 
-	if lc.regTest && lc.bc2Net {
-		log.Fatal("error: can't have -bc2 and -reg")
-	}
-	if lc.lt4Net && lc.bc2Net {
-		log.Fatal("error: can't have -lt4 and -bc2")
-	}
-	if lc.regTest && lc.lt4Net {
-		log.Fatal("error: can't have -lt4 and -reg")
-	}
+	//	if lc.regTest && lc.bc2Net {
+	//		log.Fatal("error: can't have -bc2 and -reg")
+	//	}
+	//	if lc.lt4Net && lc.bc2Net {
+	//		log.Fatal("error: can't have -lt4 and -bc2")
+	//	}
+	//	if lc.regTest && lc.lt4Net {
+	//		log.Fatal("error: can't have -lt4 and -reg")
+	//	}
 
-	if lc.lt4Net {
-		lc.Params = &chaincfg.LiteCoinTestNet4Params
-		lc.birthblock = 47295
-		if !strings.Contains(lc.spvHost, ":") {
-			lc.spvHost = lc.spvHost + ":19335"
-		}
-	} else if lc.regTest {
-		lc.Params = &chaincfg.RegressionNetParams
-		lc.birthblock = 120
-		if !strings.Contains(lc.spvHost, ":") {
-			lc.spvHost = lc.spvHost + ":18444"
-		}
-	} else if lc.bc2Net {
-		lc.Params = &chaincfg.BC2NetParams
-		if !strings.Contains(lc.spvHost, ":") {
-			lc.spvHost = lc.spvHost + ":8444"
-		}
-	} else {
-		lc.Params = &chaincfg.TestNet3Params
-		if !strings.Contains(lc.spvHost, ":") {
-			lc.spvHost = lc.spvHost + ":18333"
-		}
-	}
-
-	if lc.reSync && lc.birthblock == hardHeight {
-		log.Fatal("-resync requires -tip")
-	}
+	//	if lc.lt4host != "" {
+	//		lc.Params = &chaincfg.LiteCoinTestNet4Params
+	//		lc.birthblock = 47295
+	//		if !strings.Contains(lc.spvHost, ":") {
+	//			lc.spvHost = lc.spvHost + ":19335"
+	//		}
+	//	} else if lc.regTest {
+	//		lc.Params = &chaincfg.RegressionNetParams
+	//		lc.birthblock = 120
+	//		if !strings.Contains(lc.spvHost, ":") {
+	//			lc.spvHost = lc.spvHost + ":18444"
+	//		}
+	//	} else if lc.bc2Net {
+	//		lc.Params = &chaincfg.BC2NetParams
+	//		if !strings.Contains(lc.spvHost, ":") {
+	//			lc.spvHost = lc.spvHost + ":8444"
+	//		}
+	//	} else {
+	//		lc.Params = &chaincfg.TestNet3Params
+	//		if !strings.Contains(lc.spvHost, ":") {
+	//			lc.spvHost = lc.spvHost + ":18333"
+	//		}
+	//	}
+	//	if lc.reSync && lc.birthblock == hardHeight {
+	//		log.Fatal("-resync requires -tip")
+	//	}
 }
 
 func main() {
@@ -151,6 +149,10 @@ func main() {
 		log.SetOutput(logfile)
 	}
 
+	if conf.tn3host == "" && conf.lt4host == "" && conf.reghost == "" {
+		log.Fatal("error: no network specified; use -tn3, -reg, -lt4")
+	}
+
 	// Keys: the litNode, and wallits, all get 32 byte keys.
 	// Right now though, they all get the *same* key.  For lit as a single binary
 	// now, all using the same key makes sense; could split up later.
@@ -170,11 +172,45 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = node.LinkBaseWallet(
-		key, conf.birthblock, conf.reSync, conf.spvHost, conf.Params)
-	if err != nil {
-		log.Fatal(err)
+	// node is up; link wallets based on args
+	// try litecoin testnet4
+	if conf.lt4host != "" {
+		if !strings.Contains(conf.lt4host, ":") {
+			conf.lt4host = conf.lt4host + ":19335"
+		}
+		err = node.LinkBaseWallet(
+			key, 47295, conf.reSync,
+			conf.lt4host, &chaincfg.LiteCoinTestNet4Params)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
+	// try regtest
+	if conf.reghost != "" {
+		if !strings.Contains(conf.reghost, ":") {
+			conf.reghost = conf.reghost + ":18444"
+		}
+		fmt.Printf("reg: %s\n", conf.reghost)
+		err = node.LinkBaseWallet(
+			key, 120, conf.reSync,
+			conf.reghost, &chaincfg.RegressionNetParams)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	// try testnet3
+	if conf.tn3host != "" {
+		if !strings.Contains(conf.tn3host, ":") {
+			conf.tn3host = conf.tn3host + ":18333"
+		}
+		err = node.LinkBaseWallet(
+			key, hardHeight, conf.reSync,
+			conf.tn3host, &chaincfg.TestNet3Params)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	// try bc2... eh, or don't
 
 	rpcl := new(litrpc.LitRPC)
 	rpcl.Node = node
