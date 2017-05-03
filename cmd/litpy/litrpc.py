@@ -165,13 +165,13 @@ def main(args):
 	f.write(randomString + "\n")
 	f.close()
 	
-	litProcess = subprocess.Popen(["./../../lit","-spv","127.0.0.1","-reg", "-dir", "/dev/shm/test1","-v"], shell=True)
+	litProcess = subprocess.Popen(["./../../lit","-spv","127.0.0.1","-reg", "-dir", "/dev/shm/test1","-v"])
 	time.sleep(3)
 	
 	
 	try:
 		newConn = RegtestConn()
-		newConn.mineblock(1)
+		#newConn.mineblock(1)
 		newConn.getinfo()
 	
 		litConn = LitConn()
@@ -180,6 +180,9 @@ def main(args):
 		addr = litConn.getLegacyAddress()
 		print(addr)
 		newConn.sendTo(addr, 12.34)
+		time.sleep(5)
+		balNew = litConn.getBal()
+		print(balNew)
 		#addr = litConn.getWitAddress()
 		#resp0 = litConn.litSend([addr], [1000000])
 		#print(resp0)
