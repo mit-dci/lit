@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+import websocket
 import sys
 import random
 import subprocess
@@ -33,8 +34,11 @@ class litThread(threading.Thread):
 """
 
 def main(args):
+	if not checkPortOpen(8001):
+		return
+
 	#stop and remove current regtest server
-	subprocess.call(["bitcoin-cli", "-regtest", "stop"])
+	subprocess.call(["bitcoin-cli", "-regtest", "stop"], stderr=subprocess.DEVNULL)
 	home = os.path.expanduser('~')
 	if os.path.exists(home + "/.bitcoin/regtest"):
 		shutil.rmtree(home + "/.bitcoin/regtest")
@@ -80,6 +84,7 @@ def main(args):
 	newConn.getinfo()
 
 	bal = litConn.getBal()
+	dprint("previous bal: " + str(bal))
 	addr = litConn.getLegacyAddress()
 	newConn.sendTo(addr, 12.34)
 	
@@ -89,7 +94,8 @@ def main(args):
 	for i in range(5):
 		time.sleep(3)
 		balNew = litConn.getBal()
-		if balNew != bal and int(balNew) - int(bal) == 1234000000:
+		dprint("current bal: " + str(balNew))
+		if balNew != bal and balNew - bal == 1234000000:
 			print("PASS!")
 			break
 		print("...")

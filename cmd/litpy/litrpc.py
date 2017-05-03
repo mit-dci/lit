@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+import socket
 import websocket
 import json
 import sys
@@ -10,6 +11,21 @@ DEBUG = False
 def dprint(x):
 	if DEBUG:
 		print(x)
+
+def checkPortOpen(port):
+	open = True
+	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	try:
+		s.bind(("127.0.0.1", port))
+	except socket.error as e:
+		open = False
+		if e.errno == 98:
+			print("Port " + str(port) + " used by another process, please close it before continuing tests")
+		else:
+			# something else raised the socket.error exception
+			print(e)
+	s.close()
+	return open
 
 class RegtestConn:
 	rpcuser = "regtestuser"
