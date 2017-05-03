@@ -156,16 +156,16 @@ class litThread(threading.Thread):
 def main(args):
 	
 	subprocess.call(["bitcoind","-daemon","-regtest"])
-	if os.path.exists("/dev/shm/test1"):
-		shutil.rmtree("/dev/shm/test1")
-	os.makedirs("/dev/shm/test1")
-	f = open("/dev/shm/test1/testkey.hex","w+")
+	if os.path.exists("/tmp/test1"):
+		shutil.rmtree("/tmp/test1")
+	os.makedirs("/tmp/test1")
+	f = open("/tmp/test1/testkey.hex","w+")
 	#randomString = os.urandom(32)
 	randomString = ''.join(random.choice("abcdef"+digits) for i in range(64))
 	f.write(randomString + "\n")
 	f.close()
 	
-	litProcess = subprocess.Popen(["./../../lit","-spv","127.0.0.1","-reg", "-dir", "/dev/shm/test1","-v"], shell=True)
+	litProcess = subprocess.Popen(["./../../lit","-spv","127.0.0.1","-reg", "-dir", "/tmp/test1","-v"])
 	time.sleep(3)
 	
 	
