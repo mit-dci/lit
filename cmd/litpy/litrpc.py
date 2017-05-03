@@ -35,7 +35,7 @@ class RegtestConn:
 		payload = json.dumps(rpcCmd)
 		print("sending: " + payload)
 		response = requests.post(RegtestConn.serverURL, headers=RegtestConn.header, data=payload)
-		print("received: " + str(response.json()))
+		#print("received: " + str(response.json()))
 	
 	def getinfo(self):
 		self.id += 1
@@ -154,45 +154,76 @@ class litThread(threading.Thread):
 		"""
 
 def main(args):
+	#stop and remove current regtest server
+	subprocess.call(["bitcoin-cli", "-regtest", "stop"])
+	home = os.path.expanduser('~')
+	if os.path.exists(home + "/.bitcoin/regtest"):
+		shutil.rmtree(home + "/.bitcoin/regtest")
+		
+	time.sleep(1) #otherwise regtest might have error 1 when starting...?
+	subprocess.call(["bitcoind","-daemon","-regtest"]) #restart regtest
+
+	#remove current regtest user data
+	if os.path.exists("/tmp/test1"):
+		shutil.rmtree("/tmp/test1")
 	
-	subprocess.call(["bitcoind","-daemon","-regtest"])
-	if os.path.exists("/dev/shm/test1"):
-		shutil.rmtree("/dev/shm/test1")
-	os.makedirs("/dev/shm/test1")
-	f = open("/dev/shm/test1/testkey.hex","w+")
-	#randomString = os.urandom(32)
+	#make new regtest user
+	os.makedirs("/tmp/test1")
+	f = open("/tmp/test1/testkey.hex","w+")
 	randomString = ''.join(random.choice("abcdef"+digits) for i in range(64))
 	f.write(randomString + "\n")
 	f.close()
 	
-	litProcess = subprocess.Popen(["./../../lit","-spv","127.0.0.1","-reg", "-dir", "/dev/shm/test1","-v"])
-	time.sleep(3)
+	#wait for regtest network to start up
+	while True:
+		time.sleep(3)
+		try:
+			subprocess.check_output(["bitcoin-cli","-regtest","getbalance"], stderr=subprocess.STDOUT)
+			break #if there is no exception in previous line, regtest network has started up
+		except:
+			print("...")
+			continue
 	
+	#start lit
+	print("starting lit")
+	litProcess = subprocess.Popen(["./../../lit","-spv","127.0.0.1","-reg", "-dir", "/tmp/test1","-v"])
+	while True:
+		time.sleep(1)
+		try:
+			litConn = LitConn()
+			break
+		except:
+			print("...")
+			continue
 	
-	try:
-		newConn = RegtestConn()
-		#newConn.mineblock(1)
-		newConn.getinfo()
+	newConn = RegtestConn()
+	newConn.mineblock(101)
+	newConn.getinfo()
+
+	bal = litConn.getBal()
+	print(bal)
+	addr = litConn.getLegacyAddress()
+	print(addr)
+	newConn.sendTo(addr, 12.34)
 	
-		litConn = LitConn()
-		bal = litConn.getBal()
-		print(bal)
-		addr = litConn.getLegacyAddress()
-		print(addr)
-		newConn.sendTo(addr, 12.34)
-		time.sleep(5)
+	#wait for transaction to be received (max 15 seconds timeout)
+	for i in range(5):
+		time.sleep(3)
 		balNew = litConn.getBal()
-		print(balNew)
-		#addr = litConn.getWitAddress()
-		#resp0 = litConn.litSend([addr], [1000000])
-		#print(resp0)
-		
-		litProcess.terminate()
-	except:
-		print("error!!!")
-		print(sys.exc_info())
-		litProcess.terminate()
-		
+		if balNew != bal:
+			break
+	print(balNew)
+	
+	#addr = litConn.getWitAddress()
+	#resp0 = litConn.litSend([addr], [1000000])
+	#print(resp0)
+	
+	litProcess.terminate()
+
+	#print("error!!!")
+	#print(sys.exc_info())
+	#litProcess.terminate()
+	
 	
 if __name__ == '__main__':
 	main(sys.argv)
