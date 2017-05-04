@@ -3,6 +3,7 @@
 
 import json
 import random
+import time
 import websocket  # `pip install websocket-client`
 
 class LitConnection():
@@ -12,9 +13,17 @@ class LitConnection():
         self.port = port
 
     def connect(self):
-        """Connect to the node"""
+        """Connect to the node. Continue trying for 10 seconds"""
         self.ws = websocket.WebSocket()
-        self.ws.connect("ws://%s:%s/ws" % (self.ip, self.port))
+        for _ in range(50):
+            try:
+                self.ws.connect("ws://%s:%s/ws" % (self.ip, self.port))
+            except ConnectionRefusedError:
+                # lit is not ready to accept connections yet
+                time.sleep(0.2)
+            else:
+                # No exception - we're connected!
+                break
 
     def newAddr(self):
         """Add a new wallit address"""
@@ -56,7 +65,21 @@ class LitConnection():
         resp = json.loads(self.ws.recv())
         return resp
 
+    def stop(self):
+        """Stop lit"""
+        rpcCmd = {
+            "method": "LitRPC.Stop",
+            "params": []
+        }
+
+        rid = random.randint(0, 9999)
+        rpcCmd.update({"jsonrpc": "2.0", "id": str(rid)})
+        self.ws.send(json.dumps(rpcCmd))
+        resp = json.loads(self.ws.recv())
+        return resp
+
 if __name__ == '__main__':
+    """Test litrpc.py. lit instance must be running and available on 127.0.0.1:8001"""
     litConn = LitConnection("127.0.0.1", "8001")
     litConn.connect()
     print(litConn.newAddr())
