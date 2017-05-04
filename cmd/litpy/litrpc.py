@@ -4,29 +4,16 @@
 import json
 import random
 import requests
-import sys
 import websocket  # `pip install websocket-client`
 
-def mineblock():
-    rpcCmd = {
-        "method": "getinfo",
-        "params": []
-    }
-
-    rpcCmd.update({"jsonrpc": "2.0", "id": "99"})
-
-    rpcuser = "regtestuser"
-    rpcpass = "regtestpass"
-    rpcport = 18332
-    serverURL = "http://" + rpcuser + ":" + rpcpass + "@127.0.0.1:" + str(rpcport)
-
-    header = {"Content-type": "application/json"}
-    payload = json.dumps(rpcCmd)
-    print(payload)
-    response = requests.post(serverURL, headers=header, data=payload)
-    print(response.json())
+def litconnect():
+    """Connect to a lit node"""
+    ws = websocket.WebSocket()
+    ws.connect("ws://127.0.0.1:8001/ws")
+    return ws
 
 def litNewAddr(wsconn):
+    """Add a new wallit address"""
     rpcCmd = {
         "method": "LitRPC.Address",
         "params": [{"NumToMake": 0}]
@@ -40,6 +27,7 @@ def litNewAddr(wsconn):
     return resp["result"]["WitAddresses"][0]
 
 def litSend(wsconn, adr, amt):
+    """Send amt to adr"""
     rpcCmd = {
         "method": "LitRPC.Send",
         "params": [
@@ -60,6 +48,7 @@ def litconnect():
     return ws
 
 def getaddress():
+    """Add a wallit address and get balance."""
     rpcCmd = {
         "method": "LitRPC.Address",
         "params": [{"NumToMake": 0}]
@@ -86,10 +75,27 @@ def getaddress():
     result = json.loads(ws.recv())
     print(result)
 
-def main(args):
+def mineblock():
+    """Mine a block on the bitcoind node"""
+    rpcCmd = {
+        "method": "getinfo",
+        "params": []
+    }
+
+    rpcCmd.update({"jsonrpc": "2.0", "id": "99"})
+
+    rpcuser = "regtestuser"
+    rpcpass = "regtestpass"
+    rpcport = 18332
+    serverURL = "http://" + rpcuser + ":" + rpcpass + "@127.0.0.1:" + str(rpcport)
+
+    header = {"Content-type": "application/json"}
+    payload = json.dumps(rpcCmd)
+    print(payload)
+    response = requests.post(serverURL, headers=header, data=payload)
+    print(response.json())
+
+if __name__ == '__main__':
     ws = litconnect()
     resp = litNewAddr(ws)
     print(resp)
-
-if __name__ == '__main__':
-    main(sys.argv)
