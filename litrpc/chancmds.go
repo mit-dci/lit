@@ -104,7 +104,8 @@ func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
 			args.Capacity, spendable-50000)
 	}
 
-	idx, err := r.Node.FundChannel(args.Peer, args.Capacity, args.InitialSend)
+	idx, err := r.Node.FundChannel(
+		args.Peer, args.CoinType, args.Capacity, args.InitialSend)
 	if err != nil {
 		return err
 	}

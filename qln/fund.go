@@ -99,7 +99,13 @@ an exact timing for the payment.
 
 // FundChannel opens a channel with a peer.  Doesn't return until the channel
 // has been created.  Maybe timeout if it takes too long?
-func (nd *LitNode) FundChannel(peerIdx uint32, ccap, initSend int64) (uint32, error) {
+func (nd *LitNode) FundChannel(
+	peerIdx, cointype uint32, ccap, initSend int64) (uint32, error) {
+
+	_, ok := nd.SubWallet[cointype]
+	if !ok {
+		return 0, fmt.Errorf("No wallet of type %d connected", cointype)
+	}
 
 	nd.InProg.mtx.Lock()
 	//	defer nd.InProg.mtx.Lock()
@@ -138,12 +144,12 @@ func (nd *LitNode) FundChannel(peerIdx uint32, ccap, initSend int64) (uint32, er
 	nd.InProg.Amt = ccap
 	nd.InProg.InitSend = initSend
 
-	// TODO get coin type in arg here
-	nd.InProg.Coin = 257
+	nd.InProg.Coin = cointype
 	nd.InProg.mtx.Unlock() // switch to defer
 
 	outMsg := new(lnutil.LitMsg)
 	outMsg.MsgType = lnutil.MSGID_POINTREQ
+	outMsg.Data = lnutil.U32tB(cointype)
 	// TODO point request must include coin type
 	outMsg.PeerIdx = peerIdx
 	// no message body / data
@@ -177,12 +183,22 @@ func (nd *LitNode) PointReqHandler(lm *lnutil.LitMsg) {
 	}
 
 	// TODO : this needs to be coin type
-	coin := uint32(257)
+	if len(lm.Data) < 4 {
+		fmt.Printf("PointReqHandler err short data", err.Error())
+		return
+	}
+	cointype := lnutil.BtU32(lm.Data[:3])
+
+	_, ok := nd.SubWallet[cointype]
+	if !ok {
+		fmt.Printf("PointReqHandler err no wallet for type %d", cointype)
+		return
+	}
 
 	var kg portxo.KeyGen
 	kg.Depth = 5
 	kg.Step[0] = 44 | 1<<31
-	kg.Step[1] = coin | 1<<31
+	kg.Step[1] = cointype | 1<<31
 	kg.Step[2] = UseChannelFund
 	kg.Step[3] = lm.PeerIdx | 1<<31
 	kg.Step[4] = cIdx | 1<<31
