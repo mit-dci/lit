@@ -3,6 +3,7 @@
 
 import json
 import random
+import time
 import websocket  # `pip install websocket-client`
 
 class LitConnection():
@@ -12,9 +13,17 @@ class LitConnection():
         self.port = port
 
     def connect(self):
-        """Connect to the node"""
+        """Connect to the node. Continue trying for 10 seconds"""
         self.ws = websocket.WebSocket()
-        self.ws.connect("ws://%s:%s/ws" % (self.ip, self.port))
+        for _ in range(50):
+            try:
+                self.ws.connect("ws://%s:%s/ws" % (self.ip, self.port))
+            except ConnectionRefusedError:
+                # lit is not ready to accept connections yet
+                time.sleep(0.2)
+            else:
+                # No exception - we're connected!
+                break
 
     def newAddr(self):
         """Add a new wallit address"""
