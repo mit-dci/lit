@@ -30,8 +30,7 @@ def litSend(wsconn, adr, amt):
     rpcCmd = {
         "method": "LitRPC.Send",
         "params": [
-            {"DestAddrs": adr},
-            {"Amts": amt},
+            {"DestAddrs": adr, "Amts": amt},
         ]
     }
 
