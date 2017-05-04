@@ -5,53 +5,59 @@ import json
 import random
 import websocket  # `pip install websocket-client`
 
-def litconnect():
-    """Connect to a lit node"""
-    ws = websocket.WebSocket()
-    ws.connect("ws://127.0.0.1:8001/ws")
-    return ws
+class LitConnection():
+    """A class representing a connection to a lit node."""
+    def __init__(self, ip, port):
+        self.ip = ip
+        self.port = port
 
-def litNewAddr(wsconn):
-    """Add a new wallit address"""
-    rpcCmd = {
-        "method": "LitRPC.Address",
-        "params": [{"NumToMake": 0}]
-    }
+    def connect(self):
+        """Connect to the node"""
+        self.ws = websocket.WebSocket()
+        self.ws.connect("ws://%s:%s/ws" % (self.ip, self.port))
 
-    rid = random.randint(0, 9999)
-    rpcCmd.update({"jsonrpc": "2.0", "id": str(rid)})
+    def newAddr(self):
+        """Add a new wallit address"""
+        rpcCmd = {
+            "method": "LitRPC.Address",
+            "params": [{"NumToMake": 0}]
+        }
 
-    wsconn.send(json.dumps(rpcCmd))
-    resp = json.loads(wsconn.recv())
-    return resp["result"]["WitAddresses"][0]
+        rid = random.randint(0, 9999)
+        rpcCmd.update({"jsonrpc": "2.0", "id": str(rid)})
 
-def litSend(wsconn, adr, amt):
-    """Send amt to adr"""
-    rpcCmd = {
-        "method": "LitRPC.Send",
-        "params": [
-            {"DestAddrs": adr, "Amts": amt},
-        ]
-    }
+        self.ws.send(json.dumps(rpcCmd))
+        resp = json.loads(self.ws.recv())
+        return resp["result"]["WitAddresses"][0]
 
-    rid = random.randint(0, 9999)
-    rpcCmd.update({"jsonrpc": "2.0", "id": str(rid)})
-    wsconn.send(json.dumps(rpcCmd))
-    resp = json.loads(wsconn.recv())
-    return resp
+    def balance(self):
+        """Get wallit balance"""
+        rpcCmd = {
+            "method": "LitRPC.Bal",
+            "params": []
+        }
+        rpcCmd.update({"jsonrpc": "2.0", "id": "92"})
 
-def litBalance(wsconn):
-    """Get wallit balance"""
-    rpcCmd = {
-        "method": "LitRPC.Bal",
-        "params": []
-    }
-    rpcCmd.update({"jsonrpc": "2.0", "id": "92"})
+        self.ws.send(json.dumps(rpcCmd))
+        return json.loads(self.ws.recv())
 
-    wsconn.send(json.dumps(rpcCmd))
-    return json.loads(wsconn.recv())
+    def send(self, adr, amt):
+        """Send amt to adr"""
+        rpcCmd = {
+            "method": "LitRPC.Send",
+            "params": [
+                {"DestAddrs": adr, "Amts": amt},
+            ]
+        }
+
+        rid = random.randint(0, 9999)
+        rpcCmd.update({"jsonrpc": "2.0", "id": str(rid)})
+        self.ws.send(json.dumps(rpcCmd))
+        resp = json.loads(self.ws.recv())
+        return resp
 
 if __name__ == '__main__':
-    ws = litconnect()
-    resp = litNewAddr(ws)
-    print(resp)
+    litConn = LitConnection("127.0.0.1", "8001")
+    litConn.connect()
+    print(litConn.newAddr())
+    print(litConn.balance())
