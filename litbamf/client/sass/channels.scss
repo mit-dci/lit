@@ -10,14 +10,57 @@
 
   #peerList {
     height: 100%;
-    width: 100px;
+    width: 200px;
     margin: 0;
     padding: 0;
     list-style: none;
+    border-right: 1px solid #fff;
 
     li {
 
-      margin: 20px 10px;
+      button {
+        width: 100%;
+        padding: 20px 10px;
+        background: none;
+        color: #fff;
+        border: none;
+        outline: none;
+        display: flex;
+
+        span {
+          flex: 1;
+          margin: auto;
+        }
+
+        button {
+          display: inline-block;
+          padding: 0 0;
+          float: right;
+          border: 1px solid white;
+          width: auto;
+
+          .material-icons {
+            font-size: 15px;
+            padding: 2px 2px;
+          }
+        }
+      }
+
+      &#peer-add {
+        margin: 0 5px;
+        font-size: 16px;
+        text-align: center;
+
+        a {
+          display: block;
+          width: 100px;
+          margin: auto;
+          height: 100%;
+          text-decoration: none;
+          border: 1px solid #fff;
+          color: #fff;
+        }
+      }
     }
   }
 
@@ -36,7 +79,7 @@
       col:nth-child(3){flex: 1}
       col:nth-child(3){flex: 1}
 
-       th, td {
+      th, td {
         padding: 10px 0;
         text-align: center;
 
@@ -57,5 +100,92 @@
 
   .chan-capacity {
     width: 100px;
+  }
+}
+
+#peer-modal {
+  .css-modal_inner {
+    width: 600px;
+  }
+
+  .css-modal_content {
+    display: flex;
+
+    div {
+      flex: 1;
+      text-align: center;
+
+      &:first-child {
+      }
+
+      &:last-child {
+        display: flex;
+      }
+    }
+
+    input[type="text"] {
+      display: block;
+      margin: 20px 0;
+      background: transparent;
+      border: none;
+      outline: none;
+      border-bottom: 1px solid white;
+      color: #fff;
+
+      &#address {
+        width: 450px;
+      }
+    }
+
+    button {
+      margin: auto;
+      width: 40px;
+      height: 40px;
+      background: none;
+      color: #fff;
+    }
+  }
+}
+
+#nickname-modal {
+  .css-modal_inner {
+    width: 400px;
+  }
+
+  .css-modal_content {
+    display: flex;
+
+    div {
+      display: flex;
+      align-items: center;
+
+      &:first-child {
+        flex: 2;
+      }
+
+      &:last-child {
+        flex: 1;
+        justify-content: flex-end;
+      }
+    }
+
+    input[type="text"] {
+      display: block;
+      margin: 20px 0;
+      width: 100%;
+      background: transparent;
+      border: none;
+      outline: none;
+      border-bottom: 1px solid white;
+      color: #fff;
+    }
+
+    button {
+      width: 40px;
+      height: 40px;
+      background: none;
+      color: #fff;
+      float: right;
+    }
   }
 }

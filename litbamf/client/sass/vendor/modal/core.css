@@ -1,0 +1,270 @@
+/**
+ * Prevent overflow on HTML element
+ */
+html {
+  overflow-y: scroll;
+  -webkit-overflow-scrolling: touch; /* Native scroll momentum */
+}
+
+/**
+ * To prevent jumping <body> should not have any margin on top or bottom
+ */
+.has-overlay {
+  overflow: hidden;
+  height: auto;
+}
+
+.has-overlay > body {
+  height: 100%;
+  overflow: hidden;
+}
+
+.css-modal {
+  /* Hide initially */
+  transform: translate(0, 100%);
+  transform: translate3d(0, 100%, 0);
+
+  /* Maintain a fixed position */
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--modal--layer);
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  opacity: 0;
+}
+
+/* Show modal when requested */
+.css-modal:target,
+.css-modal.is-active {
+  transform: translate(0, 0);
+
+  width: auto;
+  height: auto;
+
+  opacity: 1;
+}
+
+/**
+ * Content Area
+ */
+.css-modal_inner {
+  position: absolute;
+  top: 3rem;
+  left: 50%;
+  z-index: 20;
+  width: var(--modal--max-width);
+  overflow: hidden;
+  transform: translateX(-50%);
+
+  -webkit-overflow-scrolling: touch; /* Native style momentum scrolling */
+}
+
+.css-modal_inner > img,
+.css-modal_inner > video,
+.css-modal_inner > iframe {
+  width: 100%;
+  height: auto;
+  min-height: 300px;
+}
+
+.css-modal_inner > img {
+  width: auto;
+  max-width: 100%;
+}
+
+.css-modal_inner iframe {
+  display: block;
+  width: 100%;
+  border: 0;
+}
+
+/**
+ * Content
+ */
+.css-modal_content {
+  position: relative;
+  max-height: calc(80vh - (3rem * 2));
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.css-modal_content > * {
+  max-width: 100%;
+}
+
+/**
+ * Footer
+ */
+.css-modal_footer {
+  border-top: 1px solid lighten(var(--modal--border-color), 20);
+  padding: 0 1.2rem 1rem;
+  background: #f0f0f0;
+  border-radius: 2px;
+}
+
+/**
+ * A close button
+ */
+.css-modal_close {
+  display: block;
+  height: 1px; /* Prevent close element to appear */
+  clip: rect(0 0 0 0);
+  margin: -1px;
+  overflow: hidden;
+}
+
+.css-modal_close_button:focus::after {
+  outline: 1px dotted;
+  outline: -webkit-focus-ring-color auto 5px;
+}
+
+/**
+ * Background as close
+ */
+.css-modal_close_area::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  background-color: var(--modal--background);
+}
+
+
+/**
+ * Actual close button on modal
+ */
+.css-modal_close_button::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: auto;
+  z-index: 20;
+}
+
+
+/**
+ * When screen isn't as wide as the modal anymore
+ */
+@media (max-width: 30em) {
+  .css-modal_inner {
+    width: auto;
+    left: var(--modal--content-margin);
+    right: var(--modal--content-margin);
+    margin-left: 0;
+  }
+
+  .css-modal_close::after {
+    margin-right: 0 !important;
+    right: car(--modal--content-margin);
+  }
+}
+
+/**
+ * For small screens adjust the modal
+ */
+@media (max-width: 30em) {
+  .css-modal {
+    transform: translate3d(0, 100%, 0);
+    transition: opacity 1ms .25s;
+    display: block;
+    right: auto;
+    bottom: auto;
+  }
+
+  .css-modal:target,
+  .css-modal.is-active {
+    width: 100%;
+    height: 100%;
+  }
+
+  .css-modal_inner {
+    box-sizing: border-box;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 100%;
+    overflow: auto;
+  }
+
+  .css-modal_content {
+    max-height: none;
+
+    /**
+     * Prevent text from breaking modal in mobile view
+     */
+    -ms-word-break: break-all;
+        word-break: break-all;
+        word-break: break-word; /* Non-standard for WebKit */
+    hyphens: auto;
+  }
+
+  .css-modal_close {
+    display: none;
+    right: auto;
+  }
+
+  .css-modal_close::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 20;
+  }
+
+  .css-modal_close::after {
+    top: 0.25em !important;
+    right: 0.25em;
+    left: auto;
+    margin-left: 0;
+  }
+}
+
+
+/**
+ * Stackable Modals
+ */
+.css-modal.is-stacked {
+  transform: translate(0, 0) scale(1, 1);
+  opacity: 1;
+}
+
+.css-modal.is-stacked .css-modal_inner {
+  animation: scaleDown .7s ease both;
+}
+
+
+/**
+ * Hide overlay and close button
+ */
+.css-modal.is-stacked .css-modal_close {
+  opacity: 0;
+}
+
+
+/**
+ * On small screens
+ */
+@media (max-width: 30em) {
+  .css-modal.is-stacked {
+    animation: scaleDown .7s ease both;
+  }
+
+  .css-modal_inner {
+    animation: none;
+  }
+
+
+  .css-modal_close {
+    opacity: 1;
+  }
+}

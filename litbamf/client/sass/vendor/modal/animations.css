@@ -1,0 +1,15 @@
+/**
+ * Animations for CSS Modal
+ *
+ */
+
+/* Configuration: */
+:root {
+  --modal--transition-duration: 0.4s;
+}
+
+@media screen and (min-width: 30em) {
+  .css-modal--transition--fade {
+    transition: opacity var(--modal--transition-duration);
+  }
+}

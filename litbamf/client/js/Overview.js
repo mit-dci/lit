@@ -16,7 +16,6 @@ class Overview extends React.Component {
     };
   }
   update () {
-    console.log('all of them');
     Q.spread([
       lc.send('LitRPC.ListConnections'),
       lc.send('LitRPC.GetListeningPorts'),
