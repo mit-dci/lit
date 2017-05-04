@@ -65,7 +65,21 @@ class LitConnection():
         resp = json.loads(self.ws.recv())
         return resp
 
+    def stop(self):
+        """Stop lit"""
+        rpcCmd = {
+            "method": "LitRPC.Stop",
+            "params": []
+        }
+
+        rid = random.randint(0, 9999)
+        rpcCmd.update({"jsonrpc": "2.0", "id": str(rid)})
+        self.ws.send(json.dumps(rpcCmd))
+        resp = json.loads(self.ws.recv())
+        return resp
+
 if __name__ == '__main__':
+    """Test litrpc.py. lit instance must be running and available on 127.0.0.1:8001"""
     litConn = LitConnection("127.0.0.1", "8001")
     litConn.connect()
     print(litConn.newAddr())
