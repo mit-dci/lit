@@ -46,19 +46,11 @@ class LitConnection():
 
     def new_address(self):
         """Add a new wallit address"""
-        return self.send_message("Address", {"NumToMake": 1})
+        return self.Address({"NumToMake": 1})
 
     def balance(self):
         """Get wallit balance"""
-        return self.send_message("Bal")
-
-    def send(self, adr, amt):
-        """Send amt to adr"""
-        return self.send_message("Send", {"DestAddrs": adr, "Amts": amt})
-
-    def stop(self):
-        """Stop lit"""
-        return self.send_message("Stop")
+        return self.Bal()
 
 if __name__ == '__main__':
     """Test litrpc.py. lit instance must be running and available on 127.0.0.1:8001"""
