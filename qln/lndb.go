@@ -96,10 +96,11 @@ type LitNode struct {
 }
 
 type RemotePeer struct {
-	Idx   uint32 // the peer index
-	Con   *lndc.LNDConn
-	QCs   map[uint32]*Qchan   // keep map of all peer's channels in ram
-	OpMap map[[36]byte]uint32 // quick lookup for channels
+	Idx      uint32 // the peer index
+	Nickname string
+	Con      *lndc.LNDConn
+	QCs      map[uint32]*Qchan   // keep map of all peer's channels in ram
+	OpMap    map[[36]byte]uint32 // quick lookup for channels
 }
 
 // InFlightFund is a funding transaction that has not yet been broadcast
@@ -126,6 +127,7 @@ func (inff *InFlightFund) Clear() {
 func (nd *LitNode) GetPubHostFromPeerIdx(idx uint32) ([33]byte, string) {
 	var pub [33]byte
 	var host string
+
 	// look up peer in db
 	err := nd.LitDB.View(func(btx *bolt.Tx) error {
 		mp := btx.Bucket(BKTPeerMap)
@@ -154,6 +156,40 @@ func (nd *LitNode) GetPubHostFromPeerIdx(idx uint32) ([33]byte, string) {
 	return pub, host
 }
 
+// GetNicknameFromPeerIdx gets the pubkey and internet host name for a peer
+func (nd *LitNode) GetNicknameFromPeerIdx(idx uint32) string {
+	var pub [33]byte
+	var nickname string
+
+	// look up peer in db
+	err := nd.LitDB.View(func(btx *bolt.Tx) error {
+		mp := btx.Bucket(BKTPeerMap)
+		if mp == nil {
+			return nil
+		}
+		pubBytes := mp.Get(lnutil.U32tB(idx))
+		if pubBytes != nil {
+			copy(pub[:], pubBytes)
+		}
+		peerBkt := btx.Bucket(BKTPeers)
+		if peerBkt == nil {
+			return fmt.Errorf("no Peers")
+		}
+		prBkt := peerBkt.Bucket(pubBytes)
+		if prBkt == nil {
+			return fmt.Errorf("no peer %x", pubBytes)
+		}
+
+		nickname = string(prBkt.Get(KEYnickname))
+
+		return nil
+	})
+	if err != nil {
+		fmt.Printf(err.Error())
+	}
+	return nickname
+}
+
 // NextIdx returns the next channel index to use.
 func (nd *LitNode) NextChannelIdx() (uint32, error) {
 	var cIdx uint32
@@ -173,7 +209,7 @@ func (nd *LitNode) NextChannelIdx() (uint32, error) {
 	return cIdx, nil
 }
 
-// GetPeerIdx returns the peer index given a pubkey.  Creates it if it's not there
+// GetPeerIdx returdns the peer index given a pubkey.  Creates it if it's not there
 // yet!  Also return a bool for new..?  not needed?
 func (nd *LitNode) GetPeerIdx(pub *btcec.PublicKey, host string) (uint32, error) {
 	var idx uint32
@@ -214,9 +250,46 @@ func (nd *LitNode) GetPeerIdx(pub *btcec.PublicKey, host string) (uint32, error)
 				return err
 			}
 		}
+
 		return nil
 	})
 	return idx, err
+}
+
+// GetPeerIdx returdns the peer index given a pubkey.  Creates it if it's not there
+// yet!  Also return a bool for new..?  not needed?
+func (nd *LitNode) SaveNicknameForPeerIdx(nickname string, idx uint32) error {
+	var pub [33]byte
+	var err error
+
+	// look up peer in db
+	err = nd.LitDB.Update(func(btx *bolt.Tx) error {
+		mp := btx.Bucket(BKTPeerMap)
+		if mp == nil {
+			return nil
+		}
+		pubBytes := mp.Get(lnutil.U32tB(idx))
+		if pubBytes != nil {
+			copy(pub[:], pubBytes)
+		}
+		peerBkt := btx.Bucket(BKTPeers)
+		if peerBkt == nil {
+			return fmt.Errorf("no Peers")
+		}
+		prBkt := peerBkt.Bucket(pubBytes)
+		if prBkt == nil {
+			return fmt.Errorf("no peer %x", pubBytes)
+		}
+
+		err = prBkt.Put(KEYnickname, []byte(nickname))
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	return err
 }
 
 // SaveQchanUtxoData saves utxo data such as outpoint and close tx / status

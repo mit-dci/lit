@@ -37,6 +37,7 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
 
 	// first, see if the peer to connect to is referenced by peer index.
 	var connectAdr string
+
 	// check if a peer number was supplied instead of a pubkeyhash
 	peerIdxint, err := strconv.Atoi(args.LNAddr)
 	// number will mean no error
@@ -61,6 +62,25 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
 	}
 
 	reply.Status = fmt.Sprintf("connected to peer %s", connectAdr)
+	return nil
+}
+
+// ------------------------- name a connection
+type AssignNicknameArgs struct {
+	Peer     uint32
+	Nickname string
+}
+
+func (r *LitRPC) AssignNickname(args AssignNicknameArgs, reply *StatusReply) error {
+	err := r.Node.SaveNicknameForPeerIdx(args.Nickname, args.Peer)
+	if err != nil {
+		return err
+	}
+
+	r.Node.RemoteCons[args.Peer].Nickname = args.Nickname
+
+	reply.Status = fmt.Sprintf("changed nickname of peer %d to %s",
+		args.Peer, args.Nickname)
 	return nil
 }
 
