@@ -30,7 +30,7 @@ class LitConnection():
         """Sends a websocket message to the lit node"""
         if params != []:
             params = [params]
-        self.ws.send(json.dumps({"method": method,
+        self.ws.send(json.dumps({"method": "LitRPC.%s" % method,
                                  "params": params,
                                  "jsonrpc": "2.0",
                                  "id": str(self.msg_id)}))
@@ -40,56 +40,19 @@ class LitConnection():
 
     def newAddr(self):
         """Add a new wallit address"""
-        rpcCmd = {
-            "method": "LitRPC.Address",
-            "params": [{"NumToMake": 0}]
-        }
-
-        rid = random.randint(0, 9999)
-        rpcCmd.update({"jsonrpc": "2.0", "id": str(rid)})
-
-        self.ws.send(json.dumps(rpcCmd))
-        resp = json.loads(self.ws.recv())
-        return resp["result"]["WitAddresses"][0]
+        return self.send_message("Address", {"NumToMake": 1})
 
     def balance(self):
         """Get wallit balance"""
-        rpcCmd = {
-            "method": "LitRPC.Bal",
-            "params": []
-        }
-        rpcCmd.update({"jsonrpc": "2.0", "id": "92"})
-
-        self.ws.send(json.dumps(rpcCmd))
-        return json.loads(self.ws.recv())
+        return self.send_message("Bal")
 
     def send(self, adr, amt):
         """Send amt to adr"""
-        rpcCmd = {
-            "method": "LitRPC.Send",
-            "params": [
-                {"DestAddrs": adr, "Amts": amt},
-            ]
-        }
-
-        rid = random.randint(0, 9999)
-        rpcCmd.update({"jsonrpc": "2.0", "id": str(rid)})
-        self.ws.send(json.dumps(rpcCmd))
-        resp = json.loads(self.ws.recv())
-        return resp
+        return self.send_message("Send", {"DestAddrs": adr, "Amts": amt})
 
     def stop(self):
         """Stop lit"""
-        rpcCmd = {
-            "method": "LitRPC.Stop",
-            "params": []
-        }
-
-        rid = random.randint(0, 9999)
-        rpcCmd.update({"jsonrpc": "2.0", "id": str(rid)})
-        self.ws.send(json.dumps(rpcCmd))
-        resp = json.loads(self.ws.recv())
-        return resp
+        return self.send_message("Stop")
 
 if __name__ == '__main__':
     """Test litrpc.py. lit instance must be running and available on 127.0.0.1:8001"""
