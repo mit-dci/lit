@@ -38,6 +38,12 @@ class LitConnection():
         self.msg_id = self.msg_id + 1 % 10000
         return json.loads(self.ws.recv())
 
+    def __getattr__(self, name):
+        """Dispatches any unrecognised messages to the websocket connection"""
+        def dispatcher(params=[]):
+            return self.send_message(name, params)
+        return dispatcher
+
     def new_address(self):
         """Add a new wallit address"""
         return self.send_message("Address", {"NumToMake": 1})
