@@ -204,7 +204,7 @@ func main() {
 			conf.tn3host = conf.tn3host + ":18333"
 		}
 		err = node.LinkBaseWallet(
-			key, hardHeight, conf.reSync,
+			key, conf.birthblock, conf.reSync,
 			conf.tn3host, &chaincfg.TestNet3Params)
 		if err != nil {
 			log.Fatal(err)
