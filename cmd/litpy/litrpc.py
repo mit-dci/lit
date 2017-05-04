@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 
-import websocket
+import websocket  # `pip install websocket-client`
 import json
 import sys
 import requests
