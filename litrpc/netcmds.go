@@ -77,7 +77,11 @@ func (r *LitRPC) AssignNickname(args AssignNicknameArgs, reply *StatusReply) err
 		return err
 	}
 
-	r.Node.RemoteCons[args.Peer].Nickname = args.Nickname
+	peer, ok := r.Node.RemoteCons[args.Peer]
+	if !ok {
+		return fmt.Errorf("peer %d doesn't exist", args.Peer)
+	}
+	peer.Nickname = args.Nickname
 
 	reply.Status = fmt.Sprintf("changed nickname of peer %d to %s",
 		args.Peer, args.Nickname)
