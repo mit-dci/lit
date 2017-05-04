@@ -1,14 +1,12 @@
 package litrpc
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/adiabat/bech32"
 	"github.com/adiabat/btcd/chaincfg"
 	"github.com/adiabat/btcd/txscript"
 	"github.com/adiabat/btcutil"
-	"github.com/mit-dci/lit/lnutil"
 )
 
 /*
@@ -25,17 +23,8 @@ func AdrStringToOutscript(adr string) ([]byte, error) {
 	var outScript []byte
 
 	// use HRP to determine network / wallet to use
-	_, adrData, err := bech32.Decode(adr)
-	if err == nil { // valid bech32 string
-		if len(adrData) != 20 {
-			return nil, fmt.Errorf("Address %s has %d byte payload, expect 20",
-				adr, len(adrData))
-		}
-		var adr160 [20]byte
-		copy(adr160[:], adrData)
-
-		outScript = lnutil.DirectWPKHScriptFromPKH(adr160)
-	} else {
+	outScript, err = bech32.SegWitAddressDecode(adr)
+	if err != nil { // valid bech32 string
 		// try for base58 address
 		// btcutil addresses don't really work as they won't tell you the
 		// network; you have to tell THEM the network, which defeats the point
