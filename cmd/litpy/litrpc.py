@@ -24,6 +24,19 @@ class LitConnection():
             else:
                 # No exception - we're connected!
                 break
+        self.msg_id = random.randint(0, 9999)
+
+    def send_message(self, method, params=[]):
+        """Sends a websocket message to the lit node"""
+        if params != []:
+            params = [params]
+        self.ws.send(json.dumps({"method": method,
+                                 "params": params,
+                                 "jsonrpc": "2.0",
+                                 "id": str(self.msg_id)}))
+
+        self.msg_id = self.msg_id + 1 % 10000
+        return json.loads(self.ws.recv())
 
     def newAddr(self):
         """Add a new wallit address"""
