@@ -3,7 +3,6 @@
 
 import json
 import random
-import requests
 import websocket  # `pip install websocket-client`
 
 def litconnect():
@@ -42,58 +41,16 @@ def litSend(wsconn, adr, amt):
     resp = json.loads(wsconn.recv())
     return resp
 
-def litconnect():
-    ws = websocket.WebSocket()
-    ws.connect("ws://127.0.0.1:8001/ws")
-    return ws
-
-def getaddress():
-    """Add a wallit address and get balance."""
+def litBalance(wsconn):
+    """Get wallit balance"""
     rpcCmd = {
-        "method": "LitRPC.Address",
-        "params": [{"NumToMake": 0}]
-    }
-
-    rpcCmd.update({"jsonrpc": "2.0", "id": "94"})
-
-    ws = websocket.WebSocket()
-    ws.connect("ws://127.0.0.1:8001/ws")
-
-    ws.send(json.dumps(rpcCmd))
-    result = json.loads(ws.recv())
-
-    result = ws.recv()
-    print(result["result"]["WitAddresses"][2])
-
-    rpc2 = {
         "method": "LitRPC.Bal",
         "params": []
     }
-    rpc2.update({"jsonrpc": "2.0", "id": "92"})
+    rpcCmd.update({"jsonrpc": "2.0", "id": "92"})
 
-    ws.send(json.dumps(rpc2))
-    result = json.loads(ws.recv())
-    print(result)
-
-def mineblock():
-    """Mine a block on the bitcoind node"""
-    rpcCmd = {
-        "method": "getinfo",
-        "params": []
-    }
-
-    rpcCmd.update({"jsonrpc": "2.0", "id": "99"})
-
-    rpcuser = "regtestuser"
-    rpcpass = "regtestpass"
-    rpcport = 18332
-    serverURL = "http://" + rpcuser + ":" + rpcpass + "@127.0.0.1:" + str(rpcport)
-
-    header = {"Content-type": "application/json"}
-    payload = json.dumps(rpcCmd)
-    print(payload)
-    response = requests.post(serverURL, headers=header, data=payload)
-    print(response.json())
+    wsconn.send(json.dumps(rpcCmd))
+    return json.loads(wsconn.recv())
 
 if __name__ == '__main__':
     ws = litconnect()
