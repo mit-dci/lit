@@ -38,7 +38,7 @@ class LitConnection():
         self.msg_id = self.msg_id + 1 % 10000
         return json.loads(self.ws.recv())
 
-    def newAddr(self):
+    def new_address(self):
         """Add a new wallit address"""
         return self.send_message("Address", {"NumToMake": 1})
 
@@ -58,5 +58,5 @@ if __name__ == '__main__':
     """Test litrpc.py. lit instance must be running and available on 127.0.0.1:8001"""
     litConn = LitConnection("127.0.0.1", "8001")
     litConn.connect()
-    print(litConn.newAddr())
+    print(litConn.new_address())
     print(litConn.balance())

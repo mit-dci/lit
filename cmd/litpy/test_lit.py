@@ -26,7 +26,7 @@ def testLit():
 
     litConn = litrpc.LitConnection("127.0.0.1", "8001")
     litConn.connect()
-    litConn.newAddr()
+    litConn.new_address()
     litConn.balance()
     litConn.stop()
 
