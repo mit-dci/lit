@@ -3,8 +3,8 @@ package qln
 import (
 	"fmt"
 
-	"github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/adiabat/btcd/btcec"
+	"github.com/adiabat/btcd/wire"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
@@ -104,26 +104,32 @@ func (nd *LitNode) FundChannel(peerIdx uint32, ccap, initSend int64) (uint32, er
 	nd.InProg.mtx.Lock()
 	//	defer nd.InProg.mtx.Lock()
 	if nd.InProg.PeerIdx != 0 {
+		nd.InProg.mtx.Unlock()
 		return 0, fmt.Errorf("fund with peer %d not done yet", nd.InProg.PeerIdx)
 	}
 
 	if initSend < 0 || ccap < 0 {
+		nd.InProg.mtx.Unlock()
 		return 0, fmt.Errorf("Can't have negative send or capacity")
 	}
 	if ccap < 1000000 { // limit for now
+		nd.InProg.mtx.Unlock()
 		return 0, fmt.Errorf("Min channel capacity 1M sat")
 	}
 	if initSend > ccap {
+		nd.InProg.mtx.Unlock()
 		return 0, fmt.Errorf("Cant send %d in %d capacity channel", initSend, ccap)
 	}
 
 	// TODO - would be convenient if it auto connected to the peer huh
 	if !nd.ConnectedToPeer(peerIdx) {
+		nd.InProg.mtx.Unlock()
 		return 0, fmt.Errorf("Not connected to peer %d. Do that yourself.", peerIdx)
 	}
 
 	cIdx, err := nd.NextChannelIdx()
 	if err != nil {
+		nd.InProg.mtx.Unlock()
 		return 0, err
 	}
 
@@ -133,10 +139,9 @@ func (nd *LitNode) FundChannel(peerIdx uint32, ccap, initSend int64) (uint32, er
 	nd.InProg.InitSend = initSend
 	nd.InProg.mtx.Unlock() // switch to defer
 
-	outMsg := new(lnutil.LitMsg)
-	outMsg.MsgType = lnutil.MSGID_POINTREQ
-	outMsg.PeerIdx = peerIdx
-	// no message body / data
+	cointype := uint32(0)
+	outMsg := lnutil.NewPointReqMsg(peerIdx, cointype)
+
 	nd.OmniOut <- outMsg
 
 	// wait until it's done!
@@ -149,7 +154,7 @@ func (nd *LitNode) FundChannel(peerIdx uint32, ccap, initSend int64) (uint32, er
 // and a refund pubkey hash. (currently makes pubkey hash, need to only make 1)
 // so if someone sends 10 pubkeyreqs, they'll get the same pubkey back 10 times.
 // they have to provide an actual tx before the next pubkey will come out.
-func (nd *LitNode) PointReqHandler(lm *lnutil.LitMsg) {
+func (nd *LitNode) PointReqHandler(msg lnutil.PointReqMsg) {
 
 	/* shouldn't be possible to get this error...
 	if nd.RemoteCon == nil || nd.RemoteCon.RemotePub == nil {
@@ -158,7 +163,7 @@ func (nd *LitNode) PointReqHandler(lm *lnutil.LitMsg) {
 	}*/
 
 	// pub req; check that idx matches next idx of ours and create pubkey
-	// peerArr, _ := nd.GetPubHostFromPeerIdx(lm.PeerIdx)
+	// peerArr, _ := nd.GetPubHostFromPeerIdx(msg.Peer())
 
 	cIdx, err := nd.NextChannelIdx()
 	if err != nil {
@@ -171,7 +176,7 @@ func (nd *LitNode) PointReqHandler(lm *lnutil.LitMsg) {
 	kg.Step[0] = 44 | 1<<31
 	kg.Step[1] = 0 | 1<<31
 	kg.Step[2] = UseChannelFund
-	kg.Step[3] = lm.PeerIdx | 1<<31
+	kg.Step[3] = msg.Peer() | 1<<31
 	kg.Step[4] = cIdx | 1<<31
 
 	myChanPub := nd.GetUsePub(kg, UseChannelFund)
@@ -179,23 +184,16 @@ func (nd *LitNode) PointReqHandler(lm *lnutil.LitMsg) {
 	myHAKDbase := nd.GetUsePub(kg, UseChannelHAKDBase)
 	fmt.Printf("Generated channel pubkey %x\n", myChanPub)
 
-	var msg []byte
-	msg = append(msg, myChanPub[:]...)
-	msg = append(msg, myRefundPub[:]...)
-	msg = append(msg, myHAKDbase[:]...)
-
-	outMsg := new(lnutil.LitMsg)
-	outMsg.MsgType = lnutil.MSGID_POINTRESP
-	outMsg.PeerIdx = lm.PeerIdx
-	outMsg.Data = msg
+	outMsg := lnutil.NewPointRespMsg(msg.Peer(), myChanPub, myRefundPub, myHAKDbase)
 	nd.OmniOut <- outMsg
+	outMsg.Bytes()
 
 	return
 }
 
 // FUNDER
 // PointRespHandler takes in a point response, and returns a channel description
-func (nd LitNode) PointRespHandler(lm *lnutil.LitMsg) error {
+func (nd LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 
 	nd.InProg.mtx.Lock()
 	defer nd.InProg.mtx.Unlock()
@@ -204,15 +202,10 @@ func (nd LitNode) PointRespHandler(lm *lnutil.LitMsg) error {
 		return fmt.Errorf("Got point response but no channel creation in progress")
 	}
 
-	if len(lm.Data) != 99 {
-		return fmt.Errorf("PointRespHandler err: msg %d bytes, expect 99\n",
-			len(lm.Data))
-	}
-
-	if nd.InProg.PeerIdx != lm.PeerIdx {
+	if nd.InProg.PeerIdx != msg.Peer() {
 		return fmt.Errorf(
 			"making channel with peer %d but got PointResp from %d",
-			nd.InProg.PeerIdx, lm.PeerIdx)
+			nd.InProg.PeerIdx, msg.Peer())
 	}
 
 	// make channel (not in db) just for keys / elk
@@ -234,9 +227,9 @@ func (nd LitNode) PointRespHandler(lm *lnutil.LitMsg) error {
 	qc.MyHAKDBase = nd.GetUsePub(qc.KeyGen, UseChannelHAKDBase)
 
 	// chop up incoming message, save points to channel struct
-	copy(qc.TheirPub[:], lm.Data[:33])
-	copy(qc.TheirRefundPub[:], lm.Data[33:66])
-	copy(qc.TheirHAKDBase[:], lm.Data[66:])
+	copy(qc.TheirPub[:], msg.ChannelPub[:])
+	copy(qc.TheirRefundPub[:], msg.RefundPub[:])
+	copy(qc.TheirHAKDBase[:], msg.HAKDbase[:])
 
 	// make sure their pubkeys are real pubkeys
 	_, err := btcec.ParsePubKey(qc.TheirPub[:], btcec.S256())
@@ -278,10 +271,6 @@ func (nd LitNode) PointRespHandler(lm *lnutil.LitMsg) error {
 	// also set outpoint in channel
 	qc.Op = *nd.InProg.op
 
-	// should watch for this tx.  Maybe after broadcasting
-
-	opArr := lnutil.OutPointToBytes(*nd.InProg.op)
-
 	// create initial state for elkrem points
 	qc.State = new(StatCom)
 	qc.State.StateIdx = 0
@@ -308,29 +297,14 @@ func (nd LitNode) PointRespHandler(lm *lnutil.LitMsg) error {
 		return err
 	}
 
-	initPayBytes := lnutil.I64tB(nd.InProg.InitSend) // also will be an arg
-	capBytes := lnutil.I64tB(nd.InProg.Amt)
-
 	// description is outpoint (36), mypub(33), myrefund(33),
 	// myHAKDbase(33), capacity (8),
 	// initial payment (8), ElkPoint0,1,2 (99)
 	// total length 250
 
-	var msg []byte
+	outMsg := lnutil.NewChanDescMsg(msg.Peer(), *nd.InProg.op, qc.MyPub, qc.MyRefundPub,
+		qc.MyHAKDBase, nd.InProg.Amt, nd.InProg.InitSend, elkPointZero, elkPointOne, elkPointTwo)
 
-	msg = append(msg, opArr[:]...)
-	msg = append(msg, qc.MyPub[:]...)
-	msg = append(msg, qc.MyRefundPub[:]...)
-	msg = append(msg, qc.MyHAKDBase[:]...)
-	msg = append(msg, capBytes...)
-	msg = append(msg, initPayBytes...)
-	msg = append(msg, elkPointZero[:]...)
-	msg = append(msg, elkPointOne[:]...)
-	msg = append(msg, elkPointTwo[:]...)
-	outMsg := new(lnutil.LitMsg)
-	outMsg.MsgType = lnutil.MSGID_CHANDESC
-	outMsg.PeerIdx = lm.PeerIdx
-	outMsg.Data = msg
 	nd.OmniOut <- outMsg
 
 	return nil
@@ -339,25 +313,12 @@ func (nd LitNode) PointRespHandler(lm *lnutil.LitMsg) error {
 // RECIPIENT
 // QChanDescHandler takes in a description of a channel output.  It then
 // saves it to the local db, and returns a channel acknowledgement
-func (nd *LitNode) QChanDescHandler(lm *lnutil.LitMsg) {
-	if len(lm.Data) < 250 || len(lm.Data) > 250 {
-		fmt.Printf("got %d byte channel description, expect 250", len(lm.Data))
-		return
-	}
-	var elkPointZero, elkPointOne, elkPointTwo, theirPub, theirRefundPub, theirHAKDbase [33]byte
-	var opArr [36]byte
+func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 
 	// deserialize desc
-	copy(opArr[:], lm.Data[:36])
-	op := lnutil.OutPointFromBytes(opArr)
-	copy(theirPub[:], lm.Data[36:69])
-	copy(theirRefundPub[:], lm.Data[69:102])
-	copy(theirHAKDbase[:], lm.Data[102:135])
-	amt := lnutil.BtI64(lm.Data[135:143])
-	initPay := lnutil.BtI64(lm.Data[143:151])
-	copy(elkPointZero[:], lm.Data[151:184])
-	copy(elkPointOne[:], lm.Data[184:217])
-	copy(elkPointTwo[:], lm.Data[217:])
+	op := msg.Outpoint
+	opArr := lnutil.OutPointToBytes(op)
+	amt := msg.Capacity
 
 	cIdx, err := nd.NextChannelIdx()
 	if err != nil {
@@ -372,16 +333,16 @@ func (nd *LitNode) QChanDescHandler(lm *lnutil.LitMsg) {
 	qc.KeyGen.Step[0] = 44 | 1<<31
 	qc.KeyGen.Step[1] = 0 | 1<<31
 	qc.KeyGen.Step[2] = UseChannelFund
-	qc.KeyGen.Step[3] = lm.PeerIdx | 1<<31
+	qc.KeyGen.Step[3] = msg.Peer() | 1<<31
 	qc.KeyGen.Step[4] = cIdx | 1<<31
 	qc.Value = amt
 	qc.Mode = portxo.TxoP2WSHComp
-	qc.Op = *op
+	qc.Op = op
 
 	qc.MyPub = nd.GetUsePub(qc.KeyGen, UseChannelFund)
-	qc.TheirPub = theirPub
-	qc.TheirRefundPub = theirRefundPub
-	qc.TheirHAKDBase = theirHAKDbase
+	qc.TheirPub = msg.PubKey
+	qc.TheirRefundPub = msg.RefundPub
+	qc.TheirHAKDBase = msg.HAKDbase
 	qc.MyRefundPub = nd.GetUsePub(qc.KeyGen, UseChannelRefund)
 	qc.MyHAKDBase = nd.GetUsePub(qc.KeyGen, UseChannelHAKDBase)
 
@@ -398,12 +359,12 @@ func (nd *LitNode) QChanDescHandler(lm *lnutil.LitMsg) {
 	// create initial state
 	qc.State = new(StatCom)
 	// similar to SIGREV in pushpull
-	qc.State.MyAmt = initPay
+	qc.State.MyAmt = msg.InitPayment
 	qc.State.StateIdx = 0
 	// use new ElkPoint for signing
-	qc.State.ElkPoint = elkPointZero
-	qc.State.NextElkPoint = elkPointOne
-	qc.State.N2ElkPoint = elkPointTwo
+	qc.State.ElkPoint = msg.ElkZero
+	qc.State.NextElkPoint = msg.ElkOne
+	qc.State.N2ElkPoint = msg.ElkTwo
 
 	// create empty elkrem receiver to save
 	//	qc.ElkRcv = new(elkrem.ElkremReceiver)
@@ -458,18 +419,10 @@ func (nd *LitNode) QChanDescHandler(lm *lnutil.LitMsg) {
 	//	}
 	// ACK the channel address, which causes the funder to sign / broadcast
 	// ACK is outpoint (36), ElkPoint0,1,2 (99) and signature (64)
-	var msg []byte
 
-	msg = append(msg, opArr[:]...)
-	msg = append(msg, theirElkPointZero[:]...)
-	msg = append(msg, theirElkPointOne[:]...)
-	msg = append(msg, theirElkPointTwo[:]...)
-	msg = append(msg, sig[:]...)
+	outMsg := lnutil.NewChanAckMsg(msg.Peer(), op, theirElkPointZero, theirElkPointOne, theirElkPointTwo, sig)
+	outMsg.Bytes()
 
-	outMsg := new(lnutil.LitMsg)
-	outMsg.MsgType = lnutil.MSGID_CHANACK
-	outMsg.PeerIdx = lm.PeerIdx
-	outMsg.Data = msg
 	nd.OmniOut <- outMsg
 
 	return
@@ -478,21 +431,9 @@ func (nd *LitNode) QChanDescHandler(lm *lnutil.LitMsg) {
 // FUNDER
 // QChanAckHandler takes in an acknowledgement multisig description.
 // when a multisig outpoint is ackd, that causes the funder to sign and broadcast.
-func (nd *LitNode) QChanAckHandler(lm *lnutil.LitMsg, peer *RemotePeer) {
-	if len(lm.Data) < 199 || len(lm.Data) > 199 {
-		fmt.Printf("got %d byte multiAck, expect 199", len(lm.Data))
-		return
-	}
-	var opArr [36]byte
-	var elkPointZero, elkPointOne, elkPointTwo [33]byte
-	var sig [64]byte
-
-	// deserialize chanACK
-	copy(opArr[:], lm.Data[:36])
-	copy(elkPointZero[:], lm.Data[36:69])
-	copy(elkPointOne[:], lm.Data[69:102])
-	copy(elkPointTwo[:], lm.Data[102:135])
-	copy(sig[:], lm.Data[135:])
+func (nd *LitNode) QChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePeer) {
+	opArr := lnutil.OutPointToBytes(msg.Outpoint)
+	sig := msg.Signature
 
 	// load channel to save their refund address
 	qc, err := nd.GetQchan(opArr)
@@ -506,9 +447,9 @@ func (nd *LitNode) QChanAckHandler(lm *lnutil.LitMsg, peer *RemotePeer) {
 	//		fmt.Printf("QChanAckHandler IngestElkrem err %s", err.Error())
 	//		return
 	//	}
-	qc.State.ElkPoint = elkPointZero
-	qc.State.NextElkPoint = elkPointOne
-	qc.State.N2ElkPoint = elkPointTwo
+	qc.State.ElkPoint = msg.ElkZero
+	qc.State.NextElkPoint = msg.ElkOne
+	qc.State.N2ElkPoint = msg.ElkTwo
 
 	err = qc.VerifySig(sig)
 	if err != nil {
@@ -566,14 +507,9 @@ func (nd *LitNode) QChanAckHandler(lm *lnutil.LitMsg, peer *RemotePeer) {
 	// sig proof should be sent later once there are confirmations.
 	// it'll have an spv proof of the fund tx.
 	// but for now just send the sig.
-	var msg []byte
-	msg = append(msg, opArr[:]...)
-	msg = append(msg, sig[:]...)
 
-	outMsg := new(lnutil.LitMsg)
-	outMsg.MsgType = lnutil.MSGID_SIGPROOF
-	outMsg.PeerIdx = lm.PeerIdx
-	outMsg.Data = msg
+	outMsg := lnutil.NewSigProofMsg(msg.Peer(), msg.Outpoint, sig)
+
 	nd.OmniOut <- outMsg
 
 	return
@@ -582,17 +518,10 @@ func (nd *LitNode) QChanAckHandler(lm *lnutil.LitMsg, peer *RemotePeer) {
 // RECIPIENT
 // SigProofHandler saves the signature the recipent stores.
 // In some cases you don't need this message.
-func (nd *LitNode) SigProofHandler(lm *lnutil.LitMsg, peer *RemotePeer) {
-	if len(lm.Data) < 100 || len(lm.Data) > 100 {
-		fmt.Printf("got %d byte Sigproof, expect ~100\n", len(lm.Data))
-		return
-	}
+func (nd *LitNode) SigProofHandler(msg lnutil.SigProofMsg, peer *RemotePeer) {
 
-	var opArr [36]byte
-	var sig [64]byte
-
-	copy(opArr[:], lm.Data[:36])
-	copy(sig[:], lm.Data[36:])
+	op := msg.Outpoint
+	opArr := lnutil.OutPointToBytes(op)
 
 	qc, err := nd.GetQchan(opArr)
 	if err != nil {
@@ -600,7 +529,7 @@ func (nd *LitNode) SigProofHandler(lm *lnutil.LitMsg, peer *RemotePeer) {
 		return
 	}
 
-	err = qc.VerifySig(sig)
+	err = qc.VerifySig(msg.Signature)
 	if err != nil {
 		fmt.Printf("SigProofHandler err %s", err.Error())
 		return
@@ -612,8 +541,8 @@ func (nd *LitNode) SigProofHandler(lm *lnutil.LitMsg, peer *RemotePeer) {
 		fmt.Printf("SigProofHandler err %s", err.Error())
 		return
 	}
-	op := lnutil.OutPointFromBytes(opArr)
-	err = nd.SubWallet.WatchThis(*op)
+
+	err = nd.SubWallet.WatchThis(op)
 	if err != nil {
 		fmt.Printf("SigProofHandler err %s", err.Error())
 		return

@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 
 	"github.com/boltdb/bolt"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil/hdkeychain"
+	"github.com/adiabat/btcd/chaincfg"
+	"github.com/adiabat/btcd/wire"
+	"github.com/adiabat/btcutil/hdkeychain"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/wallit"
 )
@@ -63,8 +63,8 @@ func NewLitNode(path string, tower bool) (*LitNode, error) {
 
 	nd.RemoteCons = make(map[uint32]*RemotePeer)
 
-	nd.OmniOut = make(chan *lnutil.LitMsg, 10)
-	nd.OmniIn = make(chan *lnutil.LitMsg, 10)
+	nd.OmniOut = make(chan lnutil.LitMsg, 10)
+	nd.OmniIn = make(chan lnutil.LitMsg, 10)
 	//	go nd.OmniHandler()
 	go nd.OutMessager()
 

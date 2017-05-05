@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/adiabat/btcd/chaincfg/chainhash"
+	"github.com/adiabat/btcd/wire"
 	"github.com/btcsuite/fastsha256"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
@@ -60,38 +60,28 @@ func (nd *LitNode) CoopClose(q *Qchan) error {
 		return err
 	}
 
-	opArr := lnutil.OutPointToBytes(q.Op)
+	var signature [64]byte
+	copy(signature[:], sig[:])
 
-	var msg []byte
-	// close request is just the op, sig
-	msg = append(msg, opArr[:]...)
-	msg = append(msg, sig...)
+	// Save something to db... TODO
+	// Should save something, just so the UI marks it as closed, and
+	// we don't accept payments on this channel anymore.
 
-	outMsg := new(lnutil.LitMsg)
-	outMsg.MsgType = lnutil.MSGID_CLOSEREQ
-	outMsg.PeerIdx = q.Peer()
-	outMsg.Data = msg
+	outMsg := lnutil.NewCloseReqMsg(q.Peer(), q.Op, signature)
 
 	nd.OmniOut <- outMsg
-
 	return nil
 }
 
 // CloseReqHandler takes in a close request from a remote host, signs and
 // responds with a close response.  Obviously later there will be some judgment
 // over what to do, but for now it just signs whatever it's requested to.
-func (nd *LitNode) CloseReqHandler(lm *lnutil.LitMsg) {
-	if len(lm.Data) < 100 {
-		log.Printf("got %d byte closereq, expect 100ish\n", len(lm.Data))
-		return
-	}
 
-	// deserialize outpoint
-	var opArr [36]byte
-	copy(opArr[:], lm.Data[:36])
+func (nd *LitNode) CloseReqHandler(msg lnutil.CloseReqMsg) {
+	opArr := lnutil.OutPointToBytes(msg.Outpoint)
 
 	// find their sig
-	theirSig := lm.Data[36:]
+	theirSig := msg.Signature[:]
 
 	// get channel
 	q, err := nd.GetQchan(opArr)

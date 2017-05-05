@@ -4,10 +4,10 @@ import (
 	"fmt"
 
 	"github.com/adiabat/bech32"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
+	"github.com/adiabat/btcd/chaincfg"
+	"github.com/adiabat/btcd/txscript"
+	"github.com/adiabat/btcd/wire"
+	"github.com/adiabat/btcutil"
 	"github.com/mit-dci/lit/portxo"
 )
 
@@ -130,7 +130,7 @@ func (r *LitRPC) Send(args SendArgs, reply *TxidsReply) error {
 			return fmt.Errorf("Amt %d less than min 10000", args.Amts[i])
 		}
 
-		outScript, err := AdrStringToOutscript(s, r.Node.SubWallet.Params())
+		outScript, err := AdrStringToOutscript(s)
 		if err != nil {
 			return err
 		}
@@ -161,21 +161,25 @@ type SweepArgs struct {
 }
 
 // AdrStringToOutscript converts an address string into an output script byte slice
-func AdrStringToOutscript(adr string, p *chaincfg.Params) ([]byte, error) {
+func AdrStringToOutscript(adr string) ([]byte, error) {
 	var err error
 	var outScript []byte
-	if adr[:3] == "tb1" || adr[:3] == "bc1" {
-		// try bech32 address
-		outScript, err = bech32.SegWitAddressDecode(adr)
-		if err != nil {
-			return nil, err
-		}
-	} else {
+
+	// use HRP to determine network / wallet to use
+	outScript, err = bech32.SegWitAddressDecode(adr)
+	if err != nil { // valid bech32 string
 		// try for base58 address
-		adr, err := btcutil.DecodeAddress(adr, p)
+		// btcutil addresses don't really work as they won't tell you the
+		// network; you have to tell THEM the network, which defeats the point
+		// of having an address.  default to testnet only here
+
+		// could work on adding more old-style addresses; for now use new bech32
+		// addresses for multi-wallet / segwit sends.
+		adr, err := btcutil.DecodeAddress(adr, &chaincfg.TestNet3Params)
 		if err != nil {
 			return nil, err
 		}
+
 		outScript, err = txscript.PayToAddrScript(adr)
 		if err != nil {
 			return nil, err
@@ -186,7 +190,7 @@ func AdrStringToOutscript(adr string, p *chaincfg.Params) ([]byte, error) {
 
 func (r *LitRPC) Sweep(args SweepArgs, reply *TxidsReply) error {
 
-	outScript, err := AdrStringToOutscript(args.DestAdr, r.Node.SubWallet.Params())
+	outScript, err := AdrStringToOutscript(args.DestAdr)
 	if err != nil {
 		return err
 	}
@@ -222,7 +226,7 @@ func (r *LitRPC) Fanout(args FanArgs, reply *TxidsReply) error {
 	if args.AmtPerOutput < 5000 {
 		return fmt.Errorf("Minimum 5000 per output")
 	}
-	outScript, err := AdrStringToOutscript(args.DestAdr, r.Node.SubWallet.Params())
+	outScript, err := AdrStringToOutscript(args.DestAdr)
 	if err != nil {
 		return err
 	}
@@ -294,7 +298,8 @@ func (r *LitRPC) Address(args *AddressArgs, reply *AddressReply) error {
 		reply.LegacyAddresses[i] = oldadr.String()
 
 		// convert 20-byte PKH to a bech32 segwit v0 address
-		bech32adr, err := bech32.Tb1AdrFromPKH(a[:])
+		bech32adr, err := bech32.SegWitV0Encode(
+			r.Node.SubWallet.Params().Bech32Prefix, a[:])
 		if err != nil {
 			return err
 		}

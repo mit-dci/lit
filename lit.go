@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/adiabat/btcd/chaincfg"
 	"github.com/mit-dci/lit/litbamf"
 	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/lnutil"

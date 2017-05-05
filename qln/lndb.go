@@ -5,9 +5,9 @@ import (
 	"sync"
 
 	"github.com/boltdb/bolt"
-	"github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
+	"github.com/adiabat/btcd/btcec"
+	"github.com/adiabat/btcd/wire"
+	"github.com/adiabat/btcutil"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
@@ -78,8 +78,8 @@ type LitNode struct {
 	WatchCon *lndc.LNDConn // merge these later
 
 	// OmniChan is the channel for the OmniHandler
-	OmniIn  chan *lnutil.LitMsg
-	OmniOut chan *lnutil.LitMsg
+	OmniIn  chan lnutil.LitMsg
+	OmniOut chan lnutil.LitMsg
 
 	// the current channel that in the process of being created
 	// (1 at a time for now)

@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+"""Python interface to lit"""
 
 import socket
 import websocket
@@ -148,4 +149,3 @@ class LitConn:
 		#TODO: get different kinds of balances
 		return resp["result"]["TxoTotal"]
 
-    

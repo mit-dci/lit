@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/adiabat/btcd/chaincfg/chainhash"
+	"github.com/adiabat/btcd/wire"
 )
 
 // OutPointsEqual
@@ -152,7 +152,7 @@ func TestOutPointToBytes(t *testing.T) {
 
 // OutPointFromBytes
 // test some bytes arrays of 36 byte long
-// this depends on a test of NewOutPoint() in btcsuite/btcd/wire/msgtx.go
+// this depends on a test of NewOutPoint() in adiabat/btcd/wire/msgtx.go
 // and OutPointsEqual() in this file
 func TestOutPointFromBytes(t *testing.T) {
 	// test for a normal situation
@@ -218,7 +218,7 @@ func TestP2WSHify(t *testing.T) {
 
 // DirectWPKHScript
 // test some public keys
-// this depends on a test of Hash160() in btcsuite/btcutil
+// this depends on a test of Hash160() in adiabat/btcutil
 func TestDirectWPKHScript(t *testing.T) {
 	// test for a normal situation(blackbox test)
 	// input: inB33, [33]bytes array, public key

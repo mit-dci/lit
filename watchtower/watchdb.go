@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/adiabat/btcd/chaincfg/chainhash"
+	"github.com/adiabat/btcd/wire"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
 
@@ -113,7 +113,7 @@ func (w *WatchTower) OpenDB(filename string) error {
 
 // AddNewChannel puts a new channel into the watchtower db.
 // Probably need some way to prevent overwrites.
-func (w *WatchTower) AddNewChannel(wd WatchannelDescriptor) error {
+func (w *WatchTower) AddNewChannel(wd lnutil.WatchDescMsg) error {
 	return w.WatchDB.Update(func(btx *bolt.Tx) error {
 		// open index : pkh mapping bucket
 		mapBucket := btx.Bucket(BUCKETPKHMap)
@@ -141,7 +141,7 @@ func (w *WatchTower) AddNewChannel(wd WatchannelDescriptor) error {
 			return err
 		}
 		// save truncated descriptor for static info (drop elk0)
-		wdBytes := wd.ToBytes()
+		wdBytes := wd.Bytes()
 		if len(wdBytes) < 96 {
 			return fmt.Errorf("watchdescriptor %d bytes, expect 96")
 		}
@@ -165,7 +165,7 @@ func (w *WatchTower) AddNewChannel(wd WatchannelDescriptor) error {
 
 // AddMsg adds a new message describing a penalty tx to the db.
 // optimization would be to add a bunch of messages at once.  Not a huge speedup though.
-func (w *WatchTower) AddState(cm ComMsg) error {
+func (w *WatchTower) AddState(cm lnutil.ComMsg) error {
 	return w.WatchDB.Update(func(btx *bolt.Tx) error {
 
 		// first get the channel bucket, update the elkrem and read the idx

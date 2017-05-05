@@ -6,8 +6,8 @@ import (
 	"log"
 
 	"github.com/boltdb/bolt"
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/adiabat/btcd/txscript"
+	"github.com/adiabat/btcd/wire"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/sig64"
@@ -22,7 +22,7 @@ func (w *WatchTower) BuildJusticeTx(badTx *wire.MsgTx) (*wire.MsgTx, error) {
 	var err error
 
 	// wd and elkRcv are the two things we need to get out of the db
-	var wd WatchannelDescriptor
+	var wd lnutil.WatchDescMsg
 	var elkRcv *elkrem.ElkremReceiver
 	var iSig *IdxSig
 
@@ -69,7 +69,14 @@ func (w *WatchTower) BuildJusticeTx(badTx *wire.MsgTx) (*wire.MsgTx, error) {
 			return fmt.Errorf("No static data for pkh %x", pkh)
 		}
 		// deserialize static watchDescriptor struct
-		wd = WatchannelDescriptorFromBytes(static)
+		var peerIdx uint32
+		peerIdx = 0 // should be replaced
+		wd2, err2 := lnutil.NewWatchDescMsgFromBytes(static, peerIdx)
+		if err2 != nil {
+			return err2
+		} else {
+			wd = wd2
+		}
 
 		// get the elkrem receiver
 		elkBytes := pkhBucket.Get(KEYElkRcv)
