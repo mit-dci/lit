@@ -16,50 +16,73 @@
     list-style: none;
     border-right: 1px solid #fff;
 
-    li {
+    ul {
+      padding: 0;
 
-      button {
-        width: 100%;
-        padding: 20px 10px;
-        background: none;
-        color: #fff;
-        border: none;
-        outline: none;
+      li {
         display: flex;
+        padding: 0 10px;
 
-        span {
+        label {
           flex: 1;
-          margin: auto;
+          padding: 10px 5px;
+          margin: 0 5px;
+          background: none;
+          color: #fff;
+          border: none;
+          outline: none;
+          display: flex;
+          text-align: center;
+
+          &.checked {
+            background-color: #444;
+          }
+
+          span {
+            flex: 1;
+            margin: auto;
+          }
+
+          input {
+            display: none;
+          }
         }
 
-        button {
-          display: inline-block;
-          padding: 0 0;
-          float: right;
-          border: 1px solid white;
-          width: auto;
+        div {
+          display: flex;
 
-          .material-icons {
-            font-size: 15px;
-            padding: 2px 2px;
+          button {
+            margin: auto;
+            display: inline-block;
+            padding: 0 0;
+            float: right;
+            border: 1px solid white;
+            width: auto;
+            background: black;
+            color: white;
+
+            .material-icons {
+              font-size: 20px;
+              padding: 2px 2px;
+            }
           }
         }
       }
+    }
 
-      &#peer-add {
-        margin: 0 5px;
-        font-size: 16px;
-        text-align: center;
+    #peer-add {
+      margin: 0 5px;
+      font-size: 16px;
+      text-align: center;
 
-        a {
-          display: block;
-          width: 100px;
-          margin: auto;
-          height: 100%;
-          text-decoration: none;
-          border: 1px solid #fff;
-          color: #fff;
-        }
+      a {
+        display: block;
+        width: 100px;
+        margin: auto;
+        height: 100%;
+        text-decoration: none;
+        border: 1px solid #fff;
+        color: #fff;
       }
     }
   }
@@ -72,23 +95,66 @@
 
     table {
       width: 100%;
+      border-collapse: collapse;
 
       col:nth-child(1){width:150px;}
       col:nth-child(2){width:150px;}
       col:nth-child(3){width:75px;}
-      col:nth-child(3){flex: 1}
-      col:nth-child(3){flex: 1}
+      col:nth-child(4){flex: 1}
+      col:nth-child(5){flex: 1}
 
       th, td {
         padding: 10px 0;
         text-align: center;
+        border-bottom: 1px solid white;
 
-        .chan-xtra {
-          button {
-            width: 20;
-            height: 20;
+        &.chan-zap {
+          form {
+            display: flex;
+            input {
+              margin: auto;
+              background: transparent;
+              border: none;
+              outline: none;
+              border-bottom: 1px solid white;
+              color: #fff;
+            }
+
+            button {
+              margin: auto;
+              width: 40px;
+              height: 40px;
+              background: none;
+              color: #fff;
+            }
           }
         }
+
+        &.chan-xtra {
+          button {
+            width: 30px;
+            height: 30px;
+            background: none;
+            color: #fff;
+          }
+        }
+      }
+    }
+
+    #channel-add {
+      column-span: all;
+      margin: 15px 5px 0 5px;
+      font-size: 16px;
+      text-align: center;
+
+      a {
+        display: block;
+        width: 100px;
+        margin: auto;
+        height: 100%;
+        text-decoration: none;
+        border: 1px solid #fff;
+        color: #fff;
       }
     }
   }
@@ -103,7 +169,7 @@
   }
 }
 
-#peer-modal {
+#peer-modal, #channel-modal {
   .css-modal_inner {
     width: 600px;
   }
@@ -182,6 +248,32 @@
 
     button {
       width: 40px;
+      height: 40px;
+      background: none;
+      color: #fff;
+      float: right;
+    }
+  }
+}
+
+#xtra-modal {
+  .css-modal_inner {
+    width: 600px;
+  }
+
+  .css-modal_content {
+    display: flex;
+
+    div {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 0 20px;
+      flex: 1;
+    }
+
+    button {
+      width: 60px;
       height: 40px;
       background: none;
       color: #fff;

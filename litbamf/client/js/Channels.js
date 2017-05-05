@@ -3,17 +3,18 @@ import lc from './LitClient';
 import Q from 'q';
 require('../sass/channels.scss');
 
-let Actions = Reflux.createActions([])
-
-class PeerStore extends Reflux.Store {
+class Store extends Reflux.Store {
   constructor () {
     super();
 
-    let selectedIdx = window.sessionStorage.selectedPeerIdx || -1;
+    let selectedPeerIdx = window.sessionStorage.selectedPeerIdx || -1;
+    let selectedChannelIdx = window.sessionStorage.selectedChannelIdx || -1;
 
     this.state = {
       peers: [],
-      selectedIdx: selectedIdx,
+      channels: [],
+      selectedPeerIdx: selectedPeerIdx,
+      selectedChannelIdx: selectedChannelIdx,
     };
   }
 }
@@ -25,10 +26,13 @@ class PeerModal extends Reflux.Component {
     this.state = {
       address: '',
     };
-    this.store = PeerStore;
+    this.store = Store;
   }
   connect () {
-    lc.send('LitRPC.Connect', {'LNAddr': this.state.address, 'Nickname': this.state.nickname}).then(res => {
+    lc.send('LitRPC.Connect', {
+      'LNAddr': this.state.address,
+      'Nickname': this.state.nickname,
+    }).then(res => {
       window.location = window.location.href.split('#')[0];
       this.state.peers.append({
         address: this.state.address,
@@ -58,13 +62,13 @@ class PeerModal extends Reflux.Component {
             <h2 id="label-fade">Add Peer</h2>
           </header>
 
-          <div className="css-modal_content">
+          <form action="#" className="css-modal_content">
             <div>
               <input id="address" type="text" placeholder="pubkeyhash@hostname:port"
                 value={this.state.address} onChange={this.handleChange.bind(this)}></input>
             </div>
-            <div><button onClick={this.connect.bind(this)}>Go</button></div>
-          </div>
+            <div><button type="submit" onClick={this.connect.bind(this)}>Go</button></div>
+          </form>
           <div>
             <a href="#!" className="css-modal_close css-modal_close_button"
               title="Close this modal">&times;</a>
@@ -84,11 +88,13 @@ class NicknameModal extends Reflux.Component {
     this.state = {
       nickname: '',
     };
-    this.store = PeerStore;
+    this.store = Store;
   }
   nickname () {
-    console.log(this.state.selectedIdx);
-    lc.send('LitRPC.AssignNickname', {'Peer': parseInt(this.state.selectedIdx), 'Nickname': this.state.nickname}).then(res => {
+    lc.send('LitRPC.AssignNickname', {
+      'Peer': parseInt(this.state.selectedPeerIdx),
+      'Nickname': this.state.nickname,
+    }).then(res => {
       window.location = window.location.href.split('#')[0];
     })
     .fail(err => {
@@ -103,7 +109,6 @@ class NicknameModal extends Reflux.Component {
   render () {
     return (
       <section className="css-modal css-modal--transition--fade" id="nickname-modal"
-        data-stackable="false"
         role="dialog"
         aria-labelledby="label-fade"
         aria-hidden="true">
@@ -113,13 +118,13 @@ class NicknameModal extends Reflux.Component {
             <h2 id="label-fade">Edit Nicknamer</h2>
           </header>
 
-          <div className="css-modal_content">
+          <form action="#" className="css-modal_content">
             <div>
               <input id="nickname" type="text" placeholder="nickname"
                 value={this.state.nickname} onChange={this.handleChange.bind(this)}></input>
             </div>
-            <div><button onClick={this.nickname.bind(this)}>Save</button></div>
-          </div>
+            <div><button type="submit" onClick={this.nickname.bind(this)}>Save</button></div>
+          </form>
           <div>
             <a href="#!" className="css-modal_close css-modal_close_button"
               title="Close this modal">&times;</a>
@@ -136,12 +141,11 @@ class PeerList extends Reflux.Component {
   constructor (props) {
     super(props);
 
-    this.store = PeerStore;
+    this.store = Store;
   }
   update () {
     lc.send('LitRPC.ListConnections').then(connections => {
       let peers = connections.Connections !== null ? connections.Connections : [];
-      console.log(peers);
       this.setState({
         peers: peers,
       });
@@ -151,32 +155,40 @@ class PeerList extends Reflux.Component {
     });
   }
   editNickname (idx) {
-    this.setState({selectedIdx: idx});
+    this.setState({selectedPeerIdx: idx});
     window.sessionStorage.selectedPeerIdx = idx;
     window.location = '#nickname-modal';
+  }
+  changePeer (event) {
+    this.state.selectedPeerIdx = event.target.value;
   }
   render () {
     let peerElements = this.state.peers.map((peer, i) => {
       let idx = i + 1;
       return (
-        <li>
-          <button>
+        <li key={i}>
+          <label className={this.state.selectedPeerIdx == idx ? 'checked' : ''}>
             <span>{peer.Nickname}</span>
+            <input type="radio" onChange={this.changePeer.bind(this)} name="peer" value={idx} />
+          </label>
+          <div>
             <button onClick={this.editNickname.bind(this, idx)}>
               <i className="material-icons">mode_edit</i>
             </button>
-          </button>
+          </div>
         </li>
       );
     });
 
     return (
-      <ul id="peerList">
-        {peerElements}
-        <li id="peer-add">
+      <div id="peerList">
+        <ul>
+          {peerElements}
+        </ul>
+        <div id="peer-add">
           <a href="#peer-modal">+</a>
-        </li>
-      </ul>
+        </div>
+      </div>
     );
   }
   componentDidMount () {
@@ -186,7 +198,34 @@ class PeerList extends Reflux.Component {
 
 class ChannelElement extends React.Component {
   constructor (props) {
-    super(props)
+    super(props);
+
+    this.state = {
+      pushAmount: 0,
+    };
+  }
+  push () {
+    lc.send('LitRPC.Push', {
+      'ChanIdx': parseInt(this.props.idx),
+      'Amt': parseInt(this.state.pushAmount),
+    })
+    .then(res => {
+      this.state.pushAmount = 0;
+      this.props.update();
+    })
+    .fail(err => {
+      console.error(err);
+    });
+  }
+  changePushAmount (event) {
+    this.setState({
+      pushAmount: event.target.value,
+    });
+  }
+  xtraCommands (idx) {
+    this.setState({selectedChannelIdx: this.props.idx});
+    window.sessionStorage.selectedChannelIdx = this.props.idx;
+    window.location = '#xtra-modal';
   }
   render () {
     return (
@@ -195,64 +234,91 @@ class ChannelElement extends React.Component {
         <td className="chan-balance">{this.props.balance}</td>
         <td className="chan-state">{this.props.state}</td>
         <td className="chan-zap">
-          <input></input>
-          <button>Zap</button>
+          <form action="#">
+            <input type="number" placeholder="amount"
+              onChange={this.changePushAmount.bind(this)}
+              value={this.state.pushAmount}></input>
+            <button type="submit" onClick={this.push.bind(this)}>Zap</button>
+          </form>
         </td>
         <td className="chan-xtra">
-          <button >X</button>
+          <button onClick={this.xtraCommands.bind(this)}>X</button>
         </td>
       </tr>
     );
   }
 }
 
-class ChanCmds extends React.Component {
+class ChannelList extends Reflux.Component {
   constructor (props) {
     super(props);
+
+    this.store = Store;
+  }
+  update () {
+    lc.send('LitRPC.ChannelList').then(_channels => {
+      let channels = _channels.Channels !== null ? _channels.Channels : [];
+      channels = channels.filter(chan => chan.PeerIdx == this.state.selectedPeerIdx);
+      this.setState({
+        channels: channels,
+      });
+    })
+    .fail(err => {
+      console.error(err);
+    });
+  }
+  render () {
+    let channelElements = this.state.channels.map((chan, i) => {
+      return <ChannelElement key={i} idx={chan.CIdx} capacity={chan.Capacity}
+        balance={chan.MyBalance} state={chan.StateNum} update={this.update.bind(this)}/>;
+    });
+
+
+    return (
+      <div id="channelList">
+        <table>
+          <thead>
+            <tr>
+              <th className="chan-capacity">Capacity</th>
+              <th className="chan-balance">Balance</th>
+              <th className="chan-state">State</th>
+              <th className="chan-zap">Zap Funds to Channel</th>
+              <th className="chan-xtra"> X-tra Commands</th>
+            </tr>
+          </thead>
+          <tbody>
+            {channelElements}
+          </tbody>
+        </table>
+        <div id="channel-add">
+          <a href="#channel-modal">+</a>
+        </div>
+      </div>
+    );
+  }
+  componentDidMount () {
+    this.update();
+  }
+}
+
+class ChannelModal extends Reflux.Component {
+  constructor (props) {
+    super(props);
+
     this.state = {
-      fundPeer: 0,
-      fundCapacity: 1,
-      fundInitialSend: 1,
-      pushChannel: 0,
-      pushAmount: 1,
-      pushTimes: 1,
-      closeChannel: '',
-      breakChannel: '',
+      capacity: '',
+      initial: '',
     };
+    this.store = Store;
   }
-  fund () {
-    lc.send('LitRPC.Fund', this.state.fundPeer,
-    this.state.fundCapacity, this.state.fundInitialSend)
-    .then(res => {
-      console.log(res);
+  connect () {
+    lc.send('LitRPC.FundChannel', {
+      'Peer': parseInt(this.state.selectedPeerIdx),
+      'Capacity': parseInt(this.state.capacity),
+      'Initial': parseInt(this.state.initial),
     })
-    .fail(err => {
-      console.error(err);
-    });
-  }
-  push () {
-    lc.send('LitRPC.Push', this.state.pushChannel,
-    this.state.pushAmount, this.state.pushTimes)
     .then(res => {
-      console.log(res);
-    })
-    .fail(err => {
-      console.error(err);
-    });
-  }
-  CloseChannel () {
-    lc.send('LitRPC.CloseChannel', this.state.closeChannel)
-    .then(res => {
-      console.log(res);
-    })
-    .fail(err => {
-      console.error(err);
-    });
-  }
-  breakChannel () {
-    lc.send('LitRPC.BreakChannel', this.state.breakChannel)
-    .then(res => {
-      console.log(res);
+      window.location = window.location.href.split('#')[0];
     })
     .fail(err => {
       console.error(err);
@@ -264,57 +330,122 @@ class ChanCmds extends React.Component {
     this.setState(state);
   }
   render () {
-    let channelElements = [<ChannelElement key="dumchan" capacity="lots o money" balance="less money" state="42"/>];
+    return (
+      <section className="css-modal css-modal--transition--fade" id="channel-modal"
+        role="dialog"
+        aria-labelledby="label-fade"
+        aria-hidden="true">
 
+        <div className="css-modal_inner">
+          <header className="css-modal_header">
+            <h2 id="label-fade">Open Channel</h2>
+          </header>
+
+          <form action="#" className="css-modal_content">
+            <div>
+              <input id="capacity" type="text" placeholder="channel capacity"
+                value={this.state.capacity} onChange={this.handleChange.bind(this)}></input>
+              <input id="initial" type="text" placeholder="initial transfer"
+                value={this.state.initial} onChange={this.handleChange.bind(this)}></input>
+            </div>
+            <div><button type="submit" onClick={this.connect.bind(this)}>Go</button></div>
+          </form>
+          <div>
+            <a href="#!" className="css-modal_close css-modal_close_button"
+              title="Close this modal">&times;</a>
+          </div>
+        </div>
+        <a href="#!" className="css-modal_close css-modal_close_area"
+          title="Close this modal">&times;</a>
+      </section>
+    );
+  }
+}
+
+class XtraModal extends Reflux.Component {
+  constructor (props) {
+    super(props);
+
+    this.store = Store;
+  }
+  closeChannel () {
+    lc.send('LitRPC.CloseChannel', {
+      'ChanIdx': parseInt(this.state.selectedChannelIdx),
+    })
+    .then(res => {
+      window.location = window.location.href.split('#')[0];
+    })
+    .fail(err => {
+      console.error(err);
+    });
+  }
+  breakChannel () {
+    let justice = window.confirm('Are you sure you want to break the channel?');
+    if(justice) {
+      lc.send('LitRPC.BreakChannel', {
+        'ChanIdx': parseInt(this.state.selectedChannelIdx),
+      })
+      .then(res => {
+        window.location = window.location.href.split('#')[0];
+      })
+      .fail(err => {
+        console.error(err);
+      });
+    }
+  }
+  render () {
+    return (
+      <section className="css-modal css-modal--transition--fade" id="xtra-modal"
+        role="dialog"
+        aria-labelledby="label-fade"
+        aria-hidden="true">
+
+        <div className="css-modal_inner">
+          <header className="css-modal_header">
+            <h2 id="label-fade">Xtra Commands</h2>
+          </header>
+
+          <div className="css-modal_content">
+            <div>
+              <p>If the other party is online then you can close the channel
+                and you funds will be available shortly.</p>
+              <div><button onClick={this.closeChannel.bind(this)}>Close</button></div>
+            </div>
+            <div>
+              <p>At anytime you can break the channel, but your funds will be
+                locked for a long time.</p>
+              <div><button onClick={this.breakChannel.bind(this)}>Break</button></div>
+            </div>
+          </div>
+          <div>
+            <a href="#!" className="css-modal_close css-modal_close_button"
+              title="Close this modal">&times;</a>
+          </div>
+        </div>
+        <a href="#!" className="css-modal_close css-modal_close_area"
+          title="Close this modal">&times;</a>
+      </section>
+    );
+  }
+}
+
+class ChanCmds extends React.Component {
+  render () {
     return (
       <div>
         <Navbar />
 
         <div id="chanbox">
           <PeerList />
-          <div id="channelList">
-            <table>
-              <thead>
-                <tr>
-                  <th className="chan-capacity">Capacity</th>
-                  <th className="chan-balance">Balance</th>
-                  <th className="chan-state">State</th>
-                  <th className="chan-zap">Zap Funds to Channel</th>
-                  <th className="chan-xtra"> X-tra Commands</th>
-                </tr>
-              </thead>
-              <tbody>
-                {channelElements}
-              </tbody>
-            </table>
-          </div>
+          <ChannelList />
         </div>
         <div id="chatbox">
         </div>
 
         <PeerModal />
         <NicknameModal />
-
-        <button onClick={this.fund}>fund</button>
-        <input type="text" id="fundPeer" value={this.state.fundPeer}
-          onChange={this.handleChange}></input>
-        <input type="text" id="fundCapacity" value={this.state.fundCapacity}
-          onChange={this.handleChange}></input>
-        <input type="text" id="fundInitialSend" value={this.state.fundInitialSend}
-          onChange={this.handleChange}></input>
-        <button onClick={this.push}>push</button>
-        <input type="text" id="pushChannel" value={this.state.pushChannel}
-          onChange={this.handleChange}></input>
-        <input type="text" id="pushAmount" value={this.state.pushAmount}
-          onChange={this.handleChange}></input>
-        <input type="text" id="pushTimes" value={this.state.pushTimes}
-          onChange={this.handleChange}></input>
-        <button onClick={this.close}>close</button>
-        <input type="text" id="closeChannel" value={this.state.closeChannel}
-          onChange={this.handleChange}></input>
-        <button onClick={this.break}>break</button>
-        <input type="text" id="breakChannel" value={this.state.breakChannel}
-          onChange={this.handleChange}></input>
+        <ChannelModal />
+        <XtraModal />
       </div>
     );
   }
