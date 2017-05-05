@@ -6,6 +6,25 @@ import tempfile
 
 import litrpc
 
+TMP_DIR = tempfile.mkdtemp(prefix="test")
+LIT_BIN = "%s/../../lit" % os.path.abspath(os.path.dirname(__file__))
+
+class LitNode():
+    """A class representing a Lit node"""
+    def __init__(self, i):
+        self.data_dir = TMP_DIR + "litnode%s" % i
+        os.makedirs(self.data_dir)
+
+        # Write a hexkey to the hexkey file
+        with open(self.data_dir + "/testkey.hex", 'w+') as f:
+            f.write("1" * 64 + "\n")
+
+        self.args = ["-dir", self.data_dir]
+
+    def start_node(self):
+        subprocess.Popen([LIT_BIN] + self.args)
+
+
 def testLit():
     """starts a lit process and tests basic functionality:
 
@@ -14,15 +33,8 @@ def testLit():
     - get balance
     - stop"""
 
-    DATA_DIR = tempfile.mkdtemp(prefix="test") + "/.lit"
-    os.makedirs(DATA_DIR)
-    LIT_BIN = "%s/../../lit" % os.path.abspath(os.path.dirname(__file__))
-
-    # Write a hexkey to the hexkey file
-    with open(DATA_DIR + "/testkey.hex", 'w+') as f:
-        f.write("1" * 64 + "\n")
-
-    subprocess.Popen([LIT_BIN, "-dir", DATA_DIR])
+    node = LitNode(1)
+    node.start_node()
 
     litConn = litrpc.LitConnection("127.0.0.1", "8001")
     litConn.connect()
