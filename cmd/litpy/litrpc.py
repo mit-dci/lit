@@ -4,7 +4,17 @@
 import json
 import random
 import time
+import subprocess
+import os
+import shutil
+import requests
 import websocket  # `pip install websocket-client`
+
+DEBUG = False
+
+def dprint(x):
+	if DEBUG:
+		print(x)
 
 class LitConnection():
     """A class representing a connection to a lit node."""
@@ -49,6 +59,95 @@ class LitConnection():
     def balance(self):
         """Get wallit balance"""
         return self.Bal()
+
+class RegtestConn():
+	""" A class representing a regtest node"""
+	rpcuser = "regtestuser"
+	rpcpass = "regtestpass"
+	rpcport = 18332
+	serverURL = "http://" + rpcuser + ":" + rpcpass + "@127.0.0.1:" + str(rpcport)
+	header = {"Content-type": "application/json"}
+
+	def __init__(self):
+		self.id = 0
+	
+	def start(self):
+		#stop and remove current regtest server
+		subprocess.call(["bitcoin-cli", "-regtest", "stop"], stdout=subprocess.DEVNULL)
+		home = os.path.expanduser('~')
+		if os.path.exists(home + "/.bitcoin/regtest"):
+			shutil.rmtree(home + "/.bitcoin/regtest")
+		
+		time.sleep(1) #otherwise regtest might have error 1 when starting...?
+		subprocess.call(["bitcoind","-daemon","-regtest"]) #restart regtest
+
+		#remove current regtest user data
+		if os.path.exists("/tmp/test1"):
+			shutil.rmtree("/tmp/test1")
+				#wait for regtest network to start up
+		while True:
+			time.sleep(3)
+			try:
+				subprocess.check_output(["bitcoin-cli","-regtest","getbalance"], stderr=subprocess.STDOUT)
+				break #if there is no exception in previous line, regtest network has started up
+			except:
+				print("...")
+				continue
+	
+	def mineblock(self, number, log=False):
+		self.id += 1
+		rpcCmd = {
+			"method": "generate",
+			"params": [number],
+			"jsonrpc": "2.0",
+			"id": str(self.id)
+		}
+		payload = json.dumps(rpcCmd)
+		
+		dprint("sending: " + payload)
+		response = requests.post(RegtestConn.serverURL, headers=RegtestConn.header, data=payload)
+		dprint("received: " + str(response.json()))
+	
+	def getinfo(self):
+		self.id += 1
+		rpcCmd = {
+			"method": "getinfo",
+			"params": [],
+			"jsonrpc": "2.0",
+			"id": str(self.id)
+		}
+		payload = json.dumps(rpcCmd)
+		dprint("sending: " + payload)
+		response = requests.post(RegtestConn.serverURL, headers=RegtestConn.header, data=payload)
+		dprint("received: " + str(response.json()))
+	
+	def sendTo(self, addr, amt):
+		self.id += 1
+		rpcCmd = {
+			"method": "sendtoaddress",
+			"params": [addr, amt],
+			"jsonrpc": "2.0",
+			"id": str(self.id)
+		}
+		payload = json.dumps(rpcCmd)
+		dprint("sending: " + payload)
+		response = requests.post(RegtestConn.serverURL, headers=RegtestConn.header, data=payload)
+		dprint("received: " + str(response.json()))
+		
+	def stop(self):
+		self.id += 1
+		rpcCmd = {
+			"method": "stop",
+			"params": [],
+			"jsonrpc": "2.0",
+			"id": str(self.id)
+		}
+		payload = json.dumps(rpcCmd)
+		dprint("sending: " + payload)
+		response = requests.post(RegtestConn.serverURL, headers=RegtestConn.header, data=payload)
+		dprint("received: " + str(response.json()))
+
+
 
 if __name__ == '__main__':
     """Test litrpc.py. lit instance must be running and available on 127.0.0.1:8001"""
