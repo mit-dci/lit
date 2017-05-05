@@ -1,6 +1,7 @@
 package litrpc
 
 import (
+	"log"
 	"strings"
 
 	"github.com/adiabat/bech32"
@@ -50,8 +51,8 @@ func CoinTypeFromAdr(adr string) uint32 {
 	ct, err := CoinTypeFromBechAdr(adr)
 	if err == nil {
 		return ct
-
 	}
+	log.Printf("cointype from bech32 error: %s\n", err.Error())
 
 	if len(adr) < 5 {
 		// well that's not even an address
@@ -67,7 +68,7 @@ func CoinTypeFromAdr(adr string) uint32 {
 
 // Gives the cointype from an address string (if known)
 func CoinTypeFromBechAdr(adr string) (uint32, error) {
-	hrp, _, err := bech32.Decode(adr)
+	hrp, err := bech32.GetHRP(adr)
 	if err != nil {
 		return 0, err
 	}

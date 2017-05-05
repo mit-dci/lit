@@ -1,102 +1,86 @@
 #!/usr/bin/python3
+"""Python interface to lit"""
 
-
-import websocket
 import json
-import sys
-import requests
 import random
+import time
+import websocket  # `pip install websocket-client`
 
+class LitConnection():
+    """A class representing a connection to a lit node."""
+    def __init__(self, ip, port):
+        self.ip = ip
+        self.port = port
 
-def mineblock():
-	rpcCmd = {
-			"method": "getinfo",
-			"params": []
-	}
-	
-	rpcCmd.update({"jsonrpc": "2.0", "id": "99"})
-	
-	rpcuser = "regtestuser"
-	rpcpass = "regtestpass"
-	rpcport = 18332
-	serverURL = "http://" + rpcuser + ":" + rpcpass + "@127.0.0.1:" + str(rpcport)
-	
-	header = {"Content-type": "application/json"}
-	payload = json.dumps(rpcCmd)
-	print(payload)
-	response = requests.post(serverURL, headers=header, data=payload)
-	print(response.json())
+    def connect(self):
+        """Connect to the node. Continue trying for 10 seconds"""
+        self.ws = websocket.WebSocket()
+        for _ in range(50):
+            try:
+                self.ws.connect("ws://%s:%s/ws" % (self.ip, self.port))
+            except ConnectionRefusedError:
+                # lit is not ready to accept connections yet
+                time.sleep(0.2)
+            else:
+                # No exception - we're connected!
+                break
 
-def litNewAddr(wsconn):
-	rpcCmd = {
-	   "method": "LitRPC.Address",
-	   "params": [{"NumToMake": 0}]
-	}
+    def newAddr(self):
+        """Add a new wallit address"""
+        rpcCmd = {
+            "method": "LitRPC.Address",
+            "params": [{"NumToMake": 0}]
+        }
 
-	rid = random.randint(0,9999)
-	rpcCmd.update({"jsonrpc": "2.0", "id": str(rid)})
-		
-	wsconn.send(json.dumps(rpcCmd))
-	resp = json.loads(wsconn.recv())
-	return resp["result"]["WitAddresses"][0]
-	
-def litSend(wsconn, adr, amt):
-	rpcCmd = {
-	   "method": "LitRPC.Send",
-	   "params": [
-	   {"DestAddrs": adr},
-	   {"Amts": amt},	   
-	   ]
-	}
-	
-	rid = random.randint(0,9999)
-	rpcCmd.update({"jsonrpc": "2.0", "id": str(rid)})
-	wsconn.send(json.dumps(rpcCmd))
-	resp = json.loads(wsconn.recv())
-	return resp
-	
-def litconnect():
-	ws = websocket.WebSocket()
-	ws.connect("ws://127.0.0.1:8001/ws")
-	return ws
-	
+        rid = random.randint(0, 9999)
+        rpcCmd.update({"jsonrpc": "2.0", "id": str(rid)})
 
-def getaddress():
-	rpcCmd = {
-	   "method": "LitRPC.Address",
-	   "params": [{"NumToMake": 0}]
-	}
+        self.ws.send(json.dumps(rpcCmd))
+        resp = json.loads(self.ws.recv())
+        return resp["result"]["WitAddresses"][0]
 
-	rpcCmd.update({"jsonrpc": "2.0", "id": "94"})
-	
-	ws = websocket.WebSocket()
-	ws.connect("ws://127.0.0.1:8001/ws")
-	
-	ws.send(json.dumps(rpcCmd))
-	result = json.loads(ws.recv())
-	
-	result = ws.recv()
-	#~ print("got a result")
-	#~ print(result)
-	print(result["result"]["WitAddresses"][2])
-	
-	rpc2 = {
-	   "method": "LitRPC.Bal",
-	   "params": []
-	}
-	rpc2.update({"jsonrpc": "2.0", "id": "92"})
-	
-	ws.send(json.dumps(rpc2))
-	result = json.loads(ws.recv())
-	print(result)
-		
+    def balance(self):
+        """Get wallit balance"""
+        rpcCmd = {
+            "method": "LitRPC.Bal",
+            "params": []
+        }
+        rpcCmd.update({"jsonrpc": "2.0", "id": "92"})
 
-def main(args):
-	ws = litconnect()
-	resp = litNewAddr(ws)
-	print(resp)
-	#~ mineblock()
-	#~ getaddress()
+        self.ws.send(json.dumps(rpcCmd))
+        return json.loads(self.ws.recv())
+
+    def send(self, adr, amt):
+        """Send amt to adr"""
+        rpcCmd = {
+            "method": "LitRPC.Send",
+            "params": [
+                {"DestAddrs": adr, "Amts": amt},
+            ]
+        }
+
+        rid = random.randint(0, 9999)
+        rpcCmd.update({"jsonrpc": "2.0", "id": str(rid)})
+        self.ws.send(json.dumps(rpcCmd))
+        resp = json.loads(self.ws.recv())
+        return resp
+
+    def stop(self):
+        """Stop lit"""
+        rpcCmd = {
+            "method": "LitRPC.Stop",
+            "params": []
+        }
+
+        rid = random.randint(0, 9999)
+        rpcCmd.update({"jsonrpc": "2.0", "id": str(rid)})
+        self.ws.send(json.dumps(rpcCmd))
+        resp = json.loads(self.ws.recv())
+        return resp
 
 if __name__ == '__main__':
-    main(sys.argv)
+    """Test litrpc.py. lit instance must be running and available on 127.0.0.1:8001"""
+    litConn = LitConnection("127.0.0.1", "8001")
+    litConn.connect()
+    print(litConn.newAddr())
+    print(litConn.balance())

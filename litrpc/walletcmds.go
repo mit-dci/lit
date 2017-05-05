@@ -352,6 +352,7 @@ func (r *LitRPC) Address(args *AddressArgs, reply *AddressReply) error {
 
 		// convert 20-byte PKH to a bech32 segwit v0 address
 		bech32adr, err := bech32.SegWitV0Encode(param.Bech32Prefix, a[:])
+
 		if err != nil {
 			return err
 		}

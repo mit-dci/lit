@@ -132,19 +132,20 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 func (nd *LitNode) OutMessager() {
 	for {
 		msg := <-nd.OmniOut
-		if !nd.ConnectedToPeer(msg.PeerIdx) {
+		if !nd.ConnectedToPeer(msg.Peer()) {
 			fmt.Printf("message type %x to peer %d but not connected\n",
-				msg.MsgType, msg.PeerIdx)
+				msg.MsgType(), msg.Peer())
 			continue
 		}
 
-		rawmsg := append([]byte{msg.MsgType}, msg.Data...)
-		nd.RemoteMtx.Lock() // not sure this is needed...
-		n, err := nd.RemoteCons[msg.PeerIdx].Con.Write(rawmsg)
+		//rawmsg := append([]byte{msg.MsgType()}, msg.Data...)
+		rawmsg := msg.Bytes() // automatically includes messageType
+		nd.RemoteMtx.Lock()   // not sure this is needed...
+		n, err := nd.RemoteCons[msg.Peer()].Con.Write(rawmsg)
 		if err != nil {
-			fmt.Printf("error writing to peer %d: %s\n", msg.PeerIdx, err.Error())
+			fmt.Printf("error writing to peer %d: %s\n", msg.Peer(), err.Error())
 		} else {
-			fmt.Printf("type %x %d bytes to peer %d\n", msg.MsgType, n, msg.PeerIdx)
+			fmt.Printf("type %x %d bytes to peer %d\n", msg.MsgType(), n, msg.Peer())
 		}
 		nd.RemoteMtx.Unlock()
 	}
@@ -187,10 +188,8 @@ func (nd *LitNode) SendChat(peer uint32, chat string) error {
 		return fmt.Errorf("Not connected to peer %d", peer)
 	}
 
-	outMsg := new(lnutil.LitMsg)
-	outMsg.MsgType = lnutil.MSGID_TEXTCHAT
-	outMsg.PeerIdx = peer
-	outMsg.Data = []byte(chat)
+	outMsg := lnutil.NewChatMsg(peer, chat)
+
 	nd.OmniOut <- outMsg
 
 	return nil

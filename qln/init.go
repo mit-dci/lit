@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/boltdb/bolt"
 	"github.com/adiabat/btcd/chaincfg"
 	"github.com/adiabat/btcd/wire"
 	"github.com/adiabat/btcutil/hdkeychain"
+	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/wallit"
@@ -78,8 +78,8 @@ func NewLitNode(privKey *[32]byte, path string, tower bool) (*LitNode, error) {
 
 	nd.SubWallet = make(map[uint32]UWallet)
 
-	nd.OmniOut = make(chan *lnutil.LitMsg, 10)
-	nd.OmniIn = make(chan *lnutil.LitMsg, 10)
+	nd.OmniOut = make(chan lnutil.LitMsg, 10)
+	nd.OmniIn = make(chan lnutil.LitMsg, 10)
 	//	go nd.OmniHandler()
 	go nd.OutMessager()
 
