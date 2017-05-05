@@ -5,7 +5,7 @@ require('../sass/channels.scss');
 
 let Actions = Reflux.createActions(['setPeers', 'setChannels', 'setSelectedPeerIdx', 'setSelectedChannelIdx']);
 
-class Store extends Reflux.Store {
+class Store extends aeflux.Store {
   constructor () {
     super();
 
