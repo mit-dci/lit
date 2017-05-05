@@ -5,40 +5,17 @@ import sys
 import random
 import subprocess
 import os
-import signal
 import shutil
-import threading
-from string import ascii_lowercase, digits
-import random
+from string import digits
 import time
 from litrpc import *
-
-"""
-class litThread(threading.Thread):
-	def __init__(self, threadID, name):
-		threading.Thread.__init__(self)
-		self.threadID = threadID
-		self.name = name
-		
-	def run(self):
-		print ("Starting " + self.name)
-		#subprocess.call(["./../../lit","-spv","127.0.0.1","-tip","1080000","-reg", "-dir", "/dev/shm/test1"])
-		# The os.setsid() is passed in the argument preexec_fn so
-		# it's run after the fork() and before  exec() to run the shell.
-		pro = subprocess.Popen(["./../../lit","-spv","127.0.0.1","-tip","1080000","-reg", "-dir", "/dev/shm/test1"], shell=True)
-		return pro
-		
-	def kill(self):
-		os.killpg(os.getpgid(self.pro.pid), signal.SIGTERM)  # Send the signal to all the process groups
-		print ("Exiting " + self.name)
-"""
 
 def main(args):
 	if not checkPortOpen(8001):
 		return
 
 	#stop and remove current regtest server
-	subprocess.call(["bitcoin-cli", "-regtest", "stop"], stderr=subprocess.DEVNULL)
+	subprocess.call(["bitcoin-cli", "-regtest", "stop"], stdout=subprocess.DEVNULL)
 	home = os.path.expanduser('~')
 	if os.path.exists(home + "/.bitcoin/regtest"):
 		shutil.rmtree(home + "/.bitcoin/regtest")
@@ -95,22 +72,15 @@ def main(args):
 		time.sleep(3)
 		balNew = litConn.getBal()
 		dprint("current bal: " + str(balNew))
-		if balNew != bal and balNew - bal == 1234000000:
-			print("PASS!")
+		if balNew - bal == 1234000000:
+			print("PASS")
 			break
 		print("...")
 	else:
 		print("FAIL")
 	
-	#addr = litConn.getWitAddress()
-	#resp0 = litConn.litSend([addr], [1000000])
-	#print(resp0)
-	
-	litProcess.terminate()
-
-	#print("error!!!")
-	#print(sys.exc_info())
-	
+	subprocess.call(["bitcoin-cli", "-regtest", "stop"])
+	litProcess.terminate()	
 	
 if __name__ == '__main__':
 	main(sys.argv)
