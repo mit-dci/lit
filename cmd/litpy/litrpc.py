@@ -26,12 +26,10 @@ class LitConnection():
                 break
         self.msg_id = random.randint(0, 9999)
 
-    def send_message(self, method, params=[]):
+    def send_message(self, method, params):
         """Sends a websocket message to the lit node"""
-        if params != []:
-            params = [params]
         self.ws.send(json.dumps({"method": "LitRPC.%s" % method,
-                                 "params": params,
+                                 "params": [params],
                                  "jsonrpc": "2.0",
                                  "id": str(self.msg_id)}))
 
@@ -40,13 +38,13 @@ class LitConnection():
 
     def __getattr__(self, name):
         """Dispatches any unrecognised messages to the websocket connection"""
-        def dispatcher(params=[]):
-            return self.send_message(name, params)
+        def dispatcher(**kwargs):
+            return self.send_message(name, kwargs)
         return dispatcher
 
     def new_address(self):
         """Add a new wallit address"""
-        return self.Address({"NumToMake": 1})
+        return self.Address(NumToMake=1)
 
     def balance(self):
         """Get wallit balance"""
