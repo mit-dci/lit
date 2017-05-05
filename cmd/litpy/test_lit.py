@@ -13,6 +13,7 @@ import requests  # `pip install requests`
 import litrpc
 
 TMP_DIR = tempfile.mkdtemp(prefix="test")
+print("Using tmp dir %s" % TMP_DIR)
 LIT_BIN = "%s/../../lit" % os.path.abspath(os.path.dirname(__file__))
 
 class LitNode():
@@ -23,7 +24,7 @@ class LitNode():
 
         # Write a hexkey to the hexkey file
         with open(self.data_dir + "/testkey.hex", 'w+') as f:
-            f.write("1" * 64 + "\n")
+            f.write("1" * 63 + str(i) + "\n")
 
         self.args = ["-dir", self.data_dir]
 
@@ -104,20 +105,23 @@ def testLit():
     bcnode = BCNode(0)
     bcnode.start_node()
     time.sleep(3)
+    bcnode.generate(nblocks=101)
+    print("Received response from bitcoin node: %s" % bcnode.getinfo().text)
 
     # Start lit node 0 and open websocket connection
     litnode0 = LitNode(0)
+    litnode0.args.extend(["-spv", "127.0.0.1", "-reg"])
     litnode0.start_node()
     litnode0.add_rpc_connection("127.0.0.1", "8001")
-    litnode0.new_address()
+    print(litnode0.rpc.new_address())
     litnode0.Bal()
 
     # Start lit node 1 and open websocket connection
     litnode1 = LitNode(1)
-    litnode1.args.extend(["-rpcport", "8002"])
+    litnode1.args.extend(["-rpcport", "8002", "-reg"])
     litnode1.start_node()
     litnode1.add_rpc_connection("127.0.0.1", "8002")
-    litnode1.new_address()
+    litnode1.rpc.new_address()
     litnode1.Bal()
 
     # Listen on lit litnode0 and connect from lit litnode1
@@ -130,6 +134,25 @@ def testLit():
     # Check that litnode0 and litnode1 are connected
     assert len(litnode0.ListConnections()['result']['Connections']) == 1
     assert len(litnode1.ListConnections()['result']['Connections']) == 1
+
+    # Send funds from the bitcoin node to lit node 0
+    bal = litnode0.Bal()["result"]["TxoTotal"]
+    print("previous bal: " + str(bal))
+    addr = litnode0.rpc.new_address()
+    bcnode.sendtoaddress(address=addr["result"]["LegacyAddresses"][0], amount=12.34)
+
+    print("waiting to receive transaction")
+
+    # wait for transaction to be received (5 seconds timeout)
+    for i in range(50):
+        time.sleep(0.1)
+        balNew = litnode0.Bal()["result"]["TxoTotal"]
+        if balNew - bal == 1234000000:
+            print("Transaction received. Current balance = %s" % balNew)
+            break
+    else:
+        print("Test failed. No transaction received")
+        exit(1)
 
     # Stop bitcoind and lit nodes
     bcnode.stop()
