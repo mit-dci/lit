@@ -37,7 +37,6 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
 
 	// first, see if the peer to connect to is referenced by peer index.
 	var connectAdr string
-
 	// check if a peer number was supplied instead of a pubkeyhash
 	peerIdxint, err := strconv.Atoi(args.LNAddr)
 	// number will mean no error
@@ -72,16 +71,18 @@ type AssignNicknameArgs struct {
 }
 
 func (r *LitRPC) AssignNickname(args AssignNicknameArgs, reply *StatusReply) error {
+	// attempt to save nickname to the database, this process also checks if the peer exists
 	err := r.Node.SaveNicknameForPeerIdx(args.Nickname, args.Peer)
 	if err != nil {
 		return err
 	}
 
-	peer, ok := r.Node.RemoteCons[args.Peer]
-	if !ok {
-		return fmt.Errorf("peer %d doesn't exist", args.Peer)
+	// it's okay if we aren't connected to this peer right now, but if we are
+	// then their nickname needs to be updated in the remote connections list
+	// otherwise this doesn't get updated til after a restart
+	if peer, ok := r.Node.RemoteCons[args.Peer]; ok {
+		peer.Nickname = args.Nickname
 	}
-	peer.Nickname = args.Nickname
 
 	reply.Status = fmt.Sprintf("changed nickname of peer %d to %s",
 		args.Peer, args.Nickname)

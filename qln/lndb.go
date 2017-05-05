@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/boltdb/bolt"
 	"github.com/adiabat/btcd/btcec"
 	"github.com/adiabat/btcd/wire"
 	"github.com/adiabat/btcutil"
+	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
@@ -127,7 +127,6 @@ func (inff *InFlightFund) Clear() {
 func (nd *LitNode) GetPubHostFromPeerIdx(idx uint32) ([33]byte, string) {
 	var pub [33]byte
 	var host string
-
 	// look up peer in db
 	err := nd.LitDB.View(func(btx *bolt.Tx) error {
 		mp := btx.Bucket(BKTPeerMap)
@@ -156,11 +155,9 @@ func (nd *LitNode) GetPubHostFromPeerIdx(idx uint32) ([33]byte, string) {
 	return pub, host
 }
 
-// GetNicknameFromPeerIdx gets the pubkey and internet host name for a peer
+// GetNicknameFromPeerIdx gets the nickname for a peer
 func (nd *LitNode) GetNicknameFromPeerIdx(idx uint32) string {
-	var pub [33]byte
 	var nickname string
-
 	// look up peer in db
 	err := nd.LitDB.View(func(btx *bolt.Tx) error {
 		mp := btx.Bucket(BKTPeerMap)
@@ -168,9 +165,6 @@ func (nd *LitNode) GetNicknameFromPeerIdx(idx uint32) string {
 			return nil
 		}
 		pubBytes := mp.Get(lnutil.U32tB(idx))
-		if pubBytes != nil {
-			copy(pub[:], pubBytes)
-		}
 		peerBkt := btx.Bucket(BKTPeers)
 		if peerBkt == nil {
 			return fmt.Errorf("no Peers")
@@ -209,7 +203,7 @@ func (nd *LitNode) NextChannelIdx() (uint32, error) {
 	return cIdx, nil
 }
 
-// GetPeerIdx returdns the peer index given a pubkey.  Creates it if it's not there
+// GetPeerIdx returns the peer index given a pubkey.  Creates it if it's not there
 // yet!  Also return a bool for new..?  not needed?
 func (nd *LitNode) GetPeerIdx(pub *btcec.PublicKey, host string) (uint32, error) {
 	var idx uint32
@@ -250,16 +244,13 @@ func (nd *LitNode) GetPeerIdx(pub *btcec.PublicKey, host string) (uint32, error)
 				return err
 			}
 		}
-
 		return nil
 	})
 	return idx, err
 }
 
-// GetPeerIdx returdns the peer index given a pubkey.  Creates it if it's not there
-// yet!  Also return a bool for new..?  not needed?
+// SaveNicknameForPeerIdx saves/overwrites a nickname for a given peer idx
 func (nd *LitNode) SaveNicknameForPeerIdx(nickname string, idx uint32) error {
-	var pub [33]byte
 	var err error
 
 	// look up peer in db
@@ -269,9 +260,6 @@ func (nd *LitNode) SaveNicknameForPeerIdx(nickname string, idx uint32) error {
 			return nil
 		}
 		pubBytes := mp.Get(lnutil.U32tB(idx))
-		if pubBytes != nil {
-			copy(pub[:], pubBytes)
-		}
 		peerBkt := btx.Bucket(BKTPeers)
 		if peerBkt == nil {
 			return fmt.Errorf("no Peers")
@@ -285,7 +273,6 @@ func (nd *LitNode) SaveNicknameForPeerIdx(nickname string, idx uint32) error {
 		if err != nil {
 			return err
 		}
-
 		return nil
 	})
 

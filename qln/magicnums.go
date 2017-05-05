@@ -27,7 +27,7 @@ var (
 
 	KEYIdx      = []byte("idx")  // index for key derivation
 	KEYhost     = []byte("hst")  // hostname where peer lives
-	KEYnickname = []byte("nick") // hostname where peer lives
+	KEYnickname = []byte("nick") // nickname where peer lives
 
 	KEYutxo    = []byte("utx") // serialized utxo for the channel
 	KEYState   = []byte("now") // channel state
