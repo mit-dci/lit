@@ -18,14 +18,6 @@ class NetCmds extends React.Component {
       console.error(err);
     });
   }
-  say () {
-    lc.send('LitRPC.Say').then(res => {
-      console.log(res);
-    })
-    .fail(err => {
-      console.error(err);
-    });
-  }
   handleChange (event) {
     let state = {};
     state[event.target.id] = event.target.value;

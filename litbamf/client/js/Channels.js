@@ -444,7 +444,42 @@ class XtraModal extends Reflux.Component {
   }
 }
 
-class ChanCmds extends React.Component {
+class Chatbox extends React.Component {
+  constructor (props) {
+    super(props);
+
+    this.state = {
+      message: '',
+    };
+    this.store = Store;
+  }
+  say () {
+    lc.send('LitRPC.Say', {'Peer': this.state.selectedPeerIdx, 'Message': this.state.message}).then(res => {
+      console.log(res);
+    })
+    .fail(err => {
+      console.error(err);
+    });
+  }
+  render () {
+
+    let placeholder = 'Message ';
+    if(this.state.selectedPeerIdx > 0) {
+      placeholder += this.state.peers[this.state.selectedPeerIdx].Nickname;
+    }
+
+    return (
+      <div id="chatbox">
+        <div>
+
+        </div>
+        <input placeholder={placeholder} value={this.state.message} />
+      </div>
+    );
+  }
+}
+
+class Channels extends React.Component {
   render () {
     return (
       <div>
@@ -454,8 +489,8 @@ class ChanCmds extends React.Component {
           <PeerList />
           <ChannelList />
         </div>
-        <div id="chatbox">
-        </div>
+
+        <Chatbox />
 
         <PeerModal />
         <NicknameModal />
@@ -466,4 +501,8 @@ class ChanCmds extends React.Component {
   }
 }
 
+<<<<<<< HEAD
 export default ChanCmds;
+=======
+export default Channels;
+>>>>>>> chat functionality
