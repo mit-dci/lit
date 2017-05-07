@@ -109,7 +109,7 @@ func (r *LitRPC) TxoList(args *NoArgs, reply *TxoListReply) error {
 			theseTxos[i].Height = u.Height
 			// show delay before utxo can be spent
 			if u.Seq != 0 {
-				reply.Txos[i].Delay = u.Height + int32(u.Seq) - syncHeight
+				theseTxos[i].Delay = u.Height + int32(u.Seq) - syncHeight
 			}
 			theseTxos[i].Witty = u.Mode&portxo.FlagTxoWitness != 0
 			theseTxos[i].KeyPath = u.KeyGen.String()

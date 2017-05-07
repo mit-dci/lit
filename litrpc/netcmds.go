@@ -64,7 +64,7 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
 	return nil
 }
 
-// ------------------------- ShowConnections
+// ------------------------- ShowConnectionsls
 
 type ListConnectionsReply struct {
 	Connections []qln.PeerInfo
