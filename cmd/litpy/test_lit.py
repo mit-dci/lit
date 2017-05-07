@@ -39,8 +39,11 @@ class LitNode():
 
 class BCNode():
     """A class representing a bitcoind node"""
+    bin_name = "bitcoind"
+    short_name = "bc"
+
     def __init__(self, i):
-        self.data_dir = TMP_DIR + "/bcnode%s" % i
+        self.data_dir = TMP_DIR + "/%snode%s" % (self.__class__.short_name, i)
         os.makedirs(self.data_dir)
 
         self.args = ["-daemon", "-regtest", "-datadir=%s" % self.data_dir, "-rpcuser=regtestuser", "-rpcpassword=regtestpass", "-rpcport=18332"]
@@ -49,9 +52,9 @@ class BCNode():
 
     def start_node(self):
         try:
-            subprocess.Popen(["bitcoind"] + self.args)
+            subprocess.Popen([self.__class__.bin_name] + self.args)
         except FileNotFoundError:
-            print("bitcoind not found on path. Please install bitcoind")
+            print("%s not found on path. Please install %s" % (self.__class__.bin_name, self.__class__.bin_name))
             sys.exit(1)
 
     def send_message(self, method, params):
