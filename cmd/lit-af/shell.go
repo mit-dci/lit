@@ -248,9 +248,9 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		fmt.Fprintf(color.Output, lnutil.Header("\tTxos:\n"))
 	}
 	for i, t := range tReply.Txos {
-		fmt.Fprintf(color.Output, "%d %s h:%d amt:%s %s",
+		fmt.Fprintf(color.Output, "%d %s h:%d amt:%s %s %s",
 			i, lnutil.OutPoint(t.OutPoint), t.Height,
-			lnutil.SatoshiColor(t.Amt), t.KeyPath)
+			lnutil.SatoshiColor(t.Amt), t.KeyPath, t.CoinType)
 		if t.Delay != 0 {
 			fmt.Fprintf(color.Output, " delay: %d", t.Delay)
 		}
@@ -286,7 +286,8 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	}
 
 	for _, walBal := range bReply.Balances {
-		fmt.Fprintf(color.Output, "\t%s %s %s %s %s %s\n",
+		fmt.Fprintf(color.Output, "\t%s %d %s %s %s %s %s %s\n",
+			lnutil.Header("Type:"), walBal.CoinType,
 			lnutil.Header("Utxo:"), lnutil.SatoshiColor(walBal.TxoTotal),
 			lnutil.Header("WitConf:"), lnutil.SatoshiColor(walBal.MatureWitty),
 			lnutil.Header("Channel:"), lnutil.SatoshiColor(walBal.ChanTotal))

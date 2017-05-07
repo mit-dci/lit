@@ -82,6 +82,7 @@ type TxoInfo struct {
 	Amt      int64
 	Height   int32
 	Delay    int32
+	CoinType string
 	Witty    bool
 
 	KeyPath string
@@ -107,6 +108,7 @@ func (r *LitRPC) TxoList(args *NoArgs, reply *TxoListReply) error {
 			theseTxos[i].OutPoint = u.Op.String()
 			theseTxos[i].Amt = u.Value
 			theseTxos[i].Height = u.Height
+			theseTxos[i].CoinType = wal.Params().Name
 			// show delay before utxo can be spent
 			if u.Seq != 0 {
 				theseTxos[i].Delay = u.Height + int32(u.Seq) - syncHeight
