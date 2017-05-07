@@ -24,6 +24,12 @@ class LitNode():
     def start_node(self):
         subprocess.Popen([LIT_BIN] + self.args)
 
+    def add_rpc_connection(self, ip, port):
+        self.rpc = litrpc.LitConnection(ip, port)
+        self.rpc.connect()
+
+    def __getattr__(self, name):
+        return self.rpc.__getattr__(name)
 
 def testLit():
     """starts two lit processes and tests basic functionality:
@@ -38,36 +44,32 @@ def testLit():
     # Start lit node 0 and open websocket connection
     node0 = LitNode(0)
     node0.start_node()
-
-    litConn0 = litrpc.LitConnection("127.0.0.1", "8001")
-    litConn0.connect()
-    litConn0.new_address()
-    litConn0.Bal()
+    node0.add_rpc_connection("127.0.0.1", "8001")
+    node0.new_address()
+    node0.Bal()
 
     # Start lit node 1 and open websocket connection
     node1 = LitNode(1)
     node1.args.extend(["-rpcport", "8002"])
     node1.start_node()
-
-    litConn1 = litrpc.LitConnection("127.0.0.1", "8002")
-    litConn1.connect()
-    litConn1.new_address()
-    litConn1.Bal()
+    node1.add_rpc_connection("127.0.0.1", "8002")
+    node1.new_address()
+    node1.Bal()
 
     # Listen on lit node0 and connect from lit node1
-    res = litConn0.Listen(Port="127.0.0.1:10001")["result"]
+    res = node0.Listen(Port="127.0.0.1:10001")["result"]
     node0.lit_address = res["Status"].split(' ')[5] + '@' + res["Status"].split(' ')[2]
 
-    res = litConn1.Connect(LNAddr=node0.lit_address)
+    res = node1.Connect(LNAddr=node0.lit_address)
     assert not res['error']
 
     # Check that node0 and node1 are connected
-    assert len(litConn0.ListConnections()['result']['Connections']) == 1
-    assert len(litConn1.ListConnections()['result']['Connections']) == 1
+    assert len(node0.ListConnections()['result']['Connections']) == 1
+    assert len(node1.ListConnections()['result']['Connections']) == 1
 
     # Stop lit nodes
-    litConn0.Stop()
-    litConn1.Stop()
+    node0.Stop()
+    node1.Stop()
 
     print("Test succeeds!")
 
