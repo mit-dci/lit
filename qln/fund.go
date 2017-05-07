@@ -194,9 +194,14 @@ func (nd *LitNode) PointReqHandler(msg lnutil.PointReqMsg) {
 	kg.Step[3] = msg.Peer() | 1<<31
 	kg.Step[4] = cIdx | 1<<31
 
-	myChanPub := nd.GetUsePub(kg, UseChannelFund)
-	myRefundPub := nd.GetUsePub(kg, UseChannelRefund)
-	myHAKDbase := nd.GetUsePub(kg, UseChannelHAKDBase)
+	myChanPub, _ := nd.GetUsePub(kg, UseChannelFund)
+	myRefundPub, _ := nd.GetUsePub(kg, UseChannelRefund)
+	myHAKDbase, err := nd.GetUsePub(kg, UseChannelHAKDBase)
+	if err != nil {
+		fmt.Printf("PointReqHandler err %s", err.Error())
+		return
+	}
+
 	fmt.Printf("Generated channel pubkey %x\n", myChanPub)
 
 	outMsg := lnutil.NewPointRespMsg(msg.Peer(), myChanPub, myRefundPub, myHAKDbase)
@@ -241,9 +246,9 @@ func (nd LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 	q.KeyGen.Step[3] = nd.InProg.PeerIdx | 1<<31
 	q.KeyGen.Step[4] = nd.InProg.ChanIdx | 1<<31
 
-	q.MyPub = nd.GetUsePub(q.KeyGen, UseChannelFund)
-	q.MyRefundPub = nd.GetUsePub(q.KeyGen, UseChannelRefund)
-	q.MyHAKDBase = nd.GetUsePub(q.KeyGen, UseChannelHAKDBase)
+	q.MyPub, _ = nd.GetUsePub(q.KeyGen, UseChannelFund)
+	q.MyRefundPub, _ = nd.GetUsePub(q.KeyGen, UseChannelRefund)
+	q.MyHAKDBase, _ = nd.GetUsePub(q.KeyGen, UseChannelHAKDBase)
 
 	// chop up incoming message, save points to channel struct
 	copy(q.TheirPub[:], msg.ChannelPub[:])
@@ -265,7 +270,8 @@ func (nd LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 	}
 
 	// derive elkrem sender root from HD keychain
-	q.ElkSnd = elkrem.NewElkremSender(nd.GetElkremRoot(q.KeyGen))
+	elkRoot, _ := nd.GetElkremRoot(q.KeyGen)
+	q.ElkSnd = elkrem.NewElkremSender(elkRoot)
 
 	// get txo for channel
 	txo, err := lnutil.FundTxOut(q.MyPub, q.TheirPub, nd.InProg.Amt)
@@ -322,8 +328,8 @@ func (nd LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 	// initial payment (8), ElkPoint0,1,2 (99)
 
 	outMsg := lnutil.NewChanDescMsg(
-		msg.Peer(), *nd.InProg.op, q.MyPub, q.MyRefundPub,
-		q.MyHAKDBase, nd.InProg.Amt, nd.InProg.InitSend,
+		msg.Peer(), *nd.InProg.op, q.MyPub, q.MyRefundPub, q.MyHAKDBase,
+		nd.InProg.Coin, nd.InProg.Amt, nd.InProg.InitSend,
 		elkPointZero, elkPointOne, elkPointTwo)
 
 	nd.OmniOut <- outMsg
@@ -352,7 +358,7 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 	qc.Height = -1
 	qc.KeyGen.Depth = 5
 	qc.KeyGen.Step[0] = 44 | 1<<31
-	qc.KeyGen.Step[1] = 0 | 1<<31
+	qc.KeyGen.Step[1] = msg.CoinType | 1<<31
 	qc.KeyGen.Step[2] = UseChannelFund
 	qc.KeyGen.Step[3] = msg.Peer() | 1<<31
 	qc.KeyGen.Step[4] = cIdx | 1<<31
@@ -360,12 +366,12 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 	qc.Mode = portxo.TxoP2WSHComp
 	qc.Op = op
 
-	qc.MyPub = nd.GetUsePub(qc.KeyGen, UseChannelFund)
 	qc.TheirPub = msg.PubKey
 	qc.TheirRefundPub = msg.RefundPub
 	qc.TheirHAKDBase = msg.HAKDbase
-	qc.MyRefundPub = nd.GetUsePub(qc.KeyGen, UseChannelRefund)
-	qc.MyHAKDBase = nd.GetUsePub(qc.KeyGen, UseChannelHAKDBase)
+	qc.MyPub, _ = nd.GetUsePub(qc.KeyGen, UseChannelFund)
+	qc.MyRefundPub, _ = nd.GetUsePub(qc.KeyGen, UseChannelRefund)
+	qc.MyHAKDBase, _ = nd.GetUsePub(qc.KeyGen, UseChannelHAKDBase)
 
 	// it should go into the next bucket and get the right key index.
 	// but we can't actually check that.
@@ -436,15 +442,10 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 		return
 	}
 
-	//	elk, err := qc.ElkSnd.AtIndex(qc.State.StateIdx - 1) // which is 0
-	//	if err != nil {
-	//		fmt.Printf("QChanDescHandler ElkSnd err %s", err.Error())
-	//		return
-	//	}
-	// ACK the channel address, which causes the funder to sign / broadcast
-	// ACK is outpoint (36), ElkPoint0,1,2 (99) and signature (64)
-
-	outMsg := lnutil.NewChanAckMsg(msg.Peer(), op, theirElkPointZero, theirElkPointOne, theirElkPointTwo, sig)
+	outMsg := lnutil.NewChanAckMsg(
+		msg.Peer(), op,
+		theirElkPointZero, theirElkPointOne, theirElkPointTwo,
+		sig)
 	outMsg.Bytes()
 
 	nd.OmniOut <- outMsg
@@ -554,9 +555,9 @@ func (nd *LitNode) SigProofHandler(msg lnutil.SigProofMsg, peer *RemotePeer) {
 		return
 	}
 
-	wal, ok := nd.SubWallet[nd.InProg.Coin]
+	wal, ok := nd.SubWallet[qc.Coin()]
 	if !ok {
-		fmt.Printf("Not connected to coin type %d\n", nd.InProg.Coin)
+		fmt.Printf("Not connected to coin type %d\n", qc.Coin())
 		return
 	}
 

@@ -10,7 +10,8 @@ import (
 )
 
 var fundCommand = &Command{
-	Format: fmt.Sprintf("%s%s\n", lnutil.White("fund"), lnutil.ReqColor("peer", "capacity", "initialSend")),
+	Format: fmt.Sprintf("%s%s\n", lnutil.White("fund"),
+		lnutil.ReqColor("peer", "coinType", "capacity", "initialSend")),
 	Description: fmt.Sprintf("%s\n%s\n%s\n",
 		"Establish and fund a new lightning channel with the given peer.",
 		"The capacity is the amount of satoshi we insert into the channel,",
@@ -55,7 +56,7 @@ func (lc *litAfClient) FundChannel(textArgs []string) error {
 	reply := new(litrpc.StatusReply)
 
 	if len(textArgs) < 4 {
-		return fmt.Errorf("need args: fund peer cointype capacity initialSend")
+		return fmt.Errorf(fundCommand.Format)
 	}
 
 	peer, err := strconv.Atoi(textArgs[0])

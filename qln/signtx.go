@@ -80,7 +80,17 @@ func (nd *LitNode) SignSimpleClose(q *Qchan, tx *wire.MsgTx) ([]byte, error) {
 
 // SignNextState generates your signature for their state.
 func (nd *LitNode) SignState(q *Qchan) ([64]byte, error) {
+
 	var sig [64]byte
+
+	// make sure channel exists, and wallet is present on node
+	if q == nil {
+		return sig, fmt.Errorf("SignState nil channel")
+	}
+	_, ok := nd.SubWallet[q.Coin()]
+	if !ok {
+		return sig, fmt.Errorf("SignState no wallet for cointype %d", q.Coin())
+	}
 	// build transaction for next state
 	tx, err := q.BuildStateTx(false) // their tx, as I'm signing
 	if err != nil {

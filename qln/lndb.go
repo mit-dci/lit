@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/boltdb/bolt"
 	"github.com/adiabat/btcd/btcec"
 	"github.com/adiabat/btcd/wire"
 	"github.com/adiabat/btcutil"
+	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
@@ -386,14 +386,14 @@ func (nd *LitNode) RestoreQchanFromBucket(bkt *bolt.Bucket) (*Qchan, error) {
 	}
 
 	// get my channel pubkey
-	qc.MyPub = nd.GetUsePub(qc.KeyGen, UseChannelFund)
+	qc.MyPub, _ = nd.GetUsePub(qc.KeyGen, UseChannelFund)
 
 	// derive my refund / base point from index
-	qc.MyRefundPub = nd.GetUsePub(qc.KeyGen, UseChannelRefund)
-	qc.MyHAKDBase = nd.GetUsePub(qc.KeyGen, UseChannelHAKDBase)
+	qc.MyRefundPub, _ = nd.GetUsePub(qc.KeyGen, UseChannelRefund)
+	qc.MyHAKDBase, _ = nd.GetUsePub(qc.KeyGen, UseChannelHAKDBase)
 
 	// derive my watchtower refund PKH
-	watchRefundPub := nd.GetUsePub(qc.KeyGen, UseChannelWatchRefund)
+	watchRefundPub, _ := nd.GetUsePub(qc.KeyGen, UseChannelWatchRefund)
 	watchRefundPKHslice := btcutil.Hash160(watchRefundPub[:])
 	copy(qc.WatchRefundAdr[:], watchRefundPKHslice)
 
@@ -421,7 +421,7 @@ func (nd *LitNode) RestoreQchanFromBucket(bkt *bolt.Bucket) (*Qchan, error) {
 	}
 
 	// derive elkrem sender root from HD keychain
-	r := nd.GetElkremRoot(qc.KeyGen)
+	r, _ := nd.GetElkremRoot(qc.KeyGen)
 	// set sender
 	qc.ElkSnd = elkrem.NewElkremSender(r)
 
