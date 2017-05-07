@@ -75,6 +75,11 @@ class BCNode():
             return self.send_message(name, kwargs)
         return dispatcher
 
+class LCNode(BCNode):
+    """A class representing a litecoind node"""
+    bin_name = "litecoind"
+    short_name = "lc"
+
 def testLit():
     """starts two lit processes and tests basic functionality:
 
