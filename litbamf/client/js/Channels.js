@@ -3,6 +3,8 @@ import lc from './LitClient';
 import Q from 'q';
 require('../sass/channels.scss');
 
+let Actions = Reflux.createActions(['setPeers', 'setChannels', 'setSelectedPeerIdx', 'setSelectedChannelIdx']);
+
 class Store extends Reflux.Store {
   constructor () {
     super();
@@ -16,6 +18,28 @@ class Store extends Reflux.Store {
       selectedPeerIdx: selectedPeerIdx,
       selectedChannelIdx: selectedChannelIdx,
     };
+
+    this.listenables = Actions;
+  }
+  onSetPeers (peers) {
+    this.setState({
+      peers: peers,
+    });
+  }
+  onSetChannels (channels) {
+    this.setState({
+      channels: channels,
+    });
+  }
+  onSetSelectedPeerIdx (idx) {
+    this.setState({
+      setSelectedPeerIdx: idx,
+    });
+  }
+  onSetSelectedChannelIdx (idx) {
+    this.setState({
+      setSelectedChannelIdx: idx,
+    });
   }
 }
 
@@ -34,11 +58,6 @@ class PeerModal extends Reflux.Component {
       'Nickname': this.state.nickname,
     }).then(res => {
       window.location = window.location.href.split('#')[0];
-      this.state.peers.append({
-        address: this.state.address,
-        nickname: this.state.nickname,
-        channels: [],
-      });
     })
     .fail(err => {
       console.error(err);
@@ -146,9 +165,7 @@ class PeerList extends Reflux.Component {
   update () {
     lc.send('LitRPC.ListConnections').then(connections => {
       let peers = connections.Connections !== null ? connections.Connections : [];
-      this.setState({
-        peers: peers,
-      });
+      Actions.setPeers(peers);
     })
     .fail(err => {
       console.error(err);
@@ -160,7 +177,7 @@ class PeerList extends Reflux.Component {
     window.location = '#nickname-modal';
   }
   changePeer (event) {
-    this.state.selectedPeerIdx = event.target.value;
+    Actions.setSelectedPeerIdx(event.target.value);
   }
   render () {
     let peerElements = this.state.peers.map((peer, i) => {
@@ -223,7 +240,7 @@ class ChannelElement extends React.Component {
     });
   }
   xtraCommands (idx) {
-    this.setState({selectedChannelIdx: this.props.idx});
+    Actions.setSelectedChannelIdx(this.props.idx);
     window.sessionStorage.selectedChannelIdx = this.props.idx;
     window.location = '#xtra-modal';
   }
@@ -259,9 +276,7 @@ class ChannelList extends Reflux.Component {
     lc.send('LitRPC.ChannelList').then(_channels => {
       let channels = _channels.Channels !== null ? _channels.Channels : [];
       channels = channels.filter(chan => chan.PeerIdx == this.state.selectedPeerIdx);
-      this.setState({
-        channels: channels,
-      });
+      Actions.setChannels(channels);
     })
     .fail(err => {
       console.error(err);

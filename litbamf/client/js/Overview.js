@@ -10,8 +10,8 @@ class Overview extends React.Component {
     this.state =  {
       peers: '',
       port: '',
-      available: 0,
-      total: 0,
+      legacy: 0,
+      channel: 0,
       syncHeight: 0,
     };
   }
@@ -32,8 +32,8 @@ class Overview extends React.Component {
       this.setState({
         peers: peers,
         port: port,
-        available: balances.MatureWitty,
-        total: balances.TxoTotal,
+        legacy: balances.TxoTotal,
+        total: balances.ChanTotal,
         syncHeight: syncHeight.SyncHeight,
       });
     })
@@ -64,16 +64,16 @@ class Overview extends React.Component {
           <h2>Balances:</h2>
           <div className='stats'>
             <div>
-              <div>Available <span><img src='/images/correct.svg' /></span></div>
-              <div><span>{this.state.available}</span></div>
+              <div>Legacy <span><img src='/images/correct.svg' /></span></div>
+              <div><span>{this.state.legacy}</span></div>
               </div>
             <div>
-              <div>Pending <span><img src='/images/hourglass.svg' /></span></div>
-              <div><span>{this.state.total - this.state.available}</span></div>
+              <div>Channel <span><img src='/images/hourglass.svg' /></span></div>
+              <div><span>{this.state.channel}</span></div>
               </div>
             <div>
               <div>Total <span><img src='/images/the-sum-of.svg' /></span></div>
-              <div><span>{this.state.total}</span></div>
+              <div><span>{this.state.legacy + this.state.channel}</span></div>
               </div>
           </div>
         </main>
