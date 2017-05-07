@@ -169,7 +169,7 @@ class Legacy extends Reflux.Component {
   render () {
     return (
       <div>
-        <Navbar />
+        <Navbar page="legacy" />
 
         <h2>Balances:</h2>
         <div id="balances">

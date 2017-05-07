@@ -30,12 +30,20 @@ html, body {
           float: left;
           list-style: none;
           width: 20%;
+          border: 1px solid white;
+          border-bottom: none;
+          margin: 0 20px;
+
+          &.checked {
+            background: #444;
+          }
 
           a {
             display: block;
             margin: 0 10px;
             padding: 20px 15px;
             text-align: center;
+            color: white;
           }
         }
       }

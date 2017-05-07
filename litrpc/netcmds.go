@@ -64,6 +64,31 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
 	return nil
 }
 
+// ------------------------- name a connection
+type AssignNicknameArgs struct {
+	Peer     uint32
+	Nickname string
+}
+
+func (r *LitRPC) AssignNickname(args AssignNicknameArgs, reply *StatusReply) error {
+	// attempt to save nickname to the database, this process also checks if the peer exists
+	err := r.Node.SaveNicknameForPeerIdx(args.Nickname, args.Peer)
+	if err != nil {
+		return err
+	}
+
+	// it's okay if we aren't connected to this peer right now, but if we are
+	// then their nickname needs to be updated in the remote connections list
+	// otherwise this doesn't get updated til after a restart
+	if peer, ok := r.Node.RemoteCons[args.Peer]; ok {
+		peer.Nickname = args.Nickname
+	}
+
+	reply.Status = fmt.Sprintf("changed nickname of peer %d to %s",
+		args.Peer, args.Nickname)
+	return nil
+}
+
 // ------------------------- ShowConnections
 
 type ListConnectionsReply struct {

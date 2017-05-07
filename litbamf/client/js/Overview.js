@@ -44,7 +44,7 @@ class Overview extends React.Component {
   render () {
     return (
       <div>
-        <Navbar />
+        <Navbar page="overview" />
 
         <main>
           <div className='stats'>

@@ -448,7 +448,7 @@ class ChanCmds extends React.Component {
   render () {
     return (
       <div>
-        <Navbar />
+        <Navbar page="channels" />
 
         <div id="chanbox">
           <PeerList />
