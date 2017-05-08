@@ -3,7 +3,6 @@ import Channels from './Channels.js';
 import Legacy from './Legacy.js';
 import Exit from './Exit.js';
 
-console.log('hello');
 var Router = ReactRouter.Router;
 var Route = ReactRouter.Route;
 var browserHistory = ReactRouter.browserHistory;

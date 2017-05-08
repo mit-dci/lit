@@ -1,36 +1,51 @@
+@import "vendor/modal/index.css";
+
 html, body {
   height: 100%;
   width: 100%;
   background-color: black;
   color: white;
-}
 
-nav {
-  font-family: "Lato", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 15px;
-  text-align: center;
-  margin-bottom: 50px;
-  border-bottom: 1px solid white;
-
-  pre {
-    color: #007f00;
-  }
-
-  ul {
-    display: flex;
+  #root {
+    max-width: 1400px;
     margin: auto;
-    justify-content: center;
-    li {
-      display: inline-block;
-      float: left;
-      list-style: none;
-      width: 20%;
 
-      a {
-        display: block;
-        margin: 0 10px;
-        padding: 20px 15px;
-        text-align: center;
+    nav {
+      font-family: "Lato", "Helvetica Neue", Helvetica, Arial, sans-serif;
+      font-size: 15px;
+      text-align: center;
+      margin-bottom: 50px;
+      border-bottom: 1px solid white;
+
+      pre {
+        color: #007f00;
+      }
+
+      ul {
+        display: flex;
+        margin: auto;
+        justify-content: center;
+        li {
+          display: inline-block;
+          float: left;
+          list-style: none;
+          width: 20%;
+          border: 1px solid white;
+          border-bottom: none;
+          margin: 0 20px;
+
+          &.checked {
+            background: #444;
+          }
+
+          a {
+            display: block;
+            margin: 0 10px;
+            padding: 20px 15px;
+            text-align: center;
+            color: white;
+          }
+        }
       }
     }
   }

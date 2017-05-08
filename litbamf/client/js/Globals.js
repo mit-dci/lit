@@ -10,9 +10,15 @@ class Navbar extends React.Component {
       <nav>
         <pre>{bamflogo}</pre>
         <ul>
-          <li><a href="/overview">Overview</a></li>
-          <li><a href="/channels">Channels</a></li>
-          <li><a href="/legacy">Legacy</a></li>
+          <li className={this.props.page == 'overview' ? 'checked' : ''}>
+            <a href="/overview">Overview</a>
+          </li>
+          <li className={this.props.page == 'channels' ? 'checked' : ''}>
+            <a href="/channels">Channels</a>
+          </li>
+          <li className={this.props.page == 'legacy' ? 'checked' : ''}>
+            <a href="/legacy">Legacy</a>
+          </li>
         </ul>
       </nav>
     );

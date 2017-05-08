@@ -121,10 +121,11 @@ type LitNode struct {
 }
 
 type RemotePeer struct {
-	Idx   uint32 // the peer index
-	Con   *lndc.LNDConn
-	QCs   map[uint32]*Qchan   // keep map of all peer's channels in ram
-	OpMap map[[36]byte]uint32 // quick lookup for channels
+	Idx      uint32 // the peer index
+	Nickname string
+	Con      *lndc.LNDConn
+	QCs      map[uint32]*Qchan   // keep map of all peer's channels in ram
+	OpMap    map[[36]byte]uint32 // quick lookup for channels
 }
 
 // InFlightFund is a funding transaction that has not yet been broadcast
@@ -177,6 +178,35 @@ func (nd *LitNode) GetPubHostFromPeerIdx(idx uint32) ([33]byte, string) {
 		fmt.Printf(err.Error())
 	}
 	return pub, host
+}
+
+// GetNicknameFromPeerIdx gets the nickname for a peer
+func (nd *LitNode) GetNicknameFromPeerIdx(idx uint32) string {
+	var nickname string
+	// look up peer in db
+	err := nd.LitDB.View(func(btx *bolt.Tx) error {
+		mp := btx.Bucket(BKTPeerMap)
+		if mp == nil {
+			return nil
+		}
+		pubBytes := mp.Get(lnutil.U32tB(idx))
+		peerBkt := btx.Bucket(BKTPeers)
+		if peerBkt == nil {
+			return fmt.Errorf("no Peers")
+		}
+		prBkt := peerBkt.Bucket(pubBytes)
+		if prBkt == nil {
+			return fmt.Errorf("no peer %x", pubBytes)
+		}
+
+		nickname = string(prBkt.Get(KEYnickname))
+
+		return nil
+	})
+	if err != nil {
+		fmt.Printf(err.Error())
+	}
+	return nickname
 }
 
 // NextIdx returns the next channel index to use.
@@ -242,6 +272,36 @@ func (nd *LitNode) GetPeerIdx(pub *btcec.PublicKey, host string) (uint32, error)
 		return nil
 	})
 	return idx, err
+}
+
+// SaveNicknameForPeerIdx saves/overwrites a nickname for a given peer idx
+func (nd *LitNode) SaveNicknameForPeerIdx(nickname string, idx uint32) error {
+	var err error
+
+	// look up peer in db
+	err = nd.LitDB.Update(func(btx *bolt.Tx) error {
+		mp := btx.Bucket(BKTPeerMap)
+		if mp == nil {
+			return nil
+		}
+		pubBytes := mp.Get(lnutil.U32tB(idx))
+		peerBkt := btx.Bucket(BKTPeers)
+		if peerBkt == nil {
+			return fmt.Errorf("no Peers")
+		}
+		prBkt := peerBkt.Bucket(pubBytes)
+		if prBkt == nil {
+			return fmt.Errorf("no peer %x", pubBytes)
+		}
+
+		err = prBkt.Put(KEYnickname, []byte(nickname))
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
+	return err
 }
 
 // SaveQchanUtxoData saves utxo data such as outpoint and close tx / status

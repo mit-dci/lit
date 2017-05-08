@@ -66,10 +66,13 @@ func (nd *LitNode) TCPListener(
 				continue
 			}
 
+			nickname := nd.GetNicknameFromPeerIdx(peerIdx)
+
 			nd.RemoteMtx.Lock()
 			var peer RemotePeer
 			peer.Idx = peerIdx
 			peer.Con = newConn
+			peer.Nickname = nickname
 			nd.RemoteCons[peerIdx] = &peer
 			nd.RemoteMtx.Unlock()
 
@@ -115,10 +118,14 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 		return err
 	}
 
+	// also retrieve their nickname, if they have one
+	nickname := nd.GetNicknameFromPeerIdx(uint32(peerIdx))
+
 	nd.RemoteMtx.Lock()
 	var p RemotePeer
 	p.Con = newConn
 	p.Idx = peerIdx
+	p.Nickname = nickname
 	nd.RemoteCons[peerIdx] = &p
 	nd.RemoteMtx.Unlock()
 
@@ -154,6 +161,7 @@ func (nd *LitNode) OutMessager() {
 type PeerInfo struct {
 	PeerNumber uint32
 	RemoteHost string
+	Nickname   string
 }
 
 func (nd *LitNode) GetConnectedPeerList() []PeerInfo {
@@ -164,6 +172,7 @@ func (nd *LitNode) GetConnectedPeerList() []PeerInfo {
 		var newPeer PeerInfo
 		newPeer.PeerNumber = k
 		newPeer.RemoteHost = v.Con.RemoteAddr().String()
+		newPeer.Nickname = v.Nickname
 		peers = append(peers, newPeer)
 	}
 	return peers
