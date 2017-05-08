@@ -1,12 +1,12 @@
-## Lit 0.0 Walkthrough
-
 2017-01-09 Lit sortof works on testnet.  There are known bugs / omissions / errors, and also unknown ones!  Reporting bugs / crashes is helpful, and fixing them is even more helpful.
 
-This walkthrough is to set people up who want send payments over channels on a test network.
+## Lit 0.0 Walkthrough
 
+This walkthrough is to set people up who want to send payments over channels on a test network. If you haven't already, make sure to go to the [README](./README.md) for setup instructions.
+ 
 ### Step 1: Files in place
 
-Look at README.md to get set up with goalng, the dependencies and the code.  Build the binary, lit.  Also, co into cmd/lit-af and build the lit-af binary there.  lit-af is the text based client which controls the lit node.
+Make sure you have built both the `lit` and `lit-af` (in `cmd/lit-af`) packages with `go build`
 
 If you have a full node, like bitcoind or btcd, start running that as well, either on testnet3 or regtest mode.
 
@@ -14,7 +14,9 @@ For this walkthrough, you will run 2 lit nodes and have them make channels.  It'
 
 In this example, there are 2 computers.  Most things should work the same with 1 computer; just make sure to have 2 different folders for the lit nodes.
 
-Set up two folders:
+Set up two folders (i.e. anode and bnode) and copy both the `lit` and `lit-af` executables you built into both folders.
+
+Here is a sample for Linux users who have not already built the packages
 
 Alice's setup
 
@@ -30,22 +32,9 @@ alice@pi2:~/gofolder/src/github.com/mit-dci/lit/cmd/lit-af$ cd ~/anode/
 alice@pi2:~/anode$ 
 ```
 
-Bob's setup
-```
-bob@pi3:~$ mkdir bnode
-bob@pi3:~$ cd gofolder/src/github.com/mit-dci/lit
-bob@pi3:~/gofolder/src/github.com/mit-dci/lit$ go build
-bob@pi3:~/gofolder/src/github.com/mit-dci/lit$ cp lit ~/bnode/
-bob@pi3:~/gofolder/src/github.com/mit-dci/lit$ cd cmd/lit-af
-bob@pi3:~/gofolder/src/github.com/mit-dci/lit/cmd/lit-af$ go build
-bob@pi3:~/gofolder/src/github.com/mit-dci/lit/cmd/lit-af$ cp lit-af ~/bnode/
-bob@pi3:~/gofolder/src/github.com/mit-dci/lit/cmd/lit-af$ cd ~/bnode/
-bob@pi3:~/bnode$ 
-```
-
 ### Step 2: Run lit and sync up
 
-Alice starts running lit and syncs up to the blockchain.  The lit node will print lots of stuff on the screen, but can't be controlled from here.
+Alice starts running lit (with `./lit -spv fullnode.net`) and syncs up to the blockchain.  The lit node will print lots of stuff on the screen, but can't be controlled from here.
 
 Alice connects to her full node, fullnode.net.  By default this is on testnet3, using port 18333.
 
@@ -62,7 +51,7 @@ WARNING!! Key file not encrypted!!
 
 Here Alice can type a passphrase to secure the wallet the newborn lit node is generating.  But she just pressed enter twice, because this is testnet.  Even though it's testnet, lit will show warnings about not using a passphrase.
 
-Now in another window, alice connects to the lit node over RPC.
+Now in another window, alice connects to the lit node over RPC using `./lit-af`
 
 ```
 alice@pi2:~/anode$ ./lit-af 
@@ -76,9 +65,9 @@ Sync Height 1060000
 
 ```
 
-ls shows how much money Alice has, which is none.  She can get some from a faucet.
+ls shows how much money Alice has, which is none.  She can get some from a faucet. One such faucet you can find [here](https://testnet.manu.backend.hamburg/faucet).
 
-Bob can start a wallet in the same way; if bob's node is running on the same computer, he'll have to run lit with -rpcport to listen on a different port, and start lit-af with -p to connect to that port.  Once Alice and Bob are both set up, they can connect to each other.
+Bob can start a wallet in the same way; if Bob's node is running on the same computer, he'll have to run lit with -rpcport to listen on a different port, and start lit-af with -p to connect to that port.  Once Alice and Bob are both set up, they can connect to each other.
 
 ### Step 3: Connect
 
@@ -93,7 +82,7 @@ listening on :2448 with key n1ozwFWDbZXKYjqwySv3VaTxNZvdVmQcam
 
 n1ozwFWDbZXKYjqwySv3VaTxNZvdVmQcam is Alice's node-ID (This format will change soon).  She's listening on port 2448, but any port can be specified with the `lis` command.
 
-Bob can connect to Alice:
+Bob can connect to Alice using her node-ID:
 
 ```
 lit-af# con n1ozwFWDbZXKYjqwySv3VaTxNZvdVmQcam@pi2
@@ -105,6 +94,9 @@ entered command: say 1 Hi Alice!
 ```
 
 Bob puts the pubkey@hostname for Alice and connects.  Then he says hi to Alice.
+
+### Step 3b: Sweep Funds
+
 
 ### Step 4: Open a channel
 
