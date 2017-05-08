@@ -16,7 +16,7 @@ class LitNode():
         os.makedirs(self.data_dir)
 
         # Write a hexkey to the hexkey file
-        with open(self.data_dir + "/testkey.hex", 'w+') as f:
+        with open(self.data_dir + "/privkey.hex", 'w+') as f:
             f.write("1" * 64 + "\n")
 
         self.args = ["-dir", self.data_dir]
