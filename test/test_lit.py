@@ -10,11 +10,11 @@ import time
 
 import requests  # `pip install requests`
 
-import litrpc
+from litpy import litrpc
 
 TMP_DIR = tempfile.mkdtemp(prefix="test")
 print("Using tmp dir %s" % TMP_DIR)
-LIT_BIN = "%s/../../lit" % os.path.abspath(os.path.dirname(__file__))
+LIT_BIN = "%s/../lit" % os.path.abspath(os.path.dirname(__file__))
 
 class LitNode():
     """A class representing a Lit node"""

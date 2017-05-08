@@ -16,5 +16,5 @@ script:
   - go get -v ./...
   - go test ./...
   - go build
-  - cmd/litpy/test_lit.py
+  - test/test_lit.py
 
