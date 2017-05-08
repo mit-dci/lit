@@ -25,8 +25,9 @@ var (
 	BKTChanMap = []byte("cmp") // map of channel index to outpoint
 	BKTWatch   = []byte("wch") // txids & signatures for export to watchtowers
 
-	KEYIdx  = []byte("idx") // index for key derivation
-	KEYhost = []byte("hst") // hostname where peer lives
+	KEYIdx      = []byte("idx")  // index for key derivation
+	KEYhost     = []byte("hst")  // hostname where peer lives
+	KEYnickname = []byte("nick") // nickname where peer lives
 
 	KEYutxo    = []byte("utx") // serialized utxo for the channel
 	KEYState   = []byte("now") // channel state

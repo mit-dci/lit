@@ -2,22 +2,13 @@ import lc from './LitClient';
 
 class NetCmds extends React.Component {
   constructor (props) {
-    super(props)
+    super(props);
     this.state = {
       connectPubkey: '',
       connectHost: '',
       connectPort: '',
       sayText: '',
     };
-  }
-  connect () {
-    let address = `${this.state.connectPubkey}@${this.state.connectHost}:${this.state.connectPort}`;
-    lc.send('LitRPC.Connect', address).then(res => {
-      console.log(res);
-    })
-    .fail(err => {
-      console.error(err);
-    });
   }
   listen () {
     lc.send('LitRPC.Listen').then(res => {
@@ -44,7 +35,6 @@ class NetCmds extends React.Component {
     return (
       <div>
         <h2>Network Commands</h2>
-        <button onClick={this.connect}>connect</button>
         <input type="text" id="connectPubkey" value={this.state.connectPubkey}
           onChange={this.handleChange}></input>
         <input type="text" id="connectHost" value={this.state.connectHost}
@@ -61,14 +51,5 @@ class NetCmds extends React.Component {
     );
   }
 }
-
-// client.call(
-//   {'jsonrpc': '2.0', 'method': 'myMethod', 'params': [1,2], 'id': 0},
-//   function (err, res) {
-//     // Did it all work ?
-//     if (err) { console.log(err); }
-//     else { console.log(res); }
-//   }
-// );
 
 export default NetCmds;
