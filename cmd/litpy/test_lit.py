@@ -46,16 +46,26 @@ class BCNode():
         self.data_dir = TMP_DIR + "/%snode%s" % (self.__class__.short_name, i)
         os.makedirs(self.data_dir)
 
-        self.args = ["-daemon", "-regtest", "-datadir=%s" % self.data_dir, "-rpcuser=regtestuser", "-rpcpassword=regtestpass", "-rpcport=18332"]
+        self.args = ["-regtest", "-datadir=%s" % self.data_dir, "-rpcuser=regtestuser", "-rpcpassword=regtestpass", "-rpcport=18332"]
         self.msg_id = random.randint(0, 9999)
         self.rpc_url = "http://regtestuser:regtestpass@127.0.0.1:18332"
 
     def start_node(self):
         try:
-            subprocess.Popen([self.__class__.bin_name] + self.args)
+            process = subprocess.Popen([self.__class__.bin_name] + self.args)
         except FileNotFoundError:
             print("%s not found on path. Please install %s" % (self.__class__.bin_name, self.__class__.bin_name))
             sys.exit(1)
+
+        # Wait for process to start
+        while True:
+            if process.poll() is not None:
+                raise Exception('%s exited with status %i during initialization' % (self.__class__.bin_name, process.returncode))
+            try:
+                self.getblockcount()
+                break  # break out of loop on success
+            except:
+                time.sleep(0.25)
 
     def send_message(self, method, params):
         self.msg_id += 1
