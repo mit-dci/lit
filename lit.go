@@ -28,7 +28,7 @@ const (
 	hardHeight = 1111111 // height to start at if not specified
 )
 
-// variables for a goodelivery session
+// variables for a lit node & lower layers
 type LitConfig struct {
 	reSync, hard bool // flag to set networks
 
@@ -79,49 +79,53 @@ func setConfig(lc *LitConfig) {
 	lc.bamfport = uint16(*bamfportptr)
 
 	lc.litHomeDir = *litHomeDir
+}
 
-	//	if lc.spvHost == "" {
-	//		lc.spvHost = "lit3.co"
-	//	}
+// linkWallets tries to link the wallets given in conf to the litNode
+func linkWallets(node *qln.LitNode, key *[32]byte, conf *LitConfig) error {
+	// for now, wallets are linked to the litnode on startup, and
+	// can't appear / disappear while it's running.  Later
+	// could support dynamically adding / removing wallets
 
-	// soon clean this up into multi-wallet
-
-	//	if lc.regTest && lc.bc2Net {
-	//		log.Fatal("error: can't have -bc2 and -reg")
-	//	}
-	//	if lc.lt4Net && lc.bc2Net {
-	//		log.Fatal("error: can't have -lt4 and -bc2")
-	//	}
-	//	if lc.regTest && lc.lt4Net {
-	//		log.Fatal("error: can't have -lt4 and -reg")
-	//	}
-
-	//	if lc.lt4host != "" {
-	//		lc.Params = &chaincfg.LiteCoinTestNet4Params
-	//		lc.birthblock = 47295
-	//		if !strings.Contains(lc.spvHost, ":") {
-	//			lc.spvHost = lc.spvHost + ":19335"
-	//		}
-	//	} else if lc.regTest {
-	//		lc.Params = &chaincfg.RegressionNetParams
-	//		lc.birthblock = 120
-	//		if !strings.Contains(lc.spvHost, ":") {
-	//			lc.spvHost = lc.spvHost + ":18444"
-	//		}
-	//	} else if lc.bc2Net {
-	//		lc.Params = &chaincfg.BC2NetParams
-	//		if !strings.Contains(lc.spvHost, ":") {
-	//			lc.spvHost = lc.spvHost + ":8444"
-	//		}
-	//	} else {
-	//		lc.Params = &chaincfg.TestNet3Params
-	//		if !strings.Contains(lc.spvHost, ":") {
-	//			lc.spvHost = lc.spvHost + ":18333"
-	//		}
-	//	}
-	//	if lc.reSync && lc.birthblock == hardHeight {
-	//		log.Fatal("-resync requires -tip")
-	//	}
+	var err error
+	// try litecoin testnet4
+	if conf.lt4host != "" {
+		if !strings.Contains(conf.lt4host, ":") {
+			conf.lt4host = conf.lt4host + ":19335"
+		}
+		err = node.LinkBaseWallet(
+			key, 47295, conf.reSync,
+			conf.lt4host, &chaincfg.LiteCoinTestNet4Params)
+		if err != nil {
+			return err
+		}
+	}
+	// try regtest
+	if conf.reghost != "" {
+		if !strings.Contains(conf.reghost, ":") {
+			conf.reghost = conf.reghost + ":18444"
+		}
+		fmt.Printf("reg: %s\n", conf.reghost)
+		err = node.LinkBaseWallet(
+			key, 120, conf.reSync,
+			conf.reghost, &chaincfg.RegressionNetParams)
+		if err != nil {
+			return err
+		}
+	}
+	// try testnet3
+	if conf.tn3host != "" {
+		if !strings.Contains(conf.tn3host, ":") {
+			conf.tn3host = conf.tn3host + ":18333"
+		}
+		err = node.LinkBaseWallet(
+			key, conf.birthblock, conf.reSync,
+			conf.tn3host, &chaincfg.TestNet3Params)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func main() {
@@ -173,44 +177,10 @@ func main() {
 	}
 
 	// node is up; link wallets based on args
-	// try litecoin testnet4
-	if conf.lt4host != "" {
-		if !strings.Contains(conf.lt4host, ":") {
-			conf.lt4host = conf.lt4host + ":19335"
-		}
-		err = node.LinkBaseWallet(
-			key, 47295, conf.reSync,
-			conf.lt4host, &chaincfg.LiteCoinTestNet4Params)
-		if err != nil {
-			log.Fatal(err)
-		}
+	err = linkWallets(node, key, conf)
+	if err != nil {
+		log.Fatal(err)
 	}
-	// try regtest
-	if conf.reghost != "" {
-		if !strings.Contains(conf.reghost, ":") {
-			conf.reghost = conf.reghost + ":18444"
-		}
-		fmt.Printf("reg: %s\n", conf.reghost)
-		err = node.LinkBaseWallet(
-			key, 120, conf.reSync,
-			conf.reghost, &chaincfg.RegressionNetParams)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-	// try testnet3
-	if conf.tn3host != "" {
-		if !strings.Contains(conf.tn3host, ":") {
-			conf.tn3host = conf.tn3host + ":18333"
-		}
-		err = node.LinkBaseWallet(
-			key, conf.birthblock, conf.reSync,
-			conf.tn3host, &chaincfg.TestNet3Params)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-	// try bc2... eh, or don't
 
 	rpcl := new(litrpc.LitRPC)
 	rpcl.Node = node
