@@ -28,6 +28,7 @@ type CoinArgs struct {
 // BalReply is the reply when the user asks about their balance.
 type CoinBalReply struct {
 	CoinType    uint32
+	SyncHeight  int32 // height this wallet is synced to
 	ChanTotal   int64 // total balance in channels
 	TxoTotal    int64 // all utxos
 	MatureWitty int64 // confirmed, spendable and witness
@@ -53,7 +54,7 @@ func (r *LitRPC) Bal(args *NoArgs, reply *BalReply) error {
 
 		cbr.CoinType = cointype
 
-		nowHeight := wal.CurrentHeight()
+		cbr.SyncHeight = wal.CurrentHeight()
 
 		allTxos, err = wal.UtxoDump()
 		if err != nil {
@@ -62,7 +63,7 @@ func (r *LitRPC) Bal(args *NoArgs, reply *BalReply) error {
 
 		// ask sub-wallet for balance
 		cbr.TxoTotal = allTxos.Sum()
-		cbr.MatureWitty = allTxos.SumWitness(nowHeight)
+		cbr.MatureWitty = allTxos.SumWitness(cbr.SyncHeight)
 
 		// iterate through channels to figure out how much we have
 		for _, q := range qcs {
@@ -119,19 +120,6 @@ func (r *LitRPC) TxoList(args *NoArgs, reply *TxoListReply) error {
 
 		reply.Txos = append(reply.Txos, theseTxos...)
 	}
-	return nil
-}
-
-type SyncHeightReply struct {
-	SyncHeight   int32
-	HeaderHeight int32
-}
-
-func (r *LitRPC) SyncHeight(args *NoArgs, reply *SyncHeightReply) error {
-	if r.Node.DefaultWallet == nil {
-		return fmt.Errorf("no default wallet")
-	}
-	reply.SyncHeight = r.Node.DefaultWallet.CurrentHeight()
 	return nil
 }
 

@@ -57,14 +57,16 @@ func (nd *LitNode) SignBreakTx(q *Qchan) (*wire.MsgTx, error) {
 
 // SignSimpleClose signs the given simpleClose tx, given the other signature
 // Tx is modified in place.
-func (nd *LitNode) SignSimpleClose(q *Qchan, tx *wire.MsgTx) ([]byte, error) {
+func (nd *LitNode) SignSimpleClose(q *Qchan, tx *wire.MsgTx) ([64]byte, error) {
+
+	var sig [64]byte
 	// make hash cache
 	hCache := txscript.NewTxSigHashes(tx)
 
 	// generate script preimage for signing (ignore key order)
 	pre, _, err := lnutil.FundTxScript(q.MyPub, q.TheirPub)
 	if err != nil {
-		return nil, err
+		return sig, err
 	}
 	// get private signing key
 	priv := nd.SubWallet[q.Coin()].GetPriv(q.KeyGen)
@@ -72,10 +74,11 @@ func (nd *LitNode) SignSimpleClose(q *Qchan, tx *wire.MsgTx) ([]byte, error) {
 	mySig, err := txscript.RawTxInWitnessSignature(
 		tx, hCache, 0, q.Value, pre, txscript.SigHashAll, priv)
 	if err != nil {
-		return nil, err
+		return sig, err
 	}
-
-	return mySig, nil
+	// truncate sig (last byte is sighash type, always sighashAll)
+	mySig = mySig[:len(mySig)-1]
+	return sig64.SigCompress(mySig)
 }
 
 // SignNextState generates your signature for their state.

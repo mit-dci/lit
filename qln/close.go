@@ -6,10 +6,12 @@ import (
 	"log"
 
 	"github.com/adiabat/btcd/chaincfg/chainhash"
+	"github.com/adiabat/btcd/txscript"
 	"github.com/adiabat/btcd/wire"
 	"github.com/btcsuite/fastsha256"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
+	"github.com/mit-dci/lit/sig64"
 )
 
 /* CloseChannel --- cooperative close
@@ -80,9 +82,6 @@ func (nd *LitNode) CoopClose(q *Qchan) error {
 func (nd *LitNode) CloseReqHandler(msg lnutil.CloseReqMsg) {
 	opArr := lnutil.OutPointToBytes(msg.Outpoint)
 
-	// find their sig
-	theirSig := msg.Signature[:]
-
 	// get channel
 	q, err := nd.GetQchan(opArr)
 	if err != nil {
@@ -95,6 +94,7 @@ func (nd *LitNode) CloseReqHandler(msg lnutil.CloseReqMsg) {
 	}
 
 	// verify their sig?  should do that before signing our side just to be safe
+	// TODO -- yeah we need to verify their sig
 
 	// build close tx
 	tx, err := q.SimpleCloseTx()
@@ -109,6 +109,14 @@ func (nd *LitNode) CloseReqHandler(msg lnutil.CloseReqMsg) {
 		log.Printf("CloseReqHandler SignSimpleClose err %s", err.Error())
 		return
 	}
+
+	myBigSig := sig64.SigDecompress(mySig)
+	theirBigSig := sig64.SigDecompress(msg.Signature)
+
+	// put the sighash all byte on the end of both signatures
+	myBigSig = append(myBigSig, byte(txscript.SigHashAll))
+	theirBigSig = append(theirBigSig, byte(txscript.SigHashAll))
+
 	pre, swap, err := lnutil.FundTxScript(q.MyPub, q.TheirPub)
 	if err != nil {
 		log.Printf("CloseReqHandler FundTxScript err %s", err.Error())
@@ -117,9 +125,9 @@ func (nd *LitNode) CloseReqHandler(msg lnutil.CloseReqMsg) {
 
 	// swap if needed
 	if swap {
-		tx.TxIn[0].Witness = SpendMultiSigWitStack(pre, theirSig, mySig)
+		tx.TxIn[0].Witness = SpendMultiSigWitStack(pre, theirBigSig, myBigSig)
 	} else {
-		tx.TxIn[0].Witness = SpendMultiSigWitStack(pre, mySig, theirSig)
+		tx.TxIn[0].Witness = SpendMultiSigWitStack(pre, myBigSig, theirBigSig)
 	}
 	log.Printf(lnutil.TxToString(tx))
 

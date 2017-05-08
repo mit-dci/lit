@@ -9,6 +9,7 @@ import (
 
 type ChannelInfo struct {
 	OutPoint      string
+	CoinType      uint32
 	Closed        bool
 	Capacity      int64
 	MyBalance     int64
@@ -44,6 +45,7 @@ func (r *LitRPC) ChannelList(args ChanArgs, reply *ChannelListReply) error {
 
 	for i, q := range qcs {
 		reply.Channels[i].OutPoint = q.Op.String()
+		reply.Channels[i].CoinType = q.Coin()
 		reply.Channels[i].Closed = q.CloseData.Closed
 		reply.Channels[i].Capacity = q.Value
 		reply.Channels[i].MyBalance = q.State.MyAmt
