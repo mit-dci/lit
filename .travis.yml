@@ -5,12 +5,16 @@ go:
 sudo: required
 install:
   - sudo apt-get update
-  - sudo apt-get install python3 python3-pip
+  - sudo apt-get install python3 python3-pip python3-requests
+  - sudo apt-get install bitcoind
+  - wget https://download.litecoin.org/litecoin-0.13.2/linux/litecoin-0.13.2-x86_64-linux-gnu.tar.gz
+  - tar xvf litecoin-0.13.2-x86_64-linux-gnu.tar.gz
+  - PATH=$PATH:$PWD/litecoin-0.13.2/bin
   - sudo pip3 install --upgrade pip
   - sudo pip3 install websocket-client
 script:
   - go get -v ./...
   - go test ./...
   - go build
-  - cmd/litpy/test_lit.py
+  - test/test_lit.py
 
