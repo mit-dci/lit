@@ -20,7 +20,7 @@ import (
 const (
 	litHomeDirName = ".lit"
 
-	keyFileName = "testkey.hex"
+	keyFileName = "privkey.hex"
 
 	// this is my local testnet node, replace it with your own close by.
 	// Random internet testnet nodes usually work but sometimes don't, so
@@ -87,19 +87,9 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *LitConfig) error {
 	// can't appear / disappear while it's running.  Later
 	// could support dynamically adding / removing wallets
 
+	// order matters; the first registered wallet becomes the default
+
 	var err error
-	// try litecoin testnet4
-	if conf.lt4host != "" {
-		if !strings.Contains(conf.lt4host, ":") {
-			conf.lt4host = conf.lt4host + ":19335"
-		}
-		err = node.LinkBaseWallet(
-			key, 47295, conf.reSync,
-			conf.lt4host, &chaincfg.LiteCoinTestNet4Params)
-		if err != nil {
-			return err
-		}
-	}
 	// try regtest
 	if conf.reghost != "" {
 		if !strings.Contains(conf.reghost, ":") {
@@ -121,6 +111,18 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *LitConfig) error {
 		err = node.LinkBaseWallet(
 			key, conf.birthblock, conf.reSync,
 			conf.tn3host, &chaincfg.TestNet3Params)
+		if err != nil {
+			return err
+		}
+	}
+	// try litecoin testnet4
+	if conf.lt4host != "" {
+		if !strings.Contains(conf.lt4host, ":") {
+			conf.lt4host = conf.lt4host + ":19335"
+		}
+		err = node.LinkBaseWallet(
+			key, 47295, conf.reSync,
+			conf.lt4host, &chaincfg.LiteCoinTestNet4Params)
 		if err != nil {
 			return err
 		}

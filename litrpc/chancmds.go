@@ -133,7 +133,8 @@ type PushReply struct {
 func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 
 	if args.Amt > 100000000 || args.Amt < 1 {
-		return fmt.Errorf("push %d, max push is 1 coin / 100000000", args.Amt)
+		return fmt.Errorf(
+			"can't push %d max is 1 coin (100000000), min is 1", args.Amt)
 	}
 
 	fmt.Printf("push %d to chan %d\n", args.Amt, args.ChanIdx)

@@ -92,9 +92,12 @@ type LitNode struct {
 
 	// BaseWallet is the underlying wallet which keeps track of utxos, secrets,
 	// and network i/o
-	SubWallet     map[uint32]UWallet
-	DefaultWallet UWallet
-	MultiWallet   bool
+	// map of cointypes to wallets
+	SubWallet map[uint32]UWallet
+	// indicates if multiple wallets are connected
+	MultiWallet bool
+	// cointype of the first (possibly only) wallet connected
+	DefaultCoin uint32
 
 	RemoteCons map[uint32]*RemotePeer
 	RemoteMtx  sync.Mutex

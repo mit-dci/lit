@@ -290,6 +290,11 @@ func (r *LitRPC) Address(args *AddressArgs, reply *AddressReply) error {
 	var allAdr [][20]byte
 	var ctypesPerAdr []uint32
 
+	// if cointype is 0, use the node's default coin
+	if args.CoinType == 0 {
+		args.CoinType = r.Node.DefaultCoin
+	}
+
 	// If you tell it to make 0 new addresses, it sends a list of all the old ones
 	// (from every wallet)
 	if args.NumToMake == 0 {
@@ -308,8 +313,8 @@ func (r *LitRPC) Address(args *AddressArgs, reply *AddressReply) error {
 		}
 	} else {
 		// if you have non-zero NumToMake, then cointype matters
-		wal := r.Node.SubWallet[args.CoinType]
-		if wal == nil {
+		wal, ok := r.Node.SubWallet[args.CoinType]
+		if !ok {
 			return fmt.Errorf("No wallet of cointype %d linked", args.CoinType)
 		}
 
