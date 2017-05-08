@@ -3,6 +3,8 @@
 import os
 import subprocess
 import tempfile
+import random
+from string import digits
 
 import litrpc
 
@@ -17,7 +19,8 @@ class LitNode():
 
         # Write a hexkey to the hexkey file
         with open(self.data_dir + "/testkey.hex", 'w+') as f:
-            f.write("1" * 64 + "\n")
+            randomString = ''.join(random.choice("abcdef"+digits) for i in range(64))
+            f.write(randomString + "\n")
 
         self.args = ["-dir", self.data_dir]
 
