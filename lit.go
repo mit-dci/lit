@@ -153,14 +153,15 @@ func main() {
 		log.SetOutput(logfile)
 	}
 
-	if conf.tn3host == "" && conf.lt4host == "" && conf.reghost == "" {
-		log.Fatal("error: no network specified; use -tn3, -reg, -lt4")
-	}
+	// Allow node with no linked wallets, for testing.
+	// TODO Should update tests and disallow nodes without wallets later.
+	//	if conf.tn3host == "" && conf.lt4host == "" && conf.reghost == "" {
+	//		log.Fatal("error: no network specified; use -tn3, -reg, -lt4")
+	//	}
 
 	// Keys: the litNode, and wallits, all get 32 byte keys.
 	// Right now though, they all get the *same* key.  For lit as a single binary
 	// now, all using the same key makes sense; could split up later.
-
 	keyFilePath := filepath.Join(conf.litHomeDir, keyFileName)
 
 	// read key file (generate if not found)
