@@ -1,10 +1,7 @@
 package litrpc
 
 import (
-	"bytes"
 	"fmt"
-	"io/ioutil"
-	"log"
 	"net/http"
 	"net/rpc"
 	"net/rpc/jsonrpc"
@@ -30,22 +27,12 @@ type LitRPC struct {
 }
 
 func serveWS(ws *websocket.Conn) {
-	body, err := ioutil.ReadAll(ws.Request().Body)
-	if err != nil {
-		log.Printf("Error reading body: %v", err)
-		return
-	}
-
-	log.Printf(string(body))
-	ws.Request().Body = ioutil.NopCloser(bytes.NewBuffer(body))
-
-	jsonrpc.ServeConn(ws)
+	jsonrpc.ServeConn(ws) // this is a blocking call, it returns upon user disconnect
 }
 
 func RPCListen(rpcl *LitRPC, port uint16) {
 
 	rpc.Register(rpcl)
-
 	listenString := fmt.Sprintf("127.0.0.1:%d", port)
 
 	http.Handle("/ws", websocket.Handler(serveWS))

@@ -37,7 +37,7 @@ var conCommand = &Command{
 func (lc *litAfClient) RequestAsync() {
 	for {
 		args := new(litrpc.NoArgs)
-		reply := new(litrpc.StatusReply)
+		reply := new(lnutil.ChatMsg)
 
 		err := lc.rpccon.Call("LitRPC.GetMessages", args, reply)
 		if err != nil {
@@ -46,7 +46,8 @@ func (lc *litAfClient) RequestAsync() {
 			// end loop on first error.  it's probably a connection error
 
 		}
-		fmt.Fprintf(color.Output, "%s\n", reply.Status)
+		fmt.Fprintf(color.Output,
+			"\nmsg from %s: %s\n", lnutil.White(reply.PeerIdx), lnutil.Green(reply.Text))
 	}
 }
 

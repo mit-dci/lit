@@ -10,13 +10,7 @@ import (
 func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) error {
 	switch msg.MsgType() & 0xf0 {
 	case 0x00: // TEXT MESSAGE.  SIMPLE
-		chat, ok := msg.(lnutil.ChatMsg)
-		if !ok {
-			return fmt.Errorf("can't cast to chat message")
-		}
-		nd.UserMessageBox <- fmt.Sprintf(
-			"\nmsg from %s: %s", lnutil.White(msg.Peer()), lnutil.Green(chat.Text))
-		return nil // no error
+		return nd.BroadcastChatMessage(msg)
 
 	case 0x10: //Making Channel, or using
 		return nd.ChannelHandler(msg, peer)
@@ -51,6 +45,28 @@ func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) er
 
 	}
 
+}
+
+// BroadcastMessage sends a chat message to all connected websocket clients
+func (nd *LitNode) BroadcastChatMessage(msg lnutil.LitMsg) error {
+	chat, ok := msg.(lnutil.ChatMsg)
+	if !ok {
+		return fmt.Errorf("can't cast to chat message")
+	}
+
+	// get the current set of channels and save them, they may be deleted by litrpc
+	// before the iteration is over
+	var channels []chan lnutil.ChatMsg
+	for _, c := range nd.UserWsCons {
+		channels = append(channels, c)
+	}
+
+	// now send the chat to each channel
+	for i := range channels {
+		channels[i] <- chat
+	}
+
+	return nil
 }
 
 // Every lndc has one of these running
