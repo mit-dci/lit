@@ -1,38 +1,13 @@
 #!/usr/bin/python3
 """Test lit"""
-import os
-import subprocess
 import tempfile
 import time
 
 from bcnode import BCNode
-from litpy import litrpc
+from litnode import LitNode
 
 TMP_DIR = tempfile.mkdtemp(prefix="test")
 print("Using tmp dir %s" % TMP_DIR)
-LIT_BIN = "%s/../lit" % os.path.abspath(os.path.dirname(__file__))
-
-class LitNode():
-    """A class representing a Lit node"""
-    def __init__(self, i):
-        self.data_dir = TMP_DIR + "/litnode%s" % i
-        os.makedirs(self.data_dir)
-
-        # Write a hexkey to the hexkey file
-        with open(self.data_dir + "/privkey.hex", 'w+') as f:
-            f.write("1" * 63 + str(i) + "\n")
-
-        self.args = ["-dir", self.data_dir]
-
-    def start_node(self):
-        subprocess.Popen([LIT_BIN] + self.args)
-
-    def add_rpc_connection(self, ip, port):
-        self.rpc = litrpc.LitConnection(ip, port)
-        self.rpc.connect()
-
-    def __getattr__(self, name):
-        return self.rpc.__getattr__(name)
 
 def testLit():
     """starts two lit processes and tests basic functionality:
@@ -54,7 +29,7 @@ def testLit():
     print("Received response from bitcoin node: %s" % bcnode.getinfo().text)
 
     # Start lit node 0 and open websocket connection
-    litnode0 = LitNode(0)
+    litnode0 = LitNode(0, TMP_DIR)
     litnode0.args.extend(["-reg", "127.0.0.1"])
     litnode0.start_node()
     time.sleep(1)
@@ -63,7 +38,7 @@ def testLit():
     litnode0.Bal()
 
     # Start lit node 1 and open websocket connection
-    litnode1 = LitNode(1)
+    litnode1 = LitNode(1, TMP_DIR)
     litnode1.args.extend(["-rpcport", "8002", "-reg", "127.0.0.1"])
     litnode1.start_node()
     time.sleep(1)
