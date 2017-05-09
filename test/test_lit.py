@@ -4,8 +4,10 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 """Test lit"""
 import subprocess
+import sys
 import tempfile
 import time
+import traceback
 
 from bcnode import BCNode
 from litnode import LitNode
@@ -25,8 +27,9 @@ class LitTest():
             print("Test succeeds!")
         except:
             # Test asserted. Return 1
+            print("Unexpected error:", sys.exc_info()[0])
+            traceback.print_exc(file=sys.stdout)
             rc = 1
-            print("Test fails")
         finally:
             self.cleanup()
 
@@ -43,7 +46,7 @@ class LitTest():
         - stop"""
 
         # Start a bitcoind node
-        self.bcnodes = [BCNode(0, self.tmdpir)]
+        self.bcnodes = [BCNode(0, self.tmpdir)]
         self.bcnodes[0].start_node()
         time.sleep(15)
         print("generate response: %s" % bcnode.generate(nblocks=150).text)
