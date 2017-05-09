@@ -105,16 +105,16 @@ def testLit():
     bcnode = BCNode(0)
     bcnode.start_node()
     # takes a while to start on a pi
-    time.sleep(20)
-    print("generate response: %s" % bcnode.generate(nblocks="101").text)
-    time.sleep(5)
+    time.sleep(15)
+    print("generate response: %s" % bcnode.generate(nblocks=150).text)
+    time.sleep(2)
     print("Received response from bitcoin node: %s" % bcnode.getinfo().text)
 
     # Start lit node 0 and open websocket connection
     litnode0 = LitNode(0)
     litnode0.args.extend(["-reg", "127.0.0.1"])
     litnode0.start_node()
-    time.sleep(5)
+    time.sleep(1)
     litnode0.add_rpc_connection("127.0.0.1", "8001")
     print(litnode0.rpc.new_address())
     litnode0.Bal()
@@ -123,7 +123,7 @@ def testLit():
     litnode1 = LitNode(1)
     litnode1.args.extend(["-rpcport", "8002", "-reg", "127.0.0.1"])
     litnode1.start_node()
-    time.sleep(5)
+    time.sleep(1)
     litnode1.add_rpc_connection("127.0.0.1", "8002")
     litnode1.rpc.new_address()
     litnode1.Bal()
@@ -146,7 +146,7 @@ def testLit():
     print("previous bal: " + str(bal))
     addr = litnode0.rpc.new_address()
     bcnode.sendtoaddress(address=addr["result"]["LegacyAddresses"][0], amount=12.34)
-
+    print("generate response: %s" % bcnode.generate(nblocks=1).text)
     print("waiting to receive transaction")
 
     # wait for transaction to be received (5 seconds timeout)

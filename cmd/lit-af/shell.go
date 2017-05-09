@@ -204,7 +204,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	cReply := new(litrpc.ChannelListReply)
 	aReply := new(litrpc.AddressReply)
 	tReply := new(litrpc.TxoListReply)
-	bReply := new(litrpc.BalReply)
+	bReply := new(litrpc.BalanceReply)
 	lReply := new(litrpc.ListeningPortsReply)
 
 	err := lc.rpccon.Call("LitRPC.ListConnections", nil, pReply)
@@ -282,7 +282,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		fmt.Fprintf(color.Output, "%d %s (%s)\n", i,
 			lnutil.Address(a), lnutil.Address(aReply.LegacyAddresses[i]))
 	}
-	err = lc.rpccon.Call("LitRPC.Bal", nil, bReply)
+	err = lc.rpccon.Call("LitRPC.Balance", nil, bReply)
 	if err != nil {
 		return err
 	}

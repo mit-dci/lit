@@ -34,11 +34,11 @@ type CoinBalReply struct {
 	MatureWitty int64 // confirmed, spendable and witness
 }
 
-type BalReply struct {
+type BalanceReply struct {
 	Balances []CoinBalReply
 }
 
-func (r *LitRPC) Bal(args *NoArgs, reply *BalReply) error {
+func (r *LitRPC) Balance(args *NoArgs, reply *BalanceReply) error {
 
 	var allTxos portxo.TxoSliceByAmt
 
