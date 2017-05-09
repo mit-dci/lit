@@ -5,13 +5,18 @@ go:
 sudo: required
 install:
   - sudo apt-get update
-  - sudo apt-get install python3 python3-pip python3-requests
-  - sudo apt-get install bitcoind
+  - sudo apt-get install python3 python3-pip
+  # Download bitcoind and add it to the path
+  - wget https://bitcoin.org/bin/bitcoin-core-0.14.1/bitcoin-0.14.1-x86_64-linux-gnu.tar.gz
+  - tar xvf bitcoin-0.14.1-x86_64-linux-gnu.tar.gz
+  - PATH=$PATH:$PWD/bitcoin-0.14.1/bin
+  # Download bitcoind and add it to the path
   - wget https://download.litecoin.org/litecoin-0.13.2/linux/litecoin-0.13.2-x86_64-linux-gnu.tar.gz
   - tar xvf litecoin-0.13.2-x86_64-linux-gnu.tar.gz
   - PATH=$PATH:$PWD/litecoin-0.13.2/bin
-  - sudo pip3 install --upgrade pip
-  - sudo pip3 install websocket-client
+  - pip3 install --upgrade pip
+  - pip3 install requests
+  - pip3 install websocket-client
 script:
   - go get -v ./...
   - go test ./...
