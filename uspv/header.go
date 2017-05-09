@@ -106,6 +106,12 @@ func calcDiffAdjust(start, end wire.BlockHeader, p *chaincfg.Params) uint32 {
 	return blockchain.BigToCompact(newTarget)
 }
 
+// GetHeader returns the header at the specified height
+func GetHeader(h height) (*wire.BlockHeader, error) {
+	// TODO
+	return nil, nil
+}
+
 func CheckHeader(r io.ReadSeeker, height, startheight int32, p *chaincfg.Params) bool {
 	// startHeight is the height the file starts at
 	// header start must be 0 mod 2106
