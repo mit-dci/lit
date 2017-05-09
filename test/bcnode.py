@@ -20,6 +20,7 @@ class BCNode():
     """A class representing a bitcoind node"""
     bin_name = "bitcoind"
     short_name = "bc"
+    min_version = 140000
 
     def __init__(self, i, tmd_dir):
         self.data_dir = tmd_dir + "/%snode%s" % (self.__class__.short_name, i)
@@ -41,9 +42,11 @@ class BCNode():
             if process.poll() is not None:
                 raise Exception('%s exited with status %i during initialization' % (self.__class__.bin_name, process.returncode))
             try:
-                self.getblockcount()
+                resp = self.getinfo()
+                # Check that we're running at least the minimum version
+                assert resp.json()['result']['version'] > self.__class__.min_version
                 break  # break out of loop on success
-            except:
+            except requests.exceptions.ConnectionError as e:
                 time.sleep(0.25)
 
     def send_message(self, method, params):
@@ -68,3 +71,4 @@ class LCNode(BCNode):
     """A class representing a litecoind node"""
     bin_name = "litecoind"
     short_name = "lc"
+    min_version = 130200
