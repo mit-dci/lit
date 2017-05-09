@@ -105,14 +105,16 @@ def testLit():
     bcnode = BCNode(0)
     bcnode.start_node()
     # takes a while to start on a pi
-    time.sleep(8)
-    bcnode.generate(nblocks=101)
+    time.sleep(20)
+    print("generate response: %s" % bcnode.generate(nblocks="101").text)
+    time.sleep(5)
     print("Received response from bitcoin node: %s" % bcnode.getinfo().text)
 
     # Start lit node 0 and open websocket connection
     litnode0 = LitNode(0)
     litnode0.args.extend(["-reg", "127.0.0.1"])
     litnode0.start_node()
+    time.sleep(5)
     litnode0.add_rpc_connection("127.0.0.1", "8001")
     print(litnode0.rpc.new_address())
     litnode0.Bal()
@@ -121,23 +123,26 @@ def testLit():
     litnode1 = LitNode(1)
     litnode1.args.extend(["-rpcport", "8002", "-reg", "127.0.0.1"])
     litnode1.start_node()
+    time.sleep(5)
     litnode1.add_rpc_connection("127.0.0.1", "8002")
     litnode1.rpc.new_address()
     litnode1.Bal()
 
     # Listen on lit litnode0 and connect from lit litnode1
     res = litnode0.Listen(Port="127.0.0.1:10001")["result"]
-    litnode0.lit_address = res["Status"].split(' ')[5] + '@' + res["Status"].split(' ')[2]
+    litnode0.lit_address = res["Adr"] + '@' + res["LisIpPorts"][0]
 
     res = litnode1.Connect(LNAddr=litnode0.lit_address)
     assert not res['error']
 
+    time.sleep(1)
     # Check that litnode0 and litnode1 are connected
     assert len(litnode0.ListConnections()['result']['Connections']) == 1
     assert len(litnode1.ListConnections()['result']['Connections']) == 1
 
     # Send funds from the bitcoin node to lit node 0
-    bal = litnode0.Bal()["result"]["TxoTotal"]
+    #print(litnode0.Bal())
+    bal = litnode0.Bal()['result']['Balances'][0]["TxoTotal"]
     print("previous bal: " + str(bal))
     addr = litnode0.rpc.new_address()
     bcnode.sendtoaddress(address=addr["result"]["LegacyAddresses"][0], amount=12.34)
@@ -147,7 +152,7 @@ def testLit():
     # wait for transaction to be received (5 seconds timeout)
     for i in range(50):
         time.sleep(0.1)
-        balNew = litnode0.Bal()["result"]["TxoTotal"]
+        balNew = litnode0.Bal()['result']["Balances"][0]["TxoTotal"]
         if balNew - bal == 1234000000:
             print("Transaction received. Current balance = %s" % balNew)
             break

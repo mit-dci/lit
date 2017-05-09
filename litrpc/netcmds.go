@@ -14,17 +14,22 @@ type ListenArgs struct {
 	Port string
 }
 
-func (r *LitRPC) Listen(args ListenArgs, reply *StatusReply) error {
+type ListeningPortsReply struct {
+	LisIpPorts []string
+	Adr        string
+}
+
+func (r *LitRPC) Listen(args ListenArgs, reply *ListeningPortsReply) error {
 	if args.Port == "" {
 		args.Port = ":2448"
 	}
-	adr, err := r.Node.TCPListener(args.Port)
+	_, err := r.Node.TCPListener(args.Port)
 	if err != nil {
 		return err
 	}
-	// todo: say what port and what pubkey in status message
-	reply.Status = fmt.Sprintf("listening on %s with key %s",
-		args.Port, adr)
+
+	reply.Adr, reply.LisIpPorts = r.Node.GetLisAddressAndPorts()
+
 	return nil
 }
 
@@ -103,11 +108,6 @@ type ConInfo struct {
 func (r *LitRPC) ListConnections(args NoArgs, reply *ListConnectionsReply) error {
 	reply.Connections = r.Node.GetConnectedPeerList()
 	return nil
-}
-
-type ListeningPortsReply struct {
-	LisIpPorts []string
-	Adr        string
 }
 
 func (r *LitRPC) GetListeningPorts(args NoArgs, reply *ListeningPortsReply) error {
