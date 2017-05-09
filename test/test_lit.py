@@ -10,13 +10,13 @@ import time
 from bcnode import BCNode
 from litnode import LitNode
 
-TMP_DIR = tempfile.mkdtemp(prefix="test")
-print("Using tmp dir %s" % TMP_DIR)
 
 class LitTest():
     def __init__(self):
         self.litnodes = []
         self.bcnodes = []
+        self.tmpdir = tempfile.mkdtemp(prefix="test")
+        print("Using tmp dir %s" % self.tmpdir)
 
     def main(self):
         rc = 0
@@ -43,7 +43,7 @@ class LitTest():
         - stop"""
 
         # Start a bitcoind node
-        self.bcnodes = [BCNode(0, TMP_DIR)]
+        self.bcnodes = [BCNode(0, self.tmdpir)]
         self.bcnodes[0].start_node()
         time.sleep(15)
         print("generate response: %s" % bcnode.generate(nblocks=150).text)
@@ -51,7 +51,7 @@ class LitTest():
         print("Received response from bitcoin node: %s" % self.bcnodes[0].getinfo().text)
 
         # Start lit node 0 and open websocket connection
-        self.litnodes.append(LitNode(0, TMP_DIR))
+        self.litnodes.append(LitNode(0, self.tmpdir))
         self.litnodes[0].args.extend(["-reg", "127.0.0.1"])
         self.litnodes[0].start_node()
         time.sleep()
@@ -60,7 +60,7 @@ class LitTest():
         self.litnodes[0].Bal()
 
         # Start lit node 1 and open websocket connection
-        self.litnodes[1] = LitNode(1, TMP_DIR)
+        self.litnodes[1] = LitNode(1, self.tmpdir)
         self.litnodes[1].args.extend(["-rpcport", "8002", "-reg", "127.0.0.1"])
         self.litnodes[1].start_node()
         time.sleep(1)
@@ -98,7 +98,6 @@ class LitTest():
         else:
             print("Test failed. No transaction received")
             exit(1)
-
 
     def cleanup(self):
         # Stop bitcoind and lit nodes
