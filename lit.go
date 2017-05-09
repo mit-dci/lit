@@ -38,7 +38,6 @@ type LitConfig struct {
 	verbose    bool
 	birthblock int32
 	rpcport    uint16
-	bamfport   uint16
 	litHomeDir string
 
 	Params *chaincfg.Params
@@ -59,7 +58,6 @@ func setConfig(lc *LitConfig) {
 	resyncprt := flag.Bool("resync", false, "force resync from given tip")
 
 	rpcportptr := flag.Int("rpcport", 8001, "port to listen for RPC")
-	bamfportptr := flag.Int("bamfport", 8001, "port to listen for Lit-BAMF")
 
 	litHomeDir := flag.String("dir",
 		filepath.Join(os.Getenv("HOME"), litHomeDirName), "lit home directory")
@@ -76,7 +74,6 @@ func setConfig(lc *LitConfig) {
 	lc.verbose = *verbptr
 
 	lc.rpcport = uint16(*rpcportptr)
-	lc.bamfport = uint16(*bamfportptr)
 
 	lc.litHomeDir = *litHomeDir
 }
@@ -190,7 +187,7 @@ func main() {
 	rpcl.OffButton = make(chan bool, 1)
 
 	litrpc.RPCListen(rpcl, conf.rpcport)
-	litbamf.BamfListen(conf.bamfport, conf.litHomeDir)
+	litbamf.BamfListen(conf.rpcport, conf.litHomeDir)
 
 	<-rpcl.OffButton
 	fmt.Printf("Got stop request\n")

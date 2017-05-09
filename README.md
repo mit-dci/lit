@@ -14,8 +14,54 @@ Under development, not for use with real money.
 
 4. Run lit: 
 ```
-user@host:~/go/src/github.com/mit-dci/lit$ ./lit -spv my.testnet.node.tld
+user@host:~/go/src/github.com/mit-dci/lit$ ./lit -tn3 my.testnet3.node.tld
 ```
+
+## Command line arguments
+(a lit.conf file is not yet implemented but is on the TODO list)
+
+When starting lit, the following command line arguments are available
+
+#### connecting to networks:
+
+-tn3 <nodeHostName>
+
+connect to nodeHostName, which is a bitcoin testnet3 node.  Default port 18333
+
+-reg <nodeHostName>
+
+connect to <nodeHostName>, which is a bitcoin regtest node.  Default port 18444
+
+-lt4 <nodeHostName>
+
+connect to <nodeHostName>, which is a litecoin testnet4 node.  Default port 19335
+
+#### other settings
+
+-ez
+
+use bloom filters unstead of downloading the whole block.  This fucntionality hasn't been maintained for a few months and may not work properly.
+
+-v
+
+Verbose; log everything to stdout as well as the lit.log file.  Lots of text.
+
+-dir <folderPath>
+
+use <folderPath> as the directory.  By default, saves to ~/.lit/
+
+-rpcport <portNumber>
+
+listen for RPC clients on port <portNumber>.  Defaults to 8001.  Useful when you want to run multiple lit nodes on the same computer (also need the -dir option)
+
+-tip <height>
+
+start synchronization of the blockchain from <height>.  (probably doesn't work right now)
+
+-resync
+
+try to re-sync to the blockchain from the height give in -tip
+
 
 ## Folders:
 
