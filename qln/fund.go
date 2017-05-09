@@ -99,7 +99,13 @@ an exact timing for the payment.
 
 // FundChannel opens a channel with a peer.  Doesn't return until the channel
 // has been created.  Maybe timeout if it takes too long?
-func (nd *LitNode) FundChannel(peerIdx uint32, ccap, initSend int64) (uint32, error) {
+func (nd *LitNode) FundChannel(
+	peerIdx, cointype uint32, ccap, initSend int64) (uint32, error) {
+
+	_, ok := nd.SubWallet[cointype]
+	if !ok {
+		return 0, fmt.Errorf("No wallet of type %d connected", cointype)
+	}
 
 	nd.InProg.mtx.Lock()
 	//	defer nd.InProg.mtx.Lock()
@@ -137,9 +143,10 @@ func (nd *LitNode) FundChannel(peerIdx uint32, ccap, initSend int64) (uint32, er
 	nd.InProg.PeerIdx = peerIdx
 	nd.InProg.Amt = ccap
 	nd.InProg.InitSend = initSend
+
+	nd.InProg.Coin = cointype
 	nd.InProg.mtx.Unlock() // switch to defer
 
-	cointype := uint32(0)
 	outMsg := lnutil.NewPointReqMsg(peerIdx, cointype)
 
 	nd.OmniOut <- outMsg
@@ -171,17 +178,30 @@ func (nd *LitNode) PointReqHandler(msg lnutil.PointReqMsg) {
 		return
 	}
 
+	cointype := msg.Cointype
+
+	_, ok := nd.SubWallet[cointype]
+	if !ok {
+		fmt.Printf("PointReqHandler err no wallet for type %d", cointype)
+		return
+	}
+
 	var kg portxo.KeyGen
 	kg.Depth = 5
 	kg.Step[0] = 44 | 1<<31
-	kg.Step[1] = 0 | 1<<31
+	kg.Step[1] = cointype | 1<<31
 	kg.Step[2] = UseChannelFund
 	kg.Step[3] = msg.Peer() | 1<<31
 	kg.Step[4] = cIdx | 1<<31
 
-	myChanPub := nd.GetUsePub(kg, UseChannelFund)
-	myRefundPub := nd.GetUsePub(kg, UseChannelRefund)
-	myHAKDbase := nd.GetUsePub(kg, UseChannelHAKDBase)
+	myChanPub, _ := nd.GetUsePub(kg, UseChannelFund)
+	myRefundPub, _ := nd.GetUsePub(kg, UseChannelRefund)
+	myHAKDbase, err := nd.GetUsePub(kg, UseChannelHAKDBase)
+	if err != nil {
+		fmt.Printf("PointReqHandler err %s", err.Error())
+		return
+	}
+
 	fmt.Printf("Generated channel pubkey %x\n", myChanPub)
 
 	outMsg := lnutil.NewPointRespMsg(msg.Peer(), myChanPub, myRefundPub, myHAKDbase)
@@ -208,55 +228,60 @@ func (nd LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 			nd.InProg.PeerIdx, msg.Peer())
 	}
 
+	if nd.SubWallet[nd.InProg.Coin] == nil {
+		return fmt.Errorf("Not connected to coin type %d\n", nd.InProg.Coin)
+	}
+
 	// make channel (not in db) just for keys / elk
-	qc := new(Qchan)
+	q := new(Qchan)
 
-	qc.Height = -1
+	q.Height = -1
 
-	qc.Value = nd.InProg.Amt
+	q.Value = nd.InProg.Amt
 
-	qc.KeyGen.Depth = 5
-	qc.KeyGen.Step[0] = 44 | 1<<31
-	qc.KeyGen.Step[1] = 0 | 1<<31
-	qc.KeyGen.Step[2] = UseChannelFund
-	qc.KeyGen.Step[3] = nd.InProg.PeerIdx | 1<<31
-	qc.KeyGen.Step[4] = nd.InProg.ChanIdx | 1<<31
+	q.KeyGen.Depth = 5
+	q.KeyGen.Step[0] = 44 | 1<<31
+	q.KeyGen.Step[1] = nd.InProg.Coin | 1<<31
+	q.KeyGen.Step[2] = UseChannelFund
+	q.KeyGen.Step[3] = nd.InProg.PeerIdx | 1<<31
+	q.KeyGen.Step[4] = nd.InProg.ChanIdx | 1<<31
 
-	qc.MyPub = nd.GetUsePub(qc.KeyGen, UseChannelFund)
-	qc.MyRefundPub = nd.GetUsePub(qc.KeyGen, UseChannelRefund)
-	qc.MyHAKDBase = nd.GetUsePub(qc.KeyGen, UseChannelHAKDBase)
+	q.MyPub, _ = nd.GetUsePub(q.KeyGen, UseChannelFund)
+	q.MyRefundPub, _ = nd.GetUsePub(q.KeyGen, UseChannelRefund)
+	q.MyHAKDBase, _ = nd.GetUsePub(q.KeyGen, UseChannelHAKDBase)
 
 	// chop up incoming message, save points to channel struct
-	copy(qc.TheirPub[:], msg.ChannelPub[:])
-	copy(qc.TheirRefundPub[:], msg.RefundPub[:])
-	copy(qc.TheirHAKDBase[:], msg.HAKDbase[:])
+	copy(q.TheirPub[:], msg.ChannelPub[:])
+	copy(q.TheirRefundPub[:], msg.RefundPub[:])
+	copy(q.TheirHAKDBase[:], msg.HAKDbase[:])
 
 	// make sure their pubkeys are real pubkeys
-	_, err := btcec.ParsePubKey(qc.TheirPub[:], btcec.S256())
+	_, err := btcec.ParsePubKey(q.TheirPub[:], btcec.S256())
 	if err != nil {
 		return fmt.Errorf("PubRespHandler TheirPub err %s", err.Error())
 	}
-	_, err = btcec.ParsePubKey(qc.TheirRefundPub[:], btcec.S256())
+	_, err = btcec.ParsePubKey(q.TheirRefundPub[:], btcec.S256())
 	if err != nil {
 		return fmt.Errorf("PubRespHandler TheirRefundPub err %s", err.Error())
 	}
-	_, err = btcec.ParsePubKey(qc.TheirHAKDBase[:], btcec.S256())
+	_, err = btcec.ParsePubKey(q.TheirHAKDBase[:], btcec.S256())
 	if err != nil {
 		return fmt.Errorf("PubRespHandler TheirHAKDBase err %s", err.Error())
 	}
 
 	// derive elkrem sender root from HD keychain
-	qc.ElkSnd = elkrem.NewElkremSender(nd.GetElkremRoot(qc.KeyGen))
+	elkRoot, _ := nd.GetElkremRoot(q.KeyGen)
+	q.ElkSnd = elkrem.NewElkremSender(elkRoot)
 
 	// get txo for channel
-	txo, err := lnutil.FundTxOut(qc.MyPub, qc.TheirPub, nd.InProg.Amt)
+	txo, err := lnutil.FundTxOut(q.MyPub, q.TheirPub, nd.InProg.Amt)
 	if err != nil {
 		return err
 	}
 
 	// call MaybeSend, freezing inputs and learning the txid of the channel
 	// here, we require only witness inputs
-	outPoints, err := nd.SubWallet.MaybeSend([]*wire.TxOut{txo}, true)
+	outPoints, err := nd.SubWallet[q.Coin()].MaybeSend([]*wire.TxOut{txo}, true)
 	if err != nil {
 		return err
 	}
@@ -269,30 +294,31 @@ func (nd LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 	// save fund outpoint to inProg
 	nd.InProg.op = outPoints[0]
 	// also set outpoint in channel
-	qc.Op = *nd.InProg.op
+	q.Op = *nd.InProg.op
 
 	// create initial state for elkrem points
-	qc.State = new(StatCom)
-	qc.State.StateIdx = 0
-	qc.State.MyAmt = nd.InProg.Amt - nd.InProg.InitSend
+	q.State = new(StatCom)
+	q.State.StateIdx = 0
+	q.State.MyAmt = nd.InProg.Amt - nd.InProg.InitSend
+	q.State.Fee = 10000 // fixed fee for now here.
 
 	// save channel to db
-	err = nd.SaveQChan(qc)
+	err = nd.SaveQChan(q)
 	if err != nil {
 		return fmt.Errorf("PointRespHandler SaveQchanState err %s", err.Error())
 	}
 
 	// when funding a channel, give them the first *3* elkpoints.
-	elkPointZero, err := qc.ElkPoint(false, 0)
+	elkPointZero, err := q.ElkPoint(false, 0)
 	if err != nil {
 		return err
 	}
-	elkPointOne, err := qc.ElkPoint(false, 1)
+	elkPointOne, err := q.ElkPoint(false, 1)
 	if err != nil {
 		return err
 	}
 
-	elkPointTwo, err := qc.N2ElkPointForThem()
+	elkPointTwo, err := q.N2ElkPointForThem()
 	if err != nil {
 		return err
 	}
@@ -300,10 +326,11 @@ func (nd LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 	// description is outpoint (36), mypub(33), myrefund(33),
 	// myHAKDbase(33), capacity (8),
 	// initial payment (8), ElkPoint0,1,2 (99)
-	// total length 250
 
-	outMsg := lnutil.NewChanDescMsg(msg.Peer(), *nd.InProg.op, qc.MyPub, qc.MyRefundPub,
-		qc.MyHAKDBase, nd.InProg.Amt, nd.InProg.InitSend, elkPointZero, elkPointOne, elkPointTwo)
+	outMsg := lnutil.NewChanDescMsg(
+		msg.Peer(), *nd.InProg.op, q.MyPub, q.MyRefundPub, q.MyHAKDBase,
+		nd.InProg.Coin, nd.InProg.Amt, nd.InProg.InitSend,
+		elkPointZero, elkPointOne, elkPointTwo)
 
 	nd.OmniOut <- outMsg
 
@@ -331,7 +358,7 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 	qc.Height = -1
 	qc.KeyGen.Depth = 5
 	qc.KeyGen.Step[0] = 44 | 1<<31
-	qc.KeyGen.Step[1] = 0 | 1<<31
+	qc.KeyGen.Step[1] = msg.CoinType | 1<<31
 	qc.KeyGen.Step[2] = UseChannelFund
 	qc.KeyGen.Step[3] = msg.Peer() | 1<<31
 	qc.KeyGen.Step[4] = cIdx | 1<<31
@@ -339,12 +366,12 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 	qc.Mode = portxo.TxoP2WSHComp
 	qc.Op = op
 
-	qc.MyPub = nd.GetUsePub(qc.KeyGen, UseChannelFund)
 	qc.TheirPub = msg.PubKey
 	qc.TheirRefundPub = msg.RefundPub
 	qc.TheirHAKDBase = msg.HAKDbase
-	qc.MyRefundPub = nd.GetUsePub(qc.KeyGen, UseChannelRefund)
-	qc.MyHAKDBase = nd.GetUsePub(qc.KeyGen, UseChannelHAKDBase)
+	qc.MyPub, _ = nd.GetUsePub(qc.KeyGen, UseChannelFund)
+	qc.MyRefundPub, _ = nd.GetUsePub(qc.KeyGen, UseChannelRefund)
+	qc.MyHAKDBase, _ = nd.GetUsePub(qc.KeyGen, UseChannelHAKDBase)
 
 	// it should go into the next bucket and get the right key index.
 	// but we can't actually check that.
@@ -359,7 +386,10 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 	// create initial state
 	qc.State = new(StatCom)
 	// similar to SIGREV in pushpull
+
+	qc.State.Fee = 10000
 	qc.State.MyAmt = msg.InitPayment
+
 	qc.State.StateIdx = 0
 	// use new ElkPoint for signing
 	qc.State.ElkPoint = msg.ElkZero
@@ -412,15 +442,10 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 		return
 	}
 
-	//	elk, err := qc.ElkSnd.AtIndex(qc.State.StateIdx - 1) // which is 0
-	//	if err != nil {
-	//		fmt.Printf("QChanDescHandler ElkSnd err %s", err.Error())
-	//		return
-	//	}
-	// ACK the channel address, which causes the funder to sign / broadcast
-	// ACK is outpoint (36), ElkPoint0,1,2 (99) and signature (64)
-
-	outMsg := lnutil.NewChanAckMsg(msg.Peer(), op, theirElkPointZero, theirElkPointOne, theirElkPointTwo, sig)
+	outMsg := lnutil.NewChanAckMsg(
+		msg.Peer(), op,
+		theirElkPointZero, theirElkPointOne, theirElkPointTwo,
+		sig)
 	outMsg.Bytes()
 
 	nd.OmniOut <- outMsg
@@ -474,24 +499,25 @@ func (nd *LitNode) QChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePeer) {
 	}
 
 	// OK to fund.
-	err = nd.SubWallet.ReallySend(&qc.Op.Hash)
+	err = nd.SubWallet[qc.Coin()].ReallySend(&qc.Op.Hash)
 	if err != nil {
 		fmt.Printf("QChanAckHandler ReallySend err %s", err.Error())
 		return
 	}
 
-	err = nd.SubWallet.WatchThis(qc.Op)
+	err = nd.SubWallet[qc.Coin()].WatchThis(qc.Op)
 	if err != nil {
 		fmt.Printf("QChanAckHandler WatchThis err %s", err.Error())
 		return
 	}
 
 	// tell base wallet about watcher refund address in case that happens
+	// TODO this is weird & ugly... maybe have a export keypath func?
 	nullTxo := new(portxo.PorTxo)
 	nullTxo.Value = 0 // redundant, but explicitly show that this is just for adr
 	nullTxo.KeyGen = qc.KeyGen
 	nullTxo.KeyGen.Step[2] = UseChannelWatchRefund
-	nd.SubWallet.ExportUtxo(nullTxo)
+	nd.SubWallet[qc.Coin()].ExportUtxo(nullTxo)
 
 	// channel creation is ~complete, clear InProg.
 	// We may be asked to re-send the sig-proof
@@ -529,6 +555,12 @@ func (nd *LitNode) SigProofHandler(msg lnutil.SigProofMsg, peer *RemotePeer) {
 		return
 	}
 
+	wal, ok := nd.SubWallet[qc.Coin()]
+	if !ok {
+		fmt.Printf("Not connected to coin type %d\n", qc.Coin())
+		return
+	}
+
 	err = qc.VerifySig(msg.Signature)
 	if err != nil {
 		fmt.Printf("SigProofHandler err %s", err.Error())
@@ -542,7 +574,8 @@ func (nd *LitNode) SigProofHandler(msg lnutil.SigProofMsg, peer *RemotePeer) {
 		return
 	}
 
-	err = nd.SubWallet.WatchThis(op)
+	err = wal.WatchThis(op)
+
 	if err != nil {
 		fmt.Printf("SigProofHandler err %s", err.Error())
 		return
@@ -553,7 +586,7 @@ func (nd *LitNode) SigProofHandler(msg lnutil.SigProofMsg, peer *RemotePeer) {
 	nullTxo.Value = 0 // redundant, but explicitly show that this is just for adr
 	nullTxo.KeyGen = qc.KeyGen
 	nullTxo.KeyGen.Step[2] = UseChannelWatchRefund
-	nd.SubWallet.ExportUtxo(nullTxo)
+	wal.ExportUtxo(nullTxo)
 
 	peer.QCs[qc.Idx()] = qc
 	peer.OpMap[opArr] = qc.Idx()

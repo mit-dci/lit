@@ -9,6 +9,7 @@ import (
 
 type ChannelInfo struct {
 	OutPoint      string
+	CoinType      uint32
 	Closed        bool
 	Capacity      int64
 	MyBalance     int64
@@ -44,6 +45,7 @@ func (r *LitRPC) ChannelList(args ChanArgs, reply *ChannelListReply) error {
 
 	for i, q := range qcs {
 		reply.Channels[i].OutPoint = q.Op.String()
+		reply.Channels[i].CoinType = q.Coin()
 		reply.Channels[i].Closed = q.CloseData.Closed
 		reply.Channels[i].Capacity = q.Value
 		reply.Channels[i].MyBalance = q.State.MyAmt
@@ -58,6 +60,7 @@ func (r *LitRPC) ChannelList(args ChanArgs, reply *ChannelListReply) error {
 // ------------------------- fund
 type FundArgs struct {
 	Peer        uint32 // who to make the channel with
+	CoinType    uint32 // what coin to use
 	Capacity    int64  // later can be minimum capacity
 	Roundup     int64  // ignore for now; can be used to round-up capacity
 	InitialSend int64  // Initial send of -1 means "ALL"
@@ -80,13 +83,18 @@ func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
 			args.InitialSend, args.Capacity)
 	}
 
-	nowHeight := r.Node.SubWallet.CurrentHeight()
+	wal := r.Node.SubWallet[args.CoinType]
+	if wal == nil {
+		return fmt.Errorf("No wallet of cointype %d linked", args.CoinType)
+	}
+
+	nowHeight := wal.CurrentHeight()
 
 	// see if we have enough money before calling the funding function.  Not
 	// strictly required but it's better to fail here instead of after net traffic.
 	// also assume a fee of like 50K sat just to be safe
 	var allPorTxos portxo.TxoSliceByAmt
-	allPorTxos, err = r.Node.SubWallet.UtxoDump()
+	allPorTxos, err = wal.UtxoDump()
 	if err != nil {
 		return err
 	}
@@ -98,7 +106,8 @@ func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
 			args.Capacity, spendable-50000)
 	}
 
-	idx, err := r.Node.FundChannel(args.Peer, args.Capacity, args.InitialSend)
+	idx, err := r.Node.FundChannel(
+		args.Peer, args.CoinType, args.Capacity, args.InitialSend)
 	if err != nil {
 		return err
 	}
@@ -124,7 +133,8 @@ type PushReply struct {
 func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 
 	if args.Amt > 100000000 || args.Amt < 1 {
-		return fmt.Errorf("push %d, max push is 1 coin / 100000000", args.Amt)
+		return fmt.Errorf(
+			"can't push %d max is 1 coin (100000000), min is 1", args.Amt)
 	}
 
 	fmt.Printf("push %d to chan %d\n", args.Amt, args.ChanIdx)

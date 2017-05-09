@@ -127,6 +127,7 @@ func TestChanDescMsg(t *testing.T) {
 	var pubKey [33]byte
 	var refundPub [33]byte
 	var hakd [33]byte
+	cointype := uint32(rand.Int31())
 	capacity := rand.Int63()
 	payment := rand.Int63()
 	var elkZero [33]byte
@@ -143,8 +144,9 @@ func TestChanDescMsg(t *testing.T) {
 
 	op := *OutPointFromBytes(outPoint)
 
-	msg := NewChanDescMsg(peerid, op, pubKey, refundPub, hakd,
-		capacity, payment, elkZero, elkOne, elkTwo)
+	msg := NewChanDescMsg(peerid, op,
+		pubKey, refundPub, hakd,
+		cointype, capacity, payment, elkZero, elkOne, elkTwo)
 	b := msg.Bytes()
 
 	msg2, err := NewChanDescMsgFromBytes(b, peerid)

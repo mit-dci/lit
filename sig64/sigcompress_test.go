@@ -17,7 +17,7 @@ var (
 
 // TestRandom makes random signatures and compresses / decompresses them
 func TestRandom(t *testing.T) {
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 8; i++ {
 		priv, _ := btcec.NewPrivateKey(btcec.S256())
 		sig, err := priv.Sign(chainhash.DoubleHashB([]byte{byte(i)}))
 		if err != nil {

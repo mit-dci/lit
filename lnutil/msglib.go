@@ -247,6 +247,7 @@ type ChanDescMsg struct {
 	RefundPub [33]byte
 	HAKDbase  [33]byte
 
+	CoinType    uint32
 	Capacity    int64
 	InitPayment int64
 
@@ -255,8 +256,12 @@ type ChanDescMsg struct {
 	ElkTwo  [33]byte
 }
 
-func NewChanDescMsg(peerid uint32, OP wire.OutPoint, pubkey [33]byte, refund [33]byte, hakd [33]byte,
-	capacity int64, payment int64, ELKZero [33]byte, ELKOne [33]byte, ELKTwo [33]byte) ChanDescMsg {
+func NewChanDescMsg(
+	peerid uint32, OP wire.OutPoint,
+	pubkey, refund, hakd [33]byte,
+	cointype uint32,
+	capacity int64, payment int64,
+	ELKZero, ELKOne, ELKTwo [33]byte) ChanDescMsg {
 
 	cd := new(ChanDescMsg)
 	cd.PeerIdx = peerid
@@ -264,6 +269,7 @@ func NewChanDescMsg(peerid uint32, OP wire.OutPoint, pubkey [33]byte, refund [33
 	cd.PubKey = pubkey
 	cd.RefundPub = refund
 	cd.HAKDbase = hakd
+	cd.CoinType = cointype
 	cd.Capacity = capacity
 	cd.InitPayment = payment
 	cd.ElkZero = ELKZero
@@ -287,6 +293,7 @@ func NewChanDescMsgFromBytes(b []byte, peerid uint32) (ChanDescMsg, error) {
 	copy(cm.PubKey[:], buf.Next(33))
 	copy(cm.RefundPub[:], buf.Next(33))
 	copy(cm.HAKDbase[:], buf.Next(33))
+	cm.CoinType = BtU32(buf.Next(4))
 	cm.Capacity = BtI64(buf.Next(8))
 	cm.InitPayment = BtI64(buf.Next(8))
 	copy(cm.ElkZero[:], buf.Next(33))
@@ -297,6 +304,7 @@ func NewChanDescMsgFromBytes(b []byte, peerid uint32) (ChanDescMsg, error) {
 }
 
 func (self ChanDescMsg) Bytes() []byte {
+	coinTypeBin := U32tB(self.CoinType)
 	capBin := I64tB(self.Capacity)
 	initBin := I64tB(self.InitPayment)
 
@@ -307,6 +315,7 @@ func (self ChanDescMsg) Bytes() []byte {
 	msg = append(msg, self.PubKey[:]...)
 	msg = append(msg, self.RefundPub[:]...)
 	msg = append(msg, self.HAKDbase[:]...)
+	msg = append(msg, coinTypeBin[:]...)
 	msg = append(msg, capBin[:]...)
 	msg = append(msg, initBin[:]...)
 	msg = append(msg, self.ElkZero[:]...)

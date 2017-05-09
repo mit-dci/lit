@@ -14,6 +14,7 @@ import (
 
 	"github.com/adiabat/btcd/blockchain"
 	"github.com/adiabat/btcd/chaincfg"
+	"github.com/adiabat/btcd/chaincfg/chainhash"
 	"github.com/adiabat/btcd/wire"
 )
 
@@ -33,6 +34,7 @@ const (
 /* checkProofOfWork verifies the header hashes into something
 lower than specified by the 4-byte bits field. */
 func checkProofOfWork(header wire.BlockHeader, p *chaincfg.Params) bool {
+
 	target := blockchain.CompactToBig(header.Bits)
 
 	// The target must more than 0.  Why can you even encode negative...
@@ -46,9 +48,19 @@ func checkProofOfWork(header wire.BlockHeader, p *chaincfg.Params) bool {
 			"higher than max of %064x", target, p.PowLimit.Bytes())
 		return false
 	}
+
 	// The header hash must be less than the claimed target in the header.
-	blockHash := header.BlockHash()
-	hashNum := blockchain.HashToBig(&blockHash)
+	var blockHash chainhash.Hash
+
+	if p.Name == "litetest4" {
+		blockHash = header.ScryptHash()
+	} else {
+		blockHash = header.BlockHash()
+	}
+
+	hashNum := new(big.Int)
+
+	hashNum = blockchain.HashToBig(&blockHash)
 	if hashNum.Cmp(target) > 0 {
 		log.Printf("block hash %064x is higher than "+
 			"required target of %064x", hashNum, target)

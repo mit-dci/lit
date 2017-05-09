@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/fatih/color"
 	"github.com/mit-dci/lit/litrpc"
@@ -58,19 +59,27 @@ func (lc *litAfClient) Lis(textArgs []string) error {
 	}
 
 	args := new(litrpc.ListenArgs)
-	reply := new(litrpc.StatusReply)
+	reply := new(litrpc.ListeningPortsReply)
 
 	args.Port = ":2448"
 	if len(textArgs) > 0 {
-		args.Port = ":" + textArgs[0]
+		if strings.Contains(textArgs[0], ":") {
+			args.Port = textArgs[0]
+		} else {
+			args.Port = ":" + textArgs[0]
+		}
 	}
 
 	err := lc.rpccon.Call("LitRPC.Listen", args, reply)
 	if err != nil {
 		return err
 	}
+	if len(reply.LisIpPorts) == 0 {
+		return fmt.Errorf("no listening port returned")
+	}
 
-	fmt.Fprintf(color.Output, "%s\n", reply.Status)
+	fmt.Fprintf(color.Output, "listening on %s@%s\n", reply.Adr, reply.LisIpPorts[0])
+
 	return nil
 }
 

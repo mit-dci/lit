@@ -52,6 +52,9 @@ type StatCom struct {
 	WatchUpTo uint64 // have sent out to watchtowers up to this state  ( < stateidx)
 
 	MyAmt int64 // my channel allocation
+
+	Fee int64 // symmetric fee in absolute satoshis
+
 	// their Amt is the utxo.Value minus this
 	Delta int32 // fund amount in-transit; is negative for the pusher
 	// Delta for when the channel is in a collision state which needs to be resolved
@@ -154,6 +157,14 @@ func (q *Qchan) Idx() uint32 {
 	return q.KeyGen.Step[4] & 0x7fffffff
 }
 
+// Coin returns the coin type of the channel
+func (q *Qchan) Coin() uint32 {
+	if q == nil {
+		return 0
+	}
+	return q.KeyGen.Step[1] & 0x7fffffff
+}
+
 // ImFirst decides who goes first when it's unclear.  Smaller pubkey goes first.
 func (q *Qchan) ImFirst() bool {
 	return bytes.Compare(q.MyRefundPub[:], q.TheirRefundPub[:]) == -1
@@ -187,7 +198,9 @@ func (q *Qchan) GetChanHint(mine bool) uint64 {
 // GetDHSecret gets a per-channel shared secret from the Diffie-Helman of the
 // two pubkeys in the fund tx.
 func (nd *LitNode) GetDHSecret(q *Qchan) ([]byte, error) {
-
+	if nd.SubWallet[q.Coin()] == nil {
+		return nil, fmt.Errorf("Not connected to coin type %d\n", q.Coin())
+	}
 	if nd == nil || q == nil {
 		return nil, fmt.Errorf("GetDHPoint: nil node or channel")
 	}
@@ -196,7 +209,7 @@ func (nd *LitNode) GetDHSecret(q *Qchan) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	priv := nd.GetPriv(q.KeyGen)
+	priv := nd.SubWallet[q.Coin()].GetPriv(q.KeyGen)
 	// not sure what happens if this breaks.  Maybe it always works.
 
 	return btcec.GenerateSharedSecret(priv, theirPub), nil
