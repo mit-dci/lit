@@ -32,15 +32,15 @@ class BCNode():
 
     def start_node(self):
         try:
-            process = subprocess.Popen([self.__class__.bin_name] + self.args)
+            self.process = subprocess.Popen([self.__class__.bin_name] + self.args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except FileNotFoundError:
             print("%s not found on path. Please install %s" % (self.__class__.bin_name, self.__class__.bin_name))
             sys.exit(1)
 
         # Wait for process to start
         while True:
-            if process.poll() is not None:
-                raise Exception('%s exited with status %i during initialization' % (self.__class__.bin_name, process.returncode))
+            if self.process.poll() is not None:
+                raise Exception('%s exited with status %i during initialization' % (self.__class__.bin_name, self.process.returncode))
             try:
                 resp = self.getinfo()
                 # Check that we're running at least the minimum version

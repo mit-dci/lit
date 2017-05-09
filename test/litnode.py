@@ -26,7 +26,7 @@ class LitNode():
         self.args = ["-dir", self.data_dir]
 
     def start_node(self):
-        subprocess.Popen([LIT_BIN] + self.args)
+        self.process = subprocess.Popen([LIT_BIN] + self.args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     def add_rpc_connection(self, ip, port):
         self.rpc = litrpc.LitConnection(ip, port)
