@@ -170,17 +170,20 @@ func (nd LitNode) PushChannel(qc *Qchan, amt uint32) error {
 	// reload from disk here, after unlock
 	err := nd.ReloadQchanState(qc)
 	if err != nil {
+		// don't clear to send here; something is wrong with the channel
 		return err
 	}
 
 	// perform minbal checks after reload
 	// check if this push would lower my balance below minBal
 	if int64(amt)+minBal > qc.State.MyAmt {
+		qc.ClearToSend <- true
 		return fmt.Errorf("want to push %s but %s available, %s minBal",
 			lnutil.SatoshiColor(int64(amt)), lnutil.SatoshiColor(qc.State.MyAmt), lnutil.SatoshiColor(minBal))
 	}
 	// check if this push is sufficient to get them above minBal
 	if int64(amt)+(qc.Value-qc.State.MyAmt) < minBal {
+		qc.ClearToSend <- true
 		return fmt.Errorf("pushing %s insufficient; counterparty bal %s minBal %s",
 			lnutil.SatoshiColor(int64(amt)),
 			lnutil.SatoshiColor(qc.Value-qc.State.MyAmt),
@@ -191,8 +194,10 @@ func (nd LitNode) PushChannel(qc *Qchan, amt uint32) error {
 	if qc.State.Delta != 0 {
 		err = nd.ReSendMsg(qc)
 		if err != nil {
+			qc.ClearToSend <- true
 			return err
 		}
+		qc.ClearToSend <- true
 		return fmt.Errorf("Didn't send.  Recovered though, so try again!")
 	}
 
@@ -200,12 +205,14 @@ func (nd LitNode) PushChannel(qc *Qchan, amt uint32) error {
 	// save to db with ONLY delta changed
 	err = nd.SaveQchanState(qc)
 	if err != nil {
+		// don't clear to send here; something is wrong with the channel
 		return err
 	}
 	// move unlock to here so that delta is saved before
 
 	err = nd.SendDeltaSig(qc)
 	if err != nil {
+		// don't clear; something is wrong with the network
 		return err
 	}
 
@@ -266,6 +273,12 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 		return fmt.Errorf("DeltaSigHandler ReloadQchan err %s", err.Error())
 	}
 
+	// TODO we should send a response that the channel is closed.
+	// or offer to double spend with a cooperative close?
+	// or update the remote node on closed channel status when connecting
+	// TODO should disallow 'break' command when connected to the other node
+	// or merge 'break' and 'close' UI so that it breaks when it can't
+	// connect, and closes when it can.
 	if qc.CloseData.Closed {
 		return fmt.Errorf("DeltaSigHandler err: %d, %d is closed.",
 			qc.Peer(), qc.Idx())

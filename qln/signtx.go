@@ -27,7 +27,7 @@ func (nd *LitNode) SignBreakTx(q *Qchan) (*wire.MsgTx, error) {
 	}
 
 	// get private signing key
-	priv := nd.GetPriv(q.KeyGen)
+	priv := nd.SubWallet[q.Coin()].GetPriv(q.KeyGen)
 	// generate sig.
 	mySig, err := txscript.RawTxInWitnessSignature(
 		tx, hCache, 0, q.Value, pre, txscript.SigHashAll, priv)
@@ -57,30 +57,43 @@ func (nd *LitNode) SignBreakTx(q *Qchan) (*wire.MsgTx, error) {
 
 // SignSimpleClose signs the given simpleClose tx, given the other signature
 // Tx is modified in place.
-func (nd *LitNode) SignSimpleClose(q *Qchan, tx *wire.MsgTx) ([]byte, error) {
+func (nd *LitNode) SignSimpleClose(q *Qchan, tx *wire.MsgTx) ([64]byte, error) {
+
+	var sig [64]byte
 	// make hash cache
 	hCache := txscript.NewTxSigHashes(tx)
 
 	// generate script preimage for signing (ignore key order)
 	pre, _, err := lnutil.FundTxScript(q.MyPub, q.TheirPub)
 	if err != nil {
-		return nil, err
+		return sig, err
 	}
 	// get private signing key
-	priv := nd.GetPriv(q.KeyGen)
+	priv := nd.SubWallet[q.Coin()].GetPriv(q.KeyGen)
 	// generate sig
 	mySig, err := txscript.RawTxInWitnessSignature(
 		tx, hCache, 0, q.Value, pre, txscript.SigHashAll, priv)
 	if err != nil {
-		return nil, err
+		return sig, err
 	}
-
-	return mySig, nil
+	// truncate sig (last byte is sighash type, always sighashAll)
+	mySig = mySig[:len(mySig)-1]
+	return sig64.SigCompress(mySig)
 }
 
 // SignNextState generates your signature for their state.
 func (nd *LitNode) SignState(q *Qchan) ([64]byte, error) {
+
 	var sig [64]byte
+
+	// make sure channel exists, and wallet is present on node
+	if q == nil {
+		return sig, fmt.Errorf("SignState nil channel")
+	}
+	_, ok := nd.SubWallet[q.Coin()]
+	if !ok {
+		return sig, fmt.Errorf("SignState no wallet for cointype %d", q.Coin())
+	}
 	// build transaction for next state
 	tx, err := q.BuildStateTx(false) // their tx, as I'm signing
 	if err != nil {
@@ -97,7 +110,7 @@ func (nd *LitNode) SignState(q *Qchan) ([64]byte, error) {
 	}
 
 	// get private signing key
-	priv := nd.GetPriv(q.KeyGen)
+	priv := nd.SubWallet[q.Coin()].GetPriv(q.KeyGen)
 
 	// generate sig.
 	bigSig, err := txscript.RawTxInWitnessSignature(

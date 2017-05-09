@@ -1,6 +1,8 @@
 package qln
 
 import (
+	"fmt"
+
 	"github.com/adiabat/btcd/btcec"
 	"github.com/adiabat/btcd/chaincfg"
 	"github.com/adiabat/btcd/chaincfg/chainhash"
@@ -87,23 +89,27 @@ type UWallet interface {
 
 // GetUsePub gets a pubkey from the base wallet, but first modifies
 // the "use" step
-func (nd *LitNode) GetUsePub(k portxo.KeyGen, use uint32) (pubArr [33]byte) {
+func (nd *LitNode) GetUsePub(k portxo.KeyGen, use uint32) (pubArr [33]byte, err error) {
+	coin := k.Step[1] & 0x7fffffff // de-assert MSB
+	if nd.SubWallet[coin] == nil {
+		err = fmt.Errorf("coin type %d not in wallet", k.Step[1]&0x7fffffff)
+		return // fail if that wallet isn't attached
+	}
 	k.Step[2] = use
-	pub := nd.SubWallet.GetPub(k)
+	pub := nd.SubWallet[coin].GetPub(k)
 	copy(pubArr[:], pub.SerializeCompressed())
 	return
-}
-
-// Get rid of this function soon and replace with signing function
-func (nd *LitNode) GetPriv(k portxo.KeyGen) *btcec.PrivateKey {
-	return nd.SubWallet.GetPriv(k)
 }
 
 // GetElkremRoot returns the Elkrem root for a given key path
 // gets the use-pub for elkrems and hashes it.
 // A little weird because it's a "pub" key you shouldn't reveal.
 // either do this or export privkeys... or signing empty txs or something.
-func (nd *LitNode) GetElkremRoot(k portxo.KeyGen) chainhash.Hash {
-	pubArr := nd.GetUsePub(k, UseChannelElkrem)
-	return chainhash.DoubleHashH(pubArr[:])
+func (nd *LitNode) GetElkremRoot(k portxo.KeyGen) (chainhash.Hash, error) {
+	pubArr, err := nd.GetUsePub(k, UseChannelElkrem)
+	if err != nil {
+		var empty [32]byte
+		return empty, err
+	}
+	return chainhash.DoubleHashH(pubArr[:]), nil
 }

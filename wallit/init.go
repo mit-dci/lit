@@ -5,22 +5,27 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/boltdb/bolt"
 	"github.com/adiabat/btcd/chaincfg"
 	"github.com/adiabat/btcd/wire"
 	"github.com/adiabat/btcutil/hdkeychain"
+	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/uspv"
 )
 
 func NewWallit(
-	rootkey *hdkeychain.ExtendedKey,
-	birthHeight int32, spvhost, path string, p *chaincfg.Params) *Wallit {
+	rootkey *hdkeychain.ExtendedKey, birthHeight int32, resync bool,
+	spvhost, path string, p *chaincfg.Params) *Wallit {
 
 	var w Wallit
 	w.rootPrivKey = rootkey
 	w.Param = p
 	w.FreezeSet = make(map[wire.OutPoint]*FrozenTx)
+
+	w.FeeRate = 80
+	if w.Param.HDCoinType == 65537 { // litecoin testnet4 has high fee
+		w.FeeRate = 800
+	}
 
 	wallitpath := filepath.Join(path, p.Name)
 
@@ -46,7 +51,7 @@ func NewWallit(
 	// get height
 	height := w.CurrentHeight()
 	log.Printf("DB height %d\n", height)
-	if height < birthHeight {
+	if height < birthHeight || resync {
 		height = birthHeight
 	}
 	log.Printf("DB height %d\n", height)

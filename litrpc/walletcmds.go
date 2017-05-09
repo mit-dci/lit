@@ -4,8 +4,6 @@ import (
 	"fmt"
 
 	"github.com/adiabat/bech32"
-	"github.com/adiabat/btcd/chaincfg"
-	"github.com/adiabat/btcd/txscript"
 	"github.com/adiabat/btcd/wire"
 	"github.com/adiabat/btcutil"
 	"github.com/mit-dci/lit/portxo"
@@ -22,40 +20,61 @@ type NoArgs struct {
 	// nothin
 }
 
+type CoinArgs struct {
+	CoinType uint32
+}
+
 // ------------------------- balance
 // BalReply is the reply when the user asks about their balance.
-// This is a Non-Channel
-type BalReply struct {
+type CoinBalReply struct {
+	CoinType    uint32
+	SyncHeight  int32 // height this wallet is synced to
 	ChanTotal   int64 // total balance in channels
 	TxoTotal    int64 // all utxos
 	MatureWitty int64 // confirmed, spendable and witness
 }
 
-func (r *LitRPC) Bal(args *NoArgs, reply *BalReply) error {
-	var err error
+type BalanceReply struct {
+	Balances []CoinBalReply
+}
+
+func (r *LitRPC) Balance(args *NoArgs, reply *BalanceReply) error {
+
 	var allTxos portxo.TxoSliceByAmt
 
-	nowHeight := r.Node.SubWallet.CurrentHeight()
-
-	allTxos, err = r.Node.SubWallet.UtxoDump()
-	if err != nil {
-		return err
-	}
-
-	// ask sub-wallet for balance
-	reply.TxoTotal = allTxos.Sum()
-	reply.MatureWitty = allTxos.SumWitness(nowHeight)
-
-	// get all channel states
+	// get all channels
 	qcs, err := r.Node.GetAllQchans()
 	if err != nil {
 		return err
 	}
-	// iterate through channels to figure out how much we have
-	for _, q := range qcs {
-		reply.ChanTotal += q.State.MyAmt
-	}
 
+	for cointype, wal := range r.Node.SubWallet {
+		// will add the balance for this wallet to the full reply
+		var cbr CoinBalReply
+
+		cbr.CoinType = cointype
+
+		cbr.SyncHeight = wal.CurrentHeight()
+
+		allTxos, err = wal.UtxoDump()
+		if err != nil {
+			return err
+		}
+
+		// ask sub-wallet for balance
+		cbr.TxoTotal = allTxos.Sum()
+		cbr.MatureWitty = allTxos.SumWitness(cbr.SyncHeight)
+
+		// iterate through channels to figure out how much we have
+		for _, q := range qcs {
+			if q.Coin() == cointype {
+				cbr.ChanTotal += q.State.MyAmt
+			}
+		}
+		// I thought slices were pointery enough that I could put this line
+		// near the top.  Guess not.
+		reply.Balances = append(reply.Balances, cbr)
+	}
 	return nil
 }
 
@@ -64,6 +83,7 @@ type TxoInfo struct {
 	Amt      int64
 	Height   int32
 	Delay    int32
+	CoinType string
 	Witty    bool
 
 	KeyPath string
@@ -74,35 +94,32 @@ type TxoListReply struct {
 
 // TxoList sends back a list of all non-channel utxos
 func (r *LitRPC) TxoList(args *NoArgs, reply *TxoListReply) error {
-	allTxos, err := r.Node.SubWallet.UtxoDump()
-	if err != nil {
-		return err
-	}
 
-	syncHeight := r.Node.SubWallet.CurrentHeight()
+	for _, wal := range r.Node.SubWallet {
 
-	reply.Txos = make([]TxoInfo, len(allTxos))
-	for i, u := range allTxos {
-		reply.Txos[i].OutPoint = u.Op.String()
-		reply.Txos[i].Amt = u.Value
-		reply.Txos[i].Height = u.Height
-		// show delay before utxo can be spent
-		if u.Seq != 0 {
-			reply.Txos[i].Delay = u.Height + int32(u.Seq) - syncHeight
+		walTxos, err := wal.UtxoDump()
+		if err != nil {
+			return err
 		}
-		reply.Txos[i].Witty = u.Mode&portxo.FlagTxoWitness != 0
-		reply.Txos[i].KeyPath = u.KeyGen.String()
+
+		syncHeight := wal.CurrentHeight()
+
+		theseTxos := make([]TxoInfo, len(walTxos))
+		for i, u := range walTxos {
+			theseTxos[i].OutPoint = u.Op.String()
+			theseTxos[i].Amt = u.Value
+			theseTxos[i].Height = u.Height
+			theseTxos[i].CoinType = wal.Params().Name
+			// show delay before utxo can be spent
+			if u.Seq != 0 {
+				theseTxos[i].Delay = u.Height + int32(u.Seq) - syncHeight
+			}
+			theseTxos[i].Witty = u.Mode&portxo.FlagTxoWitness != 0
+			theseTxos[i].KeyPath = u.KeyGen.String()
+		}
+
+		reply.Txos = append(reply.Txos, theseTxos...)
 	}
-	return nil
-}
-
-type SyncHeightReply struct {
-	SyncHeight   int32
-	HeaderHeight int32
-}
-
-func (r *LitRPC) SyncHeight(args *NoArgs, reply *SyncHeightReply) error {
-	reply.SyncHeight = r.Node.SubWallet.CurrentHeight()
 	return nil
 }
 
@@ -123,6 +140,22 @@ func (r *LitRPC) Send(args SendArgs, reply *TxidsReply) error {
 		return fmt.Errorf("%d addresses but %d amounts specified",
 			nOutputs, len(args.Amts))
 	}
+	// get cointype for first address.
+	coinType := CoinTypeFromAdr(args.DestAddrs[0])
+	// make sure we support that coin type
+	wal, ok := r.Node.SubWallet[coinType]
+	if !ok {
+		return fmt.Errorf("no connnected wallet for address %s type %d",
+			args.DestAddrs[0], coinType)
+	}
+	// All addresses must have the same cointype as they all
+	// must to be in the same tx.
+	for _, a := range args.DestAddrs {
+		if CoinTypeFromAdr(a) != coinType {
+			return fmt.Errorf("Coin type mismatch for address %s, %s",
+				a, args.DestAddrs[0])
+		}
+	}
 
 	txOuts := make([]*wire.TxOut, nOutputs)
 	for i, s := range args.DestAddrs {
@@ -139,12 +172,12 @@ func (r *LitRPC) Send(args SendArgs, reply *TxidsReply) error {
 	}
 
 	// we don't care if it's witness or not
-	ops, err := r.Node.SubWallet.MaybeSend(txOuts, false)
+	ops, err := wal.MaybeSend(txOuts, false)
 	if err != nil {
 		return err
 	}
 
-	err = r.Node.SubWallet.ReallySend(&ops[0].Hash)
+	err = wal.ReallySend(&ops[0].Hash)
 	if err != nil {
 		return err
 	}
@@ -160,35 +193,15 @@ type SweepArgs struct {
 	Drop    bool
 }
 
-// AdrStringToOutscript converts an address string into an output script byte slice
-func AdrStringToOutscript(adr string) ([]byte, error) {
-	var err error
-	var outScript []byte
-
-	// use HRP to determine network / wallet to use
-	outScript, err = bech32.SegWitAddressDecode(adr)
-	if err != nil { // valid bech32 string
-		// try for base58 address
-		// btcutil addresses don't really work as they won't tell you the
-		// network; you have to tell THEM the network, which defeats the point
-		// of having an address.  default to testnet only here
-
-		// could work on adding more old-style addresses; for now use new bech32
-		// addresses for multi-wallet / segwit sends.
-		adr, err := btcutil.DecodeAddress(adr, &chaincfg.TestNet3Params)
-		if err != nil {
-			return nil, err
-		}
-
-		outScript, err = txscript.PayToAddrScript(adr)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return outScript, nil
-}
-
 func (r *LitRPC) Sweep(args SweepArgs, reply *TxidsReply) error {
+	// get cointype for first address.
+	coinType := CoinTypeFromAdr(args.DestAdr)
+	// make sure we support that coin type
+	wal, ok := r.Node.SubWallet[coinType]
+	if !ok {
+		return fmt.Errorf("no connnected wallet for address %s type %d",
+			args.DestAdr, coinType)
+	}
 
 	outScript, err := AdrStringToOutscript(args.DestAdr)
 	if err != nil {
@@ -200,7 +213,7 @@ func (r *LitRPC) Sweep(args SweepArgs, reply *TxidsReply) error {
 		return fmt.Errorf("can't send %d txs", args.NumTx)
 	}
 
-	txids, err := r.Node.SubWallet.Sweep(outScript, args.NumTx)
+	txids, err := wal.Sweep(outScript, args.NumTx)
 	if err != nil {
 		return err
 	}
@@ -226,6 +239,16 @@ func (r *LitRPC) Fanout(args FanArgs, reply *TxidsReply) error {
 	if args.AmtPerOutput < 5000 {
 		return fmt.Errorf("Minimum 5000 per output")
 	}
+
+	// get cointype for first address.
+	coinType := CoinTypeFromAdr(args.DestAdr)
+	// make sure we support that coin type
+	wal, ok := r.Node.SubWallet[coinType]
+	if !ok {
+		return fmt.Errorf("no connnected wallet for address %s type %d",
+			args.DestAdr, coinType)
+	}
+
 	outScript, err := AdrStringToOutscript(args.DestAdr)
 	if err != nil {
 		return err
@@ -240,11 +263,11 @@ func (r *LitRPC) Fanout(args FanArgs, reply *TxidsReply) error {
 	}
 
 	// don't care if inputs are witty or not
-	ops, err := r.Node.SubWallet.MaybeSend(txos, false)
+	ops, err := wal.MaybeSend(txos, false)
 	if err != nil {
 		return err
 	}
-	err = r.Node.SubWallet.ReallySend(&ops[0].Hash)
+	err = wal.ReallySend(&ops[0].Hash)
 	if err != nil {
 		return err
 	}
@@ -256,6 +279,7 @@ func (r *LitRPC) Fanout(args FanArgs, reply *TxidsReply) error {
 // ------------------------- address
 type AddressArgs struct {
 	NumToMake uint32
+	CoinType  uint32
 }
 type AddressReply struct {
 	WitAddresses    []string
@@ -263,43 +287,67 @@ type AddressReply struct {
 }
 
 func (r *LitRPC) Address(args *AddressArgs, reply *AddressReply) error {
-	var err error
 	var allAdr [][20]byte
+	var ctypesPerAdr []uint32
+
+	// if cointype is 0, use the node's default coin
+	if args.CoinType == 0 {
+		args.CoinType = r.Node.DefaultCoin
+	}
 
 	// If you tell it to make 0 new addresses, it sends a list of all the old ones
+	// (from every wallet)
 	if args.NumToMake == 0 {
 		// this gets 20 byte addresses; need to convert them to bech32 / base58
-		allAdr, err = r.Node.SubWallet.AdrDump()
-		if err != nil {
-			return err
+		// iterate through every wallet
+		for cointype, wal := range r.Node.SubWallet {
+			walAdr, err := wal.AdrDump()
+			if err != nil {
+				return err
+			}
+
+			for _, _ = range walAdr {
+				ctypesPerAdr = append(ctypesPerAdr, cointype)
+			}
+			allAdr = append(allAdr, walAdr...)
 		}
 	} else {
+		// if you have non-zero NumToMake, then cointype matters
+		wal, ok := r.Node.SubWallet[args.CoinType]
+		if !ok {
+			return fmt.Errorf("No wallet of cointype %d linked", args.CoinType)
+		}
+
 		// call NewAdr a bunch of times
 		remaining := args.NumToMake
 		for remaining > 0 {
-			adr, err := r.Node.SubWallet.NewAdr()
+			adr, err := wal.NewAdr()
 			if err != nil {
 				return err
 			}
 			allAdr = append(allAdr, adr)
+			ctypesPerAdr = append(ctypesPerAdr, args.CoinType)
 			remaining--
 		}
 	}
+
 	reply.WitAddresses = make([]string, len(allAdr))
 	reply.LegacyAddresses = make([]string, len(allAdr))
 
 	for i, a := range allAdr {
 		// convert 20 byte array to old address
-		oldadr, err := btcutil.NewAddressPubKeyHash(
-			a[:], r.Node.SubWallet.Params())
+
+		param := r.Node.SubWallet[ctypesPerAdr[i]].Params()
+
+		oldadr, err := btcutil.NewAddressPubKeyHash(a[:], param)
 		if err != nil {
 			return err
 		}
 		reply.LegacyAddresses[i] = oldadr.String()
 
 		// convert 20-byte PKH to a bech32 segwit v0 address
-		bech32adr, err := bech32.SegWitV0Encode(
-			r.Node.SubWallet.Params().Bech32Prefix, a[:])
+		bech32adr, err := bech32.SegWitV0Encode(param.Bech32Prefix, a[:])
+
 		if err != nil {
 			return err
 		}

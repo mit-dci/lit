@@ -204,8 +204,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	cReply := new(litrpc.ChannelListReply)
 	aReply := new(litrpc.AddressReply)
 	tReply := new(litrpc.TxoListReply)
-	bReply := new(litrpc.BalReply)
-	sReply := new(litrpc.SyncHeightReply)
+	bReply := new(litrpc.BalanceReply)
 	lReply := new(litrpc.ListeningPortsReply)
 
 	err := lc.rpccon.Call("LitRPC.ListConnections", nil, pReply)
@@ -234,8 +233,11 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		} else {
 			fmt.Fprintf(color.Output, lnutil.Green("Channel "))
 		}
-		fmt.Fprintf(color.Output, "%s (peer %d) %s\n\t cap: %s bal: %s h: %d state: %d\n",
-			lnutil.White(c.CIdx), c.PeerIdx, lnutil.OutPoint(c.OutPoint),
+		fmt.Fprintf(
+			color.Output,
+			"%s (peer %d) type %d %s\n\t cap: %s bal: %s h: %d state: %d\n",
+			lnutil.White(c.CIdx), c.PeerIdx, c.CoinType,
+			lnutil.OutPoint(c.OutPoint),
 			lnutil.SatoshiColor(c.Capacity), lnutil.SatoshiColor(c.MyBalance),
 			c.Height, c.StateNum)
 	}
@@ -248,9 +250,9 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		fmt.Fprintf(color.Output, lnutil.Header("\tTxos:\n"))
 	}
 	for i, t := range tReply.Txos {
-		fmt.Fprintf(color.Output, "%d %s h:%d amt:%s %s",
+		fmt.Fprintf(color.Output, "%d %s h:%d amt:%s %s %s",
 			i, lnutil.OutPoint(t.OutPoint), t.Height,
-			lnutil.SatoshiColor(t.Amt), t.KeyPath)
+			lnutil.SatoshiColor(t.Amt), t.KeyPath, t.CoinType)
 		if t.Delay != 0 {
 			fmt.Fprintf(color.Output, " delay: %d", t.Delay)
 		}
@@ -280,23 +282,21 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		fmt.Fprintf(color.Output, "%d %s (%s)\n", i,
 			lnutil.Address(a), lnutil.Address(aReply.LegacyAddresses[i]))
 	}
-	err = lc.rpccon.Call("LitRPC.Bal", nil, bReply)
+	err = lc.rpccon.Call("LitRPC.Balance", nil, bReply)
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintf(color.Output, "\t%s %s %s %s %s %s\n",
-		lnutil.Header("Utxo:"), lnutil.SatoshiColor(bReply.TxoTotal),
-		lnutil.Header("WitConf:"), lnutil.SatoshiColor(bReply.MatureWitty),
-		lnutil.Header("Channel:"), lnutil.SatoshiColor(bReply.ChanTotal))
-
-	err = lc.rpccon.Call("LitRPC.SyncHeight", nil, sReply)
-	if err != nil {
-		return err
+	for _, walBal := range bReply.Balances {
+		fmt.Fprintf(
+			color.Output, "\t%s %d\t%s %d\t%s %s\t%s %s %s %s\n",
+			lnutil.Header("Type:"), walBal.CoinType,
+			lnutil.Header("Sync Height:"), walBal.SyncHeight,
+			lnutil.Header("Utxo:"), lnutil.SatoshiColor(walBal.TxoTotal),
+			lnutil.Header("WitConf:"), lnutil.SatoshiColor(walBal.MatureWitty),
+			lnutil.Header("Channel:"), lnutil.SatoshiColor(walBal.ChanTotal),
+		)
 	}
-
-	fmt.Fprintf(color.Output, "%s %d\n",
-		lnutil.Header("Sync Height:"), sReply.SyncHeight)
 
 	return nil
 }

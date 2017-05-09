@@ -10,26 +10,31 @@ import (
 )
 
 var sendCommand = &Command{
-	Format:           fmt.Sprintf("%s%s\n", lnutil.White("send"), lnutil.ReqColor("address", "amount")),
+	Format: fmt.Sprintf(
+		"%s%s\n", lnutil.White("send"), lnutil.ReqColor("address", "amount")),
 	Description:      "Send the given amount of satoshis to the given address.\n",
 	ShortDescription: "Send the given amount of satoshis to the given address.\n",
 }
 
 var addressCommand = &Command{
-	Format:           fmt.Sprintf("%s%s\n", lnutil.White("address"), lnutil.ReqColor("?amount")),
-	Description:      "Makes a new address.\n",
-	ShortDescription: "Makes a new address.\n",
+	Format: fmt.Sprintf(
+		"%s%s\n", lnutil.White("address"), lnutil.ReqColor("?amount", "?cointype")),
+	Description:      "Makes new addresses in a specified wallet.\n",
+	ShortDescription: "Makes new addresses.\n",
 }
 
 var fanCommand = &Command{
-	Format:           fmt.Sprintf("%s%s\n", lnutil.White("fan"), lnutil.ReqColor("addr", "howmany", "howmuch")),
+	Format: fmt.Sprintf(
+		"%s%s\n", lnutil.White("fan"), lnutil.ReqColor("addr", "howmany", "howmuch")),
 	Description:      "\n",
 	ShortDescription: "\n",
 	// TODO: Add description.
 }
 
 var sweepCommand = &Command{
-	Format:      fmt.Sprintf("%s%s%s\n", lnutil.White("sweep"), lnutil.ReqColor("addr", "howmany"), lnutil.OptColor("drop")),
+	Format: fmt.Sprintf(
+		"%s%s%s\n", lnutil.White("sweep"),
+		lnutil.ReqColor("addr", "howmany"), lnutil.OptColor("drop")),
 	Description: "Move UTXOs with many 1-in-1-out txs.\n",
 	// TODO: Make this more clear.
 	ShortDescription: "Move UTXOs with many 1-in-1-out txs.\n",
@@ -171,18 +176,38 @@ func (lc *litAfClient) Address(textArgs []string) error {
 		return nil
 	}
 
-	args := new(litrpc.AddressArgs)
+	var cointype, numadrs uint32
 
 	// if no arguments given, generate 1 new address.
-	if len(textArgs) < 1 {
-		args.NumToMake = 1
-	} else {
-		num, _ := strconv.Atoi(textArgs[0])
-		args.NumToMake = uint32(num)
+	// if no cointype given, assume type 1 (testnet)
+	switch len(textArgs) {
+	default: // meaning 2 or more args.  args 3+ are ignored
+		cnum, err := strconv.Atoi(textArgs[1])
+		if err != nil {
+			return err
+		}
+		cointype = uint32(cnum)
+		fallthrough
+	case 1:
+		num, err := strconv.Atoi(textArgs[0])
+		if err != nil {
+			return err
+		}
+		numadrs = uint32(num)
+	case 0:
+		// default one new address
+		numadrs = 1
 	}
+	// cointype of 0 means default, not mainnet.
+	// this is ugly but does prevent mainnet use for now.
 
 	reply := new(litrpc.AddressReply)
-	fmt.Printf("call here\n")
+
+	args := new(litrpc.AddressArgs)
+	args.CoinType = cointype
+	args.NumToMake = numadrs
+
+	fmt.Printf("args: %v\n", args)
 	err := lc.rpccon.Call("LitRPC.Address", args, reply)
 	if err != nil {
 		return err

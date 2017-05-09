@@ -64,7 +64,7 @@ func (w *Wallit) GetWalletPrivkey(idx uint32) *btcec.PrivateKey {
 	var kg portxo.KeyGen
 	kg.Depth = 5
 	kg.Step[0] = 44 | 1<<31
-	kg.Step[1] = 0 | 1<<31
+	kg.Step[1] = w.Param.HDCoinType | 1<<31
 	kg.Step[2] = 0 | 1<<31
 	kg.Step[3] = 0 | 1<<31
 	kg.Step[4] = idx | 1<<31
@@ -72,11 +72,11 @@ func (w *Wallit) GetWalletPrivkey(idx uint32) *btcec.PrivateKey {
 }
 
 // GetWalletKeygen returns the keygen for a standard wallet address
-func GetWalletKeygen(idx uint32) portxo.KeyGen {
+func GetWalletKeygen(idx, cointype uint32) portxo.KeyGen {
 	var kg portxo.KeyGen
 	kg.Depth = 5
 	kg.Step[0] = 44 | 1<<31
-	kg.Step[1] = 0 | 1<<31
+	kg.Step[1] = cointype | 1<<31
 	kg.Step[2] = 0 | 1<<31
 	kg.Step[3] = 0 | 1<<31
 	kg.Step[4] = idx | 1<<31
@@ -97,16 +97,4 @@ func (w *Wallit) GetUsePub(kg portxo.KeyGen, use uint32) [33]byte {
 		copy(b[:], pub.SerializeCompressed())
 	}
 	return b
-}
-
-// IdKey returns the identity private key
-func (w *Wallit) IdKeyx() *btcec.PrivateKey {
-	var kg portxo.KeyGen
-	kg.Depth = 5
-	kg.Step[0] = 44 | 1<<31
-	kg.Step[1] = 0 | 1<<31
-	kg.Step[2] = 9 | 1<<31
-	kg.Step[3] = 0 | 1<<31
-	kg.Step[4] = 0 | 1<<31
-	return w.PathPrivkey(kg)
 }

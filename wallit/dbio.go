@@ -91,7 +91,7 @@ func (w *Wallit) AdrDump() ([][20]byte, error) {
 	}
 
 	for i = 0; i < last; i++ {
-		nKg := GetWalletKeygen(i)
+		nKg := GetWalletKeygen(i, w.Param.HDCoinType)
 		nAdr160 := w.PathPubHash160(nKg)
 
 		adrSlice = append(adrSlice, nAdr160)
@@ -125,7 +125,7 @@ func (w *Wallit) NewAdr160() ([20]byte, error) {
 		return empty160, fmt.Errorf("Got %d keys stored, expect something reasonable", n)
 	}
 
-	nKg := GetWalletKeygen(n)
+	nKg := GetWalletKeygen(n, w.Param.HDCoinType)
 	nAdr160 := w.PathPubHash160(nKg)
 
 	if nAdr160 == empty160 {

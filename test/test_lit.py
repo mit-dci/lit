@@ -23,7 +23,7 @@ class LitNode():
         os.makedirs(self.data_dir)
 
         # Write a hexkey to the hexkey file
-        with open(self.data_dir + "/testkey.hex", 'w+') as f:
+        with open(self.data_dir + "/privkey.hex", 'w+') as f:
             f.write("1" * 63 + str(i) + "\n")
 
         self.args = ["-dir", self.data_dir]
@@ -104,49 +104,55 @@ def testLit():
     # Start a bitcoind node
     bcnode = BCNode(0)
     bcnode.start_node()
-    time.sleep(3)
-    bcnode.generate(nblocks=101)
+    # takes a while to start on a pi
+    time.sleep(15)
+    print("generate response: %s" % bcnode.generate(nblocks=150).text)
+    time.sleep(2)
     print("Received response from bitcoin node: %s" % bcnode.getinfo().text)
 
     # Start lit node 0 and open websocket connection
     litnode0 = LitNode(0)
-    litnode0.args.extend(["-spv", "127.0.0.1", "-reg"])
+    litnode0.args.extend(["-reg", "127.0.0.1"])
     litnode0.start_node()
+    time.sleep(1)
     litnode0.add_rpc_connection("127.0.0.1", "8001")
     print(litnode0.rpc.new_address())
     litnode0.Bal()
 
     # Start lit node 1 and open websocket connection
     litnode1 = LitNode(1)
-    litnode1.args.extend(["-rpcport", "8002", "-reg"])
+    litnode1.args.extend(["-rpcport", "8002", "-reg", "127.0.0.1"])
     litnode1.start_node()
+    time.sleep(1)
     litnode1.add_rpc_connection("127.0.0.1", "8002")
     litnode1.rpc.new_address()
     litnode1.Bal()
 
     # Listen on lit litnode0 and connect from lit litnode1
     res = litnode0.Listen(Port="127.0.0.1:10001")["result"]
-    litnode0.lit_address = res["Status"].split(' ')[5] + '@' + res["Status"].split(' ')[2]
+    litnode0.lit_address = res["Adr"] + '@' + res["LisIpPorts"][0]
 
     res = litnode1.Connect(LNAddr=litnode0.lit_address)
     assert not res['error']
 
+    time.sleep(1)
     # Check that litnode0 and litnode1 are connected
     assert len(litnode0.ListConnections()['result']['Connections']) == 1
     assert len(litnode1.ListConnections()['result']['Connections']) == 1
 
     # Send funds from the bitcoin node to lit node 0
-    bal = litnode0.Bal()["result"]["TxoTotal"]
+    #print(litnode0.Bal())
+    bal = litnode0.Bal()['result']['Balances'][0]["TxoTotal"]
     print("previous bal: " + str(bal))
     addr = litnode0.rpc.new_address()
     bcnode.sendtoaddress(address=addr["result"]["LegacyAddresses"][0], amount=12.34)
-
+    print("generate response: %s" % bcnode.generate(nblocks=1).text)
     print("waiting to receive transaction")
 
     # wait for transaction to be received (5 seconds timeout)
     for i in range(50):
         time.sleep(0.1)
-        balNew = litnode0.Bal()["result"]["TxoTotal"]
+        balNew = litnode0.Bal()['result']["Balances"][0]["TxoTotal"]
         if balNew - bal == 1234000000:
             print("Transaction received. Current balance = %s" % balNew)
             break

@@ -20,7 +20,7 @@ import (
 const (
 	litHomeDirName = ".lit"
 
-	keyFileName = "testkey.hex"
+	keyFileName = "privkey.hex"
 
 	// this is my local testnet node, replace it with your own close by.
 	// Random internet testnet nodes usually work but sometimes don't, so
@@ -28,31 +28,34 @@ const (
 	hardHeight = 1111111 // height to start at if not specified
 )
 
-// variables for a goodelivery session
+// variables for a lit node & lower layers
 type LitConfig struct {
-	spvHost               string
-	regTest, reSync, hard bool // flag to set networks
-	bc2Net                bool
-	verbose               bool
-	birthblock            int32
-	rpcport               uint16
-	bamfport              uint16
-	litHomeDir            string
+	reSync, hard bool // flag to set networks
+
+	// hostnames to connect to for different networks
+	tn3host, bc2host, lt4host, reghost string
+
+	verbose    bool
+	birthblock int32
+	rpcport    uint16
+	bamfport   uint16
+	litHomeDir string
 
 	Params *chaincfg.Params
 }
 
 func setConfig(lc *LitConfig) {
-	spvhostptr := flag.String("spv", "na", "full node to connect to")
-
 	birthptr := flag.Int("tip", hardHeight, "height to begin db sync")
 
 	easyptr := flag.Bool("ez", false, "use easy mode (bloom filters)")
 
 	verbptr := flag.Bool("v", false, "verbose; print all logs to stdout")
 
-	regtestptr := flag.Bool("reg", false, "use regtest (not testnet3)")
-	bc2ptr := flag.Bool("bc2", false, "use bc2 network (not testnet3)")
+	tn3ptr := flag.String("tn3", "", "testnet3 full node")
+	regptr := flag.String("reg", "", "regtest full node")
+	bc2ptr := flag.String("bc2", "", "bc2 full node")
+	lt4ptr := flag.String("lt4", "", "litecoin testnet4 full node")
+
 	resyncprt := flag.Bool("resync", false, "force resync from given tip")
 
 	rpcportptr := flag.Int("rpcport", 8001, "port to listen for RPC")
@@ -63,11 +66,11 @@ func setConfig(lc *LitConfig) {
 
 	flag.Parse()
 
-	lc.spvHost = *spvhostptr
 	lc.birthblock = int32(*birthptr)
 
-	lc.regTest = *regtestptr
-	lc.bc2Net = *bc2ptr
+	lc.tn3host, lc.bc2host, lc.lt4host, lc.reghost =
+		*tn3ptr, *bc2ptr, *lt4ptr, *regptr
+
 	lc.reSync = *resyncprt
 	lc.hard = !*easyptr
 	lc.verbose = *verbptr
@@ -76,36 +79,55 @@ func setConfig(lc *LitConfig) {
 	lc.bamfport = uint16(*bamfportptr)
 
 	lc.litHomeDir = *litHomeDir
+}
 
-	//	if lc.spvHost == "" {
-	//		lc.spvHost = "lit3.co"
-	//	}
+// linkWallets tries to link the wallets given in conf to the litNode
+func linkWallets(node *qln.LitNode, key *[32]byte, conf *LitConfig) error {
+	// for now, wallets are linked to the litnode on startup, and
+	// can't appear / disappear while it's running.  Later
+	// could support dynamically adding / removing wallets
 
-	if lc.regTest && lc.bc2Net {
-		log.Fatal("error: can't have -bc2 and -reg")
-	}
+	// order matters; the first registered wallet becomes the default
 
-	if lc.regTest {
-		lc.Params = &chaincfg.RegressionNetParams
-		lc.birthblock = 120
-		if !strings.Contains(lc.spvHost, ":") {
-			lc.spvHost = lc.spvHost + ":18444"
+	var err error
+	// try regtest
+	if conf.reghost != "" {
+		if !strings.Contains(conf.reghost, ":") {
+			conf.reghost = conf.reghost + ":18444"
 		}
-	} else if lc.bc2Net {
-		lc.Params = &chaincfg.BC2NetParams
-		if !strings.Contains(lc.spvHost, ":") {
-			lc.spvHost = lc.spvHost + ":8444"
-		}
-	} else {
-		lc.Params = &chaincfg.TestNet3Params
-		if !strings.Contains(lc.spvHost, ":") {
-			lc.spvHost = lc.spvHost + ":18333"
+		fmt.Printf("reg: %s\n", conf.reghost)
+		err = node.LinkBaseWallet(
+			key, 120, conf.reSync,
+			conf.reghost, &chaincfg.RegressionNetParams)
+		if err != nil {
+			return err
 		}
 	}
-
-	if lc.reSync && lc.birthblock == hardHeight {
-		log.Fatal("-resync requires -tip")
+	// try testnet3
+	if conf.tn3host != "" {
+		if !strings.Contains(conf.tn3host, ":") {
+			conf.tn3host = conf.tn3host + ":18333"
+		}
+		err = node.LinkBaseWallet(
+			key, conf.birthblock, conf.reSync,
+			conf.tn3host, &chaincfg.TestNet3Params)
+		if err != nil {
+			return err
+		}
 	}
+	// try litecoin testnet4
+	if conf.lt4host != "" {
+		if !strings.Contains(conf.lt4host, ":") {
+			conf.lt4host = conf.lt4host + ":19335"
+		}
+		err = node.LinkBaseWallet(
+			key, 47295, conf.reSync,
+			conf.lt4host, &chaincfg.LiteCoinTestNet4Params)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func main() {
@@ -133,6 +155,15 @@ func main() {
 		log.SetOutput(logfile)
 	}
 
+	// Allow node with no linked wallets, for testing.
+	// TODO Should update tests and disallow nodes without wallets later.
+	//	if conf.tn3host == "" && conf.lt4host == "" && conf.reghost == "" {
+	//		log.Fatal("error: no network specified; use -tn3, -reg, -lt4")
+	//	}
+
+	// Keys: the litNode, and wallits, all get 32 byte keys.
+	// Right now though, they all get the *same* key.  For lit as a single binary
+	// now, all using the same key makes sense; could split up later.
 	keyFilePath := filepath.Join(conf.litHomeDir, keyFileName)
 
 	// read key file (generate if not found)
@@ -143,12 +174,13 @@ func main() {
 
 	// Setup LN node.  Activate Tower if in hard mode.
 	// give node and below file pathof lit home directoy
-	node, err := qln.NewLitNode(conf.litHomeDir, false)
+	node, err := qln.NewLitNode(key, conf.litHomeDir, false)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = node.LinkBaseWallet(key, conf.birthblock, conf.spvHost, conf.Params)
+	// node is up; link wallets based on args
+	err = linkWallets(node, key, conf)
 	if err != nil {
 		log.Fatal(err)
 	}

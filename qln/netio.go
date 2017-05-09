@@ -7,7 +7,6 @@ import (
 	"github.com/adiabat/btcd/btcec"
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
-	"github.com/mit-dci/lit/portxo"
 )
 
 // Gets the list of ports where LitNode is listening for incoming connections,
@@ -189,14 +188,7 @@ func (nd *LitNode) ConnectedToPeer(peer uint32) bool {
 
 // IdKey returns the identity private key
 func (nd *LitNode) IdKey() *btcec.PrivateKey {
-	var kg portxo.KeyGen
-	kg.Depth = 5
-	kg.Step[0] = 44 | 1<<31
-	kg.Step[1] = 0 | 1<<31
-	kg.Step[2] = 9 | 1<<31
-	kg.Step[3] = 0 | 1<<31
-	kg.Step[4] = 0 | 1<<31
-	return nd.SubWallet.GetPriv(kg)
+	return nd.IdentityKey
 }
 
 // SendChat sends a text string to a peer

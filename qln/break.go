@@ -8,6 +8,10 @@ import (
 // ------------------------- break
 func (nd *LitNode) BreakChannel(q *Qchan) error {
 
+	if nd.SubWallet[q.Coin()] == nil {
+		return fmt.Errorf("Not connected to coin type %d\n", q.Coin())
+	}
+
 	err := nd.ReloadQchanState(q)
 	if err != nil {
 		return err
@@ -46,5 +50,5 @@ func (nd *LitNode) BreakChannel(q *Qchan) error {
 	}
 
 	// broadcast break tx directly
-	return nd.SubWallet.PushTx(tx)
+	return nd.SubWallet[q.Coin()].PushTx(tx)
 }
