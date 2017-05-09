@@ -55,7 +55,7 @@ go build
 6. If you run into anymore dependency errors, repeat Step 3 by using `go get` for all of the missing packages.
 
 7. To run lit use: 
-(Note : Windows users can take off ./ but may need to chagne lit to lit.exe in the second line.)
+(Note : Windows users can take off ./ but may need to chagne lit to lit.exe in the second line.) 
 ```
 cd GOPATH/src/github.com/mit-dci/lit 
 ./lit -spv my.testnet.node.tld
@@ -64,10 +64,10 @@ cd GOPATH/src/github.com/mit-dci/lit
 ## Using Lightning
 
 Great! Now that you are all done setting up Lit, you can 
--read about the arguments for starting Lit [here](#command-line-arguments)
--read about the folders for the code and what does what [here](#folders)
--head over to the [Walkthrough](./WALKTHROUGH.md) to create some lit nodes or
--check out how to [Contribute](./CONTRIBUTING.md).
+- read about the arguments for starting Lit [here](#command-line-arguments)
+- read about the folders for the code and what does what [here](#folders)
+- head over to the [Walkthrough](./WALKTHROUGH.md) to create some lit nodes or
+- check out how to [Contribute](./CONTRIBUTING.md).
 
 
 

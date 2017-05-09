@@ -11,9 +11,9 @@ However, currently adiabat is the maintainer / lead dev and has full access to t
 
 ### What can I do?
 
--File issues you see that haven't been reported in the issues tab
--Make pull requests to fix these issues
--Add features (squash them if more than a few commits).  If it's a big change, discuss with people beforehand.  adiabat is on IRC in the various bitcoin-related channels.
+- File issues you see that haven't been reported in the issues tab
+- Make pull requests to fix these issues
+- Add features (squash them if more than a few commits).  If it's a big change, discuss with people beforehand.  adiabat is on IRC in the various bitcoin-related channels.
 
 ### Code practices / philosopy
 
