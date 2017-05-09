@@ -18,7 +18,7 @@ Set up two folders (i.e. anode and bnode) and copy both the `lit` and `lit-af` e
 
 Here is a sample for Linux users who have not already built the packages
 
-Alice's setup
+#### Alice's setup
 
 ```
 alice@pi2:~$ mkdir anode
@@ -95,12 +95,21 @@ entered command: say 1 Hi Alice!
 
 Bob puts the pubkey@hostname for Alice and connects.  Then he says hi to Alice.
 
-### Step 3b: Sweep Funds
+### Step 4: Sweep Funds
 
+Before Bob can make a channel, he needs to sweep his coins to make sure they are in his segwit address.
 
-### Step 4: Open a channel
+```
+lit-af# sweep H5qcg9CudN1KyHKx5h1R87tspxmZ4rPSypQ6w 50000000
+entered command: sweep H5qcg9CudN1KyHKx5h1R87tspxmZ4rPSypQ6w 50000000
+Swept
+0 acd0bf89ee6902f6c66cd831fe332f6f89eab2d613de4120dc3791df44885bb1
+1 f28aae0860cefadc921a661bf77f5ab80f7a0d7a64c5269093219a99e345dac7
+```
 
-Bob is connected to Alice and wants to open a payment channel.  Bob has already made sure he has channel-ready coins by sweeping some to himself using the sweep command to his segwit address.  If he has enough money and is connected to Alice, he can open a channel.
+### Step 5: Open a channel
+
+Bob is connected to Alice and wants to open a payment channel. If he has enough (segwit) money and is connected to Alice, he can open a channel.
 
 ```
 lit-af# fund 1 50000000 0
@@ -108,7 +117,7 @@ lit-af# fund 1 50000000 0
 
 This opens a channel with peer 1 (Alice) with a channel capacity of 50,000,000 satoshis (half a coin), and sends 0 satoshis over in the creation process.  Bob starts out with all 50,000,000 satoshis in the channel, so only he can send to Alice.
 
-### Step 5: Send micro-payments
+### Step 6: Send micro-payments
 
 (Do they count as micro-payments if testnet coins have zero value?)
 
@@ -120,7 +129,7 @@ lit-af# push 1 200000
 
 This pushes 200,000 satoshis to the other side of the channel.  You can do this 200 trillion times before the channel needs to be closed.  (Actually, since I don't think you can send that many payments, the software will probably crash if you do manage to exceed 2^48)
 
-### Step 6: Close/Break the channel
+### Step 7: Close/Break the channel
 
 You can close the channel cooperatively using:
 
