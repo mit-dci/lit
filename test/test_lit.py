@@ -48,28 +48,25 @@ class LitTest():
         # Start a bitcoind node
         self.bcnodes = [BCNode(0, self.tmpdir)]
         self.bcnodes[0].start_node()
-        time.sleep(15)
-        print("generate response: %s" % bcnode.generate(nblocks=150).text)
-        time.sleep(2)
-        print("Received response from bitcoin node: %s" % self.bcnodes[0].getinfo().text)
+        print("generate response: %s" % self.bcnodes[0].generate(nblocks=150).text)
 
         # Start lit node 0 and open websocket connection
         self.litnodes.append(LitNode(0, self.tmpdir))
         self.litnodes[0].args.extend(["-reg", "127.0.0.1"])
         self.litnodes[0].start_node()
-        time.sleep()
+        time.sleep(2)
         self.litnodes[0].add_rpc_connection("127.0.0.1", "8001")
         print(self.litnodes[0].rpc.new_address())
-        self.litnodes[0].Bal()
+        self.litnodes[0].Balance()
 
         # Start lit node 1 and open websocket connection
-        self.litnodes[1] = LitNode(1, self.tmpdir)
+        self.litnodes.append(LitNode(1, self.tmpdir))
         self.litnodes[1].args.extend(["-rpcport", "8002", "-reg", "127.0.0.1"])
         self.litnodes[1].start_node()
         time.sleep(1)
         self.litnodes[1].add_rpc_connection("127.0.0.1", "8002")
         self.litnodes[1].rpc.new_address()
-        self.litnodes[1].Bal()
+        self.litnodes[1].Balance()
 
         # Listen on litnode0 and connect from litnode1
         res = self.litnodes[0].Listen(Port="127.0.0.1:10001")["result"]
@@ -84,23 +81,24 @@ class LitTest():
         assert len(self.litnodes[1].ListConnections()['result']['Connections']) == 1
 
         # Send funds from the bitcoin node to litnode0
-        bal = self.litnodes[0].Bal()['result']['balances'][0]['TxoTotal']
+        print(self.litnodes[0].Balance()['result'])
+        bal = self.litnodes[0].Balance()['result']['Balances'][0]['TxoTotal']
         print("previous bal: " + str(bal))
         addr = self.litnodes[0].rpc.new_address()
         self.bcnodes[0].sendtoaddress(address=addr["result"]["LegacyAddresses"][0], amount=12.34)
-        print("generate response: %s" % bcnodes[0].generate(nblocks=1).text)
+        print("generate response: %s" % self.bcnodes[0].generate(nblocks=1).text)
         print("waiting to receive transaction")
 
         # wait for transaction to be received (5 seconds timeout)
         for i in range(50):
             time.sleep(0.1)
-            balNew = self.litnodes[0].Bal()['result']["Balances"][0]["TxoTotal"]
+            balNew = self.litnodes[0].Balance()['result']["Balances"][0]["TxoTotal"]
             if balNew - bal == 1234000000:
                 print("Transaction received. Current balance = %s" % balNew)
                 break
         else:
             print("Test failed. No transaction received")
-            exit(1)
+            raise AssertionError
 
     def cleanup(self):
         # Stop bitcoind and lit nodes

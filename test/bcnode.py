@@ -43,6 +43,9 @@ class BCNode():
                 raise Exception('%s exited with status %i during initialization' % (self.__class__.bin_name, self.process.returncode))
             try:
                 resp = self.getinfo()
+                if resp.json()['error'] and resp.json()['error']['code'] == -28:
+                    # RPC is still in warmup. Sleep some more.
+                    continue
                 # Check that we're running at least the minimum version
                 assert resp.json()['result']['version'] > self.__class__.min_version
                 break  # break out of loop on success
