@@ -142,7 +142,7 @@ def testLit():
 
     # Send funds from the bitcoin node to lit node 0
     #print(litnode0.Bal())
-    bal = litnode0.Bal()['result']['Balances'][0]["TxoTotal"]
+    bal = litnode0.Balance()['result']['Balances'][0]["TxoTotal"]
     print("previous bal: " + str(bal))
     addr = litnode0.rpc.new_address()
     bcnode.sendtoaddress(address=addr["result"]["LegacyAddresses"][0], amount=12.34)
@@ -152,7 +152,7 @@ def testLit():
     # wait for transaction to be received (5 seconds timeout)
     for i in range(50):
         time.sleep(0.1)
-        balNew = litnode0.Bal()['result']["Balances"][0]["TxoTotal"]
+        balNew = litnode0.Balance()['result']["Balances"][0]["TxoTotal"]
         if balNew - bal == 1234000000:
             print("Transaction received. Current balance = %s" % balNew)
             break
