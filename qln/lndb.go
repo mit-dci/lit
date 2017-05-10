@@ -116,8 +116,8 @@ type LitNode struct {
 	// Nodes don't have Params; their SubWallets do
 	// Param *chaincfg.Params // network parameters (testnet3, segnet, etc)
 
-	// websocket connections of users to a message channel
-	UserWsCons map[int]chan lnutil.ChatMsg
+	// chan for storing received chat messages for connected users
+	UserChat chan lnutil.ChatMsg
 	// this is used to make sure each user pulls from a different channel
 	UserSelector int
 

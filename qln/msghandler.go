@@ -44,7 +44,6 @@ func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) er
 		return fmt.Errorf("Unknown message id byte %x &f0", msg.MsgType())
 
 	}
-
 }
 
 // BroadcastMessage sends a chat message to all connected websocket clients
@@ -53,19 +52,8 @@ func (nd *LitNode) BroadcastChatMessage(msg lnutil.LitMsg) error {
 	if !ok {
 		return fmt.Errorf("can't cast to chat message")
 	}
-
-	// get the current set of channels and save them, they may be deleted by litrpc
-	// before the iteration is over
-	var channels []chan lnutil.ChatMsg
-	for _, c := range nd.UserWsCons {
-		channels = append(channels, c)
-	}
-
-	// now send the chat to each channel
-	for i := range channels {
-		channels[i] <- chat
-	}
-
+	// queue messages for listening peers
+	nd.UserChat <- chat
 	return nil
 }
 

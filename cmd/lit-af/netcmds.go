@@ -31,26 +31,6 @@ var conCommand = &Command{
 	ShortDescription: "Make a connection to another host by connecting to their pubkeyhash\n",
 }
 
-// RequestAsync keeps requesting messages from the server.  The server blocks
-// and will send a response once it gets one.  Once the rpc client receives a
-// response, it will immediately request another.
-func (lc *litAfClient) RequestAsync() {
-	for {
-		args := new(litrpc.NoArgs)
-		reply := new(lnutil.ChatMsg)
-
-		err := lc.rpccon.Call("LitRPC.GetMessages", args, reply)
-		if err != nil {
-			fmt.Fprintf(color.Output, "RequestAsync error %s\n", lnutil.Red(err.Error()))
-			break
-			// end loop on first error.  it's probably a connection error
-
-		}
-		fmt.Fprintf(color.Output,
-			"\nmsg from %s: %s\n", lnutil.White(reply.PeerIdx), lnutil.Green(reply.Text))
-	}
-}
-
 // Lis starts listening.  Takes args of port to listen on.
 func (lc *litAfClient) Lis(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {

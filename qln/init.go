@@ -73,7 +73,7 @@ func NewLitNode(privKey *[32]byte, path string, tower bool) (*LitNode, error) {
 	nd.InProg.done = make(chan uint32, 1)
 
 	nd.RemoteCons = make(map[uint32]*RemotePeer)
-	nd.UserWsCons = make(map[int]chan lnutil.ChatMsg)
+	nd.UserChat = make(chan lnutil.ChatMsg, 10)
 
 	nd.SubWallet = make(map[uint32]UWallet)
 

@@ -116,19 +116,6 @@ func (r *LitRPC) GetListeningPorts(args NoArgs, reply *ListeningPortsReply) erro
 	return nil
 }
 
-// TODO: implement retrieval of the last 10 messages from the database
-func (r *LitRPC) GetMessages(args NoArgs, reply *lnutil.ChatMsg) error {
-	// each user who requests messages needs to update the selector
-	// so everyone gets their own channel to pull from
-	r.Node.UserSelector = (r.Node.UserSelector + 1)
-	index := r.Node.UserSelector
-	r.Node.UserWsCons[index] = make(chan lnutil.ChatMsg, 1)
-	*reply = <-r.Node.UserWsCons[index]
-
-	delete(r.Node.UserWsCons, index) //we don't need this channel anymore
-	return nil
-}
-
 type SayArgs struct {
 	Peer    uint32
 	Message string
