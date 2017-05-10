@@ -6,6 +6,7 @@
 import subprocess
 import sys
 import tempfile
+import time
 import traceback
 
 class LitTest():
@@ -49,5 +50,17 @@ class LitTest():
             except subprocess.TimeoutExpired:
                 litnode.process.kill()
 
-if __name__ == "__main__":
-    exit(LitTest().main())
+def wait_until(predicate, *, attempts=float('inf'), timeout=float('inf')):
+    if attempts == float('inf') and timeout == float('inf'):
+        timeout = 60
+    attempt = 0
+    elapsed = 0
+
+    while attempt < attempts and elapsed < timeout:
+        if predicate():
+            return True
+        attempt += 1
+        elapsed += 0.05
+        time.sleep(0.05)
+
+    raise AssertionError("wait_until() timed out")
