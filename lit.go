@@ -145,6 +145,8 @@ func main() {
 	logfile, err := os.OpenFile(logFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	defer logfile.Close()
 
+	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
+
 	if conf.verbose {
 		logOutput := io.MultiWriter(os.Stdout, logfile)
 		log.SetOutput(logOutput)
