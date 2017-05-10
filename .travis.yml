@@ -23,5 +23,5 @@ script:
   - go get -v ./...
   - go test ./...
   - go build
-  - test/test_lit.py
+  - test/test_basic.py
 
