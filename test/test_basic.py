@@ -2,48 +2,25 @@
 # Copyright (c) 2017 The lit developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
-"""Test lit"""
-import subprocess
-import sys
-import tempfile
+"""Test basic lit functionality
+
+- start bitcoind process
+- start two lit processes
+- connect over websocket
+- create new address
+- get balance
+- listen on litnode0
+- connect from litnode1 to litnode0
+- send funds from bitcoind process to litnode0 address
+- stop"""
 import time
-import traceback
 
 from bcnode import BCNode
 from litnode import LitNode
+from lit_test_framework import LitTest
 
-
-class LitTest():
-    def __init__(self):
-        self.litnodes = []
-        self.bcnodes = []
-        self.tmpdir = tempfile.mkdtemp(prefix="test")
-        print("Using tmp dir %s" % self.tmpdir)
-
-    def main(self):
-        rc = 0
-        try:
-            self.run_test()
-            print("Test succeeds!")
-        except:
-            # Test asserted. Return 1
-            print("Unexpected error:", sys.exc_info()[0])
-            traceback.print_exc(file=sys.stdout)
-            rc = 1
-        finally:
-            self.cleanup()
-
-        return rc
-
+class TestBasic(LitTest):
     def run_test(self):
-        """starts two lit processes and tests basic functionality:
-
-        - connect over websocket
-        - create new address
-        - get balance
-        - listen on litnode0
-        - connect from litnode1 to litnode0
-        - stop"""
 
         # Start a bitcoind node
         self.bcnodes = [BCNode(0, self.tmpdir)]
@@ -100,20 +77,5 @@ class LitTest():
             print("Test failed. No transaction received")
             raise AssertionError
 
-    def cleanup(self):
-        # Stop bitcoind and lit nodes
-        for bcnode in self.bcnodes:
-            bcnode.stop()
-            try:
-                bcnode.process.wait(2)
-            except subprocess.TimeoutExpired:
-                bcnode.process.kill()
-        for litnode in self.litnodes:
-            litnode.Stop()
-            try:
-                litnode.process.wait(2)
-            except subprocess.TimeoutExpired:
-                litnode.process.kill()
-
 if __name__ == "__main__":
-    exit(LitTest().main())
+    exit(TestBasic().main())
