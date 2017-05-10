@@ -26,7 +26,7 @@ class BCNode():
         self.data_dir = tmd_dir + "/%snode%s" % (self.__class__.short_name, i)
         os.makedirs(self.data_dir)
 
-        self.args = ["-regtest", "-datadir=%s" % self.data_dir, "-rpcuser=regtestuser", "-rpcpassword=regtestpass", "-rpcport=18332"]
+        self.args = ["-regtest", "-datadir=%s" % self.data_dir, "-rpcuser=regtestuser", "-rpcpassword=regtestpass", "-rpcport=18332", "-logtimemicros"]
         self.msg_id = random.randint(0, 9999)
         self.rpc_url = "http://regtestuser:regtestpass@127.0.0.1:18332"
 
