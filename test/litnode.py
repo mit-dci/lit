@@ -24,7 +24,9 @@ class LitNode():
             f.write("1" * 63 + str(i) + "\n")
 
         self.args = ["-dir", self.data_dir]
-
+        #disable auto-connect to testnet3 and litetest4
+        self.args.extend(['-tn3', '', '-lt4', ''])
+		
     def start_node(self):
         self.process = subprocess.Popen([LIT_BIN] + self.args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 

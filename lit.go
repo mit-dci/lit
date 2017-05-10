@@ -50,10 +50,10 @@ func setConfig(lc *LitConfig) {
 
 	verbptr := flag.Bool("v", false, "verbose; print all logs to stdout")
 
-	tn3ptr := flag.String("tn3", "", "testnet3 full node")
+	tn3ptr := flag.String("tn3", "testnet3.lit3.co", "testnet3 full node")
 	regptr := flag.String("reg", "", "regtest full node")
 	bc2ptr := flag.String("bc2", "", "bc2 full node")
-	lt4ptr := flag.String("lt4", "", "litecoin testnet4 full node")
+	lt4ptr := flag.String("lt4", "litetest4.lit3.co", "litecoin testnet4 full node")
 
 	resyncprt := flag.Bool("resync", false, "force resync from given tip")
 
