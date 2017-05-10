@@ -19,6 +19,14 @@ This directory contains lit integration tests, which start lit and bitcoind/lite
 
 Run tests with `./test_[testname].py`
 
+Logs from tests can be combined into a single log file using the `combine_logs` tool. To run the tool:
+
+```
+combine_logs.py -c <test directory> | less -r
+```
+
+further help is available by running `combine_logs.py -h`
+
 ### Adding tests
 
 New tests should be named `tests_[description].py`. They should import the `LitTest` class from `lit_test_framework.py`. The test should subclass the `LitTest` class and override the `run_test()` method to include its own test logic. See `test_basic.py` for an example.
