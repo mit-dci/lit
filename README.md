@@ -164,7 +164,7 @@ Unlinkable outsourcing of channel monitoring
 
 
 
-### Heirarchy of packages
+### Hierarchy of packages
 
 One instance of lit has one litNode (package qln).
 
