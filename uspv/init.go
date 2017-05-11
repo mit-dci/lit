@@ -124,7 +124,6 @@ func (s *SPVCon) openHeaderFile(hfn string) error {
 				if err != nil {
 					return err
 				}
-        s.headerStartHeight = s.Param.StartHeight
       } else {
 				// start from beginning.
 				err = s.Param.GenesisBlock.Header.Serialize(&b)
@@ -141,6 +140,10 @@ func (s *SPVCon) openHeaderFile(hfn string) error {
 			log.Printf("created hardcoded genesis header at %s\n", hfn)
 		}
 	}
+  
+  if s.Param.StartHeader != "" {
+    s.headerStartHeight = s.Param.StartHeight
+  }
 
 	s.headerFile, err = os.OpenFile(hfn, os.O_RDWR, 0600)
 	if err != nil {
