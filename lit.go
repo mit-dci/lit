@@ -33,7 +33,7 @@ type LitConfig struct {
 	reSync, hard bool // flag to set networks
 
 	// hostnames to connect to for different networks
-	tn3host, bc2host, lt4host, reghost string
+	tn3host, bc2host, lt4host, reghost, tvtchost string
 
 	verbose    bool
 	birthblock int32
@@ -54,6 +54,7 @@ func setConfig(lc *LitConfig) {
 	regptr := flag.String("reg", "", "regtest full node")
 	bc2ptr := flag.String("bc2", "", "bc2 full node")
 	lt4ptr := flag.String("lt4", "", "litecoin testnet4 full node")
+  tvtcptr := flag.String("tvtc", "", "vertcoin testnet full node")
 
 	resyncprt := flag.Bool("resync", false, "force resync from given tip")
 
@@ -66,8 +67,8 @@ func setConfig(lc *LitConfig) {
 
 	lc.birthblock = int32(*birthptr)
 
-	lc.tn3host, lc.bc2host, lc.lt4host, lc.reghost =
-		*tn3ptr, *bc2ptr, *lt4ptr, *regptr
+	lc.tn3host, lc.bc2host, lc.lt4host, lc.reghost, lc.tvtchost =
+		*tn3ptr, *bc2ptr, *lt4ptr, *regptr, *tvtcptr
 
 	lc.reSync = *resyncprt
 	lc.hard = !*easyptr
@@ -120,6 +121,18 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *LitConfig) error {
 		err = node.LinkBaseWallet(
 			key, 47295, conf.reSync,
 			conf.lt4host, &chaincfg.LiteCoinTestNet4Params)
+		if err != nil {
+			return err
+		}
+	}
+  // try vertcoin testnet
+	if conf.tvtchost != "" {
+		if !strings.Contains(conf.tvtchost, ":") {
+			conf.tvtchost = conf.tvtchost + ":" + chaincfg.VertcoinTestNetParams.DefaultPort
+		}
+		err = node.LinkBaseWallet(
+			key, 0, conf.reSync,
+			conf.tvtchost, &chaincfg.VertcoinTestNetParams)
 		if err != nil {
 			return err
 		}

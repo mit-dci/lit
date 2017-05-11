@@ -33,7 +33,7 @@ const (
 
 /* checkProofOfWork verifies the header hashes into something
 lower than specified by the 4-byte bits field. */
-func checkProofOfWork(header wire.BlockHeader, height int32, p *chaincfg.Params) bool {
+func checkProofOfWork(header wire.BlockHeader, p *chaincfg.Params) bool {
 
 	target := blockchain.CompactToBig(header.Bits)
 
@@ -54,7 +54,7 @@ func checkProofOfWork(header wire.BlockHeader, height int32, p *chaincfg.Params)
   var buf bytes.Buffer
 	_ = wire.WriteBlockHeader(&buf, 0, &header)
 
-  blockHash := p.PoWFunction(buf.Bytes(), height)
+  blockHash := p.PoWFunction(buf.Bytes())
 
 	hashNum := new(big.Int)
 
@@ -134,7 +134,7 @@ func CheckHeader(r io.ReadSeeker, height, startheight int32, p *chaincfg.Params)
   }
 
 	// check if there's a valid proof of work.  That whole "Bitcoin" thing.
-	if !checkProofOfWork(cur, height, p) {
+	if !checkProofOfWork(cur, p) {
 		log.Printf("Block %d Bad proof of work.\n", height)
 		return false
 	}
