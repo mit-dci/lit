@@ -1,11 +1,19 @@
 Contributing to Lit
 ============================
 
-There are not too many contributors / users yet, so things can be pretty chill.
+Thank you for deciding you want to contribute!
 
-Currently adiabat is the maintainer / lead dev and has full access to the repo.
+### Who is working on this?
 
-File issues, make pull requests (squash them if more than a few commits).  If it's a big change, discuss with people beforehand.  adiabat is on IRC in the various bitcoin-related channels.
+As of this writing there are not many contributors yet, so things can be pretty chill regarding rules of contributions.
+
+However, currently adiabat is the maintainer / lead dev and has full access to the repo. If you want to make a pull request, he'll have to approve it.
+
+### What can I do?
+
+- File issues you see that haven't been reported in the issues tab
+- Make pull requests to fix these issues
+- Add features (squash them if more than a few commits).  If it's a big change, discuss with people beforehand.  adiabat is on IRC in the various bitcoin-related channels.
 
 ### Code practices / philosopy
 
