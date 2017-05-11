@@ -44,7 +44,7 @@ i.e.
 go get golang.org/x/crypto
 ```
 
-4. Go back to location of the lit foler if you are not already there ([Step 1](#building)) and try to rebuild the project.
+4. Go back to location of the lit folder if you are not already there ([Step 1](#building)) and try to rebuild the project.
 
 5. You may now want to build `lit-af`, the text based client which controls the lit node using
 ```
@@ -52,10 +52,10 @@ cd cmd/lit-af
 go build
 ```
 
-6. If you run into anymore dependency errors, repeat Step 3 by using `go get` for all of the missing packages.
+6. If you run into any more dependency errors, repeat Step 3 by using `go get` for all of the missing packages.
 
 7. To run lit use: 
-(Note : Windows users can take off ./ but may need to chagne lit to lit.exe in the second line.) 
+(Note : Windows users can take off ./ but may need to change lit to lit.exe in the second line.) 
 ```
 cd GOPATH/src/github.com/mit-dci/lit 
 ./lit -spv my.testnet.node.tld
@@ -63,8 +63,8 @@ cd GOPATH/src/github.com/mit-dci/lit
 
 ## Using Lightning
 
-Great! Now that you are all done setting up Lit, you can 
-- read about the arguments for starting Lit [here](#command-line-arguments)
+Great! Now that you are all done setting up lit, you can 
+- read about the arguments for starting lit [here](#command-line-arguments)
 - read about the folders for the code and what does what [here](#folders)
 - head over to the [Walkthrough](./WALKTHROUGH.md) to create some lit nodes or
 - check out how to [Contribute](./CONTRIBUTING.md).
@@ -114,7 +114,7 @@ start synchronization of the blockchain from <height>.  (probably doesn't work r
 
 -resync
 
-try to re-sync to the blockchain from the height give in -tip
+try to re-sync to the blockchain from the height given -tip
 
 
 ## Folders
@@ -144,7 +144,7 @@ portable utxo format, exchangable between node and base wallet (or between walle
 Introduces a web API chainhook in addition to the uspv one
 
 ### qln
-A quick, channel implementation with databases.  Doesn't do multihop yet.
+A quick channel implementation with databases.  Doesn't do multihop yet.
 
 ### sig64
 Library to make signatures 64 bytes instead of 71 or 72 or something
