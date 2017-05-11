@@ -114,10 +114,9 @@ func (s *SPVCon) openHeaderFile(hfn string) error {
 	if err != nil {
 		if os.IsNotExist(err) {
 			var b bytes.Buffer
-			// if testnet, start with hardcoded height
-			if s.Param.Name == "testnet3" {
-				// hard-coded millionth block header (actually 1032192)
-				hdr, err := hex.DecodeString("00000020da33925b1f7a55e9fa8e6c955a20ea094148b60c5c88f69a4f500000000000003673b7b6ce8157d3cfcaf415b6740918df7610a8769d70334aa9abd9c941b25e7621215880ba371a85bf9646")
+			// if StartHeader is defined, start with hardcoded height
+      if s.Param.StartHeader != "" {
+        hdr, err := hex.DecodeString(s.Param.StartHeader)
 				if err != nil {
 					return err
 				}
@@ -125,19 +124,9 @@ func (s *SPVCon) openHeaderFile(hfn string) error {
 				if err != nil {
 					return err
 				}
-			} else if s.Param.Name == "litetest4" {
-				// hard-coded litecoin block header
-				// because I don't want to deal with the different genesis block
-				hdr, err := hex.DecodeString("010000000000000000000000000000000000000000000000000000000000000000000000d9ced4ed1130f7b7faad9be25323ffafa33232a17c3edf6cfd97bee6bafbdd97f60ba158f0ff0f1ee1790400")
-				if err != nil {
-					return err
-				}
-				_, err = b.Write(hdr)
-				if err != nil {
-					return err
-				}
-			} else {
-				// not testnet3, start from beginning.
+        s.headerStartHeight = s.Param.StartHeight
+      } else {
+				// start from beginning.
 				err = s.Param.GenesisBlock.Header.Serialize(&b)
 				if err != nil {
 					return err
@@ -151,9 +140,6 @@ func (s *SPVCon) openHeaderFile(hfn string) error {
 			log.Printf("made genesis hash %s\n", s.Param.GenesisHash.String())
 			log.Printf("created hardcoded genesis header at %s\n", hfn)
 		}
-	}
-	if s.Param.Name == "testnet3" {
-		s.headerStartHeight = 1032192
 	}
 
 	s.headerFile, err = os.OpenFile(hfn, os.O_RDWR, 0600)
