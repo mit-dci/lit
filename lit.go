@@ -21,11 +21,6 @@ const (
 	litHomeDirName = ".lit"
 
 	keyFileName = "privkey.hex"
-
-	// this is my local testnet node, replace it with your own close by.
-	// Random internet testnet nodes usually work but sometimes don't, so
-	// maybe I should test against different versions out there.
-	hardHeight = 1111111 // height to start at if not specified
 )
 
 // variables for a lit node & lower layers
@@ -36,7 +31,6 @@ type LitConfig struct {
 	tn3host, bc2host, lt4host, reghost, tvtchost string
 
 	verbose    bool
-	birthblock int32
 	rpcport    uint16
 	litHomeDir string
 
@@ -44,8 +38,6 @@ type LitConfig struct {
 }
 
 func setConfig(lc *LitConfig) {
-	birthptr := flag.Int("tip", hardHeight, "height to begin db sync")
-
 	easyptr := flag.Bool("ez", false, "use easy mode (bloom filters)")
 
 	verbptr := flag.Bool("v", false, "verbose; print all logs to stdout")
@@ -64,8 +56,6 @@ func setConfig(lc *LitConfig) {
 		filepath.Join(os.Getenv("HOME"), litHomeDirName), "lit home directory")
 
 	flag.Parse()
-
-	lc.birthblock = int32(*birthptr)
 
 	lc.tn3host, lc.bc2host, lc.lt4host, lc.reghost, lc.tvtchost =
 		*tn3ptr, *bc2ptr, *lt4ptr, *regptr, *tvtcptr
@@ -107,7 +97,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *LitConfig) error {
 			conf.tn3host = conf.tn3host + ":18333"
 		}
 		err = node.LinkBaseWallet(
-			key, conf.birthblock, conf.reSync,
+			key, chaincfg.TestNet3Params.StartHeight, conf.reSync,
 			conf.tn3host, &chaincfg.TestNet3Params)
 		if err != nil {
 			return err
@@ -119,7 +109,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *LitConfig) error {
 			conf.lt4host = conf.lt4host + ":19335"
 		}
 		err = node.LinkBaseWallet(
-			key, 47295, conf.reSync,
+			key, chaincfg.LiteCoinTestNet4Params.StartHeight, conf.reSync,
 			conf.lt4host, &chaincfg.LiteCoinTestNet4Params)
 		if err != nil {
 			return err

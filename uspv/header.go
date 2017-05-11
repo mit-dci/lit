@@ -118,7 +118,7 @@ func CheckHeader(r io.ReadSeeker, height, startheight int32, p *chaincfg.Params)
 	}
   
   // Check that the difficulty bits are correct
-  if offsetHeight > 0 {
+  if offsetHeight > 0 && height >= p.AssumeDiffBefore {
     rightBits, err := p.DiffCalcFunction(r, height, startheight, p)
     if err != nil {
       log.Printf("Error calculating Block %d %s difficuly. %s\n",
@@ -138,6 +138,17 @@ func CheckHeader(r io.ReadSeeker, height, startheight int32, p *chaincfg.Params)
 		log.Printf("Block %d Bad proof of work.\n", height)
 		return false
 	}
+  
+  // Check for checkpoints
+  for _, checkpoint := range p.Checkpoints {
+    if checkpoint.Height == height {
+      if *checkpoint.Hash != cur.BlockHash() {
+        log.Printf("Block %d is not a valid checkpoint", height)
+        return false
+      }
+      break
+    }
+  } 
   
   // Not entirely sure why I need to do this, but otherwise the tip block
   // can go missing
