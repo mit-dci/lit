@@ -4,58 +4,151 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 """Python interface to lit"""
 
+import socket
+import websocket
 import json
-import random
-import time
-import websocket  # `pip install websocket-client`
+import sys
+import requests
 
-class LitConnection():
-    """A class representing a connection to a lit node."""
-    def __init__(self, ip, port):
-        self.ip = ip
-        self.port = port
+DEBUG = False
 
-    def connect(self):
-        """Connect to the node. Continue trying for 10 seconds"""
-        self.ws = websocket.WebSocket()
-        for _ in range(50):
-            try:
-                self.ws.connect("ws://%s:%s/ws" % (self.ip, self.port))
-            except ConnectionRefusedError:
-                # lit is not ready to accept connections yet
-                time.sleep(0.2)
-            else:
-                # No exception - we're connected!
-                break
-        self.msg_id = random.randint(0, 9999)
+def dprint(x):
+	if DEBUG:
+		print(x)
 
-    def send_message(self, method, params):
-        """Sends a websocket message to the lit node"""
-        self.ws.send(json.dumps({"method": "LitRPC.%s" % method,
-                                 "params": [params],
-                                 "jsonrpc": "2.0",
-                                 "id": str(self.msg_id)}))
+def checkPortOpen(port):
+	open = True
+	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	try:
+		s.bind(("127.0.0.1", port))
+	except socket.error as e:
+		open = False
+		if e.errno == 98:
+			print("Port " + str(port) + " used by another process, please close it before continuing tests")
+		else:
+			# something else raised the socket.error exception
+			print(e)
+	s.close()
+	return open
 
-        self.msg_id = self.msg_id + 1 % 10000
-        return json.loads(self.ws.recv())
+class RegtestConn:
+	rpcuser = "regtestuser"
+	rpcpass = "regtestpass"
+	rpcport = 18332
+	serverURL = "http://" + rpcuser + ":" + rpcpass + "@127.0.0.1:" + str(rpcport)
+	header = {"Content-type": "application/json"}
 
-    def __getattr__(self, name):
-        """Dispatches any unrecognised messages to the websocket connection"""
-        def dispatcher(**kwargs):
-            return self.send_message(name, kwargs)
-        return dispatcher
+	def __init__(self):
+		self.id = 0
+	
+	def mineblock(self, number, log=False):
+		self.id += 1
+		rpcCmd = {
+			"method": "generate",
+			"params": [number],
+			"jsonrpc": "2.0",
+			"id": str(self.id)
+		}
+		payload = json.dumps(rpcCmd)
+		
+		dprint("sending: " + payload)
+		response = requests.post(RegtestConn.serverURL, headers=RegtestConn.header, data=payload)
+		dprint("received: " + str(response.json()))
+	
+	def getinfo(self):
+		self.id += 1
+		rpcCmd = {
+			"method": "getinfo",
+			"params": [],
+			"jsonrpc": "2.0",
+			"id": str(self.id)
+		}
+		payload = json.dumps(rpcCmd)
+		dprint("sending: " + payload)
+		response = requests.post(RegtestConn.serverURL, headers=RegtestConn.header, data=payload)
+		dprint("received: " + str(response.json()))
+	
+	def sendTo(self, addr, amt):
+		self.id += 1
+		rpcCmd = {
+			"method": "sendtoaddress",
+			"params": [addr, amt],
+			"jsonrpc": "2.0",
+			"id": str(self.id)
+		}
+		payload = json.dumps(rpcCmd)
+		dprint("sending: " + payload)
+		response = requests.post(RegtestConn.serverURL, headers=RegtestConn.header, data=payload)
+		dprint("received: " + str(response.json()))
 
-    def new_address(self):
-        """Add a new wallit address"""
-        return self.Address(NumToMake=1)
+class LitConn:
+	def __init__(self):
+		self.id = 0
+		self.ws = websocket.WebSocket()
+		self.ws.connect("ws://127.0.0.1:8001/ws")
 
-    def balance(self):
-        """Get wallit balance"""
-        return self.Bal()
+	def litNewAddr(self):
+		self.id += 1
+		rpcCmd = {
+		   "method": "LitRPC.Address",
+		   "params": [{"NumToMake": 0}],
+		   "jsonrpc": "2.0",
+		   "id": str(self.id)
+		}
+			
+		self.ws.send(json.dumps(rpcCmd))
+		resp = json.loads(self.ws.recv())
+		return resp["result"]["WitAddresses"][0]
 
-if __name__ == '__main__':
-    """Test litrpc.py. lit instance must be running and available on 127.0.0.1:8001"""
-    litConn = LitConnection("127.0.0.1", "8001")
-    litConn.connect()
-    print(litConn.new_address())
-    print(litConn.balance())
+	def litSend(self, adr, amt):
+		self.id += 1
+		rpcCmd = {
+		   "method": "LitRPC.Send",
+		   "params": [{
+		   		"DestAddrs": adr,
+		   		"Amts": amt}	   
+		   		],
+		   	"jsonrpc": "2.0",
+		   	"id": str(self.id)
+		}
+		self.ws.send(json.dumps(rpcCmd))
+		resp = json.loads(self.ws.recv())
+		return resp
+	
+	def getWitAddress(self):
+		self.id += 1
+		rpcCmd = {
+			"method": "LitRPC.Address",
+			"params": [{"NumToMake": 0}],
+			"jsonrpc": "2.0",
+			"id": str(self.id)
+		}
+		self.ws.send(json.dumps(rpcCmd))
+		resp = json.loads(self.ws.recv())
+		return resp["result"]["WitAddresses"][0]
+
+	def getLegacyAddress(self):
+		self.id += 1
+		rpcCmd = {
+			"method": "LitRPC.Address",
+			"params": [{"NumToMake": 0}],
+			"jsonrpc": "2.0",
+			"id": str(self.id)
+		}
+		self.ws.send(json.dumps(rpcCmd))
+		resp = json.loads(self.ws.recv())
+		return resp["result"]["LegacyAddresses"][0]
+	
+	def getBal(self):
+		self.id += 1
+		rpcCmd = {
+			"method": "LitRPC.Bal",
+			"params": [],
+			"jsonrpc": "2.0",
+			"id": str(self.id)
+		}
+		self.ws.send(json.dumps(rpcCmd))
+		resp = json.loads(self.ws.recv())
+		#TODO: get different kinds of balances
+		return resp["result"]["TxoTotal"]
+
