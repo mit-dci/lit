@@ -25,7 +25,7 @@ func (s *SPVCon) Connect(remoteNode string) error {
 	if err != nil {
 		return err
 	}
-	err = myMsgVer.AddUserAgent("test", "zero")
+	err = myMsgVer.AddUserAgent("lit", "v0.1")
 	if err != nil {
 		return err
 	}

@@ -129,7 +129,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *LitConfig) error {
 
 func main() {
 
-	log.Printf("lit node v0.1\n")
+	log.Printf("lit v0.1\n")
 	log.Printf("-h for list of options.\n")
 
 	conf := new(LitConfig)
