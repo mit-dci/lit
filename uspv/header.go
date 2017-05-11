@@ -11,10 +11,10 @@ import (
 	"math/big"
 	"os"
 	"time"
+  "bytes"
 
 	"github.com/adiabat/btcd/blockchain"
 	"github.com/adiabat/btcd/chaincfg"
-	"github.com/adiabat/btcd/chaincfg/chainhash"
 	"github.com/adiabat/btcd/wire"
 )
 
@@ -33,7 +33,7 @@ const (
 
 /* checkProofOfWork verifies the header hashes into something
 lower than specified by the 4-byte bits field. */
-func checkProofOfWork(header wire.BlockHeader, p *chaincfg.Params) bool {
+func checkProofOfWork(header wire.BlockHeader, height int32, p *chaincfg.Params) bool {
 
 	target := blockchain.CompactToBig(header.Bits)
 
@@ -50,13 +50,11 @@ func checkProofOfWork(header wire.BlockHeader, p *chaincfg.Params) bool {
 	}
 
 	// The header hash must be less than the claimed target in the header.
-	var blockHash chainhash.Hash
+  
+  var buf bytes.Buffer
+	_ = wire.WriteBlockHeader(&buf, 0, &header)
 
-	if p.Name == "litetest4" {
-		blockHash = header.ScryptHash()
-	} else {
-		blockHash = header.BlockHash()
-	}
+  blockHash := p.PoWFunction(buf.Bytes(), height)
 
 	hashNum := new(big.Int)
 
@@ -104,12 +102,6 @@ func calcDiffAdjust(start, end wire.BlockHeader, p *chaincfg.Params) uint32 {
 
 	// calculate and return 4-byte 'bits' difficulty from 32-byte target
 	return blockchain.BigToCompact(newTarget)
-}
-
-// GetHeader returns the header at the specified height
-func GetHeader(h height) (*wire.BlockHeader, error) {
-	// TODO
-	return nil, nil
 }
 
 func CheckHeader(r io.ReadSeeker, height, startheight int32, p *chaincfg.Params) bool {
@@ -198,7 +190,7 @@ func CheckHeader(r io.ReadSeeker, height, startheight int32, p *chaincfg.Params)
 	}
 
 	// check if there's a valid proof of work.  That whole "Bitcoin" thing.
-	if !checkProofOfWork(cur, p) {
+	if !checkProofOfWork(cur, height, p) {
 		log.Printf("Block %d Bad proof of work.\n", height)
 		return false
 	}
