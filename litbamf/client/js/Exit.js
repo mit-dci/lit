@@ -1,6 +1,6 @@
 require('../sass/exit.scss');
 
-class Exit extends React.Component {
+class Exit extends Reflux.Component {
   render () {
     return (
       <div>

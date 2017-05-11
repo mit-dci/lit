@@ -1,7 +1,7 @@
 import lc from './LitClient';
 import Q from 'q';
 
-class MetaCmds extends React.Component {
+class MetaCmds extends Reflux.Component {
   stop () {
     lc.send('LitRPC.Stop')
     .then(res => {

@@ -1,6 +1,6 @@
 import lc from './LitClient';
 
-class NetCmds extends React.Component {
+class NetCmds extends Reflux.Component {
   constructor (props) {
     super(props);
     this.state = {

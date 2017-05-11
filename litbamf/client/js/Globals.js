@@ -1,6 +1,6 @@
 import bamflogo from './bamf.ascii.js';
 
-class Navbar extends React.Component {
+class Navbar extends Reflux.Component {
   constructor (props) {
     super(props);
   }

@@ -5,7 +5,7 @@ require('../sass/channels.scss');
 
 let Actions = Reflux.createActions(['setPeers', 'setChannels', 'setSelectedPeerIdx', 'setSelectedChannelIdx']);
 
-class Store extends aeflux.Store {
+class Store extends Reflux.Store {
   constructor () {
     super();
 
@@ -13,7 +13,7 @@ class Store extends aeflux.Store {
     let selectedChannelIdx = window.sessionStorage.selectedChannelIdx || -1;
 
     this.state = {
-      peers: [],
+      peers: {},
       channels: [],
       selectedPeerIdx: selectedPeerIdx,
       selectedChannelIdx: selectedChannelIdx,
@@ -164,7 +164,11 @@ class PeerList extends Reflux.Component {
   }
   update () {
     lc.send('LitRPC.ListConnections').then(connections => {
-      let peers = connections.Connections !== null ? connections.Connections : [];
+      connections = connections.Connections !== null ? connections.Connections : [];
+      let peers = {};
+      connections.forEach(conn => {
+        peers[conn.PeerNumber] = conn;
+      });
       Actions.setPeers(peers);
     })
     .fail(err => {
@@ -180,10 +184,11 @@ class PeerList extends Reflux.Component {
     Actions.setSelectedPeerIdx(event.target.value);
   }
   render () {
-    let peerElements = this.state.peers.map((peer, i) => {
-      let idx = i + 1;
+    let peerElements = Object.keys(this.state.peers).map(key => {
+      let peer = this.state.peers[key];
+      let idx = peer.PeerNumber;
       return (
-        <li key={i}>
+        <li key={idx}>
           <label className={this.state.selectedPeerIdx == idx ? 'checked' : ''}>
             <span>{peer.Nickname}</span>
             <input type="radio" onChange={this.changePeer.bind(this)} name="peer" value={idx} />
@@ -213,7 +218,7 @@ class PeerList extends Reflux.Component {
   }
 }
 
-class ChannelElement extends React.Component {
+class ChannelElement extends Reflux.Component {
   constructor (props) {
     super(props);
 
@@ -444,53 +449,110 @@ class XtraModal extends Reflux.Component {
   }
 }
 
-class Chatbox extends React.Component {
+class Chatbox extends Reflux.Component {
   constructor (props) {
     super(props);
 
     this.state = {
       message: '',
+      conversations: {},
     };
     this.store = Store;
   }
   say () {
-    lc.send('LitRPC.Say', {'Peer': this.state.selectedPeerIdx, 'Message': this.state.message}).then(res => {
-      console.log(res);
+    lc.send('LitRPC.Say', {
+      'Peer': parseInt(this.state.selectedPeerIdx),
+      'Message': this.state.message,
+    }).then(res => {
+      let date = new Date();
+      let time = date.getHours() + ':' + date.getMinutes();
+
+      let conversations = this.state.conversations;
+      let conversation = conversations[this.state.selectedPeerIdx] || [];
+      conversation.push({
+        name: 'You',
+        message: this.state.message,
+        time: time,
+      });
+      conversations[this.state.selectedPeerIdx] = conversation;
+      this.setState({conversations: conversations});
+      this.state.message = '';
     })
     .fail(err => {
       console.error(err);
     });
   }
+  chatHandler (message) {
+    let peer = this.state.peers[message.PeerIdx];
+    //if we receive a message before the peers list is updated
+    //it can't be handled yet
+    if(peer === undefined) {
+      return;
+    }
+
+    let date = new Date();
+    let time = date.getHours() + ':' + date.getMinutes();
+
+    let conversations = this.state.conversations;
+    let conversation = conversations[message.PeerIdx] || [];
+    conversation.push({
+      name: peer.Nickname,
+      message: message.Text,
+      time: time,
+    });
+    conversations[message.PeerIdx] = conversation;
+    this.setState({conversations: conversations});
+  }
+  changeMessage (event) {
+    this.setState({message: event.target.value});
+  }
   render () {
 
     let placeholder = 'Message ';
-    if(this.state.selectedPeerIdx > 0) {
-      placeholder += this.state.peers[this.state.selectedPeerIdx].Nickname;
-    }
+    let peer = this.state.peers[this.state.selectedPeerIdx];
+    placeholder += peer === undefined ? '' : peer.Nickname;
+
+    let selectedConvo = this.state.conversations[this.state.selectedPeerIdx] || [];
+    let chat = selectedConvo.map(convo => {
+      return (
+        <div>
+          <span className="nickname">[{convo.time}] {convo.name}</span>
+          <span className="message">{convo.message}</span>
+        </div>
+      );
+    });
+    console.log(chat);
 
     return (
       <div id="chatbox">
         <div>
-
+          {chat}
         </div>
-        <input placeholder={placeholder} value={this.state.message} />
+        <form action="#">
+          <input placeholder={placeholder} onChange={this.changeMessage.bind(this)} value={this.state.message} />
+          <button type="submit" onClick={this.say.bind(this)} hidden></button>
+        </form>
       </div>
     );
   }
+  componentDidMount () {
+    lc.register(null, this.chatHandler.bind(this));
+  }
 }
 
-class Channels extends React.Component {
+class Channels extends Reflux.Component {
   render () {
     return (
       <div>
         <Navbar page="channels" />
 
-        <div id="chanbox">
+        <div>
           <PeerList />
-          <ChannelList />
+          <div id="boxes">
+            <ChannelList />
+            <Chatbox />
+          </div>
         </div>
-
-        <Chatbox />
 
         <PeerModal />
         <NicknameModal />
@@ -501,8 +563,4 @@ class Channels extends React.Component {
   }
 }
 
-<<<<<<< HEAD
-export default ChanCmds;
-=======
 export default Channels;
->>>>>>> chat functionality
