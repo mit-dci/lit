@@ -50,9 +50,7 @@ def read_logs(tmp_dir):
     Delegates to generator function get_log_events() to provide individual log events
     for each of the input log files."""
 
-    files = [("test", "%s/test_framework.log" % tmp_dir)]
-    # TODO: update this to also ingest the test framework once lit test framework supports logging
-    files = []
+    files = [("test", "%s/test_framework.log" % tmp_dir, TIMESTAMP_PATTERN1, None)]
     for i in itertools.count():
         logfile = "{}/bcnode{}/regtest/debug.log".format(tmp_dir, i)
         if not os.path.isfile(logfile):
