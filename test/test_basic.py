@@ -127,29 +127,27 @@ class TestBasic(LitTest):
         assert not litnode1_channel['Closed']
         assert litnode1_channel['MyBalance'] == 0
 
-        self.log.info("Channel balances: %s // %s" % (litnode0_channel['MyBalance'], litnode1_channel['MyBalance']))
+        self.log_channel_balance(self.litnodes[0], 0, self.litnodes[1], 0)
         self.log.info("Now push some funds from litnode0 to litnode1")
 
         self.litnodes[0].Push(ChanIdx=1, Amt=100000000)
 
         litnode0_channel = self.litnodes[0].ChannelList()['result']['Channels'][0]
         litnode1_channel = self.litnodes[1].ChannelList()['result']['Channels'][0]
-
         assert litnode0_channel['MyBalance'] == 900000000
         assert litnode1_channel['MyBalance'] == 100000000
 
-        self.log.info("Channel balances: %s // %s" % (litnode0_channel['MyBalance'], litnode1_channel['MyBalance']))
-        self.log.info("Push some funds back")
+        self.log_channel_balance(self.litnodes[0], 0, self.litnodes[1], 0)
 
+        self.log.info("Push some funds back")
         self.litnodes[1].Push(ChanIdx=1, Amt=50000000)
 
         litnode0_channel = self.litnodes[0].ChannelList()['result']['Channels'][0]
         litnode1_channel = self.litnodes[1].ChannelList()['result']['Channels'][0]
-
         assert litnode0_channel['MyBalance'] == 950000000
         assert litnode1_channel['MyBalance'] == 50000000
 
-        self.log.info("Channel balances: %s // %s" % (litnode0_channel['MyBalance'], litnode1_channel['MyBalance']))
+        self.log_channel_balance(self.litnodes[0], 0, self.litnodes[1], 0)
         self.log.info("Close channel")
         self.litnodes[0].CloseChannel(ChanIdx=1)
         self.bcnodes[0].generate(nblocks=10)

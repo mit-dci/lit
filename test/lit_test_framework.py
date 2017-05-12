@@ -76,6 +76,13 @@ class LitTest():
             log_str += str(node.get_balance(coin_type))
         self.log.info(log_str)
 
+    def log_channel_balance(self, node1, node1_chan, node2, node2_chan):
+        log_str = "Channel balance: " + \
+                  str(node1.ChannelList()['result']['Channels'][node1_chan]['MyBalance']) + \
+                  " // " + \
+                  str(node2.ChannelList()['result']['Channels'][node2_chan]['MyBalance'])
+        self.log.info(log_str)
+
     # Internal methods. Should not be called by test case subclasses
     def _getargs(self):
         """Parse arguments and pass through unrecognised args"""
