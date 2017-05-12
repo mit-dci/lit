@@ -36,7 +36,7 @@ class LitNode():
         self.args.extend(['-tn3', '', '-lt4', ''])
 
     def start_node(self):
-        logger.debug("Starting litnode %d" % self.index)
+        logger.debug("Starting litnode %d with args %s" % (self.index, str(self.args)))
         self.process = subprocess.Popen([LIT_BIN] + self.args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     def add_rpc_connection(self, ip, port):

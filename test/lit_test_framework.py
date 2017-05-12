@@ -11,7 +11,7 @@ import tempfile
 import time
 import traceback
 
-from bcnode import BCNode
+from bcnode import BCNode, LCNode
 from litnode import LitNode
 
 class LitTest():
@@ -22,6 +22,7 @@ class LitTest():
     def __init__(self):
         self.litnodes = []
         self.bcnodes = []
+        self.lcnodes = []
         self.tmpdir = tempfile.mkdtemp(prefix="test")
         self._getargs()
         self._start_logging()
@@ -55,6 +56,14 @@ class LitTest():
                 bcnode.process.wait(2)
             except subprocess.TimeoutExpired:
                 bcnode.process.kill()
+
+        for lcnode in self.lcnodes:
+            lcnode.stop()
+            try:
+                lcnode.process.wait(2)
+            except subprocess.TimeoutExpired:
+                lcnode.process.kill()
+
         for litnode in self.litnodes:
             litnode.Stop()
             try:
@@ -68,6 +77,9 @@ class LitTest():
 
     def add_bcnode(self):
         self.bcnodes.append(BCNode(self.tmpdir))
+
+    def add_lcnode(self):
+        self.lcnodes.append(LCNode(self.tmpdir))
 
     def log_balances(self, coin_type):
         log_str = "Balances:"
@@ -131,7 +143,7 @@ def wait_until(predicate, *, attempts=float('inf'), timeout=float('inf')):
         if predicate():
             return True
         attempt += 1
-        elapsed += 0.05
-        time.sleep(0.05)
+        elapsed += 0.25
+        time.sleep(0.25)
 
     raise AssertionError("wait_until() timed out")

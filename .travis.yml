@@ -24,4 +24,5 @@ script:
   - go test ./...
   - go build
   - test/test_basic.py
+  - test/test_lc.py
 

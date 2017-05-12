@@ -38,7 +38,7 @@ class BCNode():
         self.rpc_url = "http://regtestuser:regtestpass@127.0.0.1:18332"
 
     def start_node(self):
-        logger.debug("Starting bcnode %d" % self.index)
+        logger.debug("Starting %s%d" % (self.__class__.bin_name, self.index))
         try:
             self.process = subprocess.Popen([self.__class__.bin_name] + self.args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except FileNotFoundError:
@@ -54,14 +54,20 @@ class BCNode():
                     # RPC is still in warmup. Sleep some more.
                     continue
                 # Check that we're running at least the minimum version
-                assert resp.json()['result']['version'] > self.__class__.min_version
+                assert resp.json()['result']['version'] >= self.__class__.min_version
                 logger.debug("bcnode %d started" % self.index)
                 break  # break out of loop on success
             except requests.exceptions.ConnectionError as e:
                 time.sleep(0.25)
 
-    def send_message(self, method, params):
-        logging.debug("Sending message %s, params: %s" % (method, str(params)))
+    def send_message(self, method, pos_args, named_args):
+        if pos_args and named_args:
+            raise AssertionError("RPCs must not use a mix of positional and named arguments")
+        elif named_args:
+            params = named_args
+        else:
+            params = list(pos_args)
+        logger.debug("Sending message %s, params: %s" % (method, str(params)))
         self.msg_id += 1
         rpcCmd = {
             "method": method,
@@ -73,14 +79,14 @@ class BCNode():
 
         resp = requests.post(self.rpc_url, headers={"Content-type": "application/json"}, data=payload)
 
-        logging.debug("Response received for %s, %s" % (method, str(resp)))
+        logger.debug("Response received for %s, %s" % (method, resp.text))
 
         return resp
 
     def __getattr__(self, name):
         """Dispatches any unrecognised messages to the websocket connection"""
-        def dispatcher(**kwargs):
-            return self.send_message(name, kwargs)
+        def dispatcher(*args, **kwargs):
+            return self.send_message(name, args, kwargs)
         return dispatcher
 
 class LCNode(BCNode):
