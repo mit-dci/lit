@@ -39,23 +39,13 @@ class TestBasic(LitTest):
         self.add_litnode()
         self.litnodes[0].args.extend(["-reg", "127.0.0.1"])
         self.litnodes[0].start_node()
-        time.sleep(1)
         self.litnodes[0].add_rpc_connection("127.0.0.1", "8001")
-
-        # Get new address on litnode0
-        self.litnodes[0].rpc.new_address()
-        self.litnodes[0].Balance()
 
         # Start lit node 1 and open websocket connection
         self.add_litnode()
         self.litnodes[1].args.extend(["-rpcport", "8002", "-reg", "127.0.0.1"])
         self.litnodes[1].start_node()
-        time.sleep(1)
         self.litnodes[1].add_rpc_connection("127.0.0.1", "8002")
-
-        # Get new address on litnode1
-        self.litnodes[1].rpc.new_address()
-        self.litnodes[1].Balance()
 
         self.log.info("Connect lit nodes")
         res = self.litnodes[0].Listen(Port="127.0.0.1:10001")["result"]
