@@ -69,6 +69,13 @@ class LitTest():
     def add_bcnode(self):
         self.bcnodes.append(BCNode(self.tmpdir))
 
+    def log_balances(self, coin_type):
+        log_str = "Balances:"
+        for node in self.litnodes:
+            log_str += " litnode%s: " % node.index
+            log_str += str(node.get_balance(coin_type))
+        self.log.info(log_str)
+
     # Internal methods. Should not be called by test case subclasses
     def _getargs(self):
         """Parse arguments and pass through unrecognised args"""
