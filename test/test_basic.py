@@ -19,8 +19,6 @@
 - stop"""
 import time
 
-from bcnode import BCNode
-from litnode import LitNode
 from lit_test_framework import LitTest, wait_until
 
 BC_REGTEST = 257
@@ -29,7 +27,7 @@ class TestBasic(LitTest):
     def run_test(self):
 
         # Start a bitcoind node
-        self.bcnodes = [BCNode(0, self.tmpdir)]
+        self.add_bcnode()
         self.bcnodes[0].start_node()
 
         self.log.info("Generate 500 blocks to activate segwit")
@@ -38,26 +36,16 @@ class TestBasic(LitTest):
         assert network_info['bip9_softforks']['segwit']['status'] == 'active'
 
         # Start lit node 0 and open websocket connection
-        self.litnodes.append(LitNode(0, self.tmpdir))
+        self.add_litnode()
         self.litnodes[0].args.extend(["-reg", "127.0.0.1"])
         self.litnodes[0].start_node()
-        time.sleep(1)
         self.litnodes[0].add_rpc_connection("127.0.0.1", "8001")
 
-        # Get new address on litnode0
-        self.litnodes[0].rpc.new_address()
-        self.litnodes[0].Balance()
-
         # Start lit node 1 and open websocket connection
-        self.litnodes.append(LitNode(1, self.tmpdir))
+        self.add_litnode()
         self.litnodes[1].args.extend(["-rpcport", "8002", "-reg", "127.0.0.1"])
         self.litnodes[1].start_node()
-        time.sleep(1)
         self.litnodes[1].add_rpc_connection("127.0.0.1", "8002")
-
-        # Get new address on litnode1
-        self.litnodes[1].rpc.new_address()
-        self.litnodes[1].Balance()
 
         self.log.info("Connect lit nodes")
         res = self.litnodes[0].Listen(Port="127.0.0.1:10001")["result"]
@@ -74,7 +62,7 @@ class TestBasic(LitTest):
 
         self.log.info("Send funds from bitcoind node to litnode0")
         balance = self.litnodes[0].get_balance(BC_REGTEST)
-        self.log.info("Previous balance: " + str(balance))
+        self.log_balances(BC_REGTEST)
         addr = self.litnodes[0].rpc.new_address()
         self.bcnodes[0].sendtoaddress(address=addr["result"]["LegacyAddresses"][0], amount=12.34)
         self.bcnodes[0].generate(nblocks=1).text
@@ -84,7 +72,8 @@ class TestBasic(LitTest):
         # Wait for transaction to be received (15 seconds timeout)
         wait_until(lambda: self.litnodes[0].get_balance(BC_REGTEST) - balance == 1234000000)
         balance = self.litnodes[0].get_balance(BC_REGTEST)
-        self.log.info("Funds received. New balance:" + str(balance))
+        self.log.info("Funds received")
+        self.log_balances(BC_REGTEST)
 
         self.log.info("Send money from litnode0 to its own segwit address and confirm")
         self.log.info("sending 1000000000 satoshis to litnode1 address")
@@ -96,13 +85,14 @@ class TestBasic(LitTest):
         # We'll lose some money to fees. Hopefully not too much!
         assert balance - self.litnodes[0].get_balance(BC_REGTEST) < 50000
         balance = self.litnodes[0].get_balance(BC_REGTEST)
-        self.log.info("Funds transferred to segwit address. New balance: %s" % balance)
+        self.log.info("Funds transferred to segwit address")
+        self.log_balances(BC_REGTEST)
 
         self.log.info("Open channel from litnode0 to litnode1")
         assert self.litnodes[0].ChannelList()['result']['Channels'] == []
         assert self.litnodes[1].ChannelList()['result']['Channels'] == []
 
-        resp = self.litnodes[0].FundChannel(Peer=1, CoinType=257, Capacity=1000000000)
+        self.litnodes[0].FundChannel(Peer=1, CoinType=257, Capacity=1000000000)
         self.log.info("litnode0 has funded channel")
 
         # Wait for channel to open
@@ -112,7 +102,7 @@ class TestBasic(LitTest):
 
         assert abs(balance - self.litnodes[0].get_balance(BC_REGTEST) - 1000000000) < 50000
         balance = self.litnodes[0].get_balance(BC_REGTEST)
-        self.log.info("New balance for litnode0: %s" % balance)
+        self.log_balances(BC_REGTEST)
 
         litnode0_channel = self.litnodes[0].ChannelList()['result']['Channels'][0]
         litnode1_channel = self.litnodes[1].ChannelList()['result']['Channels'][0]
@@ -127,29 +117,27 @@ class TestBasic(LitTest):
         assert not litnode1_channel['Closed']
         assert litnode1_channel['MyBalance'] == 0
 
-        self.log.info("Channel balances: %s // %s" % (litnode0_channel['MyBalance'], litnode1_channel['MyBalance']))
+        self.log_channel_balance(self.litnodes[0], 0, self.litnodes[1], 0)
         self.log.info("Now push some funds from litnode0 to litnode1")
 
         self.litnodes[0].Push(ChanIdx=1, Amt=100000000)
 
         litnode0_channel = self.litnodes[0].ChannelList()['result']['Channels'][0]
         litnode1_channel = self.litnodes[1].ChannelList()['result']['Channels'][0]
-
         assert litnode0_channel['MyBalance'] == 900000000
         assert litnode1_channel['MyBalance'] == 100000000
 
-        self.log.info("Channel balances: %s // %s" % (litnode0_channel['MyBalance'], litnode1_channel['MyBalance']))
-        self.log.info("Push some funds back")
+        self.log_channel_balance(self.litnodes[0], 0, self.litnodes[1], 0)
 
+        self.log.info("Push some funds back")
         self.litnodes[1].Push(ChanIdx=1, Amt=50000000)
 
         litnode0_channel = self.litnodes[0].ChannelList()['result']['Channels'][0]
         litnode1_channel = self.litnodes[1].ChannelList()['result']['Channels'][0]
-
         assert litnode0_channel['MyBalance'] == 950000000
         assert litnode1_channel['MyBalance'] == 50000000
 
-        self.log.info("Channel balances: %s // %s" % (litnode0_channel['MyBalance'], litnode1_channel['MyBalance']))
+        self.log_channel_balance(self.litnodes[0], 0, self.litnodes[1], 0)
         self.log.info("Close channel")
         self.litnodes[0].CloseChannel(ChanIdx=1)
         self.bcnodes[0].generate(nblocks=10)
@@ -158,8 +146,7 @@ class TestBasic(LitTest):
         assert abs(self.litnodes[1].get_balance(BC_REGTEST) - 50000000) < 50000
         assert abs(balance + 950000000 - self.litnodes[0].get_balance(BC_REGTEST)) < 50000
 
-        balance = self.litnodes[0].get_balance(BC_REGTEST)
-        self.log.info("New balance: %s" % balance)
+        self.log_balances(BC_REGTEST)
 
 if __name__ == "__main__":
     exit(TestBasic().main())

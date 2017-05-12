@@ -11,7 +11,14 @@ import tempfile
 import time
 import traceback
 
+from bcnode import BCNode
+from litnode import LitNode
+
 class LitTest():
+    """A lit test case"""
+
+    # Mainline functions. run_test() should be overridden by subclasses. Other
+    # methods should not be overridden.
     def __init__(self):
         self.litnodes = []
         self.bcnodes = []
@@ -21,6 +28,7 @@ class LitTest():
         self.log.info("Using tmp dir %s" % self.tmpdir)
 
     def main(self):
+        """Setup, run and cleanup test case"""
         rc = 0
         try:
             self.run_test()
@@ -40,7 +48,7 @@ class LitTest():
         raise NotImplementedError
 
     def cleanup(self):
-        # Stop bitcoind and lit nodes
+        """Cleanup test resources"""
         for bcnode in self.bcnodes:
             bcnode.stop()
             try:
@@ -54,6 +62,28 @@ class LitTest():
             except subprocess.TimeoutExpired:
                 litnode.process.kill()
 
+    # Helper methods. Can be called by test case subclasses
+    def add_litnode(self):
+        self.litnodes.append(LitNode(self.tmpdir))
+
+    def add_bcnode(self):
+        self.bcnodes.append(BCNode(self.tmpdir))
+
+    def log_balances(self, coin_type):
+        log_str = "Balances:"
+        for node in self.litnodes:
+            log_str += " litnode%s: " % node.index
+            log_str += str(node.get_balance(coin_type))
+        self.log.info(log_str)
+
+    def log_channel_balance(self, node1, node1_chan, node2, node2_chan):
+        log_str = "Channel balance: " + \
+                  str(node1.ChannelList()['result']['Channels'][node1_chan]['MyBalance']) + \
+                  " // " + \
+                  str(node2.ChannelList()['result']['Channels'][node2_chan]['MyBalance'])
+        self.log.info(log_str)
+
+    # Internal methods. Should not be called by test case subclasses
     def _getargs(self):
         """Parse arguments and pass through unrecognised args"""
         parser = argparse.ArgumentParser(description=__doc__)

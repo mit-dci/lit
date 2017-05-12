@@ -19,8 +19,11 @@ logger.propogate = False
 
 class LitNode():
     """A class representing a Lit node"""
-    def __init__(self, i, tmp_dir):
-        self.index = int(i)
+    index = 0
+
+    def __init__(self, tmp_dir):
+        self.index = LitNode.index
+        LitNode.index += 1
         self.data_dir = tmp_dir + "/litnode%d" % self.index
         os.makedirs(self.data_dir)
 

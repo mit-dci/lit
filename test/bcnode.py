@@ -24,8 +24,12 @@ class BCNode():
     short_name = "bc"
     min_version = 140000
 
-    def __init__(self, i, tmd_dir):
-        self.index = i
+    index = 0
+
+    def __init__(self, tmd_dir):
+        self.index = self.__class__.index
+        self.__class__.index += 1
+
         self.data_dir = tmd_dir + "/%snode%d" % (self.__class__.short_name, self.index)
         os.makedirs(self.data_dir)
 
