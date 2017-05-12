@@ -19,8 +19,6 @@
 - stop"""
 import time
 
-from bcnode import BCNode
-from litnode import LitNode
 from lit_test_framework import LitTest, wait_until
 
 BC_REGTEST = 257
@@ -29,7 +27,7 @@ class TestBasic(LitTest):
     def run_test(self):
 
         # Start a bitcoind node
-        self.bcnodes = [BCNode(self.tmpdir)]
+        self.add_bcnode()
         self.bcnodes[0].start_node()
 
         self.log.info("Generate 500 blocks to activate segwit")
@@ -38,7 +36,7 @@ class TestBasic(LitTest):
         assert network_info['bip9_softforks']['segwit']['status'] == 'active'
 
         # Start lit node 0 and open websocket connection
-        self.litnodes.append(LitNode(self.tmpdir))
+        self.add_litnode()
         self.litnodes[0].args.extend(["-reg", "127.0.0.1"])
         self.litnodes[0].start_node()
         time.sleep(1)
@@ -49,7 +47,7 @@ class TestBasic(LitTest):
         self.litnodes[0].Balance()
 
         # Start lit node 1 and open websocket connection
-        self.litnodes.append(LitNode(self.tmpdir))
+        self.add_litnode()
         self.litnodes[1].args.extend(["-rpcport", "8002", "-reg", "127.0.0.1"])
         self.litnodes[1].start_node()
         time.sleep(1)

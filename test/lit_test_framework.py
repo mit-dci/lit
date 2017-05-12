@@ -11,6 +11,9 @@ import tempfile
 import time
 import traceback
 
+from bcnode import BCNode
+from litnode import LitNode
+
 class LitTest():
     """A lit test case"""
 
@@ -58,6 +61,13 @@ class LitTest():
                 litnode.process.wait(2)
             except subprocess.TimeoutExpired:
                 litnode.process.kill()
+
+    # Helper methods. Can be called by test case subclasses
+    def add_litnode(self):
+        self.litnodes.append(LitNode(self.tmpdir))
+
+    def add_bcnode(self):
+        self.bcnodes.append(BCNode(self.tmpdir))
 
     # Internal methods. Should not be called by test case subclasses
     def _getargs(self):
