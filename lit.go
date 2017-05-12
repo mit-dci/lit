@@ -33,7 +33,7 @@ type LitConfig struct {
 	reSync, hard bool // flag to set networks
 
 	// hostnames to connect to for different networks
-	tn3host, bc2host, lt4host, reghost string
+	tn3host, bc2host, lt4host, reghost, litereghost string
 
 	verbose    bool
 	birthblock int32
@@ -52,6 +52,7 @@ func setConfig(lc *LitConfig) {
 
 	tn3ptr := flag.String("tn3", "testnet3.lit3.co", "testnet3 full node")
 	regptr := flag.String("reg", "", "regtest full node")
+	literegptr := flag.String("ltr", "", "litecoin regtest full node")
 	bc2ptr := flag.String("bc2", "", "bc2 full node")
 	lt4ptr := flag.String("lt4", "litetest4.lit3.co", "litecoin testnet4 full node")
 
@@ -68,6 +69,8 @@ func setConfig(lc *LitConfig) {
 
 	lc.tn3host, lc.bc2host, lc.lt4host, lc.reghost =
 		*tn3ptr, *bc2ptr, *lt4ptr, *regptr
+
+	lc.litereghost = *literegptr
 
 	lc.reSync = *resyncprt
 	lc.hard = !*easyptr
@@ -89,37 +92,47 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *LitConfig) error {
 	var err error
 	// try regtest
 	if conf.reghost != "" {
+		p := &chaincfg.RegressionNetParams
 		if !strings.Contains(conf.reghost, ":") {
-			conf.reghost = conf.reghost + ":18444"
+			conf.reghost = conf.reghost + ":" + p.DefaultPort
 		}
 		fmt.Printf("reg: %s\n", conf.reghost)
-		err = node.LinkBaseWallet(
-			key, 120, conf.reSync,
-			conf.reghost, &chaincfg.RegressionNetParams)
+		err = node.LinkBaseWallet(key, 120, conf.reSync, conf.reghost, p)
 		if err != nil {
 			return err
 		}
 	}
 	// try testnet3
 	if conf.tn3host != "" {
+		p := &chaincfg.TestNet3Params
 		if !strings.Contains(conf.tn3host, ":") {
-			conf.tn3host = conf.tn3host + ":18333"
+			conf.tn3host = conf.tn3host + ":" + p.DefaultPort
 		}
 		err = node.LinkBaseWallet(
-			key, conf.birthblock, conf.reSync,
-			conf.tn3host, &chaincfg.TestNet3Params)
+			key, conf.birthblock, conf.reSync, conf.tn3host, p)
 		if err != nil {
 			return err
 		}
 	}
+	// try litecoin regtest
+	if conf.litereghost != "" {
+		p := &chaincfg.LiteRegNetParams
+		if !strings.Contains(conf.litereghost, ":") {
+			conf.litereghost = conf.litereghost + ":" + p.DefaultPort
+		}
+		err = node.LinkBaseWallet(key, 120, conf.reSync, conf.litereghost, p)
+		if err != nil {
+			return err
+		}
+	}
+
 	// try litecoin testnet4
 	if conf.lt4host != "" {
+		p := &chaincfg.LiteCoinTestNet4Params
 		if !strings.Contains(conf.lt4host, ":") {
-			conf.lt4host = conf.lt4host + ":19335"
+			conf.lt4host = conf.lt4host + ":" + p.DefaultPort
 		}
-		err = node.LinkBaseWallet(
-			key, 47295, conf.reSync,
-			conf.lt4host, &chaincfg.LiteCoinTestNet4Params)
+		err = node.LinkBaseWallet(key, 47295, conf.reSync, conf.lt4host, p)
 		if err != nil {
 			return err
 		}

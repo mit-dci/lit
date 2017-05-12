@@ -52,7 +52,8 @@ func checkProofOfWork(header wire.BlockHeader, p *chaincfg.Params) bool {
 	// The header hash must be less than the claimed target in the header.
 	var blockHash chainhash.Hash
 
-	if p.Name == "litetest4" {
+	// TODO remove this soon, make parameterizable
+	if p.Name == "litetest4" || p.Name == "litereg" {
 		blockHash = header.ScryptHash()
 	} else {
 		blockHash = header.BlockHash()
