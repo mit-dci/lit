@@ -22,10 +22,7 @@ func NewWallit(
 	w.Param = p
 	w.FreezeSet = make(map[wire.OutPoint]*FrozenTx)
 
-	w.FeeRate = 80
-	if w.Param.HDCoinType == 65537 { // litecoin testnet4 has high fee
-		w.FeeRate = 800
-	}
+  w.FeeRate = w.Param.FeePerByte
 
 	wallitpath := filepath.Join(path, p.Name)
 
