@@ -29,7 +29,7 @@ class TestBasic(LitTest):
     def run_test(self):
 
         # Start a bitcoind node
-        self.bcnodes = [BCNode(0, self.tmpdir)]
+        self.bcnodes = [BCNode(self.tmpdir)]
         self.bcnodes[0].start_node()
 
         self.log.info("Generate 500 blocks to activate segwit")
@@ -38,7 +38,7 @@ class TestBasic(LitTest):
         assert network_info['bip9_softforks']['segwit']['status'] == 'active'
 
         # Start lit node 0 and open websocket connection
-        self.litnodes.append(LitNode(0, self.tmpdir))
+        self.litnodes.append(LitNode(self.tmpdir))
         self.litnodes[0].args.extend(["-reg", "127.0.0.1"])
         self.litnodes[0].start_node()
         time.sleep(1)
@@ -49,7 +49,7 @@ class TestBasic(LitTest):
         self.litnodes[0].Balance()
 
         # Start lit node 1 and open websocket connection
-        self.litnodes.append(LitNode(1, self.tmpdir))
+        self.litnodes.append(LitNode(self.tmpdir))
         self.litnodes[1].args.extend(["-rpcport", "8002", "-reg", "127.0.0.1"])
         self.litnodes[1].start_node()
         time.sleep(1)
