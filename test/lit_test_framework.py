@@ -12,6 +12,10 @@ import time
 import traceback
 
 class LitTest():
+    """A lit test case"""
+
+    # Mainline functions. run_test() should be overridden by subclasses. Other
+    # methods should not be overridden.
     def __init__(self):
         self.litnodes = []
         self.bcnodes = []
@@ -21,6 +25,7 @@ class LitTest():
         self.log.info("Using tmp dir %s" % self.tmpdir)
 
     def main(self):
+        """Setup, run and cleanup test case"""
         rc = 0
         try:
             self.run_test()
@@ -40,7 +45,7 @@ class LitTest():
         raise NotImplementedError
 
     def cleanup(self):
-        # Stop bitcoind and lit nodes
+        """Cleanup test resources"""
         for bcnode in self.bcnodes:
             bcnode.stop()
             try:
@@ -54,6 +59,7 @@ class LitTest():
             except subprocess.TimeoutExpired:
                 litnode.process.kill()
 
+    # Internal methods. Should not be called by test case subclasses
     def _getargs(self):
         """Parse arguments and pass through unrecognised args"""
         parser = argparse.ArgumentParser(description=__doc__)
