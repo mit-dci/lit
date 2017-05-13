@@ -11,6 +11,22 @@ div#root > div {
     flex-direction: row;
     border: 1px solid white;
 
+    &#identity {
+      h4 {
+        padding: 0 15px;
+      }
+
+      div {
+        display: flex;
+        margin: 0 20px 0 auto;
+
+        * {
+          float: left;
+          margin: auto;
+        }
+      }
+    }
+
     #peerList {
       width: 200px;
       margin: 0;

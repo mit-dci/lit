@@ -90,7 +90,7 @@ class ActionList extends Reflux.Component {
             <div>{legacyList}</div>
           </div>
           <div>
-            <h3>Lightning Addresses</h3>
+            <h3>Witness Addresses</h3>
             <div>{witList}</div>
           </div>
         </div>
@@ -177,7 +177,7 @@ class Legacy extends Reflux.Component {
   render () {
     let balances = this.state.balances.map(bal => {
       return (
-        <div key={bal.coinType} id='balances'>
+        <div key={bal.coinType} id="balances">
           <div>
             <div>Legacy <span><img src='/images/correct.svg' /></span></div>
             <div><span>{bal.legacy}</span></div>

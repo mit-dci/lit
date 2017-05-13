@@ -23,7 +23,6 @@ class LitAfClient {
       }else if(data.id === null) {
         //go to the special chat message handler, but don't delete the callback
         callbacks[data.id](data.result);
-        console.log('dadad');
       }else {
         callbacks[data.id].resolve(data.result);
         delete callbacks[data.id];

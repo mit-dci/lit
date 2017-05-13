@@ -44,9 +44,100 @@ html, body {
             padding: 20px 15px;
             text-align: center;
             color: white;
+            text-decoration: none;
           }
         }
       }
     }
+
+    .tgl {
+      display: none;
+      &,
+      &:after,
+      &:before,
+      & *,
+      & *:after,
+      & *:before,
+      & + .tgl-btn {
+        box-sizing: border-box;
+        &::selection {
+          background: none;
+        }
+      }
+
+      + .tgl-btn {
+        outline: 0;
+        display: block;
+        width: 4em;
+        height: 2em;
+        position: relative;
+        &:after,
+        &:before {
+          position: relative;
+          display: block;
+          content: "";
+          width: 50%;
+          height: 100%;
+        }
+
+        &:after {
+          left: 0;
+        }
+
+        &:before {
+          display: none;
+        }
+      }
+
+      &:checked + .tgl-btn:after {
+        left: 50%;
+      }
+    }
+
+
+    @mixin tglColorize($fg, $bg) {
+      & + .tgl-btn {
+        border: 4px solid mix($bg, $fg, 90%);
+        &:after {
+          background: mix(white, $fg, 70%);
+        }
+      }
+
+      &:checked + .tgl-btn {
+        border: 4px solid mix(black, $fg, 10%);
+        &:after {
+          background: mix(white, $fg, 3%);
+        }
+      }
+    }
+
+    .tgl-flat {
+      @include tglColorize(#007f00, #aaa);
+
+      + .tgl-btn {
+        margin: auto;
+        padding: 2px;
+        transition: all .2s ease;
+        background: #fff;
+        border-radius: 2em;
+        width: 70px;
+        flex: none;
+
+        &:after {
+          transition: all .2s ease;
+          content: "";
+          border-radius: 1em;
+        }
+      }
+
+      &:checked + .tgl-btn {
+        border: 4px solid #007f00 ;
+        &:after {
+          left: 50%;
+          background: #007f00;
+        }
+      }
+    }
+
   }
 }

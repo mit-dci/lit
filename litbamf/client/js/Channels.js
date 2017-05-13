@@ -81,7 +81,7 @@ class PeerModal extends Reflux.Component {
             <h2 id="label-fade">Add Peer</h2>
           </header>
 
-          <form action="#" className="css-modal_content">
+          <form action="javascript:void(0);" className="css-modal_content">
             <div>
               <input id="address" type="text" placeholder="pubkeyhash@hostname:port"
                 value={this.state.address} onChange={this.handleChange.bind(this)}></input>
@@ -137,7 +137,7 @@ class NicknameModal extends Reflux.Component {
             <h2 id="label-fade">Edit Nicknamer</h2>
           </header>
 
-          <form action="#" className="css-modal_content">
+          <form action="javascript:void(0);" className="css-modal_content">
             <div>
               <input id="nickname" type="text" placeholder="nickname"
                 value={this.state.nickname} onChange={this.handleChange.bind(this)}></input>
@@ -256,7 +256,7 @@ class ChannelElement extends Reflux.Component {
         <td className="chan-balance">{this.props.balance}</td>
         <td className="chan-state">{this.props.state}</td>
         <td className="chan-zap">
-          <form action="#">
+          <form action="javascript:void(0);">
             <input type="number" placeholder="amount"
               onChange={this.changePushAmount.bind(this)}
               value={this.state.pushAmount}></input>
@@ -361,7 +361,7 @@ class ChannelModal extends Reflux.Component {
             <h2 id="label-fade">Open Channel</h2>
           </header>
 
-          <form action="#" className="css-modal_content">
+          <form action="javascript:void(0);" className="css-modal_content">
             <div>
               <input id="capacity" type="text" placeholder="channel capacity"
                 value={this.state.capacity} onChange={this.handleChange.bind(this)}></input>
@@ -516,19 +516,18 @@ class Chatbox extends Reflux.Component {
     let chat = selectedConvo.map(convo => {
       return (
         <div>
-          <span className="nickname">[{convo.time}] {convo.name}</span>
+          <span className="nickname">[{convo.time}] {convo.name}:</span>
           <span className="message">{convo.message}</span>
         </div>
       );
     });
-    console.log(chat);
 
     return (
       <div id="chatbox">
         <div>
           {chat}
         </div>
-        <form action="#">
+        <form action="javascript:void(0);">
           <input placeholder={placeholder} onChange={this.changeMessage.bind(this)} value={this.state.message} />
           <button type="submit" onClick={this.say.bind(this)} hidden></button>
         </form>
@@ -541,11 +540,50 @@ class Chatbox extends Reflux.Component {
 }
 
 class Channels extends Reflux.Component {
+  constructor (props) {
+    super(props);
+    this.state = {
+      address: '',
+      listening: false,
+    };
+  }
+  getListeningPorts () {
+    lc.send('LitRPC.GetListeningPorts').then(ports => {
+      this.setState({
+        listening: ports.LisIpPorts !== null,
+        address: ports.Adr,
+      });
+    });
+  }
+  listen () {
+    //don't need to bother making the call if we are already listening
+    if(this.state.listening) {
+      return;
+    }
+
+    lc.send('LitRPC.Listen').then(res => {
+      this.getListeningPorts();
+    })
+    .fail(err => {
+      window.alert(err);
+    });
+  }
   render () {
     return (
       <div>
         <Navbar page="channels" />
+        <div id="identity">
+          <h4>Your Channel identity: </h4>
+          <h4>{this.state.address}</h4>
 
+          <div>
+            <h4>Listening for connections: </h4>
+            <input id="listeningSelector" type="checkbox" className="tgl tgl-flat"
+              checked={this.state.listening ? 'checked' : ''}
+              onChange={this.listen.bind(this)} />
+            <label htmlFor="listeningSelector" className="tgl-btn"></label>
+          </div>
+        </div>
         <div>
           <PeerList />
           <div id="boxes">
@@ -560,6 +598,9 @@ class Channels extends Reflux.Component {
         <XtraModal />
       </div>
     );
+  }
+  componentDidMount () {
+    this.getListeningPorts();
   }
 }
 
