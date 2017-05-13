@@ -50,13 +50,24 @@ def read_logs(tmp_dir):
     Delegates to generator function get_log_events() to provide individual log events
     for each of the input log files."""
 
+    # Test framework logs
     files = [("test", "%s/test_framework.log" % tmp_dir, TIMESTAMP_PATTERN1, None)]
+
+    # bitcoin node logs
+    for i in itertools.count():
+        logfile = "{}/lcnode{}/regtest/debug.log".format(tmp_dir, i)
+        if not os.path.isfile(logfile):
+            break
+        files.append(("lcnode%d" % i, logfile, TIMESTAMP_PATTERN1, None))
+
+    # litecoin node logs
     for i in itertools.count():
         logfile = "{}/bcnode{}/regtest/debug.log".format(tmp_dir, i)
         if not os.path.isfile(logfile):
             break
         files.append(("bcnode%d" % i, logfile, TIMESTAMP_PATTERN1, None))
 
+    # lit node logs
     for i in itertools.count():
         logfile = "{}/litnode{}/lit.log".format(tmp_dir, i)
         if not os.path.isfile(logfile):
@@ -108,6 +119,8 @@ def print_logs(log_events, color=False, html=False):
             colors["bcnode1"]  = "\033[0;32m"  # GREEN
             colors["litnode0"] = "\033[0;31m"  # RED
             colors["litnode1"] = "\033[0;33m"  # YELLOW
+            colors["lcnode0"]  = "\033[0;35m"  # MAGENTA
+            colors["lcnode1"]  = "\033[0;33m"  # YELLOW
             colors["reset"]    = "\033[0m"     # Reset font color
 
         for event in log_events:
