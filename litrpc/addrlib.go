@@ -62,6 +62,12 @@ func CoinTypeFromAdr(adr string) uint32 {
 		// guess testnet; could be regtest
 		return 1
 	}
+  if strings.HasPrefix(adr, "V") {
+    return 28
+  }
+  if strings.HasPrefix(adr, "X") || strings.HasPrefix(adr, "W") {
+    return 65536
+  }
 	// add other prefixes here...
 	return 1
 }
