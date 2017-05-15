@@ -193,16 +193,26 @@ div#root > div {
 
           div {
             margin: 5px 2px;
+            display: inline-block;
+
             span {
               padding: 0 5px;
               font-size: 16px;
-
-              &.nickname {
-                color: #00dcff;
-              }
+              float: left;
 
               &.message {
-                color: #e8d000;
+                color: #00dcff;
+              }
+            }
+
+
+            &.myMessage {
+              span {
+                float: right;
+
+                &.message {
+                  color: #e8d000;
+                }
               }
             }
           }

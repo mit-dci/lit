@@ -470,6 +470,7 @@ class Chatbox extends Reflux.Component {
       let conversations = this.state.conversations;
       let conversation = conversations[this.state.selectedPeerIdx] || [];
       conversation.push({
+        isMyMessage: true,
         name: 'You',
         message: this.state.message,
         time: time,
@@ -496,6 +497,7 @@ class Chatbox extends Reflux.Component {
     let conversations = this.state.conversations;
     let conversation = conversations[message.PeerIdx] || [];
     conversation.push({
+      isMyMessage: false,
       name: peer.Nickname,
       message: message.Text,
       time: time,
@@ -515,7 +517,7 @@ class Chatbox extends Reflux.Component {
     let selectedConvo = this.state.conversations[this.state.selectedPeerIdx] || [];
     let chat = selectedConvo.map(convo => {
       return (
-        <div>
+        <div className={convo.isMyMessage ? 'myMessage' : ''}>
           <span className="nickname">[{convo.time}] {convo.name}:</span>
           <span className="message">{convo.message}</span>
         </div>
