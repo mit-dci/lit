@@ -1,174 +1,232 @@
 @import "./globals";
 
-#chanbox {
+div#root > div {
   width: 90%;
-  height: 500px;
   margin: auto;
-  border: 1px solid white;
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
 
-  #peerList {
-    height: 100%;
-    width: 200px;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    border-right: 1px solid #fff;
+  > div {
+    display: flex;
+    flex-direction: row;
+    border: 1px solid white;
 
-    ul {
-      padding: 0;
+    &#identity {
+      h4 {
+        padding: 0 15px;
+      }
 
-      li {
+      div {
         display: flex;
-        padding: 0 10px;
+        margin: 0 20px 0 auto;
 
-        label {
-          flex: 1;
-          padding: 10px 5px;
-          margin: 0 5px;
-          background: none;
-          color: #fff;
-          border: none;
-          outline: none;
+        * {
+          float: left;
+          margin: auto;
+        }
+      }
+    }
+
+    #peerList {
+      width: 200px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      border-right: 1px solid #fff;
+      flex-direction: column;
+
+      ul {
+        padding: 0;
+
+        li {
           display: flex;
-          text-align: center;
+          padding: 0 10px;
 
-          &.checked {
-            background-color: #444;
-          }
-
-          span {
+          label {
             flex: 1;
-            margin: auto;
-          }
-
-          input {
-            display: none;
-          }
-        }
-
-        div {
-          display: flex;
-
-          button {
-            margin: auto;
-            display: inline-block;
-            padding: 0 0;
-            float: right;
-            border: 1px solid white;
-            width: auto;
-            background: black;
-            color: white;
-
-            .material-icons {
-              font-size: 20px;
-              padding: 2px 2px;
-            }
-          }
-        }
-      }
-    }
-
-    #peer-add {
-      margin: 0 5px;
-      font-size: 16px;
-      text-align: center;
-
-      a {
-        display: block;
-        width: 100px;
-        margin: auto;
-        height: 100%;
-        text-decoration: none;
-        border: 1px solid #fff;
-        color: #fff;
-      }
-    }
-  }
-
-  #channelList {
-    width: 100%;
-    margin: 0;
-    padding: 0;
-    flex: 1;
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-
-      col:nth-child(1){width:150px;}
-      col:nth-child(2){width:150px;}
-      col:nth-child(3){width:75px;}
-      col:nth-child(4){flex: 1}
-      col:nth-child(5){flex: 1}
-
-      th, td {
-        padding: 10px 0;
-        text-align: center;
-        border-bottom: 1px solid white;
-
-        &.chan-zap {
-          form {
+            padding: 10px 5px;
+            margin: 0 5px;
+            background: none;
+            color: #fff;
+            border: none;
+            outline: none;
             display: flex;
-            input {
-              margin: auto;
-              background: transparent;
-              border: none;
-              outline: none;
-              border-bottom: 1px solid white;
-              color: #fff;
+            text-align: center;
+
+            &.checked {
+              background-color: #444;
             }
+
+            span {
+              flex: 1;
+              margin: auto;
+            }
+
+            input {
+              display: none;
+            }
+          }
+
+          div {
+            display: flex;
 
             button {
               margin: auto;
-              width: 40px;
-              height: 40px;
-              background: none;
-              color: #fff;
+              display: inline-block;
+              padding: 0 0;
+              float: right;
+              border: 1px solid white;
+              width: auto;
+              background: black;
+              color: white;
+
+              .material-icons {
+                font-size: 20px;
+                padding: 2px 2px;
+              }
+            }
+          }
+        }
+      }
+
+      #peer-add {
+        margin: 0 5px;
+        font-size: 16px;
+        text-align: center;
+
+        a {
+          display: block;
+          width: 100px;
+          margin: auto;
+          height: 100%;
+          text-decoration: none;
+          border: 1px solid #fff;
+          color: #fff;
+        }
+      }
+    }
+    #boxes {
+      width: 100%;
+
+      #channelList {
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        flex: 1;
+
+        table {
+          width: 100%;
+          border-collapse: collapse;
+
+          col:nth-child(1){width:150px;}
+          col:nth-child(2){width:150px;}
+          col:nth-child(3){width:75px;}
+          col:nth-child(4){flex: 1}
+          col:nth-child(5){flex: 1}
+
+          th, td {
+            padding: 10px 0;
+            text-align: center;
+            border-bottom: 1px solid white;
+
+            &.chan-zap {
+              form {
+                display: flex;
+                input {
+                  margin: auto;
+                  background: transparent;
+                  border: none;
+                  outline: none;
+                  border-bottom: 1px solid white;
+                  color: #fff;
+                }
+
+                button {
+                  margin: auto;
+                  width: 40px;
+                  height: 40px;
+                  background: none;
+                  color: #fff;
+                }
+              }
+            }
+
+            &.chan-xtra {
+              button {
+                width: 30px;
+                height: 30px;
+                background: none;
+                color: #fff;
+              }
             }
           }
         }
 
-        &.chan-xtra {
-          button {
-            width: 30px;
-            height: 30px;
-            background: none;
+        #channel-add {
+          column-span: all;
+          margin: 15px 5px 0 5px;
+          font-size: 16px;
+          text-align: center;
+
+          a {
+            display: block;
+            width: 100px;
+            margin: auto;
+            height: 100%;
+            text-decoration: none;
+            border: 1px solid #fff;
             color: #fff;
           }
         }
       }
-    }
 
-    #channel-add {
-      column-span: all;
-      margin: 15px 5px 0 5px;
-      font-size: 16px;
-      text-align: center;
+      #chatbox {
+        display: flex;
+        flex-direction: column;
+        margin: 50px auto 0 auto;
+        height: 500px;
+        border-top: 1px solid white;
 
-      a {
-        display: block;
-        width: 100px;
-        margin: auto;
-        height: 100%;
-        text-decoration: none;
-        border: 1px solid #fff;
-        color: #fff;
+        div {
+          flex: 1;
+          width: 100%;
+
+          div {
+            margin: 5px 2px;
+            display: inline-block;
+
+            span {
+              padding: 0 5px;
+              font-size: 16px;
+              float: left;
+
+              &.message {
+                color: #00dcff;
+              }
+            }
+
+
+            &.myMessage {
+              span {
+                float: right;
+
+                &.message {
+                  color: #e8d000;
+                }
+              }
+            }
+          }
+        }
+
+        input {
+          width: 100%;
+          height: 30px;
+          padding: 0 0;
+        }
       }
     }
   }
 }
-
-#chatbox {
-  width: 80%;
-  margin: auto;
-
-  .chan-capacity {
-    width: 100px;
-  }
-}
-
 #peer-modal, #channel-modal {
   .css-modal_inner {
     width: 600px;
