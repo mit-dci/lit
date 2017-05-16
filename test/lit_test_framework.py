@@ -4,6 +4,8 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 """Test lit"""
 import argparse
+import collections
+import glob
 import logging
 import subprocess
 import sys
@@ -30,7 +32,7 @@ class LitTest():
 
     def main(self):
         """Setup, run and cleanup test case"""
-        rc = 0
+        self.rc = 0
         try:
             self.run_test()
             self.log.info("Test succeeds!")
@@ -38,11 +40,11 @@ class LitTest():
             # Test asserted. Return 1
             self.log.error("Unexpected error: %s" % str(sys.exc_info()[0]))
             traceback.print_exc(file=sys.stdout)
-            rc = 1
+            self.rc = 1
         finally:
             self.cleanup()
 
-        return rc
+        return self.rc
 
     def run_test(self):
         """Test Logic. This method should be overridden by subclasses"""
@@ -50,6 +52,22 @@ class LitTest():
 
     def cleanup(self):
         """Cleanup test resources"""
+        if self.rc == 1:
+            # Dump the end of the debug logs, to aid in debugging rare
+            # travis failures.
+            filenames = [self.tmpdir + "/test_framework.log"]
+            filenames += glob.glob(self.tmpdir + "/bcnode*/regtest/debug.log")
+            filenames += glob.glob(self.tmpdir + "/lcnode*/regtest/debug.log")
+            filenames += glob.glob(self.tmpdir + "/litnode*/lit.log")
+            for fn in filenames:
+                try:
+                    with open(fn, 'r') as f:
+                        print("From %s:\n" % fn)
+                        print("".join(collections.deque(f, 500)))
+                except OSError:
+                    print("Opening file %s failed." % fn)
+                    traceback.print_exc()
+
         for bcnode in self.bcnodes:
             bcnode.stop()
             try:
