@@ -17,32 +17,32 @@
 - push funds back
 - close channel co-operatively
 - stop"""
-from lit_test_framework import LitTest, wait_until
+from lit_test_framework import LitTest, wait_until, COINS
 
-BC_REGTEST = 257
-
-class TestLC(LitTest):
+class TestBasic(LitTest):
     def run_test(self):
 
+        self.coin = COINS["reg"]
+
         # Start a coin node
-        self.add_bcnode()
-        self.bcnodes[0].start_node()
+        self.add_coinnode(self.coin)
+        self.coinnodes[0].start_node()
 
         self.log.info("Generate 500 blocks to activate segwit")
-        self.bcnodes[0].generate(500)
+        self.coinnodes[0].generate(500)
         self.chain_height = 500
-        network_info = self.bcnodes[0].getblockchaininfo().json()['result']
+        network_info = self.coinnodes[0].getblockchaininfo().json()['result']
         assert network_info['bip9_softforks']['segwit']['status'] == 'active'
 
         # Start lit node 0 and open websocket connection
         self.add_litnode()
-        self.litnodes[0].args.extend(["-reg", "127.0.0.1"])
+        self.litnodes[0].args.extend([self.coin["wallit_code"], "127.0.0.1"])
         self.litnodes[0].start_node()
         self.litnodes[0].add_rpc_connection("127.0.0.1", "8001")
 
         # Start lit node 1 and open websocket connection
         self.add_litnode()
-        self.litnodes[1].args.extend(["-rpcport", "8002", "-reg", "127.0.0.1"])
+        self.litnodes[1].args.extend(["-rpcport", "8002", self.coin["wallit_code"], "127.0.0.1"])
         self.litnodes[1].start_node()
         self.litnodes[1].add_rpc_connection("127.0.0.1", "8002")
 
@@ -59,37 +59,37 @@ class TestLC(LitTest):
         self.log.info("lit nodes connected")
 
         self.log.info("Send funds from coin node to lit node 0")
-        balance = self.litnodes[0].get_balance(BC_REGTEST)
-        self.log_balances(BC_REGTEST)
-        addr = self.litnodes[0].rpc.Address(NumToMake=1, CoinType=BC_REGTEST)
-        self.bcnodes[0].sendtoaddress(addr["result"]["LegacyAddresses"][0], 12.34)
-        self.confirm_transactions(self.bcnodes[0], self.litnodes[0], 1)
+        balance = self.litnodes[0].get_balance(self.coin['code'])
+        self.log_balances(self.coin['code'])
+        addr = self.litnodes[0].rpc.Address(NumToMake=1, CoinType=self.coin['code'])
+        self.coinnodes[0].sendtoaddress(addr["result"]["LegacyAddresses"][0], 12.34)
+        self.confirm_transactions(self.coinnodes[0], self.litnodes[0], 1)
 
         self.log.info("Waiting to receive transaction")
 
         # Wait for transaction to be received by lit node
-        wait_until(lambda: self.litnodes[0].get_balance(BC_REGTEST) - balance == 1234000000)
-        balance = self.litnodes[0].get_balance(BC_REGTEST)
+        wait_until(lambda: self.litnodes[0].get_balance(self.coin['code']) - balance == 1234000000)
+        balance = self.litnodes[0].get_balance(self.coin['code'])
         self.log.info("Funds received by lit node 0")
-        self.log_balances(BC_REGTEST)
+        self.log_balances(self.coin['code'])
 
         self.log.info("Send money from lit node 0 to its own segwit address and confirm")
         self.log.info("sending 1000000000 satoshis to litnode1 address")
         self.litnodes[0].Send(DestAddrs=[self.litnodes[0].Address()['result']['WitAddresses'][0]], Amts=[1000000000])
-        self.confirm_transactions(self.bcnodes[0], self.litnodes[0], 1)
+        self.confirm_transactions(self.coinnodes[0], self.litnodes[0], 1)
 
         # We'll lose some money to fees.
-        assert balance - self.litnodes[0].get_balance(BC_REGTEST) < 200000
-        balance = self.litnodes[0].get_balance(BC_REGTEST)
+        assert balance - self.litnodes[0].get_balance(self.coin['code']) < self.coin["feerate"] * 250
+        balance = self.litnodes[0].get_balance(self.coin['code'])
         self.log.info("Funds transferred to segwit address")
-        self.log_balances(BC_REGTEST)
+        self.log_balances(self.coin['code'])
 
         self.log.info("Open channel from litnode0 to litnode1")
         assert self.litnodes[0].ChannelList()['result']['Channels'] == []
         assert self.litnodes[1].ChannelList()['result']['Channels'] == []
 
-        self.litnodes[0].FundChannel(Peer=1, CoinType=BC_REGTEST, Capacity=1000000000)
-        self.confirm_transactions(self.bcnodes[0], self.litnodes[0], 1)
+        self.litnodes[0].FundChannel(Peer=1, CoinType=self.coin['code'], Capacity=1000000000)
+        self.confirm_transactions(self.coinnodes[0], self.litnodes[0], 1)
         self.log.info("lit node 0 has funded channel")
 
         # Wait for channel to open
@@ -97,9 +97,9 @@ class TestLC(LitTest):
         assert len(self.litnodes[1].ChannelList()['result']['Channels']) > 0
         self.log.info("Channel open")
 
-        assert abs(balance - self.litnodes[0].get_balance(BC_REGTEST) - 1000000000) < 200000
-        balance = self.litnodes[0].get_balance(BC_REGTEST)
-        self.log_balances(BC_REGTEST)
+        assert abs(balance - self.litnodes[0].get_balance(self.coin['code']) - 1000000000) < self.coin["feerate"] * 250
+        balance = self.litnodes[0].get_balance(self.coin['code'])
+        self.log_balances(self.coin['code'])
 
         litnode0_channel = self.litnodes[0].ChannelList()['result']['Channels'][0]
         litnode1_channel = self.litnodes[1].ChannelList()['result']['Channels'][0]
@@ -138,12 +138,12 @@ class TestLC(LitTest):
 
         self.log.info("Close channel")
         self.litnodes[0].CloseChannel(ChanIdx=1)
-        self.confirm_transactions(self.bcnodes[0], self.litnodes[0], 1)
+        self.confirm_transactions(self.coinnodes[0], self.litnodes[0], 1)
 
-        wait_until(lambda: abs(self.litnodes[1].get_balance(BC_REGTEST) - 50000000) < 200000)
-        assert abs(balance + 950000000 - self.litnodes[0].get_balance(BC_REGTEST)) < 200000
+        wait_until(lambda: abs(self.litnodes[1].get_balance(self.coin['code']) - 50000000) < self.coin["feerate"] * 2000)
+        assert abs(balance + 950000000 - self.litnodes[0].get_balance(self.coin['code'])) < self.coin["feerate"] * 2000
 
-        self.log_balances(BC_REGTEST)
+        self.log_balances(self.coin['code'])
 
 if __name__ == "__main__":
-    exit(TestLC().main())
+    exit(TestBasic().main())

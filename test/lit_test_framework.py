@@ -21,6 +21,24 @@ import traceback
 from bcnode import BCNode, LCNode
 from litnode import LitNode
 
+COINS = {
+    "reg": {
+        "longname": "Bitcoin_regtest",
+        "code": 257,
+        "feerate": 80,
+        "class": BCNode,
+        "wallit_code": "-reg"
+    },
+    "ltr": {
+        "longname": "Litecoin_regtest",
+        "code": 258,
+        "feerate": 800,
+        "class": LCNode,
+        "wallit_code": "-ltr"
+    }
+}
+
+
 class LitTest():
     """A lit test case"""
 
@@ -41,6 +59,7 @@ class LitTest():
         except (OSError, subprocess.SubprocessError):
             pass
         self.litnodes = []
+        self.coinnodes = []
         self.bcnodes = []
         self.lcnodes = []
         self.tmpdir = tempfile.mkdtemp(prefix="test")
@@ -89,6 +108,13 @@ class LitTest():
                     print("Opening file %s failed." % fn)
                     traceback.print_exc()
 
+        for bcnode in self.coinnodes:
+            bcnode.stop()
+            try:
+                bcnode.process.wait(2)
+            except subprocess.TimeoutExpired:
+                bcnode.process.kill()
+
         for bcnode in self.bcnodes:
             bcnode.stop()
             try:
@@ -117,6 +143,9 @@ class LitTest():
             self.log.warning("Not cleaning up %s" % self.tmpdir)
 
     # Helper methods. Can be called by test case subclasses
+    def add_coinnode(self, coin):
+        self.coinnodes.append(coin["class"](self.tmpdir))
+
     def add_litnode(self):
         self.litnodes.append(LitNode(self.tmpdir))
 
