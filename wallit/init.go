@@ -23,7 +23,7 @@ func NewWallit(
 	w.FreezeSet = make(map[wire.OutPoint]*FrozenTx)
 
 	w.FeeRate = 80
-	if w.Param.HDCoinType == 65537 { // litecoin testnet4 has high fee
+	if w.Param.HDCoinType == 65537 || w.Param.HDCoinType == 258 { // litecoin testnet4 has high fee
 		w.FeeRate = 800
 	}
 
