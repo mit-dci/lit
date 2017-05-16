@@ -7,6 +7,10 @@ import argparse
 import collections
 import glob
 import logging
+try:
+    import ipdb as pdb
+except:
+    import pdb
 import shutil
 import subprocess
 import sys
@@ -55,6 +59,9 @@ class LitTest():
             self.log.error("Unexpected error: %s" % str(sys.exc_info()[0]))
             traceback.print_exc(file=sys.stdout)
             self.rc = 1
+            if self.args.debugger:
+                self.log.info("Attaching debugger")
+                pdb.set_trace()
         finally:
             self.cleanup()
 
@@ -137,6 +144,7 @@ class LitTest():
     def _getargs(self):
         """Parse arguments and pass through unrecognised args"""
         parser = argparse.ArgumentParser(description=__doc__)
+        parser.add_argument("--debugger", "-d", action='store_true', help="Automatically attach a debugger on test failure.")
         parser.add_argument("--loglevel", "-l", default="INFO", help="log events at this level and higher to the console. Can be set to DEBUG, INFO, WARNING, ERROR or CRITICAL. Passing --loglevel DEBUG will output all logs to console. Note that logs at all levels are always written to the test_framework.log file in the temporary test directory.")
         parser.add_argument("--nocleanup", "-n", action='store_true', help="Don't clean up the test directory after running (even on success).")
         self.args, self.unknown_args = parser.parse_known_args()
