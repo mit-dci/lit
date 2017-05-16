@@ -165,13 +165,6 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		}
 		return nil
 	}
-	if cmd == "setfee" { // set fee rate for a wallet
-		err = lc.SetFee(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "fee error: %s\n", err)
-		}
-		return nil
-	}
 
 	fmt.Fprintf(color.Output, "Command not recognized. type help for command list.\n")
 	return nil
