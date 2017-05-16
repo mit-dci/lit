@@ -281,13 +281,36 @@ type SetFeeArgs struct {
 	Fee      int64
 	CoinType uint32
 }
-type SetFeeReply struct {
+
+// get fee
+type FeeArgs struct {
+	CoinType uint32
+}
+type FeeReply struct {
 	CurrentFee int64
 }
 
-// SetFee allows you to set a fee rate for a wallet.  If you try to set a negative
+// SetFee allows you to set a fee rate for a wallet.
+func (r *LitRPC) SetFee(args *SetFeeArgs, reply *FeeReply) error {
+	// if cointype is 0, use the node's default coin
+	if args.CoinType == 0 {
+		args.CoinType = r.Node.DefaultCoin
+	}
+	if args.Fee < 0 {
+		return fmt.Errorf("Invalid value for SetFee: %d", args.Fee)
+	}
+	// make sure we support that coin type
+	wal, ok := r.Node.SubWallet[args.CoinType]
+	if !ok {
+		return fmt.Errorf("no connnected wallet for coin type %d", args.CoinType)
+	}
+	reply.CurrentFee = wal.SetFee(args.Fee)
+	return nil
+}
+
+// Fee gets th fee rate for a wallet.  If you try to set a negative
 // fee rate, it will return the current rate.
-func (r *LitRPC) SetFee(args *SetFeeArgs, reply *SetFeeReply) error {
+func (r *LitRPC) Fee(args *FeeArgs, reply *FeeReply) error {
 	// if cointype is 0, use the node's default coin
 	if args.CoinType == 0 {
 		args.CoinType = r.Node.DefaultCoin
@@ -297,7 +320,7 @@ func (r *LitRPC) SetFee(args *SetFeeArgs, reply *SetFeeReply) error {
 	if !ok {
 		return fmt.Errorf("no connnected wallet for coin type %d", args.CoinType)
 	}
-	reply.CurrentFee = wal.Fee(args.Fee)
+	reply.CurrentFee = wal.Fee()
 	return nil
 }
 

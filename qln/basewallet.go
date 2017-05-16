@@ -82,8 +82,11 @@ type UWallet interface {
 	// Ask for network parameters
 	Params() *chaincfg.Params
 
-	// Set / Ask for current fee rate.  A negative value means check, dont' set.
-	Fee(int64) int64
+	// Get current fee rate.
+	Fee() int64
+
+	// Set fee rate
+	SetFee(int64) int64
 
 	// ===== TESTING / SPAMMING ONLY, these funcs will not be in the real interface
 	// Sweep sends lots of txs (uint32 of them) to the specified address.
