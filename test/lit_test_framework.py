@@ -7,6 +7,7 @@ import argparse
 import collections
 import glob
 import logging
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -102,6 +103,12 @@ class LitTest():
             except subprocess.TimeoutExpired:
                 litnode.process.kill()
 
+        if self.rc == 0 and not self.args.nocleanup:
+            self.log.info("Cleaning up")
+            shutil.rmtree(self.tmpdir)
+        else:
+            self.log.warning("Not cleaning up %s" % self.tmpdir)
+
     # Helper methods. Can be called by test case subclasses
     def add_litnode(self):
         self.litnodes.append(LitNode(self.tmpdir))
@@ -131,8 +138,8 @@ class LitTest():
         """Parse arguments and pass through unrecognised args"""
         parser = argparse.ArgumentParser(description=__doc__)
         parser.add_argument("--loglevel", "-l", default="INFO", help="log events at this level and higher to the console. Can be set to DEBUG, INFO, WARNING, ERROR or CRITICAL. Passing --loglevel DEBUG will output all logs to console. Note that logs at all levels are always written to the test_framework.log file in the temporary test directory.")
-        args, unknown_args = parser.parse_known_args()
-        self.loglevel = args.loglevel
+        parser.add_argument("--nocleanup", "-n", action='store_true', help="Don't clean up the test directory after running (even on success).")
+        self.args, self.unknown_args = parser.parse_known_args()
 
     def _start_logging(self):
         """Add logging"""
@@ -147,7 +154,7 @@ class LitTest():
         # Create console handler to log messages to stderr. By default this logs only error messages, but can be configured with --loglevel.
         ch = logging.StreamHandler(sys.stdout)
         # User can provide log level as a number or string (eg DEBUG). loglevel was caught as a string, so try to convert it to an int
-        ll = int(self.loglevel) if self.loglevel.isdigit() else self.loglevel.upper()
+        ll = int(self.args.loglevel) if self.args.loglevel.isdigit() else self.args.loglevel.upper()
         ch.setLevel(ll)
         # Format logs the same as bitcoind's debug.log with microprecision (so log files can be concatenated and sorted)
         formatter = logging.Formatter(fmt='%(asctime)s.%(msecs)03d000 %(name)s (%(levelname)s): %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
