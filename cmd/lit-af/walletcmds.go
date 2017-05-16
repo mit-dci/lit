@@ -168,21 +168,36 @@ func (lc *litAfClient) Fan(textArgs []string) error {
 	return nil
 }
 
+// ------------------ get fee
+
+func (lc *litAfClient) Fee(textArgs []string) error {
+
+	reply := new(litrpc.FeeReply)
+
+	// There is an argument. That's the coin type. (coin type 0 means default)
+	if len(textArgs) > 0 {
+		coinint, err := strconv.Atoi(textArgs[1])
+		if err != nil {
+			return err
+		}
+		args.CoinType = uint32(coinint)
+	}
+	err := lc.rpccon.Call("LitRPC.Fee", args, reply)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Current fee rate %d sat / byte\n", reply.CurrentFee)
+
+	return nil
+}
+
 // ------------------ set fee
 
 func (lc *litAfClient) SetFee(textArgs []string) error {
-	//	if len(textArgs) > 0 && textArgs[0] == "-h" {
-	//		fmt.Fprintf(color.Output, fanCommand.Format)
-	//		fmt.Fprintf(color.Output, fanCommand.Description)
-	//		return nil
-	//	}
 
 	args := new(litrpc.SetFeeArgs)
-	reply := new(litrpc.SetFeeReply)
-
-	// if no arguments are given, the "fee rate" is -1, which means
-	// we'll find out what the current fee rate is
-	args.Fee = -1
+	reply := new(litrpc.FeeReply)
 
 	// there is at least 1 argument; that should be the new fee rate
 	if len(textArgs) > 0 {

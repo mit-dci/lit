@@ -115,10 +115,11 @@ func (w *Wallit) WatchThis(op wire.OutPoint) error {
 	return nil
 }
 
-func (w *Wallit) Fee(set int64) int64 {
-	if set < 0 {
-		return w.FeeRate
-	}
+func (w *Wallit) Fee() int64 {
+	return w.FeeRate
+}
+
+func (w *Wallit) SetFee(set int64) int64 {
 	w.FeeRate = set
 	return set
 }

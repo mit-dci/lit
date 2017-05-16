@@ -300,7 +300,7 @@ func (nd LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 	q.State.MyAmt = nd.InProg.Amt - nd.InProg.InitSend
 	// get fee from sub wallet.  Later should make fee per channel and update state
 	// based on size
-	q.State.Fee = nd.SubWallet[q.Coin()].Fee(-1) * 1000
+	q.State.Fee = nd.SubWallet[q.Coin()].Fee() * 1000
 
 	// save channel to db
 	err = nd.SaveQChan(q)
@@ -394,7 +394,7 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 	// similar to SIGREV in pushpull
 
 	// TODO assumes both parties use same fee
-	qc.State.Fee = wal.Fee(-1) * 1000
+	qc.State.Fee = wal.Fee() * 1000
 	qc.State.MyAmt = msg.InitPayment
 
 	qc.State.StateIdx = 0
