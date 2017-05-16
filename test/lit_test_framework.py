@@ -126,6 +126,12 @@ class LitTest():
     def add_lcnode(self):
         self.lcnodes.append(LCNode(self.tmpdir))
 
+    def confirm_transactions(self, coin_node, lit_node, no_transactions):
+        wait_until(lambda: coin_node.getmempoolinfo().json()['result']['size'] == no_transactions)
+        coin_node.generate(1)
+        self.chain_height += 1
+        wait_until(lambda: lit_node.Balance()['result']["Balances"][0]["SyncHeight"] == self.chain_height)
+
     def log_balances(self, coin_type):
         log_str = "Balances:"
         for node in self.litnodes:
