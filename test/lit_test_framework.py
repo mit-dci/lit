@@ -22,6 +22,19 @@ class LitTest():
     # Mainline functions. run_test() should be overridden by subclasses. Other
     # methods should not be overridden.
     def __init__(self):
+        # Warn and exit if lit or coin nodes are already running
+        try:
+            if subprocess.check_output(["pidof", "lit"]) is not None:
+                print("ERROR! There is already a lit process running on this system. Tests may fail unexpectedly due to resource contention!")
+                sys.exit(1)
+            if subprocess.check_output(["pidof", "bitcoind"]) is not None:
+                print("ERROR! There is already a bitcoind process running on this system. Tests may fail unexpectedly due to resource contention!")
+                sys.exit(1)
+            if subprocess.check_output(["pidof", "litecoind"]) is not None:
+                print("ERROR! There is already a litecoind process running on this system. Tests may fail unexpectedly due to resource contention!")
+                sys.exit(1)
+        except (OSError, subprocess.SubprocessError):
+            pass
         self.litnodes = []
         self.bcnodes = []
         self.lcnodes = []
