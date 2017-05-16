@@ -27,7 +27,7 @@ class LitConnection():
                 self.ws.connect("ws://%s:%s/ws" % (self.ip, self.port))
             except ConnectionRefusedError:
                 # lit is not ready to accept connections yet
-                time.sleep(0.2)
+                time.sleep(0.25)
             else:
                 # No exception - we're connected!
                 break
@@ -44,7 +44,7 @@ class LitConnection():
         self.msg_id = self.msg_id + 1 % 10000
 
         resp = json.loads(self.ws.recv())
-        logger.debug("Recieved rpc response from %s:%s Metohd: %s Response: %s." % (self.ip, self.port, method, str(resp)))
+        logger.debug("Recieved rpc response from %s:%s method: %s Response: %s." % (self.ip, self.port, method, str(resp)))
         return resp
 
     def __getattr__(self, name):
@@ -60,10 +60,3 @@ class LitConnection():
     def balance(self):
         """Get wallit balance"""
         return self.Bal()
-
-if __name__ == '__main__':
-    """Test litrpc.py. lit instance must be running and available on 127.0.0.1:8001"""
-    litConn = LitConnection("127.0.0.1", "8001")
-    litConn.connect()
-    print(litConn.new_address())
-    print(litConn.balance())
