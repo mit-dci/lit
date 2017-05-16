@@ -276,6 +276,31 @@ func (r *LitRPC) Fanout(args FanArgs, reply *TxidsReply) error {
 	return nil
 }
 
+// set fee
+type SetFeeArgs struct {
+	Fee      int64
+	CoinType uint32
+}
+type SetFeeReply struct {
+	CurrentFee int64
+}
+
+// SetFee allows you to set a fee rate for a wallet.  If you try to set a negative
+// fee rate, it will return the current rate.
+func (r *LitRPC) SetFee(args *SetFeeArgs, reply *SetFeeReply) error {
+	// if cointype is 0, use the node's default coin
+	if args.CoinType == 0 {
+		args.CoinType = r.Node.DefaultCoin
+	}
+	// make sure we support that coin type
+	wal, ok := r.Node.SubWallet[args.CoinType]
+	if !ok {
+		return fmt.Errorf("no connnected wallet for coin type %d", args.CoinType)
+	}
+	reply.CurrentFee = wal.Fee(args.Fee)
+	return nil
+}
+
 // ------------------------- address
 type AddressArgs struct {
 	NumToMake uint32
