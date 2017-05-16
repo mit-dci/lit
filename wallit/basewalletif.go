@@ -115,6 +115,14 @@ func (w *Wallit) WatchThis(op wire.OutPoint) error {
 	return nil
 }
 
+func (w *Wallit) Fee(set int64) int64 {
+	if set < 0 {
+		return w.FeeRate
+	}
+	w.FeeRate = set
+	return set
+}
+
 // ********* sweep is for testing / spamming, remove for real use
 func (w *Wallit) Sweep(outScript []byte, n uint32) ([]*chainhash.Hash, error) {
 	var err error
