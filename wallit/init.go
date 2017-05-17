@@ -5,17 +5,17 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/adiabat/btcd/chaincfg"
 	"github.com/adiabat/btcd/wire"
 	"github.com/adiabat/btcutil/hdkeychain"
 	"github.com/boltdb/bolt"
+	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/uspv"
 )
 
 func NewWallit(
 	rootkey *hdkeychain.ExtendedKey, birthHeight int32, resync bool,
-	spvhost, path string, p *chaincfg.Params) *Wallit {
+	spvhost, path string, p *coinparam.Params) *Wallit {
 
 	var w Wallit
 	w.rootPrivKey = rootkey

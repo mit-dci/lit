@@ -13,13 +13,13 @@ import (
 	"time"
 
 	"github.com/adiabat/btcd/blockchain"
-	"github.com/adiabat/btcd/chaincfg"
 	"github.com/adiabat/btcd/chaincfg/chainhash"
 	"github.com/adiabat/btcd/wire"
+	"github.com/mit-dci/lit/coinparam"
 )
 
 // blockchain settings.  These are kindof bitcoin specific, but not contained in
-// chaincfg.Params so they'll go here.  If you're into the [ANN]altcoin scene,
+// coinparam.Params so they'll go here.  If you're into the [ANN]altcoin scene,
 // you may want to paramaterize these constants.
 const (
 	targetTimespanx = time.Hour * 24 * 14
@@ -33,7 +33,7 @@ const (
 
 /* checkProofOfWork verifies the header hashes into something
 lower than specified by the 4-byte bits field. */
-func checkProofOfWork(header wire.BlockHeader, p *chaincfg.Params) bool {
+func checkProofOfWork(header wire.BlockHeader, p *coinparam.Params) bool {
 
 	target := blockchain.CompactToBig(header.Bits)
 
@@ -75,7 +75,7 @@ true if the correct dificulty adjustment is seen in the "next" header.
 Only feed it headers n-2016 and n-1, otherwise it will calculate a difficulty
 when no adjustment should take place, and return false.
 Note that the epoch is actually 2015 blocks long, which is confusing. */
-func calcDiffAdjust(start, end wire.BlockHeader, p *chaincfg.Params) uint32 {
+func calcDiffAdjust(start, end wire.BlockHeader, p *coinparam.Params) uint32 {
 
 	minRetargetTimespan := int64(p.TargetTimespan.Seconds()) / p.RetargetAdjustmentFactor
 	maxRetargetTimespan := int64(p.TargetTimespan.Seconds()) * p.RetargetAdjustmentFactor
@@ -107,7 +107,7 @@ func calcDiffAdjust(start, end wire.BlockHeader, p *chaincfg.Params) uint32 {
 	return blockchain.BigToCompact(newTarget)
 }
 
-func CheckHeader(r io.ReadSeeker, height, startheight int32, p *chaincfg.Params) bool {
+func CheckHeader(r io.ReadSeeker, height, startheight int32, p *coinparam.Params) bool {
 	// startHeight is the height the file starts at
 	// header start must be 0 mod 2106
 	epochLength := int32(p.TargetTimespan / p.TargetTimePerBlock)
@@ -206,7 +206,7 @@ difficulty adjustments, and that they all link in to each other properly.
 This is the only blockchain technology in the whole code base.
 Returns false if anything bad happens.  Returns true if the range checks
 out with no errors. */
-func CheckRange(r io.ReadSeeker, first, last, startHeight int32, p *chaincfg.Params) bool {
+func CheckRange(r io.ReadSeeker, first, last, startHeight int32, p *coinparam.Params) bool {
 	for i := first; i <= last; i++ {
 		if !CheckHeader(r, i, startHeight, p) {
 			return false

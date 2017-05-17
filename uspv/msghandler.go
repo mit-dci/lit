@@ -10,8 +10,8 @@ import (
 
 func (s *SPVCon) incomingMessageHandler() {
 	for {
-		n, xm, _, err := wire.ReadMessageWithEncodingN(
-			s.con, s.localVersion, s.Param.Net, wire.LatestEncoding)
+		n, xm, _, err := wire.ReadMessageWithEncodingN(s.con, s.localVersion,
+			wire.BitcoinNet(s.Param.NetMagicBytes), wire.LatestEncoding)
 		if err != nil {
 			log.Printf("ReadMessageWithEncodingN error.  Disconnecting: %s\n", err.Error())
 			return
@@ -65,7 +65,9 @@ func (s *SPVCon) incomingMessageHandler() {
 func (s *SPVCon) outgoingMessageHandler() {
 	for {
 		msg := <-s.outMsgQueue
-		n, err := wire.WriteMessageWithEncodingN(s.con, msg, s.localVersion, s.Param.Net, wire.LatestEncoding)
+		n, err := wire.WriteMessageWithEncodingN(s.con, msg, s.localVersion,
+			wire.BitcoinNet(s.Param.NetMagicBytes), wire.LatestEncoding)
+
 		if err != nil {
 			log.Printf("Write message error: %s", err.Error())
 		}

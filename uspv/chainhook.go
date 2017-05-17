@@ -3,9 +3,9 @@ package uspv
 import (
 	"path/filepath"
 
-	"github.com/adiabat/btcd/chaincfg"
 	"github.com/adiabat/btcd/chaincfg/chainhash"
 	"github.com/adiabat/btcd/wire"
+	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
 )
 
@@ -24,7 +24,7 @@ type ChainHook interface {
 // --- implementation of ChainHook interface ----
 
 func (s *SPVCon) Start(
-	startHeight int32, host, path string, params *chaincfg.Params) (
+	startHeight int32, host, path string, params *coinparam.Params) (
 	chan lnutil.TxAndHeight, chan int32, error) {
 
 	// These can be set before calling Start()

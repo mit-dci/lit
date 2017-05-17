@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/adiabat/btcd/chaincfg"
 	"github.com/adiabat/btcd/wire"
 	"github.com/adiabat/btcutil/hdkeychain"
 	"github.com/boltdb/bolt"
+	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/wallit"
@@ -27,7 +27,8 @@ func NewLitNode(privKey *[32]byte, path string, tower bool) (*LitNode, error) {
 	}
 
 	// Maybe make a new parameter set for "LN".. meh
-	rootPrivKey, err := hdkeychain.NewMaster(privKey[:], &chaincfg.TestNet3Params)
+	// TODO change this to a non-coin
+	rootPrivKey, err := hdkeychain.NewMaster(privKey[:], &coinparam.TestNet3Params)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +90,7 @@ func NewLitNode(privKey *[32]byte, path string, tower bool) (*LitNode, error) {
 // LinkBaseWallet activates a wallet and hooks it into the litnode.
 func (nd *LitNode) LinkBaseWallet(
 	privKey *[32]byte, birthHeight int32, resync bool,
-	host string, param *chaincfg.Params) error {
+	host string, param *coinparam.Params) error {
 
 	rootpriv, err := hdkeychain.NewMaster(privKey[:], param)
 	if err != nil {
