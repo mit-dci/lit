@@ -68,7 +68,7 @@ class TestBasic(LitTest):
 
     def _ready_litnode_for_channel(self):
         self.log.info("Send funds from coin node to lit node 0")
-        self.balance = self.litnodes[0].get_balance(self.coins[0]['code'])
+        self.balance = self.litnodes[0].get_balance(self.coins[0]['code'])['TxoTotal']
         self.log_balances(self.coins[0]['code'])
         addr = self.litnodes[0].rpc.Address(NumToMake=1, CoinType=self.coins[0]['code'])
         self.coinnodes[0].sendtoaddress(addr["result"]["LegacyAddresses"][0], 12.34)
@@ -77,8 +77,8 @@ class TestBasic(LitTest):
         self.log.info("Waiting to receive transaction")
 
         # Wait for transaction to be received by lit node
-        wait_until(lambda: self.litnodes[0].get_balance(self.coins[0]['code']) - self.balance == 1234000000)
-        self.balance = self.litnodes[0].get_balance(self.coins[0]['code'])
+        wait_until(lambda: self.litnodes[0].get_balance(self.coins[0]['code'])['TxoTotal'] - self.balance == 1234000000)
+        self.balance = self.litnodes[0].get_balance(self.coins[0]['code'])['TxoTotal']
         self.log.info("Funds received by lit node 0")
         self.log_balances(self.coins[0]['code'])
 
@@ -88,8 +88,8 @@ class TestBasic(LitTest):
         self.confirm_transactions(self.coinnodes[0], self.litnodes[0], 1)
 
         # We'll lose some money to fees.
-        assert self.balance - self.litnodes[0].get_balance(self.coins[0]['code']) < self.coins[0]["feerate"] * 250
-        self.balance = self.litnodes[0].get_balance(self.coins[0]['code'])
+        assert self.balance - self.litnodes[0].get_balance(self.coins[0]['code'])['TxoTotal'] < self.coins[0]["feerate"] * 250
+        self.balance = self.litnodes[0].get_balance(self.coins[0]['code'])['TxoTotal']
         self.log.info("Funds transferred to segwit address")
         self.log_balances(self.coins[0]['code'])
 
@@ -107,8 +107,8 @@ class TestBasic(LitTest):
         assert len(self.litnodes[1].ChannelList()['result']['Channels']) > 0
         self.log.info("Channel open")
 
-        assert abs(self.balance - self.litnodes[0].get_balance(self.coins[0]['code']) - 1000000000) < self.coins[0]["feerate"] * 250
-        self.balance = self.litnodes[0].get_balance(self.coins[0]['code'])
+        assert abs(self.balance - self.litnodes[0].get_balance(self.coins[0]['code'])['TxoTotal'] - 1000000000) < self.coins[0]["feerate"] * 250
+        self.balance = self.litnodes[0].get_balance(self.coins[0]['code'])['TxoTotal']
         self.log_balances(self.coins[0]['code'])
 
         litnode0_channel = self.litnodes[0].ChannelList()['result']['Channels'][0]
@@ -153,8 +153,8 @@ class TestBasic(LitTest):
         self.litnodes[0].CloseChannel(ChanIdx=1)
         self.confirm_transactions(self.coinnodes[0], self.litnodes[0], 1)
 
-        wait_until(lambda: abs(self.litnodes[1].get_balance(self.coins[0]['code']) - 50000000) < self.coins[0]["feerate"] * 2000)
-        assert abs(self.balance + 950000000 - self.litnodes[0].get_balance(self.coins[0]['code'])) < self.coins[0]["feerate"] * 2000
+        wait_until(lambda: abs(self.litnodes[1].get_balance(self.coins[0]['code'])['TxoTotal'] - 50000000) < self.coins[0]["feerate"] * 2000)
+        assert abs(self.balance + 950000000 - self.litnodes[0].get_balance(self.coins[0]['code'])['TxoTotal']) < self.coins[0]["feerate"] * 2000
 
         self.log_balances(self.coins[0]['code'])
 

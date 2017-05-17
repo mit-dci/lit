@@ -165,7 +165,7 @@ class LitTest():
         log_str = "Balances:"
         for node in self.litnodes:
             log_str += " litnode%s: " % node.index
-            log_str += str(node.get_balance(coin_type))
+            log_str += str(node.get_balance(coin_type)['TxoTotal'])
         self.log.info(log_str)
 
     def log_channel_balance(self, node1, node1_chan, node2, node2_chan):
