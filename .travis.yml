@@ -3,6 +3,7 @@ language: go
 go:
   - 1.8
 sudo: required
+go_import_path: github.com/mit-dci/lit
 cache:
   directories:
   - bitcoin-0.14.1
