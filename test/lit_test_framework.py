@@ -179,10 +179,18 @@ class LitTest():
     def _getargs(self):
         """Parse arguments and pass through unrecognised args"""
         parser = argparse.ArgumentParser(description=__doc__)
+        parser.add_argument("--chains", "-c", default='reg', help="comma-separated list of coins to use for the test.")
         parser.add_argument("--debugger", "-d", action='store_true', help="Automatically attach a debugger on test failure.")
         parser.add_argument("--loglevel", "-l", default="INFO", help="log events at this level and higher to the console. Can be set to DEBUG, INFO, WARNING, ERROR or CRITICAL. Passing --loglevel DEBUG will output all logs to console. Note that logs at all levels are always written to the test_framework.log file in the temporary test directory.")
         parser.add_argument("--nocleanup", "-n", action='store_true', help="Don't clean up the test directory after running (even on success).")
         self.args, self.unknown_args = parser.parse_known_args()
+
+        coins = self.args.chains.split(',')
+        for coin in coins:
+            if coin not in COINS:
+                print("coin '%s' does not exist! Allowed coins are %s" % (coin, [coin for coin in COINS.keys()]))
+                sys.exit(1)
+        self.coins = [COINS[coin] for coin in coins]
 
     def _start_logging(self):
         """Add logging"""
