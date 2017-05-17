@@ -52,5 +52,5 @@ class LitNode():
         balances = self.rpc.Balance()['result']['Balances']
         for balance in balances:
             if balance['CoinType'] == coin_type:
-                return balance['TxoTotal']
+                return balance
         raise AssertionError("No balance for coin_type %s" % coin_type)

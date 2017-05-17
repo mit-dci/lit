@@ -92,7 +92,7 @@ class LitTest():
 
     def cleanup(self):
         """Cleanup test resources"""
-        if self.rc == 1:
+        if self.rc != 0 and self.args.dumplogs:
             # Dump the end of the debug logs, to aid in debugging rare
             # travis failures.
             filenames = [self.tmpdir + "/test_framework.log"]
@@ -165,7 +165,8 @@ class LitTest():
         log_str = "Balances:"
         for node in self.litnodes:
             log_str += " litnode%s: " % node.index
-            log_str += str(node.get_balance(coin_type))
+            balance = node.get_balance(coin_type)
+            log_str += "%s/%s/%s" % (balance['MatureWitty'], balance['TxoTotal'], balance['ChanTotal'])
         self.log.info(log_str)
 
     def log_channel_balance(self, node1, node1_chan, node2, node2_chan):
@@ -181,6 +182,7 @@ class LitTest():
         parser = argparse.ArgumentParser(description=__doc__)
         parser.add_argument("--chains", "-c", default='reg', help="comma-separated list of coins to use for the test.")
         parser.add_argument("--debugger", "-d", action='store_true', help="Automatically attach a debugger on test failure.")
+        parser.add_argument("--dumplogs", action='store_true', help="Dump all logs to screen on failure (useful for travis failures).")
         parser.add_argument("--loglevel", "-l", default="INFO", help="log events at this level and higher to the console. Can be set to DEBUG, INFO, WARNING, ERROR or CRITICAL. Passing --loglevel DEBUG will output all logs to console. Note that logs at all levels are always written to the test_framework.log file in the temporary test directory.")
         parser.add_argument("--nocleanup", "-n", action='store_true', help="Don't clean up the test directory after running (even on success).")
         self.args, self.unknown_args = parser.parse_known_args()
