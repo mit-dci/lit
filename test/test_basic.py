@@ -21,7 +21,15 @@ from lit_test_framework import LitTest, wait_until
 
 class TestBasic(LitTest):
     def run_test(self):
+        self._ready_coinnode()
+        self._ready_litnodes()
+        self._ready_litnode_for_channel()
+        self._open_channel()
+        self._push_funds_through_channel()
+        self._close_channel()
 
+    def _ready_coinnode(self):
+        """Starts a coin node and makes sure it's segwit activated."""
         # Start a coin node
         self.add_coinnode(self.coins[0])
         self.coinnodes[0].start_node()
@@ -32,6 +40,8 @@ class TestBasic(LitTest):
         network_info = self.coinnodes[0].getblockchaininfo().json()['result']
         assert network_info['bip9_softforks']['segwit']['status'] == 'active'
 
+    def _ready_litnodes(self):
+        """Start two lit nodes and connect them."""
         # Start lit node 0 and open websocket connection
         self.add_litnode()
         self.litnodes[0].args.extend([self.coins[0]["wallit_code"], "127.0.0.1"])
@@ -56,8 +66,9 @@ class TestBasic(LitTest):
         assert len(self.litnodes[1].ListConnections()['result']['Connections']) == 1
         self.log.info("lit nodes connected")
 
+    def _ready_litnode_for_channel(self):
         self.log.info("Send funds from coin node to lit node 0")
-        balance = self.litnodes[0].get_balance(self.coins[0]['code'])
+        self.balance = self.litnodes[0].get_balance(self.coins[0]['code'])
         self.log_balances(self.coins[0]['code'])
         addr = self.litnodes[0].rpc.Address(NumToMake=1, CoinType=self.coins[0]['code'])
         self.coinnodes[0].sendtoaddress(addr["result"]["LegacyAddresses"][0], 12.34)
@@ -66,8 +77,8 @@ class TestBasic(LitTest):
         self.log.info("Waiting to receive transaction")
 
         # Wait for transaction to be received by lit node
-        wait_until(lambda: self.litnodes[0].get_balance(self.coins[0]['code']) - balance == 1234000000)
-        balance = self.litnodes[0].get_balance(self.coins[0]['code'])
+        wait_until(lambda: self.litnodes[0].get_balance(self.coins[0]['code']) - self.balance == 1234000000)
+        self.balance = self.litnodes[0].get_balance(self.coins[0]['code'])
         self.log.info("Funds received by lit node 0")
         self.log_balances(self.coins[0]['code'])
 
@@ -77,11 +88,12 @@ class TestBasic(LitTest):
         self.confirm_transactions(self.coinnodes[0], self.litnodes[0], 1)
 
         # We'll lose some money to fees.
-        assert balance - self.litnodes[0].get_balance(self.coins[0]['code']) < self.coins[0]["feerate"] * 250
-        balance = self.litnodes[0].get_balance(self.coins[0]['code'])
+        assert self.balance - self.litnodes[0].get_balance(self.coins[0]['code']) < self.coins[0]["feerate"] * 250
+        self.balance = self.litnodes[0].get_balance(self.coins[0]['code'])
         self.log.info("Funds transferred to segwit address")
         self.log_balances(self.coins[0]['code'])
 
+    def _open_channel(self):
         self.log.info("Open channel from lit node 0 to lit node 1")
         assert self.litnodes[0].ChannelList()['result']['Channels'] == []
         assert self.litnodes[1].ChannelList()['result']['Channels'] == []
@@ -95,8 +107,8 @@ class TestBasic(LitTest):
         assert len(self.litnodes[1].ChannelList()['result']['Channels']) > 0
         self.log.info("Channel open")
 
-        assert abs(balance - self.litnodes[0].get_balance(self.coins[0]['code']) - 1000000000) < self.coins[0]["feerate"] * 250
-        balance = self.litnodes[0].get_balance(self.coins[0]['code'])
+        assert abs(self.balance - self.litnodes[0].get_balance(self.coins[0]['code']) - 1000000000) < self.coins[0]["feerate"] * 250
+        self.balance = self.litnodes[0].get_balance(self.coins[0]['code'])
         self.log_balances(self.coins[0]['code'])
 
         litnode0_channel = self.litnodes[0].ChannelList()['result']['Channels'][0]
@@ -113,6 +125,8 @@ class TestBasic(LitTest):
         assert litnode1_channel['MyBalance'] == 0
 
         self.log_channel_balance(self.litnodes[0], 0, self.litnodes[1], 0)
+
+    def _push_funds_through_channel(self):
         self.log.info("Now push some funds from lit node 0 to lit node 1")
 
         self.litnodes[0].Push(ChanIdx=1, Amt=100000000)
@@ -134,12 +148,13 @@ class TestBasic(LitTest):
 
         self.log_channel_balance(self.litnodes[0], 0, self.litnodes[1], 0)
 
+    def _close_channel(self):
         self.log.info("Close channel")
         self.litnodes[0].CloseChannel(ChanIdx=1)
         self.confirm_transactions(self.coinnodes[0], self.litnodes[0], 1)
 
         wait_until(lambda: abs(self.litnodes[1].get_balance(self.coins[0]['code']) - 50000000) < self.coins[0]["feerate"] * 2000)
-        assert abs(balance + 950000000 - self.litnodes[0].get_balance(self.coins[0]['code'])) < self.coins[0]["feerate"] * 2000
+        assert abs(self.balance + 950000000 - self.litnodes[0].get_balance(self.coins[0]['code'])) < self.coins[0]["feerate"] * 2000
 
         self.log_balances(self.coins[0]['code'])
 
