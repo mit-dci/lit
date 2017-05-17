@@ -21,6 +21,24 @@ import traceback
 from bcnode import BCNode, LCNode
 from litnode import LitNode
 
+COINS = {
+    "reg": {
+        "longname": "Bitcoin_regtest",
+        "code": 257,
+        "feerate": 80,
+        "class": BCNode,
+        "wallit_code": "-reg"
+    },
+    "ltr": {
+        "longname": "Litecoin_regtest",
+        "code": 258,
+        "feerate": 800,
+        "class": LCNode,
+        "wallit_code": "-ltr"
+    }
+}
+
+
 class LitTest():
     """A lit test case"""
 
@@ -41,6 +59,7 @@ class LitTest():
         except (OSError, subprocess.SubprocessError):
             pass
         self.litnodes = []
+        self.coinnodes = []
         self.bcnodes = []
         self.lcnodes = []
         self.tmpdir = tempfile.mkdtemp(prefix="test")
@@ -89,6 +108,13 @@ class LitTest():
                     print("Opening file %s failed." % fn)
                     traceback.print_exc()
 
+        for bcnode in self.coinnodes:
+            bcnode.stop()
+            try:
+                bcnode.process.wait(2)
+            except subprocess.TimeoutExpired:
+                bcnode.process.kill()
+
         for bcnode in self.bcnodes:
             bcnode.stop()
             try:
@@ -117,6 +143,9 @@ class LitTest():
             self.log.warning("Not cleaning up %s" % self.tmpdir)
 
     # Helper methods. Can be called by test case subclasses
+    def add_coinnode(self, coin):
+        self.coinnodes.append(coin["class"](self.tmpdir))
+
     def add_litnode(self):
         self.litnodes.append(LitNode(self.tmpdir))
 
@@ -125,6 +154,12 @@ class LitTest():
 
     def add_lcnode(self):
         self.lcnodes.append(LCNode(self.tmpdir))
+
+    def confirm_transactions(self, coin_node, lit_node, no_transactions):
+        wait_until(lambda: coin_node.getmempoolinfo().json()['result']['size'] == no_transactions)
+        coin_node.generate(1)
+        self.chain_height += 1
+        wait_until(lambda: lit_node.Balance()['result']["Balances"][0]["SyncHeight"] == self.chain_height)
 
     def log_balances(self, coin_type):
         log_str = "Balances:"
@@ -144,10 +179,18 @@ class LitTest():
     def _getargs(self):
         """Parse arguments and pass through unrecognised args"""
         parser = argparse.ArgumentParser(description=__doc__)
+        parser.add_argument("--chains", "-c", default='reg', help="comma-separated list of coins to use for the test.")
         parser.add_argument("--debugger", "-d", action='store_true', help="Automatically attach a debugger on test failure.")
         parser.add_argument("--loglevel", "-l", default="INFO", help="log events at this level and higher to the console. Can be set to DEBUG, INFO, WARNING, ERROR or CRITICAL. Passing --loglevel DEBUG will output all logs to console. Note that logs at all levels are always written to the test_framework.log file in the temporary test directory.")
         parser.add_argument("--nocleanup", "-n", action='store_true', help="Don't clean up the test directory after running (even on success).")
         self.args, self.unknown_args = parser.parse_known_args()
+
+        coins = self.args.chains.split(',')
+        for coin in coins:
+            if coin not in COINS:
+                print("coin '%s' does not exist! Allowed coins are %s" % (coin, [coin for coin in COINS.keys()]))
+                sys.exit(1)
+        self.coins = [COINS[coin] for coin in coins]
 
     def _start_logging(self):
         """Add logging"""

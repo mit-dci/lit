@@ -23,6 +23,6 @@ script:
   - go get -v ./...
   - go test ./...
   - go build
-  - test/test_basic.py
-  - test/test_lc.py
+  - test/test_basic.py -c reg
+  - test/test_basic.py -c ltr
 
