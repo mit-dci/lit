@@ -153,8 +153,13 @@ class TestBasic(LitTest):
         self.litnodes[0].CloseChannel(ChanIdx=1)
         self.confirm_transactions(self.coinnodes[0], self.litnodes[0], 1)
 
+        # Make sure balances are as expected
         wait_until(lambda: abs(self.litnodes[1].get_balance(self.coins[0]['code'])['TxoTotal'] - 50000000) < self.coins[0]["feerate"] * 2000)
-        assert abs(self.balance + 950000000 - self.litnodes[0].get_balance(self.coins[0]['code'])['TxoTotal']) < self.coins[0]["feerate"] * 2000
+        litnode1_balance = self.litnodes[1].get_balance(self.coins[0]['code'])
+        assert litnode1_balance['TxoTotal'] == litnode1_balance['MatureWitty']
+        litnode0_balance = self.litnodes[0].get_balance(self.coins[0]['code'])
+        assert abs(self.balance + 950000000 - litnode0_balance['TxoTotal']) < self.coins[0]["feerate"] * 2000
+        assert litnode0_balance['TxoTotal'] == litnode0_balance['MatureWitty']
 
         self.log_balances(self.coins[0]['code'])
 

@@ -47,7 +47,7 @@ class LitNode():
     def __getattr__(self, name):
         return self.rpc.__getattr__(name)
 
-    def get_balance(self, coin_type,):
+    def get_balance(self, coin_type):
         # convenience method for grabbing the node balance
         balances = self.rpc.Balance()['result']['Balances']
         for balance in balances:
