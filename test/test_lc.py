@@ -140,8 +140,8 @@ class TestLC(LitTest):
         self.litnodes[0].CloseChannel(ChanIdx=1)
         self.confirm_transactions(self.lcnodes[0], self.litnodes[0], 1)
 
-        wait_until(lambda: abs(self.litnodes[1].get_balance(LC_REGTEST) - 50000000) < 200000)
-        assert abs(balance + 950000000 - self.litnodes[0].get_balance(LC_REGTEST)) < 200000
+        wait_until(lambda: abs(self.litnodes[1].get_balance(LC_REGTEST) - 50000000) < 1000000)
+        assert abs(balance + 950000000 - self.litnodes[0].get_balance(LC_REGTEST)) < 1000000
 
         self.log_balances(LC_REGTEST)
 
