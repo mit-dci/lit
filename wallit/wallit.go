@@ -8,12 +8,12 @@ import (
 	"sync"
 
 	"github.com/adiabat/btcd/blockchain"
-	"github.com/adiabat/btcd/chaincfg"
 	"github.com/adiabat/btcd/chaincfg/chainhash"
 	"github.com/adiabat/btcd/wire"
 	"github.com/adiabat/btcutil"
 	"github.com/adiabat/btcutil/hdkeychain"
 	"github.com/boltdb/bolt"
+	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 )
@@ -33,7 +33,7 @@ type Wallit struct {
 	OPEventChan chan lnutil.OutPointEvent
 
 	// Params live here...
-	Param *chaincfg.Params // network parameters (testnet3, segnet, etc)
+	Param *coinparam.Params // network parameters (testnet3, segnet, etc)
 
 	// Hook is the connection to a blockchain.
 	Hook ChainHook

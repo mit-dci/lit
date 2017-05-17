@@ -1,11 +1,14 @@
 package litrpc
 
 import (
+	"errors"
 	"fmt"
+
+	"golang.org/x/crypto/ripemd160"
 
 	"github.com/adiabat/bech32"
 	"github.com/adiabat/btcd/wire"
-	"github.com/adiabat/btcutil"
+	"github.com/adiabat/btcutil/base58"
 	"github.com/mit-dci/lit/portxo"
 )
 
@@ -387,11 +390,11 @@ func (r *LitRPC) Address(args *AddressArgs, reply *AddressReply) error {
 
 		param := r.Node.SubWallet[ctypesPerAdr[i]].Params()
 
-		oldadr, err := btcutil.NewAddressPubKeyHash(a[:], param)
+		oldadr, err := oldAddressPubKeyHash(a[:], param.PubKeyHashAddrID)
 		if err != nil {
 			return err
 		}
-		reply.LegacyAddresses[i] = oldadr.String()
+		reply.LegacyAddresses[i] = oldadr
 
 		// convert 20-byte PKH to a bech32 segwit v0 address
 		bech32adr, err := bech32.SegWitV0Encode(param.Bech32Prefix, a[:])
@@ -403,4 +406,12 @@ func (r *LitRPC) Address(args *AddressArgs, reply *AddressReply) error {
 	}
 
 	return nil
+}
+
+func oldAddressPubKeyHash(pkHash []byte, netID byte) (string, error) {
+	// Check for a valid pubkey hash length.
+	if len(pkHash) != ripemd160.Size {
+		return "", errors.New("pkHash must be 20 bytes")
+	}
+	return base58.CheckEncode(pkHash, netID), nil
 }

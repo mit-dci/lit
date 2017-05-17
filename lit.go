@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/adiabat/btcd/chaincfg"
+	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/litbamf"
 	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/lnutil"
@@ -40,7 +40,7 @@ type LitConfig struct {
 	rpcport    uint16
 	litHomeDir string
 
-	Params *chaincfg.Params
+	Params *coinparam.Params
 }
 
 func setConfig(lc *LitConfig) {
@@ -92,7 +92,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *LitConfig) error {
 	var err error
 	// try regtest
 	if conf.reghost != "" {
-		p := &chaincfg.RegressionNetParams
+		p := &coinparam.RegressionNetParams
 		if !strings.Contains(conf.reghost, ":") {
 			conf.reghost = conf.reghost + ":" + p.DefaultPort
 		}
@@ -104,7 +104,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *LitConfig) error {
 	}
 	// try testnet3
 	if conf.tn3host != "" {
-		p := &chaincfg.TestNet3Params
+		p := &coinparam.TestNet3Params
 		if !strings.Contains(conf.tn3host, ":") {
 			conf.tn3host = conf.tn3host + ":" + p.DefaultPort
 		}
@@ -116,7 +116,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *LitConfig) error {
 	}
 	// try litecoin regtest
 	if conf.litereghost != "" {
-		p := &chaincfg.LiteRegNetParams
+		p := &coinparam.LiteRegNetParams
 		if !strings.Contains(conf.litereghost, ":") {
 			conf.litereghost = conf.litereghost + ":" + p.DefaultPort
 		}
@@ -128,7 +128,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *LitConfig) error {
 
 	// try litecoin testnet4
 	if conf.lt4host != "" {
-		p := &chaincfg.LiteCoinTestNet4Params
+		p := &coinparam.LiteCoinTestNet4Params
 		if !strings.Contains(conf.lt4host, ":") {
 			conf.lt4host = conf.lt4host + ":" + p.DefaultPort
 		}

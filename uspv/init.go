@@ -35,7 +35,7 @@ func (s *SPVCon) Connect(remoteNode string) error {
 	myMsgVer.AddService(wire.SFNodeWitness)
 	// this actually sends
 	n, err := wire.WriteMessageWithEncodingN(
-		s.con, myMsgVer, s.localVersion, s.Param.Net, wire.LatestEncoding)
+		s.con, myMsgVer, s.localVersion, wire.BitcoinNet(s.Param.NetMagicBytes), wire.LatestEncoding)
 	if err != nil {
 		return err
 	}
@@ -43,7 +43,7 @@ func (s *SPVCon) Connect(remoteNode string) error {
 	log.Printf("wrote %d byte version message to %s\n",
 		n, s.con.RemoteAddr().String())
 	n, m, b, err := wire.ReadMessageWithEncodingN(
-		s.con, s.localVersion, s.Param.Net, wire.LatestEncoding)
+		s.con, s.localVersion, wire.BitcoinNet(s.Param.NetMagicBytes), wire.LatestEncoding)
 	if err != nil {
 		return err
 	}
@@ -61,7 +61,7 @@ func (s *SPVCon) Connect(remoteNode string) error {
 	s.remoteHeight = mv.LastBlock
 	mva := wire.NewMsgVerAck()
 	n, err = wire.WriteMessageWithEncodingN(
-		s.con, mva, s.localVersion, s.Param.Net, wire.LatestEncoding)
+		s.con, mva, s.localVersion, wire.BitcoinNet(s.Param.NetMagicBytes), wire.LatestEncoding)
 	if err != nil {
 		return err
 	}

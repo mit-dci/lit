@@ -5,9 +5,9 @@ import (
 	"sort"
 
 	"github.com/adiabat/btcd/btcec"
-	"github.com/adiabat/btcd/chaincfg"
 	"github.com/adiabat/btcd/chaincfg/chainhash"
 	"github.com/adiabat/btcd/wire"
+	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 )
@@ -45,7 +45,7 @@ func (w *Wallit) PushTx(tx *wire.MsgTx) error {
 	return w.Hook.PushTx(tx)
 }
 
-func (w *Wallit) Params() *chaincfg.Params {
+func (w *Wallit) Params() *coinparam.Params {
 	return w.Param
 }
 
