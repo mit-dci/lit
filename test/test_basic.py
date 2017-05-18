@@ -147,6 +147,7 @@ class TestBasic(LitTest):
         assert litnode1_channel['MyBalance'] == 50000000
 
         self.log_channel_balance(self.litnodes[0], 0, self.litnodes[1], 0)
+        self.log_balances(self.coins[0]['code'])
 
     def _close_channel(self):
         self.log.info("Close channel")

@@ -70,7 +70,7 @@ func (r *LitRPC) Balance(args *NoArgs, reply *BalanceReply) error {
 
 		// iterate through channels to figure out how much we have
 		for _, q := range qcs {
-			if q.Coin() == cointype {
+			if q.Coin() == cointype && !q.CloseData.Closed {
 				cbr.ChanTotal += q.State.MyAmt
 			}
 		}
