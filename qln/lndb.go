@@ -116,8 +116,8 @@ type LitNode struct {
 	// Nodes don't have Params; their SubWallets do
 	// Param *chaincfg.Params // network parameters (testnet3, segnet, etc)
 
-	// queue for async messages to RPC user
-	UserMessageBox chan string
+	// chan for storing received chat messages for connected users
+	UserChat chan lnutil.ChatMsg
 
 	// The port(s) in which it listens for incoming connections
 	LisIpPorts []string

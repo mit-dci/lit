@@ -10,13 +10,7 @@ import (
 func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) error {
 	switch msg.MsgType() & 0xf0 {
 	case 0x00: // TEXT MESSAGE.  SIMPLE
-		chat, ok := msg.(lnutil.ChatMsg)
-		if !ok {
-			return fmt.Errorf("can't cast to chat message")
-		}
-		nd.UserMessageBox <- fmt.Sprintf(
-			"\nmsg from %s: %s", lnutil.White(msg.Peer()), lnutil.Green(chat.Text))
-		return nil // no error
+		return nd.BroadcastChatMessage(msg)
 
 	case 0x10: //Making Channel, or using
 		return nd.ChannelHandler(msg, peer)
@@ -50,7 +44,26 @@ func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) er
 		return fmt.Errorf("Unknown message id byte %x &f0", msg.MsgType())
 
 	}
+}
 
+// BroadcastMessage sends a chat message to all connected websocket clients
+func (nd *LitNode) BroadcastChatMessage(msg lnutil.LitMsg) error {
+	chat, ok := msg.(lnutil.ChatMsg)
+	if !ok {
+		return fmt.Errorf("can't cast to chat message")
+	}
+	// queue messages for listening peers
+	// we keep trying to write to the channel and if it's full the oldest message gets dropped
+	writePending := true
+	for writePending {
+		select {
+		case nd.UserChat <- chat:
+			writePending = false
+		default:
+			<-nd.UserChat
+		}
+	}
+	return nil
 }
 
 // Every lndc has one of these running

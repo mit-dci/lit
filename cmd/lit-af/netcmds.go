@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/mit-dci/lit/litrpc"
@@ -29,25 +30,6 @@ var conCommand = &Command{
 		"(printed when listening using the lis command), on the given host.",
 		"A port may be provided; if omitted, 2448 is used."),
 	ShortDescription: "Make a connection to another host by connecting to their pubkeyhash\n",
-}
-
-// RequestAsync keeps requesting messages from the server.  The server blocks
-// and will send a response once it gets one.  Once the rpc client receives a
-// response, it will immediately request another.
-func (lc *litAfClient) RequestAsync() {
-	for {
-		args := new(litrpc.NoArgs)
-		reply := new(litrpc.StatusReply)
-
-		err := lc.rpccon.Call("LitRPC.GetMessages", args, reply)
-		if err != nil {
-			fmt.Fprintf(color.Output, "RequestAsync error %s\n", lnutil.Red(err.Error()))
-			break
-			// end loop on first error.  it's probably a connection error
-
-		}
-		fmt.Fprintf(color.Output, "%s\n", reply.Status)
-	}
 }
 
 // Lis starts listening.  Takes args of port to listen on.
@@ -106,6 +88,40 @@ func (lc *litAfClient) Connect(textArgs []string) error {
 
 	fmt.Fprintf(color.Output, "%s\n", reply.Status)
 	return nil
+}
+
+func (lc *litAfClient) CheckChatMessages() {
+	var err error
+
+	// the ticker will activate approximately every half second
+	chatTicker := time.NewTicker(time.Nanosecond * 500000000)
+
+	for {
+		select {
+		case <-chatTicker.C:
+			args := new(litrpc.NoArgs)
+			reply := new(litrpc.CheckChatMessagesReply)
+
+			err = lc.rpccon.Call("LitRPC.CheckChatMessages", args, reply)
+			if err != nil {
+				fmt.Fprintf(color.Output, "CheckChatMessages error %s\n", lnutil.Red(err.Error()))
+				break
+			}
+
+			if reply.Status {
+				chat := new(lnutil.ChatMsg)
+				err = lc.rpccon.Call("LitRPC.GetChatMessage", args, chat)
+
+				if err != nil {
+					fmt.Fprintf(color.Output, "GetChatMessage error %s\n", lnutil.Red(err.Error()))
+					break
+				}
+
+				fmt.Fprintf(color.Output,
+					"\nmsg from %s: %s\n", lnutil.White(chat.PeerIdx), lnutil.Green(chat.Text))
+			}
+		}
+	}
 }
 
 func (lc *litAfClient) Say(textArgs []string) error {

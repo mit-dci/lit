@@ -98,8 +98,7 @@ func main() {
 	defer wsConn.Close()
 
 	lc.rpccon = jsonrpc.NewClient(wsConn)
-
-	go lc.RequestAsync()
+	go lc.CheckChatMessages()
 
 	rl, err := readline.NewEx(&readline.Config{
 		Prompt:       lnutil.Prompt("lit-af") + lnutil.White("# "),

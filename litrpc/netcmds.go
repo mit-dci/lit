@@ -116,9 +116,24 @@ func (r *LitRPC) GetListeningPorts(args NoArgs, reply *ListeningPortsReply) erro
 	return nil
 }
 
-// ------- receive chat
-func (r *LitRPC) GetMessages(args NoArgs, reply *StatusReply) error {
-	reply.Status = <-r.Node.UserMessageBox
+type CheckChatMessagesReply struct {
+	Status bool
+}
+
+func (r *LitRPC) CheckChatMessages(args NoArgs, reply *CheckChatMessagesReply) error {
+	reply.Status = len(r.Node.UserChat) > 0
+
+	return nil
+}
+
+func (r *LitRPC) GetChatMessage(args NoArgs, reply *lnutil.ChatMsg) error {
+	select {
+	case chat := <-r.Node.UserChat:
+		*reply = chat
+	default:
+		//if there are no new message then there is nothing to return
+	}
+
 	return nil
 }
 
