@@ -118,8 +118,6 @@ type LitNode struct {
 
 	// chan for storing received chat messages for connected users
 	UserChat chan lnutil.ChatMsg
-	// this is used to make sure each user pulls from a different channel
-	UserSelector int
 
 	// The port(s) in which it listens for incoming connections
 	LisIpPorts []string

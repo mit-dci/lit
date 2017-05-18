@@ -53,7 +53,16 @@ func (nd *LitNode) BroadcastChatMessage(msg lnutil.LitMsg) error {
 		return fmt.Errorf("can't cast to chat message")
 	}
 	// queue messages for listening peers
-	nd.UserChat <- chat
+	// we keep trying to write to the channel and if it's full the oldest message gets dropped
+	writePending := true
+	for writePending {
+		select {
+		case nd.UserChat <- chat:
+			writePending = false
+		default:
+			<-nd.UserChat
+		}
+	}
 	return nil
 }
 

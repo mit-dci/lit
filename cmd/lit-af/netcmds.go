@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/mit-dci/lit/litrpc"
@@ -87,6 +88,40 @@ func (lc *litAfClient) Connect(textArgs []string) error {
 
 	fmt.Fprintf(color.Output, "%s\n", reply.Status)
 	return nil
+}
+
+func (lc *litAfClient) CheckChatMessages() {
+	var err error
+
+	// the ticker will activate approximately every half second
+	chatTicker := time.NewTicker(time.Nanosecond * 500000000)
+
+	for {
+		select {
+		case <-chatTicker.C:
+			args := new(litrpc.NoArgs)
+			reply := new(litrpc.CheckChatMessagesReply)
+
+			err = lc.rpccon.Call("LitRPC.CheckChatMessages", args, reply)
+			if err != nil {
+				fmt.Fprintf(color.Output, "CheckChatMessages error %s\n", lnutil.Red(err.Error()))
+				break
+			}
+
+			if reply.Status {
+				chat := new(lnutil.ChatMsg)
+				err = lc.rpccon.Call("LitRPC.GetChatMessage", args, chat)
+
+				if err != nil {
+					fmt.Fprintf(color.Output, "GetChatMessage error %s\n", lnutil.Red(err.Error()))
+					break
+				}
+
+				fmt.Fprintf(color.Output,
+					"\nmsg from %s: %s\n", lnutil.White(chat.PeerIdx), lnutil.Green(chat.Text))
+			}
+		}
+	}
 }
 
 func (lc *litAfClient) Say(textArgs []string) error {

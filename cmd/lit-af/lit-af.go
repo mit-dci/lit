@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/rpc"
+	"net/rpc/jsonrpc"
 	"os"
 	"path/filepath"
 	"strings"
@@ -96,7 +97,8 @@ func main() {
 	}
 	defer wsConn.Close()
 
-	lc.CreateRPCCon(wsConn)
+	lc.rpccon = jsonrpc.NewClient(wsConn)
+	go lc.CheckChatMessages()
 
 	rl, err := readline.NewEx(&readline.Config{
 		Prompt:       lnutil.Prompt("lit-af") + lnutil.White("# "),
