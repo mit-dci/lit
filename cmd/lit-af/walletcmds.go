@@ -168,6 +168,84 @@ func (lc *litAfClient) Fan(textArgs []string) error {
 	return nil
 }
 
+// ------------------ get / set fee
+
+func (lc *litAfClient) Fee(textArgs []string) error {
+
+	reply := new(litrpc.FeeReply)
+
+	SetArgs := new(litrpc.SetFeeArgs)
+	GetArgs := new(litrpc.FeeArgs)
+
+	// whether we are setting the fee or not
+	var set bool
+	// There is an argument. That's the coin type. (coin type 0 means default)
+	if len(textArgs) > 0 {
+		feeint, err := strconv.Atoi(textArgs[0])
+		if err != nil {
+			fmt.Printf("Can't set fee to %s, querying current fee instead\n", textArgs[0])
+		} else {
+			set = true
+			SetArgs.Fee = int64(feeint)
+		}
+	}
+
+	if len(textArgs) > 1 {
+		coinint, err := strconv.Atoi(textArgs[1])
+		if err != nil {
+			return err
+		}
+		SetArgs.CoinType = uint32(coinint)
+		GetArgs.CoinType = uint32(coinint)
+	}
+
+	if set {
+		err := lc.rpccon.Call("LitRPC.SetFee", SetArgs, reply)
+		if err != nil {
+			return err
+		}
+	} else {
+		err := lc.rpccon.Call("LitRPC.Fee", GetArgs, reply)
+		if err != nil {
+			return err
+		}
+
+	}
+
+	fmt.Printf("Current fee rate %d sat / byte\n", reply.CurrentFee)
+
+	return nil
+}
+
+// ------------------ set fee
+
+func (lc *litAfClient) SetFee(textArgs []string) error {
+
+	args := new(litrpc.SetFeeArgs)
+	reply := new(litrpc.FeeReply)
+
+	// there is at least 1 argument; that should be the new fee rate
+	if len(textArgs) > 0 {
+		feeint, err := strconv.Atoi(textArgs[0])
+		if err != nil {
+			return err
+		}
+		args.Fee = int64(feeint)
+	}
+	// there is another argument. That's the coin type. (coin type 0 means default)
+	if len(textArgs) > 1 {
+		coinint, err := strconv.Atoi(textArgs[1])
+		if err != nil {
+			return err
+		}
+		args.CoinType = uint32(coinint)
+	}
+
+	fmt.Printf("Current fee rate %d sat / byte\n", reply.CurrentFee)
+
+	return nil
+}
+
 // Address makes new addresses
 func (lc *litAfClient) Address(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {

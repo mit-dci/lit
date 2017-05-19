@@ -3,6 +3,7 @@ language: go
 go:
   - 1.8
 sudo: required
+go_import_path: github.com/mit-dci/lit
 cache:
   directories:
   - bitcoin-0.14.1
@@ -23,5 +24,8 @@ script:
   - go get -v ./...
   - go test ./...
   - go build
-  - test/test_basic.py
+  - test/test_basic.py -c reg --dumplogs
+  - test/test_basic.py -c ltr --dumplogs
+  - test/test_break.py -c reg --dumplogs
+  - test/test_break.py -c ltr --dumplogs
 

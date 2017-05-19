@@ -178,18 +178,16 @@ func (nd *LitNode) PointReqHandler(msg lnutil.PointReqMsg) {
 		return
 	}
 
-	cointype := msg.Cointype
-
-	_, ok := nd.SubWallet[cointype]
+	_, ok := nd.SubWallet[msg.Cointype]
 	if !ok {
-		fmt.Printf("PointReqHandler err no wallet for type %d", cointype)
+		fmt.Printf("PointReqHandler err no wallet for type %d", msg.Cointype)
 		return
 	}
 
 	var kg portxo.KeyGen
 	kg.Depth = 5
 	kg.Step[0] = 44 | 1<<31
-	kg.Step[1] = cointype | 1<<31
+	kg.Step[1] = msg.Cointype | 1<<31
 	kg.Step[2] = UseChannelFund
 	kg.Step[3] = msg.Peer() | 1<<31
 	kg.Step[4] = cIdx | 1<<31
@@ -300,7 +298,9 @@ func (nd LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 	q.State = new(StatCom)
 	q.State.StateIdx = 0
 	q.State.MyAmt = nd.InProg.Amt - nd.InProg.InitSend
-	q.State.Fee = 10000 // fixed fee for now here.
+	// get fee from sub wallet.  Later should make fee per channel and update state
+	// based on size
+	q.State.Fee = nd.SubWallet[q.Coin()].Fee() * 1000
 
 	// save channel to db
 	err = nd.SaveQChan(q)
@@ -341,6 +341,12 @@ func (nd LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 // QChanDescHandler takes in a description of a channel output.  It then
 // saves it to the local db, and returns a channel acknowledgement
 func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
+
+	wal, ok := nd.SubWallet[msg.CoinType]
+	if !ok {
+		fmt.Printf("QChanDescHandler err no wallet for type %d", msg.CoinType)
+		return
+	}
 
 	// deserialize desc
 	op := msg.Outpoint
@@ -387,7 +393,8 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 	qc.State = new(StatCom)
 	// similar to SIGREV in pushpull
 
-	qc.State.Fee = 10000
+	// TODO assumes both parties use same fee
+	qc.State.Fee = wal.Fee() * 1000
 	qc.State.MyAmt = msg.InitPayment
 
 	qc.State.StateIdx = 0
@@ -395,14 +402,6 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 	qc.State.ElkPoint = msg.ElkZero
 	qc.State.NextElkPoint = msg.ElkOne
 	qc.State.N2ElkPoint = msg.ElkTwo
-
-	// create empty elkrem receiver to save
-	//	qc.ElkRcv = new(elkrem.ElkremReceiver)
-	//	err = qc.IngestElkrem(revElk)
-	//	if err != nil { // this can't happen because it's the first elk... remove?
-	//		fmt.Printf("QChanDescHandler err %s", err.Error())
-	//		return
-	//	}
 
 	// save new channel to db
 	err = nd.SaveQChan(qc)

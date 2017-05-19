@@ -4,112 +4,115 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 """Test basic lit functionality
 
-- start bitcoind process
-- start two lit processes
+- start coin node
+- start two lit nodes
 - connect over websocket
 - create new address
 - get balance
-- listen on litnode0
-- connect from litnode1 to litnode0
-- send funds from bitcoind process to litnode0 address
-- open channel between litnode0 and litnode1
-- push funds from litnode0 to litnode1
+- listen on lit node 0
+- connect from lit node 1 to lit node 0
+- send funds from coin node to lit node 0 address
+- open channel between lit node 0 and lit node 1
+- push funds from lit node 0 to lit node 1
 - push funds back
 - close channel co-operatively
 - stop"""
-import time
-
-from bcnode import BCNode
-from litnode import LitNode
 from lit_test_framework import LitTest, wait_until
-
-BC_REGTEST = 257
 
 class TestBasic(LitTest):
     def run_test(self):
+        self._ready_coinnode()
+        self._ready_litnodes()
+        self._ready_litnode_for_channel()
+        self._open_channel()
+        self._push_funds_through_channel()
+        self._close_channel()
 
-        # Start a bitcoind node
-        self.bcnodes = [BCNode(0, self.tmpdir)]
-        self.bcnodes[0].start_node()
-        print("generating 500 blocks")
-        self.bcnodes[0].generate(nblocks=500)
-        # We need segwit to have activated
-        network_info = self.bcnodes[0].getblockchaininfo().json()['result']
-        print(network_info)
+    def _ready_coinnode(self):
+        """Starts a coin node and makes sure it's segwit activated."""
+        # Start a coin node
+        self.add_coinnode(self.coins[0])
+        self.coinnodes[0].start_node()
+
+        self.log.info("Generate 500 blocks to activate segwit")
+        self.coinnodes[0].generate(500)
+        self.chain_height = 500
+        network_info = self.coinnodes[0].getblockchaininfo().json()['result']
         assert network_info['bip9_softforks']['segwit']['status'] == 'active'
 
+    def _ready_litnodes(self):
+        """Start two lit nodes and connect them."""
         # Start lit node 0 and open websocket connection
-        self.litnodes.append(LitNode(0, self.tmpdir))
-        self.litnodes[0].args.extend(["-reg", "127.0.0.1"])
+        self.add_litnode()
+        self.litnodes[0].args.extend([self.coins[0]["wallit_code"], "127.0.0.1"])
         self.litnodes[0].start_node()
-        time.sleep(2)
         self.litnodes[0].add_rpc_connection("127.0.0.1", "8001")
-        print(self.litnodes[0].rpc.new_address())
-        self.litnodes[0].Balance()
 
         # Start lit node 1 and open websocket connection
-        self.litnodes.append(LitNode(1, self.tmpdir))
-        self.litnodes[1].args.extend(["-rpcport", "8002", "-reg", "127.0.0.1"])
+        self.add_litnode()
+        self.litnodes[1].args.extend(["-rpcport", "8002", self.coins[0]["wallit_code"], "127.0.0.1"])
         self.litnodes[1].start_node()
-        time.sleep(1)
         self.litnodes[1].add_rpc_connection("127.0.0.1", "8002")
-        self.litnodes[1].rpc.new_address()
-        self.litnodes[1].Balance()
 
-        # Listen on litnode0 and connect from litnode1
+        self.log.info("Connect lit nodes")
         res = self.litnodes[0].Listen(Port="127.0.0.1:10001")["result"]
         self.litnodes[0].lit_address = res["Adr"] + '@' + res["LisIpPorts"][0]
 
         res = self.litnodes[1].Connect(LNAddr=self.litnodes[0].lit_address)
         assert not res['error']
 
-        time.sleep(1)
         # Check that litnode0 and litnode1 are connected
-        assert len(self.litnodes[0].ListConnections()['result']['Connections']) == 1
+        wait_until(lambda: len(self.litnodes[0].ListConnections()['result']['Connections']) == 1)
         assert len(self.litnodes[1].ListConnections()['result']['Connections']) == 1
+        self.log.info("lit nodes connected")
 
-        # Send funds from the bitcoin node to litnode0
-        balance = self.litnodes[0].get_balance(BC_REGTEST)
-        print("previous bal: " + str(balance))
-        addr = self.litnodes[0].rpc.new_address()
-        self.bcnodes[0].sendtoaddress(address=addr["result"]["LegacyAddresses"][0], amount=12.34)
-        print("New block mined: %s" % self.bcnodes[0].generate(nblocks=1).text)
-        print("waiting to receive transaction")
+    def _ready_litnode_for_channel(self):
+        self.log.info("Send funds from coin node to lit node 0")
+        self.balance = self.litnodes[0].get_balance(self.coins[0]['code'])['TxoTotal']
+        self.log_balances(self.coins[0]['code'])
+        addr = self.litnodes[0].rpc.Address(NumToMake=1, CoinType=self.coins[0]['code'])
+        self.coinnodes[0].sendtoaddress(addr["result"]["LegacyAddresses"][0], 12.34)
+        self.confirm_transactions(self.coinnodes[0], self.litnodes[0], 1)
 
-        # Wait for transaction to be received (15 seconds timeout)
-        wait_until(lambda: self.litnodes[0].get_balance(BC_REGTEST) - balance == 1234000000)
-        balance = self.litnodes[0].get_balance(BC_REGTEST)
+        self.log.info("Waiting to receive transaction")
 
-        # Send money from litnode0 to its own segwit address and confirm
-        print("sending 1000000000 satoshis to litnode1 address")
-        self.bcnodes[0].generate(nblocks=1)
+        # Wait for transaction to be received by lit node
+        wait_until(lambda: self.litnodes[0].get_balance(self.coins[0]['code'])['TxoTotal'] - self.balance == 1234000000)
+        self.balance = self.litnodes[0].get_balance(self.coins[0]['code'])['TxoTotal']
+        self.log.info("Funds received by lit node 0")
+        self.log_balances(self.coins[0]['code'])
+
+        self.log.info("Send money from lit node 0 to its own segwit address and confirm")
+        self.log.info("Sending 1000000000 satoshis to lit node 0 address")
         self.litnodes[0].Send(DestAddrs=[self.litnodes[0].Address()['result']['WitAddresses'][0]], Amts=[1000000000])
-        self.bcnodes[0].generate(nblocks=1)
-        wait_until(lambda: self.litnodes[0].Balance()['result']["Balances"][0]["SyncHeight"] == 503)
-        # We'll lose some money to fees. Hopefully not too much!
-        assert balance - self.litnodes[0].get_balance(BC_REGTEST) < 50000
-        balance = self.litnodes[0].get_balance(BC_REGTEST)
-        print("New balance: %s" % balance)
+        self.confirm_transactions(self.coinnodes[0], self.litnodes[0], 1)
 
-        # Now let's open some channels!
-        print("Opening channel from litnode0 to litnode1")
+        # We'll lose some money to fees.
+        assert self.balance - self.litnodes[0].get_balance(self.coins[0]['code'])['TxoTotal'] < self.coins[0]["feerate"] * 250
+        self.balance = self.litnodes[0].get_balance(self.coins[0]['code'])['TxoTotal']
+        self.log.info("Funds transferred to segwit address")
+        self.log_balances(self.coins[0]['code'])
+
+    def _open_channel(self):
+        self.log.info("Open channel from lit node 0 to lit node 1")
         assert self.litnodes[0].ChannelList()['result']['Channels'] == []
         assert self.litnodes[1].ChannelList()['result']['Channels'] == []
 
-        resp = self.litnodes[0].FundChannel(Peer=1, CoinType=257, Capacity=1000000000)
-        print("FundChannel response: %s" % resp)
+        self.litnodes[0].FundChannel(Peer=1, CoinType=self.coins[0]['code'], Capacity=1000000000)
+        self.confirm_transactions(self.coinnodes[0], self.litnodes[0], 1)
+        self.log.info("lit node 0 has funded channel")
 
         # Wait for channel to open
         wait_until(lambda: len(self.litnodes[0].ChannelList()['result']['Channels']) > 0)
+        assert len(self.litnodes[1].ChannelList()['result']['Channels']) > 0
+        self.log.info("Channel open")
 
-        assert abs(balance - self.litnodes[0].get_balance(BC_REGTEST) - 1000000000) < 50000
-        balance = self.litnodes[0].get_balance(BC_REGTEST)
-        print("New balance: %s" % balance)
+        assert abs(self.balance - self.litnodes[0].get_balance(self.coins[0]['code'])['TxoTotal'] - 1000000000) < self.coins[0]["feerate"] * 250
+        self.balance = self.litnodes[0].get_balance(self.coins[0]['code'])['TxoTotal']
+        self.log_balances(self.coins[0]['code'])
 
         litnode0_channel = self.litnodes[0].ChannelList()['result']['Channels'][0]
         litnode1_channel = self.litnodes[1].ChannelList()['result']['Channels'][0]
-        print(litnode0_channel)
-        print(litnode1_channel)
 
         assert litnode0_channel['Capacity'] == 1000000000
         assert litnode0_channel['StateNum'] == 0
@@ -121,43 +124,45 @@ class TestBasic(LitTest):
         assert not litnode1_channel['Closed']
         assert litnode1_channel['MyBalance'] == 0
 
-        print("Now push some funds from litnode0 to litnode1")
+        self.log_channel_balance(self.litnodes[0], 0, self.litnodes[1], 0)
 
-        resp = self.litnodes[0].Push(ChanIdx=1, Amt=100000000)
-        print("Push response: %s" % resp)
+    def _push_funds_through_channel(self):
+        self.log.info("Now push some funds from lit node 0 to lit node 1")
+
+        self.litnodes[0].Push(ChanIdx=1, Amt=100000000)
 
         litnode0_channel = self.litnodes[0].ChannelList()['result']['Channels'][0]
         litnode1_channel = self.litnodes[1].ChannelList()['result']['Channels'][0]
-        print(litnode0_channel)
-        print(litnode1_channel)
-
         assert litnode0_channel['MyBalance'] == 900000000
         assert litnode1_channel['MyBalance'] == 100000000
 
-        print("push some funds back")
+        self.log_channel_balance(self.litnodes[0], 0, self.litnodes[1], 0)
 
-        resp = self.litnodes[1].Push(ChanIdx=1, Amt=50000000)
-        print("Push response: %s" % resp)
+        self.log.info("Push some funds back")
+        self.litnodes[1].Push(ChanIdx=1, Amt=50000000)
 
         litnode0_channel = self.litnodes[0].ChannelList()['result']['Channels'][0]
         litnode1_channel = self.litnodes[1].ChannelList()['result']['Channels'][0]
-        print(litnode0_channel)
-        print(litnode1_channel)
-
         assert litnode0_channel['MyBalance'] == 950000000
         assert litnode1_channel['MyBalance'] == 50000000
 
-        print("Close channel")
-        resp = self.litnodes[0].CloseChannel(ChanIdx=1)
-        print("Close channel response: %s" % resp)
-        self.bcnodes[0].generate(nblocks=10)
-        wait_until(lambda: self.litnodes[0].Balance()['result']["Balances"][0]["SyncHeight"] == 513)
+        self.log_channel_balance(self.litnodes[0], 0, self.litnodes[1], 0)
+        self.log_balances(self.coins[0]['code'])
 
-        assert abs(self.litnodes[1].get_balance(BC_REGTEST) - 50000000) < 50000
+    def _close_channel(self):
+        self.log.info("Close channel")
+        self.litnodes[0].CloseChannel(ChanIdx=1)
+        self.confirm_transactions(self.coinnodes[0], self.litnodes[0], 1)
 
-        assert abs(balance + 950000000 - self.litnodes[0].get_balance(BC_REGTEST)) < 50000
-        balance = self.litnodes[0].get_balance(BC_REGTEST)
-        print("New balance: %s" % balance)
+        # Make sure balances are as expected
+        wait_until(lambda: abs(self.litnodes[1].get_balance(self.coins[0]['code'])['TxoTotal'] - 50000000) < self.coins[0]["feerate"] * 2000)
+        litnode1_balance = self.litnodes[1].get_balance(self.coins[0]['code'])
+        assert litnode1_balance['TxoTotal'] == litnode1_balance['MatureWitty']
+        litnode0_balance = self.litnodes[0].get_balance(self.coins[0]['code'])
+        assert abs(self.balance + 950000000 - litnode0_balance['TxoTotal']) < self.coins[0]["feerate"] * 2000
+        assert litnode0_balance['TxoTotal'] == litnode0_balance['MatureWitty']
+
+        self.log_balances(self.coins[0]['code'])
 
 if __name__ == "__main__":
     exit(TestBasic().main())

@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	"github.com/adiabat/btcd/btcec"
-	"github.com/adiabat/btcd/chaincfg"
 	"github.com/adiabat/btcd/chaincfg/chainhash"
 	"github.com/adiabat/btcd/wire"
+	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 )
@@ -80,7 +80,13 @@ type UWallet interface {
 	BlockMonitor() chan *wire.MsgBlock
 
 	// Ask for network parameters
-	Params() *chaincfg.Params
+	Params() *coinparam.Params
+
+	// Get current fee rate.
+	Fee() int64
+
+	// Set fee rate
+	SetFee(int64) int64
 
 	// ===== TESTING / SPAMMING ONLY, these funcs will not be in the real interface
 	// Sweep sends lots of txs (uint32 of them) to the specified address.

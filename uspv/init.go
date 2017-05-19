@@ -35,7 +35,7 @@ func (s *SPVCon) Connect(remoteNode string) error {
 	myMsgVer.AddService(wire.SFNodeWitness)
 	// this actually sends
 	n, err := wire.WriteMessageWithEncodingN(
-		s.con, myMsgVer, s.localVersion, s.Param.Net, wire.LatestEncoding)
+		s.con, myMsgVer, s.localVersion, wire.BitcoinNet(s.Param.NetMagicBytes), wire.LatestEncoding)
 	if err != nil {
 		return err
 	}
@@ -43,7 +43,7 @@ func (s *SPVCon) Connect(remoteNode string) error {
 	log.Printf("wrote %d byte version message to %s\n",
 		n, s.con.RemoteAddr().String())
 	n, m, b, err := wire.ReadMessageWithEncodingN(
-		s.con, s.localVersion, s.Param.Net, wire.LatestEncoding)
+		s.con, s.localVersion, wire.BitcoinNet(s.Param.NetMagicBytes), wire.LatestEncoding)
 	if err != nil {
 		return err
 	}
@@ -61,7 +61,7 @@ func (s *SPVCon) Connect(remoteNode string) error {
 	s.remoteHeight = mv.LastBlock
 	mva := wire.NewMsgVerAck()
 	n, err = wire.WriteMessageWithEncodingN(
-		s.con, mva, s.localVersion, s.Param.Net, wire.LatestEncoding)
+		s.con, mva, s.localVersion, wire.BitcoinNet(s.Param.NetMagicBytes), wire.LatestEncoding)
 	if err != nil {
 		return err
 	}
@@ -115,22 +115,21 @@ func (s *SPVCon) openHeaderFile(hfn string) error {
 		if os.IsNotExist(err) {
 			var b bytes.Buffer
 			// if StartHeader is defined, start with hardcoded height
-      if s.Param.StartHeader != "" {
-        hdr, err := hex.DecodeString(s.Param.StartHeader)
-				if err != nil {
-					return err
-				}
-				_, err = b.Write(hdr)
-				if err != nil {
-					return err
-				}
-      } else {
-				// start from beginning.
-				err = s.Param.GenesisBlock.Header.Serialize(&b)
-				if err != nil {
-					return err
-				}
-			}
+            if s.Param.StartHeader != "" {
+              hdr, err := hex.DecodeString(s.Param.StartHeader)
+	          if err != nil {
+	           return err
+	          }
+	          _, err = b.Write(hdr)
+	          if err != nil {
+	           return err
+	          }
+            } else {
+	            err = s.Param.GenesisBlock.Header.Serialize(&b)
+	            if err != nil {
+		            return err
+	            }
+            }
 			err = ioutil.WriteFile(hfn, b.Bytes(), 0600)
 			if err != nil {
 				return err
@@ -141,9 +140,9 @@ func (s *SPVCon) openHeaderFile(hfn string) error {
 		}
 	}
   
-  if s.Param.StartHeader != "" {
-    s.headerStartHeight = s.Param.StartHeight
-  }
+    if s.Param.StartHeader != "" {
+        s.headerStartHeight = s.Param.StartHeight
+    }
 
 	s.headerFile, err = os.OpenFile(hfn, os.O_RDWR, 0600)
 	if err != nil {

@@ -1,11 +1,14 @@
 package litrpc
 
 import (
+	"errors"
 	"fmt"
+
+	"golang.org/x/crypto/ripemd160"
 
 	"github.com/adiabat/bech32"
 	"github.com/adiabat/btcd/wire"
-	"github.com/adiabat/btcutil"
+	"github.com/adiabat/btcutil/base58"
 	"github.com/mit-dci/lit/portxo"
 )
 
@@ -67,7 +70,7 @@ func (r *LitRPC) Balance(args *NoArgs, reply *BalanceReply) error {
 
 		// iterate through channels to figure out how much we have
 		for _, q := range qcs {
-			if q.Coin() == cointype {
+			if q.Coin() == cointype && !q.CloseData.Closed {
 				cbr.ChanTotal += q.State.MyAmt
 			}
 		}
@@ -276,6 +279,54 @@ func (r *LitRPC) Fanout(args FanArgs, reply *TxidsReply) error {
 	return nil
 }
 
+// set fee
+type SetFeeArgs struct {
+	Fee      int64
+	CoinType uint32
+}
+
+// get fee
+type FeeArgs struct {
+	CoinType uint32
+}
+type FeeReply struct {
+	CurrentFee int64
+}
+
+// SetFee allows you to set a fee rate for a wallet.
+func (r *LitRPC) SetFee(args *SetFeeArgs, reply *FeeReply) error {
+	// if cointype is 0, use the node's default coin
+	if args.CoinType == 0 {
+		args.CoinType = r.Node.DefaultCoin
+	}
+	if args.Fee < 0 {
+		return fmt.Errorf("Invalid value for SetFee: %d", args.Fee)
+	}
+	// make sure we support that coin type
+	wal, ok := r.Node.SubWallet[args.CoinType]
+	if !ok {
+		return fmt.Errorf("no connnected wallet for coin type %d", args.CoinType)
+	}
+	reply.CurrentFee = wal.SetFee(args.Fee)
+	return nil
+}
+
+// Fee gets th fee rate for a wallet.  If you try to set a negative
+// fee rate, it will return the current rate.
+func (r *LitRPC) Fee(args *FeeArgs, reply *FeeReply) error {
+	// if cointype is 0, use the node's default coin
+	if args.CoinType == 0 {
+		args.CoinType = r.Node.DefaultCoin
+	}
+	// make sure we support that coin type
+	wal, ok := r.Node.SubWallet[args.CoinType]
+	if !ok {
+		return fmt.Errorf("no connnected wallet for coin type %d", args.CoinType)
+	}
+	reply.CurrentFee = wal.Fee()
+	return nil
+}
+
 // ------------------------- address
 type AddressArgs struct {
 	NumToMake uint32
@@ -339,11 +390,11 @@ func (r *LitRPC) Address(args *AddressArgs, reply *AddressReply) error {
 
 		param := r.Node.SubWallet[ctypesPerAdr[i]].Params()
 
-		oldadr, err := btcutil.NewAddressPubKeyHash(a[:], param)
+		oldadr, err := oldAddressPubKeyHash(a[:], param.PubKeyHashAddrID)
 		if err != nil {
 			return err
 		}
-		reply.LegacyAddresses[i] = oldadr.String()
+		reply.LegacyAddresses[i] = oldadr
 
 		// convert 20-byte PKH to a bech32 segwit v0 address
 		bech32adr, err := bech32.SegWitV0Encode(param.Bech32Prefix, a[:])
@@ -355,4 +406,12 @@ func (r *LitRPC) Address(args *AddressArgs, reply *AddressReply) error {
 	}
 
 	return nil
+}
+
+func oldAddressPubKeyHash(pkHash []byte, netID byte) (string, error) {
+	// Check for a valid pubkey hash length.
+	if len(pkHash) != ripemd160.Size {
+		return "", errors.New("pkHash must be 20 bytes")
+	}
+	return base58.CheckEncode(pkHash, netID), nil
 }

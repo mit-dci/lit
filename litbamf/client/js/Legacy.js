@@ -45,7 +45,9 @@ class ActionList extends Reflux.Component {
       lc.send('LitRPC.TxoList'),
       lc.send('LitRPC.Address', {'NumToMake': 0}),
     ], (txs, addrs) => {
-      let transactions = txs.Txos.map(tx => {
+      txs = txs.Txos || [];
+      addrs = addrs || [];
+      let transactions = txs.map(tx => {
         return tx.OutPoint.split(';')[0];
       });
 
@@ -88,7 +90,7 @@ class ActionList extends Reflux.Component {
             <div>{legacyList}</div>
           </div>
           <div>
-            <h3>Lightning Addresses</h3>
+            <h3>Witness Addresses</h3>
             <div>{witList}</div>
           </div>
         </div>
@@ -106,18 +108,24 @@ class Legacy extends Reflux.Component {
     this.state = {
       sendAddress: '',
       sendSatoshis: '',
-      legacy: 0,
-      channel: 0,
-      total: 0,
+      balances: [],
     };
 
     this.store = Store;
   }
   update () {
-    lc.send('LitRPC.Bal').then(balances => {
+    lc.send('LitRPC.Balance').then(balances => {
+      balances = balances.Balances.map(bal => {
+        return {
+          coinType: bal.CoinType,
+          legacy: bal.TxoTotal,
+          channel: bal.ChanTotal,
+          syncHeight: bal.SyncHeight,
+        };
+      }).filter(bal => bal.coinType == 65537);
+
       this.setState({
-        legacy: balances.TxoTotal,
-        channel: balances.ChanTotal,
+        balances: balances,
       });
     })
     .fail(err => {
@@ -167,25 +175,31 @@ class Legacy extends Reflux.Component {
     this.setState(state);
   }
   render () {
+    let balances = this.state.balances.map(bal => {
+      return (
+        <div key={bal.coinType} id="balances">
+          <div>
+            <div>Legacy <span><img src='/images/correct.svg' /></span></div>
+            <div><span>{bal.legacy}</span></div>
+          </div>
+          <div>
+            <div>Channel <span><img src='/images/hourglass.svg' /></span></div>
+            <div><span>{bal.channel}</span></div>
+          </div>
+          <div>
+            <div>Total <span><img src='/images/the-sum-of.svg' /></span></div>
+            <div><span>{bal.legacy + bal.channel}</span></div>
+          </div>
+        </div>
+      );
+    });
+
     return (
       <div>
         <Navbar page="legacy" />
 
         <h2>Balances:</h2>
-        <div id="balances">
-          <div>
-            <div>Legacy <span><img src='/images/correct.svg' /></span></div>
-            <div><span>{this.state.legacy}</span></div>
-          </div>
-          <div>
-            <div>Channel <span><img src='/images/hourglass.svg' /></span></div>
-            <div><span>{this.state.channel}</span></div>
-          </div>
-          <div>
-            <div>Total <span><img src='/images/the-sum-of.svg' /></span></div>
-            <div><span>{this.state.legacy + this.state.channel}</span></div>
-          </div>
-        </div>
+        {balances}
 
         <h2>Wallet Commands</h2>
         <div id="walletbox">

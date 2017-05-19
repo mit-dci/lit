@@ -1,6 +1,6 @@
 import lc from './LitClient';
 
-class NetCmds extends React.Component {
+class NetCmds extends Reflux.Component {
   constructor (props) {
     super(props);
     this.state = {
@@ -12,14 +12,6 @@ class NetCmds extends React.Component {
   }
   listen () {
     lc.send('LitRPC.Listen').then(res => {
-      console.log(res);
-    })
-    .fail(err => {
-      console.error(err);
-    });
-  }
-  say () {
-    lc.send('LitRPC.Say').then(res => {
       console.log(res);
     })
     .fail(err => {

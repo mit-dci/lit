@@ -6,6 +6,7 @@
 
 LitNode represents a lit node. It can be used to start/stop a lit node
 and communicate with it over RPC."""
+import logging
 import os
 import subprocess
 
@@ -13,24 +14,33 @@ from litpy import litrpc
 
 LIT_BIN = "%s/../lit" % os.path.abspath(os.path.dirname(__file__))
 
+logger = logging.getLogger("TestFramework.litnode")
+logger.propogate = False
+
 class LitNode():
     """A class representing a Lit node"""
-    def __init__(self, i, tmp_dir):
-        self.data_dir = tmp_dir + "/litnode%s" % i
+    index = 0
+
+    def __init__(self, tmp_dir):
+        self.index = LitNode.index
+        LitNode.index += 1
+        self.data_dir = tmp_dir + "/litnode%d" % self.index
         os.makedirs(self.data_dir)
 
         # Write a hexkey to the privkey file
         with open(self.data_dir + "/privkey.hex", 'w+') as f:
-            f.write("1" * 63 + str(i) + "\n")
+            f.write("1" * 63 + str(self.index) + "\n")
 
         self.args = ["-dir", self.data_dir]
-        #disable auto-connect to testnet3 and litetest4
+        # disable auto-connect to testnet3 and litetest4
         self.args.extend(['-tn3', '', '-lt4', ''])
-		
+
     def start_node(self):
+        logger.debug("Starting litnode %d with args %s" % (self.index, str(self.args)))
         self.process = subprocess.Popen([LIT_BIN] + self.args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     def add_rpc_connection(self, ip, port):
+        logger.debug("Opening rpc connection to litnode %d: %s:%s" % (self.index, ip, port))
         self.rpc = litrpc.LitConnection(ip, port)
         self.rpc.connect()
 
@@ -42,5 +52,5 @@ class LitNode():
         balances = self.rpc.Balance()['result']['Balances']
         for balance in balances:
             if balance['CoinType'] == coin_type:
-                return balance['TxoTotal']
+                return balance
         raise AssertionError("No balance for coin_type %s" % coin_type)

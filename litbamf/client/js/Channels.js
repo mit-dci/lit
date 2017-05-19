@@ -13,7 +13,7 @@ class Store extends Reflux.Store {
     let selectedChannelIdx = window.sessionStorage.selectedChannelIdx || -1;
 
     this.state = {
-      peers: [],
+      peers: {},
       channels: [],
       selectedPeerIdx: selectedPeerIdx,
       selectedChannelIdx: selectedChannelIdx,
@@ -81,7 +81,7 @@ class PeerModal extends Reflux.Component {
             <h2 id="label-fade">Add Peer</h2>
           </header>
 
-          <form action="#" className="css-modal_content">
+          <form action="javascript:void(0);" className="css-modal_content">
             <div>
               <input id="address" type="text" placeholder="pubkeyhash@hostname:port"
                 value={this.state.address} onChange={this.handleChange.bind(this)}></input>
@@ -137,7 +137,7 @@ class NicknameModal extends Reflux.Component {
             <h2 id="label-fade">Edit Nicknamer</h2>
           </header>
 
-          <form action="#" className="css-modal_content">
+          <form action="javascript:void(0);" className="css-modal_content">
             <div>
               <input id="nickname" type="text" placeholder="nickname"
                 value={this.state.nickname} onChange={this.handleChange.bind(this)}></input>
@@ -164,7 +164,11 @@ class PeerList extends Reflux.Component {
   }
   update () {
     lc.send('LitRPC.ListConnections').then(connections => {
-      let peers = connections.Connections !== null ? connections.Connections : [];
+      connections = connections.Connections !== null ? connections.Connections : [];
+      let peers = {};
+      connections.forEach(conn => {
+        peers[conn.PeerNumber] = conn;
+      });
       Actions.setPeers(peers);
     })
     .fail(err => {
@@ -180,10 +184,11 @@ class PeerList extends Reflux.Component {
     Actions.setSelectedPeerIdx(event.target.value);
   }
   render () {
-    let peerElements = this.state.peers.map((peer, i) => {
-      let idx = i + 1;
+    let peerElements = Object.keys(this.state.peers).map(key => {
+      let peer = this.state.peers[key];
+      let idx = peer.PeerNumber;
       return (
-        <li key={i}>
+        <li key={idx}>
           <label className={this.state.selectedPeerIdx == idx ? 'checked' : ''}>
             <span>{peer.Nickname}</span>
             <input type="radio" onChange={this.changePeer.bind(this)} name="peer" value={idx} />
@@ -213,7 +218,7 @@ class PeerList extends Reflux.Component {
   }
 }
 
-class ChannelElement extends React.Component {
+class ChannelElement extends Reflux.Component {
   constructor (props) {
     super(props);
 
@@ -251,7 +256,7 @@ class ChannelElement extends React.Component {
         <td className="chan-balance">{this.props.balance}</td>
         <td className="chan-state">{this.props.state}</td>
         <td className="chan-zap">
-          <form action="#">
+          <form action="javascript:void(0);">
             <input type="number" placeholder="amount"
               onChange={this.changePushAmount.bind(this)}
               value={this.state.pushAmount}></input>
@@ -356,7 +361,7 @@ class ChannelModal extends Reflux.Component {
             <h2 id="label-fade">Open Channel</h2>
           </header>
 
-          <form action="#" className="css-modal_content">
+          <form action="javascript:void(0);" className="css-modal_content">
             <div>
               <input id="capacity" type="text" placeholder="channel capacity"
                 value={this.state.capacity} onChange={this.handleChange.bind(this)}></input>
@@ -444,17 +449,149 @@ class XtraModal extends Reflux.Component {
   }
 }
 
-class ChanCmds extends React.Component {
+class Chatbox extends Reflux.Component {
+  constructor (props) {
+    super(props);
+
+    this.state = {
+      message: '',
+      conversations: {},
+    };
+    this.store = Store;
+  }
+  say () {
+    lc.send('LitRPC.Say', {
+      'Peer': parseInt(this.state.selectedPeerIdx),
+      'Message': this.state.message,
+    }).then(res => {
+      let date = new Date();
+      let time = date.getHours() + ':' + date.getMinutes();
+
+      let conversations = this.state.conversations;
+      let conversation = conversations[this.state.selectedPeerIdx] || [];
+      conversation.push({
+        isMyMessage: true,
+        name: 'You',
+        message: this.state.message,
+        time: time,
+      });
+      conversations[this.state.selectedPeerIdx] = conversation;
+      this.setState({conversations: conversations});
+      this.state.message = '';
+    })
+    .fail(err => {
+      console.error(err);
+    });
+  }
+  chatHandler (message) {
+    let peer = this.state.peers[message.PeerIdx];
+    //if we receive a message before the peers list is updated
+    //it can't be handled yet
+    if(peer === undefined) {
+      return;
+    }
+
+    let date = new Date();
+    let time = date.getHours() + ':' + date.getMinutes();
+
+    let conversations = this.state.conversations;
+    let conversation = conversations[message.PeerIdx] || [];
+    conversation.push({
+      isMyMessage: false,
+      name: peer.Nickname,
+      message: message.Text,
+      time: time,
+    });
+    conversations[message.PeerIdx] = conversation;
+    this.setState({conversations: conversations});
+  }
+  changeMessage (event) {
+    this.setState({message: event.target.value});
+  }
+  render () {
+
+    let placeholder = 'Message ';
+    let peer = this.state.peers[this.state.selectedPeerIdx];
+    placeholder += peer === undefined ? '' : peer.Nickname;
+
+    let selectedConvo = this.state.conversations[this.state.selectedPeerIdx] || [];
+    let chat = selectedConvo.map(convo => {
+      return (
+        <div className={convo.isMyMessage ? 'myMessage' : ''}>
+          <span className="nickname">[{convo.time}] {convo.name}:</span>
+          <span className="message">{convo.message}</span>
+        </div>
+      );
+    });
+
+    return (
+      <div id="chatbox">
+        <div>
+          {chat}
+        </div>
+        <form action="javascript:void(0);">
+          <input placeholder={placeholder} onChange={this.changeMessage.bind(this)} value={this.state.message} />
+          <button type="submit" onClick={this.say.bind(this)} hidden></button>
+        </form>
+      </div>
+    );
+  }
+  componentDidMount () {
+    lc.register(null, this.chatHandler.bind(this));
+  }
+}
+
+class Channels extends Reflux.Component {
+  constructor (props) {
+    super(props);
+    this.state = {
+      address: '',
+      listening: false,
+    };
+  }
+  getListeningPorts () {
+    lc.send('LitRPC.GetListeningPorts').then(ports => {
+      this.setState({
+        listening: ports.LisIpPorts !== null,
+        address: ports.Adr,
+      });
+    });
+  }
+  listen () {
+    //don't need to bother making the call if we are already listening
+    if(this.state.listening) {
+      return;
+    }
+
+    lc.send('LitRPC.Listen').then(res => {
+      this.getListeningPorts();
+    })
+    .fail(err => {
+      window.alert(err);
+    });
+  }
   render () {
     return (
       <div>
         <Navbar page="channels" />
+        <div id="identity">
+          <h4>Your Channel identity: </h4>
+          <h4>{this.state.address}</h4>
 
-        <div id="chanbox">
-          <PeerList />
-          <ChannelList />
+          <div>
+            <h4>Listening for connections: </h4>
+            <input id="listeningSelector" type="checkbox" className="tgl tgl-flat"
+              checked={this.state.listening ? 'checked' : ''}
+              onChange={this.listen.bind(this)} />
+            <label htmlFor="listeningSelector" className="tgl-btn"></label>
+          </div>
         </div>
-        <div id="chatbox">
+        <div>
+          <PeerList />
+          <div id="boxes">
+            <ChannelList />
+            <Chatbox />
+          </div>
         </div>
 
         <PeerModal />
@@ -464,6 +601,9 @@ class ChanCmds extends React.Component {
       </div>
     );
   }
+  componentDidMount () {
+    this.getListeningPorts();
+  }
 }
 
-export default ChanCmds;
+export default Channels;

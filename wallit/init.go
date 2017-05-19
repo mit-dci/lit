@@ -5,24 +5,24 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/adiabat/btcd/chaincfg"
 	"github.com/adiabat/btcd/wire"
 	"github.com/adiabat/btcutil/hdkeychain"
 	"github.com/boltdb/bolt"
+	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/uspv"
 )
 
 func NewWallit(
 	rootkey *hdkeychain.ExtendedKey, birthHeight int32, resync bool,
-	spvhost, path string, p *chaincfg.Params) *Wallit {
+	spvhost, path string, p *coinparam.Params) *Wallit {
 
 	var w Wallit
 	w.rootPrivKey = rootkey
 	w.Param = p
 	w.FreezeSet = make(map[wire.OutPoint]*FrozenTx)
 
-  w.FeeRate = w.Param.FeePerByte
+    w.FeeRate = w.Param.FeePerByte
 
 	wallitpath := filepath.Join(path, p.Name)
 

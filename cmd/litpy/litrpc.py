@@ -5,9 +5,12 @@
 """Python interface to lit"""
 
 import json
+import logging
 import random
 import time
 import websocket  # `pip install websocket-client`
+
+logger = logging.getLogger("litrpc")
 
 class LitConnection():
     """A class representing a connection to a lit node."""
@@ -17,13 +20,14 @@ class LitConnection():
 
     def connect(self):
         """Connect to the node. Continue trying for 10 seconds"""
+        logger.debug("Opening RPC connection to litnode %s:%s" % (self.ip, self.port))
         self.ws = websocket.WebSocket()
         for _ in range(50):
             try:
                 self.ws.connect("ws://%s:%s/ws" % (self.ip, self.port))
             except ConnectionRefusedError:
                 # lit is not ready to accept connections yet
-                time.sleep(0.2)
+                time.sleep(0.25)
             else:
                 # No exception - we're connected!
                 break
@@ -31,13 +35,17 @@ class LitConnection():
 
     def send_message(self, method, params):
         """Sends a websocket message to the lit node"""
+        logger.debug("Sending rpc message to %s:%s %s(%s)" % (self.ip, self.port, method, str(params)))
         self.ws.send(json.dumps({"method": "LitRPC.%s" % method,
                                  "params": [params],
                                  "jsonrpc": "2.0",
                                  "id": str(self.msg_id)}))
 
         self.msg_id = self.msg_id + 1 % 10000
-        return json.loads(self.ws.recv())
+
+        resp = json.loads(self.ws.recv())
+        logger.debug("Recieved rpc response from %s:%s method: %s Response: %s." % (self.ip, self.port, method, str(resp)))
+        return resp
 
     def __getattr__(self, name):
         """Dispatches any unrecognised messages to the websocket connection"""
@@ -52,10 +60,3 @@ class LitConnection():
     def balance(self):
         """Get wallit balance"""
         return self.Bal()
-
-if __name__ == '__main__':
-    """Test litrpc.py. lit instance must be running and available on 127.0.0.1:8001"""
-    litConn = LitConnection("127.0.0.1", "8001")
-    litConn.connect()
-    print(litConn.new_address())
-    print(litConn.balance())
