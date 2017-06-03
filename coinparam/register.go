@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"time"
 	"io"
+	"log"
 
 	"github.com/adiabat/btcd/chaincfg/chainhash"
 	"github.com/adiabat/btcd/wire"
@@ -40,7 +41,7 @@ type Params struct {
     DiffCalcFunction func(r io.ReadSeeker, height, startheight int32, p *Params) (uint32, error)
   
     // The block header to start downloading blocks from
-    StartHeader string
+    StartHeader [80]byte
   
     // The height of the StartHash
     StartHeight int32
@@ -241,6 +242,7 @@ var (
 // If that prefix isn't registered, it returns an error.
 func PrefixToCoinType(prefix string) (uint32, error) {
 	coinType, ok := bech32Prefixes[prefix]
+	log.Printf("wow: ")
 	if !ok {
 		return 0, ErrUnknownPrefix
 	}

@@ -2,7 +2,6 @@ package uspv
 
 import (
 	"bytes"
-	"encoding/hex"
 	"io/ioutil"
 	"log"
 	"net"
@@ -115,12 +114,9 @@ func (s *SPVCon) openHeaderFile(hfn string) error {
 		if os.IsNotExist(err) {
 			var b bytes.Buffer
 			// if StartHeader is defined, start with hardcoded height
-            if s.Param.StartHeader != "" {
-              hdr, err := hex.DecodeString(s.Param.StartHeader)
-	          if err != nil {
-	           return err
-	          }
-	          _, err = b.Write(hdr)
+            if s.Param.StartHeight != 0 {
+              hdr := s.Param.StartHeader
+	          _, err := b.Write(hdr[:])
 	          if err != nil {
 	           return err
 	          }
@@ -140,7 +136,7 @@ func (s *SPVCon) openHeaderFile(hfn string) error {
 		}
 	}
   
-    if s.Param.StartHeader != "" {
+    if s.Param.StartHeight != 0 {
         s.headerStartHeight = s.Param.StartHeight
     }
 

@@ -8,7 +8,6 @@ import (
     "log"
 
     "github.com/adiabat/btcd/wire"
-    "github.com/adiabat/btcd/blockchain"
 )
 
 /* calcDiff returns a bool given two block headers.  This bool is
@@ -28,7 +27,7 @@ func calcDiffAdjustBitcoin(start, end wire.BlockHeader, p *Params) uint32 {
 
 	// calculation of new 32-byte difficulty target
 	// first turn the previous target into a big int
-	prevTarget := blockchain.CompactToBig(end.Bits)
+	prevTarget := CompactToBig(end.Bits)
 	// new target is old * duration...
 	newTarget := new(big.Int).Mul(prevTarget, big.NewInt(duration))
 	// divided by 2 weeks
@@ -40,7 +39,7 @@ func calcDiffAdjustBitcoin(start, end wire.BlockHeader, p *Params) uint32 {
 	}
 
 	// calculate and return 4-byte 'bits' difficulty from 32-byte target
-	return blockchain.BigToCompact(newTarget)
+	return BigToCompact(newTarget)
 }
 
 func diffBTC(r io.ReadSeeker, height, startheight int32, p *Params, ltc bool) (uint32, error) {
@@ -175,9 +174,9 @@ func calcDiffAdjustKGW(r io.ReadSeeker, height, startheight int32, p *Params) (u
         blocksScanned++
 
         if i == 1 {
-            difficultyAverage = *blockchain.CompactToBig(currentBlock.Bits)
+            difficultyAverage = *CompactToBig(currentBlock.Bits)
         } else {
-            compact := blockchain.CompactToBig(currentBlock.Bits)
+            compact := CompactToBig(currentBlock.Bits)
           
             difference  := new(big.Int).Sub(compact, &previousDifficultyAverage)
             difference.Div(difference, big.NewInt(int64(i)))
@@ -235,7 +234,7 @@ func calcDiffAdjustKGW(r io.ReadSeeker, height, startheight int32, p *Params) (u
         newTarget = *p.PowLimit
     }
 
-    return blockchain.BigToCompact(&newTarget), nil
+    return BigToCompact(&newTarget), nil
 }
 
 func diffVTCtest(r io.ReadSeeker, height, startheight int32, p *Params) (uint32, error) {
