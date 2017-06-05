@@ -765,22 +765,27 @@ func (self WatchDescMsg) MsgType() uint8 { return MSGID_WATCH_DESC }
 
 // the message describing the next commitment tx, sent from the client to the watchtower
 
-// ComMsg are 132 bytes.
+// ComMsg are 137 bytes.
+// msgtype
+// CoinType 4
 // PKH 20
 // txid 16
 // sig 64
 // elk 32
 type WatchStateMsg struct {
-	PeerIdx uint32
-	DestPKH [20]byte       // identifier for channel; could be optimized away
-	Elk     chainhash.Hash // elkrem for this state index
-	ParTxid [16]byte       // 16 bytes of txid
-	Sig     [64]byte       // 64 bytes of sig
+	PeerIdx  uint32
+	CoinType uint32         // could figure it out from PKH but this is easier
+	DestPKH  [20]byte       // identifier for channel; could be optimized away
+	Elk      chainhash.Hash // elkrem for this state index
+	ParTxid  [16]byte       // 16 bytes of txid
+	Sig      [64]byte       // 64 bytes of sig
 }
 
-func NewComMsg(peerIdx uint32, destPKH [20]byte, elk chainhash.Hash, parTxid [16]byte, sig [64]byte) WatchStateMsg {
+func NewComMsg(peerIdx, cointype uint32, destPKH [20]byte,
+	elk chainhash.Hash, parTxid [16]byte, sig [64]byte) WatchStateMsg {
 	cm := new(WatchStateMsg)
 	cm.PeerIdx = peerIdx
+	cm.CoinType = cointype
 	cm.DestPKH = destPKH
 	cm.Elk = elk
 	cm.ParTxid = parTxid
@@ -794,23 +799,17 @@ func NewWatchStateMsgFromBytes(b []byte, peerIDX uint32) (WatchStateMsg, error) 
 	sm := new(WatchStateMsg)
 	sm.PeerIdx = peerIDX
 
-	if len(b) < 133 {
-		return *sm, fmt.Errorf("WatchComMsg %d bytes, expect 133", len(b))
+	if len(b) < 137 {
+		return *sm, fmt.Errorf("WatchComMsg %d bytes, expect 137", len(b))
 	}
 
 	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
-
+	_ = binary.Read(buf, binary.BigEndian, &sm.CoinType)
 	copy(sm.DestPKH[:], buf.Next(20))
 	copy(sm.ParTxid[:], buf.Next(16))
 	copy(sm.Sig[:], buf.Next(64))
 	copy(sm.Elk[:], buf.Next(32))
 
-	/*
-		copy(sm.DestPKH[:], b[:20])
-		copy(sm.ParTxid[:], b[20:36])
-		copy(sm.Sig[:], b[36:100])
-		copy(sm.Elk[:], b[100:])
-	*/
 	return *sm, nil
 }
 
@@ -818,6 +817,7 @@ func NewWatchStateMsgFromBytes(b []byte, peerIDX uint32) (WatchStateMsg, error) 
 func (self WatchStateMsg) Bytes() []byte {
 	var buf bytes.Buffer
 	buf.WriteByte(self.MsgType())
+	binary.Write(&buf, binary.BigEndian, self.CoinType)
 	buf.Write(self.DestPKH[:])
 	buf.Write(self.ParTxid[:])
 	buf.Write(self.Sig[:])

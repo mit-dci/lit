@@ -10,8 +10,9 @@ import (
 
 type Watcher interface {
 	// Links to the blockchain.  Blocks go in to the watcher, and
-	// justice transactions come out.  The uint32 is the cointype
-	ChainLink(uint32, chan *wire.MsgBlock) chan *wire.MsgTx
+	// justice transactions come out.  The uint32 is the cointype, the
+	// string is the folder to put all db files in
+	ChainLink(string, uint32, chan *wire.MsgBlock) chan *wire.MsgTx
 
 	// New Channel to watch
 	NewChannel(lnutil.WatchDescMsg) error
@@ -29,23 +30,44 @@ type Watcher interface {
 
 // The main watchtower struct
 type WatchTower struct {
-	Path    string   // where the DB goes?  needed?
-	WatchDB *bolt.DB // DB with everything in it
+	Path string // where the DB goes?  needed?
+
+	WatchDB map[uint32]*bolt.DB // DB with everything in it
 
 	Accepting bool // true if new channels and sigs are allowed in
 	Watching  bool // true if there are txids to watch for
 
 	SyncHeight int32 // last block we've sync'd to.  Not needed?
 
-	OutBox chan *wire.MsgTx // where the tower sends its justice txs
+	//	OutBox
+
+	//	OutBox chan *wire.MsgTx // where the tower sends its justice txs
 }
 
-func (w *WatchTower) ChainLink(
-	cointype uint32, blockchan chan *wire.MsgBlock) chan *wire.MsgTx {
+// Chainlink is the connection between the watchtower and the blockchain
+// Takes in a channel of blocks, and the cointype.  Immediately returns
+// a channel which it will send justice transactions to.
+func (w *WatchTower) ChainLink(dbPath string, cointype uint32,
+	blockchan chan *wire.MsgBlock) (chan *wire.MsgTx, error) {
 
-	go w.BlockHandler(blockchan)
+	// see if this cointype is already registered
+	_, ok := w.WatchDB[cointype]
+	if ok {
+		return nil, fmt.Errorf("Coin type %d already linked", cointype)
+	}
 
-	return nil
+	// this coin hasn't been linked yet, open DB for this coin
+	err := w.OpenDB(dbPath, cointype)
+	if err != nil {
+		return nil, err
+	}
+
+	// start blockhandler; pulls from block channel and pushes to justice channel
+	// make the channel to return
+	txchan := make(chan *wire.MsgTx)
+	go w.BlockHandler(cointype, blockchan, txchan)
+
+	return txchan, nil
 }
 
 // 2 structs used in the DB: IdxSigs and ChanStatic
@@ -86,8 +108,4 @@ func (w *WatchTower) HandleMessage(msg lnutil.LitMsg) error {
 		fmt.Printf("unknown message type %x\n", msg.MsgType())
 	}
 	return nil
-}
-
-func (w *WatchTower) JusticeOutbox() chan *wire.MsgTx {
-	return w.OutBox
 }
