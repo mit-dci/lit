@@ -45,17 +45,6 @@ func NewLitNode(privKey *[32]byte, path string, tower bool) (*LitNode, error) {
 		return nil, err
 	}
 
-	/*
-		// make a base wallet
-		wallit := wallit.NewWallit(rootpriv, path, p)
-
-		// connect to base wallet
-		nd.SubWallet = wallit
-
-		// ask basewallet for outpoint event messages
-		go nd.OPEventHandler(nd.SubWallet.LetMeKnow())
-	*/
-
 	// optional tower activation
 	if tower {
 		watchname := filepath.Join(nd.LitFolder, "watch.db")
@@ -120,6 +109,10 @@ func (nd *LitNode) LinkBaseWallet(
 	if !nd.MultiWallet {
 		nd.DefaultCoin = param.HDCoinType
 	}
+
+	// if this node is running a watchtower, link the watchtower to the
+	// new wallet block events
+	//	go nd.Tower.BlockHandler()
 
 	return nil
 }

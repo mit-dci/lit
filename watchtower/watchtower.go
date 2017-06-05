@@ -8,6 +8,25 @@ import (
 	"github.com/mit-dci/lit/lnutil"
 )
 
+type Watcher interface {
+	// Links to the blockchain.  Blocks go in to the watcher, and
+	// justice transactions come out.  The uint32 is the cointype
+	ChainLink(uint32, chan *wire.MsgBlock) chan *wire.MsgTx
+
+	// New Channel to watch
+	NewChannel(lnutil.WatchDescMsg) error
+
+	// Update a channel being watched
+	UpdateChannel(lnutil.WatchStateMsg) error
+
+	// Delete a channel being watched
+	DeteleChannel(lnutil.WatchDelMsg) error
+
+	// Later on, allow users to recover channel state from
+	// the data in a watcher.  Like if they wipe their ln.db files but
+	// still have their keys.
+}
+
 // The main watchtower struct
 type WatchTower struct {
 	Path    string   // where the DB goes?  needed?
@@ -19,6 +38,14 @@ type WatchTower struct {
 	SyncHeight int32 // last block we've sync'd to.  Not needed?
 
 	OutBox chan *wire.MsgTx // where the tower sends its justice txs
+}
+
+func (w *WatchTower) ChainLink(
+	cointype uint32, blockchan chan *wire.MsgBlock) chan *wire.MsgTx {
+
+	go w.BlockHandler(blockchan)
+
+	return nil
 }
 
 // 2 structs used in the DB: IdxSigs and ChanStatic
@@ -43,9 +70,9 @@ func (w *WatchTower) HandleMessage(msg lnutil.LitMsg) error {
 			return w.AddNewChannel(message)
 		}
 
-	case lnutil.MSGID_WATCH_COMMSG:
+	case lnutil.MSGID_WATCH_STATEMSG:
 		fmt.Printf("new commsg\n")
-		message, ok := msg.(lnutil.ComMsg)
+		message, ok := msg.(lnutil.WatchStateMsg)
 		if !ok {
 			return fmt.Errorf("didn't work")
 		} else {

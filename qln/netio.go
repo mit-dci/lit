@@ -88,6 +88,7 @@ func (nd *LitNode) TCPListener(
 
 // DialPeer makes an outgoing connection to another node.
 func (nd *LitNode) DialPeer(connectAdr string) error {
+	var err error
 
 	// parse address and get pkh / host / port
 	who, where := lndc.SplitAdrString(connectAdr)
