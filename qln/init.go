@@ -46,13 +46,14 @@ func NewLitNode(privKey *[32]byte, path string, tower bool) (*LitNode, error) {
 	}
 
 	// optional tower activation
+	// towers are turned on when wallets are linked
 	if tower {
-		watchname := filepath.Join(nd.LitFolder, "watch.db")
-		err = nd.Tower.OpenDB(watchname)
-		if err != nil {
-			return nil, err
-		}
-		nd.Tower.Accepting = true
+		//		watchname := filepath.Join(nd.LitFolder, "watch.db")
+		//		err = nd.Tower.OpenDB(watchname)
+		//		if err != nil {
+		//			return nil, err
+		//		}
+		//		nd.Tower.Accepting = true
 		// call base wallet blockmonitor and hand this channel to the tower
 		//		go nd.Tower.BlockHandler(nd.SubWallet.BlockMonitor())
 		//		go nd.Relay(nd.Tower.JusticeOutbox())

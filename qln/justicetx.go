@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/boltdb/bolt"
 	"github.com/adiabat/btcd/txscript"
 	"github.com/adiabat/btcd/wire"
+	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/sig64"
 )
@@ -206,7 +206,9 @@ func (nd *LitNode) SyncWatch(qc *Qchan) error {
 	if qc.State.WatchUpTo == 0 {
 		var peerIdx uint32
 		peerIdx = 0 // should be replaced
-		desc := lnutil.NewWatchDescMsg(peerIdx, qc.WatchRefundAdr, qc.Delay, 5000, qc.TheirHAKDBase, qc.MyHAKDBase)
+		desc := lnutil.NewWatchDescMsg(
+			peerIdx, qc.Coin(), qc.WatchRefundAdr,
+			qc.Delay, 5000, qc.TheirHAKDBase, qc.MyHAKDBase)
 
 		_, err := nd.WatchCon.Write(desc.Bytes())
 		if err != nil {
@@ -257,7 +259,8 @@ func (nd *LitNode) SendWatchComMsg(qc *Qchan, idx uint64) error {
 	copy(parTx[:], txidsig[:16])
 	copy(sig[:], txidsig[16:])
 
-	comMsg := lnutil.NewComMsg(peerIdx, qc.WatchRefundAdr, *elk, parTx, sig)
+	comMsg := lnutil.NewComMsg(
+		peerIdx, qc.Coin(), qc.WatchRefundAdr, *elk, parTx, sig)
 
 	// stash to send all?  or just send once each time?  probably should
 	// set up some output buffering
