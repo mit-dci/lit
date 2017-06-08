@@ -479,6 +479,7 @@ func TestRevMsg(t *testing.T) {
 
 func TestWatchDescMsg(t *testing.T) {
 	peerid := rand.Uint32()
+	cointype := rand.Uint32()
 	var pkh [20]byte
 	delay := uint16(rand.Int())
 	fee := rand.Int63()
@@ -489,7 +490,7 @@ func TestWatchDescMsg(t *testing.T) {
 	_, _ = rand.Read(customerBP[:])
 	_, _ = rand.Read(adBP[:])
 
-	msg := NewWatchDescMsg(peerid, pkh, delay, fee, customerBP, adBP)
+	msg := NewWatchDescMsg(peerid, cointype, pkh, delay, fee, customerBP, adBP)
 	b := msg.Bytes()
 
 	msg2, err := NewWatchDescMsgFromBytes(b, peerid)
@@ -530,13 +531,13 @@ func TestComMsg(t *testing.T) {
 	_, _ = rand.Read(elk[:])
 	_, _ = rand.Read(pkh[:])
 	_, _ = rand.Read(sig[:])
-
+	cointype := rand.Uint32()
 	Elk, _ := chainhash.NewHash(elk[:])
 
-	msg := NewComMsg(peerid, pkh, *Elk, parTxid, sig)
+	msg := NewComMsg(peerid, cointype, pkh, *Elk, parTxid, sig)
 	b := msg.Bytes()
 
-	msg2, err := NewComMsgFromBytes(b, peerid)
+	msg2, err := NewWatchStateMsgFromBytes(b, peerid)
 
 	if err != nil {
 		t.Fatal(err)
