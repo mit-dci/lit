@@ -15,7 +15,7 @@ import (
 
 // Init starts up a lit node.  Needs priv key, and a path.
 // Does not activate a subwallet; do that after init.
-func NewLitNode(privKey *[32]byte, path string, tower bool) (*LitNode, error) {
+func NewLitNode(privKey *[32]byte, path string) (*LitNode, error) {
 
 	nd := new(LitNode)
 	nd.LitFolder = path
@@ -46,17 +46,7 @@ func NewLitNode(privKey *[32]byte, path string, tower bool) (*LitNode, error) {
 	}
 
 	// optional tower activation
-	if tower {
-		watchname := filepath.Join(nd.LitFolder, "watch.db")
-		err = nd.Tower.OpenDB(watchname)
-		if err != nil {
-			return nil, err
-		}
-		nd.Tower.Accepting = true
-		// call base wallet blockmonitor and hand this channel to the tower
-		//		go nd.Tower.BlockHandler(nd.SubWallet.BlockMonitor())
-		//		go nd.Relay(nd.Tower.JusticeOutbox())
-	}
+	// moved to LinkBaseWallet()
 
 	// make maps and channels
 	nd.UserMessageBox = make(chan string, 32)
@@ -112,7 +102,12 @@ func (nd *LitNode) LinkBaseWallet(
 
 	// if this node is running a watchtower, link the watchtower to the
 	// new wallet block events
-	//	go nd.Tower.BlockHandler()
+
+	err = nd.Tower.HookLink(
+		nd.LitFolder, param, nd.SubWallet[WallitIdx].ExportHook())
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

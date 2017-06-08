@@ -3,7 +3,6 @@ package watchtower
 import (
 	"fmt"
 	"log"
-	"path/filepath"
 
 	"github.com/adiabat/btcd/chaincfg/chainhash"
 	"github.com/adiabat/btcd/wire"
@@ -75,12 +74,10 @@ var (
 )
 
 // Opens the DB file for the LnNode
-func (w *WatchTower) OpenDB(path string, cointype uint32) error {
+func (w *WatchTower) OpenDB(filepath string, cointype uint32) error {
 	var err error
 
-	filename := filepath.Join(path, "watch.db")
-
-	w.WatchDB[cointype], err = bolt.Open(filename, 0644, nil)
+	w.WatchDB[cointype], err = bolt.Open(filepath, 0644, nil)
 	if err != nil {
 		return err
 	}
@@ -281,7 +278,7 @@ func (w *WatchTower) MatchTxids(
 }
 
 func (w *WatchTower) BlockHandler(
-	cointype uint32, bchan chan *wire.MsgBlock, txchan chan *wire.MsgTx) {
+	cointype uint32, bchan chan *wire.MsgBlock) {
 
 	log.Printf("-- started BlockHandler type %d, block channel cap %d\n",
 		cointype, cap(bchan))
@@ -321,7 +318,10 @@ func (w *WatchTower) BlockHandler(
 						}
 						log.Printf("made & sent out justice tx %s\n",
 							justice.TxHash().String())
-						txchan <- justice
+						err = w.Hooks[cointype].PushTx(justice)
+						if err != nil {
+							log.Printf("BuildJusticeTx error: %s", err.Error())
+						}
 					}
 				}
 			}

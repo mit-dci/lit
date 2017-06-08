@@ -2,17 +2,22 @@ package watchtower
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 
-	"github.com/adiabat/btcd/wire"
 	"github.com/boltdb/bolt"
+	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/uspv"
 )
 
 type Watcher interface {
-	// Links to the blockchain.  Blocks go in to the watcher, and
-	// justice transactions come out.  The uint32 is the cointype, the
-	// string is the folder to put all db files in
-	ChainLink(string, uint32, chan *wire.MsgBlock) chan *wire.MsgTx
+	// Links to the blockchain.
+	// Uses the same chainhook interface as the wallit does.  But only uses
+	// 2 of the functions: PushTx() and RawBlocks()
+	// Blocks come in from the chainhook, and justice transactions come out.
+	// The uint32 is the cointype, the string is the folder to put all db files.
+	HookLink(string, *coinparam.Params, uspv.ChainHook) error
 
 	// New Channel to watch
 	NewChannel(lnutil.WatchDescMsg) error
@@ -39,35 +44,49 @@ type WatchTower struct {
 
 	SyncHeight int32 // last block we've sync'd to.  Not needed?
 
-	//	OutBox
-
-	//	OutBox chan *wire.MsgTx // where the tower sends its justice txs
+	Hooks map[uint32]uspv.ChainHook
 }
 
 // Chainlink is the connection between the watchtower and the blockchain
 // Takes in a channel of blocks, and the cointype.  Immediately returns
 // a channel which it will send justice transactions to.
-func (w *WatchTower) ChainLink(dbPath string, cointype uint32,
-	blockchan chan *wire.MsgBlock) (chan *wire.MsgTx, error) {
+func (w *WatchTower) HookLink(dbPath string, param *coinparam.Params,
+	hook uspv.ChainHook) error {
+
+	cointype := param.HDCoinType
+
+	// if the DB map hasn't been initialized, make it
+	if len(w.WatchDB) == 0 {
+		w.WatchDB = make(map[uint32]*bolt.DB)
+		w.Hooks = make(map[uint32]uspv.ChainHook)
+	}
 
 	// see if this cointype is already registered
 	_, ok := w.WatchDB[cointype]
 	if ok {
-		return nil, fmt.Errorf("Coin type %d already linked", cointype)
+		return fmt.Errorf("Coin type %d already linked", cointype)
 	}
 
 	// this coin hasn't been linked yet, open DB for this coin
-	err := w.OpenDB(dbPath, cointype)
-	if err != nil {
-		return nil, err
+	towerPath := filepath.Join(dbPath, param.Name)
+	towerDBName := filepath.Join(towerPath, "watch.db")
+	// create wallit sub dir if it's not there
+	_, err := os.Stat(towerPath)
+	if os.IsNotExist(err) {
+		os.Mkdir(towerPath, 0700)
 	}
 
-	// start blockhandler; pulls from block channel and pushes to justice channel
-	// make the channel to return
-	txchan := make(chan *wire.MsgTx)
-	go w.BlockHandler(cointype, blockchan, txchan)
+	err = w.OpenDB(towerDBName, cointype)
+	if err != nil {
+		return err
+	}
 
-	return txchan, nil
+	// only need this for the pushTx() method
+	w.Hooks[cointype] = hook
+
+	go w.BlockHandler(cointype, hook.RawBlocks())
+
+	return nil
 }
 
 // 2 structs used in the DB: IdxSigs and ChanStatic

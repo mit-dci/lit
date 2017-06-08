@@ -104,7 +104,7 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 	// Assign remote connection
 	newConn := new(lndc.LNDConn)
 
-	err := newConn.Dial(idPriv, where, who)
+	err = newConn.Dial(idPriv, where, who)
 	if err != nil {
 		return err
 	}

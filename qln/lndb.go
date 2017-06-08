@@ -88,7 +88,7 @@ type LitNode struct {
 	IdentityKey *btcec.PrivateKey
 
 	// all nodes have a watchtower.  but could have a tower without a node
-	Tower watchtower.WatchTower
+	Tower watchtower.Watcher
 
 	// BaseWallet is the underlying wallet which keeps track of utxos, secrets,
 	// and network i/o
