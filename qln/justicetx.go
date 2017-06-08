@@ -206,6 +206,7 @@ func (nd *LitNode) SyncWatch(qc *Qchan) error {
 	if qc.State.WatchUpTo == 0 {
 		var peerIdx uint32
 		peerIdx = 0 // should be replaced
+
 		desc := lnutil.NewWatchDescMsg(peerIdx, qc.Coin(),
 			qc.WatchRefundAdr, qc.Delay, 5000, qc.TheirHAKDBase, qc.MyHAKDBase)
 
