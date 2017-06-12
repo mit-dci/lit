@@ -2,7 +2,6 @@ package watchtower
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/boltdb/bolt"
@@ -37,13 +36,17 @@ type Watcher interface {
 type WatchTower struct {
 	Path string // where the DB goes?  needed?
 
-	WatchDB map[uint32]*bolt.DB // DB with everything in it
+	WatchDB *bolt.DB // single DB with everything in it
+	// much more efficient to have a separate DB for each cointype
+	// ... but that's less anonymous.  To get that efficiency; make a bunch of
+	// towers, I guess.
 
 	Accepting bool // true if new channels and sigs are allowed in
 	Watching  bool // true if there are txids to watch for
 
 	SyncHeight int32 // last block we've sync'd to.  Not needed?
 
+	// map of cointypes to chainhooks
 	Hooks map[uint32]uspv.ChainHook
 }
 
@@ -55,30 +58,22 @@ func (w *WatchTower) HookLink(dbPath string, param *coinparam.Params,
 
 	cointype := param.HDCoinType
 
-	// if the DB map hasn't been initialized, make it
-	if len(w.WatchDB) == 0 {
-		w.WatchDB = make(map[uint32]*bolt.DB)
+	// if the hooks map hasn't been initialized, make it. also open DB
+	if len(w.Hooks) == 0 {
 		w.Hooks = make(map[uint32]uspv.ChainHook)
+
+		towerDBName := filepath.Join(dbPath, "watch.db")
+		err := w.OpenDB(towerDBName)
+		if err != nil {
+			return err
+		}
+
 	}
 
 	// see if this cointype is already registered
-	_, ok := w.WatchDB[cointype]
+	_, ok := w.Hooks[cointype]
 	if ok {
 		return fmt.Errorf("Coin type %d already linked", cointype)
-	}
-
-	// this coin hasn't been linked yet, open DB for this coin
-	towerPath := filepath.Join(dbPath, param.Name)
-	towerDBName := filepath.Join(towerPath, "watch.db")
-	// create wallit sub dir if it's not there
-	_, err := os.Stat(towerPath)
-	if os.IsNotExist(err) {
-		os.Mkdir(towerPath, 0700)
-	}
-
-	err = w.OpenDB(towerDBName, cointype)
-	if err != nil {
-		return err
 	}
 
 	// only need this for the pushTx() method

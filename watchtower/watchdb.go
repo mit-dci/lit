@@ -74,15 +74,15 @@ var (
 )
 
 // Opens the DB file for the LnNode
-func (w *WatchTower) OpenDB(filepath string, cointype uint32) error {
+func (w *WatchTower) OpenDB(filepath string) error {
 	var err error
 
-	w.WatchDB[cointype], err = bolt.Open(filepath, 0644, nil)
+	w.WatchDB, err = bolt.Open(filepath, 0644, nil)
 	if err != nil {
 		return err
 	}
 	// create buckets if they're not already there
-	err = w.WatchDB[cointype].Update(func(btx *bolt.Tx) error {
+	err = w.WatchDB.Update(func(btx *bolt.Tx) error {
 		_, err := btx.CreateBucketIfNotExists(BUCKETPKHMap)
 		if err != nil {
 			return err
@@ -111,13 +111,16 @@ func (w *WatchTower) OpenDB(filepath string, cointype uint32) error {
 // Probably need some way to prevent overwrites.
 func (w *WatchTower) AddNewChannel(m lnutil.WatchDescMsg) error {
 
-	db, ok := w.WatchDB[m.CoinType]
+	// quick check if we support the cointype
+	_, ok := w.Hooks[m.CoinType]
 	if !ok {
-		return fmt.Errorf(
-			"AddNewChannel error: cointype %d not registered", m.CoinType)
+		return fmt.Errorf("Cointype %d not supported", m.CoinType)
 	}
 
-	return db.Update(func(btx *bolt.Tx) error {
+	// TODO change it so the user first requests supported cointypes,
+	// then sends the DescMsg without indicating cointype
+
+	return w.WatchDB.Update(func(btx *bolt.Tx) error {
 		// open index : pkh mapping bucket
 		mapBucket := btx.Bucket(BUCKETPKHMap)
 		if mapBucket == nil {
@@ -169,13 +172,8 @@ func (w *WatchTower) AddNewChannel(m lnutil.WatchDescMsg) error {
 // AddMsg adds a new message describing a penalty tx to the db.
 // optimization would be to add a bunch of messages at once.  Not a huge speedup though.
 func (w *WatchTower) AddState(m lnutil.WatchStateMsg) error {
-	db, ok := w.WatchDB[m.CoinType]
-	if !ok {
-		return fmt.Errorf(
-			"AddNewChannel error: cointype %d not registered", m.CoinType)
-	}
 
-	return db.Update(func(btx *bolt.Tx) error {
+	return w.WatchDB.Update(func(btx *bolt.Tx) error {
 
 		// first get the channel bucket, update the elkrem and read the idx
 		allChanbkt := btx.Bucket(BUCKETChandata)
@@ -249,12 +247,7 @@ func (w *WatchTower) MatchTxids(
 	var err error
 	var hits []chainhash.Hash
 
-	db, ok := w.WatchDB[cointype]
-	if !ok {
-		return nil, fmt.Errorf("MatchTxids error: cointype %d not linked", cointype)
-	}
-
-	err = db.View(func(btx *bolt.Tx) error {
+	err = w.WatchDB.View(func(btx *bolt.Tx) error {
 		// open the big bucket
 		txidbkt := btx.Bucket(BUCKETTxid)
 		if txidbkt == nil {
@@ -308,7 +301,7 @@ func (w *WatchTower) BlockHandler(
 			for _, hitTxid := range hits {
 				log.Printf("zomg tx %s matched db\n", hitTxid.String())
 				for _, tx := range block.Transactions {
-					// inefficient here, iterating through whole block
+					// inefficient here, iterating through whole block.
 					// probably OK because this rarely hapens
 					curTxid := tx.TxHash()
 					if curTxid.IsEqual(&hitTxid) {

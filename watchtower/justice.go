@@ -28,7 +28,7 @@ func (w *WatchTower) BuildJusticeTx(
 	var iSig *IdxSig
 
 	// open DB and get static channel info
-	err = w.WatchDB[cointype].View(func(btx *bolt.Tx) error {
+	err = w.WatchDB.View(func(btx *bolt.Tx) error {
 		// get
 		// open the big bucket
 		txidbkt := btx.Bucket(BUCKETTxid)
