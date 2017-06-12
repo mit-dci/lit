@@ -109,7 +109,7 @@ func (w *WatchTower) OpenDB(filepath string) error {
 
 // AddNewChannel puts a new channel into the watchtower db.
 // Probably need some way to prevent overwrites.
-func (w *WatchTower) AddNewChannel(m lnutil.WatchDescMsg) error {
+func (w *WatchTower) NewChannel(m lnutil.WatchDescMsg) error {
 
 	// quick check if we support the cointype
 	_, ok := w.Hooks[m.CoinType]
@@ -171,7 +171,7 @@ func (w *WatchTower) AddNewChannel(m lnutil.WatchDescMsg) error {
 
 // AddMsg adds a new message describing a penalty tx to the db.
 // optimization would be to add a bunch of messages at once.  Not a huge speedup though.
-func (w *WatchTower) AddState(m lnutil.WatchStateMsg) error {
+func (w *WatchTower) UpdateChannel(m lnutil.WatchStateMsg) error {
 
 	return w.WatchDB.Update(func(btx *bolt.Tx) error {
 
@@ -239,6 +239,11 @@ func (w *WatchTower) AddState(m lnutil.WatchStateMsg) error {
 	})
 }
 
+// TODO implement DeleteChannel.  Would be nice to delete old channels.
+func (w *WatchTower) DeleteChannel(m lnutil.WatchDelMsg) error {
+	return nil
+}
+
 // MatchTxid takes in a txid, checks against the DB, and if there's a hit, returns a
 // IdxSig with which to make a JusticeTx.  Hits should be rare.
 func (w *WatchTower) MatchTxids(
@@ -280,7 +285,7 @@ func (w *WatchTower) BlockHandler(
 		// block here, take in blocks
 		block := <-bchan
 
-		log.Printf("checking block %s, %d txs\n",
+		log.Printf("tower check block %s %d txs\n",
 			block.BlockHash().String(), len(block.Transactions))
 
 		// get all txids from the blocks

@@ -25,7 +25,7 @@ type Watcher interface {
 	UpdateChannel(lnutil.WatchStateMsg) error
 
 	// Delete a channel being watched
-	DeteleChannel(lnutil.WatchDelMsg) error
+	DeleteChannel(lnutil.WatchDelMsg) error
 
 	// Later on, allow users to recover channel state from
 	// the data in a watcher.  Like if they wipe their ln.db files but
@@ -93,6 +93,7 @@ type IdxSig struct {
 	Sig      [64]byte // What
 }
 
+/*
 func (w *WatchTower) HandleMessage(msg lnutil.LitMsg) error {
 	fmt.Printf("got message from %x\n", msg.Peer())
 
@@ -123,3 +124,4 @@ func (w *WatchTower) HandleMessage(msg lnutil.LitMsg) error {
 	}
 	return nil
 }
+*/

@@ -51,7 +51,7 @@ func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) er
 			nd.Tower.UpdateChannel(msg.(lnutil.WatchStateMsg))
 		}
 		if msg.MsgType() == lnutil.MSGID_WATCH_DELETE {
-			nd.Tower.DeteleChannel(msg.(lnutil.WatchDelMsg))
+			nd.Tower.DeleteChannel(msg.(lnutil.WatchDelMsg))
 		}
 	default:
 		return fmt.Errorf("Unknown message id byte %x &f0", msg.MsgType())

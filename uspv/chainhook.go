@@ -161,5 +161,6 @@ func (s *SPVCon) PushTx(tx *wire.MsgTx) error {
 // RawBlocks returns a channel where all the blocks appear.
 func (s *SPVCon) RawBlocks() chan *wire.MsgBlock {
 	s.RawBlockActive = true
+	s.RawBlockSender = make(chan *wire.MsgBlock, 8) // I dunno, 8?
 	return s.RawBlockSender
 }

@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/adiabat/btcd/wire"
 	"github.com/adiabat/btcutil/hdkeychain"
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/wallit"
+	"github.com/mit-dci/lit/watchtower"
 )
 
 // Init starts up a lit node.  Needs priv key, and a path.
@@ -46,7 +46,8 @@ func NewLitNode(privKey *[32]byte, path string) (*LitNode, error) {
 	}
 
 	// optional tower activation
-	// moved to LinkBaseWallet()
+
+	nd.Tower = new(watchtower.WatchTower)
 
 	// make maps and channels
 	nd.UserMessageBox = make(chan string, 32)
@@ -110,18 +111,6 @@ func (nd *LitNode) LinkBaseWallet(
 	}
 
 	return nil
-}
-
-// relay txs from the watchtower to the underlying wallet...
-// small, but a little ugly; maybe there's a cleaner way
-func (nd *LitNode) Relay(outbox chan *wire.MsgTx) {
-	for {
-		// TODO add watchtower coin type stuff
-		//		err := nd.SubWallet.PushTx(<-outbox)
-		//		if err != nil {
-		//			fmt.Printf("PushTx error: %s", err.Error())
-		//		}
-	}
 }
 
 // Opens the DB file for the LnNode
