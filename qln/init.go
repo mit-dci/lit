@@ -4,18 +4,18 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/adiabat/btcd/wire"
 	"github.com/adiabat/btcutil/hdkeychain"
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/wallit"
+	"github.com/mit-dci/lit/watchtower"
 )
 
 // Init starts up a lit node.  Needs priv key, and a path.
 // Does not activate a subwallet; do that after init.
-func NewLitNode(privKey *[32]byte, path string, tower bool) (*LitNode, error) {
+func NewLitNode(privKey *[32]byte, path string) (*LitNode, error) {
 
 	nd := new(LitNode)
 	nd.LitFolder = path
@@ -45,29 +45,9 @@ func NewLitNode(privKey *[32]byte, path string, tower bool) (*LitNode, error) {
 		return nil, err
 	}
 
-	/*
-		// make a base wallet
-		wallit := wallit.NewWallit(rootpriv, path, p)
-
-		// connect to base wallet
-		nd.SubWallet = wallit
-
-		// ask basewallet for outpoint event messages
-		go nd.OPEventHandler(nd.SubWallet.LetMeKnow())
-	*/
-
 	// optional tower activation
-	if tower {
-		watchname := filepath.Join(nd.LitFolder, "watch.db")
-		err = nd.Tower.OpenDB(watchname)
-		if err != nil {
-			return nil, err
-		}
-		nd.Tower.Accepting = true
-		// call base wallet blockmonitor and hand this channel to the tower
-		//		go nd.Tower.BlockHandler(nd.SubWallet.BlockMonitor())
-		//		go nd.Relay(nd.Tower.JusticeOutbox())
-	}
+
+	nd.Tower = new(watchtower.WatchTower)
 
 	// make maps and channels
 	nd.UserMessageBox = make(chan string, 32)
@@ -121,19 +101,16 @@ func (nd *LitNode) LinkBaseWallet(
 		nd.DefaultCoin = param.HDCoinType
 	}
 
-	return nil
-}
+	// if this node is running a watchtower, link the watchtower to the
+	// new wallet block events
 
-// relay txs from the watchtower to the underlying wallet...
-// small, but a little ugly; maybe there's a cleaner way
-func (nd *LitNode) Relay(outbox chan *wire.MsgTx) {
-	for {
-		// TODO add watchtower coin type stuff
-		//		err := nd.SubWallet.PushTx(<-outbox)
-		//		if err != nil {
-		//			fmt.Printf("PushTx error: %s", err.Error())
-		//		}
+	err = nd.Tower.HookLink(
+		nd.LitFolder, param, nd.SubWallet[WallitIdx].ExportHook())
+	if err != nil {
+		return err
 	}
+
+	return nil
 }
 
 // Opens the DB file for the LnNode

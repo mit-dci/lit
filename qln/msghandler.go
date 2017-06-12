@@ -40,17 +40,24 @@ func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) er
 	*/
 
 	case 0x60: //Tower Messages
-		if !nd.Tower.Accepting {
-			return fmt.Errorf("Error: Got tower msg from %x but tower disabled\n",
-				msg.Peer())
+		//if !nd.Tower.Accepting {
+		//	return fmt.Errorf("Error: Got tower msg from %x but tower disabled\n",
+		//		msg.Peer())
+		//}
+		if msg.MsgType() == lnutil.MSGID_WATCH_DESC {
+			nd.Tower.NewChannel(msg.(lnutil.WatchDescMsg))
 		}
-		return nd.Tower.HandleMessage(msg)
-
+		if msg.MsgType() == lnutil.MSGID_WATCH_STATEMSG {
+			nd.Tower.UpdateChannel(msg.(lnutil.WatchStateMsg))
+		}
+		if msg.MsgType() == lnutil.MSGID_WATCH_DELETE {
+			nd.Tower.DeleteChannel(msg.(lnutil.WatchDelMsg))
+		}
 	default:
 		return fmt.Errorf("Unknown message id byte %x &f0", msg.MsgType())
 
 	}
-
+	return nil
 }
 
 // Every lndc has one of these running

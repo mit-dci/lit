@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/boltdb/bolt"
 	"github.com/adiabat/btcd/txscript"
 	"github.com/adiabat/btcd/wire"
+	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/sig64"
@@ -18,7 +18,8 @@ import (
 // Re-opens the DB which just was closed by IngestTx, but since this almost never
 // happens, we need to end IngestTx as quickly as possible.
 // Note that you should flag the channel for deletion after the JusticeTx is broadcast.
-func (w *WatchTower) BuildJusticeTx(badTx *wire.MsgTx) (*wire.MsgTx, error) {
+func (w *WatchTower) BuildJusticeTx(
+	cointype uint32, badTx *wire.MsgTx) (*wire.MsgTx, error) {
 	var err error
 
 	// wd and elkRcv are the two things we need to get out of the db

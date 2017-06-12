@@ -10,6 +10,7 @@ import (
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
+	"github.com/mit-dci/lit/uspv"
 )
 
 /*
@@ -49,10 +50,6 @@ func (w *Wallit) Params() *coinparam.Params {
 	return w.Param
 }
 
-func (w *Wallit) BlockMonitor() chan *wire.MsgBlock {
-	return w.Hook.RawBlocks()
-}
-
 func (w *Wallit) LetMeKnow() chan lnutil.OutPointEvent {
 	w.OPEventChan = make(chan lnutil.OutPointEvent, 1)
 	return w.OPEventChan
@@ -69,6 +66,10 @@ func (w *Wallit) CurrentHeight() int32 {
 
 func (w *Wallit) NewAdr() ([20]byte, error) {
 	return w.NewAdr160()
+}
+
+func (w *Wallit) ExportHook() uspv.ChainHook {
+	return w.Hook
 }
 
 // ExportUtxo is really *IM*port utxo on this side.
