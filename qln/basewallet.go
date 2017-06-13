@@ -9,6 +9,7 @@ import (
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
+	"github.com/mit-dci/lit/uspv"
 )
 
 // The UWallet interface are the functions needed to work with the LnNode
@@ -23,6 +24,10 @@ type UWallet interface {
 
 	// Send a tx out to the network.  Maybe could replace?  Maybe not.
 	// Needed for channel break / cooperative close.  Maybe grabs.
+
+	// export the chainhook that the UWallet uses, for pushTx and fullblock
+	ExportHook() uspv.ChainHook
+
 	PushTx(tx *wire.MsgTx) error
 
 	// ExportUtxo gives a utxo to the underlying wallet; that wallet saves it
@@ -75,9 +80,6 @@ type UWallet interface {
 	// LetMeKnow opens the chan where OutPointEvent flows from the underlying
 	// wallet up to the LN module.
 	LetMeKnow() chan lnutil.OutPointEvent
-
-	// raw blocks coming in for the watchtower to check
-	BlockMonitor() chan *wire.MsgBlock
 
 	// Ask for network parameters
 	Params() *coinparam.Params

@@ -63,6 +63,9 @@ type SPVCon struct {
 	// only kicks in when requested from upper layer
 	RawBlockSender chan *wire.MsgBlock
 
+	// If the above RawBlockSender chan isn't being pulled from, don't send to it
+	RawBlockActive bool
+
 	// for internal use -------------------------
 
 	// mBlockQueue is for keeping track of what height we've requested.

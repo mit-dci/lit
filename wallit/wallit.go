@@ -16,6 +16,7 @@ import (
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
+	"github.com/mit-dci/lit/uspv"
 )
 
 // The Wallit is lit's main wallet struct.  It's got the root key, the dbs, and
@@ -36,7 +37,9 @@ type Wallit struct {
 	Param *coinparam.Params // network parameters (testnet3, segnet, etc)
 
 	// Hook is the connection to a blockchain.
-	Hook ChainHook
+	// imports the uspv interface.  Could put that somewhere else.
+	// like an interfaces library, ... lnutil?
+	Hook uspv.ChainHook
 
 	// current fee per byte
 	FeeRate int64

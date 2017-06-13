@@ -157,6 +157,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *LitConfig) error {
 		if err != nil {
 			return err
 		}
+
 	}
 	return nil
 }
@@ -207,7 +208,7 @@ func main() {
 
 	// Setup LN node.  Activate Tower if in hard mode.
 	// give node and below file pathof lit home directoy
-	node, err := qln.NewLitNode(key, conf.litHomeDir, false)
+	node, err := qln.NewLitNode(key, conf.litHomeDir)
 	if err != nil {
 		log.Fatal(err)
 	}

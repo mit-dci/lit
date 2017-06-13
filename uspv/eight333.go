@@ -420,7 +420,8 @@ func (s *SPVCon) AskForBlocks() error {
 		iv1 := new(wire.InvVect)
 		// if hardmode, ask for legit blocks, none of this ralphy stuff
 		// I don't think you can have a queue for SPV.  You miss stuff.
-		if s.HardMode {
+		// also ask if someone wants rawblocks, like the watchtower
+		if s.HardMode || s.RawBlockActive {
 			iv1 = wire.NewInvVect(wire.InvTypeWitnessBlock, &bHash)
 		} else { // ah well
 			iv1 = wire.NewInvVect(wire.InvTypeFilteredBlock, &bHash)

@@ -38,9 +38,9 @@ const (
 	MSGID_SELFPUSH = 0x50
 
 	//Tower Messages
-	MSGID_WATCH_DESC   = 0x60 // desc describes a new channel
-	MSGID_WATCH_COMMSG = 0x61 // commsg is a single state in the channel
-	MSGID_WATCH_DELETE = 0x62 // Watch_clear marks a channel as ok to delete.  No further updates possible.
+	MSGID_WATCH_DESC     = 0x60 // desc describes a new channel
+	MSGID_WATCH_STATEMSG = 0x61 // commsg is a single state in the channel
+	MSGID_WATCH_DELETE   = 0x62 // Watch_clear marks a channel as ok to delete.  No further updates possible.
 )
 
 //interface that all messages follow, for easy use
@@ -102,8 +102,8 @@ func LitMsgFromBytes(b []byte, peerid uint32) (LitMsg, error) {
 
 	case MSGID_WATCH_DESC:
 		return NewWatchDescMsgFromBytes(b, peerid)
-	case MSGID_WATCH_COMMSG:
-		return NewComMsgFromBytes(b, peerid)
+	case MSGID_WATCH_STATEMSG:
+		return NewWatchStateMsgFromBytes(b, peerid)
 	/*
 		case MSGID_WATCH_DELETE:
 	*/
@@ -696,6 +696,7 @@ func (self RevMsg) MsgType() uint8 { return MSGID_REV }
 // WatchannelDescriptor is the initial message setting up a Watchannel
 type WatchDescMsg struct {
 	PeerIdx       uint32
+	CoinType      uint32   // what network this channel is on
 	DestPKHScript [20]byte // PKH to grab to; main unique identifier.
 
 	Delay uint16 // timeout in blocks
@@ -707,9 +708,14 @@ type WatchDescMsg struct {
 
 // NewWatchDescMsg turns 96 bytes into a WatchannelDescriptor
 // Silently fails with incorrect size input, watch out.
-func NewWatchDescMsg(peeridx uint32, destScript [20]byte, delay uint16, fee int64, customerBase [33]byte, adversaryBase [33]byte) WatchDescMsg {
+func NewWatchDescMsg(
+	peeridx, coinType uint32, destScript [20]byte,
+	delay uint16, fee int64, customerBase [33]byte,
+	adversaryBase [33]byte) WatchDescMsg {
+
 	wd := new(WatchDescMsg)
 	wd.PeerIdx = peeridx
+	wd.CoinType = coinType
 	wd.DestPKHScript = destScript
 	wd.Delay = delay
 	wd.Fee = fee
@@ -728,6 +734,8 @@ func NewWatchDescMsgFromBytes(b []byte, peerIDX uint32) (WatchDescMsg, error) {
 
 	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
 
+	_ = binary.Read(buf, binary.BigEndian, &sd.CoinType)
+
 	copy(sd.DestPKHScript[:], buf.Next(20))
 	_ = binary.Read(buf, binary.BigEndian, &sd.Delay)
 
@@ -743,6 +751,7 @@ func NewWatchDescMsgFromBytes(b []byte, peerIDX uint32) (WatchDescMsg, error) {
 func (self WatchDescMsg) Bytes() []byte {
 	var buf bytes.Buffer
 	buf.WriteByte(self.MsgType())
+	binary.Write(&buf, binary.BigEndian, self.CoinType)
 	buf.Write(self.DestPKHScript[:])
 	binary.Write(&buf, binary.BigEndian, self.Delay)
 	binary.Write(&buf, binary.BigEndian, self.Fee)
@@ -756,22 +765,27 @@ func (self WatchDescMsg) MsgType() uint8 { return MSGID_WATCH_DESC }
 
 // the message describing the next commitment tx, sent from the client to the watchtower
 
-// ComMsg are 132 bytes.
+// ComMsg are 137 bytes.
+// msgtype
+// CoinType 4
 // PKH 20
 // txid 16
 // sig 64
 // elk 32
-type ComMsg struct {
-	PeerIdx uint32
-	DestPKH [20]byte       // identifier for channel; could be optimized away
-	Elk     chainhash.Hash // elkrem for this state index
-	ParTxid [16]byte       // 16 bytes of txid
-	Sig     [64]byte       // 64 bytes of sig
+type WatchStateMsg struct {
+	PeerIdx  uint32
+	CoinType uint32         // could figure it out from PKH but this is easier
+	DestPKH  [20]byte       // identifier for channel; could be optimized away
+	Elk      chainhash.Hash // elkrem for this state index
+	ParTxid  [16]byte       // 16 bytes of txid
+	Sig      [64]byte       // 64 bytes of sig
 }
 
-func NewComMsg(peerIdx uint32, destPKH [20]byte, elk chainhash.Hash, parTxid [16]byte, sig [64]byte) ComMsg {
-	cm := new(ComMsg)
+func NewComMsg(peerIdx, cointype uint32, destPKH [20]byte,
+	elk chainhash.Hash, parTxid [16]byte, sig [64]byte) WatchStateMsg {
+	cm := new(WatchStateMsg)
 	cm.PeerIdx = peerIdx
+	cm.CoinType = cointype
 	cm.DestPKH = destPKH
 	cm.Elk = elk
 	cm.ParTxid = parTxid
@@ -781,34 +795,29 @@ func NewComMsg(peerIdx uint32, destPKH [20]byte, elk chainhash.Hash, parTxid [16
 
 // ComMsgFromBytes turns 132 bytes into a SorceMsg
 // Silently fails with wrong size input.
-func NewComMsgFromBytes(b []byte, peerIDX uint32) (ComMsg, error) {
-	sm := new(ComMsg)
+func NewWatchStateMsgFromBytes(b []byte, peerIDX uint32) (WatchStateMsg, error) {
+	sm := new(WatchStateMsg)
 	sm.PeerIdx = peerIDX
 
-	if len(b) < 133 {
-		return *sm, fmt.Errorf("WatchComMsg %d bytes, expect 133", len(b))
+	if len(b) < 137 {
+		return *sm, fmt.Errorf("WatchComMsg %d bytes, expect 137", len(b))
 	}
 
 	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
-
+	_ = binary.Read(buf, binary.BigEndian, &sm.CoinType)
 	copy(sm.DestPKH[:], buf.Next(20))
 	copy(sm.ParTxid[:], buf.Next(16))
 	copy(sm.Sig[:], buf.Next(64))
 	copy(sm.Elk[:], buf.Next(32))
 
-	/*
-		copy(sm.DestPKH[:], b[:20])
-		copy(sm.ParTxid[:], b[20:36])
-		copy(sm.Sig[:], b[36:100])
-		copy(sm.Elk[:], b[100:])
-	*/
 	return *sm, nil
 }
 
 // ToBytes turns a ComMsg into 132 bytes
-func (self ComMsg) Bytes() []byte {
+func (self WatchStateMsg) Bytes() []byte {
 	var buf bytes.Buffer
 	buf.WriteByte(self.MsgType())
+	binary.Write(&buf, binary.BigEndian, self.CoinType)
 	buf.Write(self.DestPKH[:])
 	buf.Write(self.ParTxid[:])
 	buf.Write(self.Sig[:])
@@ -816,7 +825,43 @@ func (self ComMsg) Bytes() []byte {
 	return buf.Bytes()
 }
 
-func (self ComMsg) Peer() uint32   { return self.PeerIdx }
-func (self ComMsg) MsgType() uint8 { return MSGID_WATCH_COMMSG }
+func (self WatchStateMsg) Peer() uint32   { return self.PeerIdx }
+func (self WatchStateMsg) MsgType() uint8 { return MSGID_WATCH_STATEMSG }
 
 //----------
+
+type WatchDelMsg struct {
+	PeerIdx  uint32
+	DestPKH  [20]byte // identifier for channel; could be optimized away
+	RevealPK [33]byte // reveal this pubkey, matches DestPKH
+	// Don't actually have to send DestPKH huh.  Send anyway.
+}
+
+// Bytes turns a ComMsg into 132 bytes
+func (self WatchDelMsg) Bytes() []byte {
+	var buf bytes.Buffer
+	buf.WriteByte(self.MsgType())
+	buf.Write(self.DestPKH[:])
+	buf.Write(self.RevealPK[:])
+	return buf.Bytes()
+}
+
+// ComMsgFromBytes turns 132 bytes into a SorceMsg
+// Silently fails with wrong size input.
+func NewWatchDelMsgFromBytes(b []byte, peerIDX uint32) (WatchDelMsg, error) {
+	sm := new(WatchDelMsg)
+	sm.PeerIdx = peerIDX
+
+	if len(b) < 54 {
+		return *sm, fmt.Errorf("WatchDelMsg %d bytes, expect 54", len(b))
+	}
+
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
+
+	copy(sm.DestPKH[:], buf.Next(20))
+	copy(sm.RevealPK[:], buf.Next(33))
+
+	return *sm, nil
+}
+func (self WatchDelMsg) Peer() uint32   { return self.PeerIdx }
+func (self WatchDelMsg) MsgType() uint8 { return MSGID_WATCH_DELETE }

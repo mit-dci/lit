@@ -139,15 +139,13 @@ func (s *SPVCon) Refilter(f *bloom.Filter) {
 func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
 	var err error
 
-	// hand block over to the watchtower via the RawBlockSender chan
-	// omit this if qln not connected
-	/*
-		if cap(w.SpvHook.RawBlockSender) != 0 {
-			w.SpvHook.RawBlockSender <- m
-		} else {
-			fmt.Printf("Watchtower not initialized\n")
-		}
-	*/
+	// hand block over via the RawBlockSender chan
+	// hopefully this doesn't block
+	// ... get it?
+	if s.RawBlockActive {
+		s.RawBlockSender <- m
+	}
+
 	ok := BlockOK(*m) // check block self-consistency
 	if !ok {
 		log.Printf("block %s not OK!!11\n", m.BlockHash().String())
