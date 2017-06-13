@@ -98,35 +98,29 @@ func diffBTC(r io.ReadSeeker, height, startheight int32, p *Params, ltc bool) (u
 		// That whole "controlled supply" thing.
 		// calculate diff n based on n-2016 ... n-1
 		rightBits = calcDiffAdjustBitcoin(epochStart, prev, p)
-	} else { // not a new epoch
+	} else if p.ReduceMinDifficulty { // not a new epoch
 		// if on testnet, check for difficulty nerfing
-		if p.ReduceMinDifficulty && cur.Timestamp.After(
+		if cur.Timestamp.After(
 			prev.Timestamp.Add(p.TargetTimePerBlock*2)) {
 			rightBits = p.PowLimitBits // difficulty 1
 		} else {
-    
-        // Get last non-nerfed header
-        curHeight := offsetHeight
-        curHeader := prev
-        for curHeight % epochLength != 0 && curHeader.Bits == p.PowLimitBits && curHeight >= 0 {
-            curHeight--
-            _, err = r.Seek(int64(80*curHeight), os.SEEK_SET)
+		    var epochStart wire.BlockHeader
+            _, err = r.Seek(int64(80*(offsetHeight-(offsetHeight%epochLength))), os.SEEK_SET)
             if err != nil {
               log.Printf(err.Error())
               return 0, err
             }
-            err = curHeader.Deserialize(r)
+            err = epochStart.Deserialize(r)
             if err != nil {
               log.Printf(err.Error())
               return 0, err
             }
+          
+            rightBits = epochStart.Bits
         }
-      
-        rightBits = curHeader.Bits
     }
-  }
   
-  return rightBits, nil
+    return rightBits, nil
 }
 
 // Uses Kimoto Gravity Well for difficulty adjustment. Used in VTC, MONA etc
