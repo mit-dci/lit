@@ -21,11 +21,6 @@ const (
 	litHomeDirName = ".lit"
 
 	keyFileName = "privkey.hex"
-
-	// this is my local testnet node, replace it with your own close by.
-	// Random internet testnet nodes usually work but sometimes don't, so
-	// maybe I should test against different versions out there.
-	hardHeight = 1111111 // height to start at if not specified
 )
 
 // variables for a lit node & lower layers
@@ -33,10 +28,9 @@ type LitConfig struct {
 	reSync, hard bool // flag to set networks
 
 	// hostnames to connect to for different networks
-	tn3host, bc2host, lt4host, reghost, litereghost string
+	tn3host, bc2host, lt4host, reghost, litereghost, tvtchost, vtchost string
 
 	verbose    bool
-	birthblock int32
 	rpcport    uint16
 	litHomeDir string
 
@@ -44,17 +38,17 @@ type LitConfig struct {
 }
 
 func setConfig(lc *LitConfig) {
-	birthptr := flag.Int("tip", hardHeight, "height to begin db sync")
-
 	easyptr := flag.Bool("ez", false, "use easy mode (bloom filters)")
 
 	verbptr := flag.Bool("v", false, "verbose; print all logs to stdout")
 
-	tn3ptr := flag.String("tn3", "testnet3.lit3.co", "testnet3 full node")
+	tn3ptr := flag.String("tn3", "", "testnet3 full node")
 	regptr := flag.String("reg", "", "regtest full node")
 	literegptr := flag.String("ltr", "", "litecoin regtest full node")
 	bc2ptr := flag.String("bc2", "", "bc2 full node")
-	lt4ptr := flag.String("lt4", "litetest4.lit3.co", "litecoin testnet4 full node")
+	lt4ptr := flag.String("lt4", "", "litecoin testnet4 full node")
+    tvtcptr := flag.String("tvtc", "", "vertcoin testnet full node")
+    vtcptr := flag.String("vtc", "", "vertcoin mainnet full node")
 
 	resyncprt := flag.Bool("resync", false, "force resync from given tip")
 
@@ -65,10 +59,8 @@ func setConfig(lc *LitConfig) {
 
 	flag.Parse()
 
-	lc.birthblock = int32(*birthptr)
-
-	lc.tn3host, lc.bc2host, lc.lt4host, lc.reghost =
-		*tn3ptr, *bc2ptr, *lt4ptr, *regptr
+	lc.tn3host, lc.bc2host, lc.lt4host, lc.reghost, lc.tvtchost, lc.vtchost =
+		*tn3ptr, *bc2ptr, *lt4ptr, *regptr, *tvtcptr, *vtcptr
 
 	lc.litereghost = *literegptr
 
@@ -109,7 +101,8 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *LitConfig) error {
 			conf.tn3host = conf.tn3host + ":" + p.DefaultPort
 		}
 		err = node.LinkBaseWallet(
-			key, conf.birthblock, conf.reSync, conf.tn3host, p)
+			key, p.StartHeight, conf.reSync,
+			conf.tn3host, p)
 		if err != nil {
 			return err
 		}
@@ -132,7 +125,35 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *LitConfig) error {
 		if !strings.Contains(conf.lt4host, ":") {
 			conf.lt4host = conf.lt4host + ":" + p.DefaultPort
 		}
-		err = node.LinkBaseWallet(key, 47295, conf.reSync, conf.lt4host, p)
+		err = node.LinkBaseWallet(
+			key, p.StartHeight, conf.reSync,
+			conf.lt4host, p)
+		if err != nil {
+			return err
+		}
+	}
+  // try vertcoin testnet
+	if conf.tvtchost != "" {
+	    p := &coinparam.VertcoinTestNetParams
+		if !strings.Contains(conf.tvtchost, ":") {
+			conf.tvtchost = conf.tvtchost + ":" + p.DefaultPort
+		}
+		err = node.LinkBaseWallet(
+			key, 0, conf.reSync,
+			conf.tvtchost, p)
+		if err != nil {
+			return err
+		}
+	}
+  // try vertcoin mainnet
+	if conf.vtchost != "" {
+	    p := &coinparam.VertcoinParams
+		if !strings.Contains(conf.vtchost, ":") {
+			conf.vtchost = conf.vtchost + ":" + p.DefaultPort
+		}
+		err = node.LinkBaseWallet(
+			key, p.StartHeight, conf.reSync,
+			conf.vtchost, p)
 		if err != nil {
 			return err
 		}

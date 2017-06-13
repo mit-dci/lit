@@ -10,25 +10,12 @@ import (
 	"log"
 	"math/big"
 	"os"
-	"time"
+    "bytes"
 
 	"github.com/adiabat/btcd/blockchain"
-	"github.com/adiabat/btcd/chaincfg/chainhash"
+	
 	"github.com/adiabat/btcd/wire"
 	"github.com/mit-dci/lit/coinparam"
-)
-
-// blockchain settings.  These are kindof bitcoin specific, but not contained in
-// coinparam.Params so they'll go here.  If you're into the [ANN]altcoin scene,
-// you may want to paramaterize these constants.
-const (
-	targetTimespanx = time.Hour * 24 * 14
-	targetSpacingx  = time.Minute * 10
-	//	epochLength         = int32(targetTimespan / targetSpacing) // 2016
-//	maxDiffAdjust = 4
-
-//	minRetargetTimespan = int64(targetTimespan / maxDiffAdjust)
-//	maxRetargetTimespan = int64(targetTimespan * maxDiffAdjust)
 )
 
 /* checkProofOfWork verifies the header hashes into something
@@ -50,14 +37,11 @@ func checkProofOfWork(header wire.BlockHeader, p *coinparam.Params) bool {
 	}
 
 	// The header hash must be less than the claimed target in the header.
-	var blockHash chainhash.Hash
+  
+    var buf bytes.Buffer
+	_ = wire.WriteBlockHeader(&buf, 0, &header)
 
-	// TODO remove this soon, make parameterizable
-	if p.Name == "litetest4" || p.Name == "litereg" {
-		blockHash = header.ScryptHash()
-	} else {
-		blockHash = header.BlockHash()
-	}
+    blockHash := p.PoWFunction(buf.Bytes())
 
 	hashNum := new(big.Int)
 
@@ -70,49 +54,12 @@ func checkProofOfWork(header wire.BlockHeader, p *coinparam.Params) bool {
 	return true
 }
 
-/* calcDiff returns a bool given two block headers.  This bool is
-true if the correct dificulty adjustment is seen in the "next" header.
-Only feed it headers n-2016 and n-1, otherwise it will calculate a difficulty
-when no adjustment should take place, and return false.
-Note that the epoch is actually 2015 blocks long, which is confusing. */
-func calcDiffAdjust(start, end wire.BlockHeader, p *coinparam.Params) uint32 {
-
-	minRetargetTimespan := int64(p.TargetTimespan.Seconds()) / p.RetargetAdjustmentFactor
-	maxRetargetTimespan := int64(p.TargetTimespan.Seconds()) * p.RetargetAdjustmentFactor
-	duration := end.Timestamp.UnixNano() - start.Timestamp.UnixNano()
-	if duration < minRetargetTimespan {
-		log.Printf("whoa there, block %s off-scale high 4X diff adjustment!",
-			end.BlockHash().String())
-		duration = minRetargetTimespan
-	} else if duration > maxRetargetTimespan {
-		log.Printf("Uh-oh! block %s off-scale low 0.25X diff adjustment!\n",
-			end.BlockHash().String())
-		duration = maxRetargetTimespan
-	}
-
-	// calculation of new 32-byte difficulty target
-	// first turn the previous target into a big int
-	prevTarget := blockchain.CompactToBig(start.Bits)
-	// new target is old * duration...
-	newTarget := new(big.Int).Mul(prevTarget, big.NewInt(duration))
-	// divided by 2 weeks
-	newTarget.Div(newTarget, big.NewInt(int64(p.TargetTimespan)))
-
-	// clip again if above minimum target (too easy)
-	if newTarget.Cmp(p.PowLimit) > 0 {
-		newTarget.Set(p.PowLimit)
-	}
-
-	// calculate and return 4-byte 'bits' difficulty from 32-byte target
-	return blockchain.BigToCompact(newTarget)
-}
-
 func CheckHeader(r io.ReadSeeker, height, startheight int32, p *coinparam.Params) bool {
 	// startHeight is the height the file starts at
+
 	// header start must be 0 mod 2106
-	epochLength := int32(p.TargetTimespan / p.TargetTimePerBlock)
 	var err error
-	var cur, prev, epochStart wire.BlockHeader
+	var cur, prev wire.BlockHeader
 	// don't try to verfy the genesis block.  That way madness lies.
 	if height == 0 {
 		return true
@@ -120,19 +67,7 @@ func CheckHeader(r io.ReadSeeker, height, startheight int32, p *coinparam.Params
 
 	offsetHeight := height - startheight
 	// initial load of headers
-	// load epochstart, previous and current.
-	// get the header from the epoch start, up to 2016 blocks ago
-	_, err = r.Seek(int64(80*(offsetHeight-(height%epochLength))), os.SEEK_SET)
-	if err != nil {
-		log.Printf(err.Error())
-		return false
-	}
-	err = epochStart.Deserialize(r)
-	if err != nil {
-		log.Printf(err.Error())
-		return false
-	}
-	//	log.Printf("start epoch at height %d ", height-(height%epochLength))
+	// load previous and current.
 
 	// seek to n-1 header
 	_, err = r.Seek(int64(80*(offsetHeight-1)), os.SEEK_SET)
@@ -146,6 +81,7 @@ func CheckHeader(r io.ReadSeeker, height, startheight int32, p *coinparam.Params
 		log.Printf(err.Error())
 		return false
 	}
+  
 	// seek to curHeight header and read in
 	_, err = r.Seek(int64(80*(offsetHeight)), os.SEEK_SET)
 	if err != nil {
@@ -168,36 +104,53 @@ func CheckHeader(r io.ReadSeeker, height, startheight int32, p *coinparam.Params
 			prev.BlockHash().String(), cur.BlockHash().String())
 		return false
 	}
-	rightBits := epochStart.Bits // normal, no adjustment; Dn = Dn-1
-	// see if we're on a difficulty adjustment block
-	if (height)%epochLength == 0 {
-		// if so, check if difficulty adjustment is valid.
-		// That whole "controlled supply" thing.
-		// calculate diff n based on n-2016 ... n-1
-		rightBits = calcDiffAdjust(epochStart, prev, p)
-		// done with adjustment, save new ephochStart header
-		epochStart = cur
-		log.Printf("Update epoch at height %d", height)
-	} else { // not a new epoch
-		// if on testnet, check for difficulty nerfing
-		if p.ReduceMinDifficulty && cur.Timestamp.After(
-			prev.Timestamp.Add(p.TargetTimePerBlock*2)) {
-			//	fmt.Printf("nerf %d ", curHeight)
-			rightBits = p.PowLimitBits // difficulty 1
-		}
-		if cur.Bits != rightBits {
-			log.Printf("Block %d %s incorrect difficuly.  Read %x, expect %x\n",
-				height, cur.BlockHash().String(), cur.Bits, rightBits)
-			return false
-		}
-	}
+  
+  // Check that the difficulty bits are correct
+  if offsetHeight > 0 && height >= p.AssumeDiffBefore {
+    rightBits, err := p.DiffCalcFunction(r, height, startheight, p)
+    if err != nil {
+      log.Printf("Error calculating Block %d %s difficuly. %s\n",
+      height, cur.BlockHash().String(), err.Error())
+      return false
+    }
+    
+    if cur.Bits != rightBits {
+        log.Printf("Block %d %s incorrect difficuly.  Read %x, expect %x\n",
+        height, cur.BlockHash().String(), cur.Bits, rightBits)
+        return false
+    }
+  }
 
 	// check if there's a valid proof of work.  That whole "Bitcoin" thing.
 	if !checkProofOfWork(cur, p) {
 		log.Printf("Block %d Bad proof of work.\n", height)
 		return false
 	}
-
+  
+  // Check for checkpoints
+  for _, checkpoint := range p.Checkpoints {
+    if checkpoint.Height == height {
+      if *checkpoint.Hash != cur.BlockHash() {
+        log.Printf("Block %d is not a valid checkpoint", height)
+        return false
+      }
+      break
+    }
+  } 
+  
+  // Not entirely sure why I need to do this, but otherwise the tip block
+  // can go missing
+  _, err = r.Seek(int64(80*(offsetHeight)), os.SEEK_SET)
+	if err != nil {
+		log.Printf(err.Error())
+		return false
+	}
+  err = cur.Deserialize(r)
+	if err != nil {
+		log.Printf(err.Error())
+		return false
+	}
+  
 	return true // it must have worked if there's no errors and got to the end.
 }
 

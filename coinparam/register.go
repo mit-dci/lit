@@ -4,6 +4,8 @@ import (
 	"errors"
 	"math/big"
 	"time"
+	"io"
+	"log"
 
 	"github.com/adiabat/btcd/chaincfg/chainhash"
 	"github.com/adiabat/btcd/wire"
@@ -31,6 +33,26 @@ type Params struct {
 
 	// GenesisHash is the starting block hash.
 	GenesisHash *chainhash.Hash
+	
+	// The function used to calculate the proof of work value for a block
+	PoWFunction func(b []byte) chainhash.Hash
+  
+    // The function used to calculate the difficulty of a given block
+    DiffCalcFunction func(r io.ReadSeeker, height, startheight int32, p *Params) (uint32, error)
+  
+    // The block header to start downloading blocks from
+    StartHeader [80]byte
+  
+    // The height of the StartHash
+    StartHeight int32
+  
+    // Assume the difficulty bits are valid before this header height
+    // This is needed for coins with variable retarget lookbacks that use 
+    // StartHeader to offset the beginning of the header chain for SPV
+    AssumeDiffBefore int32
+  
+    // Fee per byte for transactions
+    FeePerByte int64
 
 	// PowLimit defines the highest allowed proof of work value for a block
 	// as a uint256.
@@ -159,6 +181,8 @@ func init() {
 	mustRegister(&BC2NetParams)
 	mustRegister(&LiteCoinTestNet4Params)
 	mustRegister(&LiteRegNetParams)
+	mustRegister(&VertcoinTestNetParams)
+	mustRegister(&VertcoinParams)
 }
 
 // mustRegister performs the same function as Register except it panics if there
@@ -218,6 +242,7 @@ var (
 // If that prefix isn't registered, it returns an error.
 func PrefixToCoinType(prefix string) (uint32, error) {
 	coinType, ok := bech32Prefixes[prefix]
+	log.Printf("wow: ")
 	if !ok {
 		return 0, ErrUnknownPrefix
 	}
