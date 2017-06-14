@@ -37,6 +37,7 @@ class LitNode():
 
     def start_node(self):
         logger.debug("Starting litnode %d with args %s" % (self.index, str(self.args)))
+        assert os.path.isfile(LIT_BIN), "lit binary not found at %s" % LIT_BIN
         self.process = subprocess.Popen([LIT_BIN] + self.args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     def add_rpc_connection(self, ip, port):
