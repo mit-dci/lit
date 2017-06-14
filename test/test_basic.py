@@ -17,6 +17,8 @@
 - push funds back
 - close channel co-operatively
 - stop"""
+
+import time
 from lit_test_framework import LitTest, wait_until
 
 class TestBasic(LitTest):
