@@ -17,6 +17,8 @@
 - push funds back
 - close channel co-operatively
 - stop"""
+
+import time
 from lit_test_framework import LitTest, wait_until
 
 class TestBasic(LitTest):
@@ -33,6 +35,7 @@ class TestBasic(LitTest):
         # Start a coin node
         self.add_coinnode(self.coins[0])
         self.coinnodes[0].start_node()
+        time.sleep(5)
 
         self.log.info("Generate 500 blocks to activate segwit")
         self.coinnodes[0].generate(500)

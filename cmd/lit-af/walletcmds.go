@@ -18,7 +18,7 @@ var sendCommand = &Command{
 
 var addressCommand = &Command{
 	Format: fmt.Sprintf(
-		"%s%s\n", lnutil.White("address"), lnutil.ReqColor("?amount", "?cointype")),
+		"%s%s\n", lnutil.White("adr"), lnutil.ReqColor("?amount", "?cointype")),
 	Description:      "Makes new addresses in a specified wallet.\n",
 	ShortDescription: "Makes new addresses.\n",
 }

@@ -130,7 +130,7 @@ class LitTest():
                 lcnode.process.kill()
 
         for litnode in self.litnodes:
-            litnode.Stop()
+            litnode.stop_node()
             try:
                 litnode.process.wait(2)
             except subprocess.TimeoutExpired:

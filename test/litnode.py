@@ -35,9 +35,21 @@ class LitNode():
         # disable auto-connect to testnet3 and litetest4
         self.args.extend(['-tn3', '', '-lt4', ''])
 
+        self.rpc = None
+
     def start_node(self):
         logger.debug("Starting litnode %d with args %s" % (self.index, str(self.args)))
+        assert os.path.isfile(LIT_BIN), "lit binary not found at %s" % LIT_BIN
         self.process = subprocess.Popen([LIT_BIN] + self.args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    def stop_node(self):
+        try:
+            self.Stop()
+        except AssertionError as e:
+            if e == "lit node not running":
+                logger.debug("node already stopped")
+            else:
+                raise
 
     def add_rpc_connection(self, ip, port):
         logger.debug("Opening rpc connection to litnode %d: %s:%s" % (self.index, ip, port))
@@ -45,7 +57,10 @@ class LitNode():
         self.rpc.connect()
 
     def __getattr__(self, name):
-        return self.rpc.__getattr__(name)
+        if self.rpc is not None:
+            return self.rpc.__getattr__(name)
+        else:
+            raise AssertionError("lit node not running")
 
     def get_balance(self, coin_type):
         # convenience method for grabbing the node balance

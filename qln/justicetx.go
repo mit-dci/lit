@@ -208,7 +208,6 @@ func (nd *LitNode) SyncWatch(qc *Qchan, watchPeer uint32) error {
 	}
 	// send initial description if we haven't sent anything yet
 	if qc.State.WatchUpTo == 0 {
-
 		desc := lnutil.NewWatchDescMsg(watchPeer, qc.Coin(),
 			qc.WatchRefundAdr, qc.Delay, 5000, qc.TheirHAKDBase, qc.MyHAKDBase)
 
