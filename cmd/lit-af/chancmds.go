@@ -45,6 +45,15 @@ var breakCommand = &Command{
 	ShortDescription: "Forcibly break the given channel.\n",
 }
 
+var watchCommand = &Command{
+	Format: fmt.Sprintf("%s%s\n", lnutil.White("watch"),
+		lnutil.ReqColor("channel idx", "watchPeerIdx")),
+	Description: fmt.Sprintf("%s\n%s\n%s%s\n",
+		"Send channel data to a watcher",
+		"The watcher can defend your channel while you're offline."),
+	ShortDescription: "Export channel watch data.\n",
+}
+
 func (lc *litAfClient) FundChannel(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
 		fmt.Fprintf(color.Output, fundCommand.Format)
@@ -198,6 +207,45 @@ func (lc *litAfClient) Push(textArgs []string) error {
 		fmt.Fprintf(color.Output, "Pushed %s at state %s\n", lnutil.SatoshiColor(int64(amt)), lnutil.White(reply.StateIndex))
 		times--
 	}
+
+	return nil
+}
+
+// Watch is the shell command to call litRPC watch
+func (lc *litAfClient) Watch(textArgs []string) error {
+	if len(textArgs) > 0 && textArgs[0] == "-h" {
+		fmt.Fprintf(color.Output, watchCommand.Format)
+		fmt.Fprintf(color.Output, watchCommand.Description)
+		return nil
+	}
+
+	args := new(litrpc.WatchArgs)
+	reply := new(litrpc.WatchReply)
+
+	if len(textArgs) < 2 {
+		return fmt.Errorf("need args: watch chanIdx watchPeer")
+	}
+
+	cIdx, err := strconv.Atoi(textArgs[0])
+	if err != nil {
+		return err
+	}
+
+	peer, err := strconv.Atoi(textArgs[1])
+	if err != nil {
+		return err
+	}
+
+	args.ChanIdx = uint32(cIdx)
+	args.SendToPeer = uint32(peer)
+
+	err = lc.rpccon.Call("LitRPC.Watch", args, reply)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(color.Output, "Send channel %d data to peer %d\n",
+		args.ChanIdx, args.SendToPeer)
 
 	return nil
 }

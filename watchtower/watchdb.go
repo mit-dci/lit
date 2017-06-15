@@ -134,6 +134,9 @@ func (w *WatchTower) NewChannel(m lnutil.WatchDescMsg) error {
 		if k != nil {
 			newIdx = lnutil.BtU32(k) + 1 // and add 1
 		}
+		// starts with chan 0, then increments;
+		// never goes down...
+
 		log.Printf("assigning new channel index %d\n", newIdx)
 		newIdxBytes := lnutil.U32tB(newIdx)
 

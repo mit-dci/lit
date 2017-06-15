@@ -143,6 +143,14 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		}
 		return nil
 	}
+	if cmd == "watch" {
+		err = lc.Watch(args)
+		if err != nil {
+			fmt.Fprintf(color.Output, "watch error: %s\n", err)
+		}
+		return nil
+	}
+
 	if cmd == "say" {
 		err = lc.Say(args)
 		if err != nil {

@@ -5,7 +5,7 @@ import "fmt"
 // ------------------------- listen
 
 type WatchArgs struct {
-	ChanIdx uint32
+	ChanIdx, SendToPeer uint32
 }
 
 type WatchReply struct {
@@ -24,7 +24,7 @@ func (r *LitRPC) Watch(args WatchArgs, reply *WatchReply) error {
 		return fmt.Errorf("Can't push; channel %d closed", args.ChanIdx)
 	}
 
-	err = r.Node.SyncWatch(qc)
+	err = r.Node.SyncWatch(qc, args.SendToPeer)
 	if err != nil {
 		return err
 	}
