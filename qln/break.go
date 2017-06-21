@@ -17,7 +17,7 @@ func (nd *LitNode) BreakChannel(q *Qchan) error {
 		return err
 	}
 
-	if q.CloseData.Closed {
+	if q.CloseData.Closed && q.CloseData.CloseHeight != 0 {
 		return fmt.Errorf("Can't break (%d,%d), already closed\n", q.Peer(), q.Idx())
 	}
 
