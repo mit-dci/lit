@@ -39,6 +39,8 @@ Peers
 	|- hostname...?
 	|
 	|- channels..?
+	|
+	|- PeerElkrem Receiver
 
 
 PeerMap
@@ -129,6 +131,10 @@ type RemotePeer struct {
 	Con      *lndc.LNDConn
 	QCs      map[uint32]*Qchan   // keep map of all peer's channels in ram
 	OpMap    map[[36]byte]uint32 // quick lookup for channels
+
+	// Peer Elkrems are used for HTLCs to/from a peer
+	PeerElkSnd *elkrem.ElkremSender   // derived from peer specific key
+	PeerElkRcv *elkrem.ElkremReceiver // stored in db
 }
 
 // InFlightFund is a funding transaction that has not yet been broadcast

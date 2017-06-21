@@ -81,3 +81,41 @@ func FundTxOut(pubA, pubB [33]byte, amt int64) (*wire.TxOut, error) {
 
 	return wire.NewTxOut(amt, scriptBytes), nil
 }
+
+// SenderHTLCScript gives you a script for a htlc push
+// copied from rusty's code.  doesn't look like the script in the RFC though.
+func SenderHTLCScript(
+	payHash, revokeHash [20]byte,
+	theirPubkey, myPubkey [33]byte,
+	absDelay, relDelay uint16) []byte {
+
+	builder := txscript.NewScriptBuilder()
+	builder.AddOp(txscript.OP_HASH160)
+	builder.AddOp(txscript.OP_DUP)
+	builder.AddData(payHash[:]) // hash for HTLC clearing
+	builder.AddOp(txscript.OP_EQUAL)
+	builder.AddOp(txscript.OP_SWAP)
+	builder.AddData(revokeHash[:]) // elkrem hash for revoking
+	builder.AddOp(txscript.OP_EQUAL)
+	builder.AddOp(txscript.OP_ADD)
+	// IF either hash works, it goes to them
+	builder.AddOp(txscript.OP_IF)
+
+	builder.AddData(theirPubkey[:]) // their pubkey; they can spend right away
+	// No valid preimage provided; run through timeout checks.
+	builder.AddOp(txscript.OP_ELSE)
+
+	builder.AddInt64(int64(absDelay))
+	builder.AddOp(txscript.OP_CHECKLOCKTIMEVERIFY)
+	builder.AddInt64(int64(relDelay))
+	builder.AddOp(txscript.OP_NOP3) // really OP_CHECKSEQUENCEVERIFY
+	builder.AddOp(txscript.OP_2DROP)
+	builder.AddData(myPubkey[:])
+
+	builder.AddOp(txscript.OP_ENDIF)
+	builder.AddOp(txscript.OP_CHECKSIG)
+
+	// never any errors we care about here.
+	s, _ := builder.Script()
+	return s
+}
