@@ -95,6 +95,8 @@ func (q *Qchan) SimpleCloseTx() (*wire.MsgTx, error) {
 // BuildStateTx constructs and returns a state tx.  As simple as I can make it.
 // This func just makes the tx with data from State in ram, and HAKD key arg
 func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
+	dustLimit := int64(10000) // hardcoded dust limit, change later
+
 	if q == nil {
 		return nil, fmt.Errorf("BuildStateTx: nil chan")
 	}
@@ -131,7 +133,6 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
 		pkhPub = q.TheirRefundPub
 		pkhAmt = (q.Value - s.MyAmt) - fee
 		fancyAmt = s.MyAmt - fee
-
 	} else { // build THEIR tx (to sign)
 		// Their tx that they store.  I get funds PKH.  SH is theirs eventually.
 		fmt.Printf("using elkpoint %x\n", s.ElkPoint)
@@ -167,8 +168,18 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
 	// make a new tx
 	tx := wire.NewMsgTx()
 	// add txouts
-	tx.AddTxOut(outFancy)
-	tx.AddTxOut(outPKH)
+	if fancyAmt > dustLimit {
+		tx.AddTxOut(outFancy)
+	}
+
+	if pkhAmt > dustLimit {
+		tx.AddTxOut(outPKH)
+	}
+
+	if len(tx.TxOut) < 1 {
+		return nil, fmt.Errorf("No outputs, all below dust limit")
+	}
+
 	// add unsigned txin
 	tx.AddTxIn(wire.NewTxIn(&q.Op, nil, nil))
 	// set index hints
