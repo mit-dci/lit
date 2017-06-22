@@ -125,8 +125,9 @@ func (nd *LitNode) SignState(q *Qchan) ([64]byte, error) {
 
 	fmt.Printf("____ sig creation for channel (%d,%d):\n", q.Peer(), q.Idx())
 	fmt.Printf("\tinput %s\n", tx.TxIn[0].PreviousOutPoint.String())
-	fmt.Printf("\toutput 0: %x %d\n", tx.TxOut[0].PkScript, tx.TxOut[0].Value)
-	fmt.Printf("\toutput 1: %x %d\n", tx.TxOut[1].PkScript, tx.TxOut[1].Value)
+	for i, txout := range tx.TxOut {
+		fmt.Printf("\toutput %d: %x %d\n", i, txout.PkScript, txout.Value)
+	}
 	fmt.Printf("\tstate %d myamt: %d theiramt: %d\n", q.State.StateIdx, q.State.MyAmt, q.Value-q.State.MyAmt)
 
 	return sig, nil
@@ -173,8 +174,9 @@ func (q *Qchan) VerifySig(sig [64]byte) error {
 	}
 	fmt.Printf("____ sig verification for channel (%d,%d):\n", q.Peer(), q.Idx())
 	fmt.Printf("\tinput %s\n", tx.TxIn[0].PreviousOutPoint.String())
-	fmt.Printf("\toutput 0: %x %d\n", tx.TxOut[0].PkScript, tx.TxOut[0].Value)
-	fmt.Printf("\toutput 1: %x %d\n", tx.TxOut[1].PkScript, tx.TxOut[1].Value)
+	for i, txout := range tx.TxOut {
+		fmt.Printf("\toutput %d: %x %d\n", i, txout.PkScript, txout.Value)
+	}
 	fmt.Printf("\tstate %d myamt: %d theiramt: %d\n", q.State.StateIdx, q.State.MyAmt, q.Value-q.State.MyAmt)
 	fmt.Printf("\tsig: %x\n", sig)
 

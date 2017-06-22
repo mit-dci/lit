@@ -3,6 +3,7 @@ package litrpc
 import (
 	"fmt"
 
+	"github.com/adiabat/btcutil"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/qln"
 )
@@ -214,4 +215,81 @@ func (r *LitRPC) BreakChannel(args ChanArgs, reply *StatusReply) error {
 		return err
 	}
 	return r.Node.BreakChannel(qc)
+}
+
+// ------------------------- dumpPriv
+type PrivInfo struct {
+	OutPoint string
+	Amt      int64
+	Height   int32
+	Delay    int32
+	CoinType string
+	Witty    bool
+	PairKey  string
+
+	WIF string
+}
+
+type DumpReply struct {
+	Privs []PrivInfo
+}
+
+// DumpPrivs returns WIF private keys for every utxo and channel
+func (r *LitRPC) DumpPrivs(args NoArgs, reply *DumpReply) error {
+	// get wifs for all channels
+	qcs, err := r.Node.GetAllQchans()
+	if err != nil {
+		return err
+	}
+
+	for _, qc := range qcs {
+		wal, ok := r.Node.SubWallet[qc.Coin()]
+		if !ok {
+			return fmt.Errorf("Coin %d not connected; can't show keys", qc.Coin())
+		}
+		var thisTxo PrivInfo
+		thisTxo.OutPoint = qc.Op.String()
+		thisTxo.Amt = qc.Value
+		thisTxo.Height = qc.Height
+		thisTxo.CoinType = wal.Params().Name
+		thisTxo.Witty = true
+		thisTxo.PairKey = fmt.Sprintf("%x", qc.TheirPub)
+
+		priv := wal.GetPriv(qc.KeyGen)
+		wif := btcutil.WIF{priv, true, wal.Params().PrivateKeyID}
+		thisTxo.WIF = wif.String()
+
+		reply.Privs = append(reply.Privs, thisTxo)
+	}
+
+	// get WIFs for all utxos in the wallets
+	for _, wal := range r.Node.SubWallet {
+		walTxos, err := wal.UtxoDump()
+		if err != nil {
+			return err
+		}
+
+		syncHeight := wal.CurrentHeight()
+
+		theseTxos := make([]PrivInfo, len(walTxos))
+		for i, u := range walTxos {
+			theseTxos[i].OutPoint = u.Op.String()
+			theseTxos[i].Amt = u.Value
+			theseTxos[i].Height = u.Height
+			theseTxos[i].CoinType = wal.Params().Name
+			// show delay before utxo can be spent
+			if u.Seq != 0 {
+				theseTxos[i].Delay = u.Height + int32(u.Seq) - syncHeight
+			}
+			theseTxos[i].Witty = u.Mode&portxo.FlagTxoWitness != 0
+			priv := wal.GetPriv(u.KeyGen)
+			wif := btcutil.WIF{priv, true, wal.Params().PrivateKeyID}
+
+			theseTxos[i].WIF = wif.String()
+		}
+
+		reply.Privs = append(reply.Privs, theseTxos...)
+	}
+
+	return nil
 }
