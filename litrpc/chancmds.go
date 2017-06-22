@@ -2,6 +2,7 @@ package litrpc
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/adiabat/btcutil"
 	"github.com/mit-dci/lit/portxo"
@@ -245,8 +246,12 @@ func (r *LitRPC) DumpPrivs(args NoArgs, reply *DumpReply) error {
 	for _, qc := range qcs {
 		wal, ok := r.Node.SubWallet[qc.Coin()]
 		if !ok {
-			return fmt.Errorf("Coin %d not connected; can't show keys", qc.Coin())
+			log.Printf(
+				"Channel %s error - coin %d not connected; can't show keys",
+				qc.Op.String(), qc.Coin())
+			continue
 		}
+
 		var thisTxo PrivInfo
 		thisTxo.OutPoint = qc.Op.String()
 		thisTxo.Amt = qc.Value
