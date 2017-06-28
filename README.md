@@ -1,4 +1,4 @@
-# lit - a lightning node you can run on your pwn
+# lit - a lightning node you can run on your own
 ![Lit Logo](litlogo145.png)
 
 Under development, not for use with real money.
