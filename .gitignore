@@ -1,5 +1,6 @@
 lit
 cmd/lit-af/lit-af
+cmd/dlcoracle/dlcoracle
 headers.bin
 ln.db
 testkey.hex
