@@ -7,20 +7,26 @@ func main() {
 	// byte1: 5 bit shift, 2 bit MSBs
 	// byte2: 7 bit LSBs
 
-	ba, bb, err := split(1024)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("ba:%x bb:%x\n", ba, bb)
+	for i := uint64(1000); i < 1100; i++ {
+		ba, bb, err := split(i)
+		if err != nil {
+			panic(err)
+		}
+		//		fmt.Printf("ba:%x bb:%x\n", ba, bb)
 
-	r := join(ba, bb)
-	fmt.Printf("rejoin %d\n", r)
+		r := join(ba, bb)
+		fmt.Printf("rejoin %d\n", r)
+
+	}
 
 	//fmt.Printf("")
 
 	return
 }
 
+// split a uint64 into two bytes
+// first byte has an exponent and most significant bits,
+// the second byte has the least significant bits.
 func split(x uint64) (uint8, uint8, error) {
 
 	var ba, bb uint8
@@ -32,38 +38,44 @@ func split(x uint64) (uint8, uint8, error) {
 	}
 
 	var shift uint8
-
-	if highbit < 9 {
-		shift = 0
-	} else {
-		shift = highbit - 9
+	// A bit ugly in that there are two "0" shifts.  0 means no shift, and
+	// don't start with a 1.  1 means no shift, but put a 1 in the highest
+	// bit.
+	if highbit == 9 {
+		shift = 1
+	}
+	if highbit > 9 {
+		shift = highbit - 8
+		x = x >> (shift - 1)
 	}
 
-	x = x >> shift
-
 	ba = shift << 2
-	ba |= uint8(x >> 7)
-
+	ba |= uint8(x>>7) & 0x03
 	bb = uint8(x & 0x7f)
 
 	return ba, bb, nil
 }
 
+// join two bytes back into a uint64.
 func join(ba, bb uint8) uint64 {
 	var shift, result uint64
 
-	shift = (uint64(ba) & 0x7c) >> 2
-	fmt.Printf("shift: %d\n", shift)
-	if shift > 0 {
-		result |= 1 << 8
-	}
+	shift = (uint64(ba)) >> 2 // could also say & 7c
 
 	result |= (uint64(ba) & 0x03) << 7
 	result |= uint64(bb)
 
-	result = result << shift
+	if shift == 0 {
+		return result
+	}
 
-	return result
+	result |= 1 << 9
+
+	if shift == 1 {
+		return result
+	}
+
+	return result << (shift - 1)
 }
 
 // highestbit returns the position of the highest set bit
