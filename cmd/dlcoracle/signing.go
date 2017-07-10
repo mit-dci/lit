@@ -13,29 +13,41 @@ var (
 	bigZero = new(big.Int).SetInt64(0)
 )
 
-// it's just R - h(R,m)A
-func SGpredict(curve *btcec.KoblitzCurve,
-	msg []byte, Pub, R *btcec.PublicKey) (*btcec.PublicKey, error) {
+// it's just sG = R - h(R,m)A
+func SGpredict(msg [32]byte, Pub, R [33]byte) (*btcec.PublicKey, error) {
 
-	// h = Hash(R,m)
-	Rxb := R.X.Bytes()
+	// Hardcode curve
+	curve := btcec.S256()
+
+	pubPoint, err := btcec.ParsePubKey(Pub[:], curve)
+	if err != nil {
+		return nil, err
+	}
+	RPoint, err := btcec.ParsePubKey(R[:], curve)
+	if err != nil {
+		return nil, err
+	}
+
+	// e = Hash(R,m)
+	Rxb := RPoint.X.Bytes()
 	var hashInput []byte
-	hashInput = append(hashInput, Rxb[:]...)
-	hashInput = append(hashInput, msg...)
-	h := chainhash.HashB(hashInput)
+	hashInput = append(Rxb[:], msg[:]...)
+	e := chainhash.HashB(hashInput)
+	fmt.Printf("e %x\n", e)
+	// e * A
+	pubPoint.X, pubPoint.Y = curve.ScalarMult(pubPoint.X, pubPoint.Y, e)
 
-	// h * A
-	Pub.X, Pub.Y = curve.ScalarMult(Pub.X, Pub.Y, h)
+	fmt.Printf("eA: %x\n", pubPoint.X.Bytes())
 
 	// Negate in place
-	Pub.Y.Neg(Pub.Y)
-
-	Pub.Y.Mod(Pub.Y, curve.P)
+	pubPoint.Y.Neg(pubPoint.Y)
+	pubPoint.Y.Mod(pubPoint.Y, curve.P)
 
 	sG := new(btcec.PublicKey)
+	//	sG.Curve = curve
 
 	// Pub has been negated; add it to R
-	sG.X, sG.Y = curve.Add(R.X, R.Y, Pub.X, Pub.Y)
+	sG.X, sG.Y = curve.Add(RPoint.X, RPoint.Y, pubPoint.X, pubPoint.Y)
 
 	return sG, nil
 }
@@ -44,31 +56,34 @@ func SGpredict(curve *btcec.KoblitzCurve,
 // This is variable time so don't share hardware with enemies.
 // This re-calculates R from k, even though we already know R.
 // Could be sped up by taking the stored R as an argument.
-func RSign(curve *btcec.KoblitzCurve,
-	msg []byte, priv [32]byte, k [32]byte) (*big.Int, error) {
+func RSign(msg, priv, k [32]byte) ([32]byte, error) {
+
+	var empty, s [32]byte
+
+	// Hardcode curve
+	curve := btcec.S256()
 
 	bigPriv := new(big.Int).SetBytes(priv[:])
 	bigK := new(big.Int).SetBytes(k[:])
 
 	if bigPriv.Cmp(bigZero) == 0 {
-		return nil, fmt.Errorf("secret scalar is zero")
+		return empty, fmt.Errorf("priv scalar is zero")
 	}
 	if bigPriv.Cmp(curve.N) >= 0 {
-		return nil, fmt.Errorf("secret scalar is out of bounds")
+		return empty, fmt.Errorf("priv scalar is out of bounds")
 	}
 	if bigK.Cmp(bigZero) == 0 {
-		return nil, fmt.Errorf("k scalar is zero")
+		return empty, fmt.Errorf("k scalar is zero")
 	}
 	if bigK.Cmp(curve.N) >= 0 {
-		return nil, fmt.Errorf("k scalar is out of bounds")
+		return empty, fmt.Errorf("k scalar is out of bounds")
 	}
 
 	// re-derive R = kG
 	var Rx, Ry *big.Int
 	Rx, Ry = curve.ScalarBaseMult(k[:])
 
-	// Check if the field element that would be represented by Y is odd.
-	// If it is, just keep k in the group order.
+	// TODO figure out why this is a thing
 	if Ry.Bit(0) == 1 {
 		bigK.Mod(bigK, curve.N)
 		bigK.Sub(curve.N, bigK)
@@ -77,21 +92,27 @@ func RSign(curve *btcec.KoblitzCurve,
 	// e = Hash(r, m)
 	Rxb := Rx.Bytes()
 	var hashInput []byte
-	hashInput = append(hashInput, Rxb[:]...)
-	hashInput = append(hashInput, msg...)
+	hashInput = append(Rxb[:], msg[:]...)
 	e := chainhash.HashB(hashInput)
+	fmt.Printf("e %x\n", e)
 	bigE := new(big.Int).SetBytes(e)
 
 	// If the hash is bigger than N, fail.  Note that N is
 	// FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
 	// So this happens about once every 2**128 signatures.
 	if bigE.Cmp(curve.N) >= 0 {
-		return nil, fmt.Errorf("hash of (R, m) too big")
+		return empty, fmt.Errorf("hash of (R, m) too big")
 	}
 
 	// s = k - e*a
 	bigS := new(big.Int)
+	// e*a
 	bigS.Mul(bigE, bigK)
+	bigS.Mod(bigS, curve.N)
+	// k - (e*a)
+	eaG, _ := curve.ScalarBaseMult(bigS.Bytes())
+	fmt.Printf("eaG: %x\n", eaG.Bytes())
+
 	bigS.Sub(bigK, bigS)
 	bigS.Mod(bigS, curve.N)
 
@@ -99,10 +120,9 @@ func RSign(curve *btcec.KoblitzCurve,
 	// looks like it would happen about once every 2**256 signatures
 	if bigS.Cmp(bigZero) == 0 {
 		str := fmt.Errorf("sig s %v is zero", bigS)
-		return nil, str
+		return empty, str
 	}
 
-	var empty, s [32]byte
 	// Zero out private key and k in array and bigint form
 	// who knows if this really helps...  can't hurt though.
 	bigK.SetInt64(0)
@@ -112,5 +132,5 @@ func RSign(curve *btcec.KoblitzCurve,
 
 	copy(s[:], bigS.Bytes())
 
-	return bigS, nil
+	return s, nil
 }
