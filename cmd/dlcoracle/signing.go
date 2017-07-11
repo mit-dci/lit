@@ -19,7 +19,7 @@ func SGpredict(msg [32]byte, Pub, R [33]byte) (*btcec.PublicKey, error) {
 	// Hardcode curve
 	curve := btcec.S256()
 
-	pubPoint, err := btcec.ParsePubKey(Pub[:], curve)
+	A, err := btcec.ParsePubKey(Pub[:], curve)
 	if err != nil {
 		return nil, err
 	}
@@ -33,21 +33,26 @@ func SGpredict(msg [32]byte, Pub, R [33]byte) (*btcec.PublicKey, error) {
 	var hashInput []byte
 	hashInput = append(Rxb[:], msg[:]...)
 	e := chainhash.HashB(hashInput)
-	fmt.Printf("e %x\n", e)
+
 	// e * A
-	pubPoint.X, pubPoint.Y = curve.ScalarMult(pubPoint.X, pubPoint.Y, e)
+	A.X, A.Y = curve.ScalarMult(A.X, A.Y, e)
 
-	fmt.Printf("eA: %x\n", pubPoint.X.Bytes())
+	//	fmt.Printf("1eA(x): %s\teA(y): %s\n", A.X.String(), A.Y.String())
+	//	 Negate in place
+	A.Y.Neg(A.Y)
 
-	// Negate in place
-	pubPoint.Y.Neg(pubPoint.Y)
-	pubPoint.Y.Mod(pubPoint.Y, curve.P)
+	//	fmt.Printf("2eA(x): %s\teA(y): %s\n", A.X.String(), A.Y.String())
+
+	A.Y.Mod(A.Y, curve.P)
+
+	//	fmt.Printf("3eA(x): %s\teA(y): %s\n", A.X.String(), A.Y.String())
 
 	sG := new(btcec.PublicKey)
-	//	sG.Curve = curve
 
 	// Pub has been negated; add it to R
-	sG.X, sG.Y = curve.Add(RPoint.X, RPoint.Y, pubPoint.X, pubPoint.Y)
+	sG.X, sG.Y = curve.Add(A.X, A.Y, RPoint.X, RPoint.Y)
+
+	//	fmt.Printf("4eA(x): %s\teA(y): %s\n", sG.X.String(), sG.Y.String())
 
 	return sG, nil
 }
@@ -64,6 +69,7 @@ func RSign(msg, priv, k [32]byte) ([32]byte, error) {
 	curve := btcec.S256()
 
 	bigPriv := new(big.Int).SetBytes(priv[:])
+	priv = empty
 	bigK := new(big.Int).SetBytes(k[:])
 
 	if bigPriv.Cmp(bigZero) == 0 {
@@ -94,7 +100,6 @@ func RSign(msg, priv, k [32]byte) ([32]byte, error) {
 	var hashInput []byte
 	hashInput = append(Rxb[:], msg[:]...)
 	e := chainhash.HashB(hashInput)
-	fmt.Printf("e %x\n", e)
 	bigE := new(big.Int).SetBytes(e)
 
 	// If the hash is bigger than N, fail.  Note that N is
@@ -107,12 +112,8 @@ func RSign(msg, priv, k [32]byte) ([32]byte, error) {
 	// s = k - e*a
 	bigS := new(big.Int)
 	// e*a
-	bigS.Mul(bigE, bigK)
-	bigS.Mod(bigS, curve.N)
+	bigS.Mul(bigE, bigPriv)
 	// k - (e*a)
-	eaG, _ := curve.ScalarBaseMult(bigS.Bytes())
-	fmt.Printf("eaG: %x\n", eaG.Bytes())
-
 	bigS.Sub(bigK, bigS)
 	bigS.Mod(bigS, curve.N)
 
@@ -128,7 +129,6 @@ func RSign(msg, priv, k [32]byte) ([32]byte, error) {
 	bigK.SetInt64(0)
 	k = empty
 	bigPriv.SetInt64(0)
-	priv = empty
 
 	copy(s[:], bigS.Bytes())
 
