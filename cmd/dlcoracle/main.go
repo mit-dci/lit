@@ -26,16 +26,16 @@ func main() {
 		}
 	*/
 
-	privRoot := chainhash.HashH([]byte("my private key"))
+	privRoot := chainhash.HashH([]byte("my private keyzzzz"))
 
-	ka, Ra := deriveK(privRoot, "asset 1 a")
+	ka, Ra := deriveK(privRoot, "asset 1 a01zzz")
 
-	kb, Rb := deriveK(privRoot, "asset 1 a")
+	kb, Rb := deriveK(privRoot, "asset 1 b021")
 
-	fmt.Printf("a: %x %x\n", ka, Ra)
-	fmt.Printf("b: %x %x\n", kb, Rb)
+	fmt.Printf("key: %x\n", privRoot[:])
+	//	fmt.Printf("b: %x %x\n", kb, Rb)
 
-	msg := chainhash.HashH([]byte("hi"))
+	msg := chainhash.HashH([]byte("hi0s"))
 
 	sa, err := RSign(msg, privRoot, ka)
 	if err != nil {
@@ -46,6 +46,7 @@ func main() {
 		panic(err)
 	}
 
+	fmt.Printf("---\n")
 	pubRootArr := lnutil.PubFromHash(privRoot)
 
 	saGpub, err := SGpredict(msg, pubRootArr, Ra)
@@ -64,5 +65,27 @@ func main() {
 	fmt.Printf("saG:\npredict\t%x\ncorrect\t%x\n", saGpub.SerializeCompressed(), saG)
 	fmt.Printf("sbG:\npredict\t%x\ncorrect\t%x\n", sbGpub.SerializeCompressed(), sbG)
 
+	oneTry(privRoot, ka, msg)
+
 	return
+}
+
+func oneTry(a, k, m [32]byte) {
+	pubRootArr := lnutil.PubFromHash(a)
+	rArr := lnutil.PubFromHash(k)
+
+	s, err := RSign(m, a, k)
+	if err != nil {
+		panic(err)
+	}
+
+	sGarr := lnutil.PubFromHash(s)
+
+	sGpred, err := SGpredict(m, pubRootArr, rArr)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("p: %x\nc: %x\n", sGarr[:], sGpred.SerializeCompressed())
+
 }
