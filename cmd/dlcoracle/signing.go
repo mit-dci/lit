@@ -14,7 +14,7 @@ var (
 )
 
 // it's just sG = R - h(R,m)A
-func SGpredict(Pub [33]byte, msg, R [32]byte) (*btcec.PublicKey, error) {
+func SGpredict(Pub, R [33]byte, msg [32]byte) (*btcec.PublicKey, error) {
 
 	// Hardcode curve
 	curve := btcec.S256()
@@ -24,7 +24,7 @@ func SGpredict(Pub [33]byte, msg, R [32]byte) (*btcec.PublicKey, error) {
 		return nil, err
 	}
 
-	RPoint, err := btcec.ParsePubKey(append([]byte{0x02}, R[:]...), curve)
+	RPoint, err := btcec.ParsePubKey(R[:], curve)
 	if err != nil {
 		return nil, err
 	}
@@ -33,7 +33,7 @@ func SGpredict(Pub [33]byte, msg, R [32]byte) (*btcec.PublicKey, error) {
 
 	// e = Hash(R,m)
 	var hashInput []byte
-	hashInput = append(R[:], msg[:]...)
+	hashInput = append(RPoint.X.Bytes(), msg[:]...)
 	e := chainhash.HashB(hashInput)
 
 	bigE := new(big.Int).SetBytes(e)
@@ -42,45 +42,19 @@ func SGpredict(Pub [33]byte, msg, R [32]byte) (*btcec.PublicKey, error) {
 		return nil, fmt.Errorf("hash of (R, m) too big")
 	}
 
-	//	fmt.Printf("e: %x\n", e)
-
 	// e * A
 	A.X, A.Y = curve.ScalarMult(A.X, A.Y, e)
 
-	//	fmt.Printf("1eA(x): %s\teA(y): %s\n", A.X.String(), A.Y.String())
-
-	//	 Negate in place
 	A.Y.Neg(A.Y)
 
-	//	fmt.Printf("2eA(x): %s\teA(y): %s\n", A.X.String(), A.Y.String())
-
-	//	fmt.Printf("3eA(x): %s\teA(y): %s\n", A.X.String(), A.Y.String())
+	A.Y.Mod(A.Y, curve.P)
 
 	sG := new(btcec.PublicKey)
 
 	// add to R
 	sG.X, sG.Y = curve.Add(A.X, A.Y, RPoint.X, RPoint.Y)
 
-	//	fmt.Printf("4eA(x): %s\teA(y): %s\n", sG.X.String(), sG.Y.String())
-
 	return sG, nil
-}
-
-// R is 32 bytes and it's y-coordinate is always even.
-// Derive R from k.
-func KtoR(k [32]byte) [32]byte {
-
-	// Hardcode curve
-	curve := btcec.S256()
-
-	Rx, _ := curve.ScalarBaseMult(k[:])
-
-	// Ry is always even.
-
-	var R [32]byte
-	copy(R[:], Rx.Bytes())
-
-	return R
 }
 
 // RSign signs with the given k scalar.  Returns s as 32 bytes.
@@ -112,20 +86,18 @@ func RSign(msg, priv, k [32]byte) ([32]byte, error) {
 	}
 
 	// re-derive R = kG
-	var Rx, Ry *big.Int
-	Rx, Ry = curve.ScalarBaseMult(k[:])
+	var Rx *big.Int
+	Rx, _ = curve.ScalarBaseMult(k[:])
 
 	// Ry is always even.  Make it even if it's not.
-	if Ry.Bit(0) == 1 {
-		bigK.Mod(bigK, curve.N)
-		bigK.Sub(curve.N, bigK)
-	}
+	//	if Ry.Bit(0) == 1 {
+	//		bigK.Mod(bigK, curve.N)
+	//		bigK.Sub(curve.N, bigK)
+	//	}
 
 	// e = Hash(r, m)
-	Rxb := Rx.Bytes()
-	var hashInput []byte
-	hashInput = append(Rxb[:], msg[:]...)
-	e := chainhash.HashB(hashInput)
+
+	e := chainhash.HashB(append(Rx.Bytes(), msg[:]...))
 	bigE := new(big.Int).SetBytes(e)
 
 	// If the hash is bigger than N, fail.  Note that N is
@@ -140,7 +112,7 @@ func RSign(msg, priv, k [32]byte) ([32]byte, error) {
 	// e*a
 	bigS.Mul(bigE, bigPriv)
 	// k + (e*a)
-	bigS.Add(bigK, bigS)
+	bigS.Sub(bigK, bigS)
 	bigS.Mod(bigS, curve.N)
 
 	// check if s is 0, and fail if it is.  Can't see how this would happen;
@@ -156,7 +128,9 @@ func RSign(msg, priv, k [32]byte) ([32]byte, error) {
 	k = empty
 	bigPriv.SetInt64(0)
 
-	copy(s[:], bigS.Bytes())
+	byteOffset := (256 - bigS.BitLen()) / 8
+
+	copy(s[byteOffset:], bigS.Bytes())
 
 	return s, nil
 }

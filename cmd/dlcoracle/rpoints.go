@@ -5,13 +5,14 @@ import (
 	"crypto/sha512"
 
 	"github.com/adiabat/btcd/btcec"
+	"github.com/mit-dci/lit/lnutil"
 )
 
 // deriveK derives a k scalar from a seed and an identifier string.
 // Also returns the R point
 // the string should be more structured but other functions can take care of that
 // derivation is just sha512 hmac with key = seed private key, data = id string
-func deriveK(seed [32]byte, id string) ([32]byte, [32]byte) {
+func deriveK(seed [32]byte, id string) ([32]byte, [33]byte) {
 	// Hardcode curve
 	curve := btcec.S256()
 
@@ -25,7 +26,7 @@ func deriveK(seed [32]byte, id string) ([32]byte, [32]byte) {
 	copy(k[:], hm.Sum(nil))
 
 	// derive R = kG
-	R := KtoR(k)
+	R := lnutil.PubFromHash(k)
 
 	return k, R
 }
