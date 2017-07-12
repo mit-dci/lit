@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/adiabat/btcd/chaincfg/chainhash"
@@ -26,66 +27,61 @@ func main() {
 		}
 	*/
 
-	privRoot := chainhash.HashH([]byte("my private keyzzzz"))
+	privRoot := chainhash.HashH([]byte("my private key"))
 
-	ka, Ra := deriveK(privRoot, "asset 1 a01zzz")
+	ka, _ := deriveK(privRoot, "asset 1 azzzzz")
 
-	kb, Rb := deriveK(privRoot, "asset 1 b021")
+	//	fmt.Printf("key: %x\n", privRoot[:])
 
-	fmt.Printf("key: %x\n", privRoot[:])
-	//	fmt.Printf("b: %x %x\n", kb, Rb)
+	msg := chainhash.HashH([]byte("hi,"))
 
-	msg := chainhash.HashH([]byte("hi0s"))
+	var hits, tries int
 
-	sa, err := RSign(msg, privRoot, ka)
-	if err != nil {
-		panic(err)
-	}
-	sb, err := RSign(msg, privRoot, kb)
-	if err != nil {
-		panic(err)
-	}
+	tries = 1000
 
-	fmt.Printf("---\n")
-	pubRootArr := lnutil.PubFromHash(privRoot)
+	for i := 0; i < tries; i++ {
 
-	saGpub, err := SGpredict(msg, pubRootArr, Ra)
-	if err != nil {
-		panic(err)
-	}
+		//		ka = chainhash.HashH(ka[:])
+		msg = chainhash.HashH(msg[:])
+		//		privRoot = chainhash.HashH(privRoot[:])
 
-	sbGpub, err := SGpredict(msg, pubRootArr, Rb)
-	if err != nil {
-		panic(err)
+		if oneTry(privRoot, ka, msg) {
+			hits++
+		} else {
+
+			fmt.Printf("\tdidn't work\np: %x\nk: %x\nm: %x\n\n", ka, privRoot[:], msg[:])
+			//			panic("no")
+		}
+
 	}
 
-	saG := lnutil.PubFromHash(sa)
-	sbG := lnutil.PubFromHash(sb)
-
-	fmt.Printf("saG:\npredict\t%x\ncorrect\t%x\n", saGpub.SerializeCompressed(), saG)
-	fmt.Printf("sbG:\npredict\t%x\ncorrect\t%x\n", sbGpub.SerializeCompressed(), sbG)
-
-	oneTry(privRoot, ka, msg)
+	fmt.Printf("%d tries %d hits\n", tries, hits)
 
 	return
 }
 
-func oneTry(a, k, m [32]byte) {
+func oneTry(a, k, m [32]byte) bool {
 	pubRootArr := lnutil.PubFromHash(a)
-	rArr := lnutil.PubFromHash(k)
+
+	R := KtoR(k)
 
 	s, err := RSign(m, a, k)
 	if err != nil {
 		panic(err)
 	}
-
+	fmt.Printf("s: %x\n", s)
 	sGarr := lnutil.PubFromHash(s)
 
-	sGpred, err := SGpredict(m, pubRootArr, rArr)
+	sGpred, err := SGpredict(pubRootArr, m, R)
 	if err != nil {
 		panic(err)
 	}
 
-	fmt.Printf("p: %x\nc: %x\n", sGarr[:], sGpred.SerializeCompressed())
+	if bytes.Equal(sGarr[:], sGpred.SerializeCompressed()) {
+		return true
+	}
 
+	fmt.Printf("\n\np: %x\nc: %x\n", sGarr[:], sGpred.SerializeCompressed())
+
+	return false
 }
