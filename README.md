@@ -58,7 +58,7 @@ go build
 (Note : Windows users can take off ./ but may need to change lit to lit.exe in the second line.) 
 ```
 cd GOPATH/src/github.com/mit-dci/lit 
-./lit -spv my.testnet.node.tld
+./lit -tn3 my.testnet.node.tld
 ```
 
 ## Using Lightning
