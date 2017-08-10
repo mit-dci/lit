@@ -47,8 +47,8 @@ func setConfig(lc *LitConfig) {
 	literegptr := flag.String("ltr", "", "litecoin regtest full node")
 	bc2ptr := flag.String("bc2", "", "bc2 full node")
 	lt4ptr := flag.String("lt4", "", "litecoin testnet4 full node")
-    tvtcptr := flag.String("tvtc", "", "vertcoin testnet full node")
-    vtcptr := flag.String("vtc", "", "vertcoin mainnet full node")
+	tvtcptr := flag.String("tvtc", "", "vertcoin testnet full node")
+	vtcptr := flag.String("vtc", "", "vertcoin mainnet full node")
 
 	resyncprt := flag.Bool("resync", false, "force resync from given tip")
 
@@ -101,7 +101,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *LitConfig) error {
 			conf.tn3host = conf.tn3host + ":" + p.DefaultPort
 		}
 		err = node.LinkBaseWallet(
-			key, p.StartHeight, conf.reSync,
+			key, 1150000, conf.reSync,
 			conf.tn3host, p)
 		if err != nil {
 			return err
@@ -132,9 +132,9 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *LitConfig) error {
 			return err
 		}
 	}
-  // try vertcoin testnet
+	// try vertcoin testnet
 	if conf.tvtchost != "" {
-	    p := &coinparam.VertcoinTestNetParams
+		p := &coinparam.VertcoinTestNetParams
 		if !strings.Contains(conf.tvtchost, ":") {
 			conf.tvtchost = conf.tvtchost + ":" + p.DefaultPort
 		}
@@ -145,9 +145,9 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *LitConfig) error {
 			return err
 		}
 	}
-  // try vertcoin mainnet
+	// try vertcoin mainnet
 	if conf.vtchost != "" {
-	    p := &coinparam.VertcoinParams
+		p := &coinparam.VertcoinParams
 		if !strings.Contains(conf.vtchost, ":") {
 			conf.vtchost = conf.vtchost + ":" + p.DefaultPort
 		}
