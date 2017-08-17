@@ -72,19 +72,26 @@ func (q *Qchan) SimpleCloseTx() (*wire.MsgTx, error) {
 	if q == nil || q.State == nil {
 		return nil, fmt.Errorf("SimpleCloseTx: nil chan / state")
 	}
-	fee := q.State.Fee // symmetric fee
+	dustLimit := int64(10000) // hardcoded dust limit, change later
+	fee := q.State.Fee        // symmetric fee
 
 	// make my output
 	myScript := lnutil.DirectWPKHScript(q.MyRefundPub)
-	myOutput := wire.NewTxOut(q.State.MyAmt-fee, myScript)
+	myAmt := q.State.MyAmt - fee
+	myOutput := wire.NewTxOut(myAmt, myScript)
 	// make their output
 	theirScript := lnutil.DirectWPKHScript(q.TheirRefundPub)
-	theirOutput := wire.NewTxOut((q.Value-q.State.MyAmt)-fee, theirScript)
+	theirAmt := (q.Value - q.State.MyAmt) - fee
+	theirOutput := wire.NewTxOut(theirAmt, theirScript)
 
 	// make tx with these outputs
 	tx := wire.NewMsgTx()
-	tx.AddTxOut(myOutput)
-	tx.AddTxOut(theirOutput)
+	if myAmt > dustLimit {
+		tx.AddTxOut(myOutput)
+	}
+	if theirAmt > dustLimit {
+		tx.AddTxOut(theirOutput)
+	}
 	// add channel outpoint as txin
 	tx.AddTxIn(wire.NewTxIn(&q.Op, nil, nil))
 	// sort and return
