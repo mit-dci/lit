@@ -21,10 +21,10 @@ type announcement struct {
 }
 
 type nodeinfo struct {
-	success bool
-	node    struct {
-		url  string
-		addr string
+	Success bool
+	Node    struct {
+		Url  string
+		Addr string
 	}
 }
 
@@ -56,7 +56,7 @@ func Announce(priv *btcec.PrivateKey, litport string, litadr string) error {
 	ann.sig = hex.EncodeToString(urlSig.Serialize())
 	ann.pbk = hex.EncodeToString(priv.PubKey().SerializeCompressed())
 
-	_, err = http.PostForm("http://localhost:46580/announce",
+	_, err = http.PostForm("http://jlovejoy.mit.edu:46580/announce",
 		url.Values{"url": {ann.url},
 			"addr": {ann.addr},
 			"sig":  {ann.sig},
@@ -70,7 +70,7 @@ func Announce(priv *btcec.PrivateKey, litport string, litadr string) error {
 }
 
 func Lookup(litadr string) (string, error) {
-	resp, err := http.Get("http://localhost:46580/" + litadr)
+	resp, err := http.Get("http://jlovejoy.mit.edu:46580/" + litadr)
 	if err != nil {
 		return "", err
 	}
@@ -83,9 +83,9 @@ func Lookup(litadr string) (string, error) {
 		return "", err
 	}
 
-	if !node.success {
+	if !node.Success {
 		return "", errors.New("Node not found")
 	}
 
-	return node.node.url, nil
+	return node.Node.Url, nil
 }
