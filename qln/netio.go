@@ -41,6 +41,11 @@ func (nd *LitNode) TCPListener(
 
 	adr := lnutil.LitAdrFromPubkey(idPub)
 
+	err = Announce(idPriv, lisIpPort, adr)
+	if err != nil {
+		log.Printf("Announcement error %s", err.Error())
+	}
+
 	fmt.Printf("Listening on %s\n", listener.Addr().String())
 	fmt.Printf("Listening with ln address: %s \n", adr)
 
@@ -96,6 +101,14 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 	// sanity check the "who" pkh string
 	if !lnutil.LitAdrOK(who) {
 		return fmt.Errorf("ln address %s invalid", who)
+	}
+
+	// If we couldn't deduce a URL, look it up on the tracker
+	if where == "" {
+		where, err = Lookup(who)
+		if err != nil {
+			return err
+		}
 	}
 
 	// get my private ID key
