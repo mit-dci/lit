@@ -7,7 +7,9 @@ import (
 	"github.com/mit-dci/lit/lnutil"
 )
 
-const minBal = 10000 // channels have to have 10K sat in them; can make variable later.
+// minOutput is the minimum output amt, post fee.
+// This (plus fees) is also the minimum channel balance
+const minOutput = 100000
 
 // Grab the coins that are rightfully yours! Plus some more.
 // For right now, spend all outputs from channel close.
@@ -174,20 +176,28 @@ func (nd LitNode) PushChannel(qc *Qchan, amt uint32) error {
 		return err
 	}
 
-	// perform minbal checks after reload
+	// perform minOutput checks after reload
+	myNewOutputSize := (qc.State.MyAmt - int64(amt)) - qc.State.Fee
+	theirNewOutputSize := qc.Value - (qc.State.MyAmt - int64(amt)) - qc.State.Fee
+
 	// check if this push would lower my balance below minBal
-	if int64(amt)+minBal > qc.State.MyAmt {
+	if myNewOutputSize < minOutput {
 		qc.ClearToSend <- true
-		return fmt.Errorf("want to push %s but %s available, %s minBal",
-			lnutil.SatoshiColor(int64(amt)), lnutil.SatoshiColor(qc.State.MyAmt), lnutil.SatoshiColor(minBal))
+		return fmt.Errorf("want to push %s but %s available, %s fee, %s minOutput",
+			lnutil.SatoshiColor(int64(amt)),
+			lnutil.SatoshiColor(qc.State.MyAmt),
+			lnutil.SatoshiColor(qc.State.Fee),
+			lnutil.SatoshiColor(minOutput))
 	}
 	// check if this push is sufficient to get them above minBal
-	if int64(amt)+(qc.Value-qc.State.MyAmt) < minBal {
+	if theirNewOutputSize < minOutput {
 		qc.ClearToSend <- true
-		return fmt.Errorf("pushing %s insufficient; counterparty bal %s minBal %s",
+		return fmt.Errorf(
+			"pushing %s insufficient; counterparty bal %s fee %s minOutput %s",
 			lnutil.SatoshiColor(int64(amt)),
 			lnutil.SatoshiColor(qc.Value-qc.State.MyAmt),
-			lnutil.SatoshiColor(minBal))
+			lnutil.SatoshiColor(qc.State.Fee),
+			lnutil.SatoshiColor(minOutput))
 	}
 
 	// if we got here, but channel is not in rest state, try to fix it.
@@ -323,10 +333,19 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 		return fmt.Errorf("DeltaSigHandler err: delta %d", incomingDelta)
 	}
 
-	// check if this push would lower counterparty balance below minBal
-	if int64(incomingDelta) > (qc.Value-qc.State.MyAmt)+minBal {
-		return fmt.Errorf("DeltaSigHandler err: delta %d but they have %d, minBal %d",
-			incomingDelta, qc.Value-qc.State.MyAmt, minBal)
+	// perform minOutput check
+	theirNewOutputSize :=
+		qc.Value - (qc.State.MyAmt + int64(incomingDelta)) - qc.State.Fee
+
+	// check if this push is takes them below minimum output size
+	if theirNewOutputSize < minOutput {
+		qc.ClearToSend <- true
+		return fmt.Errorf(
+			"pushing %s reduces them too low; counterparty bal %s fee %s minOutput %s",
+			lnutil.SatoshiColor(int64(incomingDelta)),
+			lnutil.SatoshiColor(qc.Value-qc.State.MyAmt),
+			lnutil.SatoshiColor(qc.State.Fee),
+			lnutil.SatoshiColor(minOutput))
 	}
 
 	// update to the next state to verify

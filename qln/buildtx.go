@@ -72,8 +72,8 @@ func (q *Qchan) SimpleCloseTx() (*wire.MsgTx, error) {
 	if q == nil || q.State == nil {
 		return nil, fmt.Errorf("SimpleCloseTx: nil chan / state")
 	}
-	dustLimit := int64(10000) // hardcoded dust limit, change later
-	fee := q.State.Fee        // symmetric fee
+
+	fee := q.State.Fee // symmetric fee
 
 	// make my output
 	myScript := lnutil.DirectWPKHScript(q.MyRefundPub)
@@ -84,14 +84,19 @@ func (q *Qchan) SimpleCloseTx() (*wire.MsgTx, error) {
 	theirAmt := (q.Value - q.State.MyAmt) - fee
 	theirOutput := wire.NewTxOut(theirAmt, theirScript)
 
-	// make tx with these outputs
+	// check output amounts (should never fail)
+	if myAmt < minOutput {
+		return nil, fmt.Errorf("SimpleCloseTx: my output amt %d too low", myAmt)
+	}
+	if theirAmt < minOutput {
+		return nil, fmt.Errorf("SimpleCloseTx: their output amt %d too low", myAmt)
+	}
+
 	tx := wire.NewMsgTx()
-	if myAmt > dustLimit {
-		tx.AddTxOut(myOutput)
-	}
-	if theirAmt > dustLimit {
-		tx.AddTxOut(theirOutput)
-	}
+
+	// make tx with these outputs
+	tx.AddTxOut(myOutput)
+	tx.AddTxOut(theirOutput)
 	// add channel outpoint as txin
 	tx.AddTxIn(wire.NewTxIn(&q.Op, nil, nil))
 	// sort and return
@@ -102,8 +107,6 @@ func (q *Qchan) SimpleCloseTx() (*wire.MsgTx, error) {
 // BuildStateTx constructs and returns a state tx.  As simple as I can make it.
 // This func just makes the tx with data from State in ram, and HAKD key arg
 func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
-	dustLimit := int64(10000) // hardcoded dust limit, change later
-
 	if q == nil {
 		return nil, fmt.Errorf("BuildStateTx: nil chan")
 	}
@@ -112,17 +115,14 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
 	if s == nil {
 		return nil, fmt.Errorf("channel (%d,%d) has no state", q.KeyGen.Step[3], q.KeyGen.Step[4])
 	}
-	// if delta is non-zero, something is wrong.
-	// this is old? remove...
-	/*	if s.Delta != 0 {
-		return nil, fmt.Errorf(
-			"BuildStateTx: delta is %d (expect 0)", s.Delta)
-	}*/
-	var fancyAmt, pkhAmt int64   // output amounts
-	var revPub, timePub [33]byte // pubkeys
-	var pkhPub [33]byte          // the simple output's pub key hash
+
+	var fancyAmt, pkhAmt, theirAmt int64 // output amounts
+	var revPub, timePub [33]byte         // pubkeys
+	var pkhPub [33]byte                  // the simple output's pub key hash
 
 	fee := s.Fee // fixed fee for now
+
+	theirAmt = q.Value - s.MyAmt
 
 	// the PKH clear refund also has elkrem points added to mask the PKH.
 	// this changes the txouts at each state to blind sorceror better.
@@ -138,20 +138,39 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
 		timePub = lnutil.AddPubsEZ(q.MyHAKDBase, curElk)
 
 		pkhPub = q.TheirRefundPub
-		pkhAmt = (q.Value - s.MyAmt) - fee
-		fancyAmt = s.MyAmt - fee
+
+		// nonzero amts means build the output
+		if theirAmt > 0 {
+			pkhAmt = theirAmt - fee
+		}
+		if s.MyAmt > 0 {
+			fancyAmt = s.MyAmt - fee
+		}
 	} else { // build THEIR tx (to sign)
 		// Their tx that they store.  I get funds PKH.  SH is theirs eventually.
 		fmt.Printf("using elkpoint %x\n", s.ElkPoint)
 		// SH pubkeys are our base points plus the received elk point
 		revPub = lnutil.CombinePubs(q.MyHAKDBase, s.ElkPoint)
 		timePub = lnutil.AddPubsEZ(q.TheirHAKDBase, s.ElkPoint)
-
-		fancyAmt = (q.Value - s.MyAmt) - fee
-
 		// PKH output
 		pkhPub = q.MyRefundPub
-		pkhAmt = s.MyAmt - fee
+
+		// nonzero amts means build the output
+		if theirAmt > 0 {
+			fancyAmt = theirAmt - fee
+		}
+		if s.MyAmt > 0 {
+			pkhAmt = s.MyAmt - fee
+		}
+	}
+
+	// check amounts.  Nonzero amounts below the minOutput is an error.
+	// Shouldn't happen and means some checks in push/pull went wrong.
+	if fancyAmt != 0 && fancyAmt < minOutput {
+		return nil, fmt.Errorf("SH amt %d too low", fancyAmt)
+	}
+	if pkhAmt != 0 && pkhAmt < minOutput {
+		return nil, fmt.Errorf("PKH amt %d too low", pkhAmt)
 	}
 
 	// now that everything is chosen, build fancy script and pkh script
@@ -175,16 +194,15 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
 	// make a new tx
 	tx := wire.NewMsgTx()
 	// add txouts
-	if fancyAmt > dustLimit {
+	if fancyAmt != 0 {
 		tx.AddTxOut(outFancy)
 	}
-
-	if pkhAmt > dustLimit {
+	if pkhAmt != 0 {
 		tx.AddTxOut(outPKH)
 	}
 
 	if len(tx.TxOut) < 1 {
-		return nil, fmt.Errorf("No outputs, all below dust limit")
+		return nil, fmt.Errorf("No outputs, all below minOutput")
 	}
 
 	// add unsigned txin
