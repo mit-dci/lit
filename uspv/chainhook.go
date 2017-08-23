@@ -30,6 +30,9 @@ type ChainHook interface {
 	// ChainHook layer; wallit should not have to handle ingesting irrelevant txs.
 	// You get back an error and 2 channels: one for txs with height attached, and
 	// one with block heights.  Subject to change; maybe this is redundant.
+
+	// Note that for reorgs, the height chan just sends a lower height than you
+	// already have, and that means "reorg back!"
 	Start(height int32, host, path string, params *coinparam.Params) (
 		chan lnutil.TxAndHeight, chan int32, error)
 
@@ -155,6 +158,7 @@ func (s *SPVCon) PushTx(tx *wire.MsgTx) error {
 	// broadcast inv message
 	s.outMsgQueue <- invMsg
 
+	// TODO wait a few seconds here for a reject message and return it
 	return nil
 }
 

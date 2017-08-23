@@ -176,6 +176,19 @@ func (nd LitNode) PushChannel(qc *Qchan, amt uint32) error {
 		return err
 	}
 
+	// check that channel is confirmed, if non-test coin
+	wal, ok := nd.SubWallet[qc.Coin()]
+	if !ok {
+		qc.ClearToSend <- true
+		return fmt.Errorf("Not connected to coin type %d\n", qc.Coin())
+	}
+
+	if !wal.Params().TestCoin && qc.Height < 100 {
+		qc.ClearToSend <- true
+		return fmt.Errorf(
+			"height %d; must wait min 1 conf for non-test coin\n", qc.Height)
+	}
+
 	// perform minOutput checks after reload
 	myNewOutputSize := (qc.State.MyAmt - int64(amt)) - qc.State.Fee
 	theirNewOutputSize := qc.Value - (qc.State.MyAmt - int64(amt)) - qc.State.Fee

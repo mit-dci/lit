@@ -110,6 +110,8 @@ func (s *SPVCon) fPositiveHandler() {
 	}
 }
 
+// REORG TODO: how to detect reorgs and send them up to wallet layer
+
 func (s *SPVCon) HeaderHandler(m *wire.MsgHeaders) {
 	moar, err := s.IngestHeaders(m)
 	if err != nil {
