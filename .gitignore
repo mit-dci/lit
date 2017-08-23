@@ -5,6 +5,8 @@ ln.db
 testkey.hex
 utxo.db
 watch.db
+setup.sh
+
 
 *.pyc
 

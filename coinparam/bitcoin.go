@@ -1,8 +1,8 @@
 package coinparam
 
 import (
-	"time"
 	"io"
+	"time"
 
 	"github.com/adiabat/btcd/chaincfg/chainhash"
 	"github.com/adiabat/btcd/wire"
@@ -24,13 +24,13 @@ var BitcoinParams = Params{
 	},
 
 	// Chain parameters
-	GenesisBlock:             &genesisBlock,
-	GenesisHash:              &genesisHash,
-	PoWFunction:		      chainhash.DoubleHashH,
-    DiffCalcFunction:         func(r io.ReadSeeker, height, startheight int32, p *Params) (uint32, error) {
-                                    return diffBTC(r, height, startheight, p, false)
-                              },
-    FeePerByte:               80,
+	GenesisBlock: &genesisBlock,
+	GenesisHash:  &genesisHash,
+	PoWFunction:  chainhash.DoubleHashH,
+	DiffCalcFunction: func(r io.ReadSeeker, height, startheight int32, p *Params) (uint32, error) {
+		return diffBTC(r, height, startheight, p, false)
+	},
+	FeePerByte:               80,
 	PowLimit:                 mainPowLimit,
 	PowLimitBits:             0x1d00ffff,
 	CoinbaseMaturity:         100,
@@ -105,24 +105,24 @@ var TestNet3Params = Params{
 	},
 
 	// Chain parameters
-	GenesisBlock:             &testNet3GenesisBlock,
-	GenesisHash:              &testNet3GenesisHash,
-	PoWFunction:              chainhash.DoubleHashH,
-    DiffCalcFunction:         func(r io.ReadSeeker, height, startheight int32, p *Params) (uint32, error) {
-                                  return diffBTC(r, height, startheight, p, false)
-                              },
-    StartHeader:              [80]byte{
-                                    0x00, 0x00, 0x00, 0x20, 0xda, 0x33, 0x92, 0x5b, 0x1f, 0x7a, 0x55, 
-                                    0xe9, 0xfa, 0x8e, 0x6c, 0x95, 0x5a, 0x20, 0xea, 0x09, 0x41, 0x48, 
-                                    0xb6, 0x0c, 0x5c, 0x88, 0xf6, 0x9a, 0x4f, 0x50, 0x00, 0x00, 0x00, 
-                                    0x00, 0x00, 0x00, 0x36, 0x73, 0xb7, 0xb6, 0xce, 0x81, 0x57, 0xd3, 
-                                    0xcf, 0xca, 0xf4, 0x15, 0xb6, 0x74, 0x09, 0x18, 0xdf, 0x76, 0x10, 
-                                    0xa8, 0x76, 0x9d, 0x70, 0x33, 0x4a, 0xa9, 0xab, 0xd9, 0xc9, 0x41, 
-                                    0xb2, 0x5e, 0x76, 0x21, 0x21, 0x58, 0x80, 0xba, 0x37, 0x1a, 0x85, 
-                                    0xbf, 0x96, 0x46,
-                              },
-    StartHeight:              1032192,
-    FeePerByte:               80,
+	GenesisBlock: &testNet3GenesisBlock,
+	GenesisHash:  &testNet3GenesisHash,
+	PoWFunction:  chainhash.DoubleHashH,
+	DiffCalcFunction: func(r io.ReadSeeker, height, startheight int32, p *Params) (uint32, error) {
+		return diffBTC(r, height, startheight, p, false)
+	},
+	StartHeader: [80]byte{
+		0x00, 0x00, 0x00, 0x20, 0xda, 0x33, 0x92, 0x5b, 0x1f, 0x7a, 0x55,
+		0xe9, 0xfa, 0x8e, 0x6c, 0x95, 0x5a, 0x20, 0xea, 0x09, 0x41, 0x48,
+		0xb6, 0x0c, 0x5c, 0x88, 0xf6, 0x9a, 0x4f, 0x50, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x36, 0x73, 0xb7, 0xb6, 0xce, 0x81, 0x57, 0xd3,
+		0xcf, 0xca, 0xf4, 0x15, 0xb6, 0x74, 0x09, 0x18, 0xdf, 0x76, 0x10,
+		0xa8, 0x76, 0x9d, 0x70, 0x33, 0x4a, 0xa9, 0xab, 0xd9, 0xc9, 0x41,
+		0xb2, 0x5e, 0x76, 0x21, 0x21, 0x58, 0x80, 0xba, 0x37, 0x1a, 0x85,
+		0xbf, 0x96, 0x46,
+	},
+	StartHeight:              1032192,
+	FeePerByte:               80,
 	PowLimit:                 testNet3PowLimit,
 	PowLimitBits:             0x1d00ffff,
 	CoinbaseMaturity:         100,
@@ -165,6 +165,7 @@ var TestNet3Params = Params{
 	// BIP44 coin type used in the hierarchical deterministic path for
 	// address generation.
 	HDCoinType: 1,
+	TestCoin:   true,
 }
 
 // RegressionNetParams defines the network parameters for the regression test
@@ -177,13 +178,13 @@ var RegressionNetParams = Params{
 	DNSSeeds:      []string{},
 
 	// Chain parameters
-	GenesisBlock:             &regTestGenesisBlock,
-	GenesisHash:              &regTestGenesisHash,
-	PoWFunction:		      chainhash.DoubleHashH,
-    DiffCalcFunction:         func(r io.ReadSeeker, height, startheight int32, p *Params) (uint32, error) {
-                                  return diffBTC(r, height, startheight, p, false)
-                              },
-    FeePerByte:               80,
+	GenesisBlock: &regTestGenesisBlock,
+	GenesisHash:  &regTestGenesisHash,
+	PoWFunction:  chainhash.DoubleHashH,
+	DiffCalcFunction: func(r io.ReadSeeker, height, startheight int32, p *Params) (uint32, error) {
+		return diffBTC(r, height, startheight, p, false)
+	},
+	FeePerByte:               80,
 	PowLimit:                 regressionPowLimit,
 	PowLimitBits:             0x207fffff,
 	CoinbaseMaturity:         100,
@@ -224,6 +225,7 @@ var RegressionNetParams = Params{
 	// BIP44 coin type used in the hierarchical deterministic path for
 	// address generation.
 	HDCoinType: 257,
+	//	TestCoin:   true,
 }
 
 // genesisCoinbaseTx is the coinbase transaction for the genesis blocks for
