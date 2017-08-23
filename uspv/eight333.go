@@ -261,9 +261,15 @@ func (s *SPVCon) IngestHeaders(m *wire.MsgHeaders) (bool, error) {
 	// check first header returned to make sure it fits on the end
 	// of our header file
 	if !m.Headers[0].PrevBlock.IsEqual(&prevHash) {
-		// delete 100 headers if this happens!  Dumb reorg.
-		log.Printf("reorg? header msg doesn't fit. points to %s, expect %s",
+
+		// node is telling us about a header that doesn't fit.
+		// Try to find where it hooks in to; if it's in the last 100 blocks,
+		// then we'll re-org.  If the re-org is more than 100 blocks deep
+		// we should disconnect and crash.
+
+		log.Printf("header msg doesn't fit. points to %s, expect %s",
 			m.Headers[0].PrevBlock.String(), prevHash.String())
+
 		if endPos < 8160 {
 			// jeez I give up, back to genesis
 			s.headerFile.Truncate(160)

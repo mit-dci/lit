@@ -6,14 +6,14 @@ The blocks themselves don't really make a chain.  Just the headers do.
 package uspv
 
 import (
+	"bytes"
 	"io"
 	"log"
 	"math/big"
 	"os"
-    "bytes"
 
 	"github.com/adiabat/btcd/blockchain"
-	
+
 	"github.com/adiabat/btcd/wire"
 	"github.com/mit-dci/lit/coinparam"
 )
@@ -37,11 +37,11 @@ func checkProofOfWork(header wire.BlockHeader, p *coinparam.Params) bool {
 	}
 
 	// The header hash must be less than the claimed target in the header.
-  
-    var buf bytes.Buffer
+
+	var buf bytes.Buffer
 	_ = wire.WriteBlockHeader(&buf, 0, &header)
 
-    blockHash := p.PoWFunction(buf.Bytes())
+	blockHash := p.PoWFunction(buf.Bytes())
 
 	hashNum := new(big.Int)
 
@@ -52,6 +52,35 @@ func checkProofOfWork(header wire.BlockHeader, p *coinparam.Params) bool {
 		return false
 	}
 	return true
+}
+
+// FindHeader will try to find where the header you give it is.
+// it runs backwards to find it and gives up after 1000 headers
+func FindHeader(r io.ReadSeeker, hdr wire.BlockHeader) (int32, error) {
+
+	targethash := hdr.BlockHash()
+
+	var cur wire.BlockHeader
+
+	for tries := 1; tries < 100; tries++ {
+		offset, err := r.Seek(int64(-80*tries), os.SEEK_END)
+		if err != nil {
+			return -1, err
+		}
+
+		//	for blkhash.IsEqual(&target) {
+		err = cur.Deserialize(r)
+		if err != nil {
+			return -1, err
+		}
+		curhash := cur.BlockHash()
+
+		if targethash.IsEqual(&curhash) {
+			return int32(offset / 80), nil
+		}
+	}
+
+	return 0, nil
 }
 
 func CheckHeader(r io.ReadSeeker, height, startheight int32, p *coinparam.Params) bool {
@@ -81,7 +110,7 @@ func CheckHeader(r io.ReadSeeker, height, startheight int32, p *coinparam.Params
 		log.Printf(err.Error())
 		return false
 	}
-  
+
 	// seek to curHeight header and read in
 	_, err = r.Seek(int64(80*(offsetHeight)), os.SEEK_SET)
 	if err != nil {
@@ -104,53 +133,53 @@ func CheckHeader(r io.ReadSeeker, height, startheight int32, p *coinparam.Params
 			prev.BlockHash().String(), cur.BlockHash().String())
 		return false
 	}
-  
-  // Check that the difficulty bits are correct
-  if offsetHeight > 0 && height >= p.AssumeDiffBefore {
-    rightBits, err := p.DiffCalcFunction(r, height, startheight, p)
-    if err != nil {
-      log.Printf("Error calculating Block %d %s difficuly. %s\n",
-      height, cur.BlockHash().String(), err.Error())
-      return false
-    }
-    
-    if cur.Bits != rightBits {
-        log.Printf("Block %d %s incorrect difficuly.  Read %x, expect %x\n",
-        height, cur.BlockHash().String(), cur.Bits, rightBits)
-        return false
-    }
-  }
+
+	// Check that the difficulty bits are correct
+	if offsetHeight > 0 && height >= p.AssumeDiffBefore {
+		rightBits, err := p.DiffCalcFunction(r, height, startheight, p)
+		if err != nil {
+			log.Printf("Error calculating Block %d %s difficuly. %s\n",
+				height, cur.BlockHash().String(), err.Error())
+			return false
+		}
+
+		if cur.Bits != rightBits {
+			log.Printf("Block %d %s incorrect difficuly.  Read %x, expect %x\n",
+				height, cur.BlockHash().String(), cur.Bits, rightBits)
+			return false
+		}
+	}
 
 	// check if there's a valid proof of work.  That whole "Bitcoin" thing.
 	if !checkProofOfWork(cur, p) {
 		log.Printf("Block %d Bad proof of work.\n", height)
 		return false
 	}
-  
-  // Check for checkpoints
-  for _, checkpoint := range p.Checkpoints {
-    if checkpoint.Height == height {
-      if *checkpoint.Hash != cur.BlockHash() {
-        log.Printf("Block %d is not a valid checkpoint", height)
-        return false
-      }
-      break
-    }
-  } 
-  
-  // Not entirely sure why I need to do this, but otherwise the tip block
-  // can go missing
-  _, err = r.Seek(int64(80*(offsetHeight)), os.SEEK_SET)
+
+	// Check for checkpoints
+	for _, checkpoint := range p.Checkpoints {
+		if checkpoint.Height == height {
+			if *checkpoint.Hash != cur.BlockHash() {
+				log.Printf("Block %d is not a valid checkpoint", height)
+				return false
+			}
+			break
+		}
+	}
+
+	// Not entirely sure why I need to do this, but otherwise the tip block
+	// can go missing
+	_, err = r.Seek(int64(80*(offsetHeight)), os.SEEK_SET)
 	if err != nil {
 		log.Printf(err.Error())
 		return false
 	}
-  err = cur.Deserialize(r)
+	err = cur.Deserialize(r)
 	if err != nil {
 		log.Printf(err.Error())
 		return false
 	}
-  
+
 	return true // it must have worked if there's no errors and got to the end.
 }
 
