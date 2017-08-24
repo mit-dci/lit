@@ -54,6 +54,45 @@ func checkProofOfWork(header wire.BlockHeader, p *coinparam.Params) bool {
 	return true
 }
 
+// GetHeaderAtHeight gives back a header at the specified height
+func (s *SPVCon) GetHeaderAtHeight(h int32) (*wire.BlockHeader, error) {
+	s.headerMutex.Lock()
+	defer s.headerMutex.Unlock()
+
+	// seek to that header
+	_, err := s.headerFile.Seek(int64(80*h), os.SEEK_SET)
+	if err != nil {
+		return nil, err
+	}
+
+	hdr := new(wire.BlockHeader)
+	err = hdr.Deserialize(s.headerFile)
+	if err != nil {
+		return nil, err
+	}
+
+	return hdr, nil
+}
+
+// GetHeaderAtHeight gives back a header at the specified height
+func (s *SPVCon) GetHeaderTipHeight() int32 {
+	s.headerMutex.Lock() // start header file ops
+	defer s.headerMutex.Unlock()
+	info, err := s.headerFile.Stat()
+	if err != nil {
+		log.Printf("Header file error: %s", err.Error())
+		return 0
+	}
+	headerFileSize := info.Size()
+	if headerFileSize == 0 || headerFileSize%80 != 0 { // header file broken
+		// try to fix it!
+		s.headerFile.Truncate(headerFileSize - (headerFileSize % 80))
+		log.Printf("ERROR: Header file not a multiple of 80 bytes. Truncating")
+	}
+	// subtract 1 as we want the start of the tip offset, not the end
+	return int32(headerFileSize/80) + s.Param.StartHeight - 1
+}
+
 // FindHeader will try to find where the header you give it is.
 // it runs backwards to find it and gives up after 1000 headers
 func FindHeader(r io.ReadSeeker, hdr wire.BlockHeader) (int32, error) {
@@ -62,7 +101,7 @@ func FindHeader(r io.ReadSeeker, hdr wire.BlockHeader) (int32, error) {
 
 	var cur wire.BlockHeader
 
-	for tries := 1; tries < 100; tries++ {
+	for tries := 1; tries < 2200; tries++ {
 		offset, err := r.Seek(int64(-80*tries), os.SEEK_END)
 		if err != nil {
 			return -1, err
