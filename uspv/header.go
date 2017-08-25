@@ -142,7 +142,7 @@ func CheckHeaderChain(
 			"CheckHeaderChain: Header file not a multiple of 80 bytes.")
 	}
 	// get the height of this tip from the file length
-	height := int32(pos/80) + p.StartHeight
+	//	height := int32(pos/80) + p.StartHeight
 	// read in last header
 	err = prevTip.Deserialize(r)
 	if err != nil {
@@ -175,7 +175,8 @@ func CheckHeaderChain(
 			}
 		}
 	}
-
+	// more here
+	return true, nil
 }
 
 func CheckHeader(r io.ReadSeeker, height, startheight int32, p *coinparam.Params) bool {

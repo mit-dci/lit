@@ -231,7 +231,7 @@ func (s *SPVCon) IngestHeaders(m *wire.MsgHeaders) (bool, error) {
 	// verification function.  In bitcoin you never need more than 2016 previous
 	// headers to figure out the validity of the next; some alcoins need more
 	// though, like 4K or so.
-	headerChainLength := 4096
+	//	headerChainLength := 4096
 
 	gotNum := int64(len(m.Headers))
 	if gotNum > 0 {
