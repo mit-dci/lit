@@ -226,6 +226,13 @@ func (s *SPVCon) IngestMerkleBlock(m *wire.MsgMerkleBlock) {
 // If there are no headers, it assumes we're done and returns false.
 // Otherwise it assumes there's more to request and returns true.
 func (s *SPVCon) IngestHeaders(m *wire.MsgHeaders) (bool, error) {
+
+	// headerChainLength is how many headers we give to the
+	// verification function.  In bitcoin you never need more than 2016 previous
+	// headers to figure out the validity of the next; some alcoins need more
+	// though, like 4K or so.
+	headerChainLength := 4096
+
 	gotNum := int64(len(m.Headers))
 	if gotNum > 0 {
 		log.Printf("got %d headers. Range:\n%s - %s\n",

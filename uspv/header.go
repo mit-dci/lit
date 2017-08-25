@@ -7,6 +7,7 @@ package uspv
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"log"
 	"math/big"
@@ -120,6 +121,61 @@ func FindHeader(r io.ReadSeeker, hdr wire.BlockHeader) (int32, error) {
 	}
 
 	return 0, nil
+}
+
+// CheckHeaderChain takes in the headers message and sees if they all validate.
+// This function also needs read access to the previous headers.
+// Does not deal with re-orgs
+// returns true if *all* headers are cool, false if there is any problem
+func CheckHeaderChain(
+	r io.ReadSeeker, m wire.MsgHeaders, p *coinparam.Params) (bool, error) {
+
+	var prevTip wire.BlockHeader
+
+	// seek to last header
+	pos, err := r.Seek(80, os.SEEK_END)
+	if err != nil {
+		return false, err
+	}
+	if pos%80 != 0 {
+		return false, fmt.Errorf(
+			"CheckHeaderChain: Header file not a multiple of 80 bytes.")
+	}
+	// get the height of this tip from the file length
+	height := int32(pos/80) + p.StartHeight
+	// read in last header
+	err = prevTip.Deserialize(r)
+	if err != nil {
+		return false, err
+	}
+
+	tiphash := prevTip.BlockHash()
+
+	if len(m.Headers) < 1 {
+		return false, fmt.Errorf(
+			"CheckHeaderChain: headers message doesn't have any headers.")
+	}
+
+	// make sure the first header in the message points to our on-disk tip
+	if !m.Headers[0].PrevBlock.IsEqual(&tiphash) {
+		return false, fmt.Errorf(
+			"CheckHeaderChain: header message doesn't attach to tip.")
+	}
+
+	// run through all the new headers, checking what we can
+	for i, hdr := range m.Headers {
+
+		// check they link to each other
+		// That whole 'blockchain' thing.
+		if i > 1 {
+			hash := hdr.BlockHash()
+			if !hdr.PrevBlock.IsEqual(&hash) {
+				return false, fmt.Errorf(
+					"headers %d and %d in header message don't link", i, i-1)
+			}
+		}
+	}
+
 }
 
 func CheckHeader(r io.ReadSeeker, height, startheight int32, p *coinparam.Params) bool {

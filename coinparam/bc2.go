@@ -1,7 +1,6 @@
 package coinparam
 
 import (
-	"io"
 	"time"
 
 	"github.com/adiabat/btcd/chaincfg/chainhash"
@@ -16,12 +15,10 @@ var BC2NetParams = Params{
 	DNSSeeds:      []string{},
 
 	// Chain parameters
-	GenesisBlock: &bc2GenesisBlock,
-	GenesisHash:  &bc2GenesisHash,
-	PoWFunction:  chainhash.DoubleHashH,
-	DiffCalcFunction: func(r io.ReadSeeker, height, startheight int32, p *Params) (uint32, error) {
-		return diffBTC(r, height, startheight, p, false)
-	},
+	GenesisBlock:             &bc2GenesisBlock,
+	GenesisHash:              &bc2GenesisHash,
+	PoWFunction:              chainhash.DoubleHashH,
+	DiffCalcFunction:         diffBTC,
 	FeePerByte:               80,
 	PowLimit:                 bc2NetPowLimit,
 	PowLimitBits:             0x1d7fffff,
