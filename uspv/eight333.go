@@ -249,71 +249,78 @@ func (s *SPVCon) IngestHeaders(m *wire.MsgHeaders) (bool, error) {
 	// because verification is pretty quick.
 	defer s.headerMutex.Unlock()
 
-	tipheight := s.GetHeaderTipHeight()
-
-	tipheader, err := s.GetHeaderAtHeight(tipheight)
+	err := CheckHeaderChain(s.headerFile, m.Headers, s.Param)
 	if err != nil {
 		return false, err
 	}
-	tiphash := tipheader.BlockHash()
+	fmt.Printf("checked out\n")
+	// write all incoming headers to disk
 
-	// first, read our tip and see if the first thing we've gotten links up
-	if !m.Headers[0].PrevBlock.IsEqual(&tiphash) {
-		// reorg
-	}
+	//	tipheight := s.GetHeaderTipHeight()
 
-	// check all the headers
-	//	for n, curheader := range m.Headers {
-	//		worked := CheckHeader()
+	//	tipheader, err := s.GetHeaderAtHeight(tipheight)
+	//	if err != nil {
+	//		return false, err
+	//	}
+	//	tiphash := tipheader.BlockHash()
+
+	//	// first, read our tip and see if the first thing we've gotten links up
+	//	if !m.Headers[0].PrevBlock.IsEqual(&tiphash) {
+	//		// reorg
 	//	}
 
-	// seek to last header
-	_, err = s.headerFile.Seek(-80, os.SEEK_END)
-	if err != nil {
-		return false, err
-	}
-	var last wire.BlockHeader
-	err = last.Deserialize(s.headerFile)
-	if err != nil {
-		return false, err
-	}
-	prevHash := last.BlockHash()
+	//	// check all the headers
+	//	//	for n, curheader := range m.Headers {
+	//	//		worked := CheckHeader()
+	//	//	}
 
-	endPos, err := s.headerFile.Seek(0, os.SEEK_END)
-	if err != nil {
-		return false, err
-	}
-	tip := int32(endPos/80) + (s.headerStartHeight - 1) // move back 1 header length to read
+	//	// seek to last header
+	//	_, err = s.headerFile.Seek(-80, os.SEEK_END)
+	//	if err != nil {
+	//		return false, err
+	//	}
+	//	var last wire.BlockHeader
+	//	err = last.Deserialize(s.headerFile)
+	//	if err != nil {
+	//		return false, err
+	//	}
+	//	prevHash := last.BlockHash()
 
-	// check first header returned to make sure it fits on the end
-	// of our header file
-	if !m.Headers[0].PrevBlock.IsEqual(&prevHash) {
+	//	endPos, err := s.headerFile.Seek(0, os.SEEK_END)
+	//	if err != nil {
+	//		return false, err
+	//	}
+	//	tip := int32(endPos/80) + (s.headerStartHeight - 1) // move back 1 header length to read
 
-		// node is telling us about a header that doesn't fit.
-		// Try to find where it hooks in to; if it's in the last 100 blocks,
-		// then we'll re-org.  If the re-org is more than 100 blocks deep
-		// we should disconnect and crash.
+	//	// check first header returned to make sure it fits on the end
+	//	// of our header file
+	//	if !m.Headers[0].PrevBlock.IsEqual(&prevHash) {
 
-		log.Printf("header msg doesn't fit. points to %s, expect %s",
-			m.Headers[0].PrevBlock.String(), prevHash.String())
+	//		// node is telling us about a header that doesn't fit.
+	//		// Try to find where it hooks in to; if it's in the last 100 blocks,
+	//		// then we'll re-org.  If the re-org is more than 100 blocks deep
+	//		// we should disconnect and crash.
 
-		if endPos < 8160 {
-			// jeez I give up, back to genesis
-			s.headerFile.Truncate(160)
-		} else {
-			height, err := FindHeader(s.headerFile, *m.Headers[0])
-			log.Printf("header %s is back at height %d",
-				m.Headers[0].PrevBlock.String(), height)
-			if err != nil {
-				return false, err
-			}
-			err = s.headerFile.Truncate(endPos - 8000)
-			if err != nil {
-				return false, fmt.Errorf("couldn't truncate header file")
-			}
-		}
-		return true, fmt.Errorf("Truncated header file to try again")
-	}
+	//		log.Printf("header msg doesn't fit. points to %s, expect %s",
+	//			m.Headers[0].PrevBlock.String(), prevHash.String())
+
+	//		if endPos < 8160 {
+	//			// jeez I give up, back to genesis
+	//			s.headerFile.Truncate(160)
+	//		} else {
+	//			height, err := FindHeader(s.headerFile, *m.Headers[0])
+	//			log.Printf("header %s is back at height %d",
+	//				m.Headers[0].PrevBlock.String(), height)
+	//			if err != nil {
+	//				return false, err
+	//			}
+	//			err = s.headerFile.Truncate(endPos - 8000)
+	//			if err != nil {
+	//				return false, fmt.Errorf("couldn't truncate header file")
+	//			}
+	//		}
+	//		return true, fmt.Errorf("Truncated header file to try again")
+	//	}
 
 	for _, resphdr := range m.Headers {
 		// write to end of file
@@ -322,27 +329,27 @@ func (s *SPVCon) IngestHeaders(m *wire.MsgHeaders) (bool, error) {
 			return false, err
 		}
 		// advance chain tip
-		tip++
+		//		tip++
 		// check last header
-		worked := CheckHeader(s.headerFile, tip, s.headerStartHeight, s.Param)
-		if !worked {
-			if endPos < 8160 {
-				// jeez I give up, back to genesis
-				s.headerFile.Truncate(160)
-			} else {
-				err = s.headerFile.Truncate(endPos - 8000)
-				if err != nil {
-					return false, fmt.Errorf("couldn't truncate header file")
-				}
-			}
-			// probably should disconnect from spv node at this point,
-			// since they're giving us invalid headers.
-			return true, fmt.Errorf(
-				"Header %d - %s doesn't fit, dropping 100 headers.",
-				tip, resphdr.BlockHash().String())
-		}
+		//		worked := CheckHeader(s.headerFile, tip, s.headerStartHeight, s.Param)
+		//		if !worked {
+		//			if endPos < 8160 {
+		//				// jeez I give up, back to genesis
+		//				s.headerFile.Truncate(160)
+		//			} else {
+		//				err = s.headerFile.Truncate(endPos - 8000)
+		//				if err != nil {
+		//					return false, fmt.Errorf("couldn't truncate header file")
+		//				}
+		//			}
+		//			// probably should disconnect from spv node at this point,
+		//			// since they're giving us invalid headers.
+		//			return true, fmt.Errorf(
+		//				"Header %d - %s doesn't fit, dropping 100 headers.",
+		//				tip, resphdr.BlockHash().String())
+		//		}
 	}
-	log.Printf("Headers to height %d OK.", tip)
+	log.Printf("Added %d headers OK.", len(m.Headers))
 	return true, nil
 }
 
@@ -357,6 +364,7 @@ func (s *SPVCon) AskForHeaders() error {
 
 	tipheader, err := s.GetHeaderAtHeight(tipheight)
 	if err != nil {
+		log.Printf("AskForHeaders GetHeaderAtHeight error\n")
 		return err
 	}
 

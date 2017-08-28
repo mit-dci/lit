@@ -58,7 +58,7 @@ func NewWallit(
 	log.Printf("DB height %d\n", height)
 	incomingTx, incomingBlockheight, err := w.Hook.Start(height, spvhost, wallitpath, p)
 	if err != nil {
-		log.Printf("NewWallit crash  %s ", err.Error())
+		log.Printf("NewWallit Hook.Start crash  %s ", err.Error())
 	}
 
 	// check if there are any addresses.  If there aren't (initial wallet setup)

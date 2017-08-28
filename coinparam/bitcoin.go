@@ -26,7 +26,7 @@ var BitcoinParams = Params{
 	GenesisBlock:             &genesisBlock,
 	GenesisHash:              &genesisHash,
 	PoWFunction:              chainhash.DoubleHashH,
-	DiffCalcFunction:         diffBTC,
+	DiffCalcFunction:         diffBitcoin,
 	FeePerByte:               80,
 	PowLimit:                 mainPowLimit,
 	PowLimitBits:             0x1d00ffff,
@@ -105,7 +105,7 @@ var TestNet3Params = Params{
 	GenesisBlock:     &testNet3GenesisBlock,
 	GenesisHash:      &testNet3GenesisHash,
 	PoWFunction:      chainhash.DoubleHashH,
-	DiffCalcFunction: diffBTC,
+	DiffCalcFunction: diffBitcoin,
 	StartHeader: [80]byte{
 		0x00, 0x00, 0x00, 0x20, 0xda, 0x33, 0x92, 0x5b, 0x1f, 0x7a, 0x55,
 		0xe9, 0xfa, 0x8e, 0x6c, 0x95, 0x5a, 0x20, 0xea, 0x09, 0x41, 0x48,
@@ -176,7 +176,7 @@ var RegressionNetParams = Params{
 	GenesisBlock:     &regTestGenesisBlock,
 	GenesisHash:      &regTestGenesisHash,
 	PoWFunction:      chainhash.DoubleHashH,
-	DiffCalcFunction: diffBTC,
+	DiffCalcFunction: diffBitcoin,
 	//	func(r io.ReadSeeker, height, startheight int32, p *Params) (uint32, error) {
 	//		return diffBTC(r, height, startheight, p, false)
 	//	},

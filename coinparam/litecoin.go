@@ -28,7 +28,7 @@ var LiteCoinTestNet4Params = Params{
 		asChainHash, _ := chainhash.NewHash(scryptBytes)
 		return *asChainHash
 	},
-	DiffCalcFunction: diffBTC,
+	DiffCalcFunction: diffBitcoin,
 	StartHeader: [80]byte{
 		0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -98,7 +98,7 @@ var LiteRegNetParams = Params{
 		asChainHash, _ := chainhash.NewHash(scryptBytes)
 		return *asChainHash
 	},
-	DiffCalcFunction:         diffBTC,
+	DiffCalcFunction:         diffBitcoin,
 	FeePerByte:               800,
 	PowLimit:                 regressionPowLimit,
 	PowLimitBits:             0x207fffff,

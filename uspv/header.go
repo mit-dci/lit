@@ -19,8 +19,8 @@ import (
 	"github.com/mit-dci/lit/coinparam"
 )
 
-/* checkProofOfWork verifies the header hashes into something
-lower than specified by the 4-byte bits field. */
+// checkProofOfWork verifies the header hashes into something
+// lower than specified by the 4-byte bits field.
 func checkProofOfWork(header wire.BlockHeader, p *coinparam.Params) bool {
 
 	target := blockchain.CompactToBig(header.Bits)
@@ -38,7 +38,6 @@ func checkProofOfWork(header wire.BlockHeader, p *coinparam.Params) bool {
 	}
 
 	// The header hash must be less than the claimed target in the header.
-
 	var buf bytes.Buffer
 	_ = wire.WriteBlockHeader(&buf, 0, &header)
 
@@ -59,6 +58,9 @@ func checkProofOfWork(header wire.BlockHeader, p *coinparam.Params) bool {
 func (s *SPVCon) GetHeaderAtHeight(h int32) (*wire.BlockHeader, error) {
 	s.headerMutex.Lock()
 	defer s.headerMutex.Unlock()
+
+	// height is reduced by startHeight
+	h = h - s.Param.StartHeight
 
 	// seek to that header
 	_, err := s.headerFile.Seek(int64(80*h), os.SEEK_SET)
@@ -125,63 +127,127 @@ func FindHeader(r io.ReadSeeker, hdr wire.BlockHeader) (int32, error) {
 
 // CheckHeaderChain takes in the headers message and sees if they all validate.
 // This function also needs read access to the previous headers.
-// Does not deal with re-orgs
+// Does not deal with re-orgs; assumes new headers link to tip
+// TODO do reorgs and append here! why not
 // returns true if *all* headers are cool, false if there is any problem
+// Note we don't know what the height is, just the relative height.
+// returnin nil means it worked
 func CheckHeaderChain(
-	r io.ReadSeeker, m wire.MsgHeaders, p *coinparam.Params) (bool, error) {
+	r io.ReadSeeker, inHeaders []*wire.BlockHeader, p *coinparam.Params) error {
 
-	var prevTip wire.BlockHeader
-
-	// seek to last header
-	pos, err := r.Seek(80, os.SEEK_END)
-	if err != nil {
-		return false, err
-	}
-	if pos%80 != 0 {
-		return false, fmt.Errorf(
-			"CheckHeaderChain: Header file not a multiple of 80 bytes.")
-	}
-	// get the height of this tip from the file length
-	//	height := int32(pos/80) + p.StartHeight
-	// read in last header
-	err = prevTip.Deserialize(r)
-	if err != nil {
-		return false, err
-	}
-
-	tiphash := prevTip.BlockHash()
-
-	if len(m.Headers) < 1 {
-		return false, fmt.Errorf(
+	// make sure we actually got new headers
+	if len(inHeaders) < 1 {
+		return fmt.Errorf(
 			"CheckHeaderChain: headers message doesn't have any headers.")
 	}
 
-	// make sure the first header in the message points to our on-disk tip
-	if !m.Headers[0].PrevBlock.IsEqual(&tiphash) {
-		return false, fmt.Errorf(
-			"CheckHeaderChain: header message doesn't attach to tip.")
-	}
-
-	// run through all the new headers, checking what we can
-	for i, hdr := range m.Headers {
-
+	// first, look through all the incoming headers to make sure
+	// they're at least self-consistent.  Do this before even
+	// checking that they link to anything; it's all in-ram and quick
+	for i, hdr := range inHeaders {
 		// check they link to each other
 		// That whole 'blockchain' thing.
 		if i > 1 {
-			hash := hdr.BlockHash()
+			hash := inHeaders[i-1].BlockHash()
 			if !hdr.PrevBlock.IsEqual(&hash) {
-				return false, fmt.Errorf(
+				return fmt.Errorf(
 					"headers %d and %d in header message don't link", i, i-1)
 			}
 		}
+		// check if there's a valid proof of work.  That whole "Bitcoin" thing.
+		if !checkProofOfWork(*hdr, p) {
+			return fmt.Errorf("header %d in message has bad proof of work", i)
+		}
+
+		// check that header version is non-negative (fork detect)
+		if hdr.Version < 0 {
+			return fmt.Errorf(
+				"header %d in message has negative version (hard fork?)", i)
+		}
+
 	}
+	// incoming header message is internally consistent, now check that it
+	// links with what we have on disk
+
+	epochLength := int32(p.TargetTimespan / p.TargetTimePerBlock)
+
+	// seek to start of last header
+	pos, err := r.Seek(-80, os.SEEK_END)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("pos: %d\n", pos)
+	if pos%80 != 0 {
+		return fmt.Errorf(
+			"CheckHeaderChain: Header file not a multiple of 80 bytes.")
+	}
+
+	// we know incoming height; it's startheight + all the headers on disk + 1
+	height := int32(pos/80) + p.StartHeight + 1
+
+	// see if we don't have enough & load em all.
+	var numheaders int32 // number of headers to read
+
+	// load only last epoch if there are a lot on disk
+	if pos > int64(80*epochLength) {
+		_, err = r.Seek(int64(-80*epochLength), os.SEEK_END)
+		numheaders = epochLength
+	} else { // otherwise load everything, start at byte 0
+		_, err = r.Seek(0, os.SEEK_SET)
+		numheaders = height - p.StartHeight
+	}
+	if err != nil { // seems like it will always be ok here..?
+		return err
+	}
+
+	// weird off-by-1 stuff here; makes numheaders, incluing the 0th
+	oldHeaders := make([]*wire.BlockHeader, numheaders)
+	fmt.Printf("made %d header slice\n", len(oldHeaders))
+	// load a bunch of headers from disk into ram
+	for i, _ := range oldHeaders {
+		// read from file at current offset
+		oldHeaders[i] = new(wire.BlockHeader)
+		err = oldHeaders[i].Deserialize(r)
+		if err != nil {
+			log.Printf("CheckHeaderChain ran out of file at oldheader %d\n", i)
+			return err
+		}
+	}
+
+	tiphash := oldHeaders[len(oldHeaders)-1].BlockHash()
+
+	// make sure the first header in the message points to our on-disk tip
+	if !inHeaders[0].PrevBlock.IsEqual(&tiphash) {
+		return fmt.Errorf(
+			"CheckHeaderChain: header message doesn't attach to tip.")
+	}
+	// TODO reorg detection here
+
+	prevHeaders := oldHeaders
+
+	// check difficulty adjustments in the new headers
+	// since we call this many times, append each time
+	for i, hdr := range inHeaders {
+		// build slice of "previous" headers
+		prevHeaders = append(prevHeaders, inHeaders[i])
+		rightBits, err := p.DiffCalcFunction(prevHeaders, height+int32(i), p)
+		if err != nil {
+			return fmt.Errorf("Error calculating Block %d %s difficuly. %s",
+				int(height)+i, hdr.BlockHash().String(), err.Error())
+		}
+
+		if hdr.Bits != rightBits {
+			return fmt.Errorf("Block %d %s incorrect difficuly.  Read %x, expect %x",
+				int(height)+i, hdr.BlockHash().String(), hdr.Bits, rightBits)
+		}
+	}
+
 	// more here
-	return true, nil
+	return nil
 }
 
 func CheckHeader(r io.ReadSeeker, height, startheight int32, p *coinparam.Params) bool {
 	// startHeight is the height the file starts at
-
 	// header start must be 0 mod 2106
 	var err error
 	var cur, prev wire.BlockHeader
@@ -192,6 +258,7 @@ func CheckHeader(r io.ReadSeeker, height, startheight int32, p *coinparam.Params
 
 	offsetHeight := height - startheight
 	// initial load of headers
+
 	// load previous and current.
 
 	// seek to n-1 header
@@ -232,7 +299,8 @@ func CheckHeader(r io.ReadSeeker, height, startheight int32, p *coinparam.Params
 
 	// Check that the difficulty bits are correct
 	if offsetHeight > 0 && height >= p.AssumeDiffBefore {
-		rightBits, err := p.DiffCalcFunction(r, height, startheight, p)
+		//		rightBits, err := p.DiffCalcFunction(r, height, startheight, p)
+		rightBits, err := p.DiffCalcFunction(nil, height, p)
 		if err != nil {
 			log.Printf("Error calculating Block %d %s difficuly. %s\n",
 				height, cur.BlockHash().String(), err.Error())

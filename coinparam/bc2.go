@@ -18,7 +18,7 @@ var BC2NetParams = Params{
 	GenesisBlock:             &bc2GenesisBlock,
 	GenesisHash:              &bc2GenesisHash,
 	PoWFunction:              chainhash.DoubleHashH,
-	DiffCalcFunction:         diffBTC,
+	DiffCalcFunction:         diffBitcoin,
 	FeePerByte:               80,
 	PowLimit:                 bc2NetPowLimit,
 	PowLimitBits:             0x1d7fffff,

@@ -43,30 +43,45 @@ func calcDiffAdjustBitcoin(start, end *wire.BlockHeader, p *Params) uint32 {
 	return BigToCompact(newTarget)
 }
 
-// diffBitcoin finds the difficulty of the next header after the slice presented
-// needs at least 1 epochlength of headers
+// diffBitcoin checks the difficulty of the last header in the slice presented
+// give at least an epochlength of headers if this is a new epoch;
+// otherwise give at least 2
+// it's pretty ugly that it needs Params.  There must be some trick to get
+// rid of that since diffBitcoin itself is already in the Params...
 func diffBitcoin(
 	headers []*wire.BlockHeader, height int32, p *Params) (uint32, error) {
+
+	// we can reduce height by startheight for all these calculations
+	height = height - p.StartHeight
 
 	ltcmode := p.Name == "litetest4" || p.Name == "litereg" ||
 		p.Name == "litecoin" || p.Name == "vtctest" || p.Name == "vtc"
 
-	epochLength := int32(p.TargetTimespan / p.TargetTimePerBlock)
-
-	if len(headers) < int(epochLength) {
-		return 0, fmt.Errorf(
-			"diffBitcoin not enough headers, got %d, need %d",
-			len(headers), epochLength)
+	if p.Name == "regtest" {
+		return 0x207fffff, nil
 	}
 
-	prev := headers[len(headers)-1]
+	if len(headers) < 2 {
+		return 0, fmt.Errorf("diffBitcoin got %d headers, min 2", len(headers))
+	}
+
+	prev := headers[len(headers)-2]
+	cur := headers[len(headers)-1]
 
 	// normal, no adjustment; Dn = Dn-1
 	rightBits := prev.Bits
 
+	epochLength := int32(p.TargetTimespan / p.TargetTimePerBlock)
+	epochStart := new(wire.BlockHeader)
+
 	// see if we're on a difficulty adjustment block
 	if (height)%epochLength == 0 {
-		epochStart := new(wire.BlockHeader)
+		// if so, we need at least an epoch's worth of headers
+		if len(headers) < int(epochLength) {
+			return 0, fmt.Errorf("diffBitcoin not enough headers, got %d, need %d",
+				len(headers), epochLength)
+		}
+
 		if ltcmode {
 			if height == epochLength {
 				epochStart = headers[height-epochLength]
@@ -80,6 +95,22 @@ func diffBitcoin(
 		// That whole "controlled supply" thing.
 		// calculate diff n based on n-2016 ... n-1
 		rightBits = calcDiffAdjustBitcoin(epochStart, prev, p)
+	} else if p.ReduceMinDifficulty { // not a new epoch
+		// if on testnet, check for difficulty nerfing
+		if cur.Timestamp.After(
+			prev.Timestamp.Add(p.TargetTimePerBlock * 2)) {
+			rightBits = p.PowLimitBits // difficulty 1
+		} else {
+			// actually need to iterate back to last nerfed block,
+			// then take the diff from the one behind it
+			epochStartDepth := height % epochLength
+			if int32(len(headers)) < epochStartDepth {
+				return 0, fmt.Errorf(
+					"diffBitcoin not enough headers, need back to epoch start")
+			}
+			epochStart := headers[int32(len(headers))-(epochStartDepth+1)]
+			rightBits = epochStart.Bits
+		}
 	}
 
 	return rightBits, nil
