@@ -18,7 +18,7 @@ when no adjustment should take place, and return false.
 Note that the epoch is actually 2015 blocks long, which is confusing. */
 func calcDiffAdjustBitcoin(start, end *wire.BlockHeader, p *Params) uint32 {
 
-	duration := end.Timestamp.UnixNano() - start.Timestamp.UnixNano()
+	duration := end.Timestamp.Unix() - start.Timestamp.Unix()
 
 	minRetargetTimespan :=
 		int64(p.TargetTimespan.Seconds()) / p.RetargetAdjustmentFactor
@@ -44,8 +44,10 @@ func calcDiffAdjustBitcoin(start, end *wire.BlockHeader, p *Params) uint32 {
 		newTarget.Set(p.PowLimit)
 	}
 
-	fmt.Printf("start %d end %d adj %s\n", start.Timestamp.Unix(), end.Timestamp.Unix(),
-		prevTarget.Div(newTarget, prevTarget).String())
+	fmt.Printf("start %d end %d adj %s newdiff %s\n",
+		start.Timestamp.Unix(), end.Timestamp.Unix(),
+		prevTarget.Div(newTarget, prevTarget).String(),
+		prevTarget.Div(p.PowLimit, newTarget).String())
 
 	// calculate and return 4-byte 'bits' difficulty from 32-byte target
 	return BigToCompact(newTarget)
@@ -59,6 +61,7 @@ func calcDiffAdjustBitcoin(start, end *wire.BlockHeader, p *Params) uint32 {
 func diffBitcoin(
 	headers []*wire.BlockHeader, height int32, p *Params) (uint32, error) {
 
+	maxHeader := len(headers) - 1
 	// we can reduce heiqght by startheight for all these calculations
 	relHeight := height - p.StartHeight
 
@@ -69,7 +72,7 @@ func diffBitcoin(
 		return 0x207fffff, nil
 	}
 
-	if len(headers) < 2 {
+	if maxHeader < 1 {
 		return 0, fmt.Errorf("diffBitcoin got %d headers, min 2", len(headers))
 	}
 
@@ -79,25 +82,27 @@ func diffBitcoin(
 	// normal, no adjustment; Dn = Dn-1
 	rightBits := prev.Bits
 
-	epochLength := int32(p.TargetTimespan / p.TargetTimePerBlock)
+	epochLength := int(p.TargetTimespan / p.TargetTimePerBlock)
 	epochStart := new(wire.BlockHeader)
 
+	epochHeight := int(height) % epochLength
+
 	// see if we're on a difficulty adjustment block
-	if (relHeight)%epochLength == 0 {
+	if epochHeight == 0 {
 		// if so, we need at least an epoch's worth of headers
-		if len(headers) < int(epochLength+1) {
+		if maxHeader < int(epochLength) {
 			return 0, fmt.Errorf("diffBitcoin not enough headers, got %d, need %d",
 				len(headers), epochLength)
 		}
 
 		if ltcmode {
-			if height == epochLength {
-				epochStart = headers[relHeight-epochLength]
+			if int(height) == epochLength {
+				epochStart = headers[maxHeader-(epochLength)]
 			} else {
-				epochStart = headers[relHeight-epochLength-1]
+				epochStart = headers[maxHeader-(epochLength-1)]
 			}
 		} else {
-			epochStart = headers[relHeight-epochLength]
+			epochStart = headers[maxHeader-(epochLength)]
 		}
 		// if so, check if difficulty adjustment is valid.
 		// That whole "controlled supply" thing.
@@ -119,10 +124,10 @@ func diffBitcoin(
 			// pindex->nHeight % params.DifficultyAdjustmentInterval() != 0 &&
 			// pindex->nBits == nProofOfWorkLimit)
 			//maxIndex :=
-			index := len(headers) - 1
+			index := maxHeader
 			minHeight := int(relHeight) - index
 			for index > 0 &&
-				minHeight+index%int(epochLength) != 0 &&
+				minHeight+index%(epochLength) != 0 &&
 				headers[index].Bits == p.PowLimitBits {
 				index--
 				fmt.Printf("height: %d index: %d\n", height, index)
