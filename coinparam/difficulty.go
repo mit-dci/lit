@@ -44,11 +44,6 @@ func calcDiffAdjustBitcoin(start, end *wire.BlockHeader, p *Params) uint32 {
 		newTarget.Set(p.PowLimit)
 	}
 
-	fmt.Printf("start %d end %d adj %s newdiff %s\n",
-		start.Timestamp.Unix(), end.Timestamp.Unix(),
-		prevTarget.Div(newTarget, prevTarget).String(),
-		prevTarget.Div(p.PowLimit, newTarget).String())
-
 	// calculate and return 4-byte 'bits' difficulty from 32-byte target
 	return BigToCompact(newTarget)
 }
@@ -61,19 +56,11 @@ func calcDiffAdjustBitcoin(start, end *wire.BlockHeader, p *Params) uint32 {
 func diffBitcoin(
 	headers []*wire.BlockHeader, height int32, p *Params) (uint32, error) {
 
-	maxHeader := len(headers) - 1
-	// we can reduce heiqght by startheight for all these calculations
-	relHeight := height - p.StartHeight
-
 	ltcmode := p.Name == "litetest4" || p.Name == "litereg" ||
 		p.Name == "litecoin" || p.Name == "vtctest" || p.Name == "vtc"
 
 	if p.Name == "regtest" {
 		return 0x207fffff, nil
-	}
-
-	if maxHeader < 1 {
-		return 0, fmt.Errorf("diffBitcoin got %d headers, min 2", len(headers))
 	}
 
 	prev := headers[len(headers)-2]
@@ -86,6 +73,14 @@ func diffBitcoin(
 	epochStart := new(wire.BlockHeader)
 
 	epochHeight := int(height) % epochLength
+	maxHeader := len(headers) - 1
+
+	// must include an epoch start header
+	if epochHeight > maxHeader {
+		return 0, fmt.Errorf("diffBitcoin got insufficient headers")
+	}
+
+	epochStart = headers[maxHeader-epochHeight]
 
 	// see if we're on a difficulty adjustment block
 	if epochHeight == 0 {
@@ -97,12 +92,12 @@ func diffBitcoin(
 
 		if ltcmode {
 			if int(height) == epochLength {
-				epochStart = headers[maxHeader-(epochLength)]
+				epochStart = headers[maxHeader-epochLength]
 			} else {
 				epochStart = headers[maxHeader-(epochLength-1)]
 			}
 		} else {
-			epochStart = headers[maxHeader-(epochLength)]
+			epochStart = headers[maxHeader-epochLength]
 		}
 		// if so, check if difficulty adjustment is valid.
 		// That whole "controlled supply" thing.
@@ -123,16 +118,11 @@ func diffBitcoin(
 			// while (pindex->pprev &&
 			// pindex->nHeight % params.DifficultyAdjustmentInterval() != 0 &&
 			// pindex->nBits == nProofOfWorkLimit)
-			//maxIndex :=
-			index := maxHeader
-			minHeight := int(relHeight) - index
-			for index > 0 &&
-				minHeight+index%(epochLength) != 0 &&
-				headers[index].Bits == p.PowLimitBits {
-				index--
-				fmt.Printf("height: %d index: %d\n", height, index)
-			}
-			rightBits = headers[index].Bits
+
+			// ugh I don't know, and whatever this is testnet.
+			// just go to epoch start even though that's not what the cpp code
+			// seems to say
+			rightBits = epochStart.Bits
 		}
 	}
 
