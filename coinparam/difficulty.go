@@ -17,9 +17,14 @@ Only feed it headers n-2016 and n-1, otherwise it will calculate a difficulty
 when no adjustment should take place, and return false.
 Note that the epoch is actually 2015 blocks long, which is confusing. */
 func calcDiffAdjustBitcoin(start, end *wire.BlockHeader, p *Params) uint32 {
-	minRetargetTimespan := int64(p.TargetTimespan.Seconds()) / p.RetargetAdjustmentFactor
-	maxRetargetTimespan := int64(p.TargetTimespan.Seconds()) * p.RetargetAdjustmentFactor
-	duration := end.Timestamp.Unix() - start.Timestamp.Unix()
+
+	duration := end.Timestamp.UnixNano() - start.Timestamp.UnixNano()
+
+	minRetargetTimespan :=
+		int64(p.TargetTimespan.Seconds()) / p.RetargetAdjustmentFactor
+	maxRetargetTimespan :=
+		int64(p.TargetTimespan.Seconds()) * p.RetargetAdjustmentFactor
+
 	if duration < minRetargetTimespan {
 		duration = minRetargetTimespan
 	} else if duration > maxRetargetTimespan {
@@ -39,6 +44,9 @@ func calcDiffAdjustBitcoin(start, end *wire.BlockHeader, p *Params) uint32 {
 		newTarget.Set(p.PowLimit)
 	}
 
+	fmt.Printf("start %d end %d adj %s\n", start.Timestamp.Unix(), end.Timestamp.Unix(),
+		prevTarget.Div(newTarget, prevTarget).String())
+
 	// calculate and return 4-byte 'bits' difficulty from 32-byte target
 	return BigToCompact(newTarget)
 }
@@ -51,8 +59,8 @@ func calcDiffAdjustBitcoin(start, end *wire.BlockHeader, p *Params) uint32 {
 func diffBitcoin(
 	headers []*wire.BlockHeader, height int32, p *Params) (uint32, error) {
 
-	// we can reduce height by startheight for all these calculations
-	height = height - p.StartHeight
+	// we can reduce heiqght by startheight for all these calculations
+	relHeight := height - p.StartHeight
 
 	ltcmode := p.Name == "litetest4" || p.Name == "litereg" ||
 		p.Name == "litecoin" || p.Name == "vtctest" || p.Name == "vtc"
@@ -75,26 +83,28 @@ func diffBitcoin(
 	epochStart := new(wire.BlockHeader)
 
 	// see if we're on a difficulty adjustment block
-	if (height)%epochLength == 0 {
+	if (relHeight)%epochLength == 0 {
 		// if so, we need at least an epoch's worth of headers
-		if len(headers) < int(epochLength) {
+		if len(headers) < int(epochLength+1) {
 			return 0, fmt.Errorf("diffBitcoin not enough headers, got %d, need %d",
 				len(headers), epochLength)
 		}
 
 		if ltcmode {
 			if height == epochLength {
-				epochStart = headers[height-epochLength]
+				epochStart = headers[relHeight-epochLength]
 			} else {
-				epochStart = headers[height-epochLength-1]
+				epochStart = headers[relHeight-epochLength-1]
 			}
 		} else {
-			epochStart = headers[height-epochLength]
+			epochStart = headers[relHeight-epochLength]
 		}
 		// if so, check if difficulty adjustment is valid.
 		// That whole "controlled supply" thing.
 		// calculate diff n based on n-2016 ... n-1
 		rightBits = calcDiffAdjustBitcoin(epochStart, prev, p)
+		fmt.Printf("h %d diff adjust %x -> %x\n",
+			height, prev.Bits, rightBits)
 	} else if p.ReduceMinDifficulty { // not a new epoch
 		// if on testnet, check for difficulty nerfing
 		if cur.Timestamp.After(
@@ -103,13 +113,21 @@ func diffBitcoin(
 		} else {
 			// actually need to iterate back to last nerfed block,
 			// then take the diff from the one behind it
-			epochStartDepth := height % epochLength
-			if int32(len(headers)) < epochStartDepth {
-				return 0, fmt.Errorf(
-					"diffBitcoin not enough headers, need back to epoch start")
+			// btcd code is findPrevTestNetDifficulty()
+			// code in bitcoin/cpp:
+			// while (pindex->pprev &&
+			// pindex->nHeight % params.DifficultyAdjustmentInterval() != 0 &&
+			// pindex->nBits == nProofOfWorkLimit)
+			//maxIndex :=
+			index := len(headers) - 1
+			minHeight := int(relHeight) - index
+			for index > 0 &&
+				minHeight+index%int(epochLength) != 0 &&
+				headers[index].Bits == p.PowLimitBits {
+				index--
+				fmt.Printf("height: %d index: %d\n", height, index)
 			}
-			epochStart := headers[int32(len(headers))-(epochStartDepth+1)]
-			rightBits = epochStart.Bits
+			rightBits = headers[index].Bits
 		}
 	}
 
@@ -199,7 +217,8 @@ func diffBTC(r io.ReadSeeker, height, startheight int32, p *Params) (uint32, err
 }
 
 // Uses Kimoto Gravity Well for difficulty adjustment. Used in VTC, MONA etc
-func calcDiffAdjustKGW(r io.ReadSeeker, height, startheight int32, p *Params) (uint32, error) {
+func calcDiffAdjustKGW(
+	r io.ReadSeeker, height, startheight int32, p *Params) (uint32, error) {
 	var minBlocks, maxBlocks int32
 	minBlocks = 144
 	maxBlocks = 4032
@@ -228,7 +247,8 @@ func calcDiffAdjustKGW(r io.ReadSeeker, height, startheight int32, p *Params) (u
 
 	var blocksScanned, actualRate, targetRate int64
 	var difficultyAverage, previousDifficultyAverage big.Int
-	var rateAdjustmentRatio, eventHorizonDeviation, eventHorizonDeviationFast, eventHorizonDevationSlow float64
+	var rateAdjustmentRatio, eventHorizonDeviation float64
+	var eventHorizonDeviationFast, eventHorizonDevationSlow float64
 	rateAdjustmentRatio = 1
 
 	currentHeight := height - 1
@@ -267,11 +287,14 @@ func calcDiffAdjustKGW(r io.ReadSeeker, height, startheight int32, p *Params) (u
 			rateAdjustmentRatio = float64(targetRate) / float64(actualRate)
 		}
 
-		eventHorizonDeviation = 1 + (0.7084 * math.Pow(float64(blocksScanned)/float64(minBlocks), -1.228))
+		eventHorizonDeviation = 1 + (0.7084 *
+			math.Pow(float64(blocksScanned)/float64(minBlocks), -1.228))
 		eventHorizonDeviationFast = eventHorizonDeviation
 		eventHorizonDevationSlow = 1 / eventHorizonDeviation
 
-		if blocksScanned >= int64(minBlocks) && (rateAdjustmentRatio <= eventHorizonDevationSlow || rateAdjustmentRatio >= eventHorizonDeviationFast) {
+		if blocksScanned >= int64(minBlocks) &&
+			(rateAdjustmentRatio <= eventHorizonDevationSlow ||
+				rateAdjustmentRatio >= eventHorizonDeviationFast) {
 			break
 		}
 

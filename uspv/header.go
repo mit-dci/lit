@@ -189,8 +189,8 @@ func CheckHeaderChain(
 	var numheaders int32 // number of headers to read
 
 	// load only last epoch if there are a lot on disk
-	if pos > int64(80*epochLength) {
-		_, err = r.Seek(int64(-80*epochLength), os.SEEK_END)
+	if pos > int64(80*(epochLength+1)) {
+		_, err = r.Seek(int64(-80*(epochLength+1)), os.SEEK_END)
 		numheaders = epochLength
 	} else { // otherwise load everything, start at byte 0
 		_, err = r.Seek(0, os.SEEK_SET)
