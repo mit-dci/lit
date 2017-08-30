@@ -89,7 +89,7 @@ var VertcoinParams = Params{
 	},
 	StartHeight:      598752,
 	AssumeDiffBefore: 602784,
-	DiffCalcFunction: calcDiffAdjustKGW,
+	DiffCalcFunction: diffKGW,
 	FeePerByte:       105,
 	GenesisBlock:     &VertcoinGenesisBlock,
 	GenesisHash:      &VertcoinGenesisHash,
