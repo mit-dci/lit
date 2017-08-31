@@ -253,74 +253,9 @@ func (s *SPVCon) IngestHeaders(m *wire.MsgHeaders) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	fmt.Printf("checked out\n")
-	// write all incoming headers to disk
 
-	//	tipheight := s.GetHeaderTipHeight()
-
-	//	tipheader, err := s.GetHeaderAtHeight(tipheight)
-	//	if err != nil {
-	//		return false, err
-	//	}
-	//	tiphash := tipheader.BlockHash()
-
-	//	// first, read our tip and see if the first thing we've gotten links up
-	//	if !m.Headers[0].PrevBlock.IsEqual(&tiphash) {
-	//		// reorg
-	//	}
-
-	//	// check all the headers
-	//	//	for n, curheader := range m.Headers {
-	//	//		worked := CheckHeader()
-	//	//	}
-
-	//	// seek to last header
-	//	_, err = s.headerFile.Seek(-80, os.SEEK_END)
-	//	if err != nil {
-	//		return false, err
-	//	}
-	//	var last wire.BlockHeader
-	//	err = last.Deserialize(s.headerFile)
-	//	if err != nil {
-	//		return false, err
-	//	}
-	//	prevHash := last.BlockHash()
-
-	//	endPos, err := s.headerFile.Seek(0, os.SEEK_END)
-	//	if err != nil {
-	//		return false, err
-	//	}
-	//	tip := int32(endPos/80) + (s.headerStartHeight - 1) // move back 1 header length to read
-
-	//	// check first header returned to make sure it fits on the end
-	//	// of our header file
-	//	if !m.Headers[0].PrevBlock.IsEqual(&prevHash) {
-
-	//		// node is telling us about a header that doesn't fit.
-	//		// Try to find where it hooks in to; if it's in the last 100 blocks,
-	//		// then we'll re-org.  If the re-org is more than 100 blocks deep
-	//		// we should disconnect and crash.
-
-	//		log.Printf("header msg doesn't fit. points to %s, expect %s",
-	//			m.Headers[0].PrevBlock.String(), prevHash.String())
-
-	//		if endPos < 8160 {
-	//			// jeez I give up, back to genesis
-	//			s.headerFile.Truncate(160)
-	//		} else {
-	//			height, err := FindHeader(s.headerFile, *m.Headers[0])
-	//			log.Printf("header %s is back at height %d",
-	//				m.Headers[0].PrevBlock.String(), height)
-	//			if err != nil {
-	//				return false, err
-	//			}
-	//			err = s.headerFile.Truncate(endPos - 8000)
-	//			if err != nil {
-	//				return false, fmt.Errorf("couldn't truncate header file")
-	//			}
-	//		}
-	//		return true, fmt.Errorf("Truncated header file to try again")
-	//	}
+	// a header message is all or nothing; if we think there's something
+	// wrong with it, we don't take any of their headers
 
 	for _, resphdr := range m.Headers {
 		// write to end of file

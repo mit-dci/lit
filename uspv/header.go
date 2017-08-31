@@ -133,7 +133,7 @@ func FindHeader(r io.ReadSeeker, hdr wire.BlockHeader) (int32, error) {
 // Note we don't know what the height is, just the relative height.
 // returnin nil means it worked
 func CheckHeaderChain(
-	r io.ReadSeeker, inHeaders []*wire.BlockHeader, p *coinparam.Params) error {
+	r io.ReadWriteSeeker, inHeaders []*wire.BlockHeader, p *coinparam.Params) error {
 
 	// make sure we actually got new headers
 	if len(inHeaders) < 1 {
@@ -218,8 +218,16 @@ func CheckHeaderChain(
 
 	// make sure the first header in the message points to our on-disk tip
 	if !inHeaders[0].PrevBlock.IsEqual(&tiphash) {
-		return fmt.Errorf(
-			"CheckHeaderChain: header message doesn't attach to tip.")
+
+		// find where it points to
+
+		attchHeight, err := FindHeader(r, *inHeaders[0])
+		if err != nil {
+			return fmt.Errorf(
+				"CheckHeaderChain: header message doesn't attach to tip or anywhere.")
+		}
+		return fmt.Errorf("Header message attaches at height %d", attchHeight)
+
 	}
 	// TODO reorg detection here
 
