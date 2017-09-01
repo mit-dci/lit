@@ -100,8 +100,6 @@ func (s *SPVCon) GetHeaderTipHeight() int32 {
 // it runs backwards to find it and gives up after 1000 headers
 func FindHeader(r io.ReadSeeker, hdr wire.BlockHeader) (int32, error) {
 
-	targethash := hdr.BlockHash()
-
 	var cur wire.BlockHeader
 
 	for tries := 1; tries < 2200; tries++ {
@@ -117,7 +115,9 @@ func FindHeader(r io.ReadSeeker, hdr wire.BlockHeader) (int32, error) {
 		}
 		curhash := cur.BlockHash()
 
-		if targethash.IsEqual(&curhash) {
+		//		fmt.Printf("try %d %s\n", tries, curhash.String())
+
+		if hdr.PrevBlock.IsEqual(&curhash) {
 			return int32(offset / 80), nil
 		}
 	}
@@ -132,12 +132,15 @@ func FindHeader(r io.ReadSeeker, hdr wire.BlockHeader) (int32, error) {
 // returns true if *all* headers are cool, false if there is any problem
 // Note we don't know what the height is, just the relative height.
 // returnin nil means it worked
+// returns an int32 usually 0, but if there's a reorg, shows what height to
+// reorg back to before adding on the headers
 func CheckHeaderChain(
-	r io.ReadWriteSeeker, inHeaders []*wire.BlockHeader, p *coinparam.Params) error {
+	r io.ReadSeeker, inHeaders []*wire.BlockHeader,
+	p *coinparam.Params) (int32, error) {
 
 	// make sure we actually got new headers
 	if len(inHeaders) < 1 {
-		return fmt.Errorf(
+		return 0, fmt.Errorf(
 			"CheckHeaderChain: headers message doesn't have any headers.")
 	}
 
@@ -150,18 +153,18 @@ func CheckHeaderChain(
 		if i > 1 {
 			hash := inHeaders[i-1].BlockHash()
 			if !hdr.PrevBlock.IsEqual(&hash) {
-				return fmt.Errorf(
+				return 0, fmt.Errorf(
 					"headers %d and %d in header message don't link", i, i-1)
 			}
 		}
 		// check if there's a valid proof of work.  That whole "Bitcoin" thing.
 		if !checkProofOfWork(*hdr, p) {
-			return fmt.Errorf("header %d in message has bad proof of work", i)
+			return 0, fmt.Errorf("header %d in message has bad proof of work", i)
 		}
 
 		// check that header version is non-negative (fork detect)
 		if hdr.Version < 0 {
-			return fmt.Errorf(
+			return 0, fmt.Errorf(
 				"header %d in message has negative version (hard fork?)", i)
 		}
 
@@ -174,11 +177,11 @@ func CheckHeaderChain(
 	// seek to start of last header
 	pos, err := r.Seek(-80, os.SEEK_END)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	fmt.Printf("pos: %d\n", pos)
 	if pos%80 != 0 {
-		return fmt.Errorf(
+		return 0, fmt.Errorf(
 			"CheckHeaderChain: Header file not a multiple of 80 bytes.")
 	}
 
@@ -197,7 +200,7 @@ func CheckHeaderChain(
 		numheaders = height - p.StartHeight
 	}
 	if err != nil { // seems like it will always be ok here..?
-		return err
+		return 0, err
 	}
 
 	// weird off-by-1 stuff here; makes numheaders, incluing the 0th
@@ -210,26 +213,43 @@ func CheckHeaderChain(
 		err = oldHeaders[i].Deserialize(r)
 		if err != nil {
 			log.Printf("CheckHeaderChain ran out of file at oldheader %d\n", i)
-			return err
+			return 0, err
 		}
 	}
 
 	tiphash := oldHeaders[len(oldHeaders)-1].BlockHash()
 
+	var attachHeight int32
 	// make sure the first header in the message points to our on-disk tip
 	if !inHeaders[0].PrevBlock.IsEqual(&tiphash) {
 
 		// find where it points to
 
-		attchHeight, err := FindHeader(r, *inHeaders[0])
+		attachHeight, err = FindHeader(r, *inHeaders[0])
 		if err != nil {
-			return fmt.Errorf(
+			return 0, fmt.Errorf(
 				"CheckHeaderChain: header message doesn't attach to tip or anywhere.")
 		}
-		return fmt.Errorf("Header message attaches at height %d", attchHeight)
 
+		log.Printf("Header %s attaches at height %d\n",
+			inHeaders[0].BlockHash().String(), attachHeight)
+
+		// TODO check for more work here instead of length
+		// if we've been given insufficient headers, don't reorg, but
+		// ask for more headers.
+		if attachHeight+int32(len(inHeaders)) < height {
+			return -1, fmt.Errorf(
+				"reorg message up to height %d, but have up to %d",
+				attachHeight+int32(len(inHeaders)), height-1)
+		}
+
+		log.Printf("reorg from height %d to %d",
+			height, attachHeight+int32(len(inHeaders)))
+
+		// reorg is go, snip to attach height
+		reorgDepth := height - attachHeight
+		oldHeaders = oldHeaders[:numheaders-reorgDepth]
 	}
-	// TODO reorg detection here
 
 	prevHeaders := oldHeaders
 
@@ -240,18 +260,17 @@ func CheckHeaderChain(
 		prevHeaders = append(prevHeaders, inHeaders[i])
 		rightBits, err := p.DiffCalcFunction(prevHeaders, height+int32(i), p)
 		if err != nil {
-			return fmt.Errorf("Error calculating Block %d %s difficuly. %s",
+			return 0, fmt.Errorf("Error calculating Block %d %s difficuly. %s",
 				int(height)+i, hdr.BlockHash().String(), err.Error())
 		}
 
 		if hdr.Bits != rightBits {
-			return fmt.Errorf("Block %d %s incorrect difficuly.  Read %x, expect %x",
+			return 0, fmt.Errorf("Block %d %s incorrect difficuly.  Read %x, expect %x",
 				int(height)+i, hdr.BlockHash().String(), hdr.Bits, rightBits)
 		}
 	}
 
-	// more here
-	return nil
+	return attachHeight, nil
 }
 
 func CheckHeader(r io.ReadSeeker, height, startheight int32, p *coinparam.Params) bool {

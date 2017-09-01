@@ -158,18 +158,6 @@ func NewRootAndHeight(b chainhash.Hash, h int32) (hah HashAndHeight) {
 	return
 }
 
-func (s *SPVCon) RemoveHeaders(r int32) error {
-	endPos, err := s.headerFile.Seek(0, os.SEEK_END)
-	if err != nil {
-		return err
-	}
-	err = s.headerFile.Truncate(endPos - int64(r*80))
-	if err != nil {
-		return fmt.Errorf("couldn't truncate header file")
-	}
-	return nil
-}
-
 func (s *SPVCon) IngestMerkleBlock(m *wire.MsgMerkleBlock) {
 
 	txids, err := checkMBlock(m) // check self-consistency
@@ -249,40 +237,40 @@ func (s *SPVCon) IngestHeaders(m *wire.MsgHeaders) (bool, error) {
 	// because verification is pretty quick.
 	defer s.headerMutex.Unlock()
 
-	err := CheckHeaderChain(s.headerFile, m.Headers, s.Param)
+	reorgHeight, err := CheckHeaderChain(s.headerFile, m.Headers, s.Param)
 	if err != nil {
+		// insufficient depth reorg means we're still trying to sync up?
+		// really, the re-org hasn't been proven; if the remote node
+		// provides us with a new block we'll ask again.
+		if reorgHeight == -1 {
+			log.Printf("Header error: %s\n", err.Error())
+			return false, nil
+		}
+		// some other error
 		return false, err
+	}
+
+	// truncate header file if reorg happens
+	if reorgHeight != 0 {
+		fileHeight := reorgHeight - s.Param.StartHeight
+		err = s.headerFile.Truncate(int64(fileHeight) * 80)
+		if err != nil {
+			return false, err
+		}
+
+		// also we need to tell the upstream modules that a reorg happened
+		s.CurrentHeightChan <- reorgHeight
+		s.syncHeight = reorgHeight
 	}
 
 	// a header message is all or nothing; if we think there's something
 	// wrong with it, we don't take any of their headers
-
 	for _, resphdr := range m.Headers {
 		// write to end of file
 		err = resphdr.Serialize(s.headerFile)
 		if err != nil {
 			return false, err
 		}
-		// advance chain tip
-		//		tip++
-		// check last header
-		//		worked := CheckHeader(s.headerFile, tip, s.headerStartHeight, s.Param)
-		//		if !worked {
-		//			if endPos < 8160 {
-		//				// jeez I give up, back to genesis
-		//				s.headerFile.Truncate(160)
-		//			} else {
-		//				err = s.headerFile.Truncate(endPos - 8000)
-		//				if err != nil {
-		//					return false, fmt.Errorf("couldn't truncate header file")
-		//				}
-		//			}
-		//			// probably should disconnect from spv node at this point,
-		//			// since they're giving us invalid headers.
-		//			return true, fmt.Errorf(
-		//				"Header %d - %s doesn't fit, dropping 100 headers.",
-		//				tip, resphdr.BlockHash().String())
-		//		}
 	}
 	log.Printf("Added %d headers OK.", len(m.Headers))
 	return true, nil
@@ -323,11 +311,12 @@ func (s *SPVCon) AskForHeaders() error {
 		if err != nil {
 			return err
 		}
-		backnum++
 
 		// send the most recent 10 blockhashes, then get sparse
 		if backnum > 10 {
 			backnum <<= 2
+		} else {
+			backnum++
 		}
 	}
 

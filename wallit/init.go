@@ -113,12 +113,19 @@ func (w *Wallit) TxHandler(incomingTxAndHeight chan lnutil.TxAndHeight) {
 }
 
 func (w *Wallit) HeightHandler(incomingHeight chan int32) {
+	var prevHeight int32
 	for {
 		h := <-incomingHeight
+		// detect reorg
+		if h < prevHeight {
+			log.Printf("HeightHandler: oh no, reorg!\n")
+		}
+
 		err := w.SetDBSyncHeight(h)
 		if err != nil {
 			log.Printf("HeightHandler crash  %s ", err.Error())
 		}
+		prevHeight = h
 	}
 }
 
