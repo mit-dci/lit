@@ -211,9 +211,7 @@ func diffBTC(r io.ReadSeeker, height, startheight int32, p *Params) (uint32, err
 	return rightBits, nil
 }
 
-// Uses Kimoto Gravity Well for difficulty adjustment. Used in VTC, MONA etc
-func calcDiffAdjustKGW(
-	r io.ReadSeeker, height, startheight int32, p *Params) (uint32, error) {
+func diffKGW(headers []*wire.BlockHeader, height int32, p *Params) (uint32, error) {
 	var minBlocks, maxBlocks int32
 	minBlocks = 144
 	maxBlocks = 4032
@@ -222,21 +220,7 @@ func calcDiffAdjustKGW(
 		return p.PowLimitBits, nil
 	}
 
-	offsetHeight := height - startheight - 1
-
-	var currentBlock wire.BlockHeader
-	var err error
-
-	// seek to n-1 header
-	_, err = r.Seek(int64(80*offsetHeight), os.SEEK_SET)
-	if err != nil {
-		return 0, err
-	}
-	// read in n-1
-	err = currentBlock.Deserialize(r)
-	if err != nil {
-		return 0, err
-	}
+	currentBlock := headers[len(headers)-2]
 
 	lastSolved := currentBlock
 
@@ -299,15 +283,7 @@ func calcDiffAdjustKGW(
 
 		currentHeight--
 
-		_, err = r.Seek(int64(80*(currentHeight-startheight)), os.SEEK_SET)
-		if err != nil {
-			return 0, err
-		}
-		// read in n-1
-		err = currentBlock.Deserialize(r)
-		if err != nil {
-			return 0, err
-		}
+		currentBlock = headers[len(headers)-int(i+2)]
 	}
 
 	newTarget := difficultyAverage
@@ -324,39 +300,18 @@ func calcDiffAdjustKGW(
 	return BigToCompact(&newTarget), nil
 }
 
-// dummy function for VTC diff calc
-// TODO
-func diffVTCdummy(
-	headers []*wire.BlockHeader, height int32, p *Params) (uint32, error) {
-	return 0, nil
-}
-
-func diffVTCtest(r io.ReadSeeker, height, startheight int32, p *Params) (uint32, error) {
+func diffVTCtest(headers []*wire.BlockHeader, height int32, p *Params) (uint32, error) {
 	if height < 2116 {
-		return diffBTC(r, height, startheight, p)
+		return diffBitcoin(headers, height, p)
 	}
-
-	offsetHeight := height - startheight
 
 	// Testnet retargets only every 12 blocks
 	if height%12 != 0 {
-		var prev wire.BlockHeader
-		var err error
-
-		// seek to n-1 header
-		_, err = r.Seek(int64(80*(offsetHeight-1)), os.SEEK_SET)
-		if err != nil {
-			return 0, err
-		}
-		// read in n-1
-		err = prev.Deserialize(r)
-		if err != nil {
-			return 0, err
-		}
+		prev := headers[len(headers)-2]
 
 		return prev.Bits, nil
 	}
 
 	// Run KGW
-	return calcDiffAdjustKGW(r, height, startheight, p)
+	return diffKGW(headers, height, p)
 }
