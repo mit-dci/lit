@@ -228,17 +228,19 @@ func CheckHeaderChain(
 	// check difficulty adjustments in the new headers
 	// since we call this many times, append each time
 	for i, hdr := range inHeaders {
-		// build slice of "previous" headers
-		prevHeaders = append(prevHeaders, inHeaders[i])
-		rightBits, err := p.DiffCalcFunction(prevHeaders, height+int32(i), p)
-		if err != nil {
-			return fmt.Errorf("Error calculating Block %d %s difficuly. %s",
-				int(height)+i, hdr.BlockHash().String(), err.Error())
-		}
+		if height+int32(i) >= p.AssumeDiffBefore {
+			// build slice of "previous" headers
+			prevHeaders = append(prevHeaders, inHeaders[i])
+			rightBits, err := p.DiffCalcFunction(prevHeaders, height+int32(i), p)
+			if err != nil {
+				return fmt.Errorf("Error calculating Block %d %s difficuly. %s",
+					int(height)+i, hdr.BlockHash().String(), err.Error())
+			}
 
-		if hdr.Bits != rightBits {
-			return fmt.Errorf("Block %d %s incorrect difficuly.  Read %x, expect %x",
-				int(height)+i, hdr.BlockHash().String(), hdr.Bits, rightBits)
+			if hdr.Bits != rightBits {
+				return fmt.Errorf("Block %d %s incorrect difficuly.  Read %x, expect %x",
+					int(height)+i, hdr.BlockHash().String(), hdr.Bits, rightBits)
+			}
 		}
 	}
 
