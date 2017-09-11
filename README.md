@@ -1,4 +1,4 @@
-# lit - a lightning node you can run on your pwn
+# lit - a lightning node you can run on your own
 ![Lit Logo](litlogo145.png)
 
 Under development, not for use with real money.
@@ -37,12 +37,7 @@ cannot find package [packageName]
 ...
 ```
 
-3. For each unfound package, you will need to use go to download these libraries into your GOPATH. For each outer package use `go get` to download the repositories.
-
-i.e.
-```
-go get golang.org/x/crypto
-```
+3. In order to download all missing packages, do `go get ./...` or `go get .`
 
 4. Go back to location of the lit folder if you are not already there ([Step 1](#building)) and try to rebuild the project.
 
@@ -52,9 +47,7 @@ cd cmd/lit-af
 go build
 ```
 
-6. If you run into any more dependency errors, repeat Step 3 by using `go get` for all of the missing packages.
-
-7. To run lit use: 
+6. To run lit use: 
 (Note : Windows users can take off ./ but may need to change lit to lit.exe in the second line.) 
 ```
 cd GOPATH/src/github.com/mit-dci/lit 
