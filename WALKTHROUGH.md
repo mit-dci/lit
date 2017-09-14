@@ -34,13 +34,13 @@ alice@pi2:~/anode$
 
 ### Step 2: Run lit and sync up
 
-Alice starts running lit (with `./lit -spv fullnode.net`) and syncs up to the blockchain.  The lit node will print lots of stuff on the screen, but can't be controlled from here.
+Alice starts running lit (with `./lit -tn3 fullnode.net`) and syncs up to the blockchain.  The lit node will print lots of stuff on the screen, but can't be controlled from here.
 
 Alice connects to her full node, fullnode.net.  By default this is on testnet3, using port 18333.
 
 ```
-alice@pi2:~/anode$ ./lit -spv fullnode.net
-lit node v0.0
+alice@pi2:~/anode$ ./lit -tn3 fullnode.net -v
+lit node v0.1
 -h for list of options.
 No file testkey.hex, generating.
 passphrase: 
