@@ -119,6 +119,10 @@ func (w *Wallit) HeightHandler(incomingHeight chan int32) {
 		// detect reorg
 		if h < prevHeight {
 			log.Printf("HeightHandler: oh no, reorg!\n")
+			err := w.RollBack(h)
+			if err != nil {
+				log.Printf("Rollback crash  %s ", err.Error())
+			}
 		}
 
 		err := w.SetDBSyncHeight(h)

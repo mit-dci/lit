@@ -340,6 +340,112 @@ func NewPorTxoBytesFromKGBytes(
 	return ptxo.Bytes()
 }
 
+// Rollback rewinds the wallet state to a previous height.  It removes new UTXOs
+// and restores utxos spent before this time.
+func (w *Wallit) RollBack(rollHeight int32) error {
+	// Assume this is an actual reord / rewind.  If you supply a height *greater*
+	// than the current height, all bets are off.  ( probably nothing will
+	// happen; but don't do it)
+
+	// I still don't 100% get how these bolt tx things get encapsulated.
+	return w.StateDB.Update(func(btx *bolt.Tx) error {
+		// range through utxos and remove all above target height
+
+		dufb := btx.Bucket(BKToutpoint)
+		old := btx.Bucket(BKTStxos)
+
+		if dufb == nil {
+			return fmt.Errorf("no duffel bag")
+		}
+
+		// build slice of stuff to delete
+		var killOPs [][]byte
+
+		err := dufb.ForEach(func(k, v []byte) error {
+			var txHeight int32
+			// 0 len v means it's a watch-only utxo, not spendable
+			// we have no way of getting rid of these.  Maybe should!
+			if len(v) == 0 {
+				return nil
+			}
+
+			// all we care about is the height, which starts 8 btyes in to the v
+			buf := bytes.NewBuffer(v)
+
+			// drop first 8 bytes (amt)
+			_ = buf.Next(8)
+
+			err := binary.Read(buf, binary.BigEndian, txHeight)
+			if err != nil {
+				return err
+			}
+
+			if txHeight > rollHeight {
+				// need to kill this TX.  we could save it somewhere else?
+				// just mark to get rid of it for now.
+				killOPs = append(killOPs, k)
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+
+		// now delete em all
+		for _, op := range killOPs {
+			err = dufb.Delete(op)
+			if err != nil {
+				return err
+			}
+		}
+
+		var reTxos [][]byte
+
+		// reanimate old stxos
+		err = old.ForEach(func(k, v []byte) error {
+			// these are all k:op v:everything else
+			x := make([]byte, len(k)+len(v))
+			copy(x, k)
+			copy(x[len(k):], v)
+
+			thisStxo, err := StxoFromBytes(x)
+			if err != nil {
+				return err
+			}
+			// if this spent txo was spent after the rollback height,
+			// need to reanimate
+			if thisStxo.SpendHeight > rollHeight {
+				// get portxo bytes to store
+				ptxoBytes, err := thisStxo.PorTxo.Bytes()
+				if err != nil {
+					return err
+				}
+				// stash portxo bytes
+				reTxos = append(reTxos, ptxoBytes)
+			}
+
+			return nil
+		})
+
+		// now reanimate by adding the utxo, and deleting the stxo
+		for _, txob := range reTxos {
+			err = dufb.Put(txob[:36], txob[36:])
+			if err != nil {
+				return err
+			}
+			err = old.Delete(txob[:36])
+			if err != nil {
+				return err
+			}
+		}
+
+		log.Printf("Rollback db.  %d utxos lost, %d regained\n",
+			len(killOPs), len(reTxos))
+
+		return nil
+	})
+}
+
 // Ingest -- take in a tx from the ChainHook
 func (w *Wallit) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 	return w.IngestMany([]*wire.MsgTx{tx}, height)
