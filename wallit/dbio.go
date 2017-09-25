@@ -350,6 +350,7 @@ func (w *Wallit) RollBack(rollHeight int32) error {
 	// I still don't 100% get how these bolt tx things get encapsulated.
 	return w.StateDB.Update(func(btx *bolt.Tx) error {
 		// range through utxos and remove all above target height
+		log.Printf("Rollback height %d\n", rollHeight)
 
 		dufb := btx.Bucket(BKToutpoint)
 		old := btx.Bucket(BKTStxos)
@@ -375,11 +376,12 @@ func (w *Wallit) RollBack(rollHeight int32) error {
 			// drop first 8 bytes (amt)
 			_ = buf.Next(8)
 
-			err := binary.Read(buf, binary.BigEndian, txHeight)
+			err := binary.Read(buf, binary.BigEndian, &txHeight)
 			if err != nil {
 				return err
 			}
 
+			log.Printf("tx height %d\n", txHeight)
 			if txHeight > rollHeight {
 				// need to kill this TX.  we could save it somewhere else?
 				// just mark to get rid of it for now.
@@ -441,6 +443,10 @@ func (w *Wallit) RollBack(rollHeight int32) error {
 
 		log.Printf("Rollback db.  %d utxos lost, %d regained\n",
 			len(killOPs), len(reTxos))
+
+		// But wait!  This doesn't work!  Right?
+		// Because the replayed txos might be spent by each other??? we need to
+		// replay txs, not txos.  I think.
 
 		return nil
 	})

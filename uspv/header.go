@@ -244,7 +244,7 @@ func CheckHeaderChain(
 		}
 
 		log.Printf("reorg from height %d to %d",
-			height, attachHeight+int32(len(inHeaders)))
+			height-1, attachHeight+int32(len(inHeaders)))
 
 		// reorg is go, snip to attach height
 		reorgDepth := height - attachHeight
