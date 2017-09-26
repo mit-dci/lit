@@ -353,7 +353,6 @@ func (w *Wallit) RollBack(rollHeight int32) error {
 		log.Printf("Rollback height %d\n", rollHeight)
 
 		dufb := btx.Bucket(BKToutpoint)
-		old := btx.Bucket(BKTStxos)
 
 		if dufb == nil {
 			return fmt.Errorf("no duffel bag")
@@ -401,52 +400,55 @@ func (w *Wallit) RollBack(rollHeight int32) error {
 			}
 		}
 
-		var reTxos [][]byte
+		// Don't re-animate old txos at all; just hope that they get back into
+		// blocks, which they probably will.
 
-		// reanimate old stxos
-		err = old.ForEach(func(k, v []byte) error {
-			// these are all k:op v:everything else
-			x := make([]byte, len(k)+len(v))
-			copy(x, k)
-			copy(x[len(k):], v)
+		// The right way to do this (TODO) would be to make a rebroadcast pool
+		// where if the stored txs above the reorg height aren't re-confirmed,
+		// then it will attempt to rebroadcast them.
 
-			thisStxo, err := StxoFromBytes(x)
-			if err != nil {
-				return err
-			}
-			// if this spent txo was spent after the rollback height,
-			// need to reanimate
-			if thisStxo.SpendHeight > rollHeight {
-				// get portxo bytes to store
-				ptxoBytes, err := thisStxo.PorTxo.Bytes()
+		/*
+			var reTxos [][]byte
+
+			// reanimate old stxos
+			err = old.ForEach(func(k, v []byte) error {
+				// these are all k:op v:everything else
+				x := make([]byte, len(k)+len(v))
+				copy(x, k)
+				copy(x[len(k):], v)
+
+				thisStxo, err := StxoFromBytes(x)
 				if err != nil {
 					return err
 				}
-				// stash portxo bytes
-				reTxos = append(reTxos, ptxoBytes)
+				// if this spent txo was spent after the rollback height,
+				// need to reanimate
+				if thisStxo.SpendHeight > rollHeight {
+					// get portxo bytes to store
+					ptxoBytes, err := thisStxo.PorTxo.Bytes()
+					if err != nil {
+						return err
+					}
+					// stash portxo bytes
+					reTxos = append(reTxos, ptxoBytes)
+				}
+
+				return nil
+			})
+
+			// now reanimate by adding the utxo, and deleting the stxo
+			for _, txob := range reTxos {
+				err = dufb.Put(txob[:36], txob[36:])
+				if err != nil {
+					return err
+				}
+				err = old.Delete(txob[:36])
+				if err != nil {
+					return err
+				}
 			}
-
-			return nil
-		})
-
-		// now reanimate by adding the utxo, and deleting the stxo
-		for _, txob := range reTxos {
-			err = dufb.Put(txob[:36], txob[36:])
-			if err != nil {
-				return err
-			}
-			err = old.Delete(txob[:36])
-			if err != nil {
-				return err
-			}
-		}
-
-		log.Printf("Rollback db.  %d utxos lost, %d regained\n",
-			len(killOPs), len(reTxos))
-
-		// But wait!  This doesn't work!  Right?
-		// Because the replayed txos might be spent by each other??? we need to
-		// replay txs, not txos.  I think.
+		*/
+		log.Printf("Rollback db.  %d utxos lost\n", len(killOPs))
 
 		return nil
 	})
