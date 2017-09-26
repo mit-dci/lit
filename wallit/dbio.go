@@ -341,7 +341,6 @@ func NewPorTxoBytesFromKGBytes(
 }
 
 // Rollback rewinds the wallet state to a previous height.  It removes new UTXOs
-// and restores utxos spent before this time.
 func (w *Wallit) RollBack(rollHeight int32) error {
 	// Assume this is an actual reord / rewind.  If you supply a height *greater*
 	// than the current height, all bets are off.  ( probably nothing will
@@ -407,47 +406,6 @@ func (w *Wallit) RollBack(rollHeight int32) error {
 		// where if the stored txs above the reorg height aren't re-confirmed,
 		// then it will attempt to rebroadcast them.
 
-		/*
-			var reTxos [][]byte
-
-			// reanimate old stxos
-			err = old.ForEach(func(k, v []byte) error {
-				// these are all k:op v:everything else
-				x := make([]byte, len(k)+len(v))
-				copy(x, k)
-				copy(x[len(k):], v)
-
-				thisStxo, err := StxoFromBytes(x)
-				if err != nil {
-					return err
-				}
-				// if this spent txo was spent after the rollback height,
-				// need to reanimate
-				if thisStxo.SpendHeight > rollHeight {
-					// get portxo bytes to store
-					ptxoBytes, err := thisStxo.PorTxo.Bytes()
-					if err != nil {
-						return err
-					}
-					// stash portxo bytes
-					reTxos = append(reTxos, ptxoBytes)
-				}
-
-				return nil
-			})
-
-			// now reanimate by adding the utxo, and deleting the stxo
-			for _, txob := range reTxos {
-				err = dufb.Put(txob[:36], txob[36:])
-				if err != nil {
-					return err
-				}
-				err = old.Delete(txob[:36])
-				if err != nil {
-					return err
-				}
-			}
-		*/
 		log.Printf("Rollback db.  %d utxos lost\n", len(killOPs))
 
 		return nil

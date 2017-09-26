@@ -128,7 +128,6 @@ func FindHeader(r io.ReadSeeker, hdr wire.BlockHeader) (int32, error) {
 // CheckHeaderChain takes in the headers message and sees if they all validate.
 // This function also needs read access to the previous headers.
 // Does not deal with re-orgs; assumes new headers link to tip
-// TODO do reorgs and append here! why not
 // returns true if *all* headers are cool, false if there is any problem
 // Note we don't know what the height is, just the relative height.
 // returnin nil means it worked
@@ -234,7 +233,7 @@ func CheckHeaderChain(
 		log.Printf("Header %s attaches at height %d\n",
 			inHeaders[0].BlockHash().String(), attachHeight)
 
-		// TODO check for more work here instead of length
+		// TODO check for more work here instead of length.  This is wrong...
 		// if we've been given insufficient headers, don't reorg, but
 		// ask for more headers.
 		if attachHeight+int32(len(inHeaders)) < height {
