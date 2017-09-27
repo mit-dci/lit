@@ -69,3 +69,7 @@ class LitNode():
             if balance['CoinType'] == coin_type:
                 return balance
         raise AssertionError("No balance for coin_type %s" % coin_type)
+
+    def get_height(self, coin_type):
+        # convenience method for grabbing the sync height
+        return self.get_balance(coin_type)['SyncHeight']
