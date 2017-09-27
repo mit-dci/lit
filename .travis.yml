@@ -17,9 +17,9 @@ install:
   # Download litecoind and add it to the path
   - ls litecoin-0.14.2/bin/litecoind || (wget https://download.litecoin.org/litecoin-0.14.2/linux/litecoin-0.14.2-x86_64-linux-gnu.tar.gz && tar xvf litecoin-0.14.2-x86_64-linux-gnu.tar.gz)
   - PATH=$PATH:$PWD/litecoin-0.14.2/bin
-  - pip3 install --upgrade pip
-  - pip3 install requests
-  - pip3 install websocket-client
+  - sudo pip3 install --upgrade pip
+  - sudo pip3 install requests
+  - sudo pip3 install websocket-client
 script:
   - go get -v ./...
   - go test ./...
