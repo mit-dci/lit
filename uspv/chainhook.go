@@ -1,6 +1,7 @@
 package uspv
 
 import (
+	"log"
 	"path/filepath"
 
 	"github.com/adiabat/btcd/chaincfg/chainhash"
@@ -114,11 +115,13 @@ func (s *SPVCon) Start(
 
 	err = s.Connect(host)
 	if err != nil {
+		log.Printf("Can't connect to host %s\n", host)
 		return nil, nil, err
 	}
 
 	err = s.AskForHeaders()
 	if err != nil {
+		log.Printf("AskForHeaders error\n")
 		return nil, nil, err
 	}
 

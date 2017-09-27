@@ -2,7 +2,6 @@ package coinparam
 
 import (
 	"errors"
-	"io"
 	"log"
 	"math/big"
 	"time"
@@ -38,7 +37,10 @@ type Params struct {
 	PoWFunction func(b []byte) chainhash.Hash
 
 	// The function used to calculate the difficulty of a given block
-	DiffCalcFunction func(r io.ReadSeeker, height, startheight int32, p *Params) (uint32, error)
+	DiffCalcFunction func(
+		headers []*wire.BlockHeader, height int32, p *Params) (uint32, error)
+
+	//DiffCalcFunction func(r io.ReadSeeker, height, startheight int32, p *Params) (uint32, error)
 
 	// The block header to start downloading blocks from
 	StartHeader [80]byte

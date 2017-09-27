@@ -30,9 +30,9 @@ type LitConfig struct {
 	// hostnames to connect to for different networks
 	tn3host, bc2host, lt4host, reghost, litereghost, tvtchost, vtchost string
 
-	verbose    bool
-	rpcport    uint16
-	litHomeDir string
+	verbose, tower bool
+	rpcport        uint16
+	litHomeDir     string
 
 	Params *coinparam.Params
 }
@@ -41,6 +41,8 @@ func setConfig(lc *LitConfig) {
 	easyptr := flag.Bool("ez", false, "use easy mode (bloom filters)")
 
 	verbptr := flag.Bool("v", false, "verbose; print all logs to stdout")
+
+	towerptr := flag.Bool("tower", false, "watchtower: run a watching node")
 
 	tn3ptr := flag.String("tn3", "", "testnet3 full node")
 	regptr := flag.String("reg", "", "regtest full node")
@@ -67,6 +69,7 @@ func setConfig(lc *LitConfig) {
 	lc.reSync = *resyncprt
 	lc.hard = !*easyptr
 	lc.verbose = *verbptr
+	lc.tower = *towerptr
 
 	lc.rpcport = uint16(*rpcportptr)
 
@@ -89,7 +92,8 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *LitConfig) error {
 			conf.reghost = conf.reghost + ":" + p.DefaultPort
 		}
 		fmt.Printf("reg: %s\n", conf.reghost)
-		err = node.LinkBaseWallet(key, 120, conf.reSync, conf.reghost, p)
+		err = node.LinkBaseWallet(
+			key, 120, conf.reSync, conf.tower, conf.reghost, p)
 		if err != nil {
 			return err
 		}
@@ -101,8 +105,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *LitConfig) error {
 			conf.tn3host = conf.tn3host + ":" + p.DefaultPort
 		}
 		err = node.LinkBaseWallet(
-			key, 1150000, conf.reSync,
-			conf.tn3host, p)
+			key, 1150000, conf.reSync, conf.tower, conf.tn3host, p)
 		if err != nil {
 			return err
 		}
@@ -113,7 +116,8 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *LitConfig) error {
 		if !strings.Contains(conf.litereghost, ":") {
 			conf.litereghost = conf.litereghost + ":" + p.DefaultPort
 		}
-		err = node.LinkBaseWallet(key, 120, conf.reSync, conf.litereghost, p)
+		err = node.LinkBaseWallet(
+			key, 120, conf.reSync, conf.tower, conf.litereghost, p)
 		if err != nil {
 			return err
 		}
@@ -126,8 +130,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *LitConfig) error {
 			conf.lt4host = conf.lt4host + ":" + p.DefaultPort
 		}
 		err = node.LinkBaseWallet(
-			key, p.StartHeight, conf.reSync,
-			conf.lt4host, p)
+			key, p.StartHeight, conf.reSync, conf.tower, conf.lt4host, p)
 		if err != nil {
 			return err
 		}
@@ -139,8 +142,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *LitConfig) error {
 			conf.tvtchost = conf.tvtchost + ":" + p.DefaultPort
 		}
 		err = node.LinkBaseWallet(
-			key, 0, conf.reSync,
-			conf.tvtchost, p)
+			key, 0, conf.reSync, conf.tower, conf.tvtchost, p)
 		if err != nil {
 			return err
 		}
@@ -152,8 +154,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *LitConfig) error {
 			conf.vtchost = conf.vtchost + ":" + p.DefaultPort
 		}
 		err = node.LinkBaseWallet(
-			key, p.StartHeight, conf.reSync,
-			conf.vtchost, p)
+			key, p.StartHeight, conf.reSync, conf.tower, conf.vtchost, p)
 		if err != nil {
 			return err
 		}

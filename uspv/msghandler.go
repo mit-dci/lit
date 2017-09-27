@@ -65,6 +65,7 @@ func (s *SPVCon) incomingMessageHandler() {
 func (s *SPVCon) outgoingMessageHandler() {
 	for {
 		msg := <-s.outMsgQueue
+
 		n, err := wire.WriteMessageWithEncodingN(s.con, msg, s.localVersion,
 			wire.BitcoinNet(s.Param.NetMagicBytes), wire.LatestEncoding)
 
@@ -199,7 +200,7 @@ func (s *SPVCon) GetDataHandler(m *wire.MsgGetData) {
 		// I don't think they'll request non-witness anyway.
 		if thing.Type == wire.InvTypeWitnessTx || thing.Type == wire.InvTypeTx {
 			tx, ok := s.TxMap[thing.Hash]
-			if !ok {
+			if !ok || tx == nil {
 				log.Printf("tx %s requested by we don't have it\n",
 					thing.Hash.String())
 			}

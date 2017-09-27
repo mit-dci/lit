@@ -340,6 +340,78 @@ func NewPorTxoBytesFromKGBytes(
 	return ptxo.Bytes()
 }
 
+// Rollback rewinds the wallet state to a previous height.  It removes new UTXOs
+func (w *Wallit) RollBack(rollHeight int32) error {
+	// Assume this is an actual reord / rewind.  If you supply a height *greater*
+	// than the current height, all bets are off.  ( probably nothing will
+	// happen; but don't do it)
+
+	// I still don't 100% get how these bolt tx things get encapsulated.
+	return w.StateDB.Update(func(btx *bolt.Tx) error {
+		// range through utxos and remove all above target height
+		log.Printf("Rollback height %d\n", rollHeight)
+
+		dufb := btx.Bucket(BKToutpoint)
+
+		if dufb == nil {
+			return fmt.Errorf("no duffel bag")
+		}
+
+		// build slice of stuff to delete
+		var killOPs [][]byte
+
+		err := dufb.ForEach(func(k, v []byte) error {
+			var txHeight int32
+			// 0 len v means it's a watch-only utxo, not spendable
+			// we have no way of getting rid of these.  Maybe should!
+			if len(v) == 0 {
+				return nil
+			}
+
+			// all we care about is the height, which starts 8 btyes in to the v
+			buf := bytes.NewBuffer(v)
+
+			// drop first 8 bytes (amt)
+			_ = buf.Next(8)
+
+			err := binary.Read(buf, binary.BigEndian, &txHeight)
+			if err != nil {
+				return err
+			}
+
+			log.Printf("tx height %d\n", txHeight)
+			if txHeight > rollHeight {
+				// need to kill this TX.  we could save it somewhere else?
+				// just mark to get rid of it for now.
+				killOPs = append(killOPs, k)
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+
+		// now delete em all
+		for _, op := range killOPs {
+			err = dufb.Delete(op)
+			if err != nil {
+				return err
+			}
+		}
+
+		// Don't re-animate old txos at all; just hope that they get back into
+		// blocks, which they probably will.
+
+		// The right way to do this (TODO) would be to make a rebroadcast pool
+		// where if the stored txs above the reorg height aren't re-confirmed,
+		// then it will attempt to rebroadcast them.
+
+		log.Printf("Rollback db.  %d utxos lost\n", len(killOPs))
+
+		return nil
+	})
+}
+
 // Ingest -- take in a tx from the ChainHook
 func (w *Wallit) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 	return w.IngestMany([]*wire.MsgTx{tx}, height)

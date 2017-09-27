@@ -38,6 +38,11 @@ func BlockOK(blk wire.MsgBlock) bool {
 		}
 	}
 
+	// block minus witnesses should be < 1M
+	if blk.SerializeSizeStripped() > 1000000 {
+		return false
+	}
+
 	var commitBytes []byte
 	// try to extract coinbase witness commitment (even if !witMode)
 	cb := blk.Transactions[0]                 // get coinbase tx
