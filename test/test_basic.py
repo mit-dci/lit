@@ -18,7 +18,6 @@
 - close channel co-operatively
 - stop"""
 
-import time
 from lit_test_framework import LitTest, wait_until
 from utils import assert_equal
 
@@ -36,7 +35,6 @@ class TestBasic(LitTest):
         # Start a coin node
         self.add_coinnode(self.coins[0])
         self.coinnodes[0].start_node()
-        time.sleep(5)
 
         self.log.info("Generate 500 blocks to activate segwit")
         self.coinnodes[0].generate(500)
@@ -57,6 +55,10 @@ class TestBasic(LitTest):
         self.litnodes[1].args.extend(["-rpcport", "8002", self.coins[0]["wallit_code"], "127.0.0.1"])
         self.litnodes[1].start_node()
         self.litnodes[1].add_rpc_connection("127.0.0.1", "8002")
+
+        self.log.info("Wait until lit nodes are sync'ed")
+        wait_until(lambda: self.litnodes[0].get_height(self.coins[0]['code']) == 500)
+        wait_until(lambda: self.litnodes[1].get_height(self.coins[0]['code']) == 500)
 
         self.log.info("Connect lit nodes")
         res = self.litnodes[0].Listen(Port="127.0.0.1:10001")["result"]
