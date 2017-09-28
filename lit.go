@@ -189,6 +189,51 @@ func main() {
 	var configFileError error
 	parser := newConfigParser(&conf, flags.Default) // Single line command to read all the CLI params passed
 
+	// creates a directory in the absolute sense
+	if _, err := os.Stat(preconf.LitHomeDir); os.IsNotExist(err) {
+		os.Mkdir(preconf.LitHomeDir, 0700)
+		fmt.Println("Creating a new config file")
+		err1 := createDefaultConfigFile(preconf.LitHomeDir) // Source of error
+		if err1 != nil {
+			fmt.Fprintf(os.Stderr, "Error creating a "+
+				"default config file: %v\n", err)
+		}
+	}
+
+	if err != nil {
+		fmt.Println("Error while creating a directory")
+		fmt.Println(err)
+	}
+
+	if !(preconf.ConfigFile != defaultConfigFile) {
+		// passing works fine.
+		// fmt.Println("Watch out")
+		// fmt.Println(filepath.Join(preconf.LitHomeDir))
+		if _, err := os.Stat(filepath.Join(filepath.Join(preconf.LitHomeDir), "lit.conf")); os.IsNotExist(err) {
+			if err != nil {
+				fmt.Println(err)
+			}
+			fmt.Println("Creating a new config file")
+			err1 := createDefaultConfigFile(filepath.Join(preconf.LitHomeDir)) // Source of error
+			if err1 != nil {
+				fmt.Fprintf(os.Stderr, "Error creating a "+
+					"default config file: %v\n", err)
+			}
+		}
+		preconf.ConfigFile = filepath.Join(filepath.Join(preconf.LitHomeDir), "lit.conf")
+		err := flags.NewIniParser(parser).ParseFile(preconf.ConfigFile) // lets parse the config file provided, if any
+		if err != nil {
+			if _, ok := err.(*os.PathError); !ok {
+				fmt.Fprintf(os.Stderr, "Error parsing config "+
+					"file: %v\n", err)
+				// fmt.Fprintln(os.Stderr, usageMessage)
+				log.Fatal(err)
+				// return nil, nil, err
+			}
+			configFileError = err
+		}
+	}
+
 	// Parse command line options again to ensure they take precedence.
 	remainingArgs, err := parser.Parse() // no extra work, free overloading.
 	if err != nil {
@@ -205,47 +250,6 @@ func main() {
 
 	if remainingArgs != nil {
 		//fmt.Printf("%v", remainingArgs)
-	}
-
-	// creates a directory in the absolute sense
-	if _, err := os.Stat(conf.LitHomeDir); os.IsNotExist(err) {
-		os.Mkdir(conf.LitHomeDir, 0700)
-	}
-
-	if err != nil {
-		fmt.Println("Error while creating a directory")
-		fmt.Println(err)
-	}
-
-	if !(preconf.ConfigFile != defaultConfigFile) {
-		// means the user has not provided us with a config file, lazy guy
-		ex := filepath.Join(conf.LitHomeDir)
-		// passing works fine.
-		// fmt.Println("Watch out")
-		// fmt.Println(ex)
-		if _, err := os.Stat(filepath.Join(ex, "lit.conf")); os.IsNotExist(err) {
-			if err != nil {
-				fmt.Println(err)
-			}
-			fmt.Println("Creating a new config file")
-			err1 := createDefaultConfigFile(ex) // Source of error
-			if err1 != nil {
-				fmt.Fprintf(os.Stderr, "Error creating a "+
-					"default config file: %v\n", err)
-			}
-		}
-		preconf.ConfigFile = filepath.Join(ex, "lit.conf")
-		err := flags.NewIniParser(parser).ParseFile(preconf.ConfigFile) // lets parse the config file provided, if any
-		if err != nil {
-			if _, ok := err.(*os.PathError); !ok {
-				fmt.Fprintf(os.Stderr, "Error parsing config "+
-					"file: %v\n", err)
-				// fmt.Fprintln(os.Stderr, usageMessage)
-				log.Fatal(err)
-				// return nil, nil, err
-			}
-			configFileError = err
-		}
 	}
 
 	logFilePath := filepath.Join(conf.LitHomeDir, "lit.log")
@@ -310,13 +314,6 @@ func main() {
 }
 
 func createDefaultConfigFile(destinationPath string) error {
-	// Create the destination directory if it does not exists
-	if _, err := os.Stat(destinationPath); os.IsNotExist(err) {
-		err := os.Mkdir(destinationPath, 0700)
-		if err != nil {
-			return err
-		}
-	}
 
 	// We assume sample config file path is same as binary TODO: change to ~/.lit/config/
 	path, err := filepath.Abs(filepath.Dir(os.Args[0]))
