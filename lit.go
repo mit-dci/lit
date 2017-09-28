@@ -1,7 +1,9 @@
 package main
 
 import (
-	"flag"
+	"bufio"
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"log"
@@ -10,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	flags "github.com/jessevdk/go-flags"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/litbamf"
 	"github.com/mit-dci/lit/litrpc"
@@ -17,67 +20,52 @@ import (
 	"github.com/mit-dci/lit/qln"
 )
 
-const (
-	litHomeDirName = ".lit"
+type config struct { // define a struct for usage with go-flags
+	Tn3host     string `long:"tn3" description:"Connect to bitcoin testnet3."`
+	Bc2host     string `long:"bc2" description:"bc2 full node."`
+	Lt4host     string `long:"lt4" description:"Connect to litecoin testnet4."`
+	Reghost     string `long:"reg" description:"Connect to bitcoin regtest."`
+	Litereghost string `long:"litereg" description:"Connect to litecoin regtest."`
+	Tvtchost    string `long:"tvtc" description:"Connect to Vertcoin test node."`
+	Vtchost     string `long:"vtc" description:"Connect to Vertcoin."`
+	LitHomeDir  string `long:"dir" description:"Specify Home Directory of lit as an absolute path."`
+	ConfigFile  string
 
-	keyFileName = "privkey.hex"
-)
+	ReSync  bool `short:"r"long:"reSync" description:"Resync from the given tip."`
+	Tower   bool `long:"tower" description:"Watchtower: Run a watching node"`
+	Hard    bool `short:"t" long:"hard" description:"Flag to set networks."`
+	Verbose bool `short:"v" long:"verbose" description:"Set verbosity to true."`
 
-// variables for a lit node & lower layers
-type LitConfig struct {
-	reSync, hard bool // flag to set networks
-
-	// hostnames to connect to for different networks
-	tn3host, bc2host, lt4host, reghost, litereghost, tvtchost, vtchost string
-
-	verbose, tower bool
-	rpcport        uint16
-	litHomeDir     string
+	Rpcport uint16 `short:"p"long:"rpcport" description:"Set rpcport to connect to."`
 
 	Params *coinparam.Params
 }
 
-func setConfig(lc *LitConfig) {
-	easyptr := flag.Bool("ez", false, "use easy mode (bloom filters)")
+var (
+	defaultLitHomeDirName = os.Getenv("HOME") + "/.lit"
+	defaultKeyFileName    = "privkey.hex"
+	defaultConfigFilename = "lit.conf"
+	defaultHomeDir        = os.Getenv("HOME")
+	defaultConfigFile     = filepath.Join(os.Getenv("HOME"), "/.lit/lit.conf")
+	defaultRpcport        = uint16(8001)
+)
 
-	verbptr := flag.Bool("v", false, "verbose; print all logs to stdout")
-
-	towerptr := flag.Bool("tower", false, "watchtower: run a watching node")
-
-	tn3ptr := flag.String("tn3", "", "testnet3 full node")
-	regptr := flag.String("reg", "", "regtest full node")
-	literegptr := flag.String("ltr", "", "litecoin regtest full node")
-	bc2ptr := flag.String("bc2", "", "bc2 full node")
-	lt4ptr := flag.String("lt4", "", "litecoin testnet4 full node")
-	tvtcptr := flag.String("tvtc", "", "vertcoin testnet full node")
-	vtcptr := flag.String("vtc", "", "vertcoin mainnet full node")
-
-	resyncprt := flag.Bool("resync", false, "force resync from given tip")
-
-	rpcportptr := flag.Int("rpcport", 8001, "port to listen for RPC")
-
-	litHomeDir := flag.String("dir",
-		filepath.Join(os.Getenv("HOME"), litHomeDirName), "lit home directory")
-
-	flag.Parse()
-
-	lc.tn3host, lc.bc2host, lc.lt4host, lc.reghost, lc.tvtchost, lc.vtchost =
-		*tn3ptr, *bc2ptr, *lt4ptr, *regptr, *tvtcptr, *vtcptr
-
-	lc.litereghost = *literegptr
-
-	lc.reSync = *resyncprt
-	lc.hard = !*easyptr
-	lc.verbose = *verbptr
-	lc.tower = *towerptr
-
-	lc.rpcport = uint16(*rpcportptr)
-
-	lc.litHomeDir = *litHomeDir
+func fileExists(name string) bool {
+	if _, err := os.Stat(name); err != nil {
+		if os.IsNotExist(err) {
+			return false
+		}
+	}
+	return true
 }
 
-// linkWallets tries to link the wallets given in conf to the litNode
-func linkWallets(node *qln.LitNode, key *[32]byte, conf *LitConfig) error {
+// newConfigParser returns a new command line flags parser.
+func newConfigParser(conf *config, options flags.Options) *flags.Parser {
+	parser := flags.NewParser(conf, options)
+	return parser
+}
+
+func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	// for now, wallets are linked to the litnode on startup, and
 	// can't appear / disappear while it's running.  Later
 	// could support dynamically adding / removing wallets
@@ -86,75 +74,77 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *LitConfig) error {
 
 	var err error
 	// try regtest
-	if conf.reghost != "" {
+	if conf.Reghost != "" {
 		p := &coinparam.RegressionNetParams
-		if !strings.Contains(conf.reghost, ":") {
-			conf.reghost = conf.reghost + ":" + p.DefaultPort
+		if !strings.Contains(conf.Reghost, ":") {
+			conf.Reghost = conf.Reghost + ":" + p.DefaultPort
 		}
-		fmt.Printf("reg: %s\n", conf.reghost)
-		err = node.LinkBaseWallet(
-			key, 120, conf.reSync, conf.tower, conf.reghost, p)
+		fmt.Printf("reg: %s\n", conf.Reghost)
+		err = node.LinkBaseWallet(key, 120, conf.ReSync, conf.Tower, conf.Reghost, p)
 		if err != nil {
 			return err
 		}
 	}
 	// try testnet3
-	if conf.tn3host != "" {
+	if conf.Tn3host != "" {
 		p := &coinparam.TestNet3Params
-		if !strings.Contains(conf.tn3host, ":") {
-			conf.tn3host = conf.tn3host + ":" + p.DefaultPort
+		if !strings.Contains(conf.Tn3host, ":") {
+			conf.Tn3host = conf.Tn3host + ":" + p.DefaultPort
 		}
 		err = node.LinkBaseWallet(
-			key, 1150000, conf.reSync, conf.tower, conf.tn3host, p)
+			key, 1150000, conf.ReSync, conf.Tower,
+			conf.Tn3host, p)
 		if err != nil {
 			return err
 		}
 	}
 	// try litecoin regtest
-	if conf.litereghost != "" {
+	if conf.Litereghost != "" {
 		p := &coinparam.LiteRegNetParams
-		if !strings.Contains(conf.litereghost, ":") {
-			conf.litereghost = conf.litereghost + ":" + p.DefaultPort
+		if !strings.Contains(conf.Litereghost, ":") {
+			conf.Litereghost = conf.Litereghost + ":" + p.DefaultPort
 		}
-		err = node.LinkBaseWallet(
-			key, 120, conf.reSync, conf.tower, conf.litereghost, p)
+		err = node.LinkBaseWallet(key, 120, conf.ReSync, conf.Tower, conf.Litereghost, p)
 		if err != nil {
 			return err
 		}
 	}
 
 	// try litecoin testnet4
-	if conf.lt4host != "" {
+	if conf.Lt4host != "" {
 		p := &coinparam.LiteCoinTestNet4Params
-		if !strings.Contains(conf.lt4host, ":") {
-			conf.lt4host = conf.lt4host + ":" + p.DefaultPort
+		if !strings.Contains(conf.Lt4host, ":") {
+			conf.Lt4host = conf.Lt4host + ":" + p.DefaultPort
 		}
 		err = node.LinkBaseWallet(
-			key, p.StartHeight, conf.reSync, conf.tower, conf.lt4host, p)
+			key, p.StartHeight, conf.ReSync, conf.Tower,
+			conf.Lt4host, p)
 		if err != nil {
 			return err
 		}
 	}
 	// try vertcoin testnet
-	if conf.tvtchost != "" {
+	if conf.Tvtchost != "" {
 		p := &coinparam.VertcoinTestNetParams
-		if !strings.Contains(conf.tvtchost, ":") {
-			conf.tvtchost = conf.tvtchost + ":" + p.DefaultPort
+		if !strings.Contains(conf.Tvtchost, ":") {
+			conf.Tvtchost = conf.Tvtchost + ":" + p.DefaultPort
 		}
 		err = node.LinkBaseWallet(
-			key, 0, conf.reSync, conf.tower, conf.tvtchost, p)
+			key, 0, conf.ReSync, conf.Tower,
+			conf.Tvtchost, p)
 		if err != nil {
 			return err
 		}
 	}
 	// try vertcoin mainnet
-	if conf.vtchost != "" {
+	if conf.Vtchost != "" {
 		p := &coinparam.VertcoinParams
-		if !strings.Contains(conf.vtchost, ":") {
-			conf.vtchost = conf.vtchost + ":" + p.DefaultPort
+		if !strings.Contains(conf.Vtchost, ":") {
+			conf.Vtchost = conf.Vtchost + ":" + p.DefaultPort
 		}
 		err = node.LinkBaseWallet(
-			key, p.StartHeight, conf.reSync, conf.tower, conf.vtchost, p)
+			key, p.StartHeight, conf.ReSync, conf.Tower,
+			conf.Vtchost, p)
 		if err != nil {
 			return err
 		}
@@ -165,25 +155,107 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *LitConfig) error {
 
 func main() {
 
-	log.Printf("lit v0.1\n")
-	log.Printf("-h for list of options.\n")
-
-	conf := new(LitConfig)
-	setConfig(conf)
-
-	// create lit home directory if the diretory does not exist
-	if _, err := os.Stat(conf.litHomeDir); os.IsNotExist(err) {
-		os.Mkdir(conf.litHomeDir, 0700)
+	conf := config{
+		LitHomeDir: defaultLitHomeDirName,
+		ConfigFile: defaultConfigFile,
+		Rpcport:    defaultRpcport,
 	}
 
-	logFilePath := filepath.Join(conf.litHomeDir, "lit.log")
+	// Pre-parse the command line options to see if an alternative config
+	// file or the version flag was specified.  Any errors aside from the
+	// help message error can be ignored here since they will be caught by
+	// the final parse below.
+	preconf := conf
+	preParser := newConfigParser(&preconf, flags.HelpFlag)
+	_, err := preParser.Parse()
+	if err != nil { // if there is some sort of error while parsing the CLI arguments
+		if e, ok := err.(*flags.Error); ok && e.Type == flags.ErrHelp {
+			fmt.Fprintln(os.Stderr, err)
+			log.Fatal(err)
+			return
+			// return nil, nil, err
+		}
+	}
+
+	// appName := filepath.Base(os.Args[0])
+	// appName = strings.TrimSuffix(appName, filepath.Ext(appName))
+	// usageMessage := fmt.Sprintf("Use %s -h to show usage", appName)
+	// if preconf.ShowVersion {
+	// 	fmt.Println(appName, "version", version())
+	// 	os.Exit(0)
+	// }
+
+	// Load additional config from file
+	var configFileError error
+	parser := newConfigParser(&conf, flags.Default) // Single line command to read all the CLI params passed
+
+	// Parse command line options again to ensure they take precedence.
+	remainingArgs, err := parser.Parse() // no extra work, free overloading.
+	if err != nil {
+		if e, ok := err.(*flags.Error); !ok || e.Type != flags.ErrHelp {
+			// fmt.Fprintln(os.Stderr, usageMessage)
+		}
+		log.Fatal(err)
+		// return nil, nil, err
+	}
+
+	if configFileError != nil {
+		fmt.Printf("%v", configFileError)
+	}
+
+	if remainingArgs != nil {
+		//fmt.Printf("%v", remainingArgs)
+	}
+
+	// creates a directory in the absolute sense
+	if _, err := os.Stat(conf.LitHomeDir); os.IsNotExist(err) {
+		os.Mkdir(conf.LitHomeDir, 0700)
+	}
+
+	if err != nil {
+		fmt.Println("Error while creating a directory")
+		fmt.Println(err)
+	}
+
+	if !(preconf.ConfigFile != defaultConfigFile) {
+		// means the user has not provided us with a config file, lazy guy
+		ex := filepath.Join(conf.LitHomeDir)
+		// passing works fine.
+		// fmt.Println("Watch out")
+		// fmt.Println(ex)
+		if _, err := os.Stat(filepath.Join(ex, "lit.conf")); os.IsNotExist(err) {
+			if err != nil {
+				fmt.Println(err)
+			}
+			fmt.Println("Creating a new config file")
+			err1 := createDefaultConfigFile(ex) // Source of error
+			if err1 != nil {
+				fmt.Fprintf(os.Stderr, "Error creating a "+
+					"default config file: %v\n", err)
+			}
+		}
+		preconf.ConfigFile = filepath.Join(ex, "lit.conf")
+		err := flags.NewIniParser(parser).ParseFile(preconf.ConfigFile) // lets parse the config file provided, if any
+		if err != nil {
+			if _, ok := err.(*os.PathError); !ok {
+				fmt.Fprintf(os.Stderr, "Error parsing config "+
+					"file: %v\n", err)
+				// fmt.Fprintln(os.Stderr, usageMessage)
+				log.Fatal(err)
+				// return nil, nil, err
+			}
+			configFileError = err
+		}
+	}
+
+	logFilePath := filepath.Join(conf.LitHomeDir, "lit.log")
 
 	logfile, err := os.OpenFile(logFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	defer logfile.Close()
 
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
 
-	if conf.verbose {
+	if conf.Verbose {
 		logOutput := io.MultiWriter(os.Stdout, logfile)
 		log.SetOutput(logOutput)
 	} else {
@@ -192,14 +264,15 @@ func main() {
 
 	// Allow node with no linked wallets, for testing.
 	// TODO Should update tests and disallow nodes without wallets later.
-	//	if conf.tn3host == "" && conf.lt4host == "" && conf.reghost == "" {
+	//	if conf.Tn3host == "" && conf.Lt4host == "" && conf.Reghost == "" {
 	//		log.Fatal("error: no network specified; use -tn3, -reg, -lt4")
 	//	}
 
 	// Keys: the litNode, and wallits, all get 32 byte keys.
 	// Right now though, they all get the *same* key.  For lit as a single binary
 	// now, all using the same key makes sense; could split up later.
-	keyFilePath := filepath.Join(conf.litHomeDir, keyFileName)
+
+	keyFilePath := filepath.Join(conf.LitHomeDir, defaultKeyFileName)
 
 	// read key file (generate if not found)
 	key, err := lnutil.ReadKeyFile(keyFilePath)
@@ -209,13 +282,13 @@ func main() {
 
 	// Setup LN node.  Activate Tower if in hard mode.
 	// give node and below file pathof lit home directoy
-	node, err := qln.NewLitNode(key, conf.litHomeDir)
+	node, err := qln.NewLitNode(key, conf.LitHomeDir)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// node is up; link wallets based on args
-	err = linkWallets(node, key, conf)
+	err = linkWallets(node, key, &conf)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -224,12 +297,80 @@ func main() {
 	rpcl.Node = node
 	rpcl.OffButton = make(chan bool, 1)
 
-	litrpc.RPCListen(rpcl, conf.rpcport)
-	litbamf.BamfListen(conf.rpcport, conf.litHomeDir)
+	litrpc.RPCListen(rpcl, conf.Rpcport)
+	litbamf.BamfListen(conf.Rpcport, conf.LitHomeDir)
 
 	<-rpcl.OffButton
 	fmt.Printf("Got stop request\n")
 	time.Sleep(time.Second)
 
 	return
+	// New directory being created over at PWD
+	// conf file being created at /
+}
+
+func createDefaultConfigFile(destinationPath string) error {
+	// Create the destination directory if it does not exists
+	if _, err := os.Stat(destinationPath); os.IsNotExist(err) {
+		err := os.Mkdir(destinationPath, 0700)
+		if err != nil {
+			return err
+		}
+	}
+
+	// We assume sample config file path is same as binary TODO: change to ~/.lit/config/
+	path, err := filepath.Abs(filepath.Dir(os.Args[0]))
+	if err != nil {
+		return err
+	}
+	sampleConfigPath := filepath.Join(path, defaultConfigFilename)
+
+	// We generate a random user and password
+	randomBytes := make([]byte, 20)
+	_, err = rand.Read(randomBytes)
+	if err != nil {
+		return err
+	}
+	generatedRPCUser := base64.StdEncoding.EncodeToString(randomBytes)
+
+	_, err = rand.Read(randomBytes)
+	if err != nil {
+		return err
+	}
+	generatedRPCPass := base64.StdEncoding.EncodeToString(randomBytes)
+
+	src, err := os.Open(sampleConfigPath)
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	dest, err := os.OpenFile(filepath.Join(destinationPath, defaultConfigFilename),
+		os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		return err
+	}
+	defer dest.Close()
+
+	// We copy every line from the sample config file to the destination,
+	// only replacing the two lines for rpcuser and rpcpass
+	reader := bufio.NewReader(src)
+	for err != io.EOF {
+		var line string
+		line, err = reader.ReadString('\n')
+		if err != nil && err != io.EOF {
+			return err
+		}
+
+		if strings.Contains(line, "rpcuser=") {
+			line = "rpcuser=" + generatedRPCUser + "\n"
+		} else if strings.Contains(line, "rpcpass=") {
+			line = "rpcpass=" + generatedRPCPass + "\n"
+		}
+
+		if _, err := dest.WriteString(line); err != nil {
+			return err
+		}
+	}
+	return nil
 }
