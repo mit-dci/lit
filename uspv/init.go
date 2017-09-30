@@ -114,18 +114,18 @@ func (s *SPVCon) openHeaderFile(hfn string) error {
 		if os.IsNotExist(err) {
 			var b bytes.Buffer
 			// if StartHeader is defined, start with hardcoded height
-            if s.Param.StartHeight != 0 {
-              hdr := s.Param.StartHeader
-	          _, err := b.Write(hdr[:])
-	          if err != nil {
-	           return err
-	          }
-            } else {
-	            err = s.Param.GenesisBlock.Header.Serialize(&b)
-	            if err != nil {
-		            return err
-	            }
-            }
+			if s.Param.StartHeight != 0 {
+				hdr := s.Param.StartHeader
+				_, err := b.Write(hdr[:])
+				if err != nil {
+					return err
+				}
+			} else {
+				err = s.Param.GenesisBlock.Header.Serialize(&b)
+				if err != nil {
+					return err
+				}
+			}
 			err = ioutil.WriteFile(hfn, b.Bytes(), 0600)
 			if err != nil {
 				return err
@@ -135,10 +135,10 @@ func (s *SPVCon) openHeaderFile(hfn string) error {
 			log.Printf("created hardcoded genesis header at %s\n", hfn)
 		}
 	}
-  
-    if s.Param.StartHeight != 0 {
-        s.headerStartHeight = s.Param.StartHeight
-    }
+
+	if s.Param.StartHeight != 0 {
+		s.headerStartHeight = s.Param.StartHeight
+	}
 
 	s.headerFile, err = os.OpenFile(hfn, os.O_RDWR, 0600)
 	if err != nil {

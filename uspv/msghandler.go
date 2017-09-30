@@ -2,7 +2,6 @@ package uspv
 
 import (
 	"log"
-
 	"github.com/adiabat/btcd/wire"
 	"github.com/adiabat/btcutil/bloom"
 	"github.com/mit-dci/lit/lnutil"
@@ -25,6 +24,9 @@ func (s *SPVCon) incomingMessageHandler() {
 			s.remoteVersion = uint32(m.ProtocolVersion) // weird cast! bug?
 		case *wire.MsgVerAck:
 			log.Printf("Got verack.  Whatever.\n")
+		case *wire.MsgGetAddr: // what case is this?
+			log.Printf("Struck gold, good.")
+			// read this info and store somewhere.
 		case *wire.MsgAddr:
 			log.Printf("got %d addresses.\n", len(m.AddrList))
 		case *wire.MsgPing:

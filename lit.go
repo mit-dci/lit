@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -86,6 +87,21 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 		}
 	}
 	// try testnet3
+	if conf.Tn3host == "auto" || conf.Tn3host == "1" || conf.Tn3host == "true" {
+		fmt.Println("Auto option selected with testnet3")
+		for i := 0; i < len(coinparam.TestNet3Params.DNSSeeds); i++ {
+			addrs, err := net.LookupHost(coinparam.TestNet3Params.DNSSeeds[i])
+			if err != nil {
+				fmt.Println("Connecting to default testnet3 node failed. Trying again")
+				if i == len(coinparam.TestNet3Params.DNSSeeds)-1 {
+					fmt.Println("Connecting to all default testnet3 nodes failed. Please try again")
+					fmt.Println(addrs)
+					return err
+				}
+			}
+			conf.Tn3host = coinparam.TestNet3Params.DNSSeeds[i]
+		}
+	}
 	if conf.Tn3host != "" {
 		p := &coinparam.TestNet3Params
 		if !strings.Contains(conf.Tn3host, ":") {
@@ -109,8 +125,23 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 			return err
 		}
 	}
-
 	// try litecoin testnet4
+	if conf.Lt4host == "auto" || conf.Lt4host == "1" || conf.Lt4host == "true" {
+		fmt.Println("Auto option selected with litecoin")
+		for i := 0; i < len(coinparam.LiteCoinTestNet4Params.DNSSeeds); i++ {
+			addrs, err := net.LookupHost(coinparam.LiteCoinTestNet4Params.DNSSeeds[i])
+			if err != nil {
+				fmt.Println("Connecting to default lt4 node failed. Trying again")
+				if i == len(coinparam.LiteCoinTestNet4Params.DNSSeeds)-1 {
+					fmt.Println("Connecting to all default lt4 nodes failed. Please try again")
+					fmt.Println(addrs)
+					return err
+				}
+			}
+			conf.Lt4host = coinparam.LiteCoinTestNet4Params.DNSSeeds[i]
+		}
+	}
+
 	if conf.Lt4host != "" {
 		p := &coinparam.LiteCoinTestNet4Params
 		if !strings.Contains(conf.Lt4host, ":") {
@@ -124,6 +155,22 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 		}
 	}
 	// try vertcoin testnet
+	if conf.Tvtchost == "auto" || conf.Tvtchost == "1" || conf.Tvtchost == "true" {
+		fmt.Println("Auto option selected with testnet vertcoin")
+		for i := 0; i < len(coinparam.VertcoinTestNetParams.DNSSeeds); i++ {
+			addrs, err := net.LookupHost(coinparam.VertcoinTestNetParams.DNSSeeds[i])
+			if err != nil {
+				fmt.Println("Connecting to default test vtc node failed. Trying again")
+				if i == len(coinparam.VertcoinTestNetParams.DNSSeeds)-1 {
+					fmt.Println("Connecting to all default test vtc nodes failed. Please try again")
+					fmt.Println(addrs)
+					return err
+				}
+			}
+			conf.Tvtchost = coinparam.VertcoinTestNetParams.DNSSeeds[i]
+		}
+	}
+
 	if conf.Tvtchost != "" {
 		p := &coinparam.VertcoinTestNetParams
 		if !strings.Contains(conf.Tvtchost, ":") {
@@ -136,7 +183,24 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 			return err
 		}
 	}
+
 	// try vertcoin mainnet
+	if conf.Vtchost == "auto" || conf.Vtchost == "1" || conf.Vtchost == "1" {
+		fmt.Println("Auto option selected with Vertcoin")
+		for i := 0; i < len(coinparam.VertcoinParams.DNSSeeds); i++ {
+			addrs, err := net.LookupHost(coinparam.VertcoinParams.DNSSeeds[i])
+			if err != nil {
+				fmt.Println("Connecting to default vtc node failed. Trying again")
+				if i == len(coinparam.VertcoinParams.DNSSeeds)-1 {
+					fmt.Println("Connecting to all default vtc nodes failed. Please try again")
+					fmt.Println(addrs)
+					return err
+				}
+			}
+			conf.Vtchost = coinparam.VertcoinParams.DNSSeeds[i]
+		}
+	}
+
 	if conf.Vtchost != "" {
 		p := &coinparam.VertcoinParams
 		if !strings.Contains(conf.Vtchost, ":") {
