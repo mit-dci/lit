@@ -13,6 +13,19 @@ import (
 // Connect dials out and connects to full nodes.
 func (s *SPVCon) Connect(remoteNode string) error {
 	var err error
+	if len(s.Param.DNSSeeds) != 0 {
+		if remoteNode[:4] == "auto" {
+			addrs, err := net.LookupHost(s.Param.DNSSeeds[0])
+			if err != nil {
+				log.Println("Fatal Error while connecting to remote node. Exiting.")
+			}
+			remoteNode = addrs[0] + ":" + s.Param.DefaultPort
+			log.Println(remoteNode)
+		}
+		log.Println(s.Param)
+	} else {
+		log.Println("There are no default nodes for the mode you specified")
+	}
 	// open TCP connection
 	s.con, err = net.Dial("tcp", remoteNode)
 	if err != nil {

@@ -25,10 +25,13 @@ func (s *SPVCon) incomingMessageHandler() {
 		case *wire.MsgVerAck:
 			log.Printf("Got verack.  Whatever.\n")
 		case *wire.MsgGetAddr: // what case is this?
-			log.Printf("Struck gold, good.")
+			log.Printf("Got getaddr. Do nothing since we aren't a full node.")
 			// read this info and store somewhere.
 		case *wire.MsgAddr:
 			log.Printf("got %d addresses.\n", len(m.AddrList))
+			log.Printf("START OF REMOTE PEERS LIST STRUCTS")
+			log.Println(m.AddrList)
+			log.Printf("END OF REMOTE PEERS LIST STRUCTS")
 		case *wire.MsgPing:
 			// log.Printf("Got a ping message.  We should pong back or they will kick us off.")
 			go s.PongBack(m.Nonce)
