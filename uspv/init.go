@@ -20,9 +20,7 @@ func (s *SPVCon) Connect(remoteNode string) error {
 				log.Println("Fatal Error while connecting to remote node. Exiting.")
 			}
 			remoteNode = addrs[0] + ":" + s.Param.DefaultPort
-			log.Println(remoteNode)
 		}
-		log.Println(s.Param)
 	} else {
 		log.Println("There are no default nodes for the mode you specified")
 	}

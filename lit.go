@@ -85,6 +85,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 			return err
 		}
 	}
+	// try testnet3
 	if conf.Tn3host != "" {
 		p := &coinparam.TestNet3Params
 		if !strings.Contains(conf.Tn3host, ":") {
@@ -108,7 +109,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 			return err
 		}
 	}
-	// try litecoin tn4
+	// try litecoin testnet4
 	if conf.Lt4host != "" {
 		p := &coinparam.LiteCoinTestNet4Params
 		if !strings.Contains(conf.Lt4host, ":") {
@@ -134,7 +135,6 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 			return err
 		}
 	}
-
 	// try vertcoin mainnet
 	if conf.Vtchost != "" {
 		p := &coinparam.VertcoinParams

@@ -29,9 +29,12 @@ func (s *SPVCon) incomingMessageHandler() {
 			// read this info and store somewhere.
 		case *wire.MsgAddr:
 			log.Printf("got %d addresses.\n", len(m.AddrList))
-			log.Printf("START OF REMOTE PEERS LIST STRUCTS")
-			log.Println(m.AddrList)
-			log.Printf("END OF REMOTE PEERS LIST STRUCTS")
+			log.Printf("start ip list")
+			// refer https://github.com/btcsuite/btcd/blob/master/wire/netaddress.go for *wire.NetAddr struct
+			for i:=0 ; i<len(m.AddrList); i++ {
+				log.Println(m.AddrList[i].IP)
+			}
+			log.Printf("end ip list")
 		case *wire.MsgPing:
 			// log.Printf("Got a ping message.  We should pong back or they will kick us off.")
 			go s.PongBack(m.Nonce)

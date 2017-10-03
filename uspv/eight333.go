@@ -136,8 +136,6 @@ func (s *SPVCon) AskForTx(txid chainhash.Hash) {
 	//	}
 	gdata.AddInvVect(inv)
 	log.Printf("asking for tx %s\n", txid.String())
-	s.outMsgQueue <- wire.NewMsgGetAddr() // get list of all peers connected to the remote node
-	log.Printf("Ask for silver!!")
 	s.outMsgQueue <- gdata
 }
 
