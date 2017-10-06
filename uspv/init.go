@@ -2,24 +2,65 @@ package uspv
 
 import (
 	"bytes"
+	"encoding/json"
+	"github.com/adiabat/btcd/wire"
 	"io/ioutil"
 	"log"
 	"net"
 	"os"
-
-	"github.com/adiabat/btcd/wire"
+	"strconv"
 )
+
+func getNodes() []wire.NetAddress {
+	addresses := make([]wire.NetAddress, 3)
+	raw, err := ioutil.ReadFile("./dnsseeds/seeds.json")
+	if err != nil {
+		log.Println(err.Error())
+		os.Exit(1)
+	}
+	json.Unmarshal(raw, &addresses)
+	return addresses
+}
 
 // Connect dials out and connects to full nodes.
 func (s *SPVCon) Connect(remoteNode string) error {
 	var err error
 	if len(s.Param.DNSSeeds) != 0 {
 		if remoteNode[:4] == "auto" {
-			addrs, err := net.LookupHost(s.Param.DNSSeeds[0])
-			if err != nil {
-				log.Println("Fatal Error while connecting to remote node. Exiting.")
+
+			readvalues := getNodes()
+			log.Println(readvalues)
+			flag := 0
+			for _, ve := range readvalues {
+				// do what we want with the IPs, which is to try connecting to them.
+				log.Println(ve.IP)
+				if ve.IP.String() != "<nil>" {
+
+					if strconv.Itoa(int(ve.Port)) == s.Param.DefaultPort { // to handle different protocols
+						addrs, err := net.LookupHost(ve.IP.String())
+						if err != nil {
+							log.Println("Fatal Error while connecting to remote node. Trying again.")
+							continue
+						}
+						log.Println(addrs)
+						remoteNode = ve.IP.String() + ":" + s.Param.DefaultPort
+						flag = 1
+						break
+					}
+				}
 			}
-			remoteNode = addrs[0] + ":" + s.Param.DefaultPort
+			if flag != 1 {
+				for i := 0; i < len(s.Param.DNSSeeds); i++ {
+					log.Println("Going in here")
+					addrs, err := net.LookupHost(s.Param.DNSSeeds[i])
+					if err != nil {
+						log.Println("Fatal Error while connecting to remote node. Trying again.")
+						continue
+					}
+					remoteNode = addrs[i] + ":" + s.Param.DefaultPort
+					break
+				}
+			}
 		}
 	} else {
 		log.Println("There are no default nodes for the mode you specified")

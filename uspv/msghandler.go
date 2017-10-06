@@ -1,10 +1,13 @@
 package uspv
 
 import (
-	"log"
+	"encoding/json"
 	"github.com/adiabat/btcd/wire"
 	"github.com/adiabat/btcutil/bloom"
 	"github.com/mit-dci/lit/lnutil"
+	"log"
+	"os"
+	"time"
 )
 
 func (s *SPVCon) incomingMessageHandler() {
@@ -29,10 +32,116 @@ func (s *SPVCon) incomingMessageHandler() {
 			// read this info and store somewhere.
 		case *wire.MsgAddr:
 			log.Printf("got %d addresses.\n", len(m.AddrList))
+			readvalues := getNodes()
+			log.Println(readvalues)
+
+			flag := 0
+			var ips [100]string
+			var ports [100]int
+			var ve [150]wire.NetAddress
+			for i, vals := range readvalues {
+				// do what we want with the IPs, which is to try connecting to them.
+				ve[i] = vals
+				ips[i] = vals.IP.String()
+				ports[i] = int(vals.Port)
+			}
+			log.Println(ve) // ve has all the addressses read from the file. We just have to create a new file if needed.
 			log.Printf("start ip list")
+			var a wire.NetAddress // limit to 125 like bitcoind?
 			// refer https://github.com/btcsuite/btcd/blob/master/wire/netaddress.go for *wire.NetAddr struct
-			for i:=0 ; i<len(m.AddrList); i++ {
-				log.Println(m.AddrList[i].IP)
+			for i, addresses := range m.AddrList {
+				log.Printf("IP: %s", addresses.IP)
+				now := time.Now()
+				if addresses.Timestamp.After(now.Add(time.Minute * 10)) {
+					addresses.Timestamp = now.Add(-1 * time.Hour * 24 * 5)
+				}
+				log.Printf("Timestamp: %s", addresses.Timestamp)
+				a.IP = addresses.IP
+				a.Port = addresses.Port
+				for _, addr := range ips { // for a list of all IPs in the file
+					if addr == "<nil>" { // if its nil, stop execution
+						flag = 0
+						break
+					}
+					if addr == a.IP.String() { // is the address is already present in the file, ignore
+						for _, port := range ports { // if we are connecting to the same host with a different port, we should still save it
+							if port == int(a.Port) {
+								flag = 1
+								break
+							}
+						}
+						if flag == 1 {
+							break
+						}
+					}
+				}
+				// log.Println("The elusive flag")
+				// log.Println(flag)
+				if flag != 1 {
+					//log.Println("This should get executed in case we can't load the ips from the file")
+					a.Timestamp = addresses.Timestamp
+					a.Services = addresses.Services
+
+					// attach a to ve
+					ve[99+i] = a
+					for j, values := range ve {
+
+						dest, err := json.Marshal(values)
+						if err != nil {
+							log.Println("Converting to a JSON object failed")
+						}
+						if j == 0 {
+							errdel := os.Remove("./dnsseeds/seeds.json")
+							crfile, errcreate := os.Create("./dnsseeds/seeds.json")
+							if errdel != nil {
+								log.Println("File doesn't exist or is deleted already. Continuing")
+							}
+							if errcreate != nil {
+								log.Println("File creation error. Exiting")
+								break
+							}
+							crfile.Close()
+						}
+						file, err2 := os.OpenFile("./dnsseeds/seeds.json", os.O_APPEND|os.O_WRONLY, 0644)
+						if err2 != nil {
+							log.Println(err2)
+						}
+						// defer file.Close()
+
+						if j == 0 {
+							_, rnd := file.WriteString("[")
+							if rnd != nil {
+								log.Println("Saving starting character failed. Quitting")
+								break
+							}
+						}
+
+						if values.IP.String() != "<nil>" {
+							_, err1 := file.WriteString(string(dest))
+
+							if err1 != nil {
+								log.Println("Appending to a file failed")
+							}
+
+							if j < 99+i {
+								_, err3 := file.WriteString(",\n")
+								if err3 != nil {
+									log.Println("Failed to write Newline")
+								}
+							}
+							if j == 99+i {
+								_, rnd1 := file.WriteString("\n]")
+								if rnd1 != nil {
+									log.Println("Saving ending characters failed. Quitting")
+									break
+								}
+							}
+						}
+					}
+					// log.Println(string(json.Marshal(a[0].IP)))
+				} else {
+					break
+				}
 			}
 			log.Printf("end ip list")
 		case *wire.MsgPing:
@@ -184,7 +293,7 @@ func (s *SPVCon) TxHandler(tx *wire.MsgTx) {
 	//	}
 	//	if len(dubs) > 0 {
 	//		for i, dub := range dubs {
-	//			fmt.Printf("dub %d known tx %s and new tx %s are exclusive!!!\n",
+	//			log.Printf("dub %d known tx %s and new tx %s are exclusive!!!\n",
 	//				i, dub.String(), m.TxSha().String())
 	//		}
 	//	}
