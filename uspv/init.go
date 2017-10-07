@@ -13,10 +13,10 @@ import (
 
 func getNodes() []wire.NetAddress {
 	addresses := make([]wire.NetAddress, 3)
-	raw, err := ioutil.ReadFile("./dnsseeds/seeds.json")
+	raw, err := ioutil.ReadFile("./peers/peers.json")
 	if err != nil {
 		log.Println(err.Error())
-		os.Exit(1)
+		return nil
 	}
 	json.Unmarshal(raw, &addresses)
 	return addresses
@@ -25,33 +25,34 @@ func getNodes() []wire.NetAddress {
 // Connect dials out and connects to full nodes.
 func (s *SPVCon) Connect(remoteNode string) error {
 	var err error
+	flag := 0
 	if len(s.Param.DNSSeeds) != 0 {
 		if remoteNode[:4] == "auto" {
-
-			readvalues := getNodes()
-			log.Println(readvalues)
-			flag := 0
-			for _, ve := range readvalues {
-				// do what we want with the IPs, which is to try connecting to them.
-				log.Println(ve.IP)
-				if ve.IP.String() != "<nil>" {
-
-					if strconv.Itoa(int(ve.Port)) == s.Param.DefaultPort { // to handle different protocols
-						addrs, err := net.LookupHost(ve.IP.String())
-						if err != nil {
-							log.Println("Fatal Error while connecting to remote node. Trying again.")
-							continue
+			if _, errNotExists := os.Stat("./peers/peers.json"); os.IsNotExist(errNotExists) {
+				log.Println("Peers file doesn't exist") // set flag to 1 sicne peers doesn't exist
+			} else {
+				readvalues := getNodes()
+				log.Println(readvalues)
+				for _, ve := range readvalues {
+					// do what we want with the IPs, which is to try connecting to them.
+					log.Println(ve.IP)
+					if ve.IP.String() != "<nil>" {
+						if strconv.Itoa(int(ve.Port)) == s.Param.DefaultPort { // to handle different protocols
+							addrs, err := net.LookupHost(ve.IP.String())
+							if err != nil {
+								log.Println("Fatal Error while connecting to remote node. Trying again.")
+								continue
+							}
+							log.Println(addrs)
+							remoteNode = ve.IP.String() + ":" + s.Param.DefaultPort
+							flag = 1
+							break
 						}
-						log.Println(addrs)
-						remoteNode = ve.IP.String() + ":" + s.Param.DefaultPort
-						flag = 1
-						break
 					}
 				}
 			}
 			if flag != 1 {
 				for i := 0; i < len(s.Param.DNSSeeds); i++ {
-					log.Println("Going in here")
 					addrs, err := net.LookupHost(s.Param.DNSSeeds[i])
 					if err != nil {
 						log.Println("Fatal Error while connecting to remote node. Trying again.")
