@@ -92,6 +92,8 @@ func (w *Wallit) MaybeSend(txos []*wire.TxOut, ow bool) ([]*wire.OutPoint, error
 		return nil, err
 	}
 
+	// after building, store the locktime and txid
+	fTx.Nlock = tx.LockTime
 	fTx.Txid = tx.TxHash()
 
 	for _, utxo := range utxos {
@@ -137,7 +139,7 @@ func (w *Wallit) ReallySend(txid *chainhash.Hash) error {
 		allOuts = append(frozenTx.Outs, frozenTx.ChangeOut)
 	}
 
-	tx, err := w.BuildAndSign(frozenTx.Ins, allOuts)
+	tx, err := w.BuildAndSign(frozenTx.Ins, allOuts, frozenTx.Nlock)
 	if err != nil {
 		return err
 	}
@@ -336,7 +338,8 @@ func (w *Wallit) SendOne(u portxo.PorTxo, outScript []byte) (*wire.MsgTx, error)
 	// make user specified txout and add to tx
 	txout := wire.NewTxOut(sendAmt, outScript)
 
-	return w.BuildAndSign([]*portxo.PorTxo{&u}, []*wire.TxOut{txout})
+	return w.BuildAndSign(
+		[]*portxo.PorTxo{&u}, []*wire.TxOut{txout}, uint32(w.CurrentHeight()))
 }
 
 // Builds tx from inputs and outputs, returns tx.  Sorts.  Doesn't sign.
@@ -345,7 +348,11 @@ func (w *Wallit) BuildDontSign(
 
 	// make the tx
 	tx := wire.NewMsgTx()
+	// set version 2, for op_csv
 	tx.Version = 2
+	// set the time, the way core does.
+	tx.LockTime = uint32(w.CurrentHeight())
+
 	// add all the txouts
 	for _, txo := range txos {
 		tx.AddTxOut(txo)
@@ -367,7 +374,7 @@ func (w *Wallit) BuildDontSign(
 // It then signs all the inputs and returns the tx.  Should
 // pretty much always work for any inputs.
 func (w *Wallit) BuildAndSign(
-	utxos []*portxo.PorTxo, txos []*wire.TxOut) (*wire.MsgTx, error) {
+	utxos []*portxo.PorTxo, txos []*wire.TxOut, nlt uint32) (*wire.MsgTx, error) {
 	var err error
 
 	if len(utxos) == 0 || len(txos) == 0 {
@@ -381,7 +388,7 @@ func (w *Wallit) BuildAndSign(
 
 	// always make version 2 txs
 	tx.Version = 2
-
+	tx.LockTime = nlt
 	// add all the txouts, direct from the argument slice
 	for _, txo := range txos {
 		if txo == nil || txo.PkScript == nil || txo.Value == 0 {
