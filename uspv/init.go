@@ -11,7 +11,20 @@ import (
 	"strconv"
 )
 
-func getNodes(s *SPVCon) []wire.NetAddress {
+func CreateFile(s *SPVCon) error{
+	if _, err := os.Stat(s.nodeFile); os.IsNotExist(err) {
+		os.Mkdir("./peers", 0700)
+		crfile, err := os.Create(s.nodeFile)
+		crfile.Close()
+		if err != nil {
+			log.Println("File creation error. Exiting")
+			return err
+		}
+		return nil
+	}
+	return nil
+}
+func GetNodes(s *SPVCon) []wire.NetAddress {
 	addresses := make([]wire.NetAddress, 3)
 	raw, err := ioutil.ReadFile(s.nodeFile)
 	if err != nil {
@@ -34,7 +47,7 @@ func (s *SPVCon) Connect(remoteNode string) error {
 			if _, errNotExists := os.Stat(s.nodeFile); os.IsNotExist(errNotExists) {
 				log.Println("Peers file doesn't exist") // set flag to 1 sicne peers doesn't exist
 			} else {
-				readvalues := getNodes(s)
+				readvalues := GetNodes(s)
 				log.Println(readvalues)
 				for _, ve := range readvalues {
 					// do what we want with the IPs, which is to try connecting to them.

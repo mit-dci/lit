@@ -253,69 +253,51 @@ func (s *SPVCon) InvHandler(m *wire.MsgInv) {
 }
 
 func (s *SPVCon) AddrListHandler(m *wire.MsgAddr) {
-	if _, errNotExists := os.Stat(s.nodeFile); os.IsNotExist(errNotExists) {
-		os.Mkdir("./peers", 0700)
-		crfile, errcreate := os.Create(s.nodeFile)
-		crfile.Close()
-		if errcreate != nil {
-			log.Println("File creation error. Exiting")
-			return
-		}
+	errCreation := CreateFile(s)
+	if errCreation != nil {
+		log.Println("Error while trying to create a file")
 	}
-	readvalues := getNodes(s)
-	log.Println("Its coming in here")
+	readvalues := GetNodes(s)
 	// log.Println(readvalues)
 
 	flag := 0
 	var ips [100]string
-	var ports [100]int
-	var ve [1500]wire.NetAddress
+	var readAddresses [150000]wire.NetAddress // hopefully this doesn't overshoot
 	for i, vals := range readvalues {
 		// do what we want with the IPs, which is to try connecting to them.
-		ve[i] = vals
+		readAddresses[i] = vals
 		ips[i] = vals.IP.String()
-		ports[i] = int(vals.Port)
 	}
-	// og.Println(ve) // ve has all the addressses read from the file. We just have to create a new file if needed.
+	// log.Println(readAddresses) // readAddresses has all the addressses read from the file. We just have to create a new file if needed.
 	log.Printf("Start IP List")
 	var a wire.NetAddress // limit to 125 like bitcoind?
 	// refer https://github.com/btcsuite/btcd/blob/master/wire/netaddress.go for *wire.NetAddr struct
 	for i, addresses := range m.AddrList {
-		log.Printf("IP: %s", addresses.IP)
+		log.Printf("IP: %s", addresses.IP)//remember to comment this stuff
 		now := time.Now()
 		if addresses.Timestamp.After(now.Add(time.Minute * 10)) {
 			addresses.Timestamp = now.Add(-1 * time.Hour * 24 * 5)
 		}
-		log.Printf("Timestamp: %s", addresses.Timestamp)
-		a.IP = addresses.IP
-		a.Port = addresses.Port
+		log.Printf("Timestamp: %s", addresses.Timestamp) //remember to comment this stuff
 		for _, addr := range ips { // for a list of all IPs in the file
 			if addr == "<nil>" { // if its nil, stop execution
 				flag = 0
 				break
 			}
-			if addr == a.IP.String() { // is the address is already present in the file, ignore
-				for _, port := range ports { // if we are connecting to the same host with a different port, we should still save it
-					if port == int(a.Port) {
-						flag = 1
-						break
-					}
-				}
-				if flag == 1 {
-					break
-				}
+			if addr == addresses.IP.String() { // is the address is already present in the file, ignore
+				flag = 1
+				break
 			}
+
 		}
 		// log.Println("The elusive flag")
 		// log.Println(flag)
 		if flag != 1 {
-			//log.Println("This should get executed in case we can't load the ips from the file")
-			a.Timestamp = addresses.Timestamp
-			a.Services = addresses.Services
-
-			// attach a to ve
-			ve[99+i] = a
-			for j, values := range ve {
+			// Write the stuff to the file
+			a = *addresses
+			// attach a to readAddresses
+			readAddresses[99+i] = a
+			for j, values := range readAddresses {
 
 				dest, err := json.Marshal(values)
 				if err != nil {
