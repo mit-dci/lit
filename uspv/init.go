@@ -37,13 +37,11 @@ func GetNodes(s *SPVCon) []wire.NetAddress {
 
 // Connect dials out and connects to full nodes.
 func (s *SPVCon) Connect(remoteNode string) error {
-	log.Println("Keep an eye out for this")
 	log.Println(s.nodeFile)
-	log.Println("END")
 	var err error
 	flag := 0
 	if len(s.Param.DNSSeeds) != 0 {
-		if remoteNode[:4] == "auto" {
+		if remoteNode[:4] == "auto" || (remoteNode[:1] == "1" && len(remoteNode) == 7) {
 			if _, errNotExists := os.Stat(s.nodeFile); os.IsNotExist(errNotExists) {
 				log.Println("Peers file doesn't exist") // set flag to 1 sicne peers doesn't exist
 			} else {
