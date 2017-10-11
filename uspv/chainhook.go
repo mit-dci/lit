@@ -105,6 +105,7 @@ func (s *SPVCon) Start(
 	s.CurrentHeightChan = make(chan int32, 1)
 
 	s.syncHeight = startHeight
+	s.nodeFile = filepath.Join(path, "peers.json")
 
 	headerFilePath := filepath.Join(path, "header.bin")
 	// open header file
@@ -116,6 +117,12 @@ func (s *SPVCon) Start(
 	err = s.Connect(host)
 	if err != nil {
 		log.Printf("Can't connect to host %s\n", host)
+		return nil, nil, err
+	}
+
+	err = s.AskForNodes()
+	if err != nil{
+		log.Printf("Can't ask for nodes. Sorry")
 		return nil, nil, err
 	}
 

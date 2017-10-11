@@ -253,23 +253,23 @@ func (s *SPVCon) InvHandler(m *wire.MsgInv) {
 }
 
 func (s *SPVCon) AddrListHandler(m *wire.MsgAddr) {
-	if _, errNotExists := os.Stat("./peers/peers.json"); os.IsNotExist(errNotExists) {
+	if _, errNotExists := os.Stat(s.nodeFile); os.IsNotExist(errNotExists) {
 		os.Mkdir("./peers", 0700)
-		crfile, errcreate := os.Create("./peers/peers.json")
+		crfile, errcreate := os.Create(s.nodeFile)
 		crfile.Close()
 		if errcreate != nil {
 			log.Println("File creation error. Exiting")
 			return
 		}
 	}
-	readvalues := getNodes()
+	readvalues := getNodes(s)
 	log.Println("Its coming in here")
 	// log.Println(readvalues)
 
 	flag := 0
 	var ips [100]string
 	var ports [100]int
-	var ve [150]wire.NetAddress
+	var ve [1500]wire.NetAddress
 	for i, vals := range readvalues {
 		// do what we want with the IPs, which is to try connecting to them.
 		ve[i] = vals
@@ -322,19 +322,19 @@ func (s *SPVCon) AddrListHandler(m *wire.MsgAddr) {
 					log.Println("Converting to a JSON object failed")
 				}
 				if j == 0 {
-					errdel := os.Remove("./peers/peers.json")
+					errdel := os.Remove(s.nodeFile)
 					if errdel != nil {
 						log.Println("File deletion error. Exiting")
 						break
 					}
-					crfile, errcreate := os.Create("./peers/peers.json")
+					crfile, errcreate := os.Create(s.nodeFile)
 					if errcreate != nil {
 						log.Println("File creation error. Exiting")
 						break
 					}
 					crfile.Close()
 				}
-				file, err2 := os.OpenFile("./peers/peers.json", os.O_APPEND|os.O_WRONLY, 0644)
+				file, err2 := os.OpenFile(s.nodeFile, os.O_APPEND|os.O_WRONLY, 0644)
 				if err2 != nil {
 					log.Println(err2)
 				}
@@ -369,6 +369,7 @@ func (s *SPVCon) AddrListHandler(m *wire.MsgAddr) {
 						}
 					}
 				}
+				file.Close()
 			}
 			// log.Println(string(json.Marshal(a[0].IP)))
 		} else {

@@ -11,9 +11,9 @@ import (
 	"strconv"
 )
 
-func getNodes() []wire.NetAddress {
+func getNodes(s *SPVCon) []wire.NetAddress {
 	addresses := make([]wire.NetAddress, 3)
-	raw, err := ioutil.ReadFile("./peers/peers.json")
+	raw, err := ioutil.ReadFile(s.nodeFile)
 	if err != nil {
 		log.Println(err.Error())
 		return nil
@@ -24,14 +24,17 @@ func getNodes() []wire.NetAddress {
 
 // Connect dials out and connects to full nodes.
 func (s *SPVCon) Connect(remoteNode string) error {
+	log.Println("Keep an eye out for this")
+	log.Println(s.nodeFile)
+	log.Println("END")
 	var err error
 	flag := 0
 	if len(s.Param.DNSSeeds) != 0 {
 		if remoteNode[:4] == "auto" {
-			if _, errNotExists := os.Stat("./peers/peers.json"); os.IsNotExist(errNotExists) {
+			if _, errNotExists := os.Stat(s.nodeFile); os.IsNotExist(errNotExists) {
 				log.Println("Peers file doesn't exist") // set flag to 1 sicne peers doesn't exist
 			} else {
-				readvalues := getNodes()
+				readvalues := getNodes(s)
 				log.Println(readvalues)
 				for _, ve := range readvalues {
 					// do what we want with the IPs, which is to try connecting to them.

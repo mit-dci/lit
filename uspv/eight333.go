@@ -328,6 +328,14 @@ func (s *SPVCon) AskForHeaders() error {
 	return nil
 }
 
+// AskForNodes asks for the list of connected peers from a remote node.
+// This should then result in istuff being tored in the peers.json file
+func (s *SPVCon) AskForNodes() error {
+	message := wire.NewMsgGetAddr()
+	s.outMsgQueue <- message
+	return nil
+}
+
 // AskForMerkBlocks requests blocks from current to last
 // right now this asks for 1 block per getData message.
 // Maybe it's faster to ask for many in a each message?
