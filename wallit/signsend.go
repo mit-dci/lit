@@ -258,13 +258,23 @@ func (w *Wallit) PickUtxos(
 		}
 	}
 
-	// start with utxos sorted by value.
+	// start with utxos sorted by value and pop off utxos which are greater
+	// than the send amount... as long as the next 2 are greater.
+	// simple / straightforward coin selection optimization, which tends to make
+	// 2 in 2 out
+
 	// smallest and unconfirmed last (because it's reversed)
 	sort.Sort(sort.Reverse(allUtxos))
 
+	// if you've got 3 or more, and the next 2 are more than enough, pop off the
+	// first one.
+	for len(allUtxos) > 2 && allUtxos[1].Value+allUtxos[2].Value > amtWanted {
+		allUtxos = allUtxos[1:]
+	}
+
 	var rSlice portxo.TxoSliceByBip69
 	// add utxos until we've had enough
-	nokori := amtWanted // nokori is how much is needed on input side
+	remaining := amtWanted // nokori is how much is needed on input side
 	for _, utxo := range allUtxos {
 		// skip unconfirmed.  Or de-prioritize? Some option for this...
 		//		if utxo.AtHeight == 0 {
@@ -283,9 +293,9 @@ func (w *Wallit) PickUtxos(
 		}
 		// yeah, lets add this utxo!
 		rSlice = append(rSlice, utxo)
-		nokori -= utxo.Value
+		remaining -= utxo.Value
 		// if nokori is positive, don't bother checking fee yet.
-		if nokori < 0 {
+		if remaining < 0 {
 			var byteSize int64
 			for _, txo := range rSlice {
 				if txo.Mode&portxo.FlagTxoWitness != 0 {
@@ -295,18 +305,18 @@ func (w *Wallit) PickUtxos(
 				}
 			}
 			fee := byteSize * feePerByte
-			if nokori < -fee { // done adding utxos: nokori below negative est fee
+			if remaining < -fee { // done adding utxos: nokori below negative est fee
 				break
 			}
 		}
 	}
-	if nokori > 0 {
+	if remaining > 0 {
 		return nil, 0, fmt.Errorf("wanted %d but %d available.",
-			amtWanted, amtWanted-nokori)
+			amtWanted, amtWanted-remaining)
 	}
 
 	sort.Sort(rSlice) // send sorted.  This is probably redundant?
-	return rSlice, -nokori, nil
+	return rSlice, -remaining, nil
 }
 
 // SendOne is for the sweep function, and doesn't do change.
