@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import websocket  # `pip install websocket-client`
+import socket
 import json
 
 import pygtk
