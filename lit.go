@@ -92,7 +92,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 			conf.Tn3host = conf.Tn3host + ":" + p.DefaultPort
 		}
 		err = node.LinkBaseWallet(
-			key, 1150000, conf.ReSync, conf.Tower,
+			key, 1210000, conf.ReSync, conf.Tower,
 			conf.Tn3host, p)
 		if err != nil {
 			return err
