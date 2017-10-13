@@ -254,11 +254,12 @@ func (s *SPVCon) InvHandler(m *wire.MsgInv) {
 }
 
 func (s *SPVCon) AddrListHandler(m *wire.MsgAddr) {
-	errCreation := s.CreatePeerFile()
-	if errCreation != nil {
+	err := s.CreatePeerFile()
+	if err != nil {
 		log.Println("Error while trying to create a file")
 	}
-	readvalues, err := s.GetNodes()
+
+	storedAddrs, err := s.GetNodes()
 	if err != nil {
 		log.Printf("AddrListHandler error: %s", err.Error())
 		return
@@ -266,15 +267,21 @@ func (s *SPVCon) AddrListHandler(m *wire.MsgAddr) {
 
 	// log.Println(readvalues)
 
-	flag := 0
-	var ips [100]string
-	var readAddresses [150000]wire.NetAddress // hopefully this doesn't overshoot
-	for i, vals := range readvalues {
-		// do what we want with the IPs, which is to try connecting to them.
-		readAddresses[i] = vals
-		ips[i] = vals.IP.String()
-	}
+	/*
+		don't need any of this - storedAddrs has all the data we need,
+		and reformatting it into arrays doesn't help
 
+
+		   	flag := 0
+		   	var ips [100]string
+		   	var readAddresses [150000]wire.NetAddress // hopefully this doesn't overshoot
+		   	for i, vals := range readvalues {
+		   		// do what we want with the IPs, which is to try connecting to them.
+		   		readAddresses[i] = vals
+		   		ips[i] = vals.IP.String()
+		   	}
+	*/
+	var dontSaveThis bool
 	// log.Println(readAddresses) // readAddresses has all the addressses read from the file. We just have to create a new file if needed.
 	log.Printf("Start IP List")
 	var a wire.NetAddress // limit to 125 like bitcoind?
@@ -286,24 +293,37 @@ func (s *SPVCon) AddrListHandler(m *wire.MsgAddr) {
 			addresses.Timestamp = now.Add(-1 * time.Hour * 24 * 5)
 		}
 		log.Printf("Timestamp: %s", addresses.Timestamp) //remember to comment this stuff
-		for _, addr := range ips {                       // for a list of all IPs in the file
-			if addr == "<nil>" { // if its nil, stop execution
-				flag = 0
-				break
-			}
-			if addr == addresses.IP.String() { // is the address is already present in the file, ignore
-				flag = 1
+		for _, storedAddr := range storedAddrs {         // for a list of all IPs in the file
+			//			if addr == "<nil>" { // if its nil, stop execution
+			//			if storedAddr.IP.IsUnspecified() {
+			//				flag = 0
+			//				break
+			//			}
+			//			if addr == addresses.IP.String() { // is the address is already present in the file, ignore
+			if storedAddr.IP.Equal(addresses.IP) {
+				dontSaveThis = true
 				break
 			}
 		}
 		// log.Println("The elusive flag")
 		// log.Println(flag)
-		if flag != 1 {
+
+		/* can make this into a function;
+		it writes an IP address to the file
+		*/
+
+		if !dontSaveThis {
 			// Write the stuff to the file
 			a = *addresses
 			// attach a to readAddresses
-			readAddresses[99+i] = a
-			for j, values := range readAddresses {
+
+			/* not sure what this means. 99+i?  why start at 99?
+
+			instead, just append to the storedAddrs slice
+
+			*/
+			storedAddrs = append(storedAddrs, a)
+			for j, values := range storedAddrs {
 
 				dest, err := json.Marshal(values)
 				if err != nil {
