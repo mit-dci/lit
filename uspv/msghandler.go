@@ -2,12 +2,13 @@ package uspv
 
 import (
 	"encoding/json"
-	"github.com/adiabat/btcd/wire"
-	"github.com/adiabat/btcutil/bloom"
-	"github.com/mit-dci/lit/lnutil"
 	"log"
 	"os"
 	"time"
+
+	"github.com/adiabat/btcd/wire"
+	"github.com/adiabat/btcutil/bloom"
+	"github.com/mit-dci/lit/lnutil"
 )
 
 func (s *SPVCon) incomingMessageHandler() {
@@ -253,11 +254,16 @@ func (s *SPVCon) InvHandler(m *wire.MsgInv) {
 }
 
 func (s *SPVCon) AddrListHandler(m *wire.MsgAddr) {
-	errCreation := CreateFile(s)
+	errCreation := s.CreatePeerFile()
 	if errCreation != nil {
 		log.Println("Error while trying to create a file")
 	}
-	readvalues := GetNodes(s)
+	readvalues, err := s.GetNodes()
+	if err != nil {
+		log.Printf("AddrListHandler error: %s", err.Error())
+		return
+	}
+
 	// log.Println(readvalues)
 
 	flag := 0
@@ -268,18 +274,19 @@ func (s *SPVCon) AddrListHandler(m *wire.MsgAddr) {
 		readAddresses[i] = vals
 		ips[i] = vals.IP.String()
 	}
+
 	// log.Println(readAddresses) // readAddresses has all the addressses read from the file. We just have to create a new file if needed.
 	log.Printf("Start IP List")
 	var a wire.NetAddress // limit to 125 like bitcoind?
 	// refer https://github.com/btcsuite/btcd/blob/master/wire/netaddress.go for *wire.NetAddr struct
 	for i, addresses := range m.AddrList {
-		log.Printf("IP: %s", addresses.IP)//remember to comment this stuff
+		log.Printf("IP: %s", addresses.IP) //remember to comment this stuff
 		now := time.Now()
 		if addresses.Timestamp.After(now.Add(time.Minute * 10)) {
 			addresses.Timestamp = now.Add(-1 * time.Hour * 24 * 5)
 		}
 		log.Printf("Timestamp: %s", addresses.Timestamp) //remember to comment this stuff
-		for _, addr := range ips { // for a list of all IPs in the file
+		for _, addr := range ips {                       // for a list of all IPs in the file
 			if addr == "<nil>" { // if its nil, stop execution
 				flag = 0
 				break
@@ -288,7 +295,6 @@ func (s *SPVCon) AddrListHandler(m *wire.MsgAddr) {
 				flag = 1
 				break
 			}
-
 		}
 		// log.Println("The elusive flag")
 		// log.Println(flag)

@@ -3,15 +3,16 @@ package uspv
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/adiabat/btcd/wire"
 	"io/ioutil"
 	"log"
 	"net"
 	"os"
 	"strconv"
+
+	"github.com/adiabat/btcd/wire"
 )
 
-func CreateFile(s *SPVCon) error{
+func (s *SPVCon) CreatePeerFile() error {
 	if _, err := os.Stat(s.nodeFile); os.IsNotExist(err) {
 		os.Mkdir("./peers", 0700)
 		crfile, err := os.Create(s.nodeFile)
@@ -24,15 +25,15 @@ func CreateFile(s *SPVCon) error{
 	}
 	return nil
 }
-func GetNodes(s *SPVCon) []wire.NetAddress {
+
+func (s *SPVCon) GetNodes() ([]wire.NetAddress, error) {
 	addresses := make([]wire.NetAddress, 3)
 	raw, err := ioutil.ReadFile(s.nodeFile)
 	if err != nil {
-		log.Println(err.Error())
-		return nil
+		return nil, err
 	}
 	json.Unmarshal(raw, &addresses)
-	return addresses
+	return addresses, nil
 }
 
 // Connect dials out and connects to full nodes.
@@ -45,7 +46,10 @@ func (s *SPVCon) Connect(remoteNode string) error {
 			if _, errNotExists := os.Stat(s.nodeFile); os.IsNotExist(errNotExists) {
 				log.Println("Peers file doesn't exist") // set flag to 1 sicne peers doesn't exist
 			} else {
-				readvalues := GetNodes(s)
+				readvalues, err := s.GetNodes()
+				if err != nil {
+					return err
+				}
 				log.Println(readvalues)
 				for _, ve := range readvalues {
 					// do what we want with the IPs, which is to try connecting to them.
