@@ -205,7 +205,7 @@ func (lc *litAfClient) Fee(textArgs []string) error {
 			return err
 		}
 	} else {
-		err := lc.rpccon.Call("LitRPC.Fee", GetArgs, reply)
+		err := lc.rpccon.Call("LitRPC.GetFee", GetArgs, reply)
 		if err != nil {
 			return err
 		}
