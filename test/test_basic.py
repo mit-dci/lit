@@ -20,6 +20,7 @@
 
 from lit_test_framework import LitTest, wait_until
 from utils import assert_equal
+import time
 
 class TestBasic(LitTest):
     def run_test(self):
