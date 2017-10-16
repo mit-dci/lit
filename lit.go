@@ -42,12 +42,11 @@ type config struct { // define a struct for usage with go-flags
 }
 
 var (
-	defaultLitHomeDirName = os.Getenv("HOME") + "/.lit"
+	defaultLitHomeDir     = os.Getenv("HOME") + "/.lit"
 	defaultKeyFileName    = "privkey.hex"
 	defaultConfigFilename = "lit.conf"
-	defaultHomeDir        = os.Getenv("HOME")
-	defaultConfigFile     = filepath.Join(os.Getenv("HOME"), "/.lit/lit.conf")
-	defaultRpcport        = uint16(8001)
+	//	defaultConfigFile     = filepath.Join(os.Getenv("HOME"), "/.lit/lit.conf")
+	defaultRpcport = uint16(8001)
 )
 
 func fileExists(name string) bool {
@@ -80,7 +79,8 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 			conf.Reghost = conf.Reghost + ":" + p.DefaultPort
 		}
 		fmt.Printf("reg: %s\n", conf.Reghost)
-		err = node.LinkBaseWallet(key, 120, conf.ReSync, conf.Tower, conf.Reghost, p)
+		err = node.LinkBaseWallet(
+			key, 120, conf.ReSync, conf.Tower, conf.Reghost, p)
 		if err != nil {
 			return err
 		}
@@ -104,7 +104,8 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 		if !strings.Contains(conf.Litereghost, ":") {
 			conf.Litereghost = conf.Litereghost + ":" + p.DefaultPort
 		}
-		err = node.LinkBaseWallet(key, 120, conf.ReSync, conf.Tower, conf.Litereghost, p)
+		err = node.LinkBaseWallet(
+			key, 120, conf.ReSync, conf.Tower, conf.Litereghost, p)
 		if err != nil {
 			return err
 		}
@@ -156,8 +157,8 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 func main() {
 
 	conf := config{
-		LitHomeDir: defaultLitHomeDirName,
-		ConfigFile: defaultConfigFile,
+		LitHomeDir: defaultLitHomeDir,
+		ConfigFile: filepath.Join(defaultLitHomeDir, "lit.conf"),
 		Rpcport:    defaultRpcport,
 	}
 
@@ -177,24 +178,17 @@ func main() {
 		}
 	}
 
-	// appName := filepath.Base(os.Args[0])
-	// appName = strings.TrimSuffix(appName, filepath.Ext(appName))
-	// usageMessage := fmt.Sprintf("Use %s -h to show usage", appName)
-	// if preconf.ShowVersion {
-	// 	fmt.Println(appName, "version", version())
-	// 	os.Exit(0)
-	// }
-
 	// Load additional config from file
 	var configFileError error
-	parser := newConfigParser(&conf, flags.Default) // Single line command to read all the CLI params passed
+	// Single line command to read all the CLI params passed
+	parser := newConfigParser(&conf, flags.Default)
 
-	// creates a directory in the absolute sense
-	if _, err := os.Stat(preconf.LitHomeDir); os.IsNotExist(err) {
+	_, err = os.Stat(preconf.LitHomeDir)
+	if os.IsNotExist(err) {
 		os.Mkdir(preconf.LitHomeDir, 0700)
 		fmt.Println("Creating a new config file")
-		err1 := createDefaultConfigFile(preconf.LitHomeDir) // Source of error
-		if err1 != nil {
+		err := createDefaultConfigFile(preconf.LitHomeDir)
+		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error creating a "+
 				"default config file: %v\n", err)
 		}
@@ -205,30 +199,28 @@ func main() {
 		fmt.Println(err)
 	}
 
-	if !(preconf.ConfigFile != defaultConfigFile) {
-		// passing works fine.
-		// fmt.Println("Watch out")
-		// fmt.Println(filepath.Join(preconf.LitHomeDir))
-		if _, err := os.Stat(filepath.Join(filepath.Join(preconf.LitHomeDir), "lit.conf")); os.IsNotExist(err) {
+	if preconf.ConfigFile == conf.ConfigFile {
+		_, err = os.Stat(preconf.ConfigFile)
+
+		if os.IsNotExist(err) {
 			if err != nil {
 				fmt.Println(err)
 			}
 			fmt.Println("Creating a new config file")
-			err1 := createDefaultConfigFile(filepath.Join(preconf.LitHomeDir)) // Source of error
-			if err1 != nil {
-				fmt.Fprintf(os.Stderr, "Error creating a "+
-					"default config file: %v\n", err)
+			err := createDefaultConfigFile(preconf.LitHomeDir)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error creating default config file: %s\n",
+					err.Error())
 			}
 		}
-		preconf.ConfigFile = filepath.Join(filepath.Join(preconf.LitHomeDir), "lit.conf")
-		err := flags.NewIniParser(parser).ParseFile(preconf.ConfigFile) // lets parse the config file provided, if any
+		preconf.ConfigFile = filepath.Join(preconf.LitHomeDir, "lit.conf")
+		// lets parse the config file provided, if any
+		err := flags.NewIniParser(parser).ParseFile(preconf.ConfigFile)
 		if err != nil {
 			if _, ok := err.(*os.PathError); !ok {
-				fmt.Fprintf(os.Stderr, "Error parsing config "+
-					"file: %v\n", err)
-				// fmt.Fprintln(os.Stderr, usageMessage)
+				fmt.Fprintf(os.Stderr, "Error parsing config file: %s\n",
+					err.Error())
 				log.Fatal(err)
-				// return nil, nil, err
 			}
 			configFileError = err
 		}
@@ -254,7 +246,8 @@ func main() {
 
 	logFilePath := filepath.Join(conf.LitHomeDir, "lit.log")
 
-	logfile, err := os.OpenFile(logFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	logfile, err := os.OpenFile(
+		logFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	defer logfile.Close()
 
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
@@ -314,8 +307,6 @@ func main() {
 }
 
 func createDefaultConfigFile(destinationPath string) error {
-
-	// We assume sample config file path is same as binary TODO: change to ~/.lit/config/
 	path, err := filepath.Abs(filepath.Dir(os.Args[0]))
 	if err != nil {
 		return err

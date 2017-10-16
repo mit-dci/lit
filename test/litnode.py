@@ -33,7 +33,7 @@ class LitNode():
 
         self.args = ["-dir", self.data_dir]
         # disable auto-connect to testnet3 and litetest4
-        self.args.extend(['-tn3', '', '-lt4', ''])
+        self.args.extend(['--tn3', '', '--lt4', ''])
 
         self.rpc = None
 
