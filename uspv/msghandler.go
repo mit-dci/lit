@@ -254,137 +254,34 @@ func (s *SPVCon) InvHandler(m *wire.MsgInv) {
 }
 
 func (s *SPVCon) AddrListHandler(m *wire.MsgAddr) {
-	err := s.CreatePeerFile()
+	err := s.CreatePeerFile() // create a peers.json file over at testnet3/ vtc/ etc.
 	if err != nil {
 		log.Println("Error while trying to create a file")
 	}
 
-	storedAddrs, err := s.GetNodes()
+	storedAddrs, err := s.GetNodes() // get the list of Nodes
 	if err != nil {
 		log.Printf("AddrListHandler error: %s", err.Error())
 		return
 	}
-
-	// log.Println(readvalues)
-
-	/*
-		don't need any of this - storedAddrs has all the data we need,
-		and reformatting it into arrays doesn't help
-
-
-		   	flag := 0
-		   	var ips [100]string
-		   	var readAddresses [150000]wire.NetAddress // hopefully this doesn't overshoot
-		   	for i, vals := range readvalues {
-		   		// do what we want with the IPs, which is to try connecting to them.
-		   		readAddresses[i] = vals
-		   		ips[i] = vals.IP.String()
-		   	}
-	*/
 	var dontSaveThis bool
-	// log.Println(readAddresses) // readAddresses has all the addressses read from the file. We just have to create a new file if needed.
-	log.Printf("Start IP List")
-	var a wire.NetAddress // limit to 125 like bitcoind?
-	// refer https://github.com/btcsuite/btcd/blob/master/wire/netaddress.go for *wire.NetAddr struct
-	for i, addresses := range m.AddrList {
-		log.Printf("IP: %s", addresses.IP) //remember to comment this stuff
+	for _, addresses := range m.AddrList {
 		now := time.Now()
-		if addresses.Timestamp.After(now.Add(time.Minute * 10)) {
+		if addresses.Timestamp.After(now.Add(time.Minute * 10)) { // some stuff specified by btcd
 			addresses.Timestamp = now.Add(-1 * time.Hour * 24 * 5)
 		}
-		log.Printf("Timestamp: %s", addresses.Timestamp) //remember to comment this stuff
-		for _, storedAddr := range storedAddrs {         // for a list of all IPs in the file
-			//			if addr == "<nil>" { // if its nil, stop execution
-			//			if storedAddr.IP.IsUnspecified() {
-			//				flag = 0
-			//				break
-			//			}
-			//			if addr == addresses.IP.String() { // is the address is already present in the file, ignore
-			if storedAddr.IP.Equal(addresses.IP) {
+		for _, storedAddr := range storedAddrs {
+			if (storedAddr.IP.Equal(addresses.IP)) && (string(addresses.Port) == s.Param.DefaultPort) {
 				dontSaveThis = true
 				break
 			}
 		}
-		// log.Println("The elusive flag")
-		// log.Println(flag)
-
-		/* can make this into a function;
-		it writes an IP address to the file
-		*/
-
 		if !dontSaveThis {
-			// Write the stuff to the file
-			a = *addresses
-			// attach a to readAddresses
-
-			/* not sure what this means. 99+i?  why start at 99?
-
-			instead, just append to the storedAddrs slice
-
-			*/
-			storedAddrs = append(storedAddrs, a)
-			for j, values := range storedAddrs {
-
-				dest, err := json.Marshal(values)
-				if err != nil {
-					log.Println("Converting to a JSON object failed")
-				}
-				if j == 0 {
-					errdel := os.Remove(s.nodeFile)
-					if errdel != nil {
-						log.Println("File deletion error. Exiting")
-						break
-					}
-					crfile, errcreate := os.Create(s.nodeFile)
-					if errcreate != nil {
-						log.Println("File creation error. Exiting")
-						break
-					}
-					crfile.Close()
-				}
-				file, err2 := os.OpenFile(s.nodeFile, os.O_APPEND|os.O_WRONLY, 0644)
-				if err2 != nil {
-					log.Println(err2)
-				}
-				// defer file.Close()
-
-				if j == 0 {
-					_, rnd := file.WriteString("[")
-					if rnd != nil {
-						log.Println("Saving starting character failed. Quitting")
-						break
-					}
-				}
-
-				if values.IP.String() != "<nil>" {
-					_, err1 := file.WriteString(string(dest))
-
-					if err1 != nil {
-						log.Println("Appending to a file failed")
-					}
-
-					if j < 99+i {
-						_, err3 := file.WriteString(",\n")
-						if err3 != nil {
-							log.Println("Failed to write Newline")
-						}
-					}
-					if j == 99+i {
-						_, rnd1 := file.WriteString("\n]")
-						if rnd1 != nil {
-							log.Println("Saving ending characters failed. Quitting")
-							break
-						}
-					}
-				}
-				file.Close()
-			}
-			// log.Println(string(json.Marshal(a[0].IP)))
-		} else {
-			break
+			// lets append to storedAddrs if the address is not already in the list
+			storedAddrs = append(storedAddrs, *addresses)
 		}
 	}
-	log.Printf("end ip list")
+	s.WriteIpToFile(storedAddrs) // lets write storedAddrs to peers.json
 }
 
 func (s *SPVCon) PongBack(nonce uint64) {
@@ -398,4 +295,60 @@ func (s *SPVCon) SendFilter(f *bloom.Filter) {
 	s.outMsgQueue <- f.MsgFilterLoad()
 
 	return
+}
+
+func (s *SPVCon) WriteIpToFile(storedAddrs []wire.NetAddress) {
+
+	if _, err := os.Stat(s.nodeFile); !os.IsNotExist(err) {
+		err := os.Remove(s.nodeFile) // delete the file if it already exists
+		if err != nil {
+			log.Println("File deletion error. Exiting")
+			return
+		}
+	}
+	file, err := os.Create(s.nodeFile) // create a new file
+	if err != nil {
+		log.Println("File creation error. Exiting")
+		return
+	}
+	file.Close() // lets close the file and open in append mode
+	file, err = os.OpenFile(s.nodeFile, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Println(err)
+	}
+	_, err = file.WriteString("[") // we need to write this the first time around
+	if err != nil {
+		log.Println("Saving starting character failed. Quitting")
+		return
+	}
+
+	for j, values := range storedAddrs {
+
+		dest, err := json.Marshal(values)
+		if err != nil {
+			log.Println("Converting to a JSON object failed")
+		}
+
+		if values.IP.String() != "<nil>" {
+			_, err := file.WriteString(string(dest))
+			if err != nil {
+				log.Println("Appending to a file failed")
+			}
+
+			if j < len(storedAddrs)-1 {
+				_, err := file.WriteString(",\n") // separate the json objects
+				if err != nil {
+					log.Println("Failed to write Newline")
+				}
+			}
+			if j == len(storedAddrs)-1 { // this is the last line, close the json object
+				_, err := file.WriteString("\n]")
+				if err != nil {
+					log.Println("Saving ending characters failed. Quitting")
+					break
+				}
+			}
+		}
+	}
+	file.Close()
 }

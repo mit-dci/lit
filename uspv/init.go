@@ -15,8 +15,8 @@ import (
 func (s *SPVCon) CreatePeerFile() error {
 	if _, err := os.Stat(s.nodeFile); os.IsNotExist(err) {
 		os.Mkdir("./peers", 0700)
-		crfile, err := os.Create(s.nodeFile)
-		crfile.Close()
+		file, err := os.Create(s.nodeFile)
+		file.Close()
 		if err != nil {
 			log.Println("File creation error. Exiting")
 			return err
@@ -27,7 +27,7 @@ func (s *SPVCon) CreatePeerFile() error {
 }
 
 func (s *SPVCon) GetNodes() ([]wire.NetAddress, error) {
-	addresses := make([]wire.NetAddress, 3)
+	var addresses []wire.NetAddress
 	raw, err := ioutil.ReadFile(s.nodeFile)
 	if err != nil {
 		return nil, err
@@ -43,25 +43,22 @@ func (s *SPVCon) Connect(remoteNode string) error {
 	flag := 0
 	if len(s.Param.DNSSeeds) != 0 {
 		if remoteNode[:4] == "auto" || (remoteNode[:1] == "1" && len(remoteNode) == 7) {
-			if _, errNotExists := os.Stat(s.nodeFile); os.IsNotExist(errNotExists) {
+			if _, err := os.Stat(s.nodeFile); os.IsNotExist(err) {
 				log.Println("Peers file doesn't exist") // set flag to 1 sicne peers doesn't exist
 			} else {
 				readvalues, err := s.GetNodes()
 				if err != nil {
 					return err
 				}
-				log.Println(readvalues)
 				for _, ve := range readvalues {
 					// do what we want with the IPs, which is to try connecting to them.
-					log.Println(ve.IP)
 					if ve.IP.String() != "<nil>" {
 						if strconv.Itoa(int(ve.Port)) == s.Param.DefaultPort { // to handle different protocols
-							addrs, err := net.LookupHost(ve.IP.String())
+							_., err := net.LookupHost(ve.IP.String())
 							if err != nil {
 								log.Println("Fatal Error while connecting to remote node. Trying again.")
 								continue
 							}
-							log.Println(addrs)
 							remoteNode = ve.IP.String() + ":" + s.Param.DefaultPort
 							flag = 1
 							break
