@@ -276,8 +276,9 @@ func CheckHeaderChain(
 		// TODO check for more work here instead of length.  This is wrong...
 		// if we've been given insufficient headers, don't reorg, but
 		// ask for more headers.
-
-		if attachHeight+int32(len(inHeaders)) < height {
+		if moreWork(inHeaders, oldHeaders) {
+		// pretty sure this won't work without testing
+		// if attachHeight+int32(len(inHeaders)) < height {
 			return -1, fmt.Errorf(
 				"reorg message up to height %d, but have up to %d",
 				attachHeight+int32(len(inHeaders)), height-1)
