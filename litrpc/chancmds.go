@@ -176,6 +176,10 @@ func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 			args.ChanIdx, qc.CloseData.CloseTxid.String())
 	}
 
+	// TODO this is a bad place to put it -- litRPC should be a thin layer
+	// to the Node.Func() calls.  For now though, set the height here...
+	qc.Height = dummyqc.Height
+
 	err = r.Node.PushChannel(qc, uint32(args.Amt))
 	if err != nil {
 		return err

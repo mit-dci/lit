@@ -2,10 +2,10 @@ package coinparam
 
 import (
 	"errors"
-	"math/big"
-	"time"
 	"io"
 	"log"
+	"math/big"
+	"time"
 
 	"github.com/adiabat/btcd/chaincfg/chainhash"
 	"github.com/adiabat/btcd/wire"
@@ -33,26 +33,26 @@ type Params struct {
 
 	// GenesisHash is the starting block hash.
 	GenesisHash *chainhash.Hash
-	
+
 	// The function used to calculate the proof of work value for a block
 	PoWFunction func(b []byte) chainhash.Hash
-  
-    // The function used to calculate the difficulty of a given block
-    DiffCalcFunction func(r io.ReadSeeker, height, startheight int32, p *Params) (uint32, error)
-  
-    // The block header to start downloading blocks from
-    StartHeader [80]byte
-  
-    // The height of the StartHash
-    StartHeight int32
-  
-    // Assume the difficulty bits are valid before this header height
-    // This is needed for coins with variable retarget lookbacks that use 
-    // StartHeader to offset the beginning of the header chain for SPV
-    AssumeDiffBefore int32
-  
-    // Fee per byte for transactions
-    FeePerByte int64
+
+	// The function used to calculate the difficulty of a given block
+	DiffCalcFunction func(r io.ReadSeeker, height, startheight int32, p *Params) (uint32, error)
+
+	// The block header to start downloading blocks from
+	StartHeader [80]byte
+
+	// The height of the StartHash
+	StartHeight int32
+
+	// Assume the difficulty bits are valid before this header height
+	// This is needed for coins with variable retarget lookbacks that use
+	// StartHeader to offset the beginning of the header chain for SPV
+	AssumeDiffBefore int32
+
+	// Fee per byte for transactions
+	FeePerByte int64
 
 	// PowLimit defines the highest allowed proof of work value for a block
 	// as a uint256.
@@ -130,6 +130,11 @@ type Params struct {
 	// BIP44 coin type used in the hierarchical deterministic path for
 	// address generation.
 	HDCoinType uint32
+
+	// TestCoin, when true, indicates that the network deals with money that
+	// isn't worth anything.  This can be useful to skip over security code,
+	//
+	TestCoin bool
 }
 
 // These variables are the chain proof-of-work limit parameters for each default
