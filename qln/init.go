@@ -71,7 +71,7 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string) (*LitNode, er
 
 // LinkBaseWallet activates a wallet and hooks it into the litnode.
 func (nd *LitNode) LinkBaseWallet(
-	privKey *[32]byte, birthHeight int32, resync bool,
+	privKey *[32]byte, birthHeight int32, resync bool, tower bool,
 	host string, param *coinparam.Params) error {
 
 	rootpriv, err := hdkeychain.NewMaster(privKey[:], param)
@@ -106,10 +106,12 @@ func (nd *LitNode) LinkBaseWallet(
 	// if this node is running a watchtower, link the watchtower to the
 	// new wallet block events
 
-	err = nd.Tower.HookLink(
-		nd.LitFolder, param, nd.SubWallet[WallitIdx].ExportHook())
-	if err != nil {
-		return err
+	if tower {
+		err = nd.Tower.HookLink(
+			nd.LitFolder, param, nd.SubWallet[WallitIdx].ExportHook())
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

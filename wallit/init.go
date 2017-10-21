@@ -58,7 +58,7 @@ func NewWallit(
 	log.Printf("DB height %d\n", height)
 	incomingTx, incomingBlockheight, err := w.Hook.Start(height, spvhost, wallitpath, p)
 	if err != nil {
-		log.Printf("NewWallit crash  %s ", err.Error())
+		log.Printf("NewWallit Hook.Start crash  %s ", err.Error())
 	}
 
 	// check if there are any addresses.  If there aren't (initial wallet setup)
@@ -113,12 +113,23 @@ func (w *Wallit) TxHandler(incomingTxAndHeight chan lnutil.TxAndHeight) {
 }
 
 func (w *Wallit) HeightHandler(incomingHeight chan int32) {
+	var prevHeight int32
 	for {
 		h := <-incomingHeight
+		// detect reorg
+		if h < prevHeight {
+			log.Printf("HeightHandler: oh no, reorg!\n")
+			err := w.RollBack(h)
+			if err != nil {
+				log.Printf("Rollback crash  %s ", err.Error())
+			}
+		}
+
 		err := w.SetDBSyncHeight(h)
 		if err != nil {
 			log.Printf("HeightHandler crash  %s ", err.Error())
 		}
+		prevHeight = h
 	}
 }
 

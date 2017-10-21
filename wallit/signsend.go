@@ -92,6 +92,8 @@ func (w *Wallit) MaybeSend(txos []*wire.TxOut, ow bool) ([]*wire.OutPoint, error
 		return nil, err
 	}
 
+	// after building, store the locktime and txid
+	fTx.Nlock = tx.LockTime
 	fTx.Txid = tx.TxHash()
 
 	for _, utxo := range utxos {
@@ -137,7 +139,7 @@ func (w *Wallit) ReallySend(txid *chainhash.Hash) error {
 		allOuts = append(frozenTx.Outs, frozenTx.ChangeOut)
 	}
 
-	tx, err := w.BuildAndSign(frozenTx.Ins, allOuts)
+	tx, err := w.BuildAndSign(frozenTx.Ins, allOuts, frozenTx.Nlock)
 	if err != nil {
 		return err
 	}
@@ -256,13 +258,23 @@ func (w *Wallit) PickUtxos(
 		}
 	}
 
-	// start with utxos sorted by value.
+	// start with utxos sorted by value and pop off utxos which are greater
+	// than the send amount... as long as the next 2 are greater.
+	// simple / straightforward coin selection optimization, which tends to make
+	// 2 in 2 out
+
 	// smallest and unconfirmed last (because it's reversed)
 	sort.Sort(sort.Reverse(allUtxos))
 
+	// if you've got 3 or more, and the next 2 are more than enough, pop off the
+	// first one.
+	for len(allUtxos) > 2 && allUtxos[1].Value+allUtxos[2].Value > amtWanted {
+		allUtxos = allUtxos[1:]
+	}
+
 	var rSlice portxo.TxoSliceByBip69
 	// add utxos until we've had enough
-	nokori := amtWanted // nokori is how much is needed on input side
+	remaining := amtWanted // nokori is how much is needed on input side
 	for _, utxo := range allUtxos {
 		// skip unconfirmed.  Or de-prioritize? Some option for this...
 		//		if utxo.AtHeight == 0 {
@@ -281,9 +293,9 @@ func (w *Wallit) PickUtxos(
 		}
 		// yeah, lets add this utxo!
 		rSlice = append(rSlice, utxo)
-		nokori -= utxo.Value
+		remaining -= utxo.Value
 		// if nokori is positive, don't bother checking fee yet.
-		if nokori < 0 {
+		if remaining < 0 {
 			var byteSize int64
 			for _, txo := range rSlice {
 				if txo.Mode&portxo.FlagTxoWitness != 0 {
@@ -293,18 +305,18 @@ func (w *Wallit) PickUtxos(
 				}
 			}
 			fee := byteSize * feePerByte
-			if nokori < -fee { // done adding utxos: nokori below negative est fee
+			if remaining < -fee { // done adding utxos: nokori below negative est fee
 				break
 			}
 		}
 	}
-	if nokori > 0 {
+	if remaining > 0 {
 		return nil, 0, fmt.Errorf("wanted %d but %d available.",
-			amtWanted, amtWanted-nokori)
+			amtWanted, amtWanted-remaining)
 	}
 
 	sort.Sort(rSlice) // send sorted.  This is probably redundant?
-	return rSlice, -nokori, nil
+	return rSlice, -remaining, nil
 }
 
 // SendOne is for the sweep function, and doesn't do change.
@@ -336,7 +348,8 @@ func (w *Wallit) SendOne(u portxo.PorTxo, outScript []byte) (*wire.MsgTx, error)
 	// make user specified txout and add to tx
 	txout := wire.NewTxOut(sendAmt, outScript)
 
-	return w.BuildAndSign([]*portxo.PorTxo{&u}, []*wire.TxOut{txout})
+	return w.BuildAndSign(
+		[]*portxo.PorTxo{&u}, []*wire.TxOut{txout}, uint32(w.CurrentHeight()))
 }
 
 // Builds tx from inputs and outputs, returns tx.  Sorts.  Doesn't sign.
@@ -345,7 +358,11 @@ func (w *Wallit) BuildDontSign(
 
 	// make the tx
 	tx := wire.NewMsgTx()
+	// set version 2, for op_csv
 	tx.Version = 2
+	// set the time, the way core does.
+	tx.LockTime = uint32(w.CurrentHeight())
+
 	// add all the txouts
 	for _, txo := range txos {
 		tx.AddTxOut(txo)
@@ -367,7 +384,7 @@ func (w *Wallit) BuildDontSign(
 // It then signs all the inputs and returns the tx.  Should
 // pretty much always work for any inputs.
 func (w *Wallit) BuildAndSign(
-	utxos []*portxo.PorTxo, txos []*wire.TxOut) (*wire.MsgTx, error) {
+	utxos []*portxo.PorTxo, txos []*wire.TxOut, nlt uint32) (*wire.MsgTx, error) {
 	var err error
 
 	if len(utxos) == 0 || len(txos) == 0 {
@@ -381,7 +398,7 @@ func (w *Wallit) BuildAndSign(
 
 	// always make version 2 txs
 	tx.Version = 2
-
+	tx.LockTime = nlt
 	// add all the txouts, direct from the argument slice
 	for _, txo := range txos {
 		if txo == nil || txo.PkScript == nil || txo.Value == 0 {

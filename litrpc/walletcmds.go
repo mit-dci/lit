@@ -35,6 +35,7 @@ type CoinBalReply struct {
 	ChanTotal   int64 // total balance in channels
 	TxoTotal    int64 // all utxos
 	MatureWitty int64 // confirmed, spendable and witness
+	FeeRate     int64 // fee per byte
 }
 
 type BalanceReply struct {
@@ -56,8 +57,10 @@ func (r *LitRPC) Balance(args *NoArgs, reply *BalanceReply) error {
 		var cbr CoinBalReply
 
 		cbr.CoinType = cointype
-
+		// get wallet height
 		cbr.SyncHeight = wal.CurrentHeight()
+		// also current fee rate
+		cbr.FeeRate = wal.Fee()
 
 		allTxos, err = wal.UtxoDump()
 		if err != nil {
@@ -74,6 +77,7 @@ func (r *LitRPC) Balance(args *NoArgs, reply *BalanceReply) error {
 				cbr.ChanTotal += q.State.MyAmt
 			}
 		}
+
 		// I thought slices were pointery enough that I could put this line
 		// near the top.  Guess not.
 		reply.Balances = append(reply.Balances, cbr)
@@ -311,9 +315,8 @@ func (r *LitRPC) SetFee(args *SetFeeArgs, reply *FeeReply) error {
 	return nil
 }
 
-// Fee gets th fee rate for a wallet.  If you try to set a negative
-// fee rate, it will return the current rate.
-func (r *LitRPC) Fee(args *FeeArgs, reply *FeeReply) error {
+// Fee gets the fee rate for a wallet.
+func (r *LitRPC) GetFee(args *FeeArgs, reply *FeeReply) error {
 	// if cointype is 0, use the node's default coin
 	if args.CoinType == 0 {
 		args.CoinType = r.Node.DefaultCoin

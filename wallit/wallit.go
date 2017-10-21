@@ -52,6 +52,7 @@ type FrozenTx struct {
 	Ins       []*portxo.PorTxo
 	Outs      []*wire.TxOut
 	ChangeOut *wire.TxOut
+	Nlock     uint32
 	Txid      chainhash.Hash
 }
 
@@ -128,17 +129,26 @@ func (s *Stxo) ToBytes() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// Doesn't work
 // StxoFromBytes turns bytes into a Stxo.
-// first 36 bytes are how it's spent, after that is portxo
+// it's a portxo with a spendHeight and spendTxid at the end.
 func StxoFromBytes(b []byte) (Stxo, error) {
 	var s Stxo
-	if len(b) < 96 {
+
+	l := len(b)
+	if l < 96 {
 		return s, fmt.Errorf("Got %d bytes for stxo, expect a bunch", len(b))
 	}
-	buf := bytes.NewBuffer(b)
+
+	// last 36 bytes are height & spend txid.
+	u, err := portxo.PorTxoFromBytes(b[:l-36])
+	if err != nil {
+		log.Printf(" eof? ")
+		return s, err
+	}
+
+	buf := bytes.NewBuffer(b[l-36:])
 	// read 4 byte spend height
-	err := binary.Read(buf, binary.BigEndian, &s.SpendHeight)
+	err = binary.Read(buf, binary.BigEndian, &s.SpendHeight)
 	if err != nil {
 		return s, err
 	}
@@ -148,11 +158,6 @@ func StxoFromBytes(b []byte) (Stxo, error) {
 		return s, err
 	}
 
-	u, err := portxo.PorTxoFromBytes(buf.Bytes())
-	if err != nil {
-		log.Printf(" eof? ")
-		return s, err
-	}
 	s.PorTxo = *u // assign the utxo
 
 	return s, nil
