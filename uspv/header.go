@@ -19,6 +19,46 @@ import (
 	"github.com/mit-dci/lit/coinparam"
 )
 
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func moreWork(a, b []*wire.BlockHeader) bool {
+	if a[0].MerkleRoot != b[0].MerkleRoot {
+		log.Printf("Chains don't start with the same header. Quitting.!")
+		return false
+	}
+	var flag int = 0
+	var pos int = 0 //can safely assume this thanks to the first check
+	for i := min(len(a), len(b)); i >= 0; i-- {
+		if a[i].MerkleRoot == b[i].MerkleRoot {
+			flag = 1
+			pos = i
+			break
+		}
+	}
+	if flag == 1 {
+		a1 := a[pos+1:]
+		b1 := b[pos+1:]
+		var work_a *big.Int
+		var work_b *big.Int
+		for i := 0; i < len(a1); i++ {
+			work_a.Add(blockchain.CalcWork(a1[i].Bits), work_a)
+		}
+		for i := 0; i < len(b1); i++ {
+			work_b.Add(blockchain.CalcWork(b1[i].Bits), work_b)
+		}
+		if work_a.Cmp(work_b) < 0 {
+			// traditional integer comparison doesn't work here, so use Cmp instead.
+			return true
+		}
+	}
+	return false
+}
+
 // checkProofOfWork verifies the header hashes into something
 // lower than specified by the 4-byte bits field.
 func checkProofOfWork(header wire.BlockHeader, p *coinparam.Params) bool {
@@ -236,6 +276,7 @@ func CheckHeaderChain(
 		// TODO check for more work here instead of length.  This is wrong...
 		// if we've been given insufficient headers, don't reorg, but
 		// ask for more headers.
+
 		if attachHeight+int32(len(inHeaders)) < height {
 			return -1, fmt.Errorf(
 				"reorg message up to height %d, but have up to %d",
