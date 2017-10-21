@@ -15,7 +15,7 @@ import (
 
 // Init starts up a lit node.  Needs priv key, and a path.
 // Does not activate a subwallet; do that after init.
-func NewLitNode(privKey *[32]byte, path string) (*LitNode, error) {
+func NewLitNode(privKey *[32]byte, path string, trackerURL string) (*LitNode, error) {
 
 	nd := new(LitNode)
 	nd.LitFolder = path
@@ -44,6 +44,8 @@ func NewLitNode(privKey *[32]byte, path string) (*LitNode, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	nd.TrackerURL = trackerURL
 
 	// optional tower activation
 

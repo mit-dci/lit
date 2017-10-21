@@ -41,7 +41,7 @@ func (nd *LitNode) TCPListener(
 
 	adr := lnutil.LitAdrFromPubkey(idPub)
 
-	err = Announce(idPriv, lisIpPort, adr)
+	err = Announce(idPriv, lisIpPort, adr, nd.TrackerURL)
 	if err != nil {
 		log.Printf("Announcement error %s", err.Error())
 	}
@@ -105,7 +105,7 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 
 	// If we couldn't deduce a URL, look it up on the tracker
 	if where == "" {
-		where, err = Lookup(who)
+		where, err = Lookup(who, nd.TrackerURL)
 		if err != nil {
 			return err
 		}

@@ -34,6 +34,8 @@ type LitConfig struct {
 	rpcport    uint16
 	litHomeDir string
 
+	trackerURL string
+
 	Params *coinparam.Params
 }
 
@@ -54,6 +56,10 @@ func setConfig(lc *LitConfig) {
 
 	rpcportptr := flag.Int("rpcport", 8001, "port to listen for RPC")
 
+	trackerURL := flag.String("tracker",
+		"http://ni.media.mit.edu:46580",
+		"LN address tracker URL http|https://host:port")
+
 	litHomeDir := flag.String("dir",
 		filepath.Join(os.Getenv("HOME"), litHomeDirName), "lit home directory")
 
@@ -69,6 +75,8 @@ func setConfig(lc *LitConfig) {
 	lc.verbose = *verbptr
 
 	lc.rpcport = uint16(*rpcportptr)
+
+	lc.trackerURL = *trackerURL
 
 	lc.litHomeDir = *litHomeDir
 }
@@ -208,7 +216,7 @@ func main() {
 
 	// Setup LN node.  Activate Tower if in hard mode.
 	// give node and below file pathof lit home directoy
-	node, err := qln.NewLitNode(key, conf.litHomeDir)
+	node, err := qln.NewLitNode(key, conf.litHomeDir, conf.trackerURL)
 	if err != nil {
 		log.Fatal(err)
 	}

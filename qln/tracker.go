@@ -28,7 +28,7 @@ type nodeinfo struct {
 	}
 }
 
-func Announce(priv *btcec.PrivateKey, litport string, litadr string) error {
+func Announce(priv *btcec.PrivateKey, litport string, litadr string, trackerURL string) error {
 	resp, err := http.Get("http://myexternalip.com/raw")
 	if err != nil {
 		return err
@@ -56,7 +56,7 @@ func Announce(priv *btcec.PrivateKey, litport string, litadr string) error {
 	ann.sig = hex.EncodeToString(urlSig.Serialize())
 	ann.pbk = hex.EncodeToString(priv.PubKey().SerializeCompressed())
 
-	_, err = http.PostForm("http://jlovejoy.mit.edu:46580/announce",
+	_, err = http.PostForm(trackerURL+"/announce",
 		url.Values{"url": {ann.url},
 			"addr": {ann.addr},
 			"sig":  {ann.sig},
@@ -69,8 +69,8 @@ func Announce(priv *btcec.PrivateKey, litport string, litadr string) error {
 	return nil
 }
 
-func Lookup(litadr string) (string, error) {
-	resp, err := http.Get("http://jlovejoy.mit.edu:46580/" + litadr)
+func Lookup(litadr string, trackerURL string) (string, error) {
+	resp, err := http.Get(trackerURL + "/" + litadr)
 	if err != nil {
 		return "", err
 	}
