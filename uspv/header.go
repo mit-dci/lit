@@ -25,38 +25,51 @@ func min(a, b int) int {
 	}
 	return b
 }
-
-func moreWork(a, b []*wire.BlockHeader) bool {
-	if a[0].MerkleRoot != b[0].MerkleRoot {
-		log.Printf("Chains don't start with the same header. Quitting.!")
+func moreWork(a, b []*wire.BlockHeader, p *coinparam.Params) bool {
+	var isMoreWork bool = false
+	if len(a) == 0 || len(b) == 0 {
 		return false
 	}
-	var flag int = 0
+	//if checkProofOfWork(*a[0], p) == checkProofOfWork(*b[0], p) {
+	// log.Println(string(&a[0].MerkleRoot) == string(&b[0].MerkleRoot))
+
+	// if (&a[0].MerkleRoot).IsEqual(&b[0].MerkleRoot) { this always returns false,
+	// so we use the String() method to convert them, thing stole half an hour..
+	if a[0].MerkleRoot.String() != b[0].MerkleRoot.String() {
+		log.Printf("Chains don't start with the same header. Quitting.!")
+		return isMoreWork
+	}
 	var pos int = 0 //can safely assume this thanks to the first check
-	for i := min(len(a), len(b)); i >= 0; i-- {
-		if a[i].MerkleRoot == b[i].MerkleRoot {
-			flag = 1
+	for i := min(len(a), len(b)) - 1; i >= 0; i-- {
+		if a[i].MerkleRoot.String() == b[i].MerkleRoot.String() {
+			isMoreWork = true
 			pos = i
 			break
 		}
 	}
-	if flag == 1 {
-		a1 := a[pos+1:]
-		b1 := b[pos+1:]
-		var work_a *big.Int
-		var work_b *big.Int
+	if !isMoreWork {
+		return isMoreWork
+	} else {
+		var a1, b1 []*wire.BlockHeader
+		a1 = a[pos:]
+		b1 = b[pos:]
+		work_a := big.NewInt(0) // since raw declarations don't work, lets set it to 0
+		work_b := big.NewInt(0) // since raw declarations don't work, lets set it to 0
+		log.Println(work_a)
 		for i := 0; i < len(a1); i++ {
-			work_a.Add(blockchain.CalcWork(a1[i].Bits), work_a)
+			work_a.Add(blockchain.CalcWork(a1[0].Bits), work_a)
+			log.Println("It comes here and then quits")
+			log.Println(work_a)
 		}
 		for i := 0; i < len(b1); i++ {
 			work_b.Add(blockchain.CalcWork(b1[i].Bits), work_b)
 		}
-		if work_a.Cmp(work_b) < 0 {
-			// traditional integer comparison doesn't work here, so use Cmp instead.
-			return true
+		// due to cmp's stquirks in big, we can't return directly
+		if work_a.Cmp(work_b) > 0 {
+			return isMoreWork // true
 		}
+		return !isMoreWork // false
 	}
-	return false
 }
 
 // checkProofOfWork verifies the header hashes into something
@@ -276,9 +289,19 @@ func CheckHeaderChain(
 		// TODO check for more work here instead of length.  This is wrong...
 		// if we've been given insufficient headers, don't reorg, but
 		// ask for more headers.
-		if moreWork(inHeaders, oldHeaders) {
-		// pretty sure this won't work without testing
-		// if attachHeight+int32(len(inHeaders)) < height {
+
+		// Check between two chains with attachHeight+int32(len(inHeaders)) and height
+		// lengths, then Compare the work associated with them.
+		// 1. check whether they really are from the same chain i.e. start from the same Header
+		// 2. Find the most recent common Block
+		// 3. Calculate work on both chains from that block
+		// 4. Return true or false based on which one is better.
+		// the two arrays are chain+inHeaders+attachHeight and the height chain itself
+		// 2,3,4 -? fn
+
+		if moreWork(inHeaders, oldHeaders, p) {
+			// pretty sure this won't work without testing
+			// if attachHeight+int32(len(inHeaders)) < height {
 			return -1, fmt.Errorf(
 				"reorg message up to height %d, but have up to %d",
 				attachHeight+int32(len(inHeaders)), height-1)
