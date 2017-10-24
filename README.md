@@ -10,12 +10,12 @@ Under development, not for use with real money.
 
 ### Installing
 
-1. Start by installing Go 
+1. Start by installing Go
  - [Go Installation](https://golang.org/doc/install)
 
 2. Set your Go variables to match your installed paths are set correctly:
 - `.../go/bin` (your install location) is in `$PATH` (Windows: Add the install location into your `PATH` System Variable)
-- `$GOPATH` is set the location of where you want lit (and other projects) to be 
+- `$GOPATH` is set the location of where you want lit (and other projects) to be
 -  optional: If you want to have packages download in a separate location than your installation add `$GOROOT` set to another location (Windows: Add )
 
 3. Download the lit project with `go get github.com/mit-dci/lit`
@@ -47,16 +47,16 @@ cd cmd/lit-af
 go build
 ```
 
-6. To run lit use: 
-(Note : Windows users can take off ./ but may need to change lit to lit.exe in the second line.) 
+6. To run lit use:
+(Note : Windows users can take off ./ but may need to change lit to lit.exe in the second line.)
 ```
-cd GOPATH/src/github.com/mit-dci/lit 
-./lit -tn3 my.testnet.node.tld
+cd GOPATH/src/github.com/mit-dci/lit
+./lit --tn3 my.testnet.node.tld
 ```
 
 ## Using Lightning
 
-Great! Now that you are all done setting up lit, you can 
+Great! Now that you are all done setting up lit, you can
 - read about the arguments for starting lit [here](#command-line-arguments)
 - read about the folders for the code and what does what [here](#folders)
 - head over to the [Walkthrough](./WALKTHROUGH.md) to create some lit nodes or
@@ -71,41 +71,33 @@ When starting lit, the following command line arguments are available
 
 #### connecting to networks:
 
--tn3 <nodeHostName>
+--tn3 <nodeHostName>
 
 connect to nodeHostName, which is a bitcoin testnet3 node.  Default port 18333
 
--reg <nodeHostName>
+--reg <nodeHostName>
 
 connect to <nodeHostName>, which is a bitcoin regtest node.  Default port 18444
 
--lt4 <nodeHostName>
+--lt4 <nodeHostName>
 
 connect to <nodeHostName>, which is a litecoin testnet4 node.  Default port 19335
 
 #### other settings
 
--ez
-
-use bloom filters unstead of downloading the whole block.  This fucntionality hasn't been maintained for a few months and may not work properly.
-
--v
+-v or --verbose
 
 Verbose; log everything to stdout as well as the lit.log file.  Lots of text.
 
--dir <folderPath>
+--dir <folderPath>
 
 use <folderPath> as the directory.  By default, saves to ~/.lit/
 
--rpcport <portNumber>
+-p or --rpcport <portNumber>
 
 listen for RPC clients on port <portNumber>.  Defaults to 8001.  Useful when you want to run multiple lit nodes on the same computer (also need the -dir option)
 
--tip <height>
-
-start synchronization of the blockchain from <height>.  (probably doesn't work right now)
-
--resync
+-r or --reSync
 
 try to re-sync to the blockchain from the height given -tip
 
