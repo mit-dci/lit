@@ -53,19 +53,22 @@ func moreWork(a, b []*wire.BlockHeader, p *coinparam.Params) bool {
 		var a1, b1 []*wire.BlockHeader
 		a1 = a[pos:]
 		b1 = b[pos:]
+		// log.Println ("Watch here")
+		// log.Println(len(a1))
+		// log.Println(len(b1))
 		work_a := big.NewInt(0) // since raw declarations don't work, lets set it to 0
 		work_b := big.NewInt(0) // since raw declarations don't work, lets set it to 0
-		log.Println(work_a)
 		for i := 0; i < len(a1); i++ {
 			work_a.Add(blockchain.CalcWork(a1[0].Bits), work_a)
-			log.Println("It comes here and then quits")
-			log.Println(work_a)
 		}
 		for i := 0; i < len(b1); i++ {
+			//log.Println(i)
 			work_b.Add(blockchain.CalcWork(b1[i].Bits), work_b)
 		}
+		log.Println("Work done by alt chains A and B are: ")
+		log.Println(work_a, work_b)
 		// due to cmp's stquirks in big, we can't return directly
-		if work_a.Cmp(work_b) > 0 {
+		if work_a.Cmp(work_b) > 0 { // if chain A does more work than B return true
 			return isMoreWork // true
 		}
 		return !isMoreWork // false
