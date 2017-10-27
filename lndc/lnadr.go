@@ -43,14 +43,15 @@ func (l *LNAdr) String() string {
 // pkh part and network part, adding the network part if needed
 func SplitAdrString(adr string) (string, string) {
 
-	if !strings.ContainsRune(adr, '@') {
-		adr += "@localhost:2448"
-	}
-	if !strings.ContainsRune(adr, ':') {
+	if !strings.ContainsRune(adr, ':') && strings.ContainsRune(adr, '@') {
 		adr += ":2448"
 	}
 
 	idHost := strings.Split(adr, "@")
+
+	if len(idHost) == 1 {
+		return idHost[0], ""
+	}
 
 	return idHost[0], idHost[1]
 }

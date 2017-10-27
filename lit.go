@@ -29,20 +29,22 @@ type config struct { // define a struct for usage with go-flags
 	Tvtchost    string `long:"tvtc" description:"Connect to Vertcoin test node."`
 	Vtchost     string `long:"vtc" description:"Connect to Vertcoin."`
 	LitHomeDir  string `long:"dir" description:"Specify Home Directory of lit as an absolute path."`
+	TrackerURL  string `long:"tracker" description:"LN address tracker URL http|https://host:port"`
 	ConfigFile  string
 
-	ReSync  bool `short:"r"long:"reSync" description:"Resync from the given tip."`
+	ReSync  bool `short:"r" long:"reSync" description:"Resync from the given tip."`
 	Tower   bool `long:"tower" description:"Watchtower: Run a watching node"`
 	Hard    bool `short:"t" long:"hard" description:"Flag to set networks."`
 	Verbose bool `short:"v" long:"verbose" description:"Set verbosity to true."`
 
-	Rpcport uint16 `short:"p"long:"rpcport" description:"Set rpcport to connect to."`
+	Rpcport uint16 `short:"p" long:"rpcport" description:"Set RPC port to connect to"`
 
 	Params *coinparam.Params
 }
 
 var (
 	defaultLitHomeDirName = os.Getenv("HOME") + "/.lit"
+	defaultTrackerURL     = "http://ni.media.mit.edu:46580"
 	defaultKeyFileName    = "privkey.hex"
 	defaultConfigFilename = "lit.conf"
 	defaultHomeDir        = os.Getenv("HOME")
@@ -159,6 +161,7 @@ func main() {
 		LitHomeDir: defaultLitHomeDirName,
 		ConfigFile: defaultConfigFile,
 		Rpcport:    defaultRpcport,
+		TrackerURL: defaultTrackerURL,
 	}
 
 	// Pre-parse the command line options to see if an alternative config
@@ -286,7 +289,7 @@ func main() {
 
 	// Setup LN node.  Activate Tower if in hard mode.
 	// give node and below file pathof lit home directoy
-	node, err := qln.NewLitNode(key, conf.LitHomeDir)
+	node, err := qln.NewLitNode(key, conf.LitHomeDir, conf.TrackerURL)
 	if err != nil {
 		log.Fatal(err)
 	}

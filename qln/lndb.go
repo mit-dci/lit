@@ -121,6 +121,9 @@ type LitNode struct {
 
 	// The port(s) in which it listens for incoming connections
 	LisIpPorts []string
+
+	// The URL from which lit attempts to resolve the LN address
+	TrackerURL string
 }
 
 type RemotePeer struct {
