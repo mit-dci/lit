@@ -230,6 +230,9 @@ func CheckHeaderChain(
 				"CheckHeaderChain: header message doesn't attach to tip or anywhere.")
 		}
 
+		// adjust attachHeight by adding the startheight
+		attachHeight += p.StartHeight
+
 		log.Printf("Header %s attaches at height %d\n",
 			inHeaders[0].BlockHash().String(), attachHeight)
 
