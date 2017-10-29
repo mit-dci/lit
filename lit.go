@@ -304,7 +304,7 @@ func main() {
 	rpcl.Node = node
 	rpcl.OffButton = make(chan bool, 1)
 
-	litrpc.RPCListen(rpcl, conf.Rpcport)
+	go litrpc.RPCListen(rpcl, conf.Rpcport)
 	litbamf.BamfListen(conf.Rpcport, conf.LitHomeDir)
 
 	<-rpcl.OffButton
