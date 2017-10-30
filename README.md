@@ -97,11 +97,6 @@ use <folderPath> as the directory.  By default, saves to ~/.lit/
 
 listen for RPC clients on port <portNumber>.  Defaults to 8001.  Useful when you want to run multiple lit nodes on the same computer (also need the -dir option)
 
--r or --reSync
-
-try to re-sync to the blockchain from the height given -tip
-
-
 ## Folders
 
 ### cmd
