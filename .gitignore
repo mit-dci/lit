@@ -14,6 +14,9 @@ setup.sh
 \#*
 .\#*
 
+#Windows Specific
+*.exe
+
 ### Vim ###
 # swap
 [._]*.s[a-v][a-z]
