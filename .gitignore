@@ -1,5 +1,6 @@
 lit
 cmd/lit-af/lit-af
+cmd/litnuc/litnuc
 headers.bin
 ln.db
 testkey.hex
