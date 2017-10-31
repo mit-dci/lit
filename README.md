@@ -71,83 +71,39 @@ When starting lit, the following command line arguments are available
 
 #### connecting to networks:
 
---tn3 <nodeHostName>
+| Arguments                   | Details                                                      | Default Port  |
+| --------------------------- |--------------------------------------------------------------| ------------- |
+| `--tn3 <nodeHostName>`      | connect to `nodeHostName`, which is a bitcoin testnet3 node. | 18333         |
+| `--reg <nodeHostName>`      | connect to `nodeHostName`, which is a bitcoin regtest node.  | 18444         |
+| `--lt4 <nodeHostName>`      | connect to `nodeHostName`, which is a litecoin testnet4 node.| 19335         |
 
-connect to nodeHostName, which is a bitcoin testnet3 node.  Default port 18333
+#### other settings:
 
---reg <nodeHostName>
-
-connect to <nodeHostName>, which is a bitcoin regtest node.  Default port 18444
-
---lt4 <nodeHostName>
-
-connect to <nodeHostName>, which is a litecoin testnet4 node.  Default port 19335
-
-#### other settings
-
--v or --verbose
-
-Verbose; log everything to stdout as well as the lit.log file.  Lots of text.
-
---dir <folderPath>
-
-use <folderPath> as the directory.  By default, saves to ~/.lit/
-
--p or --rpcport <portNumber>
-
-listen for RPC clients on port <portNumber>.  Defaults to 8001.  Useful when you want to run multiple lit nodes on the same computer (also need the -dir option)
-
--r or --reSync
-
-try to re-sync to the blockchain from the height given -tip
-
+| Arguments                   | Details                                                      |
+| --------------------------- |--------------------------------------------------------------|
+| `-v` or `--verbose`         | Verbose; log everything to stdout as well as the lit.log file.  Lots of text.|
+| `--dir <folderPath>`        | use `folderPath` as the directory.  By default, saves to `~/.lit/` |
+| `-p` or `--rpcport <portNumber>` | listen for RPC clients on port `portNumber`.  Defaults to `8001`.  Useful when you want to run multiple lit nodes on the same computer (also need the `--dir` option) |
+| `-r` or `--reSync`          | try to re-sync to the blockchain from the height given `-tip` |
 
 ## Folders
 
-### cmd
-has some rpc client code to interact with the lit node.  Not much there yet
-
-### elkrem
-a hash-tree for storing log(n) items instead of n
-
-### litbamf
-Lightning Network Browser Actuated Multi-Functionality -- web gui for lit
-
-### litrpc
-websocket based RPC connection
-
-### lndc
-lightning network data connection -- send encrypted / authenticated messages between nodes
-
-### lnutil
-some widely used utility functions
-
-### portxo
-portable utxo format, exchangable between node and base wallet (or between wallets).  Should make this into a BIP once it's more stable.
-
-### powless
-Introduces a web API chainhook in addition to the uspv one
-
-### qln
-A quick channel implementation with databases.  Doesn't do multihop yet.
-
-### sig64
-Library to make signatures 64 bytes instead of 71 or 72 or something
-
-### test
-integration tests
-
-### uspv
-deals with the network layer, sending network messages and filtering what to hand over to wallit
-
-### wallit
-deals with storing and retreiving utxos, creating and signing transactions
-
-### watchtower
-Unlinkable outsourcing of channel monitoring
-
-
-
+| Folder Name  | Details                                                                                                                                  |
+|:-------------|:-----------------------------------------------------------------------------------------------------------------------------------------|
+| `cmd`        | Has some rpc client code to interact with the lit node.  Not much there yet                                                              |
+| `elkrem`     | A hash-tree for storing `log(n)` items instead of n                                                                                      |
+| `litbamf`    | Lightning Network Browser Actuated Multi-Functionality -- web gui for lit                                                                |
+| `litrpc`     | Websocket based RPC connection                                                                                                           |
+| `lndc`       | Lightning network data connection -- send encrypted / authenticated messages between nodes                                               |
+| `lnutil`     | Some widely used utility functions                                                                                                       |
+| `portxo`     | Portable utxo format, exchangable between node and base wallet (or between wallets).  Should make this into a BIP once it's more stable. |
+| `powless`    | Introduces a web API chainhook in addition to the uspv one                                                                               |
+| `qln`        | A quick channel implementation with databases.  Doesn't do multihop yet.                                                                 |
+| `sig64`      | Library to make signatures 64 bytes instead of 71 or 72 or something                                                                     |
+| `test`       | Integration tests                                                                                                                        |
+| `uspv`       | Deals with the network layer, sending network messages and filtering what to hand over to `wallit`                                       |
+| `wallit`     | Deals with storing and retreiving utxos, creating and signing transactions                                                               |
+| `watchtower` | Unlinkable outsourcing of channel monitoring                                                                                             |
 
 ### Hierarchy of packages
 
