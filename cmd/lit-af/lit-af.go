@@ -63,7 +63,8 @@ type Command struct {
 func setConfig(lc *litAfClient) {
 	hostptr := flag.String("node", "127.0.0.1", "host to connect to")
 	portptr := flag.Int("p", 8001, "port to connect to")
-	dirptr := flag.String("dir", filepath.Join(os.Getenv("HOME"), litHomeDirName), "directory to save settings")
+	dirptr := flag.String("dir", filepath.Join(os.Getenv("HOME"), litHomeDirName),
+		"directory to save settings")
 
 	flag.Parse()
 
