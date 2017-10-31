@@ -32,7 +32,6 @@ type config struct { // define a struct for usage with go-flags
 	TrackerURL  string `long:"tracker" description:"LN address tracker URL http|https://host:port"`
 	ConfigFile  string
 
-	ReSync  bool `short:"r" long:"reSync" description:"Resync from the given tip."`
 	Tower   bool `long:"tower" description:"Watchtower: Run a watching node"`
 	Hard    bool `short:"t" long:"hard" description:"Flag to set networks."`
 	Verbose bool `short:"v" long:"verbose" description:"Set verbosity to true."`
@@ -82,7 +81,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 			conf.Reghost = conf.Reghost + ":" + p.DefaultPort
 		}
 		fmt.Printf("reg: %s\n", conf.Reghost)
-		err = node.LinkBaseWallet(key, 120, conf.ReSync, conf.Tower, conf.Reghost, p)
+		err = node.LinkBaseWallet(key, 120, conf.Tower, conf.Reghost, p)
 		if err != nil {
 			return err
 		}
@@ -94,7 +93,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 			conf.Tn3host = conf.Tn3host + ":" + p.DefaultPort
 		}
 		err = node.LinkBaseWallet(
-			key, 1210000, conf.ReSync, conf.Tower,
+			key, 1210000, conf.Tower,
 			conf.Tn3host, p)
 		if err != nil {
 			return err
@@ -106,7 +105,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 		if !strings.Contains(conf.Litereghost, ":") {
 			conf.Litereghost = conf.Litereghost + ":" + p.DefaultPort
 		}
-		err = node.LinkBaseWallet(key, 120, conf.ReSync, conf.Tower, conf.Litereghost, p)
+		err = node.LinkBaseWallet(key, 120, conf.Tower, conf.Litereghost, p)
 		if err != nil {
 			return err
 		}
@@ -119,7 +118,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 			conf.Lt4host = conf.Lt4host + ":" + p.DefaultPort
 		}
 		err = node.LinkBaseWallet(
-			key, p.StartHeight, conf.ReSync, conf.Tower,
+			key, p.StartHeight, conf.Tower,
 			conf.Lt4host, p)
 		if err != nil {
 			return err
@@ -132,7 +131,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 			conf.Tvtchost = conf.Tvtchost + ":" + p.DefaultPort
 		}
 		err = node.LinkBaseWallet(
-			key, 0, conf.ReSync, conf.Tower,
+			key, 0, conf.Tower,
 			conf.Tvtchost, p)
 		if err != nil {
 			return err
@@ -145,7 +144,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 			conf.Vtchost = conf.Vtchost + ":" + p.DefaultPort
 		}
 		err = node.LinkBaseWallet(
-			key, p.StartHeight, conf.ReSync, conf.Tower,
+			key, p.StartHeight, conf.Tower,
 			conf.Vtchost, p)
 		if err != nil {
 			return err
