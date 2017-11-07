@@ -10,7 +10,7 @@ import (
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
-	"github.com/mit-dci/lit/uspv"
+	"github.com/mit-dci/lit/powless"
 )
 
 func NewWallit(
@@ -36,8 +36,11 @@ func NewWallit(
 	// so we have to open the db first, then turn on the chainhook, THEN tell
 	// chainhook about all our addresses.
 
-	u := new(uspv.SPVCon)
-	//	u := new(powless.APILink)
+	// use uSPV for chainhook
+	//	u := new(uspv.SPVCon)
+	// use powless for chainhook
+	u := new(powless.APILink)
+
 	w.Hook = u
 
 	wallitdbname := filepath.Join(wallitpath, "utxo.db")

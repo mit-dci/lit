@@ -13,9 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/adiabat/btcd/chaincfg"
 	"github.com/adiabat/btcd/wire"
-	"github.com/adiabat/btcutil"
+	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
 )
 
@@ -95,12 +94,12 @@ type APILink struct {
 	// time based polling
 	dirtybool bool
 
-	p *chaincfg.Params
+	p *coinparam.Params
 }
 
 // Start starts the APIlink
 func (a *APILink) Start(
-	startHeight int32, host, path string, params *chaincfg.Params) (
+	startHeight int32, host, path string, params *coinparam.Params) (
 	chan lnutil.TxAndHeight, chan int32, error) {
 
 	// later, use params to detect which api to connect to
@@ -194,11 +193,8 @@ func (a *APILink) GetAdrTxos() error {
 
 	a.TrackingAdrsMtx.Lock()
 	for adr160, _ := range a.TrackingAdrs {
-		adr58, err := btcutil.NewAddressPubKeyHash(adr160[:], a.p)
-		if err != nil {
-			return err
-		}
-		adrlist += adr58.String()
+		adr58 := lnutil.OldAddressFromPKH(adr160, a.p.PubKeyHashAddrID)
+		adrlist += adr58
 		adrlist += ","
 	}
 	a.TrackingAdrsMtx.Unlock()
