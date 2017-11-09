@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -182,6 +183,23 @@ type RawTxResponse struct {
 	RawTx string
 }
 
+func (a *APILink) GetVAdrTxos() error {
+
+	apitxourl := "https://tvtc.vertcoin.org/addressTxosSince/"
+
+	var urls []string
+	a.TrackingAdrsMtx.Lock()
+	for adr160, _ := range a.TrackingAdrs {
+		adr58 := lnutil.OldAddressFromPKH(adr160, a.p.PubKeyHashAddrID)
+		urls = append(urls, fmt.Sprintf("%s%d/%s", apitxourl, a.height, adr58))
+	}
+	a.TrackingAdrsMtx.Unlock()
+
+	// make an API call for every adr in adrs
+
+	return nil
+}
+
 // GetAdrTxos
 // ...use insight api.  at least that's open source, can run yourself, seems to have
 // some dev activity behind it.
@@ -242,6 +260,46 @@ func (a *APILink) GetAdrTxos() error {
 		// don't know what order we get these in, so update APILink height at the end
 		// I think it's OK to do this?  Seems OK but haven't seen this use of defer()
 		defer a.UpdateHeight(adrUtxo.Height)
+	}
+
+	return nil
+}
+
+func (a *APILink) GetVOPTxs() error {
+
+	apitxourl := "https://vtc.xchan.gr/new/outpointSpend/"
+
+	var oplist []wire.OutPoint
+
+	// copy registered ops here to minimize time mutex is locked
+	a.TrackingOPsMtx.Lock()
+	for op, _ := range a.TrackingOPs {
+		oplist = append(oplist, op)
+	}
+	a.TrackingOPsMtx.Unlock()
+
+	// need to query each txid with a different http request
+	for _, op := range oplist {
+		fmt.Printf("asking for %s\n", op.String())
+		// get full tx info for the outpoint's tx
+		// (if we have 2 outpoints with the same txid we query twice...)
+		opstring := op.String()
+		opstring = strings.Replace(opstring, ";", "/", 1)
+		response, err := http.Get(apitxourl + opstring)
+		if err != nil {
+			return err
+		}
+
+		var txr TxResponse
+		// parse the response to get the spending txid
+		err = json.NewDecoder(response.Body).Decode(&txr)
+		if err != nil {
+			fmt.Printf("json decode error; op %s not found\n", op.String())
+			continue
+		}
+
+		// don't need per-txout check here; the outpoint itself is spent
+
 	}
 
 	return nil
