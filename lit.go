@@ -111,7 +111,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 			return err
 		}
 	}
-
+	
 	// try litecoin testnet4
 	if conf.Lt4host != "" {
 		p := &coinparam.LiteCoinTestNet4Params

@@ -2,17 +2,88 @@ package uspv
 
 import (
 	"bytes"
+	"encoding/json"
 	"io/ioutil"
 	"log"
 	"net"
 	"os"
+	"strconv"
 
 	"github.com/adiabat/btcd/wire"
 )
 
+func (s *SPVCon) CreatePeerFile() error {
+	if _, err := os.Stat(s.nodeFile); os.IsNotExist(err) {
+		os.Mkdir("./peers", 0700)
+		crfile, err := os.Create(s.nodeFile)
+		crfile.Close()
+		if err != nil {
+			log.Println("File creation error. Exiting")
+			return err
+		}
+		return nil
+	}
+	return nil
+}
+
+func (s *SPVCon) GetNodes() ([]wire.NetAddress, error) {
+	addresses := make([]wire.NetAddress, 3)
+	raw, err := ioutil.ReadFile(s.nodeFile)
+	if err != nil {
+		return nil, err
+	}
+	json.Unmarshal(raw, &addresses)
+	return addresses, nil
+}
+
 // Connect dials out and connects to full nodes.
 func (s *SPVCon) Connect(remoteNode string) error {
+	log.Println(s.nodeFile)
 	var err error
+	flag := 0
+	if len(s.Param.DNSSeeds) != 0 {
+		if remoteNode[:4] == "auto" || (remoteNode[:1] == "1" && len(remoteNode) == 7) {
+			if _, errNotExists := os.Stat(s.nodeFile); os.IsNotExist(errNotExists) {
+				log.Println("Peers file doesn't exist") // set flag to 1 sicne peers doesn't exist
+			} else {
+				readvalues, err := s.GetNodes()
+				if err != nil {
+					return err
+				}
+				log.Println(readvalues)
+				for _, ve := range readvalues {
+					// do what we want with the IPs, which is to try connecting to them.
+					log.Println(ve.IP)
+					if ve.IP.String() != "<nil>" {
+						if strconv.Itoa(int(ve.Port)) == s.Param.DefaultPort { // to handle different protocols
+							addrs, err := net.LookupHost(ve.IP.String())
+							if err != nil {
+								log.Println("Fatal Error while connecting to remote node. Trying again.")
+								continue
+							}
+							log.Println(addrs)
+							remoteNode = ve.IP.String() + ":" + s.Param.DefaultPort
+							flag = 1
+							break
+						}
+					}
+				}
+			}
+			if flag != 1 {
+				for i := 0; i < len(s.Param.DNSSeeds); i++ {
+					addrs, err := net.LookupHost(s.Param.DNSSeeds[i])
+					if err != nil {
+						log.Println("Fatal Error while connecting to remote node. Trying again.")
+						continue
+					}
+					remoteNode = addrs[i] + ":" + s.Param.DefaultPort
+					break
+				}
+			}
+		}
+	} else {
+		log.Println("There are no default nodes for the mode you specified")
+	}
 	// open TCP connection
 	s.con, err = net.Dial("tcp", remoteNode)
 	if err != nil {
@@ -114,18 +185,18 @@ func (s *SPVCon) openHeaderFile(hfn string) error {
 		if os.IsNotExist(err) {
 			var b bytes.Buffer
 			// if StartHeader is defined, start with hardcoded height
-            if s.Param.StartHeight != 0 {
-              hdr := s.Param.StartHeader
-	          _, err := b.Write(hdr[:])
-	          if err != nil {
-	           return err
-	          }
-            } else {
-	            err = s.Param.GenesisBlock.Header.Serialize(&b)
-	            if err != nil {
-		            return err
-	            }
-            }
+			if s.Param.StartHeight != 0 {
+				hdr := s.Param.StartHeader
+				_, err := b.Write(hdr[:])
+				if err != nil {
+					return err
+				}
+			} else {
+				err = s.Param.GenesisBlock.Header.Serialize(&b)
+				if err != nil {
+					return err
+				}
+			}
 			err = ioutil.WriteFile(hfn, b.Bytes(), 0600)
 			if err != nil {
 				return err
@@ -135,10 +206,10 @@ func (s *SPVCon) openHeaderFile(hfn string) error {
 			log.Printf("created hardcoded genesis header at %s\n", hfn)
 		}
 	}
-  
-    if s.Param.StartHeight != 0 {
-        s.headerStartHeight = s.Param.StartHeight
-    }
+
+	if s.Param.StartHeight != 0 {
+		s.headerStartHeight = s.Param.StartHeight
+	}
 
 	s.headerFile, err = os.OpenFile(hfn, os.O_RDWR, 0600)
 	if err != nil {

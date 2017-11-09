@@ -1,7 +1,10 @@
 package uspv
 
 import (
+	"encoding/json"
 	"log"
+	"os"
+	"time"
 
 	"github.com/adiabat/btcd/wire"
 	"github.com/adiabat/btcutil/bloom"
@@ -25,8 +28,12 @@ func (s *SPVCon) incomingMessageHandler() {
 			s.remoteVersion = uint32(m.ProtocolVersion) // weird cast! bug?
 		case *wire.MsgVerAck:
 			log.Printf("Got verack.  Whatever.\n")
+		case *wire.MsgGetAddr: // what case is this?
+			log.Printf("Got getaddr. Do nothing since we aren't a full node.")
+			// read this info and store somewhere.
 		case *wire.MsgAddr:
 			log.Printf("got %d addresses.\n", len(m.AddrList))
+			s.AddrListHandler(m)
 		case *wire.MsgPing:
 			// log.Printf("Got a ping message.  We should pong back or they will kick us off.")
 			go s.PongBack(m.Nonce)
@@ -176,7 +183,7 @@ func (s *SPVCon) TxHandler(tx *wire.MsgTx) {
 	//	}
 	//	if len(dubs) > 0 {
 	//		for i, dub := range dubs {
-	//			fmt.Printf("dub %d known tx %s and new tx %s are exclusive!!!\n",
+	//			log.Printf("dub %d known tx %s and new tx %s are exclusive!!!\n",
 	//				i, dub.String(), m.TxSha().String())
 	//		}
 	//	}
@@ -245,6 +252,140 @@ func (s *SPVCon) InvHandler(m *wire.MsgInv) {
 			}
 		}
 	}
+}
+
+func (s *SPVCon) AddrListHandler(m *wire.MsgAddr) {
+	err := s.CreatePeerFile()
+	if err != nil {
+		log.Println("Error while trying to create a file")
+	}
+
+	storedAddrs, err := s.GetNodes()
+	if err != nil {
+		log.Printf("AddrListHandler error: %s", err.Error())
+		return
+	}
+
+	// log.Println(readvalues)
+
+	/*
+		don't need any of this - storedAddrs has all the data we need,
+		and reformatting it into arrays doesn't help
+
+
+		   	flag := 0
+		   	var ips [100]string
+		   	var readAddresses [150000]wire.NetAddress // hopefully this doesn't overshoot
+		   	for i, vals := range readvalues {
+		   		// do what we want with the IPs, which is to try connecting to them.
+		   		readAddresses[i] = vals
+		   		ips[i] = vals.IP.String()
+		   	}
+	*/
+	var dontSaveThis bool
+	// log.Println(readAddresses) // readAddresses has all the addressses read from the file. We just have to create a new file if needed.
+	log.Printf("Start IP List")
+	var a wire.NetAddress // limit to 125 like bitcoind?
+	// refer https://github.com/btcsuite/btcd/blob/master/wire/netaddress.go for *wire.NetAddr struct
+	for i, addresses := range m.AddrList {
+		log.Printf("IP: %s", addresses.IP) //remember to comment this stuff
+		now := time.Now()
+		if addresses.Timestamp.After(now.Add(time.Minute * 10)) {
+			addresses.Timestamp = now.Add(-1 * time.Hour * 24 * 5)
+		}
+		log.Printf("Timestamp: %s", addresses.Timestamp) //remember to comment this stuff
+		for _, storedAddr := range storedAddrs {         // for a list of all IPs in the file
+			//			if addr == "<nil>" { // if its nil, stop execution
+			//			if storedAddr.IP.IsUnspecified() {
+			//				flag = 0
+			//				break
+			//			}
+			//			if addr == addresses.IP.String() { // is the address is already present in the file, ignore
+			if storedAddr.IP.Equal(addresses.IP) {
+				dontSaveThis = true
+				break
+			}
+		}
+		// log.Println("The elusive flag")
+		// log.Println(flag)
+
+		/* can make this into a function;
+		it writes an IP address to the file
+		*/
+
+		if !dontSaveThis {
+			// Write the stuff to the file
+			a = *addresses
+			// attach a to readAddresses
+
+			/* not sure what this means. 99+i?  why start at 99?
+
+			instead, just append to the storedAddrs slice
+
+			*/
+			storedAddrs = append(storedAddrs, a)
+			for j, values := range storedAddrs {
+
+				dest, err := json.Marshal(values)
+				if err != nil {
+					log.Println("Converting to a JSON object failed")
+				}
+				if j == 0 {
+					errdel := os.Remove(s.nodeFile)
+					if errdel != nil {
+						log.Println("File deletion error. Exiting")
+						break
+					}
+					crfile, errcreate := os.Create(s.nodeFile)
+					if errcreate != nil {
+						log.Println("File creation error. Exiting")
+						break
+					}
+					crfile.Close()
+				}
+				file, err2 := os.OpenFile(s.nodeFile, os.O_APPEND|os.O_WRONLY, 0644)
+				if err2 != nil {
+					log.Println(err2)
+				}
+				// defer file.Close()
+
+				if j == 0 {
+					_, rnd := file.WriteString("[")
+					if rnd != nil {
+						log.Println("Saving starting character failed. Quitting")
+						break
+					}
+				}
+
+				if values.IP.String() != "<nil>" {
+					_, err1 := file.WriteString(string(dest))
+
+					if err1 != nil {
+						log.Println("Appending to a file failed")
+					}
+
+					if j < 99+i {
+						_, err3 := file.WriteString(",\n")
+						if err3 != nil {
+							log.Println("Failed to write Newline")
+						}
+					}
+					if j == 99+i {
+						_, rnd1 := file.WriteString("\n]")
+						if rnd1 != nil {
+							log.Println("Saving ending characters failed. Quitting")
+							break
+						}
+					}
+				}
+				file.Close()
+			}
+			// log.Println(string(json.Marshal(a[0].IP)))
+		} else {
+			break
+		}
+	}
+	log.Printf("end ip list")
 }
 
 func (s *SPVCon) PongBack(nonce uint64) {
