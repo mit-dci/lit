@@ -54,7 +54,7 @@ func (s *SPVCon) Connect(remoteNode string) error {
 					// do what we want with the IPs, which is to try connecting to them.
 					if ve.IP.String() != "<nil>" {
 						if strconv.Itoa(int(ve.Port)) == s.Param.DefaultPort { // to handle different protocols
-							_., err := net.LookupHost(ve.IP.String())
+							_, err := net.LookupHost(ve.IP.String())
 							if err != nil {
 								log.Println("Fatal Error while connecting to remote node. Trying again.")
 								continue
