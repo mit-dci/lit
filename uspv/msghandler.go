@@ -201,8 +201,9 @@ func (s *SPVCon) GetDataHandler(m *wire.MsgGetData) {
 		if thing.Type == wire.InvTypeWitnessTx || thing.Type == wire.InvTypeTx {
 			tx, ok := s.TxMap[thing.Hash]
 			if !ok || tx == nil {
-				log.Printf("tx %s requested by we don't have it\n",
+				log.Printf("tx %s requested but we don't have it\n",
 					thing.Hash.String())
+				continue
 			}
 			s.outMsgQueue <- tx
 			sent++
