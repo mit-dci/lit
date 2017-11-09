@@ -66,7 +66,6 @@ func newConfigParser(conf *config, options flags.Options) *flags.Parser {
 	parser := flags.NewParser(conf, options)
 	return parser
 }
-
 func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	// for now, wallets are linked to the litnode on startup, and
 	// can't appear / disappear while it's running.  Later
@@ -78,9 +77,6 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	// try regtest
 	if conf.Reghost != "" {
 		p := &coinparam.RegressionNetParams
-		if !strings.Contains(conf.Reghost, ":") {
-			conf.Reghost = conf.Reghost + ":" + p.DefaultPort
-		}
 		fmt.Printf("reg: %s\n", conf.Reghost)
 		err = node.LinkBaseWallet(key, 120, conf.ReSync, conf.Tower, conf.Reghost, p)
 		if err != nil {
@@ -90,9 +86,6 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	// try testnet3
 	if conf.Tn3host != "" {
 		p := &coinparam.TestNet3Params
-		if !strings.Contains(conf.Tn3host, ":") {
-			conf.Tn3host = conf.Tn3host + ":" + p.DefaultPort
-		}
 		err = node.LinkBaseWallet(
 			key, 1210000, conf.ReSync, conf.Tower,
 			conf.Tn3host, p)
@@ -103,9 +96,6 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	// try litecoin regtest
 	if conf.Litereghost != "" {
 		p := &coinparam.LiteRegNetParams
-		if !strings.Contains(conf.Litereghost, ":") {
-			conf.Litereghost = conf.Litereghost + ":" + p.DefaultPort
-		}
 		err = node.LinkBaseWallet(key, 120, conf.ReSync, conf.Tower, conf.Litereghost, p)
 		if err != nil {
 			return err
@@ -115,9 +105,6 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	// try litecoin testnet4
 	if conf.Lt4host != "" {
 		p := &coinparam.LiteCoinTestNet4Params
-		if !strings.Contains(conf.Lt4host, ":") {
-			conf.Lt4host = conf.Lt4host + ":" + p.DefaultPort
-		}
 		err = node.LinkBaseWallet(
 			key, p.StartHeight, conf.ReSync, conf.Tower,
 			conf.Lt4host, p)
@@ -128,9 +115,6 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	// try vertcoin testnet
 	if conf.Tvtchost != "" {
 		p := &coinparam.VertcoinTestNetParams
-		if !strings.Contains(conf.Tvtchost, ":") {
-			conf.Tvtchost = conf.Tvtchost + ":" + p.DefaultPort
-		}
 		err = node.LinkBaseWallet(
 			key, 0, conf.ReSync, conf.Tower,
 			conf.Tvtchost, p)
@@ -141,9 +125,6 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	// try vertcoin mainnet
 	if conf.Vtchost != "" {
 		p := &coinparam.VertcoinParams
-		if !strings.Contains(conf.Vtchost, ":") {
-			conf.Vtchost = conf.Vtchost + ":" + p.DefaultPort
-		}
 		err = node.LinkBaseWallet(
 			key, p.StartHeight, conf.ReSync, conf.Tower,
 			conf.Vtchost, p)
