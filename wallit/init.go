@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/adiabat/btcd/wire"
 	"github.com/adiabat/btcutil/hdkeychain"
@@ -11,6 +12,7 @@ import (
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/powless"
+	"github.com/mit-dci/lit/uspv"
 )
 
 func NewWallit(
@@ -36,12 +38,15 @@ func NewWallit(
 	// so we have to open the db first, then turn on the chainhook, THEN tell
 	// chainhook about all our addresses.
 
-	// use uSPV for chainhook
-	//	u := new(uspv.SPVCon)
-	// use powless for chainhook
-	u := new(powless.APILink)
+	// use powless for chainhook if the host string has https in it
+	// this is a bit hacky for now
 
-	w.Hook = u
+	if strings.Contains(spvhost, "https") {
+		w.Hook = new(powless.APILink)
+	} else {
+		// no https; use uSPV for chainhook
+		w.Hook = new(uspv.SPVCon)
+	}
 
 	wallitdbname := filepath.Join(wallitpath, "utxo.db")
 	err = w.OpenDB(wallitdbname)
