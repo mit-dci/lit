@@ -217,17 +217,14 @@ func main() {
 		}
 	}
 
-	// this seems to do nothing.
-	/*
-		// Parse command line options again to ensure they take precedence.
-		remainingArgs, err := parser.Parse()
-		if err != nil {
-			if e, ok := err.(*flags.Error); !ok || e.Type != flags.ErrHelp {
-				// fmt.Fprintln(os.Stderr, usageMessage)
-			}
-			log.Fatal(err)
-		}
-	*/
+	// Parse command line options again to ensure they take precedence.
+	_, err = parser.Parse()
+	if err != nil {
+		// huh?
+		//		if e, ok := err.(*flags.Error); !ok || e.Type != flags.ErrHelp {
+		//		}
+		log.Fatal(err)
+	}
 
 	if configFileError != nil {
 		fmt.Printf("%s\n", configFileError.Error())
