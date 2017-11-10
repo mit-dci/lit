@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -138,6 +139,9 @@ func (a *APILink) ClockLoop() {
 		time.Sleep(time.Second * 5)
 
 		// some kind of long range refresh for blocks...?
+		// should get dirty every 5 min?  Or better; there should be an API
+		// call to ask about the most recent block; then can poll that.
+		// maybe also link that to reorgs...?
 
 	}
 
@@ -183,6 +187,12 @@ type RawTxResponse struct {
 	RawTx string
 }
 
+type VAdrUtxoResponse struct {
+	Height  int32
+	Spender string
+	Tx      string
+}
+
 func (a *APILink) GetVAdrTxos() error {
 
 	apitxourl := "https://tvtc.vertcoin.org/addressTxosSince/"
@@ -191,14 +201,57 @@ func (a *APILink) GetVAdrTxos() error {
 	a.TrackingAdrsMtx.Lock()
 	for adr160, _ := range a.TrackingAdrs {
 		adr58 := lnutil.OldAddressFromPKH(adr160, a.p.PubKeyHashAddrID)
-		urls = append(urls, fmt.Sprintf("%s%d/%s", apitxourl, a.height, adr58))
+		urls = append(urls,
+			fmt.Sprintf("%s%d/%s%s", apitxourl, a.height, adr58, "?raw=1"))
 	}
 	a.TrackingAdrsMtx.Unlock()
 
 	// make an API call for every adr in adrs
-	response, err := http.Get(apitxourl + "/addrs/" + adrlist)
-	if err != nil {
-		return err
+	// then grab the tx hex, decode and send up to the wallit
+	for _, url := range urls {
+		response, err := http.Get(url)
+		if err != nil {
+			return err
+		}
+
+		bd, err := ioutil.ReadAll(response.Body)
+		if err != nil {
+			return err
+		}
+		log.Printf(string(bd))
+
+		txojson := new(VAdrUtxoResponse)
+
+		err = json.NewDecoder(response.Body).Decode(txojson)
+		if err != nil {
+			return err
+		}
+
+		// if there's some text in the spender field, skip this as it's already gone
+		// also, really, this shouldn't be returned by the API at all because
+		// who cares how much money we used to have.
+		if len(txojson.Spender) > 32 {
+			continue
+		}
+
+		txBytes, err := hex.DecodeString(txojson.Tx)
+		if err != nil {
+			return err
+		}
+		buf := bytes.NewBuffer(txBytes)
+		tx := wire.NewMsgTx()
+		err = tx.Deserialize(buf)
+		if err != nil {
+			return err
+		}
+
+		var txah lnutil.TxAndHeight
+		txah.Height = int32(txojson.Height)
+		txah.Tx = tx
+
+		fmt.Printf("tx %s at height %d\n", txah.Tx.TxHash().String(), txah.Height)
+		// send the tx and height back up to the wallit
+		a.TxUpToWallit <- txah
 	}
 
 	return nil
