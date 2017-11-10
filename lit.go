@@ -174,25 +174,24 @@ func main() {
 	parser := newConfigParser(&conf, flags.Default) // Single line command to read all the CLI params passed
 
 	// creates a directory in the absolute sense
-	if _, err := os.Stat(preconf.LitHomeDir); os.IsNotExist(err) {
+	_, err = os.Stat(preconf.LitHomeDir)
+	if os.IsNotExist(err) {
 		os.Mkdir(preconf.LitHomeDir, 0700)
 		fmt.Println("Creating a new config file")
-		err1 := createDefaultConfigFile(preconf.LitHomeDir) // Source of error
-		if err1 != nil {
+		err := createDefaultConfigFile(preconf.LitHomeDir) // Source of error
+		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error creating a "+
 				"default config file: %v\n", err)
 		}
 	}
 
-	if err != nil {
-		fmt.Println("Error while creating a directory")
-		fmt.Println(err)
-	}
+	// seems wrong / does nothing?
+	//	if err != nil {
+	//		fmt.Println("Error while creating a directory")
+	//		fmt.Println(err)
+	//	}
 
 	if !(preconf.ConfigFile != defaultConfigFile) {
-		// passing works fine.
-		// fmt.Println("Watch out")
-		// fmt.Println(filepath.Join(preconf.LitHomeDir))
 		if _, err := os.Stat(filepath.Join(filepath.Join(preconf.LitHomeDir), "lit.conf")); os.IsNotExist(err) {
 			if err != nil {
 				fmt.Println(err)
@@ -205,38 +204,43 @@ func main() {
 			}
 		}
 		preconf.ConfigFile = filepath.Join(filepath.Join(preconf.LitHomeDir), "lit.conf")
-		err := flags.NewIniParser(parser).ParseFile(preconf.ConfigFile) // lets parse the config file provided, if any
+		// lets parse the config file provided, if any
+		err := flags.NewIniParser(parser).ParseFile(preconf.ConfigFile)
 		if err != nil {
-			if _, ok := err.(*os.PathError); !ok {
-				fmt.Fprintf(os.Stderr, "Error parsing config "+
-					"file: %v\n", err)
-				// fmt.Fprintln(os.Stderr, usageMessage)
+			_, ok := err.(*os.PathError)
+			if !ok {
+				fmt.Fprintf(os.Stderr, "Error parsing config file: %s\n",
+					err.Error())
 				log.Fatal(err)
-				// return nil, nil, err
 			}
 			configFileError = err
 		}
 	}
 
-	// Parse command line options again to ensure they take precedence.
-	remainingArgs, err := parser.Parse() // no extra work, free overloading.
-	if err != nil {
-		if e, ok := err.(*flags.Error); !ok || e.Type != flags.ErrHelp {
-			// fmt.Fprintln(os.Stderr, usageMessage)
+	// this seems to do nothing.
+	/*
+		// Parse command line options again to ensure they take precedence.
+		remainingArgs, err := parser.Parse()
+		if err != nil {
+			if e, ok := err.(*flags.Error); !ok || e.Type != flags.ErrHelp {
+				// fmt.Fprintln(os.Stderr, usageMessage)
+			}
+			log.Fatal(err)
 		}
-		log.Fatal(err)
-		// return nil, nil, err
-	}
+	*/
 
 	if configFileError != nil {
-		fmt.Printf("%v", configFileError)
-	}
-
-	if remainingArgs != nil {
-		//fmt.Printf("%v", remainingArgs)
+		fmt.Printf("%s\n", configFileError.Error())
 	}
 
 	logFilePath := filepath.Join(conf.LitHomeDir, "lit.log")
+
+	// also does nothing
+	/*
+		if remainingArgs != nil {
+			//fmt.Printf("%v", remainingArgs)
+		}
+	*/
 
 	logfile, err := os.OpenFile(logFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	defer logfile.Close()
