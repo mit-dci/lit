@@ -123,11 +123,11 @@ func (a *APILink) ClockLoop() {
 
 	for {
 		if a.dirtybool {
-			err := a.GetAdrTxos()
+			err := a.GetVAdrTxos()
 			if err != nil {
 				log.Printf(err.Error())
 			}
-			err = a.GetOPTxs()
+			err = a.GetVOPTxs()
 			if err != nil {
 				log.Printf(err.Error())
 			}
@@ -196,6 +196,10 @@ func (a *APILink) GetVAdrTxos() error {
 	a.TrackingAdrsMtx.Unlock()
 
 	// make an API call for every adr in adrs
+	response, err := http.Get(apitxourl + "/addrs/" + adrlist)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

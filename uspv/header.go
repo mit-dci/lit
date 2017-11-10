@@ -266,7 +266,9 @@ func CheckHeaderChain(
 				int(height)+i, hdr.BlockHash().String(), err.Error())
 		}
 
-		if hdr.Bits != rightBits {
+		// vertcoin diff adjustment not yet implemented
+		// TODO - get rid of coin specific workaround
+		if hdr.Bits != rightBits && (p.Name != "vtctest" && p.Name != "vtc") {
 			return 0, fmt.Errorf("Block %d %s incorrect difficuly.  Read %x, expect %x",
 				int(height)+i, hdr.BlockHash().String(), hdr.Bits, rightBits)
 		}

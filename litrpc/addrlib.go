@@ -5,9 +5,9 @@ import (
 	"strings"
 
 	"github.com/adiabat/bech32"
-	"github.com/adiabat/btcd/chaincfg"
-	"github.com/adiabat/btcd/txscript"
-	"github.com/adiabat/btcutil"
+	"github.com/adiabat/btcutil/base58"
+	"github.com/mit-dci/lit/coinparam"
+	"github.com/mit-dci/lit/lnutil"
 )
 
 /*
@@ -33,12 +33,14 @@ func AdrStringToOutscript(adr string) ([]byte, error) {
 
 		// could work on adding more old-style addresses; for now use new bech32
 		// addresses for multi-wallet / segwit sends.
-		adr, err := btcutil.DecodeAddress(adr, &chaincfg.TestNet3Params)
+
+		// ignore netID here
+		decoded, _, err := base58.CheckDecode(adr)
 		if err != nil {
 			return nil, err
 		}
 
-		outScript, err = txscript.PayToAddrScript(adr)
+		outScript, err = lnutil.PayToPubKeyHashScript(decoded)
 		if err != nil {
 			return nil, err
 		}
@@ -62,12 +64,12 @@ func CoinTypeFromAdr(adr string) uint32 {
 		// guess testnet; could be regtest
 		return 1
 	}
-  if strings.HasPrefix(adr, "V") {
-    return 28
-  }
-  if strings.HasPrefix(adr, "X") || strings.HasPrefix(adr, "W") {
-    return 65536
-  }
+	if strings.HasPrefix(adr, "V") {
+		return 28
+	}
+	if strings.HasPrefix(adr, "X") || strings.HasPrefix(adr, "W") {
+		return 65536
+	}
 	// add other prefixes here...
 	return 1
 }
@@ -78,5 +80,5 @@ func CoinTypeFromBechAdr(adr string) (uint32, error) {
 	if err != nil {
 		return 0, err
 	}
-	return chaincfg.PrefixToCoinType(hrp)
+	return coinparam.PrefixToCoinType(hrp)
 }
