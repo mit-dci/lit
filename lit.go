@@ -2,14 +2,11 @@ package main
 
 import (
 	"bufio"
-	"crypto/rand"
-	"encoding/base64"
 	"fmt"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	flags "github.com/jessevdk/go-flags"
@@ -48,7 +45,6 @@ var (
 	defaultKeyFileName    = "privkey.hex"
 	defaultConfigFilename = "lit.conf"
 	defaultHomeDir        = os.Getenv("HOME")
-	defaultConfigFile     = filepath.Join(os.Getenv("HOME"), "/.lit/lit.conf")
 	defaultRpcport        = uint16(8001)
 )
 
@@ -140,7 +136,6 @@ func main() {
 
 	conf := config{
 		LitHomeDir: defaultLitHomeDirName,
-		ConfigFile: defaultConfigFile,
 		Rpcport:    defaultRpcport,
 		TrackerURL: defaultTrackerURL,
 	}
@@ -166,9 +161,9 @@ func main() {
 	_, err = os.Stat(preconf.LitHomeDir) // create directory
 	if err != nil {
 		log.Println("Error while creating a directory")
-		log.Fatal(err)
 	}
 	if os.IsNotExist(err) {
+		// first time the guy is running lit, lets set tn3 to true
 		os.Mkdir(preconf.LitHomeDir, 0700)
 		log.Println("Creating a new config file")
 		err := createDefaultConfigFile(preconf.LitHomeDir) // Source of error
@@ -178,27 +173,26 @@ func main() {
 		}
 	}
 
-	if !(preconf.ConfigFile != defaultConfigFile) {
-		if _, err := os.Stat(filepath.Join(filepath.Join(preconf.LitHomeDir), "lit.conf")); os.IsNotExist(err) {
-			if err != nil {
-				log.Fatal(err)
-			}
-			log.Println("Creating a new config file")
-			err := createDefaultConfigFile(filepath.Join(preconf.LitHomeDir)) // Source of error
-			if err != nil {
-				log.Fatal(err)
-				return
-			}
-		}
-
-		preconf.ConfigFile = filepath.Join(filepath.Join(preconf.LitHomeDir), "lit.conf")
-		// lets parse the config file provided, if any
-		err := flags.NewIniParser(parser).ParseFile(preconf.ConfigFile)
+	if _, err := os.Stat(filepath.Join(filepath.Join(preconf.LitHomeDir), "lit.conf")); os.IsNotExist(err) {
+		// if there is no config file found over at the directory, create one
 		if err != nil {
-			_, ok := err.(*os.PathError)
-			if !ok {
-				log.Fatal(err)
-			}
+			log.Fatal(err)
+		}
+		log.Println("Creating a new config file")
+		err := createDefaultConfigFile(filepath.Join(preconf.LitHomeDir)) // Source of error
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
+	}
+
+	preconf.ConfigFile = filepath.Join(filepath.Join(preconf.LitHomeDir), "lit.conf")
+	// lets parse the config file provided, if any
+	err = flags.NewIniParser(parser).ParseFile(preconf.ConfigFile)
+	if err != nil {
+		_, ok := err.(*os.PathError)
+		if !ok {
+			log.Fatal(err)
 		}
 	}
 	// Parse command line options again to ensure they take precedence.
@@ -272,33 +266,6 @@ func main() {
 
 func createDefaultConfigFile(destinationPath string) error {
 
-	// We assume sample config file path is same as binary TODO: change to ~/.lit/config/
-	path, err := filepath.Abs(filepath.Dir(os.Args[0]))
-	if err != nil {
-		return err
-	}
-	sampleConfigPath := filepath.Join(path, defaultConfigFilename)
-
-	// We generate a random user and password
-	randomBytes := make([]byte, 20)
-	_, err = rand.Read(randomBytes)
-	if err != nil {
-		return err
-	}
-	generatedRPCUser := base64.StdEncoding.EncodeToString(randomBytes)
-
-	_, err = rand.Read(randomBytes)
-	if err != nil {
-		return err
-	}
-	generatedRPCPass := base64.StdEncoding.EncodeToString(randomBytes)
-
-	src, err := os.Open(sampleConfigPath)
-	if err != nil {
-		return err
-	}
-	defer src.Close()
-
 	dest, err := os.OpenFile(filepath.Join(destinationPath, defaultConfigFilename),
 		os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
@@ -306,25 +273,12 @@ func createDefaultConfigFile(destinationPath string) error {
 	}
 	defer dest.Close()
 
-	// We copy every line from the sample config file to the destination,
-	// only replacing the two lines for rpcuser and rpcpass
-	reader := bufio.NewReader(src)
-	for err != io.EOF {
-		var line string
-		line, err = reader.ReadString('\n')
-		if err != nil && err != io.EOF {
-			return err
-		}
-
-		if strings.Contains(line, "rpcuser=") {
-			line = "rpcuser=" + generatedRPCUser + "\n"
-		} else if strings.Contains(line, "rpcpass=") {
-			line = "rpcpass=" + generatedRPCPass + "\n"
-		}
-
-		if _, err := dest.WriteString(line); err != nil {
-			return err
-		}
+	writer := bufio.NewWriter(dest)
+	defaultArgs := []byte("tn3=1")
+	_, err = writer.Write(defaultArgs)
+	if err != nil {
+		return err
 	}
+	writer.Flush()
 	return nil
 }
