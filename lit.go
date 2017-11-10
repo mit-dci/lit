@@ -149,95 +149,67 @@ func main() {
 	// file or the version flag was specified.  Any errors aside from the
 	// help message error can be ignored here since they will be caught by
 	// the final parse below.
+	usageMessage := fmt.Sprintf("Use %s -h to show usage", "./lit")
 	preconf := conf
 	preParser := newConfigParser(&preconf, flags.HelpFlag)
-	_, err := preParser.Parse()
-	if err != nil { // if there is some sort of error while parsing the CLI arguments
+	_, err := preParser.ParseArgs(os.Args)
+	if err != nil {
 		if e, ok := err.(*flags.Error); ok && e.Type == flags.ErrHelp {
-			fmt.Fprintln(os.Stderr, err)
-			log.Fatal(err)
+			fmt.Println(err)
 			return
-			// return nil, nil, err
 		}
 	}
 
-	// appName := filepath.Base(os.Args[0])
-	// appName = strings.TrimSuffix(appName, filepath.Ext(appName))
-	// usageMessage := fmt.Sprintf("Use %s -h to show usage", appName)
-	// if preconf.ShowVersion {
-	// 	fmt.Println(appName, "version", version())
-	// 	os.Exit(0)
-	// }
+	// Load config from file
+	parser := newConfigParser(&conf, flags.Default) //parse
 
-	// Load additional config from file
-	var configFileError error
-	parser := newConfigParser(&conf, flags.Default) // Single line command to read all the CLI params passed
-
-	// creates a directory in the absolute sense
-	_, err = os.Stat(preconf.LitHomeDir)
+	_, err = os.Stat(preconf.LitHomeDir) // create directory
+	if err != nil {
+		log.Println("Error while creating a directory")
+		log.Fatal(err)
+	}
 	if os.IsNotExist(err) {
 		os.Mkdir(preconf.LitHomeDir, 0700)
-		fmt.Println("Creating a new config file")
+		log.Println("Creating a new config file")
 		err := createDefaultConfigFile(preconf.LitHomeDir) // Source of error
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating a "+
-				"default config file: %v\n", err)
+			log.Println("Error creating a default config file: %v\n")
+			log.Fatal(err)
 		}
 	}
-
-	// seems wrong / does nothing?
-	//	if err != nil {
-	//		fmt.Println("Error while creating a directory")
-	//		fmt.Println(err)
-	//	}
 
 	if !(preconf.ConfigFile != defaultConfigFile) {
 		if _, err := os.Stat(filepath.Join(filepath.Join(preconf.LitHomeDir), "lit.conf")); os.IsNotExist(err) {
 			if err != nil {
-				fmt.Println(err)
+				log.Fatal(err)
 			}
-			fmt.Println("Creating a new config file")
-			err1 := createDefaultConfigFile(filepath.Join(preconf.LitHomeDir)) // Source of error
-			if err1 != nil {
-				fmt.Fprintf(os.Stderr, "Error creating a "+
-					"default config file: %v\n", err)
+			log.Println("Creating a new config file")
+			err := createDefaultConfigFile(filepath.Join(preconf.LitHomeDir)) // Source of error
+			if err != nil {
+				log.Fatal(err)
+				return
 			}
 		}
+
 		preconf.ConfigFile = filepath.Join(filepath.Join(preconf.LitHomeDir), "lit.conf")
 		// lets parse the config file provided, if any
 		err := flags.NewIniParser(parser).ParseFile(preconf.ConfigFile)
 		if err != nil {
 			_, ok := err.(*os.PathError)
 			if !ok {
-				fmt.Fprintf(os.Stderr, "Error parsing config file: %s\n",
-					err.Error())
 				log.Fatal(err)
 			}
-			configFileError = err
 		}
 	}
-
 	// Parse command line options again to ensure they take precedence.
-	_, err = parser.Parse()
+	_, err = parser.ParseArgs(os.Args) // returns invalid flags
 	if err != nil {
-		// huh?
-		//		if e, ok := err.(*flags.Error); !ok || e.Type != flags.ErrHelp {
-		//		}
-		log.Fatal(err)
-	}
-
-	if configFileError != nil {
-		fmt.Printf("%s\n", configFileError.Error())
+		fmt.Println(usageMessage)
+		// no need to print the error as we already have
+		return
 	}
 
 	logFilePath := filepath.Join(conf.LitHomeDir, "lit.log")
-
-	// also does nothing
-	/*
-		if remainingArgs != nil {
-			//fmt.Printf("%v", remainingArgs)
-		}
-	*/
 
 	logfile, err := os.OpenFile(logFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	defer logfile.Close()
