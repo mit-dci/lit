@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -15,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/adiabat/bech32"
 	"github.com/adiabat/btcd/wire"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
@@ -187,7 +187,9 @@ type RawTxResponse struct {
 	RawTx string
 }
 
-type VAdrUtxoResponse struct {
+type VRawResponse []VRawTx
+
+type VRawTx struct {
 	Height  int32
 	Spender string
 	Tx      string
@@ -200,58 +202,73 @@ func (a *APILink) GetVAdrTxos() error {
 	var urls []string
 	a.TrackingAdrsMtx.Lock()
 	for adr160, _ := range a.TrackingAdrs {
+		// make the bech32 segwit address
+		adrBch, err := bech32.SegWitV0Encode(a.p.Bech32Prefix, adr160[:])
+		if err != nil {
+			return err
+		}
+		// make the old base58 address
 		adr58 := lnutil.OldAddressFromPKH(adr160, a.p.PubKeyHashAddrID)
+
+		// make request URLs for both
+		urls = append(urls,
+			fmt.Sprintf("%s%d/%s%s", apitxourl, a.height, adrBch, "?raw=1"))
 		urls = append(urls,
 			fmt.Sprintf("%s%d/%s%s", apitxourl, a.height, adr58, "?raw=1"))
 	}
 	a.TrackingAdrsMtx.Unlock()
 
+	log.Printf("have %d adr urls to check\n", len(urls))
+
 	// make an API call for every adr in adrs
 	// then grab the tx hex, decode and send up to the wallit
 	for _, url := range urls {
+		log.Printf("Requesting adr %s\n", url)
 		response, err := http.Get(url)
 		if err != nil {
 			return err
 		}
 
-		bd, err := ioutil.ReadAll(response.Body)
-		if err != nil {
-			return err
-		}
-		log.Printf(string(bd))
+		//		bd, err := ioutil.ReadAll(response.Body)
+		//		if err != nil {
+		//			return err
+		//		}
 
-		txojson := new(VAdrUtxoResponse)
+		//		log.Printf(string(bd))
 
-		err = json.NewDecoder(response.Body).Decode(txojson)
-		if err != nil {
-			return err
-		}
+		var txojsons VRawResponse
 
-		// if there's some text in the spender field, skip this as it's already gone
-		// also, really, this shouldn't be returned by the API at all because
-		// who cares how much money we used to have.
-		if len(txojson.Spender) > 32 {
-			continue
-		}
-
-		txBytes, err := hex.DecodeString(txojson.Tx)
-		if err != nil {
-			return err
-		}
-		buf := bytes.NewBuffer(txBytes)
-		tx := wire.NewMsgTx()
-		err = tx.Deserialize(buf)
+		err = json.NewDecoder(response.Body).Decode(&txojsons)
 		if err != nil {
 			return err
 		}
 
-		var txah lnutil.TxAndHeight
-		txah.Height = int32(txojson.Height)
-		txah.Tx = tx
+		for _, txjson := range txojsons {
+			// if there's some text in the spender field, skip this as it's already gone
+			// also, really, this shouldn't be returned by the API at all because
+			// who cares how much money we used to have.
+			if len(txjson.Spender) > 32 {
+				continue
+			}
+			txBytes, err := hex.DecodeString(txjson.Tx)
+			if err != nil {
+				return err
+			}
+			buf := bytes.NewBuffer(txBytes)
+			tx := wire.NewMsgTx()
+			err = tx.Deserialize(buf)
+			if err != nil {
+				return err
+			}
 
-		fmt.Printf("tx %s at height %d\n", txah.Tx.TxHash().String(), txah.Height)
-		// send the tx and height back up to the wallit
-		a.TxUpToWallit <- txah
+			var txah lnutil.TxAndHeight
+			txah.Height = int32(txjson.Height)
+			txah.Tx = tx
+
+			log.Printf("tx %s at height %d\n", txah.Tx.TxHash().String(), txah.Height)
+			// send the tx and height back up to the wallit
+			a.TxUpToWallit <- txah
+		}
 	}
 
 	return nil
