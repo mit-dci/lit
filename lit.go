@@ -176,7 +176,7 @@ func main() {
 	if _, err := os.Stat(filepath.Join(filepath.Join(preconf.LitHomeDir), "lit.conf")); os.IsNotExist(err) {
 		// if there is no config file found over at the directory, create one
 		if err != nil {
-			log.Fatal(err)
+			log.Println(err)
 		}
 		log.Println("Creating a new config file")
 		err := createDefaultConfigFile(filepath.Join(preconf.LitHomeDir)) // Source of error
