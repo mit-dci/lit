@@ -1,28 +1,93 @@
 package main
 
 import (
+	"flag"
+	"fmt"
+	"log"
 	"net/rpc"
+	"net/rpc/jsonrpc"
+	"os"
+	"path/filepath"
+
+	"golang.org/x/net/websocket"
 
 	"github.com/andlabs/ui"
 )
 
+const (
+	litHomeDirName  = ".lit"
+	historyFilename = "lit-af.history"
+)
+
+type litUiClient struct {
+	remote     string
+	port       uint16
+	rpccon     *rpc.Client
+	litHomeDir string
+}
+
+func setConfig(lc *litUiClient) {
+	hostptr := flag.String("node", "127.0.0.1", "host to connect to")
+	portptr := flag.Int("p", 8001, "port to connect to")
+	dirptr := flag.String("dir", filepath.Join(os.Getenv("HOME"), litHomeDirName),
+		"directory to save settings")
+
+	flag.Parse()
+
+	lc.remote = *hostptr
+	lc.port = uint16(*portptr)
+	lc.litHomeDir = *dirptr
+}
+
+var lu *litUiClient
+
 func main() {
 
-	err := ui.Main(func() {
+	lu = new(litUiClient)
+	setConfig(lu)
 
-		name := ui.NewEntry()
-		button := ui.NewButton("Greet")
-		greeting := ui.NewLabel("")
-		box := ui.NewVerticalBox()
-		box.Append(ui.NewLabel("Enter your name:"), false)
-		box.Append(name, false)
-		box.Append(button, false)
-		box.Append(greeting, false)
-		window := ui.NewWindow("Hello", 200, 100, false)
-		window.SetChild(box)
+	origin := "http://127.0.0.1/"
+	urlString := fmt.Sprintf("ws://%s:%d/ws", lu.remote, lu.port)
+	wsConn, err := websocket.Dial(urlString, "", origin)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer wsConn.Close()
+
+	lu.rpccon = jsonrpc.NewClient(wsConn)
+
+	firstAdr, err := lu.Address()
+	if err != nil {
+		panic(err)
+	}
+
+	err = ui.Main(func() {
+
+		sendAdr := ui.NewEntry()
+
+		adrBar := ui.NewEntry()
+		adrBar.SetReadOnly(true)
+
+		adrBar.SetText(firstAdr)
+
+		button := ui.NewButton("new address")
 		button.OnClicked(func(*ui.Button) {
-			greeting.SetText("Hello, " + name.Text() + "!")
+			adr, err := lu.NewAddress()
+			if err != nil {
+				panic(err)
+			}
+
+			adrBar.SetText(adr)
 		})
+		//		sendbutton := ui.NewButton("send")
+
+		box := ui.NewVerticalBox()
+		box.Append(ui.NewLabel("lit UI"), false)
+		box.Append(sendAdr, false)
+		box.Append(adrBar, false)
+		box.Append(button, false)
+		window := ui.NewWindow("andui", 500, 300, false)
+		window.SetChild(box)
 		window.OnClosing(func(*ui.Window) bool {
 			ui.Quit()
 			return true
@@ -33,13 +98,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-}
-
-type litUiClient struct {
-	remote     string
-	port       uint16
-	rpccon     *rpc.Client
-	litHomeDir string
 }
 
 /*
