@@ -94,3 +94,16 @@ func (lu *litUiClient) Send(adr, amtString string) (string, error) {
 	}
 	return resp, nil
 }
+
+// GetBalance makes the balance RPC call and returns the balance struct
+func (lu *litUiClient) GetBalance() (*litrpc.BalanceReply, error) {
+	args := new(litrpc.NoArgs)
+	reply := new(litrpc.BalanceReply)
+
+	err := lu.rpccon.Call("LitRPC.Balance", args, reply)
+	if err != nil {
+		return nil, err
+	}
+
+	return reply, nil
+}

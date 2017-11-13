@@ -61,6 +61,11 @@ func main() {
 		panic(err)
 	}
 
+	firstBal, err := lu.GetBalance()
+	if err != nil {
+		panic(err)
+	}
+
 	err = ui.Main(func() {
 
 		adrBar := ui.NewEntry()
@@ -84,6 +89,18 @@ func main() {
 		sendAdrBox := ui.NewEntry()
 		sendAmtBox := ui.NewSpinbox(0, 100000000000)
 		statusTextBox := ui.NewLabel("")
+
+		balGroup := ui.NewGroup("baLanCes")
+		balGroup.SetTitle("Balances")
+		balBox := ui.NewVerticalBox()
+		balGroup.SetChild(balBox)
+
+		for _, bal := range firstBal.Balances {
+			btxt := fmt.Sprintf("Coin: %d Height %d Bal:%d",
+				bal.CoinType, bal.SyncHeight, bal.TxoTotal)
+			balBox.Append(ui.NewLabel(btxt), false)
+		}
+
 		sendBtn := ui.NewButton("send")
 
 		sendHbox := ui.NewHorizontalBox()
@@ -97,6 +114,9 @@ func main() {
 			amtString := fmt.Sprintf("%d", sendAmtBox.Value())
 			reponse, err := lu.Send(sendAdrBox.Text(), amtString)
 			if err != nil {
+				// you need to make a window for MsgBoxError, but
+				// it doesn't seem to DO anything.  If the window you give
+				// is nil, however, you get a nil pointer dereference crash
 				dummyWindow := ui.NewWindow("", 100, 100, false)
 				ui.MsgBoxError(dummyWindow, "Send error", err.Error())
 			} else {
@@ -118,17 +138,18 @@ func main() {
 		box.Append(recvHbox, false)
 		box.Append(sendHbox, false)
 		box.Append(statusTextBox, false)
+		box.Append(balGroup, false)
 
-		vtab := ui.NewTab()
-		cbx := ui.NewCombobox()
-		cbx.Append("a")
-		cbx.Append("b")
+		//		vtab := ui.NewTab()
+		//		cbx := ui.NewCombobox()
+		//		cbx.Append("a")
+		//		cbx.Append("b")
 
 		//		grp := ui.NewGroup("grp")
 		//		grp.SetTitle("is group")
 		//		grp.SetChild(cbx)
 
-		box.Append(vtab, false)
+		//		box.Append(vtab, false)
 
 		window := ui.NewWindow("lit ui", 650, 300, false)
 		window.SetChild(box)
