@@ -81,12 +81,16 @@ func main() {
 		})
 		//		sendbutton := ui.NewButton("send")
 
+		hbox := ui.NewHorizontalBox()
+		hbox.Append(adrBar, true)
+		hbox.Append(button, false)
+
 		box := ui.NewVerticalBox()
-		box.Append(ui.NewLabel("lit UI"), false)
+		box.Append(ui.NewLabel("lit ui"), false)
 		box.Append(sendAdr, false)
-		box.Append(adrBar, false)
-		box.Append(button, false)
-		window := ui.NewWindow("andui", 500, 300, false)
+		box.Append(hbox, false)
+
+		window := ui.NewWindow("lit ui", 500, 300, false)
 		window.SetChild(box)
 		window.OnClosing(func(*ui.Window) bool {
 			ui.Quit()
