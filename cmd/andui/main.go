@@ -63,15 +63,13 @@ func main() {
 
 	err = ui.Main(func() {
 
-		sendAdr := ui.NewEntry()
-
 		adrBar := ui.NewEntry()
 		adrBar.SetReadOnly(true)
 
 		adrBar.SetText(firstAdr)
 
-		button := ui.NewButton("new address")
-		button.OnClicked(func(*ui.Button) {
+		adrButton := ui.NewButton("new address")
+		adrButton.OnClicked(func(*ui.Button) {
 			adr, err := lu.NewAddress()
 			if err != nil {
 				panic(err)
@@ -79,19 +77,62 @@ func main() {
 
 			adrBar.SetText(adr)
 		})
-		//		sendbutton := ui.NewButton("send")
 
-		hbox := ui.NewHorizontalBox()
-		hbox.Append(adrBar, true)
-		hbox.Append(button, false)
+		sendLabel := ui.NewLabel("send to:")
+
+		sendAmtLabel := ui.NewLabel("amt:")
+		sendAdrBox := ui.NewEntry()
+		sendAmtBox := ui.NewSpinbox(0, 100000000000)
+		statusTextBox := ui.NewLabel("")
+		sendBtn := ui.NewButton("send")
+
+		sendHbox := ui.NewHorizontalBox()
+		sendHbox.Append(sendLabel, false)
+		sendHbox.Append(sendAdrBox, true)
+		sendHbox.Append(sendAmtLabel, false)
+		sendHbox.Append(sendAmtBox, false)
+		sendHbox.Append(sendBtn, false)
+
+		sendBtn.OnClicked(func(*ui.Button) {
+			amtString := fmt.Sprintf("%d", sendAmtBox.Value())
+			reponse, err := lu.Send(sendAdrBox.Text(), amtString)
+			if err != nil {
+				dummyWindow := ui.NewWindow("", 100, 100, false)
+				ui.MsgBoxError(dummyWindow, "Send error", err.Error())
+			} else {
+				statusTextBox.SetText(reponse)
+			}
+		})
+
+		sendAdrBox.SetText("")
+		//		recvHbox.Append(adrBar, true)
+		//		recvHbox.Append(button, false)
+
+		recvHbox := ui.NewHorizontalBox()
+		recvHbox.Append(adrBar, true)
+		recvHbox.Append(ui.NewHorizontalSeparator(), false)
+		recvHbox.Append(adrButton, false)
 
 		box := ui.NewVerticalBox()
-		box.Append(ui.NewLabel("lit ui"), false)
-		box.Append(sendAdr, false)
-		box.Append(hbox, false)
+		box.Append(ui.NewLabel("My address:"), false)
+		box.Append(recvHbox, false)
+		box.Append(sendHbox, false)
+		box.Append(statusTextBox, false)
 
-		window := ui.NewWindow("lit ui", 500, 300, false)
+		vtab := ui.NewTab()
+		cbx := ui.NewCombobox()
+		cbx.Append("a")
+		cbx.Append("b")
+
+		//		grp := ui.NewGroup("grp")
+		//		grp.SetTitle("is group")
+		//		grp.SetChild(cbx)
+
+		box.Append(vtab, false)
+
+		window := ui.NewWindow("lit ui", 650, 300, false)
 		window.SetChild(box)
+
 		window.OnClosing(func(*ui.Window) bool {
 			ui.Quit()
 			return true
