@@ -12,7 +12,6 @@ import (
 	"golang.org/x/net/websocket"
 
 	"github.com/andlabs/ui"
-	"github.com/atotto/clipboard"
 )
 
 const (
@@ -77,7 +76,6 @@ func main() {
 		adrBar.SetText(firstAdr)
 
 		adrButton := ui.NewButton("New Address")
-		copyButton := ui.NewButton("Copy Address")
 		//p := ui.NewPath(1)
 		//p.NewFigure(300,200)
 		//p.ArcTo(350,200,50,0,120,false)
@@ -90,13 +88,6 @@ func main() {
 			}
 			adrBar.SetText(adr)
 			adrglob = adr
-		})
-
-		copyButton.OnClicked(func(*ui.Button) {
-			err := clipboard.WriteAll(adrglob)
-			if err != nil {
-				panic(err)
-			}
 		})
 
 		sendLabel := ui.NewLabel(" Send To:")
@@ -154,7 +145,6 @@ func main() {
 		//recvHbox.Append(adrBar, false)
 		recvHbox.Append(adrBar, true) // stretch in order ot look nice
 		recvHbox.Append(adrButton, false)
-		recvHbox.Append(copyButton, false)
 		box := ui.NewVerticalBox()
 		box.SetPadded(true)
 		emptyLabel1 := ui.NewLabel("")
