@@ -1,6 +1,8 @@
 package litrpc
 
 import (
+	"bytes"
+	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -190,6 +192,43 @@ func (r *LitRPC) Send(args SendArgs, reply *TxidsReply) error {
 	}
 
 	reply.Txids = append(reply.Txids, ops[0].Hash.String())
+	return nil
+}
+
+// ------------------------- raw tx
+type RawArgs struct {
+	TxHex string
+}
+
+// PushRawTx takes some raw hex, turns it into a tx and tries to
+// push it out to the network, without any idea of what it is.
+func (r *LitRPC) PushRawTx(args RawArgs, reply *TxidsReply) error {
+	var err error
+	//hex.
+	txBytes, err := hex.DecodeString(args.TxHex)
+	if err != nil {
+		return err
+	}
+
+	buf := bytes.NewBuffer(txBytes)
+	tx := wire.NewMsgTx()
+	err = tx.Deserialize(buf)
+	if err != nil {
+		return err
+	}
+	// just broadcast to default wallet
+	wal, ok := r.Node.SubWallet[r.Node.DefaultCoin]
+	if !ok {
+		return fmt.Errorf("no connnected wallet for default cointype %d",
+			r.Node.DefaultCoin)
+	}
+
+	wal.PushTx(tx)
+	if err != nil {
+		return err
+	}
+
+	reply.Txids = []string{tx.TxHash().String()}
 	return nil
 }
 
