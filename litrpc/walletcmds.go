@@ -21,6 +21,7 @@ type StatusReply struct {
 
 type NoArgs struct {
 	// nothin
+	// what does this arg do?
 }
 
 type CoinArgs struct {
@@ -140,6 +141,8 @@ func (r *LitRPC) Send(args SendArgs, reply *TxidsReply) error {
 	var err error
 
 	nOutputs := len(args.DestAddrs)
+	// funnily enough, sending to multiple address doesn't work
+	// will remove in the next commit. TODO
 	if nOutputs < 1 {
 		return fmt.Errorf("No destination address specified")
 	}
@@ -300,6 +303,8 @@ type FeeReply struct {
 // SetFee allows you to set a fee rate for a wallet.
 func (r *LitRPC) SetFee(args *SetFeeArgs, reply *FeeReply) error {
 	// if cointype is 0, use the node's default coin
+	// Note: negative values for uint32 inputs are subtracted from 2**32
+	// TODO RBF
 	if args.CoinType == 0 {
 		args.CoinType = r.Node.DefaultCoin
 	}
@@ -311,7 +316,7 @@ func (r *LitRPC) SetFee(args *SetFeeArgs, reply *FeeReply) error {
 	if !ok {
 		return fmt.Errorf("no connnected wallet for coin type %d", args.CoinType)
 	}
-	reply.CurrentFee = wal.SetFee(args.Fee)
+	reply.CurrentFee = wal.SetFee(args.Fee) // default fee is 80 sat/byte for now
 	return nil
 }
 
