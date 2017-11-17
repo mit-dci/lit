@@ -204,7 +204,7 @@ type RawArgs struct {
 // push it out to the network, without any idea of what it is.
 func (r *LitRPC) PushRawTx(args RawArgs, reply *TxidsReply) error {
 	var err error
-	//hex.
+
 	txBytes, err := hex.DecodeString(args.TxHex)
 	if err != nil {
 		return err

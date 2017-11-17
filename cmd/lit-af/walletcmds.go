@@ -306,6 +306,9 @@ func (lc *litAfClient) RawTx(textArgs []string) error {
 	if len(textArgs) == 0 {
 		return fmt.Errorf("raw needs a hex string")
 	}
+
+	args.TxHex = textArgs[0]
+
 	err := lc.rpccon.Call("LitRPC.PushRawTx", args, reply)
 	if err != nil {
 		return err
