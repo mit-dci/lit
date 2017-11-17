@@ -296,3 +296,24 @@ func (lc *litAfClient) Address(textArgs []string) error {
 	return nil
 
 }
+
+// ------------------ send raw tx
+func (lc *litAfClient) RawTx(textArgs []string) error {
+	args := new(litrpc.RawArgs)
+	reply := new(litrpc.TxidsReply)
+
+	// there is at least 1 argument; that should be the new fee rate
+	if len(textArgs) == 0 {
+		return fmt.Errorf("raw needs a hex string")
+	}
+	err := lc.rpccon.Call("LitRPC.PushRawTx", args, reply)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(color.Output, "sent txid(s):\n")
+	for i, t := range reply.Txids {
+		fmt.Fprintf(color.Output, "\t%d %s\n", i, t)
+	}
+	return nil
+}
