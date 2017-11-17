@@ -25,6 +25,7 @@ type config struct { // define a struct for usage with go-flags
 	Litereghost string `long:"litereg" description:"Connect to litecoin regtest."`
 	Tvtchost    string `long:"tvtc" description:"Connect to Vertcoin test node."`
 	Vtchost     string `long:"vtc" description:"Connect to Vertcoin."`
+	Btghost     string `long:"btg" description:"Connect to bitcoingold."`
 	LitHomeDir  string `long:"dir" description:"Specify Home Directory of lit as an absolute path."`
 	TrackerURL  string `long:"tracker" description:"LN address tracker URL http|https://host:port"`
 	ConfigFile  string
@@ -127,8 +128,18 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 		if err != nil {
 			return err
 		}
-
 	}
+	// try btg jokenet
+	if conf.Btghost != "" && conf.Btghost != "0" {
+		p := &coinparam.BTGNetParams
+		err = node.LinkBaseWallet(
+			key, p.StartHeight, conf.ReSync, conf.Tower,
+			conf.Btghost, p)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

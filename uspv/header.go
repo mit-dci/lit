@@ -137,6 +137,16 @@ func CheckHeaderChain(
 	r io.ReadSeeker, inHeaders []*wire.BlockHeader,
 	p *coinparam.Params) (int32, error) {
 
+	// ugly hack for coins where we haven't implemented stuff.
+	// if now PoW function is defined for this chain, just go with the flow
+	// also make some warnings
+	if p.PoWFunction == nil {
+		log.Printf(
+			"Warning! No PoW function defined for %s, not checking anything!",
+			p.Name)
+		return 0, nil
+	}
+
 	// make sure we actually got new headers
 	if len(inHeaders) < 1 {
 		return 0, fmt.Errorf(

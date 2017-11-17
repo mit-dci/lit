@@ -137,6 +137,8 @@ type Params struct {
 	// isn't worth anything.  This can be useful to skip over security code,
 	//
 	TestCoin bool
+
+	ForkID uint32
 }
 
 // These variables are the chain proof-of-work limit parameters for each default

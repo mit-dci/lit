@@ -87,3 +87,60 @@ var bc2GenesisBlock = wire.MsgBlock{
 	},
 	Transactions: []*wire.MsgTx{&genesisCoinbaseTx},
 }
+
+// BTGNetParams are the parameters for the bitcoin gold network
+// This network forked off in november 2017 or so; seems similar to mainnet
+// and bitcoin cash; but has a forkID flag set to
+var BTGNetParams = Params{
+	Name:          "btg",
+	NetMagicBytes: 0x446d47e1, //different magic	//0xd9b4bef9,
+	DefaultPort:   "8338",
+	DNSSeeds:      []string{"dnsseed.bitcoingold.org"},
+
+	// Chain parameters
+	GenesisBlock:             &genesisBlock,
+	GenesisHash:              &genesisHash,
+	PowLimit:                 mainPowLimit,
+	PowLimitBits:             0x1d00ffff,
+	CoinbaseMaturity:         100,
+	SubsidyReductionInterval: 210000,
+	TargetTimespan:           time.Hour * 24 * 14, // 14 days
+	TargetTimePerBlock:       time.Minute * 10,    // 10 minutes
+	RetargetAdjustmentFactor: 4,                   // 25% less, 400% more
+	ReduceMinDifficulty:      false,
+	MinDiffReductionTime:     0,
+	GenerateSupported:        false,
+
+	// Checkpoints ordered from oldest to newest.
+	Checkpoints: []Checkpoint{},
+
+	// Enforce current block version once majority of the network has
+	// upgraded.
+	// 51% (51 / 100)
+	// Reject previous block versions once a majority of the network has
+	// upgraded.
+	// 75% (75 / 100)
+	BlockEnforceNumRequired: 51,
+	BlockRejectNumRequired:  75,
+	BlockUpgradeNumToCheck:  100,
+
+	// Mempool parameters
+	RelayNonStdTxs: true,
+
+	// Address encoding magics
+	PubKeyHashAddrID: 0x26, // starts with G
+	ScriptHashAddrID: 0x59, // starts with d
+	Bech32Prefix:     "btg",
+	PrivateKeyID:     0x80, // same as mainnet
+
+	// BIP32 hierarchical deterministic extended key magics
+	HDPrivateKeyID: [4]byte{0x04, 0x35, 0x83, 0x94}, // starts with tprv
+	HDPublicKeyID:  [4]byte{0x04, 0x35, 0x87, 0xcf}, // starts with tpub
+
+	// BIP44 coin type used in the hierarchical deterministic path for
+	// address generation.
+	HDCoinType: 79,
+
+	// ForkID is 79 because gold / Au, right.
+	ForkID: 79,
+}
