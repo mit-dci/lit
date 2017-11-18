@@ -9,6 +9,7 @@ import (
 )
 
 func (s *SPVCon) incomingMessageHandler() {
+	log.Printf("Starting %s incomingMessageHandler\n", s.Param.Name)
 	for {
 		n, xm, _, err := wire.ReadMessageWithEncodingN(s.con, s.localVersion,
 			wire.BitcoinNet(s.Param.NetMagicBytes), wire.LatestEncoding)
@@ -63,6 +64,7 @@ func (s *SPVCon) incomingMessageHandler() {
 // this one seems kindof pointless?  could get ridf of it and let
 // functions call WriteMessageWithEncodingN themselves...
 func (s *SPVCon) outgoingMessageHandler() {
+	log.Printf("Starting %s outgoingMessageHandler\n", s.Param.Name)
 	for {
 		msg := <-s.outMsgQueue
 
@@ -72,6 +74,7 @@ func (s *SPVCon) outgoingMessageHandler() {
 		if err != nil {
 			log.Printf("Write message error: %s", err.Error())
 		}
+		log.Printf("wrote %d byte %s to remote node\n", n, msg.Command())
 		s.WBytes += uint64(n)
 	}
 	return

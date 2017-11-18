@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 
 	"golang.org/x/crypto/ripemd160"
 
@@ -222,7 +223,7 @@ func (r *LitRPC) PushRawTx(args RawArgs, reply *TxidsReply) error {
 		return fmt.Errorf("no connnected wallet for default cointype %d",
 			r.Node.DefaultCoin)
 	}
-
+	log.Printf("push raw wallet type %s\n", wal.Params().Name)
 	err = wal.PushTx(tx)
 	if err != nil {
 		return err

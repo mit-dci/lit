@@ -148,6 +148,7 @@ func (s *SPVCon) PushTx(tx *wire.MsgTx) error {
 	txid := tx.TxHash()
 	s.TxMap[txid] = tx
 
+	log.Printf("push tx %s\n", txid.String())
 	// since we never delete txs, this will eventually run out of RAM.
 	// But might take years... might be nice to fix.
 
