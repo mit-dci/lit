@@ -21,10 +21,17 @@ import (
 // Bunch of redundancy with SendMany, maybe move that to a shared function...
 //NOTE this does not support multiple txouts with identical pkscripts in one tx.
 // The code would be trivial; it's not supported on purpose.  Use unique pkscripts.
+
+func (w *Wallit) SetRbf(rbf bool) {
+	w.Rbf = rbf
+	return
+}
+
 func (w *Wallit) MaybeSend(txos []*wire.TxOut, ow bool) ([]*wire.OutPoint, error) {
 	var err error
 	var totalSend int64
 	dustCutoff := int64(20000) // below this amount, just give to miners
+	// do we change the default amount to 20000?
 
 	feePerByte := w.FeeRate
 
@@ -80,6 +87,7 @@ func (w *Wallit) MaybeSend(txos []*wire.TxOut, ow bool) ([]*wire.OutPoint, error
 	}
 
 	// BuildDontSign gets the txid.  Also sorts txin, txout slices in place
+	//w.Rbf = false // set rbf for demo purposes
 	tx, err := w.BuildDontSign(utxos, txos)
 	if err != nil {
 		return nil, err
@@ -376,6 +384,8 @@ func (w *Wallit) SendOne(u portxo.PorTxo, outScript []byte) (*wire.MsgTx, error)
 func (w *Wallit) BuildDontSign(
 	utxos []*portxo.PorTxo, txos []*wire.TxOut) (*wire.MsgTx, error) {
 
+	log.Println("This is RBF")
+	log.Println(w.Rbf)
 	// make the tx
 	tx := wire.NewMsgTx()
 	// set version 2, for op_csv
@@ -391,6 +401,15 @@ func (w *Wallit) BuildDontSign(
 	for i, u := range utxos {
 		tx.AddTxIn(wire.NewTxIn(&u.Op, nil, nil))
 		// set sequence field if it's in the portxo
+		// pretty sure that this must be modified
+
+		if w.Rbf == true {
+			u.Seq = 1
+			log.Println("Awesome1")
+		} else {
+			u.Seq = 0
+		}
+
 		if u.Seq > 1 {
 			tx.TxIn[i].Sequence = u.Seq
 		}
@@ -430,6 +449,15 @@ func (w *Wallit) BuildAndSign(
 	for i, u := range utxos {
 		tx.AddTxIn(wire.NewTxIn(&u.Op, nil, nil))
 		// set sequence field if it's in the portxo
+		// pretty sure that this must be modified
+		log.Println("Lookout")
+		log.Println(u.Seq)
+		if w.Rbf == true {
+			log.Println("Awesome")
+			u.Seq = 1
+		} else {
+			u.Seq = 0
+		}
 		if u.Seq > 1 {
 			tx.TxIn[i].Sequence = u.Seq
 		}

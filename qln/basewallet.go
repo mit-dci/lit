@@ -90,6 +90,9 @@ type UWallet interface {
 	// Set fee rate
 	SetFee(int64) int64
 
+	// Set rbf bool
+	SetRbf(bool)
+
 	// ===== TESTING / SPAMMING ONLY, these funcs will not be in the real interface
 	// Sweep sends lots of txs (uint32 of them) to the specified address.
 	Sweep([]byte, uint32) ([]*chainhash.Hash, error)

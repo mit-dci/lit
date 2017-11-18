@@ -181,6 +181,10 @@ func (r *LitRPC) Send(args SendArgs, reply *TxidsReply) error {
 		txOuts[i] = wire.NewTxOut(args.Amts[i], outScript)
 	}
 
+	rbf := true
+	// test set rbf, setting rbf as a parma would require us to change a few files
+	// we shall do that hehe
+	wal.SetRbf(rbf)
 	// we don't care if it's witness or not
 	ops, err := wal.MaybeSend(txOuts, false)
 	if err != nil {
