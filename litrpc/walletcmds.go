@@ -223,7 +223,7 @@ func (r *LitRPC) PushRawTx(args RawArgs, reply *TxidsReply) error {
 			r.Node.DefaultCoin)
 	}
 
-	wal.PushTx(tx)
+	err = wal.PushTx(tx)
 	if err != nil {
 		return err
 	}

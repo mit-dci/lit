@@ -114,11 +114,17 @@ func (s *SPVCon) fPositiveHandler() {
 // REORG TODO: how to detect reorgs and send them up to wallet layer
 
 func (s *SPVCon) HeaderHandler(m *wire.MsgHeaders) {
+	// hack; don't ask for more headers if bitcoingold
+	if s.Param.Name == "btg" {
+		return
+	}
+
 	moar, err := s.IngestHeaders(m)
 	if err != nil {
 		log.Printf("Header error: %s\n", err.Error())
 		return
 	}
+
 	// more to get? if so, ask for them and return
 	if moar {
 		err = s.AskForHeaders()
