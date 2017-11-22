@@ -178,7 +178,7 @@ func CheckHeaderChain(
 	if err != nil {
 		return 0, err
 	}
-	fmt.Printf("pos: %d\n", pos)
+	log.Printf("header file position: %d\n", pos)
 	if pos%80 != 0 {
 		return 0, fmt.Errorf(
 			"CheckHeaderChain: Header file not a multiple of 80 bytes.")
@@ -204,7 +204,7 @@ func CheckHeaderChain(
 
 	// weird off-by-1 stuff here; makes numheaders, incluing the 0th
 	oldHeaders := make([]*wire.BlockHeader, numheaders)
-	fmt.Printf("made %d header slice\n", len(oldHeaders))
+	log.Printf("made %d header slice\n", len(oldHeaders))
 	// load a bunch of headers from disk into ram
 	for i, _ := range oldHeaders {
 		// read from file at current offset
@@ -229,6 +229,9 @@ func CheckHeaderChain(
 			return 0, fmt.Errorf(
 				"CheckHeaderChain: header message doesn't attach to tip or anywhere.")
 		}
+
+		// adjust attachHeight by adding the startheight
+		attachHeight += p.StartHeight
 
 		log.Printf("Header %s attaches at height %d\n",
 			inHeaders[0].BlockHash().String(), attachHeight)

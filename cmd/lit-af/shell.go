@@ -296,6 +296,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		fmt.Fprintf(color.Output, "%d %s (%s)\n", i,
 			lnutil.Address(a), lnutil.Address(aReply.LegacyAddresses[i]))
 	}
+
 	err = lc.rpccon.Call("LitRPC.Balance", nil, bReply)
 	if err != nil {
 		return err
@@ -303,9 +304,10 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 
 	for _, walBal := range bReply.Balances {
 		fmt.Fprintf(
-			color.Output, "\t%s %d\t%s %d\t%s %s\t%s %s %s %s\n",
+			color.Output, "\t%s %d\t%s %d\t%s %d\t%s %s\t%s %s %s %s\n",
 			lnutil.Header("Type:"), walBal.CoinType,
 			lnutil.Header("Sync Height:"), walBal.SyncHeight,
+			lnutil.Header("FeeRate:"), walBal.FeeRate,
 			lnutil.Header("Utxo:"), lnutil.SatoshiColor(walBal.TxoTotal),
 			lnutil.Header("WitConf:"), lnutil.SatoshiColor(walBal.MatureWitty),
 			lnutil.Header("Channel:"), lnutil.SatoshiColor(walBal.ChanTotal),

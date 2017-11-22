@@ -218,8 +218,6 @@ Like a regular header but the first 80 bytes is mostly empty.
 The very first 4 bytes (big endian) says what height the empty 80 bytes
 replace.  The next header, starting at offset 80, needs to be valid.
 */
-//
-
 func (s *SPVCon) openHeaderFile(hfn string) error {
 	_, err := os.Stat(hfn)
 	if err != nil {

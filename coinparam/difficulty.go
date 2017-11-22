@@ -103,8 +103,7 @@ func diffBitcoin(
 		// That whole "controlled supply" thing.
 		// calculate diff n based on n-2016 ... n-1
 		rightBits = calcDiffAdjustBitcoin(epochStart, prev, p)
-		fmt.Printf("h %d diff adjust %x -> %x\n",
-			height, prev.Bits, rightBits)
+		// fmt.Printf("h %d diff adjust %x -> %x\n", height, prev.Bits, rightBits)
 	} else if p.ReduceMinDifficulty { // not a new epoch
 		// if on testnet, check for difficulty nerfing
 		if cur.Timestamp.After(
@@ -125,7 +124,6 @@ func diffBitcoin(
 			rightBits = epochStart.Bits
 		}
 	}
-
 	return rightBits, nil
 }
 

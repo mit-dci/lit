@@ -52,6 +52,7 @@ type FrozenTx struct {
 	Ins       []*portxo.PorTxo
 	Outs      []*wire.TxOut
 	ChangeOut *wire.TxOut
+	Nlock     uint32
 	Txid      chainhash.Hash
 }
 

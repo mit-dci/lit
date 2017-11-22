@@ -282,7 +282,7 @@ func (s *SPVCon) AskForHeaders() error {
 	ghdr.ProtocolVersion = s.localVersion
 
 	tipheight := s.GetHeaderTipHeight()
-	fmt.Printf("got header tip height %d\n", tipheight)
+	log.Printf("got header tip height %d\n", tipheight)
 	// get tip header, as well as a few older ones (inefficient...?)
 	// yes, inefficient; really we should use "getheaders" and skip some of this
 
