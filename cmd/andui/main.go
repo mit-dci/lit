@@ -40,6 +40,7 @@ func setConfig(lc *litUiClient) {
 }
 
 var lu *litUiClient
+var adrglob string
 
 func main() {
 
@@ -60,6 +61,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	adrglob = firstAdr
 
 	firstBal, err := lu.GetBalance()
 	if err != nil {
@@ -73,42 +75,53 @@ func main() {
 
 		adrBar.SetText(firstAdr)
 
-		adrButton := ui.NewButton("new address")
+		adrButton := ui.NewButton("New Address")
+		//p := ui.NewPath(1)
+		//p.NewFigure(300,200)
+		//p.ArcTo(350,200,50,0,120,false)
+		//p.LineTo(300,400)
+		//p.End()
 		adrButton.OnClicked(func(*ui.Button) {
 			adr, err := lu.NewAddress()
 			if err != nil {
 				panic(err)
 			}
-
 			adrBar.SetText(adr)
+			adrglob = adr
 		})
 
-		sendLabel := ui.NewLabel("send to:")
+		sendLabel := ui.NewLabel(" Send To:")
 
-		sendAmtLabel := ui.NewLabel("amt:")
+		sendAmtLabel := ui.NewLabel(" Amt(sat):")
 		sendAdrBox := ui.NewEntry()
 		sendAmtBox := ui.NewSpinbox(0, 100000000000)
 		statusTextBox := ui.NewLabel("")
 
 		balGroup := ui.NewGroup("baLanCes")
-		balGroup.SetTitle("Balances")
+		balGroup.SetTitle(" ")
 		balBox := ui.NewVerticalBox()
 		balGroup.SetChild(balBox)
 
 		for _, bal := range firstBal.Balances {
-			btxt := fmt.Sprintf("Coin: %d Height %d Bal:%d",
+			btxt := fmt.Sprintf(" Coin: %d\n Height %d\n Bal:%d\n",
 				bal.CoinType, bal.SyncHeight, bal.TxoTotal)
+			balBox.Append(ui.NewLabel("Balances"), false)
+			balBox.Append(ui.NewLabel(""), false)
 			balBox.Append(ui.NewLabel(btxt), false)
 		}
 
-		sendBtn := ui.NewButton("send")
+		sendBtn := ui.NewButton("Send")
+		emptyLabel := ui.NewLabel("")
 
 		sendHbox := ui.NewHorizontalBox()
 		sendHbox.Append(sendLabel, false)
 		sendHbox.Append(sendAdrBox, true)
 		sendHbox.Append(sendAmtLabel, false)
-		sendHbox.Append(sendAmtBox, false)
-		sendHbox.Append(sendBtn, false)
+		sendHbox.Append(sendAmtBox, true)
+
+		sendVbox := ui.NewVerticalBox()
+		sendVbox.Append(emptyLabel, false)
+		sendVbox.Append(sendBtn, false)
 
 		sendBtn.OnClicked(func(*ui.Button) {
 			amtString := fmt.Sprintf("%d", sendAmtBox.Value())
@@ -117,7 +130,7 @@ func main() {
 				// you need to make a window for MsgBoxError, but
 				// it doesn't seem to DO anything.  If the window you give
 				// is nil, however, you get a nil pointer dereference crash
-				dummyWindow := ui.NewWindow("", 100, 100, false)
+				dummyWindow := ui.NewWindow("Error!!", 100, 100, false)
 				ui.MsgBoxError(dummyWindow, "Send error", err.Error())
 			} else {
 				statusTextBox.SetText(reponse)
@@ -129,16 +142,21 @@ func main() {
 		//		recvHbox.Append(button, false)
 
 		recvHbox := ui.NewHorizontalBox()
-		recvHbox.Append(adrBar, true)
-		recvHbox.Append(ui.NewHorizontalSeparator(), false)
+		//recvHbox.Append(adrBar, false)
+		recvHbox.Append(adrBar, true) // stretch in order ot look nice
 		recvHbox.Append(adrButton, false)
-
 		box := ui.NewVerticalBox()
-		box.Append(ui.NewLabel("My address:"), false)
+		box.SetPadded(true)
+		emptyLabel1 := ui.NewLabel("")
+		box.Append(emptyLabel1, false)
+		box.Append(ui.NewLabel(" My address:"), false)
 		box.Append(recvHbox, false)
+		box.Append(ui.NewHorizontalSeparator(), false)
 		box.Append(sendHbox, false)
+		box.Append(sendVbox, false)
+		box.Append(ui.NewHorizontalSeparator(), false)
 		box.Append(statusTextBox, false)
-		box.Append(balGroup, false)
+		box.Append(balGroup, true)
 
 		//		vtab := ui.NewTab()
 		//		cbx := ui.NewCombobox()
@@ -151,7 +169,18 @@ func main() {
 
 		//		box.Append(vtab, false)
 
-		window := ui.NewWindow("lit ui", 650, 300, false)
+		// new api coming up, lets wait
+		// var font ui.Font
+		// var fontDesc ui.FontDescriptor
+		// fontDesc.Family = "Arial"
+		// LoadClosestFont doesn't seem to be working
+		// neither does this
+		// 		f := (&font).Describe()
+		// doesn't work, seriously?
+		// f := (*font).LoadClosestFont(&fontDesc)
+		// fmt.Println((*ui.Font).Metrics)
+
+		window := ui.NewWindow("lit ui", 600, 400, false)
 		window.SetChild(box)
 
 		window.OnClosing(func(*ui.Window) bool {
@@ -169,7 +198,7 @@ func main() {
 /*
 Lit-UI
 
-Try using andlabs/ui for this
+The code below contains a ui using nucular
 
 Try to get most of the lit-af functionality working here.
 
