@@ -3,11 +3,13 @@ package uspv
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/adiabat/btcd/wire"
 )
@@ -36,56 +38,95 @@ func (s *SPVCon) GetNodes() ([]wire.NetAddress, error) {
 	return addresses, nil
 }
 
-// Connect dials out and connects to full nodes.
 func (s *SPVCon) Connect(remoteNode string) error {
-	log.Println(s.nodeFile)
 	var err error
-	flag := 0
-	if len(s.Param.DNSSeeds) != 0 {
-		if remoteNode[:4] == "auto" || (remoteNode[:1] == "1" && len(remoteNode) == 7) {
-			if _, err := os.Stat(s.nodeFile); os.IsNotExist(err) {
-				log.Println("Peers file doesn't exist") // set flag to 1 sicne peers doesn't exist
-			} else {
-				readvalues, err := s.GetNodes()
-				if err != nil {
-					return err
-				}
-				for _, ve := range readvalues {
-					// do what we want with the IPs, which is to try connecting to them.
-					if ve.IP.String() != "<nil>" {
-						if strconv.Itoa(int(ve.Port)) == s.Param.DefaultPort { // to handle different protocols
-							_, err := net.LookupHost(ve.IP.String())
-							if err != nil {
-								log.Println("Fatal Error while connecting to remote node. Trying again.")
-								continue
-							}
-							remoteNode = ve.IP.String() + ":" + s.Param.DefaultPort
-							flag = 1
-							break
-						}
-					}
-				}
+	//flag := 0
+	log.Println("Its coming over here")
+	log.Println(remoteNode)
+	// slice of IP addrs returned from the DNS seed
+	var seedAdrs []string
+	if remoteNode == "" || remoteNode == "auto" || remoteNode == "1" ||
+		remoteNode == "true" || remoteNode == "y" {
+		// connect to DNS seed based node
+		log.Printf("Attempting connection based on DNS seed\n")
+		if len(s.Param.DNSSeeds) == 0 {
+			// no available DNS seeds
+			return fmt.Errorf(
+				"Can't connect: No known DNS seeds for %s", s.Param.Name)
+		}
+
+		// before this part, I want to see if I can connect to stuff over in the peers file
+
+		if _, err := os.Stat(s.nodeFile); os.IsNotExist(err) {
+			log.Println("Peers file doesn't exist") // set flag to 1 sicne peers doesn't exist
+		} else {
+			readvalues, err := s.GetNodes()
+			if err != nil {
+				return err
 			}
-			if flag != 1 {
-				for i := 0; i < len(s.Param.DNSSeeds); i++ {
-					addrs, err := net.LookupHost(s.Param.DNSSeeds[i])
-					if err != nil {
-						log.Println("Fatal Error while connecting to remote node. Trying again.")
-						continue
+			for _, ve := range readvalues {
+				// do what we want with the IPs, which is to try connecting to them.
+				if ve.IP.String() != "<nil>" {
+					if strconv.Itoa(int(ve.Port)) == s.Param.DefaultPort { // to handle different protocols
+						_, err := net.LookupHost(ve.IP.String())
+						if err != nil {
+							log.Println("Fatal Error while connecting to remote node. Trying again.")
+							continue
+						}
+						remoteNode = ve.IP.String() + ":" + s.Param.DefaultPort
+						// flag = 1
+						return nil
 					}
-					remoteNode = addrs[i] + ":" + s.Param.DefaultPort
-					break
 				}
 			}
 		}
-	} else {
-		log.Println("There are no default nodes for the mode you specified")
+
+		// end the part where I connect to the stuff over at peers.json
+		// go through seeds to get a list of IP addrs
+		for _, seed := range s.Param.DNSSeeds {
+			seedAdrs, err = net.LookupHost(seed)
+			if err == nil {
+				// got em
+				log.Printf("Got %d IPs from DNS seed %s\n", len(seedAdrs), seed)
+				break
+			}
+			// gotta keep trying for those IPs
+			log.Println("DNS seed %s error", seed)
+		}
+
+		if len(seedAdrs) == 0 {
+			// never got any IPs from DNS seeds; give up
+			return fmt.Errorf(
+				"Can't connect: No functioning DNS seeds for %s", s.Param.Name)
+		}
+		// now have some IPs, go through and try to connect to one.
+		var connected bool
+		for _, ip := range seedAdrs {
+			log.Printf("Attempting connection to node at %s\n",
+				ip+":"+s.Param.DefaultPort)
+			s.con, err = net.Dial("tcp", ip+":"+s.Param.DefaultPort)
+			if err != nil {
+				log.Println(err.Error())
+			} else {
+				connected = true
+				break
+			}
+		}
+		if !connected {
+			return fmt.Errorf("Tried all IPs from DNS seed, none worked")
+		}
+	} else { // else connect to user-specified node
+		if !strings.Contains(remoteNode, ":") {
+			remoteNode = remoteNode + ":" + s.Param.DefaultPort
+		}
+
+		// open TCP connection to specified host
+		s.con, err = net.Dial("tcp", remoteNode)
+		if err != nil {
+			return err
+		}
 	}
-	// open TCP connection
-	s.con, err = net.Dial("tcp", remoteNode)
-	if err != nil {
-		return err
-	}
+
 	// assign version bits for local node
 	s.localVersion = VERSION
 	myMsgVer, err := wire.NewMsgVersionFromConn(s.con, 0, 0)
@@ -102,7 +143,8 @@ func (s *SPVCon) Connect(remoteNode string) error {
 	myMsgVer.AddService(wire.SFNodeWitness)
 	// this actually sends
 	n, err := wire.WriteMessageWithEncodingN(
-		s.con, myMsgVer, s.localVersion, wire.BitcoinNet(s.Param.NetMagicBytes), wire.LatestEncoding)
+		s.con, myMsgVer, s.localVersion,
+		wire.BitcoinNet(s.Param.NetMagicBytes), wire.LatestEncoding)
 	if err != nil {
 		return err
 	}
@@ -110,7 +152,8 @@ func (s *SPVCon) Connect(remoteNode string) error {
 	log.Printf("wrote %d byte version message to %s\n",
 		n, s.con.RemoteAddr().String())
 	n, m, b, err := wire.ReadMessageWithEncodingN(
-		s.con, s.localVersion, wire.BitcoinNet(s.Param.NetMagicBytes), wire.LatestEncoding)
+		s.con, s.localVersion,
+		wire.BitcoinNet(s.Param.NetMagicBytes), wire.LatestEncoding)
 	if err != nil {
 		return err
 	}
@@ -128,7 +171,8 @@ func (s *SPVCon) Connect(remoteNode string) error {
 	s.remoteHeight = mv.LastBlock
 	mva := wire.NewMsgVerAck()
 	n, err = wire.WriteMessageWithEncodingN(
-		s.con, mva, s.localVersion, wire.BitcoinNet(s.Param.NetMagicBytes), wire.LatestEncoding)
+		s.con, mva, s.localVersion,
+		wire.BitcoinNet(s.Param.NetMagicBytes), wire.LatestEncoding)
 	if err != nil {
 		return err
 	}
