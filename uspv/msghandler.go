@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"time"
+	"strconv"
 
 	"github.com/adiabat/btcd/wire"
 	"github.com/adiabat/btcutil/bloom"
@@ -272,7 +273,8 @@ func (s *SPVCon) AddrListHandler(m *wire.MsgAddr) {
 			addresses.Timestamp = now.Add(-1 * time.Hour * 24 * 5)
 		}
 		for _, storedAddr := range storedAddrs {
-			if (storedAddr.IP.Equal(addresses.IP)) && (string(addresses.Port) == s.Param.DefaultPort) {
+			x, _ := strconv.Atoi(s.Param.DefaultPort)
+			if (storedAddr.IP.Equal(addresses.IP)) && (int(addresses.Port) == x) {
 				dontSaveThis = true
 				break
 			}
