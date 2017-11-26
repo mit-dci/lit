@@ -2,6 +2,7 @@ package wallit
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"log"
 	"sort"
@@ -60,14 +61,19 @@ func (w *Wallit) MaybeSend(txos []*wire.TxOut, ow bool) ([]*wire.OutPoint, error
 
 	// input sum is not enough, we need more inputs.
 	// keep doing this until fee is sufficient or PickUtxos errors out
-	for fee > overshoot {
+	noTries := 1
+	// keep doing this about 5000 times and then error out
+	for fee > overshoot && noTries < 5000 {
 		utxos, overshoot, err = w.PickUtxos(totalSend+fee, feePerByte, ow)
 		if err != nil {
 			return nil, err
 		}
 		fee = EstFee(utxos, txos, feePerByte)
+		noTries += 1
 	}
-
+	if noTries == 5000 {
+		return nil, errors.New("Corresponding utxo not found, please try increasing the amount/sweepign your coins")
+	}
 	// add a change output if we have enough extra
 	if overshoot-fee > dustCutoff {
 		changeOut, err = w.NewChangeOut(overshoot - fee)
