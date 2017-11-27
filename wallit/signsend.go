@@ -38,39 +38,29 @@ func (w *Wallit) MaybeSend(txos []*wire.TxOut, ow bool) ([]*wire.OutPoint, error
 	finalOutPoints := make([]*wire.OutPoint, len(txos))
 	copy(initTxos, txos)
 
+	var outputByteSize int64
 	// check for negative...?
 	for _, txo := range txos {
 		totalSend += txo.Value
+		outputByteSize += 8 + int64(len(txo.PkScript))
 	}
 
 	// start access to utxos
 	w.FreezeMutex.Lock()
 	defer w.FreezeMutex.Unlock()
-	// get inputs for this tx.  Only segwit
-	// This might not be enough for the fee if the inputs line up right...
-	utxos, overshoot, err := w.PickUtxos(totalSend, feePerByte, ow)
+
+	// get inputs for this tx.  Only segwit if needed
+	utxos, overshoot, err :=
+		w.PickUtxos(totalSend, outputByteSize, feePerByte, ow)
 	if err != nil {
 		return nil, err
 	}
 
-	// estimate needed fee with outputs, see if change should be truncated
-	fee := EstFee(utxos, txos, feePerByte)
-
-	log.Printf("MaybeSend has fee %d, %d inputs\n", fee, len(utxos))
-
-	// input sum is not enough, we need more inputs.
-	// keep doing this until fee is sufficient or PickUtxos errors out
-	for fee > overshoot {
-		utxos, overshoot, err = w.PickUtxos(totalSend+fee, feePerByte, ow)
-		if err != nil {
-			return nil, err
-		}
-		fee = EstFee(utxos, txos, feePerByte)
-	}
+	log.Printf("MaybeSend has overshoot %d, %d inputs\n", overshoot, len(utxos))
 
 	// add a change output if we have enough extra
-	if overshoot-fee > dustCutoff {
-		changeOut, err = w.NewChangeOut(overshoot - fee)
+	if overshoot > dustCutoff {
+		changeOut, err = w.NewChangeOut(overshoot)
 		if err != nil {
 			return nil, err
 		}
@@ -233,8 +223,10 @@ func (w *Wallit) NewOutgoingTx(tx *wire.MsgTx) error {
 // PickUtxos Picks Utxos for spending.  Tell it how much money you want.
 // It returns a tx-sortable utxoslice, and the overshoot amount.  Also errors.
 // if "ow" is true, only gives witness utxos (for channel funding)
+// The overshoot amount is *after* fees, so can be used directly for a
+// change output.
 func (w *Wallit) PickUtxos(
-	amtWanted int64, feePerByte int64,
+	amtWanted, outputByteSize, feePerByte int64,
 	ow bool) (portxo.TxoSliceByBip69, int64, error) {
 
 	curHeight, err := w.GetDBSyncHeight()
@@ -268,13 +260,15 @@ func (w *Wallit) PickUtxos(
 
 	// if you've got 3 or more, and the next 2 are more than enough, pop off the
 	// first one.
+	// TODO: don't do this for unconfirmed, right?
 	for len(allUtxos) > 2 && allUtxos[1].Value+allUtxos[2].Value > amtWanted {
 		allUtxos = allUtxos[1:]
 	}
 
+	// rSlice is the return slice of the utxos which are going into the tx
 	var rSlice portxo.TxoSliceByBip69
 	// add utxos until we've had enough
-	remaining := amtWanted // nokori is how much is needed on input side
+	remaining := amtWanted // remaining is how much is needed on input side
 	for _, utxo := range allUtxos {
 		// skip unconfirmed.  Or de-prioritize? Some option for this...
 		//		if utxo.AtHeight == 0 {
@@ -294,18 +288,13 @@ func (w *Wallit) PickUtxos(
 		// yeah, lets add this utxo!
 		rSlice = append(rSlice, utxo)
 		remaining -= utxo.Value
-		// if nokori is positive, don't bother checking fee yet.
+		// if remaining is positive, don't bother checking fee yet.
 		if remaining < 0 {
-			var byteSize int64
-			for _, txo := range rSlice {
-				if txo.Mode&portxo.FlagTxoWitness != 0 {
-					byteSize += 70 // vsize of wit inputs is ~68ish
-				} else {
-					byteSize += 130 // vsize of non-wit input is ~130
-				}
-			}
-			fee := byteSize * feePerByte
-			if remaining < -fee { // done adding utxos: nokori below negative est fee
+			fee := EstFee(rSlice, outputByteSize, feePerByte)
+			if remaining < -fee { // done adding utxos: remaining below negative est fee
+				// subtract fee from returned overshoot.
+				// (remaining is negative here)
+				remaining += fee
 				break
 			}
 		}
@@ -493,10 +482,16 @@ func (w *Wallit) BuildAndSign(
 // P2 WPKH is op,seq(40) + [(33+71 / 4) = 26] = 66
 // P2 WSH is op,seq(40) + [75(script) + 71]/4 (36) = 76
 // Total guess on the p2wsh one, see if that's accurate
-func EstFee(txins []*portxo.PorTxo, txouts []*wire.TxOut, spB int64) int64 {
-	size := int64(40) // around 40 bytes for a change output and nlock time
+func EstFee(txins []*portxo.PorTxo, outputByteSize, spB int64) int64 {
+	size := int64(40)      // around 40 bytes for a change output and nlock time
+	size += outputByteSize // add the output size
+
 	// iterate through txins, guessing size based on mode
+	// TODO: These size estimates should go into the portxo package.
 	for _, txin := range txins {
+		if txin == nil { // silently ignore nil txins; somebody else's problem
+			continue
+		}
 		switch txin.Mode {
 		case portxo.TxoP2PKHComp: // non witness is about 150 bytes
 			size += 144
@@ -505,12 +500,10 @@ func EstFee(txins []*portxo.PorTxo, txouts []*wire.TxOut, spB int64) int64 {
 		case portxo.TxoP2WSHComp:
 			size += 76
 		default:
-			size += 150 // huh?
+			size += 150 // huh? uncompressed or something?
 		}
 	}
-	for _, txout := range txouts {
-		size += 8 + int64(len(txout.PkScript))
-	}
+
 	log.Printf("%d spB, est vsize %d, fee %d\n", spB, size, size*spB)
 	return size * spB
 }

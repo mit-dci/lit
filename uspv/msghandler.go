@@ -65,7 +65,10 @@ func (s *SPVCon) incomingMessageHandler() {
 func (s *SPVCon) outgoingMessageHandler() {
 	for {
 		msg := <-s.outMsgQueue
-
+		if msg == nil {
+			log.Printf("ERROR: nil message to outgoingMessageHandler\n")
+			continue
+		}
 		n, err := wire.WriteMessageWithEncodingN(s.con, msg, s.localVersion,
 			wire.BitcoinNet(s.Param.NetMagicBytes), wire.LatestEncoding)
 
