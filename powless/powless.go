@@ -93,6 +93,9 @@ type APILink struct {
 	// we've "synced" up to this height; older txs won't get pushed up to wallit
 	height int32
 
+	// this is the hash on the tip of the chain; if it changes, we need to update
+	tipBlockHash string
+
 	// time based polling
 	dirtybool bool
 
@@ -116,7 +119,8 @@ func (a *APILink) Start(
 	a.height = startHeight
 
 	go a.ClockLoop()
-
+	go a.TipRefreshLoop()
+	
 	return a.TxUpToWallit, a.CurrentHeightChan, nil
 }
 
@@ -146,6 +150,50 @@ func (a *APILink) ClockLoop() {
 	}
 
 	return
+}
+
+type VBlocksResponse []VBlock
+
+type VBlock struct {
+	Height  int32
+	Hash string
+	Time int64
+	TxLength int32
+	Size int32
+	PoolInfo string
+}
+
+// TipRefreshLoop checks for a change in the highest block hash
+// if so it sets the dirty flag to true to trigger a refresh
+func (a *APILink) TipRefreshLoop() error {
+	for {
+		// Fetch the current highest block
+		apihighestblockurl := "https://tvtc.blkidx.org/blocks?limit=1"
+		response, err := http.Get(apihighestblockurl)
+		if err != nil {
+			return err
+		}
+
+		var blockjsons VBlocksResponse
+		err = json.NewDecoder(response.Body).Decode(&blockjsons)
+		if err != nil {
+			return err
+		}			
+		
+		if blockjsons[0].Hash != a.tipBlockHash {
+			a.tipBlockHash = blockjsons[0].Hash
+			a.dirtybool = true
+			
+			
+		}
+
+		fmt.Printf("blockchain tip %v\n", a.tipBlockHash)
+		fmt.Printf("dirty %v\n", a.dirtybool)
+		
+		time.Sleep(time.Second * 60)
+	}
+
+	return nil
 }
 
 // RegisterAddress gets a 20 byte address from the wallit and starts
@@ -197,7 +245,7 @@ type VRawTx struct {
 
 func (a *APILink) GetVAdrTxos() error {
 
-	apitxourl := "https://tvtc.vertcoin.org/addressTxosSince/"
+	apitxourl := "https://tvtc.blkidx.org/addressTxosSince/"
 
 	var urls []string
 	a.TrackingAdrsMtx.Lock()
