@@ -259,10 +259,15 @@ func (w *Wallit) PickUtxos(
 	sort.Sort(sort.Reverse(allUtxos))
 
 	// if you've got 3 or more, and the next 2 are more than enough, pop off the
-	// first one.
-	// TODO: don't do this for unconfirmed, right?
+	// first one IF the other two are not unconfirmed.
 	for len(allUtxos) > 2 && allUtxos[1].Value+allUtxos[2].Value > amtWanted {
-		allUtxos = allUtxos[1:]
+		// ugly, but works
+		if !((allUtxos[1].Seq > 1 &&
+			(allUtxos[1].Height < 100 || allUtxos[1].Height+int32(allUtxos[1].Seq) > curHeight)) ||
+			(allUtxos[2].Seq > 1 &&
+				(allUtxos[2].Height < 100 || allUtxos[2].Height+int32(allUtxos[2].Seq) > curHeight))) {
+			allUtxos = allUtxos[1:]
+		}
 	}
 
 	// rSlice is the return slice of the utxos which are going into the tx
@@ -487,21 +492,11 @@ func EstFee(txins []*portxo.PorTxo, outputByteSize, spB int64) int64 {
 	size += outputByteSize // add the output size
 
 	// iterate through txins, guessing size based on mode
-	// TODO: These size estimates should go into the portxo package.
 	for _, txin := range txins {
 		if txin == nil { // silently ignore nil txins; somebody else's problem
 			continue
 		}
-		switch txin.Mode {
-		case portxo.TxoP2PKHComp: // non witness is about 150 bytes
-			size += 144
-		case portxo.TxoP2WPKHComp:
-			size += 66
-		case portxo.TxoP2WSHComp:
-			size += 76
-		default:
-			size += 150 // huh? uncompressed or something?
-		}
+		size += txin.EstSize()
 	}
 
 	log.Printf("%d spB, est vsize %d, fee %d\n", spB, size, size*spB)
