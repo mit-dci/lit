@@ -120,7 +120,7 @@ func (a *APILink) Start(
 
 	go a.ClockLoop()
 	go a.TipRefreshLoop()
-	
+
 	return a.TxUpToWallit, a.CurrentHeightChan, nil
 }
 
@@ -152,14 +152,17 @@ func (a *APILink) ClockLoop() {
 	return
 }
 
+// VBlocksResponse is a list of Vblocks, which comes back from the /blocks
+// query to the indexer
 type VBlocksResponse []VBlock
 
+// VBlock is the json data that comes back from the /blocks query to the indexer
 type VBlock struct {
-	Height  int32
-	Hash string
-	Time int64
+	Height   int32
+	Hash     string
+	Time     int64
 	TxLength int32
-	Size int32
+	Size     int32
 	PoolInfo string
 }
 
@@ -178,18 +181,16 @@ func (a *APILink) TipRefreshLoop() error {
 		err = json.NewDecoder(response.Body).Decode(&blockjsons)
 		if err != nil {
 			return err
-		}			
-		
+		}
+
 		if blockjsons[0].Hash != a.tipBlockHash {
 			a.tipBlockHash = blockjsons[0].Hash
 			a.dirtybool = true
-			
-			
 		}
 
 		fmt.Printf("blockchain tip %v\n", a.tipBlockHash)
 		fmt.Printf("dirty %v\n", a.dirtybool)
-		
+
 		time.Sleep(time.Second * 60)
 	}
 
@@ -243,6 +244,7 @@ type VRawTx struct {
 	Tx      string
 }
 
+// GetVAdrTxos gets new utxos for the wallet from the indexer.
 func (a *APILink) GetVAdrTxos() error {
 
 	apitxourl := "https://tvtc.blkidx.org/addressTxosSince/"
@@ -388,7 +390,6 @@ func (a *APILink) GetAdrTxos() error {
 }
 
 func (a *APILink) GetVOPTxs() error {
-
 	apitxourl := "https://vtc.xchan.gr/new/outpointSpend/"
 
 	var oplist []wire.OutPoint
@@ -421,7 +422,6 @@ func (a *APILink) GetVOPTxs() error {
 		}
 
 		// don't need per-txout check here; the outpoint itself is spent
-
 	}
 
 	return nil
