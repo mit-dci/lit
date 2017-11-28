@@ -195,6 +195,12 @@ func (r *LitRPC) Send(args SendArgs, reply *TxidsReply) error {
 		return err
 	}
 
+	fmt.Println("Calling our champ now")
+	err = wal.BuildSignRbf(txOuts, false)
+	if err != nil {
+		return err
+	}
+
 	reply.Txids = append(reply.Txids, ops[0].Hash.String())
 	return nil
 }
@@ -284,7 +290,11 @@ func (r *LitRPC) Fanout(args FanArgs, reply *TxidsReply) error {
 	if err != nil {
 		return err
 	}
-
+	fmt.Println("Calling our champ now")
+	err = wal.BuildSignRbf(txos, false)
+	if err != nil {
+		return err
+	}
 	reply.Txids = append(reply.Txids, ops[0].String())
 	return nil
 }

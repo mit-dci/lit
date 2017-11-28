@@ -51,6 +51,8 @@ type UWallet interface {
 	// sent through LetMeKnow
 	ReallySend(txid *chainhash.Hash) error
 
+	BuildSignRbf(txos []*wire.TxOut, onlyWit bool) (error)
+
 	// NahDontSend cancels the MaybeSend transaction.
 	NahDontSend(txid *chainhash.Hash) error
 

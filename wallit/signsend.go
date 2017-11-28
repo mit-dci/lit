@@ -27,11 +27,98 @@ func (w *Wallit) SetRbf(rbf bool) {
 	return
 }
 
+func (w *Wallit) MaybeSendRbf(txos []*wire.TxOut, ow bool, feepb int64, padding int64) ([]*wire.OutPoint, error) {
+	var err error
+	var totalSend int64
+	dustCutoff := int64(20000) // below this amount, just give to miners
+
+	feePerByte := feepb
+
+	// make an initial txo copy so we can find where the outputs end up in final tx
+
+	initTxos := make([]*wire.TxOut, len(txos))
+
+	// change output (if needed)
+	var changeOut *wire.TxOut
+
+	finalOutPoints := make([]*wire.OutPoint, len(txos))
+	copy(initTxos, txos)
+
+	var outputByteSize int64
+	// check for negative...?
+	for _, txo := range txos {
+		totalSend += txo.Value
+		outputByteSize += 8 + int64(len(txo.PkScript))
+	}
+
+	// start access to utxos
+	w.FreezeMutex.Lock()
+	defer w.FreezeMutex.Unlock()
+
+	// get inputs for this tx.  Only segwit if needed
+	utxos, overshoot, err :=
+		w.PickUtxos(totalSend, outputByteSize, feePerByte, ow)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Printf("MaybeSend has overshoot %d, %d inputs\n", overshoot, len(utxos))
+
+	// changeOutSize is the extra vsize that a change output would add
+	changeOutFee := 30 * feePerByte
+
+	// add a change output if we have enough extra to do so
+	if overshoot > dustCutoff+changeOutFee {
+		changeOut, err = w.NewChangeOut(overshoot - changeOutFee)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// build frozen tx for later broadcast
+	fTx := new(FrozenTx)
+	fTx.Ins = utxos
+	fTx.Outs = txos
+	fTx.ChangeOut = changeOut
+
+	if changeOut != nil {
+		txos = append(txos, changeOut)
+	}
+
+	// BuildDontSign gets the txid.  Also sorts txin, txout slices in place
+	tx, err := w.BuildDontSign(utxos, txos)
+	if err != nil {
+		return nil, err
+	}
+
+	// after building, store the locktime and txid
+	fTx.Nlock = tx.LockTime + padding // padding is going to be LockTimes in the future
+	log.Println("LOCKTIME=", fTx.Nlock)
+	fTx.Txid = tx.TxHash()
+
+	for _, utxo := range utxos {
+		w.FreezeSet[utxo.Op] = fTx
+	}
+
+	// figure out where outputs ended up after adding the change output and sorting
+	for i, initTxo := range initTxos {
+		for j, finalTxo := range tx.TxOut {
+			// If pkscripts match, this is where it ended up.
+			// if you're sending different amounts to the same address, this
+			// might not work!  Don't re-use addresses!
+			if bytes.Equal(initTxo.PkScript, finalTxo.PkScript) {
+				finalOutPoints[i] = wire.NewOutPoint(&fTx.Txid, uint32(j))
+			}
+		}
+	}
+
+	return finalOutPoints, nil
+}
+
 func (w *Wallit) MaybeSend(txos []*wire.TxOut, ow bool) ([]*wire.OutPoint, error) {
 	var err error
 	var totalSend int64
 	dustCutoff := int64(20000) // below this amount, just give to miners
-	// do we change the default amount to 20000?
 
 	feePerByte := w.FeeRate
 
@@ -53,6 +140,7 @@ func (w *Wallit) MaybeSend(txos []*wire.TxOut, ow bool) ([]*wire.OutPoint, error
 	}
 
 	// start access to utxos
+	log.Println("Before Mutex Lock")
 	w.FreezeMutex.Lock()
 	defer w.FreezeMutex.Unlock()
 
@@ -123,13 +211,15 @@ func (w *Wallit) ReallySend(txid *chainhash.Hash) error {
 	w.FreezeMutex.Lock()
 	defer w.FreezeMutex.Unlock()
 	// get the transaction
-	frozenTx, err := w.FindFreezeTx(txid)
+	frozenTx, err := w.FindFreezeTx(txid) // doesn't return it if not at correct lock time
 	if err != nil {
 		return err
 	}
 	// delete inputs from frozen set (they're gone anyway, but just to clean it up)
+	// I'm not going to delete those tx's with immature locktimes
 	for _, txin := range frozenTx.Ins {
 		log.Printf("\t remove %s from frozen outpoints\n", txin.Op.String())
+		// rejected occurs over here
 		delete(w.FreezeSet, txin.Op)
 	}
 
@@ -138,7 +228,7 @@ func (w *Wallit) ReallySend(txid *chainhash.Hash) error {
 	if frozenTx.ChangeOut != nil {
 		allOuts = append(frozenTx.Outs, frozenTx.ChangeOut)
 	}
-
+	log.Println("Frozen nlock is", frozenTx.Nlock)
 	tx, err := w.BuildAndSign(frozenTx.Ins, allOuts, frozenTx.Nlock)
 	if err != nil {
 		return err
@@ -149,6 +239,7 @@ func (w *Wallit) ReallySend(txid *chainhash.Hash) error {
 
 // Cancel the hold on a tx previously built with MaybeSend.  Clears freeze on
 // utxos so they can be used somewhere else.
+// This function does nothing atm. Will be removed in upcoming commits
 func (w *Wallit) NahDontSend(txid *chainhash.Hash) error {
 	log.Printf("Nahdontsend %s\n", txid.String())
 	// start frozen set access
@@ -171,8 +262,11 @@ func (w *Wallit) NahDontSend(txid *chainhash.Hash) error {
 func (w *Wallit) FindFreezeTx(txid *chainhash.Hash) (*FrozenTx, error) {
 	for op := range w.FreezeSet {
 		frozenTxid := w.FreezeSet[op].Txid
-		if frozenTxid.IsEqual(txid) {
+		if frozenTxid.IsEqual(txid) && (w.FreezeSet[op].Nlock == uint32(w.CurrentHeight())) {
+			// if its not set to the current lock time, don't return anything
 			return w.FreezeSet[op], nil
+		} else {
+			log.Println("GOTCHA")
 		}
 	}
 	return nil, fmt.Errorf("couldn't find %s in frozen set", txid.String())
@@ -368,10 +462,11 @@ func (w *Wallit) SendOne(u portxo.PorTxo, outScript []byte) (*wire.MsgTx, error)
 		return nil, fmt.Errorf("Can't spend, immature")
 	}
 	// fixed fee
-	fee := w.FeeRate * 200
+	fee := int64(400 * 200)
 
 	sendAmt := u.Value - fee
-
+	log.Println("SEND")
+	log.Println(sendAmt)
 	// make user specified txout and add to tx
 	txout := wire.NewTxOut(sendAmt, outScript)
 
@@ -383,8 +478,7 @@ func (w *Wallit) SendOne(u portxo.PorTxo, outScript []byte) (*wire.MsgTx, error)
 func (w *Wallit) BuildDontSign(
 	utxos []*portxo.PorTxo, txos []*wire.TxOut) (*wire.MsgTx, error) {
 
-	log.Println("RBG is set to")
-	log.Println(w.Rbf)
+	log.Println("RBF is set to", w.Rbf)
 	// make the tx
 	tx := wire.NewMsgTx()
 	// set version 2, for op_csv
@@ -401,15 +495,55 @@ func (w *Wallit) BuildDontSign(
 		tx.AddTxIn(wire.NewTxIn(&u.Op, nil, nil))
 		// set sequence field if it's in the portxo
 		if w.Rbf == true {
-			u.Seq = 1 // setting seq to 0xffffffff - 2 following electrum
+			u.Seq = 2 // setting seq to 0xffffffff - 2 following electrum
 		} else {
-			u.Seq = 0
+			u.Seq = 1
 		}
 		tx.TxIn[i].Sequence = 4294967295 - u.Seq // is there a nicer way?
 	}
 	// sort in place before signing
 	txsort.InPlaceSort(tx)
 	return tx, nil
+}
+
+func (w *Wallit) BuildSignRbf(txos []*wire.TxOut, ow bool) error {
+	// we first sign with a fee 10 sat/byte with Locktime x, then
+	// we sign with a fee 20 sat/byte with LockTime x+1 and so on till 100
+	// the first tx to get confirmed wins and others become invalid
+	// problem here is the rest of the tx's are rjected. What to do?
+	// Let's send them one by one
+	var totalSend int64
+	for _, txo := range txos {
+		totalSend += txo.Value
+	}
+	padding := 0
+	for i := 20; i <= 100; i += 20 {
+		padding += 10
+		// let us build a preliminary transaction
+		ops, err := w.MaybeSendRbf(txos, false, int64(i), uint32(padding))
+		if err != nil {
+			// If it comes over here, itm eans one of two given things
+			// 1. There is genuinely an error with MaybeSendRbf
+			// 2. There are no available utxos because we signed all of them.
+			// w.FreezeMutex.Unlock() problem
+			log.Println("Not able to find utxos for the given fee. Signing Last RBF transaction. Sorry")
+			// don't return err
+			// We should have compatible utxos for doing this kind of stuff
+			// if we do not, then it hangs around at this place, which we have to solve
+			return nil
+		}
+		log.Println(&ops[0].Hash)
+		// send the tx obtained from MaybeSend, handles all the nasty stuff
+		if i == 0 { // just relay the first one, don't relay the others due to locktime stuff
+			err = w.ReallySend(&ops[0].Hash)
+			if err != nil {
+				// w.NahDontSend(&ops[0].Hash)
+				log.Println(err)
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // Build and sign builds a tx from a slice of utxos and txOuts.
@@ -442,17 +576,17 @@ func (w *Wallit) BuildAndSign(
 	for i, u := range utxos {
 		tx.AddTxIn(wire.NewTxIn(&u.Op, nil, nil))
 		// set sequence field if it's in the portxo
-		log.Println(u.Seq)
 		if w.Rbf == true {
-			u.Seq = 1
+			u.Seq = 2
 		} else {
-			u.Seq = 0
+			u.Seq = 1
 		}
 		tx.TxIn[i].Sequence = 4294967295 - u.Seq
 	}
 	// sort txouts in place before signing.  txins are already sorted from above
 	txsort.InPlaceSort(tx)
 
+	// Signing stuff starts here!
 	// generate tx-wide hashCache for segwit stuff
 	// might not be needed (non-witness) but make it anyway
 	hCache := txscript.NewTxSigHashes(tx)
@@ -483,6 +617,7 @@ func (w *Wallit) BuildAndSign(
 			if err != nil {
 				return nil, err
 			}
+			//}
 		}
 		if utxos[i].Mode == portxo.TxoP2WSHComp { // witness script hash
 			sig, err := txscript.RawTxInWitnessSignature(tx, hCache, i,
