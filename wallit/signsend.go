@@ -258,17 +258,35 @@ func (w *Wallit) PickUtxos(
 	// smallest and unconfirmed last (because it's reversed)
 	sort.Sort(sort.Reverse(allUtxos))
 
-	// if you've got 3 or more, and the next 2 are more than enough, pop off the
-	// first one IF the other two are not unconfirmed.
-	for len(allUtxos) > 2 && allUtxos[1].Value+allUtxos[2].Value > amtWanted {
-		// ugly, but works
-		if !((allUtxos[1].Seq > 1 &&
-			(allUtxos[1].Height < 100 || allUtxos[1].Height+int32(allUtxos[1].Seq) > curHeight)) ||
-			(allUtxos[2].Seq > 1 &&
-				(allUtxos[2].Height < 100 || allUtxos[2].Height+int32(allUtxos[2].Seq) > curHeight))) {
-			allUtxos = allUtxos[1:]
-		}
+	// guessing that txs won't be more than 10K here...
+	maxFeeGuess := feePerByte * 10000
+
+	// first pass of removing candidate utxos; if the next one is bigger than
+	// we need, remove the top one.
+	for len(allUtxos) > 1 && allUtxos[1].Value > amtWanted+maxFeeGuess {
+		allUtxos = allUtxos[1:]
 	}
+
+	// if we've got 2 or more confirmed utxos, and the next one is
+	// more than enough, pop off the first one.
+	// Note that there are probably all sorts of edge cases where this will
+	// result in not being able to send money when you should be able to.
+	// Thus the handwavey "maxFeeGuess"
+	for len(allUtxos) > 2 &&
+		allUtxos[2].Height > 100 && // since sorted, don't need to check [1]
+		allUtxos[1].Mature(curHeight) &&
+		allUtxos[2].Mature(curHeight) &&
+		allUtxos[1].Value+allUtxos[2].Value > amtWanted+maxFeeGuess {
+		log.Printf("remaining utxo list, in order:\n")
+		for _, u := range allUtxos {
+			log.Printf("\t h: %d amt: %d\n", u.Height, u.Value)
+		}
+		allUtxos = allUtxos[1:]
+	}
+
+	// coin selection is super complex, and we can definitely do a lot better
+	// here!
+	// TODO: anyone who wants to: implement more advanced coin selection algo
 
 	// rSlice is the return slice of the utxos which are going into the tx
 	var rSlice portxo.TxoSliceByBip69
@@ -279,8 +297,7 @@ func (w *Wallit) PickUtxos(
 		//		if utxo.AtHeight == 0 {
 		//			continue
 		//		}
-		if utxo.Seq > 1 &&
-			(utxo.Height < 100 || utxo.Height+int32(utxo.Seq) > curHeight) {
+		if !utxo.Mature(curHeight) {
 			continue // skip immature or unconfirmed time-locked sh outputs
 		}
 		if ow && utxo.Mode&portxo.FlagTxoWitness == 0 {
@@ -294,16 +311,20 @@ func (w *Wallit) PickUtxos(
 		rSlice = append(rSlice, utxo)
 		remaining -= utxo.Value
 		// if remaining is positive, don't bother checking fee yet.
-		if remaining < 0 {
+		// if remaining is negative, calculate needed fee
+		if remaining <= 0 {
 			fee := EstFee(rSlice, outputByteSize, feePerByte)
-			if remaining < -fee { // done adding utxos: remaining below negative est fee
-				// subtract fee from returned overshoot.
-				// (remaining is negative here)
-				remaining += fee
+			// subtract fee from returned overshoot.
+			// (remaining is negative here)
+			remaining += fee
+
+			// done adding utxos if remaining below negative est fee
+			if remaining < -fee {
 				break
 			}
 		}
 	}
+
 	if remaining > 0 {
 		return nil, 0, fmt.Errorf("wanted %d but %d available.",
 			amtWanted, amtWanted-remaining)
@@ -482,10 +503,6 @@ func (w *Wallit) BuildAndSign(
 // EstFee gives a fee estimate based on a input / output set and a sat/Byte target.
 // It guesses the final tx size based on:
 // Txouts: 8 bytes + pkscript length
-// Txins by mode:
-// P2 PKH is op,seq (40) + pub(33) + sig(71) = 144
-// P2 WPKH is op,seq(40) + [(33+71 / 4) = 26] = 66
-// P2 WSH is op,seq(40) + [75(script) + 71]/4 (36) = 76
 // Total guess on the p2wsh one, see if that's accurate
 func EstFee(txins []*portxo.PorTxo, outputByteSize, spB int64) int64 {
 	size := int64(40)      // around 40 bytes for a change output and nlock time

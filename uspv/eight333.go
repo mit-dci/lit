@@ -335,6 +335,9 @@ func (s *SPVCon) AskForBlocks() error {
 
 	s.headerMutex.Lock() // lock just to check filesize
 	stat, err := os.Stat(s.headerFile.Name())
+	if err != nil {
+		return err
+	}
 	s.headerMutex.Unlock() // checked, unlock
 	endPos := stat.Size()
 

@@ -284,17 +284,41 @@ func PorTxoFromBytes(b []byte) (*PorTxo, error) {
 	return &u, nil
 }
 
-func (txin *PorTxo) EstSize() int64 {
-	switch txin.Mode {
-	case TxoP2PKHComp: // non witness is about 150 bytes
-		return int64(144)
-	case TxoP2WPKHComp:
-		return int64(66)
-	case TxoP2WSHComp:
-		return int64(76)
+// Spendable takes in the current block height, and returns whether
+// this utxo is spendable now or not.  It checks height (unconfirmed
+func (u *PorTxo) Mature(curHeight int32) bool {
+	// Nil portxo should be an error but just return false
+	if u == nil {
+		return false
 	}
-	return int64(150) // huh? uncompressed or something?)
+	//if sequence is nonzero, it's CSV locked, so check if it's either
+	// unconfirmed or confirmed at a height that's too shallow
+	if u.Seq > 1 &&
+		(u.Height < 100 || u.Height+int32(u.Seq) > curHeight) {
+		return false
+	}
+	return true
 }
+
+// EstSize returns an estimated vsize in bytes for using this portxo as
+// an input.  Might not be perfectly accurate.  Also maybe should switch
+// from vsize to weight..?  everything is vsize right now though.
+func (u *PorTxo) EstSize() int64 {
+	// Txins by mode:
+	// P2 PKH is op,seq (40) + pub(33) + sig(71) = 144
+	// P2 WPKH is op,seq(40) + [(33+71 / 4) = 26] = 66
+	// P2 WSH is op,seq(40) + [75(script) + 71]/4 (36) = 76
+	switch u.Mode {
+	case TxoP2PKHComp: // non witness is about 150 bytes
+		return 144
+	case TxoP2WPKHComp: // witness mode is around 66 vsize
+		return 66
+	case TxoP2WSHComp:
+		return 76
+	}
+	return 150 // guess that unknown is 150 bytes
+}
+
 func (u *PorTxo) Bytes() ([]byte, error) {
 	if u == nil {
 		return nil, fmt.Errorf("Can't serialize nil Utxo")
