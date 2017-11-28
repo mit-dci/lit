@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-  
+
 	"github.com/adiabat/btcd/wire"
 )
 
@@ -284,6 +284,17 @@ func PorTxoFromBytes(b []byte) (*PorTxo, error) {
 	return &u, nil
 }
 
+func (txin *PorTxo) EstSize() int64 {
+	switch txin.Mode {
+	case TxoP2PKHComp: // non witness is about 150 bytes
+		return int64(144)
+	case TxoP2WPKHComp:
+		return int64(66)
+	case TxoP2WSHComp:
+		return int64(76)
+	}
+	return int64(150) // huh? uncompressed or something?)
+}
 func (u *PorTxo) Bytes() ([]byte, error) {
 	if u == nil {
 		return nil, fmt.Errorf("Can't serialize nil Utxo")
