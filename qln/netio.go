@@ -179,8 +179,6 @@ type PeerInfo struct {
 }
 
 func (nd *LitNode) GetConnectedPeerList() []PeerInfo {
-	nd.RemoteMtx.Lock()
-	nd.RemoteMtx.Unlock() //TODO: This unlock is in the wrong place...?
 	var peers []PeerInfo
 	for k, v := range nd.RemoteCons {
 		var newPeer PeerInfo
