@@ -58,9 +58,12 @@ func (w *Wallit) MaybeSend(txos []*wire.TxOut, ow bool) ([]*wire.OutPoint, error
 
 	log.Printf("MaybeSend has overshoot %d, %d inputs\n", overshoot, len(utxos))
 
-	// add a change output if we have enough extra
-	if overshoot > dustCutoff {
-		changeOut, err = w.NewChangeOut(overshoot)
+	// changeOutSize is the extra vsize that a change output would add
+	changeOutFee := 30 * feePerByte
+
+	// add a change output if we have enough extra to do so
+	if overshoot > dustCutoff+changeOutFee {
+		changeOut, err = w.NewChangeOut(overshoot - changeOutFee)
 		if err != nil {
 			return nil, err
 		}
@@ -263,7 +266,9 @@ func (w *Wallit) PickUtxos(
 
 	// first pass of removing candidate utxos; if the next one is bigger than
 	// we need, remove the top one.
-	for len(allUtxos) > 1 && allUtxos[1].Value > amtWanted+maxFeeGuess {
+	for len(allUtxos) > 1 &&
+		allUtxos[1].Value > amtWanted+maxFeeGuess &&
+		allUtxos[1].Height > 100 {
 		allUtxos = allUtxos[1:]
 	}
 
