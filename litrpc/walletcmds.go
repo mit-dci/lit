@@ -168,8 +168,8 @@ func (r *LitRPC) Send(args SendArgs, reply *TxidsReply) error {
 
 	txOuts := make([]*wire.TxOut, nOutputs)
 	for i, s := range args.DestAddrs {
-		if args.Amts[i] < 10000 {
-			return fmt.Errorf("Amt %d less than min 10000", args.Amts[i])
+		if args.Amts[i] < 20000 {
+			return fmt.Errorf("Amt %d less than min 20000", args.Amts[i])
 		}
 
 		outScript, err := AdrStringToOutscript(s)
