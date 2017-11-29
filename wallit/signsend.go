@@ -27,22 +27,9 @@ func (w *Wallit) SetRbf(rbf bool) {
 	return
 }
 
-func (w *Wallit) MaybeSendRbf(txos []*wire.TxOut, ow bool, feepb int64, padding uint32) (*wire.MsgTx, error) {
+func (w *Wallit) MaybeSendRbf(txos []*wire.TxOut, ow bool) (*wire.MsgTx, error) {
 	var err error
 	var totalSend int64
-	dustCutoff := int64(20000) // below this amount, just give to miners
-
-	feePerByte := feepb
-
-	// make an initial txo copy so we can find where the outputs end up in final tx
-
-	initTxos := make([]*wire.TxOut, len(txos))
-
-	// change output (if needed)
-	var changeOut *wire.TxOut
-
-	finalOutPoints := make([]*wire.OutPoint, len(txos))
-	copy(initTxos, txos)
 
 	var outputByteSize int64
 	// check for negative...?
@@ -50,142 +37,167 @@ func (w *Wallit) MaybeSendRbf(txos []*wire.TxOut, ow bool, feepb int64, padding 
 		totalSend += txo.Value
 		outputByteSize += 8 + int64(len(txo.PkScript))
 	}
-
-	// start access to utxos
-	log.Println("Before Mutex Lock")
-	w.FreezeMutex.Lock()
-	defer w.FreezeMutex.Unlock()
-
-	// get inputs for this tx.  Only segwit if needed
-	utxos, overshoot, err :=
-		w.PickUtxos(totalSend, outputByteSize, feePerByte, ow)
-	if err != nil {
-		return nil, err
-	}
-
-	log.Printf("MaybeSend has overshoot %d, %d inputs\n", overshoot, len(utxos))
-
-	// changeOutSize is the extra vsize that a change output would add
-	changeOutFee := 30 * feePerByte
-
-	// add a change output if we have enough extra to do so
-	if overshoot > dustCutoff+changeOutFee {
-		changeOut, err = w.NewChangeOut(overshoot - changeOutFee)
+	var overshoot[6] int64
+	var utxos []*portxo.PorTxo
+	// overshoots vary for each fee value
+	for i:=1 ; i<6; i++ {
+		utxos, overshoot[i], err =
+			//w.PickUtxos(totalSend, outputByteSize, feePerByte, ow)
+			w.PickUtxos(totalSend, outputByteSize, int64(20*i), ow)
 		if err != nil {
 			return nil, err
 		}
 	}
+	// utxos configured to 100
+	// overshoot values are stored
+	log.Println("Utxos: ", utxos)
+	log.Println("Overshoot:", overshoot)
+	// Till here, nothing changes for all the Rbf guys
+	padding := uint32(0)
 
-	// build frozen tx for later broadcast
-	fTx := new(FrozenTx)
-	fTx.Ins = utxos
-	fTx.Outs = txos
-	fTx.ChangeOut = changeOut
+	for i := 20; i <= 100; i += 20 {
+		// paste stuff Here
+		log.Println("Setting fee per byte:", i)
+		// log.Println("FreezeSet: ", w.FreezeSet)
+		feePerByte := int64(i)
+		dustCutoff := int64(20000) // below this amount, just give to miners
 
-	if changeOut != nil {
-		txos = append(txos, changeOut)
-	}
+		// make an initial txo copy so we can find where the outputs end up in final tx
+		initTxos := make([]*wire.TxOut, len(txos))
 
-	// BuildDontSign gets the txid.  Also sorts txin, txout slices in place
-	tx, err := w.BuildDontSign(utxos, txos)
-	if err != nil {
-		return nil, err
-	}
+		// change output (if needed)
+		var changeOut *wire.TxOut
 
-	// after building, store the locktime and txid
-	fTx.Nlock = tx.LockTime + padding
-	fTx.Txid = tx.TxHash()
+		finalOutPoints := make([]*wire.OutPoint, len(txos))
+		copy(initTxos, txos)
 
-	for _, utxo := range utxos {
-		w.FreezeSet[utxo.Op] = fTx
-	}
-	log.Println("NLOCK: ", fTx.Nlock)
-	// figure out where outputs ended up after adding the change output and sorting
-	for i, initTxo := range initTxos {
-		for j, finalTxo := range tx.TxOut {
-			// If pkscripts match, this is where it ended up.
-			// if you're sending different amounts to the same address, this
-			// might not work!  Don't re-use addresses!
-			if bytes.Equal(initTxo.PkScript, finalTxo.PkScript) {
-				finalOutPoints[i] = wire.NewOutPoint(&fTx.Txid, uint32(j))
+		// get inputs for this tx.  Only segwit if needed
+		// The thing here must be changed
+		// Pick a set of Utxos with may rbf fee (100 sat/byte)
+		// Store the given utxo and build a tx with this and present fee (20 sat/byte)
+
+		log.Printf("MaybeSend has overshoot %d, %d inputs\n", overshoot[i/20], len(utxos))
+
+		// changeOutSize is the extra vsize that a change output would add
+		changeOutFee := 30 * feePerByte
+		// add a change output if we have enough extra to do so
+		if overshoot[i/20] > dustCutoff+changeOutFee {
+			changeOut, err = w.NewChangeOut(overshoot[i/20] - changeOutFee)
+			if err != nil {
+				return nil, err
 			}
 		}
-	}
-	log.Println("Freeze set: ", w.FreezeSet)
-	// return finalOutPoints, nil
-	ops := finalOutPoints
-	txid := &ops[0].Hash // ReallySendRbf stuff
-	// Sign and broadcast a tx previously built with MaybeSendRbf. This clears the Freeze
-	// on the utxos and returns the tx.
 
-	log.Printf("Reallysend %s\n", txid.String())
-	// start frozen set access
-	// get the transaction
-	frozenTx, err := w.FindFreezeTx(txid) // doesn't return it if not at correct lock time
-	if err != nil {
-		log.Println("Stuck here")
-		log.Println(err)
-		return nil, err
-	}
-	log.Println("Frozen nlock is", frozenTx.Nlock)
-	// why doesnt this match?
-	// delete inputs from frozen set (they're gone anyway, but just to clean it up)
-	// I'm not going to delete those tx's with immature locktimes
-	if frozenTx.Nlock == uint32(w.CurrentHeight()) { // nlock uint32 but current height int32 weird
-		for _, txin := range frozenTx.Ins {
-			log.Printf("\t remove %s from frozen outpoints\n", txin.Op.String())
-			// rejected occurs over here
-			delete(w.FreezeSet, txin.Op)
+		// build frozen tx for later broadcast
+		fTx := new(FrozenTx)
+		fTx.Ins = utxos
+		fTx.Outs = txos
+		fTx.ChangeOut = changeOut
+
+		if changeOut != nil {
+			txos = append(txos, changeOut)
 		}
-	}
 
-	allOuts := frozenTx.Outs
-
-	if frozenTx.ChangeOut != nil {
-		allOuts = append(frozenTx.Outs, frozenTx.ChangeOut)
-	}
-	log.Println("Frozen Tx Ins: ", frozenTx.Ins)
-	log.Println("Frozen Tx Outs: ", frozenTx.Outs)
-
-	utxos = frozenTx.Ins
-	txos = allOuts
-	nlt := frozenTx.Nlock
-	// these params look nicer
-	// call a aprt of buildandsign over here
-
-	if len(utxos) == 0 || len(txos) == 0 {
-		return nil, fmt.Errorf("BuildAndSign args no utxos or txos")
-	}
-	// sort input utxos first.
-	sort.Sort(portxo.TxoSliceByBip69(utxos))
-
-	// make the tx
-	tx = wire.NewMsgTx()
-
-	// always make version 2 txs
-	tx.Version = 2
-	tx.LockTime = nlt
-	// add all the txouts, direct from the argument slice
-	for _, txo := range txos {
-		if txo == nil || txo.PkScript == nil || txo.Value == 0 {
-			return nil, fmt.Errorf("BuildAndSign arg invalid txo")
+		// BuildDontSign gets the txid.  Also sorts txin, txout slices in place
+		tx, err := w.BuildDontSign(utxos, txos)
+		if err != nil {
+			return nil, err
 		}
-		tx.AddTxOut(txo)
-	}
-	// add all the txins, first refenecing the prev outPoints
-	for i, u := range utxos {
-		tx.AddTxIn(wire.NewTxIn(&u.Op, nil, nil))
-		// set sequence field if it's in the portxo
-		if w.Rbf == true {
-			u.Seq = 2
-		} else {
-			u.Seq = 1
+
+		// after building, store the locktime and txid
+		fTx.Nlock = tx.LockTime + padding
+		fTx.Txid = tx.TxHash()
+
+		// Where do I place these locks
+		// w.FreezeMutex.Lock()
+		// defer w.FreezeMutex.Unlock()
+
+		for _, utxo := range utxos {
+			w.FreezeSet[utxo.Op] = fTx
 		}
-		tx.TxIn[i].Sequence = 4294967295 - u.Seq
+		// figure out where outputs ended up after adding the change output and sorting
+		for i, initTxo := range initTxos {
+			for j, finalTxo := range tx.TxOut {
+				// If pkscripts match, this is where it ended up.
+				// if you're sending different amounts to the same address, this
+				// might not work!  Don't re-use addresses!
+				if bytes.Equal(initTxo.PkScript, finalTxo.PkScript) {
+					finalOutPoints[i] = wire.NewOutPoint(&fTx.Txid, uint32(j))
+				}
+			}
+		}
+		// return finalOutPoints, nil
+		ops := finalOutPoints
+		txid := &ops[0].Hash // ReallySendRbf stuff
+		// Sign and broadcast a tx previously built with MaybeSendRbf. This clears the Freeze
+		// on the utxos and returns the tx.
+
+		log.Printf("Reallysend %s\n", txid.String())
+		// start frozen set access
+		// get the transaction
+		frozenTx, err := w.FindFreezeTx(txid) // doesn't return it if not at correct lock time
+		if err != nil {
+			log.Println("Stuck here")
+			log.Println(err)
+			return nil, err
+		}
+		// delete inputs from frozen set (they're gone anyway, but just to clean it up)
+		// We're not going to delete those tx's with immature locktimes
+		if frozenTx.Nlock == uint32(w.CurrentHeight()) { // nlock uint32 but current height int32 weird
+			for _, txin := range frozenTx.Ins {
+				log.Printf("\t remove %s from frozen outpoints\n", txin.Op.String())
+				// rejected occurs over here
+				delete(w.FreezeSet, txin.Op)
+			}
+		}
+		allOuts := frozenTx.Outs
+
+		if frozenTx.ChangeOut != nil {
+			allOuts = append(frozenTx.Outs, frozenTx.ChangeOut)
+		}
+
+		utxos = frozenTx.Ins
+		txos = allOuts
+		nlt := frozenTx.Nlock
+		// these params look nicer
+		// call a aprt of buildandsign over here
+		if len(utxos) == 0 || len(txos) == 0 {
+			return nil, fmt.Errorf("BuildAndSign args no utxos or txos")
+		}
+		// sort input utxos first.
+		sort.Sort(portxo.TxoSliceByBip69(utxos))
+
+		// make the tx
+		tx = wire.NewMsgTx()
+
+		// always make version 2 txs
+		tx.Version = 2
+		tx.LockTime = nlt
+		// add all the txouts, direct from the argument slice
+		for _, txo := range txos {
+			if txo == nil || txo.PkScript == nil || txo.Value == 0 {
+				return nil, fmt.Errorf("BuildAndSign arg invalid txo")
+			}
+			tx.AddTxOut(txo)
+		}
+		// add all the txins, first refenecing the prev outPoints
+		for i, u := range utxos {
+			tx.AddTxIn(wire.NewTxIn(&u.Op, nil, nil))
+			// set sequence field if it's in the portxo
+			if w.Rbf == true {
+				u.Seq = 2
+			} else {
+				u.Seq = 1
+			}
+			tx.TxIn[i].Sequence = 4294967295 - u.Seq
+		}
+		// sort txouts in place before signing.  txins are already sorted from above
+		txsort.InPlaceSort(tx)
+		log.Println("tx:", tx.Version, tx.TxIn, tx.TxOut, tx.LockTime)
+		feePerByte += 20
+		padding += 10
 	}
-	// sort txouts in place before signing.  txins are already sorted from above
-	txsort.InPlaceSort(tx)
-	return tx, nil
+	return nil, nil
 }
 
 func (w *Wallit) MaybeSend(txos []*wire.TxOut, ow bool) ([]*wire.OutPoint, error) {
@@ -213,7 +225,6 @@ func (w *Wallit) MaybeSend(txos []*wire.TxOut, ow bool) ([]*wire.OutPoint, error
 	}
 
 	// start access to utxos
-	log.Println("Before Mutex Lock")
 	w.FreezeMutex.Lock()
 	defer w.FreezeMutex.Unlock()
 
@@ -332,6 +343,13 @@ func (w *Wallit) NahDontSend(txid *chainhash.Hash) error {
 
 // FindFreezeTx looks through the frozen map to find a tx.  Error if it can't find it
 func (w *Wallit) FindFreezeTx(txid *chainhash.Hash) (*FrozenTx, error) {
+	// Here, what I do is pacakgge the tx and send it off without checking whether the
+	// tx is confirmed at a specific height or not. I need to see if the transaction ahs been spent
+	// Two ways to do this
+	// 1. Query bitcoind
+	// 2. Check the mem pool for that tx. If it is still present, means that the tx didn't go through.
+	// So what I should do now is re-send th transasction with a higher fee but same input tx.
+	// the later block will invalidate what I had earlier.
 	for op := range w.FreezeSet {
 		frozenTxid := w.FreezeSet[op].Txid
 		if frozenTxid.IsEqual(txid) && (w.FreezeSet[op].Nlock == uint32(w.CurrentHeight())) {
@@ -404,13 +422,6 @@ func (w *Wallit) NewOutgoingTx(tx *wire.MsgTx) error {
 // The overshoot amount is *after* fees, so can be used directly for a
 // change output.
 func (w *Wallit) PickUtxos(
-	// why do we pick the largest value utxs first?
-	// this might result in stuff being unavailable for signing rbf stuff in advance
-	// besides, say we have two theree utxos with 99123123, 40000, 22000 and we
-	// need to send 20000. it would be better in this case to chsoe 22000/40000 instead of using
-	// the larger one since the larger one can be sued for signing subsequent larger txs.
-	// Instead what happends is that I lock the above utxo and can't use it for my further tx's
-	// which maybe disastrous for signing future tx's in rbf.
 	amtWanted, outputByteSize, feePerByte int64,
 	ow bool) (portxo.TxoSliceByBip69, int64, error) {
 
@@ -507,8 +518,6 @@ func (w *Wallit) PickUtxos(
 		}
 		// yeah, lets add this utxo!
 		rSlice = append(rSlice, utxo)
-		log.Println("Remaining", remaining)
-		log.Println("Utxo value", utxo.Value)
 		sum -= utxo.Value
 		remaining -= utxo.Value
 		// if remaining is positive, don't bother checking fee yet.
@@ -603,30 +612,12 @@ func (w *Wallit) BuildDontSign(
 }
 
 func (w *Wallit) BuildSignRbf(txos []*wire.TxOut, ow bool) error {
-	// we first sign with a fee 10 sat/byte with Locktime x, then
-	// we sign with a fee 20 sat/byte with LockTime x+1 and so on till 100
-	// the first tx to get confirmed wins and others become invalid
-	// problem here is the rest of the tx's are rjected. What to do?
-	// Let's send them one by one
-	// var totalSend int64
-	// for _, txo := range txos {
-	// 	totalSend += txo.Value
-	// }
-	padding := 0
-	for i := 20; i <= 100; i += 20 {
-		padding += 10
-		// let us build a preliminary transaction
-		tx, err := w.MaybeSendRbf(txos, false, int64(i), uint32(padding))
-		if err != nil {
-			// If it comes over here, itm eans one of two given things
-			// 1. There is genuinely an error with MaybeSendRbf
-			// 2. There are no available utxos because we signed all of them.
-			// w.FreezeMutex.Unlock() problem
-			log.Println("Not able to find utxos for the given fee. Signing Last RBF transaction. Sorry")
-			return err
-		}
-		log.Println("tx:", tx)
+	tx, err := w.MaybeSendRbf(txos, false)
+	if err != nil {
+		log.Println("Errored while sending rbf transaction. Sorry")
+		return err
 	}
+	log.Println("tx2:", tx)
 	return nil
 }
 
