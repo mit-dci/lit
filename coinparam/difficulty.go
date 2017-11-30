@@ -63,6 +63,11 @@ func diffBitcoin(
 		return 0x207fffff, nil
 	}
 
+	if len(headers) < 2 {
+		return 0, fmt.Errorf(
+			"%d headers given to diffBitcoin, expect >2", len(headers))
+	}
+
 	prev := headers[len(headers)-2]
 	cur := headers[len(headers)-1]
 
