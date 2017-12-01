@@ -67,7 +67,6 @@ func diffBitcoin(
 		return 0, fmt.Errorf(
 			"%d headers given to diffBitcoin, expect >2", len(headers))
 	}
-
 	prev := headers[len(headers)-2]
 	cur := headers[len(headers)-1]
 
@@ -114,6 +113,7 @@ func diffBitcoin(
 		if cur.Timestamp.After(
 			prev.Timestamp.Add(p.TargetTimePerBlock * 2)) {
 			rightBits = p.PowLimitBits // difficulty 1
+			// no block was found in the last 20 minutes, so the next diff must be 1
 		} else {
 			// actually need to iterate back to last nerfed block,
 			// then take the diff from the one behind it
@@ -126,7 +126,26 @@ func diffBitcoin(
 			// ugh I don't know, and whatever this is testnet.
 			// just go to epoch start even though that's not what the cpp code
 			// seems to say
-			rightBits = epochStart.Bits
+
+			// well, lets do what btcd does
+			tempCur := headers[len(headers)-1]
+			tempHeight := height
+			arrIndex := len(headers) - 1
+			for tempCur != nil && tempHeight%2016 != 0 &&
+				tempCur.Bits == p.PowLimitBits {
+				arrIndex -= 1
+				tempCur = headers[arrIndex]
+				tempHeight -= 1
+			}
+			// Return the found difficulty or the minimum difficulty if no
+			// appropriate block was found.
+			lastBits := p.PowLimitBits
+			if tempCur != nil {
+				log.Println("Cool:", tempCur.Bits)
+				lastBits = tempCur.Bits
+			}
+			rightBits = lastBits
+			// rightBits = epochStart.Bits // original line
 		}
 	}
 	return rightBits, nil

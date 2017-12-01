@@ -210,7 +210,7 @@ func (s *SPVCon) IngestMerkleBlock(m *wire.MsgMerkleBlock) {
 }
 
 // IngestHeaders takes in a bunch of headers, checks them,
-// and if they're OK, appends them to the loccal header file.
+// and if they're OK, appends them to the local header file.
 // If there are no headers, it assumes we're done and returns false.
 // Otherwise it assumes there's more to request and returns true.
 func (s *SPVCon) IngestHeaders(m *wire.MsgHeaders) (bool, error) {
