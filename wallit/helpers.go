@@ -47,6 +47,10 @@ func (r *Rand) RandRange(n uint32) (uint32, error) {
 	return v % n, nil
 }
 
+func SliceSlice(slice []portxo.TxoSliceByAmt, s int) []portxo.TxoSliceByAmt {
+	return append(slice[:s], slice[s+1:]...)
+}
+
 func Shuffle(arr portxo.TxoSliceByAmt) (portxo.TxoSliceByAmt, error) {
 	if len(arr) == 0 {
 		return nil, fmt.Errorf("The length of the utxo pool is zero")
@@ -80,9 +84,36 @@ func Choice(arr portxo.TxoSliceByAmt) (*portxo.PorTxo, error) {
 	return arr[j]
 }
 
+func getBadness(txos []portxo.PorTxo, sum, amtWanted int64) int32 {
+
+	// penalty stuff, what does the below thing mean?
+	// min_change = min(o[2] for o in tx.outputs()) * 0.75
+	// max_change = max(o[2] for o in tx.outputs()) * 1.33
+	// spent_amount = sum(o[2] for o in tx.outputs())
+	min_change := 0 // placeholders
+	max_change := 500000000 // placeholders
+	spent_amount := 20000 // placeholders
+	change := sum - (amtWanted + spentAmount) // change this
+	var badness int32
+	badness = int32(len(txos) - 1)
+
+	if change < min_change {
+		badness += (min_change - change) / (min_change + 10000)
+	} else if change > max_change {
+		badness += (change - max_change) / (max_change + 10000)
+		// Penalize large change; 5 BTC excess ~= using 1 more input
+		badness += change / (COIN * 5)
+	}
+	return badness
+}
+
+// while choosing buckets, we must take this badness index into accounting
+// in fact, this is our primary driving force behind the whole "privacy" approach
+// the winner is chosen adn returned
+// we might have to find the place as to where this thing is called
+
 // Electrum change policy: max(max(output-txos)*1.25, 0.02) for btc
 // question is, do we follow them?
 // Stuff to do:
-// 1. Penatly function similar to that of Electrum -> Privacy mode only?
-// 2. Figure out when they choose the privacy vs random model
-// 3. Is the new one better than the old one?
+// 1. Figure out when they choose the privacy vs random model
+// 2. Is the new one better than the old one?
