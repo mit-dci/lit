@@ -51,7 +51,7 @@ func (w *Wallit) MaybeSend(txos []*wire.TxOut, ow bool) ([]*wire.OutPoint, error
 
 	// get inputs for this tx.  Only segwit if needed
 	utxos, overshoot, err :=
-		w.PickUtxos(totalSend, outputByteSize, feePerByte, ow)
+		w.PickUtxosNew(totalSend, outputByteSize, feePerByte, ow)
 	if err != nil {
 		return nil, err
 	}
@@ -253,6 +253,7 @@ func (w *Wallit) PickUtxos(
 		}
 	}
 
+	// Start New Coin Algo over here
 	// start with utxos sorted by value and pop off utxos which are greater
 	// than the send amount... as long as the next 2 are greater.
 	// simple / straightforward coin selection optimization, which tends to make
@@ -336,6 +337,8 @@ func (w *Wallit) PickUtxos(
 	}
 
 	sort.Sort(rSlice) // send sorted.  This is probably redundant?
+
+	// End the new coin selection policy
 	return rSlice, -remaining, nil
 }
 
