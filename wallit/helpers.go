@@ -74,10 +74,10 @@ func Shuffle(arr portxo.TxoSliceByAmt) (portxo.TxoSliceByAmt, error) {
 		return arr, nil
 	}
 
-	seed := New(12345)
+	seed := New(12345)   // need a good seed here for this to work
 	for i := range arr { // elcetrum does reverse range, but
 		// the for loop turns out to be a bit ugly, so let's do this instead.
-		j, err := seed.RandRange(uint32(len(arr) + 1)) // +1 sicne the last element has to be shuffled
+		j, err := seed.RandRange(uint32(len(arr)))
 		if err != nil {
 			return nil, err
 		}
@@ -86,8 +86,7 @@ func Shuffle(arr portxo.TxoSliceByAmt) (portxo.TxoSliceByAmt, error) {
 	return arr, nil
 }
 
-func Choice(arr portxo.TxoSliceByAmt) (*portxo.PorTxo, error) {
-
+func PickOne(arr portxo.TxoSliceByAmt) (*portxo.PorTxo, error) {
 	if len(arr) == 0 {
 		return nil, fmt.Errorf("There is no Slice")
 	}
@@ -96,8 +95,8 @@ func Choice(arr portxo.TxoSliceByAmt) (*portxo.PorTxo, error) {
 		return arr[0], nil
 	}
 
-	seed := New(12345)
-	j, err := seed.RandRange(uint32(len(arr) + 1))
+	seed := New(123456)
+	j, err := seed.RandRange(uint32(len(arr)))
 	if err != nil {
 		return nil, err
 	}
@@ -144,6 +143,17 @@ func getBadness(utxos []portxo.PorTxo, txos []portxo.PorTxo, sum, amtWanted int6
 	return badness, nil
 }
 
+// Privacy based solution followed in Electrum: (just mimicking the random part over here)
+// DESCRIPTION:
+// Attempts to better preserve user privacy.  First, if any coin is
+// spent from a user address, all coins are.  Compared to spending
+// from other addresses to make up an amount, this reduces
+// information leakage about sender holdings.  It also helps to
+// reduce blockchain UTXO bloat, and reduce future privacy loss that
+// would come from reusing that address' remaining UTXOs.  Second, it
+// penalizes change that is quite different to the sent amount.
+// Third, it penalizes change that is too big
+
 func (w *Wallit) PickUtxosNew(
 	amtWanted, outputByteSize, feePerByte int64,
 	ow bool) (portxo.TxoSliceByBip69, int64, error) {
@@ -176,8 +186,14 @@ func (w *Wallit) PickUtxosNew(
 	// smallest and unconfirmed last (because it's reversed)
 	sum := int64(0)
 	for i, txs := range allUtxos {
+		// skip unconfirmed.  Or de-prioritize? Some option for this...
+		//		if utxo.AtHeight == 0 {
+		//			continue
+		//		}
 		//if (txs.Height > 100) &&
-		if txs.Mature(curHeight) {
+		if txs.Mature(curHeight) && (txs.Value > 1) { // why are 0-value outputs a thing..?
+			// min value ca actually be changed to 20000
+			// since the dustCutoff is 20000
 			sum += txs.Value
 		} else {
 			log.Println("tx info:", txs.Height, txs.Value)
@@ -186,27 +202,24 @@ func (w *Wallit) PickUtxosNew(
 		}
 	}
 
-	// by here, we have an allutxos set with confirmed inputs, hopefully
-	// now we're gonna follow electrum's way of a privacy based solution
-	// Privacy based solution followed in Electrum:
-	// DESCRIPTION:
-	// Attempts to better preserve user privacy.  First, if any coin is
-	// spent from a user address, all coins are.  Compared to spending
-	// from other addresses to make up an amount, this reduces
-	// information leakage about sender holdings.  It also helps to
-	// reduce blockchain UTXO bloat, and reduce future privacy loss that
-	// would come from reusing that address' remaining UTXOs.  Second, it
-	// penalizes change that is quite different to the sent amount.
-	// Third, it penalizes change that is too big
-
 	if sum <= amtWanted { // handle this case here, don't wanna go further
 		log.Println("SUM:", sum)
 		return nil, 0, fmt.Errorf("The sum of utxos is insufficient to pay for the amount")
 	}
 
-	sort.Sort(sort.Reverse(allUtxos)) // sort by reverse for convenience, we'll shuffle later anyway.
-
+	// sort.Sort(sort.Reverse(allUtxos)) // sort by reverse for convenience, we'll shuffle later anyway.
+	allUtxos, err = Shuffle(allUtxos)
+	if err != nil {
+		return nil, 0, fmt.Errorf("There was an erro when shuffling the utxo pile")
+	}
+	// 1. shuffle them
+	// 2. get badness index for all the guys
+	// 3. pick a random one among those guys / pick based on badness index
+	// 4. chec whether the given utxo value is enough for signing (along with fee)
+	// 5. yes, break and sign the tx
+	// 6. no, continue and find another tx (the next "preferable one")
 	// placeholder till here, works cool till now
+	// let's go
 
 	// utxos ready
 	// coin selection is super complex, and we can definitely do a lot better
@@ -218,33 +231,19 @@ func (w *Wallit) PickUtxosNew(
 	var rSlice portxo.TxoSliceByBip69
 	// add utxos until we've had enough
 	remaining := amtWanted // remaining is how much is needed on input side
-	for _, utxo := range allUtxos {
-		// skip unconfirmed.  Or de-prioritize? Some option for this...
-		//		if utxo.AtHeight == 0 {
-		//			continue
-		//		}
-		if remaining > sum {
-			log.Println("This sum of utxos is insufficient to make a tx. Please try again")
-			return nil, 0, fmt.Errorf("wanted %d but only %d available.",
-				remaining, sum)
-		}
-		log.Println("The value of the utxo that I get is: ", utxo.Value)
-		if !utxo.Mature(curHeight) {
-			continue // skip immature or unconfirmed time-locked sh outputs
+	amountSatisfied := false
+	for i := 0; i < 10000; i++ { // hoepfully 10000 times would be enough
+		utxo, err := PickOne(allUtxos)
+		if err != nil {
+			return nil, 0, fmt.Errorf("An error occured while picking a tx")
 		}
 		if ow && utxo.Mode&portxo.FlagTxoWitness == 0 {
 			continue // skip non-witness
-		}
-		// why are 0-value outputs a thing..?
-		if utxo.Value < 1 {
-			continue
 		}
 		// yeah, lets add this utxo!
 		rSlice = append(rSlice, utxo)
 		sum -= utxo.Value
 		remaining -= utxo.Value
-		// if remaining is positive, don't bother checking fee yet.
-		// if remaining is negative, calculate needed fee
 		if remaining <= 0 {
 			fee := EstFee(rSlice, outputByteSize, feePerByte)
 			// subtract fee from returned overshoot.
@@ -253,17 +252,21 @@ func (w *Wallit) PickUtxosNew(
 
 			// done adding utxos if remaining below negative est fee
 			if remaining < -fee {
-				break
+				amountSatisfied = true
 			}
+		}
+		if amountSatisfied {
+			break
 		}
 	}
 
-	if remaining > 0 {
-		return nil, 0, fmt.Errorf("wanted %d but %d available.",
-			amtWanted, amtWanted-remaining)
-		// guy returns negative stuff sometimes
+	if !amountSatisfied {
+		// default to the normal method
+		log.Println("OLD GUY")
+		return w.PickUtxos(amtWanted, outputByteSize, feePerByte, ow)
+		// should never come here with a good seed
 	}
-
+	// why do we send a sorted slice anyway?
 	sort.Sort(rSlice) // send sorted.  This is probably redundant?
 	return rSlice, -remaining, nil
 }
