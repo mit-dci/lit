@@ -90,6 +90,8 @@ func (w *Wallit) AdrDump() ([][20]byte, error) {
 		return nil, fmt.Errorf("Got %d keys stored, expect something reasonable", last)
 	}
 
+	// TODO: maybe store address hashes instead of recomputing them
+	// can speed things up a lot here, at a pretty small disk cost
 	for i = 0; i < last; i++ {
 		nKg := GetWalletKeygen(i, w.Param.HDCoinType)
 		nAdr160 := w.PathPubHash160(nKg)
