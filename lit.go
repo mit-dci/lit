@@ -112,7 +112,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	if conf.Tvtchost != "" && conf.Tvtchost != "0" {
 		p := &coinparam.VertcoinTestNetParams
 		err = node.LinkBaseWallet(
-			key, 0, conf.ReSync, conf.Tower,
+			key, 25000, conf.ReSync, conf.Tower,
 			conf.Tvtchost, p)
 		if err != nil {
 			return err

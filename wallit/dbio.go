@@ -322,7 +322,7 @@ func NewPorTxo(tx *wire.MsgTx, idx uint32, height int32,
 }
 
 // NewPorTxoBytesFromKGBytes just calls NewPorTxo() and de/serializes
-// quick shortcut for ingest()
+// quick shortcut for use in the ingest() function
 func NewPorTxoBytesFromKGBytes(
 	tx *wire.MsgTx, idx uint32, height int32, kgb []byte) ([]byte, error) {
 
@@ -484,7 +484,8 @@ func (w *Wallit) IngestMany(txs []*wire.MsgTx, height int32) (uint32, error) {
 					// fmt.Printf("txout script:%x matched kg: %x\n", out.PkScript, keygenBytes)
 
 					// build new portxo
-					txob, err := NewPorTxoBytesFromKGBytes(tx, uint32(j), height, keygenBytes)
+					txob, err := NewPorTxoBytesFromKGBytes(
+						tx, uint32(j), height, keygenBytes)
 					if err != nil {
 						return err
 					}
@@ -497,9 +498,15 @@ func (w *Wallit) IngestMany(txs []*wire.MsgTx, height int32) (uint32, error) {
 						continue
 					}
 
-					err = w.Hook.RegisterOutPoint(wire.OutPoint{tx.TxHash(), uint32(j)})
-					if err != nil {
-						return err
+					// if we've never seen this outpoint before, register it
+					// with the chainhook.  If we've already seen it (maybe getting
+					// confirmed now) we don't need to re-register.
+					existing := dufb.Get(txob[:36])
+					if existing == nil {
+						err = w.Hook.RegisterOutPoint(wire.OutPoint{tx.TxHash(), uint32(j)})
+						if err != nil {
+							return err
+						}
 					}
 
 					// add hits now though

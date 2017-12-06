@@ -97,7 +97,7 @@ type APILink struct {
 	tipBlockHash string
 
 	// time based polling
-	dirtybool bool
+	dirtyChan chan interface{}
 
 	p *coinparam.Params
 }
@@ -116,37 +116,42 @@ func (a *APILink) Start(
 	a.TxUpToWallit = make(chan lnutil.TxAndHeight, 1)
 	a.CurrentHeightChan = make(chan int32, 1)
 
+	a.dirtyChan = make(chan interface{}, 100)
+
 	a.height = startHeight
 
-	go a.ClockLoop()
+	go a.DirtyCheckLoop()
 	go a.TipRefreshLoop()
 
 	return a.TxUpToWallit, a.CurrentHeightChan, nil
 }
 
-func (a *APILink) ClockLoop() {
+// DirtyCheckLoop checks with the server once things have changed on the client end.
+// this is actually a bit ugly because it checks *everything* when *anything* has
+// changed.  It could be much more efficient if, eg it checks for a newly created
+// address by itself.
+func (a *APILink) DirtyCheckLoop() {
 
 	for {
-		if a.dirtybool {
-			err := a.GetVAdrTxos()
-			if err != nil {
-				log.Printf(err.Error())
-			}
-			err = a.GetVOPTxs()
-			if err != nil {
-				log.Printf(err.Error())
-			}
-			time.Sleep(time.Second * 1)
-			a.dirtybool = false
+		// wait here until something marks the state as dirty
+		log.Printf("Waiting for dirt...\n")
+		<-a.dirtyChan
+
+		log.Printf("Dirt detected\n")
+
+		err := a.GetVAdrTxos()
+		if err != nil {
+			log.Printf(err.Error())
 		}
-		fmt.Printf("clean, sleep 5 sec\n")
-		time.Sleep(time.Second * 5)
+		err = a.GetVOPTxs()
+		if err != nil {
+			log.Printf(err.Error())
+		}
 
-		// some kind of long range refresh for blocks...?
-		// should get dirty every 5 min?  Or better; there should be an API
-		// call to ask about the most recent block; then can poll that.
-		// maybe also link that to reorgs...?
-
+		// probably clean, empty it out
+		for len(a.dirtyChan) > 0 {
+			<-a.dirtyChan
+		}
 	}
 
 	return
@@ -185,11 +190,10 @@ func (a *APILink) TipRefreshLoop() error {
 
 		if blockjsons[0].Hash != a.tipBlockHash {
 			a.tipBlockHash = blockjsons[0].Hash
-			a.dirtybool = true
+			a.dirtyChan <- nil
 		}
 
 		fmt.Printf("blockchain tip %v\n", a.tipBlockHash)
-		fmt.Printf("dirty %v\n", a.dirtybool)
 
 		time.Sleep(time.Second * 60)
 	}
@@ -200,26 +204,26 @@ func (a *APILink) TipRefreshLoop() error {
 // RegisterAddress gets a 20 byte address from the wallit and starts
 // watching for utxos at that address.
 func (a *APILink) RegisterAddress(adr160 [20]byte) error {
-	fmt.Printf("register %x\n", adr160)
+	log.Printf("register %x\n", adr160)
 	a.TrackingAdrsMtx.Lock()
 	a.TrackingAdrs[adr160] = true
 	a.TrackingAdrsMtx.Unlock()
+	a.dirtyChan <- nil
+	log.Printf("Register %x complete\n", adr160)
 
-	a.dirtybool = true
-
-	fmt.Printf("dirty %v\n", a.dirtybool)
 	return nil
 }
 
 // RegisterOutPoint gets an outpoint from the wallit and starts looking
 // for txins that spend it.
 func (a *APILink) RegisterOutPoint(op wire.OutPoint) error {
-	fmt.Printf("register %s\n", op.String())
+	log.Printf("register %s\n", op.String())
 	a.TrackingOPsMtx.Lock()
 	a.TrackingOPs[op] = true
 	a.TrackingOPsMtx.Unlock()
 
-	a.dirtybool = true
+	a.dirtyChan <- nil
+	log.Printf("Register %s complete\n", op.String())
 	return nil
 }
 
@@ -315,12 +319,13 @@ func (a *APILink) GetVAdrTxos() error {
 			txah.Height = int32(txjson.Height)
 			txah.Tx = tx
 
-			log.Printf("tx %s at height %d\n", txah.Tx.TxHash().String(), txah.Height)
+			log.Printf("tx %s at height %d", txah.Tx.TxHash().String(), txah.Height)
 			// send the tx and height back up to the wallit
 			a.TxUpToWallit <- txah
+			log.Printf("sent\n")
 		}
 	}
-
+	log.Printf("GetVAdrTxos complete\n")
 	return nil
 }
 

@@ -111,6 +111,7 @@ func NewWallit(
 	return &w
 }
 
+// TxHandler is the goroutine that receives & ingests new txs for the wallit.
 func (w *Wallit) TxHandler(incomingTxAndHeight chan lnutil.TxAndHeight) {
 	for {
 		txah := <-incomingTxAndHeight
