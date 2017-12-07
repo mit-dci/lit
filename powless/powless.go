@@ -395,7 +395,7 @@ func (a *APILink) GetAdrTxos() error {
 }
 
 func (a *APILink) GetVOPTxs() error {
-	apitxourl := "https://vtc.xchan.gr/new/outpointSpend/"
+	apitxourl := "https://tvtc.blkidx.org/outpointSpend/"
 
 	var oplist []wire.OutPoint
 
@@ -602,9 +602,37 @@ type JsUtxo struct {
 
 */
 
+// PushTx for indexer
+func (a *APILink) PushTx(tx *wire.MsgTx) error {
+	if tx == nil {
+		return fmt.Errorf("tx is nil")
+	}
+	var b bytes.Buffer
+
+	err := tx.Serialize(&b)
+	if err != nil {
+		return err
+	}
+
+	txHexString := fmt.Sprintf("%x", b.Bytes())
+
+	// guess I just put the bytes as the body...?
+
+	apiurl := "https://tvtc.blkidx.org/sendRawTransaction"
+	response, err :=
+		http.Post(apiurl, "text/plain", bytes.NewBuffer([]byte(txHexString)))
+	if err != nil {
+		return err
+	}
+	fmt.Printf("respo	nse: %s", response.Status)
+	_, err = io.Copy(os.Stdout, response.Body)
+
+	return err
+}
+
 // PushTx pushes a tx to the network via the smartbit site / api
 // smartbit supports segwit so
-func (a *APILink) PushTx(tx *wire.MsgTx) error {
+func (a *APILink) PushTxSmartBit(tx *wire.MsgTx) error {
 	if tx == nil {
 		return fmt.Errorf("tx is nil")
 	}
