@@ -126,6 +126,60 @@ func (a *APILink) Start(
 	return a.TxUpToWallit, a.CurrentHeightChan, nil
 }
 
+// PushTx for indexer
+func (a *APILink) PushTx(tx *wire.MsgTx) error {
+	if tx == nil {
+		return fmt.Errorf("tx is nil")
+	}
+	var b bytes.Buffer
+
+	err := tx.Serialize(&b)
+	if err != nil {
+		return err
+	}
+
+	txHexString := fmt.Sprintf("%x", b.Bytes())
+
+	// guess I just put the bytes as the body...?
+
+	apiurl := "https://tvtc.blkidx.org/sendRawTransaction"
+	response, err :=
+		http.Post(apiurl, "text/plain", bytes.NewBuffer([]byte(txHexString)))
+	if err != nil {
+		return err
+	}
+	fmt.Printf("respo	nse: %s", response.Status)
+	_, err = io.Copy(os.Stdout, response.Body)
+
+	return err
+}
+
+// RegisterAddress gets a 20 byte address from the wallit and starts
+// watching for utxos at that address.
+func (a *APILink) RegisterAddress(adr160 [20]byte) error {
+	log.Printf("register %x\n", adr160)
+	a.TrackingAdrsMtx.Lock()
+	a.TrackingAdrs[adr160] = true
+	a.TrackingAdrsMtx.Unlock()
+	a.dirtyChan <- nil
+	log.Printf("Register %x complete\n", adr160)
+
+	return nil
+}
+
+// RegisterOutPoint gets an outpoint from the wallit and starts looking
+// for txins that spend it.
+func (a *APILink) RegisterOutPoint(op wire.OutPoint) error {
+	log.Printf("register %s\n", op.String())
+	a.TrackingOPsMtx.Lock()
+	a.TrackingOPs[op] = true
+	a.TrackingOPsMtx.Unlock()
+
+	a.dirtyChan <- nil
+	log.Printf("Register %s complete\n", op.String())
+	return nil
+}
+
 // DirtyCheckLoop checks with the server once things have changed on the client end.
 // this is actually a bit ugly because it checks *everything* when *anything* has
 // changed.  It could be much more efficient if, eg it checks for a newly created
@@ -148,7 +202,7 @@ func (a *APILink) DirtyCheckLoop() {
 			log.Printf(err.Error())
 		}
 
-		// probably clean, empty it out
+		// probably clean, empty it out to prevent cascades
 		for len(a.dirtyChan) > 0 {
 			<-a.dirtyChan
 		}
@@ -201,40 +255,6 @@ func (a *APILink) TipRefreshLoop() error {
 	return nil
 }
 
-// RegisterAddress gets a 20 byte address from the wallit and starts
-// watching for utxos at that address.
-func (a *APILink) RegisterAddress(adr160 [20]byte) error {
-	log.Printf("register %x\n", adr160)
-	a.TrackingAdrsMtx.Lock()
-	a.TrackingAdrs[adr160] = true
-	a.TrackingAdrsMtx.Unlock()
-	a.dirtyChan <- nil
-	log.Printf("Register %x complete\n", adr160)
-
-	return nil
-}
-
-// RegisterOutPoint gets an outpoint from the wallit and starts looking
-// for txins that spend it.
-func (a *APILink) RegisterOutPoint(op wire.OutPoint) error {
-	log.Printf("register %s\n", op.String())
-	a.TrackingOPsMtx.Lock()
-	a.TrackingOPs[op] = true
-	a.TrackingOPsMtx.Unlock()
-
-	a.dirtyChan <- nil
-	log.Printf("Register %s complete\n", op.String())
-	return nil
-}
-
-// ARGHGH all fields have to be exported (caps) or the json unmarshaller won't
-// populate them !
-type AdrUtxoResponse struct {
-	Txid     string
-	Height   int32
-	Satoshis int64
-}
-
 // do you even need a struct here..?
 type RawTxResponse struct {
 	RawTx string
@@ -246,6 +266,13 @@ type VRawTx struct {
 	Height  int32
 	Spender string
 	Tx      string
+}
+
+// VSpendResponse is the JSON response from the / outpointSpend call
+type VSpendResponse struct {
+	Error   bool
+	Spender string
+	Spent   bool
 }
 
 // GetVAdrTxos gets new utxos for the wallet from the indexer.
@@ -401,8 +428,10 @@ func (a *APILink) GetVOPTxs() error {
 
 	// copy registered ops here to minimize time mutex is locked
 	a.TrackingOPsMtx.Lock()
-	for op, _ := range a.TrackingOPs {
-		oplist = append(oplist, op)
+	for op, checking := range a.TrackingOPs {
+		if checking {
+			oplist = append(oplist, op)
+		}
 	}
 	a.TrackingOPsMtx.Unlock()
 
@@ -426,120 +455,25 @@ func (a *APILink) GetVOPTxs() error {
 			continue
 		}
 
+		// fetch the tx indicated and give it to the wallit.
+		//              txr.Spender
+
+		// assume you no longer need to monitor this outpoint,
+		// because it's gone, and you just told the wallit how it disappeared
+		a.TrackingOPsMtx.Lock()
+		// mark this outpoint as not checked.  It stays in ram though.
+		a.TrackingOPs[op] = false
+		a.TrackingOPsMtx.Unlock()
+
 		// don't need per-txout check here; the outpoint itself is spent
 	}
 
 	return nil
 }
 
-func (a *APILink) GetOPTxs() error {
-	apitxourl := "https://testnet.blockexplorer.com/api/"
-
-	var oplist []wire.OutPoint
-
-	// copy registered ops here to minimize time mutex is locked
-	a.TrackingOPsMtx.Lock()
-	for op, _ := range a.TrackingOPs {
-		oplist = append(oplist, op)
-	}
-	a.TrackingOPsMtx.Unlock()
-
-	// need to query each txid with a different http request
-	for _, op := range oplist {
-		fmt.Printf("asking for %s\n", op.String())
-		// get full tx info for the outpoint's tx
-		// (if we have 2 outpoints with the same txid we query twice...)
-		response, err := http.Get(apitxourl + "tx/" + op.Hash.String())
-		if err != nil {
-			return err
-		}
-
-		var txr TxResponse
-		// parse the response to get the spending txid
-		err = json.NewDecoder(response.Body).Decode(&txr)
-		if err != nil {
-			fmt.Printf("json decode error; op %s not found\n", op.String())
-			continue
-		}
-
-		// what is the "v" for here?
-		for _, txout := range txr.Vout {
-			if op.Index == txout.N { // hit; request this outpoint's spend tx
-				// see if it's been spent
-				if txout.SpentTxId == "" {
-					fmt.Printf("%s has nil spenttxid\n", op.String())
-					// this outpoint is not yet spent, can't request
-					continue
-				}
-
-				tx, err := GetRawTx(txout.SpentTxId)
-				if err != nil {
-					return err
-				}
-
-				var txah lnutil.TxAndHeight
-				txah.Tx = tx
-				txah.Height = txout.SpentHeight
-				a.TxUpToWallit <- txah
-
-				a.UpdateHeight(txout.SpentHeight)
-			}
-		}
-
-		// TODO -- REMOVE once there is any API support for segwit addresses.
-		// This queries the outpoints we already have and re-downloads them to
-		// update their height. (IF the height is non-zero)  It's a huge hack
-		// and not scalable.  But allows segwit outputs to be confirmed now.
-		//if txr.
-
-		if txr.Blockheight > 1 {
-			// this outpoint is confirmed; redownload it and send to wallit
-			tx, err := GetRawTx(txr.Txid)
-			if err != nil {
-				return err
-			}
-
-			var txah lnutil.TxAndHeight
-			txah.Tx = tx
-			txah.Height = txr.Blockheight
-			a.TxUpToWallit <- txah
-
-			a.UpdateHeight(txr.Blockheight)
-		}
-
-		// TODO -- end REMOVE section
-
-	}
-
-	return nil
-}
-
-type TxResponse struct {
-	Txid        string
-	Blockheight int32
-	Vout        []VoutJson
-}
-
-// Get txid of spending tx
-type VoutJson struct {
-	N           uint32
-	SpentTxId   string
-	SpentHeight int32
-}
-
-func (a *APILink) UpdateHeight(height int32) {
-	// if it's an increment (note reorgs are still... not a thing yet)
-	if height > a.height {
-		// update internal height
-		a.height = height
-		// send that back up to the wallit
-		a.CurrentHeightChan <- height
-	}
-}
-
-// GetRawTx is a helper function to get a tx from the insight api
-func GetRawTx(txid string) (*wire.MsgTx, error) {
-	rawTxURL := "https://testnet.blockexplorer.com/api/rawtx/"
+// VGetRawTx is a helper function to get a tx from the indexer
+func VGetRawTx(txid string) (*wire.MsgTx, error) {
+	rawTxURL := "https://tvtc.blkidx.org/getTransaction/"
 	response, err := http.Get(rawTxURL + txid)
 	if err != nil {
 		return nil, err
@@ -566,95 +500,14 @@ func GetRawTx(txid string) (*wire.MsgTx, error) {
 	return tx, nil
 }
 
-/* smartbit structs
-type AdrResponse struct {
-	Success bool
-	//	Paging  interface{}
-	Unspent []JsUtxo
-}
-
-type TxResponse struct {
-	Success     bool
-	Transaction []TxJson
-}
-
-type TxJson struct {
-	Block int32
-	Txid  string
-}
-
-type TxHexResponse struct {
-	Success bool
-	Hex     []TxHexString
-}
-
-type TxHexString struct {
-	Txid string
-	Hex  string
-}
-
-type JsUtxo struct {
-	Value_int int64
-	Txid      string
-	N         uint32
-	Addresses []string // why more than 1 ..? always 1.
-}
-
-*/
-
-// PushTx for indexer
-func (a *APILink) PushTx(tx *wire.MsgTx) error {
-	if tx == nil {
-		return fmt.Errorf("tx is nil")
+func (a *APILink) UpdateHeight(height int32) {
+	// if it's an increment (note reorgs are still... not a thing yet)
+	if height > a.height {
+		// update internal height
+		a.height = height
+		// send that back up to the wallit
+		a.CurrentHeightChan <- height
 	}
-	var b bytes.Buffer
-
-	err := tx.Serialize(&b)
-	if err != nil {
-		return err
-	}
-
-	txHexString := fmt.Sprintf("%x", b.Bytes())
-
-	// guess I just put the bytes as the body...?
-
-	apiurl := "https://tvtc.blkidx.org/sendRawTransaction"
-	response, err :=
-		http.Post(apiurl, "text/plain", bytes.NewBuffer([]byte(txHexString)))
-	if err != nil {
-		return err
-	}
-	fmt.Printf("respo	nse: %s", response.Status)
-	_, err = io.Copy(os.Stdout, response.Body)
-
-	return err
-}
-
-// PushTx pushes a tx to the network via the smartbit site / api
-// smartbit supports segwit so
-func (a *APILink) PushTxSmartBit(tx *wire.MsgTx) error {
-	if tx == nil {
-		return fmt.Errorf("tx is nil")
-	}
-	var b bytes.Buffer
-
-	err := tx.Serialize(&b)
-	if err != nil {
-		return err
-	}
-
-	// turn into hex
-	txHexString := fmt.Sprintf("{\"hex\": \"%x\"}", b.Bytes())
-
-	fmt.Printf("tx hex string is %s\n", txHexString)
-
-	apiurl := "https://testnet-api.smartbit.com.au/v1/blockchain/pushtx"
-	response, err := http.Post(
-		apiurl, "application/json", bytes.NewBuffer([]byte(txHexString)))
-	fmt.Printf("respo	nse: %s", response.Status)
-	_, err = io.Copy(os.Stdout, response.Body)
-
-	return err
 }
 
 func (a *APILink) RawBlocks() chan *wire.MsgBlock {
