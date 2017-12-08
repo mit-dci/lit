@@ -242,8 +242,12 @@ func (a *APILink) TipRefreshLoop() error {
 			return err
 		}
 
-		if blockjsons[0].Hash != a.tipBlockHash {
+		// only height needed here?
+		if blockjsons[0].Hash != a.tipBlockHash &&
+			blockjsons[0].Height > a.height {
+
 			a.tipBlockHash = blockjsons[0].Hash
+			a.UpdateHeight(blockjsons[0].Height)
 			a.dirtyChan <- nil
 		}
 
@@ -266,13 +270,6 @@ type VRawTx struct {
 	Height  int32
 	Spender string
 	Tx      string
-}
-
-// VSpendResponse is the JSON response from the / outpointSpend call
-type VSpendResponse struct {
-	Error   bool
-	Spender string
-	Spent   bool
 }
 
 // GetVAdrTxos gets new utxos for the wallet from the indexer.
@@ -356,69 +353,12 @@ func (a *APILink) GetVAdrTxos() error {
 	return nil
 }
 
-// GetAdrTxos
-// ...use insight api.  at least that's open source, can run yourself, seems to have
-// some dev activity behind it.
-func (a *APILink) GetAdrTxos() error {
-
-	apitxourl := "https://testnet.blockexplorer.com/api"
-	// make a comma-separated list of base58 addresses
-	var adrlist string
-
-	a.TrackingAdrsMtx.Lock()
-	for adr160, _ := range a.TrackingAdrs {
-		adr58 := lnutil.OldAddressFromPKH(adr160, a.p.PubKeyHashAddrID)
-		adrlist += adr58
-		adrlist += ","
-	}
-	a.TrackingAdrsMtx.Unlock()
-
-	// chop off last comma, and add /utxo
-	adrlist = adrlist[:len(adrlist)-1] + "/utxo"
-
-	response, err := http.Get(apitxourl + "/addrs/" + adrlist)
-	if err != nil {
-		return err
-	}
-
-	ars := new([]AdrUtxoResponse)
-
-	err = json.NewDecoder(response.Body).Decode(ars)
-	if err != nil {
-		return err
-	}
-
-	if len(*ars) == 0 {
-		return fmt.Errorf("no ars \n")
-	}
-
-	// go through txids, request hex tx, build txahdheight and send that up
-	for _, adrUtxo := range *ars {
-
-		// only request if higher than current 'sync' height
-		if adrUtxo.Height < a.height {
-			// skip this address; it's lower than we've already seen
-			continue
-		}
-
-		tx, err := GetRawTx(adrUtxo.Txid)
-		if err != nil {
-			return err
-		}
-
-		var txah lnutil.TxAndHeight
-		txah.Height = int32(adrUtxo.Height)
-		txah.Tx = tx
-
-		fmt.Printf("tx %s at height %d\n", txah.Tx.TxHash().String(), txah.Height)
-		a.TxUpToWallit <- txah
-
-		// don't know what order we get these in, so update APILink height at the end
-		// I think it's OK to do this?  Seems OK but haven't seen this use of defer()
-		defer a.UpdateHeight(adrUtxo.Height)
-	}
-
-	return nil
+// VSpendResponse is the JSON response from the / outpointSpend call
+type VSpendResponse struct {
+	Error      bool
+	Spender    string
+	SpenderRaw string
+	Spent      bool
 }
 
 func (a *APILink) GetVOPTxs() error {
@@ -442,29 +382,49 @@ func (a *APILink) GetVOPTxs() error {
 		// (if we have 2 outpoints with the same txid we query twice...)
 		opstring := op.String()
 		opstring = strings.Replace(opstring, ";", "/", 1)
-		response, err := http.Get(apitxourl + opstring)
+		response, err := http.Get(apitxourl + opstring + "?raw=1")
 		if err != nil {
 			return err
 		}
 
-		var txr TxResponse
+		var txr VSpendResponse
 		// parse the response to get the spending txid
 		err = json.NewDecoder(response.Body).Decode(&txr)
-		if err != nil {
+		if err != nil || txr.Error {
 			fmt.Printf("json decode error; op %s not found\n", op.String())
 			continue
 		}
 
-		// fetch the tx indicated and give it to the wallit.
-		//              txr.Spender
+		// see if this utxo is spent
+		if txr.Spent {
 
-		// assume you no longer need to monitor this outpoint,
-		// because it's gone, and you just told the wallit how it disappeared
-		a.TrackingOPsMtx.Lock()
-		// mark this outpoint as not checked.  It stays in ram though.
-		a.TrackingOPs[op] = false
-		a.TrackingOPsMtx.Unlock()
+			// if so, decode the tx indicated and give it to the wallit.
+			txBytes, err := hex.DecodeString(txr.SpenderRaw)
+			if err != nil {
+				return err
+			}
+			buf := bytes.NewBuffer(txBytes)
+			tx := wire.NewMsgTx()
+			err = tx.Deserialize(buf)
+			if err != nil {
+				return err
+			}
 
+			var txah lnutil.TxAndHeight
+			txah.Tx = tx
+			// don't know height from returned data, assume it's current height
+			// which could be wrong, gotta fix this.
+			// TODO
+			txah.Height = a.height
+			a.TxUpToWallit <- txah
+
+			// assume you no longer need to monitor this outpoint,
+			// because it's gone, and you just told the wallit how it disappeared
+			a.TrackingOPsMtx.Lock()
+			// mark this outpoint as not checked.  It stays in ram though.
+			a.TrackingOPs[op] = false
+			a.TrackingOPsMtx.Unlock()
+		}
 		// don't need per-txout check here; the outpoint itself is spent
 	}
 
