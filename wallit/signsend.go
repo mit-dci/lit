@@ -27,6 +27,20 @@ func (w *Wallit) SetRbf(rbf bool) {
 	return
 }
 
+// MaybeSendRbf drives the entire rbf theme. It is a super-function composed of:
+// 1. MaybeSend
+// 2. BuildDontSign
+// 3. BuildAndSign
+// 4. ReallySend
+// gets rid of all the intermediate frozen stuff since everything is in a single function
+// As of now, locktimes set in the future will be rejected by core (validation.cpp:496)
+// Only accept nLockTime-using transactions that can be mined in the next
+// block; we don't want our mempool filled up with transactions that can't
+// be mined yet.
+// if (!CheckFinalTx(tx, STANDARD_LOCKTIME_VERIFY_FLAGS))
+// 		return state.DoS(0, false, REJECT_NONSTANDARD, "non-final");
+// And rejects those before segwit with "no-witness-yet"
+
 func (w *Wallit) MaybeSendRbf(txos []*wire.TxOut, ow bool) (*wire.MsgTx, error) {
 	var err error
 	var totalSend int64
@@ -43,33 +57,29 @@ func (w *Wallit) MaybeSendRbf(txos []*wire.TxOut, ow bool) (*wire.MsgTx, error) 
 	for i := 1; i < 6; i++ {
 		utxos, overshoot[i], err =
 			//w.PickUtxos(totalSend, outputByteSize, feePerByte, ow)
-			w.PickUtxos(totalSend, outputByteSize, int64(20*i), ow)
+			w.PickUtxos(totalSend, outputByteSize, int64(w.FeeRate*int64(i)), ow)
 		if err != nil {
+			// means a tx is not feasible with some given rate
 			return nil, err
 		}
 	}
 	// utxos configured to 100
 	// overshoot values are stored
-	log.Println("Utxos: ", utxos)
+	log.Println("Utxos:", utxos)
 	log.Println("Overshoot:", overshoot)
+	log.Println("Current Height:", w.CurrentHeight())
 	// Till here, nothing changes for all the Rbf guys
 	padding := uint32(0)
-	feePerByte := 20
+	//feePerByte := 20
+	feePerByte := w.FeeRate
 
 	for loopVar := 1; loopVar <= 5; loopVar += 1 {
 		// paste stuff Here
-		log.Println("Setting fee per byte:", feePerByte)
 		// log.Println("FreezeSet: ", w.FreezeSet)
 		dustCutoff := int64(20000) // below this amount, just give to miners
 
-		// make an initial txo copy so we can find where the outputs end up in final tx
-		initTxos := make([]*wire.TxOut, len(txos))
-
 		// change output (if needed)
 		var changeOut *wire.TxOut
-
-		ops := make([]*wire.OutPoint, len(txos))
-		copy(initTxos, txos)
 
 		// get inputs for this tx.  Only segwit if needed
 
@@ -94,6 +104,7 @@ func (w *Wallit) MaybeSendRbf(txos []*wire.TxOut, ow bool) (*wire.MsgTx, error) 
 		// always make version 2 txs
 		tx.Version = 2
 		tx.LockTime = padding + uint32(w.CurrentHeight())
+		log.Printf("Locking fee %d at height: %d", feePerByte, tx.LockTime)
 		// add all the txouts, direct from the argument slice
 		for _, txo := range txos {
 			if txo == nil || txo.PkScript == nil || txo.Value == 0 {
@@ -114,18 +125,6 @@ func (w *Wallit) MaybeSendRbf(txos []*wire.TxOut, ow bool) (*wire.MsgTx, error) 
 		}
 		// sort txouts in place before signing.  txins are already sorted from above
 		txsort.InPlaceSort(tx)
-		temp := tx.TxHash()
-		// figure out where outputs ended up after adding the change output and sorting
-		for i, initTxo := range initTxos {
-			for j, finalTxo := range tx.TxOut {
-				// If pkscripts match, this is where it ended up.
-				// if you're sending different amounts to the same address, this
-				// might not work!  Don't re-use addresses!
-				if bytes.Equal(initTxo.PkScript, finalTxo.PkScript) {
-					ops[i] = wire.NewOutPoint(&temp, uint32(j))
-				}
-			}
-		}
 
 		if changeOut != nil {
 			txos = append(txos, changeOut)
@@ -138,9 +137,74 @@ func (w *Wallit) MaybeSendRbf(txos []*wire.TxOut, ow bool) (*wire.MsgTx, error) 
 		// sort input utxos first.
 		sort.Sort(portxo.TxoSliceByBip69(utxos))
 
-		log.Println("tx:", tx.Version, tx.TxIn, tx.TxOut, tx.LockTime)
 		padding += 10
-		feePerByte += 20
+		feePerByte += 20 // steps of 20 or 10??
+		// RerallySend the transaction
+		hCache := txscript.NewTxSigHashes(tx)
+		// make the stashes for signatures / witnesses
+		sigStash := make([][]byte, len(utxos))
+		witStash := make([][][]byte, len(utxos))
+
+		for i, _ := range tx.TxIn {
+			// get key
+			priv := w.PathPrivkey(utxos[i].KeyGen)
+			log.Printf("signing with privkey pub %x\n", priv.PubKey().SerializeCompressed())
+
+			if priv == nil {
+				return nil, fmt.Errorf("SendCoins: nil privkey")
+			}
+
+			// sign into stash.  3 possibilities:  legacy PKH, WPKH, WSH
+			if utxos[i].Mode == portxo.TxoP2PKHComp { // legacy PKH
+				sigStash[i], err = txscript.SignatureScript(tx, i,
+					utxos[i].PkScript, txscript.SigHashAll, priv, true)
+				if err != nil {
+					return nil, err
+				}
+			}
+			if utxos[i].Mode == portxo.TxoP2WPKHComp { // witness PKH
+				witStash[i], err = txscript.WitnessScript(tx, hCache, i,
+					utxos[i].Value, utxos[i].PkScript, txscript.SigHashAll, priv, true)
+				if err != nil {
+					return nil, err
+				}
+				//}
+			}
+			if utxos[i].Mode == portxo.TxoP2WSHComp { // witness script hash
+				sig, err := txscript.RawTxInWitnessSignature(tx, hCache, i,
+					utxos[i].Value, utxos[i].PkScript, txscript.SigHashAll, priv)
+				if err != nil {
+					return nil, err
+				}
+				// witness stack has the signature, items, then the previous full script
+				witStash[i] = make([][]byte, 2+len(utxos[i].PreSigStack))
+
+				// sig comes first (pushed to stack last)
+				witStash[i][0] = sig
+
+				// after stack comes PostSigStack items
+				for j, element := range utxos[i].PreSigStack {
+					witStash[i][j+1] = element
+				}
+
+				// last stack item is the pkscript
+				witStash[i][len(witStash[i])-1] = utxos[i].PkScript
+			}
+
+		}
+		// swap sigs into sigScripts in txins
+		for i, txin := range tx.TxIn {
+			if sigStash[i] != nil {
+				txin.SignatureScript = sigStash[i]
+			}
+			if witStash[i] != nil {
+				txin.Witness = witStash[i]
+				txin.SignatureScript = nil
+			}
+		}
+
+		log.Printf("tx: %s", TxToString(tx))
+		w.NewOutgoingTx(tx)
 	}
 	return nil, nil
 }
