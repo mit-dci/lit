@@ -24,35 +24,33 @@ import (
 // received money or not.
 
 /*
-Here are the inefficiencies of the block explorer model.
-The 2 things you want to support are gaining and losing money.
-Gaining is done by watching for new txs with outputs to an address.
-Losing is done by watching for new txs with inputs from an outpoint.
+Powless is a package to hook up a lit wallit to a block explorer.
+The idea is that it's proof-of-work-less, in that there isn't any, which is
+not great :(
 
-Insight does allow us to query UTXOs for an address, but not above a
-specified height.  So we end up re-downloading all the utxos we already know
-about.  But we don't have to send those to the wallit.
+Here's the API we're building for
+https://github.com/gertjaap/blockchain-indexer
 
-Watching for outpoints is easier; they disappear.  We just keep checking the
-tx of the outpoint and see if the outpoint index is spent.
+Soon we'll try to put in some merkle proofs and header chains, so there will be
+less PoW, but still some, and the name still works.  That's forwards-compatibility!
 
-To make an optimal web-explorer api, here are the api calls you'd want:
+Basic way to works is that powless implements the chainhook interface: a wallit
+starts a powless with Start() and then can register addresses and outpoints
+with the register() calls.  Powless can respond via 2 channels, the
+TxUpToWallit channel and the CurrentHeightChan, which send transactions and
+heights respectively.
 
-/utxoAboveHeight/[address]/[height]
+The way it gets the data is from the indexer API calls, addressTxosSince and
+outpointSpend.  addressTxosSince gives us new coins, and outpointSpend takes
+them away.
 
-returns the raw hex (and other json if you want) of all txs sending to [address]
-which are confirmed at [height] or above
-
-/outPointSpend/[txid]/[index]
-
-returns either null, or the raw hex (& json if you want) of the transaction
-spending outpoint [txid]:[index].
-
-Those two calls get you basically everything you need for a wallet, in a pretty
-efficient way.
-
-(but yeah re-orgs and stuff, right?  None of this deals with that yet.  That's
-going to be a pain.)
+Next up: verify proof of work.  Have all (? or just addressTxosSince?) return
+merkle branches up to a header, and then a few headers after that (maybe 10?)
+Then also have a hardcoded minimum block work to compare against.  The powless
+client will then verify the branch up to the header, and the short chain of
+headers with work greater than minWork.  This is weaker than SPV, but does
+make it so the indexer has to do a bunch of work in order to send an invalid
+transaction.
 
 */
 
