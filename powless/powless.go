@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -76,7 +75,7 @@ ChainHook interface
 
 // APILink is a link to a web API that can tell you about blockchain data.
 type APILink struct {
-	apiCon net.Conn
+	apiUrl string
 
 	// TrackingAdrs and OPs are slices of addresses and outpoints to watch for.
 	// Using struct{} saves a byte of RAM but is ugly so I'll use bool.
@@ -119,6 +118,7 @@ func (a *APILink) Start(
 	a.dirtyChan = make(chan interface{}, 100)
 
 	a.height = startHeight
+	a.apiUrl = host
 
 	go a.DirtyCheckLoop()
 	go a.TipRefreshLoop()
@@ -142,7 +142,8 @@ func (a *APILink) PushTx(tx *wire.MsgTx) error {
 
 	// guess I just put the bytes as the body...?
 
-	apiurl := "https://tvtc.blkidx.org/sendRawTransaction"
+	apiurl := a.apiUrl + "sendRawTransaction"
+
 	response, err :=
 		http.Post(apiurl, "text/plain", bytes.NewBuffer([]byte(txHexString)))
 	if err != nil {
@@ -230,8 +231,9 @@ type VBlock struct {
 func (a *APILink) TipRefreshLoop() error {
 	for {
 		// Fetch the current highest block
-		apihighestblockurl := "https://tvtc.blkidx.org/blocks?limit=1"
-		response, err := http.Get(apihighestblockurl)
+		apiurl := a.apiUrl + "blocks?limit=1"
+
+		response, err := http.Get(apiurl)
 		if err != nil {
 			return err
 		}
@@ -275,7 +277,7 @@ type VRawTx struct {
 // GetVAdrTxos gets new utxos for the wallet from the indexer.
 func (a *APILink) GetVAdrTxos() error {
 
-	apitxourl := "https://tvtc.blkidx.org/addressTxosSince/"
+	apitxourl := a.apiUrl + "addressTxosSince/"
 
 	var urls []string
 	a.TrackingAdrsMtx.Lock()
@@ -362,7 +364,7 @@ type VSpendResponse struct {
 }
 
 func (a *APILink) GetVOPTxs() error {
-	apitxourl := "https://tvtc.blkidx.org/outpointSpend/"
+	apitxourl := a.apiUrl + "outpointSpend/"
 
 	var oplist []wire.OutPoint
 
@@ -432,8 +434,8 @@ func (a *APILink) GetVOPTxs() error {
 }
 
 // VGetRawTx is a helper function to get a tx from the indexer
-func VGetRawTx(txid string) (*wire.MsgTx, error) {
-	rawTxURL := "https://tvtc.blkidx.org/getTransaction/"
+func (a *APILink) VGetRawTx(txid string) (*wire.MsgTx, error) {
+	rawTxURL := a.apiUrl + "getTransaction/"
 	response, err := http.Get(rawTxURL + txid)
 	if err != nil {
 		return nil, err

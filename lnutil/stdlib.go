@@ -83,3 +83,29 @@ func BtU64(b []byte) uint64 {
 	binary.Read(buf, binary.BigEndian, &i)
 	return i
 }
+
+// NopeString returns true if the string means "nope"
+func NopeString(s string) bool {
+	nopes := []string{
+		"nope", "no", "n", "false", "0", "nil", "null", "disable", "off", "",
+	}
+	for _, ts := range nopes {
+		if ts == s {
+			return true
+		}
+	}
+	return false
+}
+
+// YupString returns true if the string means "yup"
+func YupString(s string) bool {
+	yups := []string{
+		"yup", "yes", "y", "true", "1", "ok", "enable", "on",
+	}
+	for _, ts := range yups {
+		if ts == s {
+			return true
+		}
+	}
+	return false
+}

@@ -2,7 +2,6 @@ package coinparam
 
 import (
 	"errors"
-	"log"
 	"math/big"
 	"time"
 
@@ -249,7 +248,6 @@ var (
 // If that prefix isn't registered, it returns an error.
 func PrefixToCoinType(prefix string) (uint32, error) {
 	coinType, ok := bech32Prefixes[prefix]
-	log.Printf("wow: ")
 	if !ok {
 		return 0, ErrUnknownPrefix
 	}
