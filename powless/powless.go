@@ -9,7 +9,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -147,7 +146,7 @@ func (a *APILink) PushTx(tx *wire.MsgTx) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("respo	nse: %s", response.Status)
+	fmt.Printf("response: %s\n", response.Status)
 	_, err = io.Copy(os.Stdout, response.Body)
 
 	return err
@@ -361,8 +360,37 @@ type VSpendResponse struct {
 	Spent      bool
 }
 
+// The Json you POST to outpointSpend
+type VSpendRequest []VSpendOutpoint
+
+// Basicall just outpoints encoded in Json
+type VSpendOutpoint struct {
+	// Argh! the indexer at the other end is case sensitive!
+	// So it just ignores us if we capitalize!
+	// And go json doesn't work unless capitalized
+	Txid string `json:"txid"`
+	Vout uint32 `json:"vout"`
+}
+
+// OpSliceToVSpendRequest turns a slice of outpoints into a Json list of em
+func OpSliceToVSpendRequest(ops []wire.OutPoint) VSpendRequest {
+	var vsr VSpendRequest
+	for _, op := range ops {
+		vsr = append(vsr, OpToVSpendOp(op))
+	}
+	return vsr
+}
+
+// OpToVSpendOp turns an outpoint into a json outpoint
+func OpToVSpendOp(op wire.OutPoint) VSpendOutpoint {
+	return VSpendOutpoint{
+		Txid: op.Hash.String(),
+		Vout: op.Index,
+	}
+}
+
 func (a *APILink) GetVOPTxs() error {
-	apitxourl := a.apiUrl + "outpointSpend/"
+	apitxourl := a.apiUrl + "outpointSpends"
 
 	var oplist []wire.OutPoint
 
@@ -375,58 +403,104 @@ func (a *APILink) GetVOPTxs() error {
 	}
 	a.TrackingOPsMtx.Unlock()
 
-	// need to query each txid with a different http request
-	for _, op := range oplist {
-		fmt.Printf("asking for %s\n", op.String())
-		// get full tx info for the outpoint's tx
-		// (if we have 2 outpoints with the same txid we query twice...)
-		opstring := op.String()
-		opstring = strings.Replace(opstring, ";", "/", 1)
-		response, err := http.Get(apitxourl + opstring + "?raw=1")
-		if err != nil {
-			return err
-		}
+	// build big json list to query
+	opjson := OpSliceToVSpendRequest(oplist)
 
-		var txr VSpendResponse
-		// parse the response to get the spending txid
-		err = json.NewDecoder(response.Body).Decode(&txr)
-		if err != nil || txr.Error {
-			fmt.Printf("json decode error; op %s not found\n", op.String())
-			continue
-		}
-
-		// see if this utxo is spent
-		if txr.Spent {
-
-			// if so, decode the tx indicated and give it to the wallit.
-			txBytes, err := hex.DecodeString(txr.SpenderRaw)
-			if err != nil {
-				return err
-			}
-			buf := bytes.NewBuffer(txBytes)
-			tx := wire.NewMsgTx()
-			err = tx.Deserialize(buf)
-			if err != nil {
-				return err
-			}
-
-			var txah lnutil.TxAndHeight
-			txah.Tx = tx
-			// don't know height from returned data, assume it's current height
-			// which could be wrong, gotta fix this.
-			// TODO
-			txah.Height = a.height
-			a.TxUpToWallit <- txah
-
-			// assume you no longer need to monitor this outpoint,
-			// because it's gone, and you just told the wallit how it disappeared
-			a.TrackingOPsMtx.Lock()
-			// mark this outpoint as not checked.  It stays in ram though.
-			a.TrackingOPs[op] = false
-			a.TrackingOPsMtx.Unlock()
-		}
-		// don't need per-txout check here; the outpoint itself is spent
+	b, err := json.Marshal(opjson)
+	if err != nil {
+		return err
 	}
+	fmt.Printf("Posting:\n %s\n", b)
+	response, err := http.Post(apitxourl, "application/json", bytes.NewBuffer(b))
+	if err != nil {
+		return err
+	}
+	fmt.Printf("resp status: %s\n", response.Status)
+
+	raw := make([]byte, response.ContentLength)
+
+	_, err = response.Body.Read(raw)
+	//	if err != nil {
+	//		return err
+	//	}
+
+	fmt.Printf("%s\n", raw)
+	// parse the response to get the spending txid
+	//	err = json.NewDecoder(response.Body).Decode(&txr)
+	//	if err != nil || txr.Error {
+	//		fmt.Printf("json decode error; op %s not found\n", op.String())
+	//		continue
+	//	}
+
+	/*
+		// need to query each txid with a different http request
+		for _, op := range oplist {
+			fmt.Printf("asking for %s\n", op.String())
+			// get full tx info for the outpoint's tx
+			// (if we have 2 outpoints with the same txid we query twice...)
+			opstring := op.String()
+			opstring = strings.Replace(opstring, ";", "/", 1)
+			response, err := http.Get(apitxourl + opstring + "?raw=1")
+			if err != nil {
+				return err
+			}
+
+			var txr VSpendResponse
+			// parse the response to get the spending txid
+			err = json.NewDecoder(response.Body).Decode(&txr)
+			if err != nil || txr.Error {
+				fmt.Printf("json decode error; op %s not found\n", op.String())
+				continue
+			}
+
+			// see if this utxo is spent
+			if txr.Spent {
+
+				// if so, decode the tx indicated and give it to the wallit.
+				txBytes, err := hex.DecodeString(txr.SpenderRaw)
+				if err != nil {
+					return err
+				}
+				buf := bytes.NewBuffer(txBytes)
+				tx := wire.NewMsgTx()
+				err = tx.Deserialize(buf)
+				if err != nil {
+					return err
+				}
+
+				var txah lnutil.TxAndHeight
+				txah.Tx = tx
+				// don't know height from returned data, assume it's current height
+				// which could be wrong, gotta fix this.
+				// TODO
+				txah.Height = a.height
+				a.TxUpToWallit <- txah
+
+				// assume you no longer need to monitor this outpoint,
+				// because it's gone, and you just told the wallit how it disappeared
+				a.TrackingOPsMtx.Lock()
+				// mark this outpoint as not checked.  It stays in ram though.
+				a.TrackingOPs[op] = false
+				a.TrackingOPsMtx.Unlock()
+			}
+			// don't need per-txout check here; the outpoint itself is spent
+		}
+	*/
+
+	//	txHexString := fmt.Sprintf("%x", b.Bytes())
+
+	// use post to
+	// guess I just put the bytes as the body...?
+
+	//	apiurl := a.apiUrl + "sendRawTransaction"
+
+	//	response, err :=
+	//		http.Post(apiurl, "text/plain", bytes.NewBuffer([]byte(txHexString)))
+	//	if err != nil {
+	//		return err
+	//	}
+	//	fmt.Printf("respo	nse: %s", response.Status)
+	//	_, err = io.Copy(os.Stdout, response.Body)
 
 	return nil
 }

@@ -270,7 +270,7 @@ func (a *APILink) PushTxSmartBit(tx *wire.MsgTx) error {
 	apiurl := "https://testnet-api.smartbit.com.au/v1/blockchain/pushtx"
 	response, err := http.Post(
 		apiurl, "application/json", bytes.NewBuffer([]byte(txHexString)))
-	fmt.Printf("respo	nse: %s", response.Status)
+	fmt.Printf("response: %s", response.Status)
 	_, err = io.Copy(os.Stdout, response.Body)
 
 	return err
