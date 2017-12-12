@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"log"
@@ -71,7 +70,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 
 	var err error
 	// try regtest
-	if conf.Reghost != "" && conf.Reghost != "0" {
+	if !lnutil.NopeString(conf.Reghost) {
 		p := &coinparam.RegressionNetParams
 		fmt.Printf("reg: %s\n", conf.Reghost)
 		err = node.LinkBaseWallet(key, 120, conf.ReSync, conf.Tower, conf.Reghost, p)
@@ -80,7 +79,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 		}
 	}
 	// try testnet3
-	if conf.Tn3host != "" && conf.Tn3host != "0" {
+	if !lnutil.NopeString(conf.Tn3host) {
 		p := &coinparam.TestNet3Params
 		err = node.LinkBaseWallet(
 			key, 1210000, conf.ReSync, conf.Tower,
@@ -90,7 +89,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 		}
 	}
 	// try litecoin regtest
-	if conf.Litereghost != "" && conf.Litereghost != "0" {
+	if !lnutil.NopeString(conf.Litereghost) {
 		p := &coinparam.LiteRegNetParams
 		err = node.LinkBaseWallet(key, 120, conf.ReSync, conf.Tower, conf.Litereghost, p)
 		if err != nil {
@@ -99,7 +98,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	}
 
 	// try litecoin testnet4
-	if conf.Lt4host != "" && conf.Lt4host != "0" {
+	if !lnutil.NopeString(conf.Lt4host) {
 		p := &coinparam.LiteCoinTestNet4Params
 		err = node.LinkBaseWallet(
 			key, p.StartHeight, conf.ReSync, conf.Tower,
@@ -109,17 +108,17 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 		}
 	}
 	// try vertcoin testnet
-	if conf.Tvtchost != "" && conf.Tvtchost != "0" {
+	if !lnutil.NopeString(conf.Tvtchost) {
 		p := &coinparam.VertcoinTestNetParams
 		err = node.LinkBaseWallet(
-			key, 0, conf.ReSync, conf.Tower,
+			key, 25000, conf.ReSync, conf.Tower,
 			conf.Tvtchost, p)
 		if err != nil {
 			return err
 		}
 	}
 	// try vertcoin mainnet
-	if conf.Vtchost != "" && conf.Vtchost != "0" {
+	if !lnutil.NopeString(conf.Vtchost) {
 		p := &coinparam.VertcoinParams
 		err = node.LinkBaseWallet(
 			key, p.StartHeight, conf.ReSync, conf.Tower,
@@ -262,23 +261,4 @@ func main() {
 	return
 	// New directory being created over at PWD
 	// conf file being created at /
-}
-
-func createDefaultConfigFile(destinationPath string) error {
-
-	dest, err := os.OpenFile(filepath.Join(destinationPath, defaultConfigFilename),
-		os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
-	if err != nil {
-		return err
-	}
-	defer dest.Close()
-
-	writer := bufio.NewWriter(dest)
-	defaultArgs := []byte("tn3=1")
-	_, err = writer.Write(defaultArgs)
-	if err != nil {
-		return err
-	}
-	writer.Flush()
-	return nil
 }

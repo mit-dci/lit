@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/adiabat/btcd/wire"
+	"github.com/mit-dci/lit/lnutil"
 )
 
 // Connect dials out and connects to full nodes.
@@ -18,8 +19,8 @@ func (s *SPVCon) Connect(remoteNode string) error {
 
 	// slice of IP addrs returned from the DNS seed
 	var seedAdrs []string
-	if remoteNode == "" || remoteNode == "auto" || remoteNode == "1" ||
-		remoteNode == "true" || remoteNode == "y" {
+	// if remoteNode is "yes" but no IP specified, use DNS seed
+	if lnutil.YupString(remoteNode) {
 		// connect to DNS seed based node
 		log.Printf("Attempting connection based on DNS seed\n")
 		if len(s.Param.DNSSeeds) == 0 {

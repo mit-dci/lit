@@ -111,6 +111,13 @@ func KeyHashFromPkScript(pkscript []byte) []byte {
 	return nil
 }
 
+// Not exported in txscript... so we copy and paste here
+func PayToPubKeyHashScript(pubKeyHash []byte) ([]byte, error) {
+	return txscript.NewScriptBuilder().AddOp(txscript.OP_DUP).
+		AddOp(txscript.OP_HASH160).AddData(pubKeyHash).
+		AddOp(txscript.OP_EQUALVERIFY).AddOp(txscript.OP_CHECKSIG).Script()
+}
+
 // TxToString prints out some info about a transaction. for testing / debugging
 func TxToString(tx *wire.MsgTx) string {
 	utx := btcutil.NewTx(tx)
