@@ -125,6 +125,11 @@ func (w *Wallit) SetFee(set int64) int64 {
 	return set
 }
 
+func (w *Wallit) SetRbf(rbf bool) {
+	w.Rbf = rbf
+	return
+}
+
 // ********* sweep is for testing / spamming, remove for real use
 func (w *Wallit) Sweep(outScript []byte, n uint32) ([]*chainhash.Hash, error) {
 	var err error
