@@ -141,7 +141,6 @@ func diffBitcoin(
 			// appropriate block was found.
 			lastBits := p.PowLimitBits
 			if tempCur != nil {
-				log.Println("Cool:", tempCur.Bits)
 				lastBits = tempCur.Bits
 			}
 			rightBits = lastBits
