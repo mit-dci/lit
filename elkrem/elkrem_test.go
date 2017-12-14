@@ -111,7 +111,7 @@ func TestElkremIngestLeftFail(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = rcv.AddNext(sha)
-	if err != nil {
+	if err == nil {
 		t.Fatalf("Should have a left child mismatch, but everything went OK!")
 	}
 }
