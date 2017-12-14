@@ -1,6 +1,6 @@
 lit
 cmd/lit-af/lit-af
-cmd/andui/andui
+cmd/glit/glit
 headers.bin
 ln.db
 testkey.hex
