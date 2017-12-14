@@ -1,5 +1,6 @@
 lit
 cmd/lit-af/lit-af
+cmd/glit/glit
 headers.bin
 ln.db
 testkey.hex
