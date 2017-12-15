@@ -172,6 +172,13 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		}
 		return nil
 	}
+	if cmd == "rawtx" { // send raw transaction
+		err = lc.RawTx(args)
+		if err != nil {
+			fmt.Fprintf(color.Output, "rawtx error: %s\n", err)
+		}
+		return nil
+	}
 
 	fmt.Fprintf(color.Output, "Command not recognized. type help for command list.\n")
 	return nil

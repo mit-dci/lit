@@ -267,6 +267,7 @@ func CombinePrivKeyWithBytes(k *btcec.PrivateKey, b []byte) *btcec.PrivateKey {
 // CombinePrivateKeys, but once it gets the combined private key, it subtracts the
 // original base key.  It's weird, but it allows the porTxo standard to always add
 // private keys and not need to be aware of different derivation methods.
+// Weird / ugly mix of types here as they're all [32]byte... ah well.
 func CombinePrivKeyAndSubtract(k *btcec.PrivateKey, b []byte) [32]byte {
 	// create empty array to copy into
 	var diffKey [32]byte
