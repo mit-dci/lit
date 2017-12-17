@@ -1,33 +1,32 @@
-// There is some inheritance from the base "coin" class to derived types in electrum.
-// Investigating that.. and they use buckets, not slices argh.
-// Structure of how stuff is done right now in Electrum:
-// Coin Chooser Base (base class): bucketize_coins, change_amounts, change_outputs, make_tx
-// Coin Chooser Random(Base): bucket_candidates, choose_bucket
-// Coin Chooser Privacy(Random): penalty_func
+// Privacy based solution followed in Electrum
+// DESCRIPTION:
+// Attempts to better preserve user privacy.  First, if any coin is
+// spent from a user address, all coins are.  Compared to spending
+// from other addresses to make up an amount, this reduces
+// information leakage about sender holdings.  It also helps to
+// reduce blockchain UTXO bloat, and reduce future privacy loss that
+// would come from reusing that address' remaining UTXOs.  Second, it
+// penalizes change that is quite different to the sent amount.
+// Third, it penalizes change that is too big
+// TODO: is this new model better than the existing one?
+// even if it isn't, it atelast follows a "standard" approach
 
 package wallit
 
-// helper functions to test out the new coin selection algo
-// TODO: is this new model better than the existing one?
-// even if it isn't, it atelast follows a "standard" approach
-// to coin selection (Electrum)
 import (
 	"crypto/sha512"
 	"encoding/binary"
 
 	"fmt"
-	"log"
-	"sort"
-
 	"github.com/mit-dci/lit/portxo"
+	"log"
+	"math/rand"
+	"sort"
 )
 
 type Rand struct {
 	buf [sha512.Size]byte
 }
-
-// lets create a deterministic prng
-// New returns a new seeded Rand.
 
 func (r *Rand) RandNumber() uint32 {
 	hash := sha512.New()
@@ -74,9 +73,8 @@ func Shuffle(arr portxo.TxoSliceByAmt) (portxo.TxoSliceByAmt, error) {
 		return arr, nil
 	}
 
-	seed := New(12345)   // need a good seed here for this to work
-	for i := range arr { // elcetrum does reverse range, but
-		// the for loop turns out to be a bit ugly, so let's do this instead.
+	seed := New(uint32(rand.Int()))
+	for i := range arr { // elcetrum does reverse range
 		j, err := seed.RandRange(uint32(len(arr)))
 		if err != nil {
 			return nil, err
@@ -87,6 +85,12 @@ func Shuffle(arr portxo.TxoSliceByAmt) (portxo.TxoSliceByAmt, error) {
 }
 
 func PickOne(arr portxo.TxoSliceByAmt) (*portxo.PorTxo, error) {
+	var err error
+	arr, err = Shuffle(arr) // Shuffle and pick a random utxo
+	if err != nil {
+		return nil, fmt.Errorf("There was an erro when shuffling the utxo pile")
+	}
+
 	if len(arr) == 0 {
 		return nil, fmt.Errorf("There is no Slice")
 	}
@@ -94,8 +98,7 @@ func PickOne(arr portxo.TxoSliceByAmt) (*portxo.PorTxo, error) {
 	if len(arr) == 1 { // could remove this, we don't really want this to be here
 		return arr[0], nil
 	}
-
-	seed := New(123456)
+	seed := New(uint32(rand.Int()))
 	j, err := seed.RandRange(uint32(len(arr)))
 	if err != nil {
 		return nil, err
@@ -103,56 +106,48 @@ func PickOne(arr portxo.TxoSliceByAmt) (*portxo.PorTxo, error) {
 	return arr[j], nil
 }
 
-func getBadness(utxos []portxo.PorTxo, txos []portxo.PorTxo, sum, amtWanted int64) (int64, error) {
-
+func getBadness(utxos []*portxo.PorTxo, amtWanted, fee int64) (float64, error) {
+	var maxChange float64
+	var minChange float64
 	if len(utxos) == 0 {
 		return 0, fmt.Errorf("There are no tx's in the utxos list")
 	}
-	min_change := (txos[0].Value)
-	max_change := (txos[0].Value)
-	spent_amount := int64(0)
-	total_input := int64(0)
-	for _, tx := range txos {
-		if tx.Value < min_change {
-			min_change = tx.Value
-		}
-		if tx.Value > max_change {
-			max_change = tx.Value
-		}
-		spent_amount += tx.Value // sum of total output txos
-	}
+	minChangeInt := (utxos[0].Value)
+	maxChangeInt := (utxos[0].Value)
+	amountSpent := float64(amtWanted + fee)
+	totalInput := float64(0)
 	for _, utx := range utxos {
-		total_input += utx.Value
+		if utx.Value < minChangeInt {
+			minChangeInt = utx.Value
+		}
+		if utx.Value > maxChangeInt {
+			maxChangeInt = utx.Value
+		}
+		totalInput += float64(utx.Value)
 	}
-	min_change2 := float64(min_change) * float64(0.75)
-	max_change2 := float64(max_change) * float64(1.33)
-	// min_change := 0
-	// max_change := 500000000
-	// spent_amount := 20000
-	change := sum - (amtWanted + int64(spent_amount)) // change this
-	var badness int64
-	badness = int64(len(utxos) - 1)
-
-	if change < int64(min_change2) {
-		badness += (int64(min_change2) - change) / (int64(min_change2) + 10000)
-	} else if change > int64(max_change2) {
-		badness += (change - int64(max_change2)) / (int64(max_change2) + 10000)
+	maxChange = float64(maxChangeInt) * 0.9
+	minChange = float64(minChangeInt) * 0.5
+	// minChange = float64(minChangeInt) * 0.75
+	// maxChange = float64(maxChangeInt) * 1.33
+	// Electrum's choice always biases towards larger utxo values
+	// because in single input utxos, maxChangeInt = totalInput
+	change := totalInput - amountSpent
+	badness := float64(len(utxos) - 1)
+	//log.Println("change < minChange2", change < minChange)
+	//log.Println("change > maxChange2", change > maxChange)
+	if change < minChange {
+		// totalinput < minChange + amtWanted + fee, increase badness
+		// because I want a certain amount of minimum change. Increase badness
+		badness += (minChange - change) / (minChange + 10000)
+	} else if change > maxChange {
+		// totalInput > maxChange + amtWanted + fee
+		// I don't want to waste a big utxo on this. Increase badness
+		badness += (change - maxChange) / (maxChange + 10000)
 		// Penalize large change; 5 BTC excess ~= using 1 more input
 		badness += change / 5
 	}
 	return badness, nil
 }
-
-// Privacy based solution followed in Electrum: (just mimicking the random part over here)
-// DESCRIPTION:
-// Attempts to better preserve user privacy.  First, if any coin is
-// spent from a user address, all coins are.  Compared to spending
-// from other addresses to make up an amount, this reduces
-// information leakage about sender holdings.  It also helps to
-// reduce blockchain UTXO bloat, and reduce future privacy loss that
-// would come from reusing that address' remaining UTXOs.  Second, it
-// penalizes change that is quite different to the sent amount.
-// Third, it penalizes change that is too big
 
 func (w *Wallit) PickUtxosNew(
 	amtWanted, outputByteSize, feePerByte int64,
@@ -192,12 +187,12 @@ func (w *Wallit) PickUtxosNew(
 		//		}
 		//if (txs.Height > 100) &&
 		if txs.Mature(curHeight) && (txs.Value > 1) { // why are 0-value outputs a thing..?
-			// min value ca actually be changed to 20000
+			// min value can actually be changed to 20000
 			// since the dustCutoff is 20000
 			sum += txs.Value
 		} else {
 			log.Println("tx info:", txs.Height, txs.Value)
-			SliceSlice(allUtxos, i) // slice off those guys whoaren't confirmed
+			SliceSlice(allUtxos, i) // slice off those guys who aren't confirmed
 			i -= 1
 		}
 	}
@@ -212,61 +207,77 @@ func (w *Wallit) PickUtxosNew(
 	if err != nil {
 		return nil, 0, fmt.Errorf("There was an erro when shuffling the utxo pile")
 	}
-	// 1. shuffle them
-	// 2. get badness index for all the guys
-	// 3. pick a random one among those guys / pick based on badness index
-	// 4. chec whether the given utxo value is enough for signing (along with fee)
-	// 5. yes, break and sign the tx
-	// 6. no, continue and find another tx (the next "preferable one")
-	// placeholder till here, works cool till now
-	// let's go
 
 	// utxos ready
 	// coin selection is super complex, and we can definitely do a lot better
 	// here!
 	// TODO: anyone who wants to: implement more advanced coin selection algo
-	// 1. Instead of buckets in ELectrum, we have portxo slices
 
-	// rSlice is the return slice of the utxos which are going into the tx
 	var rSlice portxo.TxoSliceByBip69
+	var fee int64
+	var badnessList [100]float64
+	var rSliceRef [100]portxo.TxoSliceByBip69
+	var remainingRef [100]int64
 	// add utxos until we've had enough
 	remaining := amtWanted // remaining is how much is needed on input side
 	amountSatisfied := false
-	for i := 0; i < 10000; i++ { // hoepfully 10000 times would be enough
-		utxo, err := PickOne(allUtxos)
-		if err != nil {
-			return nil, 0, fmt.Errorf("An error occured while picking a tx")
-		}
-		if ow && utxo.Mode&portxo.FlagTxoWitness == 0 {
-			continue // skip non-witness
-		}
-		// yeah, lets add this utxo!
-		rSlice = append(rSlice, utxo)
-		sum -= utxo.Value
-		remaining -= utxo.Value
-		if remaining <= 0 {
-			fee := EstFee(rSlice, outputByteSize, feePerByte)
-			// subtract fee from returned overshoot.
-			// (remaining is negative here)
-			remaining += fee
+	for j := 0; j < 100; j++ {
+		remaining = amtWanted
+		amountSatisfied = false
+		rSlice = nil                 // memory leak?
+		for i := 0; i < 10000; i++ { // hoepfully 10000 times would be enough
+			utxo, err := PickOne(allUtxos)
+			if err != nil {
+				return nil, 0, fmt.Errorf("An error occured while picking a tx")
+			}
+			if ow && utxo.Mode&portxo.FlagTxoWitness == 0 {
+				continue // skip non-witness
+			}
+			// yeah, lets add this utxo!
+			rSlice = append(rSlice, utxo)
+			//log.Println("Taking this utxo into rSlice", utxo.Value)
+			sum -= utxo.Value
+			remaining -= utxo.Value
+			if remaining <= 0 {
+				fee = EstFee(rSlice, outputByteSize, feePerByte)
+				// subtract fee from returned overshoot.
+				// (remaining is negative here)
+				remaining += fee
 
-			// done adding utxos if remaining below negative est fee
-			if remaining < -fee {
-				amountSatisfied = true
+				// done adding utxos if remaining below negative est fee
+				if remaining < -fee {
+					amountSatisfied = true
+				}
+			}
+			if amountSatisfied {
+				// if the amount is satisfied, add it to a superset of utxos
+				// do this process about 100 times (electrum), evaluate badness 100 times
+				// choose the least among that and return
+				break
 			}
 		}
-		if amountSatisfied {
-			break
+		badness, err := getBadness(rSlice, int64(amtWanted), int64(fee)) // check badness for the entire slice
+		if err != nil {
+			log.Println(err)
+			return nil, 0, err
+		}
+		badnessList[j] = badness
+		rSliceRef[j] = rSlice
+		remainingRef[j] = remaining
+	}
+	minBadness := badnessList[0]
+	var index int
+	for i, badness := range badnessList {
+		if badness < minBadness {
+			minBadness = badness
+			index = i
 		}
 	}
-
 	if !amountSatisfied {
-		// default to the normal method
-		log.Println("OLD GUY")
+		// default to the old method
+		log.Println("Reverting to old coin selction algorithm")
 		return w.PickUtxos(amtWanted, outputByteSize, feePerByte, ow)
-		// should never come here with a good seed
 	}
-	// why do we send a sorted slice anyway?
-	sort.Sort(rSlice) // send sorted.  This is probably redundant?
-	return rSlice, -remaining, nil
+	sort.Sort(rSliceRef[index]) // send sorted.  This is probably redundant?
+	return rSliceRef[index], -remainingRef[index], nil
 }

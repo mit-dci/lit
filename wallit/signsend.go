@@ -55,7 +55,6 @@ func (w *Wallit) MaybeSend(txos []*wire.TxOut, ow bool) ([]*wire.OutPoint, error
 	if err != nil {
 		return nil, err
 	}
-
 	log.Printf("MaybeSend has overshoot %d, %d inputs\n", overshoot, len(utxos))
 
 	// changeOutSize is the extra vsize that a change output would add
