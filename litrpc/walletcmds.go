@@ -230,6 +230,40 @@ func (r *LitRPC) PushRawTx(args RawArgs, reply *TxidsReply) error {
 	return nil
 }
 
+// ImporTxo lets you import a portxo
+func (r *LitRPC) ImporTxo(args RawArgs, reply *StatusReply) error {
+	var err error
+
+	ptxoBytes, err := hex.DecodeString(args.TxHex)
+	if err != nil {
+		return err
+	}
+
+	ptx, err := portxo.PorTxoFromBytes(ptxoBytes)
+	if err != nil {
+		return err
+	}
+
+	// import to default wallet
+	// imports probably won't have a derivation path so we can't tell
+	// what the coin is.  But maybe we shoud detect that, and add cointype
+	// derivation paths even if there's nothing to derive from...
+	wal, ok := r.Node.SubWallet[r.Node.DefaultCoin]
+	if !ok {
+		return fmt.Errorf("no connnected wallet for default cointype %d",
+			r.Node.DefaultCoin)
+	}
+
+	log.Printf("import to raw wallet type %s\n", wal.Params().Name)
+	err = wal.PushTx(tx)
+	if err != nil {
+		return err
+	}
+
+	reply.Txids = []string{tx.TxHash().String()}
+	return nil
+}
+
 // ------------------------- sweep
 type SweepArgs struct {
 	DestAdr string
