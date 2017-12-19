@@ -51,7 +51,7 @@ func (w *Wallit) MaybeSend(txos []*wire.TxOut, ow bool) ([]*wire.OutPoint, error
 
 	// get inputs for this tx.  Only segwit if needed
 	utxos, overshoot, err :=
-		w.PickUtxosNew(totalSend, outputByteSize, feePerByte, ow)
+		w.PickUtxosRandom(totalSend, outputByteSize, feePerByte, ow)
 	if err != nil {
 		return nil, err
 	}
@@ -227,7 +227,7 @@ func (w *Wallit) NewOutgoingTx(tx *wire.MsgTx) error {
 // if "ow" is true, only gives witness utxos (for channel funding)
 // The overshoot amount is *after* fees, so can be used directly for a
 // change output.
-func (w *Wallit) PickUtxos(
+func (w *Wallit) PickUtxosDefault(
 	amtWanted, outputByteSize, feePerByte int64,
 	ow bool) (portxo.TxoSliceByBip69, int64, error) {
 

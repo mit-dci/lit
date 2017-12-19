@@ -107,8 +107,7 @@ func PickOne(arr portxo.TxoSliceByAmt) (*portxo.PorTxo, error) {
 }
 
 func getBadness(utxos []*portxo.PorTxo, amtWanted, fee int64) (float64, error) {
-	var maxChange float64
-	var minChange float64
+	var maxChange, minChange float64
 	if len(utxos) == 0 {
 		return 0, fmt.Errorf("There are no tx's in the utxos list")
 	}
@@ -129,19 +128,18 @@ func getBadness(utxos []*portxo.PorTxo, amtWanted, fee int64) (float64, error) {
 	minChange = float64(minChangeInt) * 0.5
 	// minChange = float64(minChangeInt) * 0.75
 	// maxChange = float64(maxChangeInt) * 1.33
-	// Electrum's choice always biases towards larger utxo values
+	// Electrum's default choices are based on maximizing privacy.
+	// however, it seems to bias towards larger utxo values for single utxo tx's
 	// because in single input utxos, maxChangeInt = totalInput
 	change := totalInput - amountSpent
 	badness := float64(len(utxos) - 1)
-	//log.Println("change < minChange2", change < minChange)
-	//log.Println("change > maxChange2", change > maxChange)
 	if change < minChange {
 		// totalinput < minChange + amtWanted + fee, increase badness
 		// because I want a certain amount of minimum change. Increase badness
 		badness += (minChange - change) / (minChange + 10000)
 	} else if change > maxChange {
 		// totalInput > maxChange + amtWanted + fee
-		// I don't want to waste a big utxo on this. Increase badness
+		// Don't waste a big utxo on this. Increase badness
 		badness += (change - maxChange) / (maxChange + 10000)
 		// Penalize large change; 5 BTC excess ~= using 1 more input
 		badness += change / 5
@@ -149,7 +147,7 @@ func getBadness(utxos []*portxo.PorTxo, amtWanted, fee int64) (float64, error) {
 	return badness, nil
 }
 
-func (w *Wallit) PickUtxosNew(
+func (w *Wallit) PickUtxosRandom(
 	amtWanted, outputByteSize, feePerByte int64,
 	ow bool) (portxo.TxoSliceByBip69, int64, error) {
 
@@ -198,14 +196,13 @@ func (w *Wallit) PickUtxosNew(
 	}
 
 	if sum <= amtWanted { // handle this case here, don't wanna go further
-		log.Println("SUM:", sum)
 		return nil, 0, fmt.Errorf("The sum of utxos is insufficient to pay for the amount")
 	}
 
-	// sort.Sort(sort.Reverse(allUtxos)) // sort by reverse for convenience, we'll shuffle later anyway.
 	allUtxos, err = Shuffle(allUtxos)
 	if err != nil {
-		return nil, 0, fmt.Errorf("There was an erro when shuffling the utxo pile")
+		log.Printf("There was an error while shuffling the utxo pile")
+		return nil, 0, err
 	}
 
 	// utxos ready
@@ -215,17 +212,20 @@ func (w *Wallit) PickUtxosNew(
 
 	var rSlice portxo.TxoSliceByBip69
 	var fee int64
-	var badnessList [100]float64
-	var rSliceRef [100]portxo.TxoSliceByBip69
-	var remainingRef [100]int64
+	var badnessList []float64              // badnessList contains a list of all the badness values
+	var rSliceRef []portxo.TxoSliceByBip69 // the superset containing the array of utxos
+	var remainingRef []int64
+	j := 0
 	// add utxos until we've had enough
 	remaining := amtWanted // remaining is how much is needed on input side
 	amountSatisfied := false
-	for j := 0; j < 100; j++ {
+
+	for { // run this only for 100 times as specified
 		remaining = amtWanted
 		amountSatisfied = false
-		rSlice = nil                 // memory leak?
-		for i := 0; i < 10000; i++ { // hoepfully 10000 times would be enough
+		rSlice = nil
+		i := 0
+		for { // hopefully 10000 times will be enough
 			utxo, err := PickOne(allUtxos)
 			if err != nil {
 				return nil, 0, fmt.Errorf("An error occured while picking a tx")
@@ -235,7 +235,6 @@ func (w *Wallit) PickUtxosNew(
 			}
 			// yeah, lets add this utxo!
 			rSlice = append(rSlice, utxo)
-			//log.Println("Taking this utxo into rSlice", utxo.Value)
 			sum -= utxo.Value
 			remaining -= utxo.Value
 			if remaining <= 0 {
@@ -255,15 +254,23 @@ func (w *Wallit) PickUtxosNew(
 				// choose the least among that and return
 				break
 			}
+			if i == 10000 {
+				break
+			}
+			i += 1
 		}
 		badness, err := getBadness(rSlice, int64(amtWanted), int64(fee)) // check badness for the entire slice
 		if err != nil {
 			log.Println(err)
 			return nil, 0, err
 		}
-		badnessList[j] = badness
-		rSliceRef[j] = rSlice
-		remainingRef[j] = remaining
+		badnessList = append(badnessList, badness)
+		rSliceRef = append(rSliceRef, rSlice)
+		remainingRef = append(remainingRef, remaining)
+		if j == 99 {
+			break // should never come here, doing this to make go happy
+		}
+		j += 1
 	}
 	minBadness := badnessList[0]
 	var index int
@@ -275,8 +282,8 @@ func (w *Wallit) PickUtxosNew(
 	}
 	if !amountSatisfied {
 		// default to the old method
-		log.Println("Reverting to old coin selction algorithm")
-		return w.PickUtxos(amtWanted, outputByteSize, feePerByte, ow)
+		log.Println("Reverting to default coin selection algorithm")
+		return w.PickUtxosDefault(amtWanted, outputByteSize, feePerByte, ow)
 	}
 	sort.Sort(rSliceRef[index]) // send sorted.  This is probably redundant?
 	return rSliceRef[index], -remainingRef[index], nil
