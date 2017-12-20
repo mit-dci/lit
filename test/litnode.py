@@ -31,9 +31,9 @@ class LitNode():
         with open(self.data_dir + "/privkey.hex", 'w+') as f:
             f.write("1" * 63 + str(self.index) + "\n")
 
-        self.args = ["-dir", self.data_dir]
+        self.args = ["--dir", self.data_dir]
         # disable auto-connect to testnet3 and litetest4
-        self.args.extend(['-tn3', '', '-lt4', ''])
+        self.args.extend(['--tn3', '', '--lt4', ''])
 
         self.rpc = None
 
