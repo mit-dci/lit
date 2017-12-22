@@ -47,7 +47,7 @@ const (
 type LitMsg interface {
 	Peer() uint32   //return PeerIdx
 	MsgType() uint8 //returns Message Type (see constants above)
-	Bytes() []byte  //returnns data of message as []byte with the MsgType() preceeding it
+	Bytes() []byte  //returns data of message as []byte with the MsgType() preceding it
 }
 
 func LitMsgEqual(msg LitMsg, msg2 LitMsg) bool {
@@ -654,7 +654,7 @@ func NewRevMsgFromBytes(b []byte, peerId uint32) (RevMsg, error) {
 	rv.PeerIdx = peerId
 
 	if len(b) < 102 {
-		return *rv, fmt.Errorf("got %d b yte REV, expect 102", len(b))
+		return *rv, fmt.Errorf("got %d byte REV, expect 102", len(b))
 	}
 
 	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
@@ -793,7 +793,7 @@ func NewComMsg(peerIdx, cointype uint32, destPKH [20]byte,
 	return *cm
 }
 
-// ComMsgFromBytes turns 132 bytes into a SorceMsg
+// ComMsgFromBytes turns 132 bytes into a SourceMsg
 // Silently fails with wrong size input.
 func NewWatchStateMsgFromBytes(b []byte, peerIDX uint32) (WatchStateMsg, error) {
 	sm := new(WatchStateMsg)
@@ -846,7 +846,7 @@ func (self WatchDelMsg) Bytes() []byte {
 	return buf.Bytes()
 }
 
-// ComMsgFromBytes turns 132 bytes into a SorceMsg
+// ComMsgFromBytes turns 132 bytes into a SourceMsg
 // Silently fails with wrong size input.
 func NewWatchDelMsgFromBytes(b []byte, peerIDX uint32) (WatchDelMsg, error) {
 	sm := new(WatchDelMsg)

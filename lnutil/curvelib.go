@@ -93,7 +93,7 @@ func (p CombinablePubKeySlice) Less(i, j int) bool {
 
 // CombinableSliceFromArrSlice turns an array of 33 byte pubkey arrays into a
 // CombinablePubKeySlice which can then be combined.
-// Varadic.  First time I've used that, seems appropriate here.
+// Variadic.  First time I've used that, seems appropriate here.
 func PubsFromArrs(arrSlice ...[33]byte) (CombinablePubKeySlice, error) {
 	if len(arrSlice) < 2 {
 		return nil, fmt.Errorf("Need 2 or more pubkeys to combine")

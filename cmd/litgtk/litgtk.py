@@ -37,7 +37,7 @@ def getAdr():
 	print(r)
 	n = len(r["result"]["PreviousAddresses"]) -1
 	return r["result"]["PreviousAddresses"][n]   #[len(r["result"]["PreviousAddresses"]-1)]
-	
+
 def prSend(adr, amt):
 	rpcCmd = {
 		   "method": "LitRPC.Send",
@@ -51,17 +51,17 @@ def prSend(adr, amt):
 	if r["error"] != None:
 		return "send error: " + r["error"]
 	return "Sent. TXID: " + r["result"]["Txids"][0]
-	
+
 
 class lndrpcui:
 
-	def dialogg(self, widget, adrWidget, amtWidget):
+	def dialog(self, widget, adrWidget, amtWidget):
 		txid = prSend(adrWidget.get_text(), amtWidget.get_value_as_int())
 		d = gtk.MessageDialog(
 			type=gtk.MESSAGE_INFO,  buttons=gtk.BUTTONS_OK,message_format=txid)
 		d.run()
 		d.destroy()
-		
+
 	def gBal(self, widget, balWidget, rcvadrWidget):
 		bal = getBal()
 		balWidget.set_text("Balance: " + "{:,}".format(bal) + " (" + str(bal/100000000.0) + "BTC)")
@@ -88,7 +88,7 @@ class lndrpcui:
 		rcvLabel = gtk.Label("receive address here")
 		rcvLabel.set_selectable(True)
 		rcvhbox.pack_start(rcvLabel, False, False, 5)
-		
+
 		balFrame = gtk.Frame("balance")
 		main_vbox.pack_start(balFrame, True, False, 0)
 #~ balHbox
@@ -108,11 +108,11 @@ class lndrpcui:
 		vbox = gtk.VBox(False, 0)
 		vbox.set_border_width(5)
 		frame.add(vbox)
-		
- #~ adr / amt hbox 
+
+ #~ adr / amt hbox
 		hbox = gtk.HBox(False, 0)
 		vbox.pack_start(hbox, False, False, 5)
-		
+
 		sendButton = gtk.Button("Send")
 		vbox.pack_start(sendButton, False, False, 5)
 #~ adrVbox
@@ -120,40 +120,40 @@ class lndrpcui:
 		hbox.pack_start(adrVbox, True, True, 5)
 		adrLabel = gtk.Label("send to address")
 		adrLabel.set_alignment(0, 1)
-	  
+
 		adrVbox.pack_start(adrLabel, False, False, 0)
-		
+
 		adrEntry = gtk.Entry(50)
 		adrEntry.set_size_request(500, -1)
-		adrVbox.pack_start(adrEntry, True, True, 0)       
-#~ amtVbox     
+		adrVbox.pack_start(adrEntry, True, True, 0)
+#~ amtVbox
 		amtVbox = gtk.VBox(False, 0)
 		hbox.pack_start(amtVbox, False, False, 5)
 
 		label = gtk.Label("amount")
 		label.set_alignment(0, 1)
 		amtVbox.pack_start(label, False, False, 0)
-		
+
 		adj = gtk.Adjustment(0, 1000000, 100000000.0, 1.0)
 		sendamtSpinner = gtk.SpinButton(adj, 1.0, 0)
 		sendamtSpinner.set_wrap(False)
 		#~ sendamtSpinner.set_size_request(100, -1)
 		amtVbox.pack_start(sendamtSpinner, False, False, 0)
- 
+
 
 		#~ sendButton.connect("clicked", lambda w: prSend(adrEntry, sendamtSpinner))
-		sendButton.connect("clicked", self.dialogg, adrEntry, sendamtSpinner)
+		sendButton.connect("clicked", self.dialog, adrEntry, sendamtSpinner)
 
-  
-  
+
+
 		quitButton = gtk.Button("Quit")
 		quitButton.connect("clicked", lambda w: gtk.main_quit())
 		buttonBox = gtk.HBox(False, 0)
-		buttonBox.pack_start(quitButton, False, False, 5)        
+		buttonBox.pack_start(quitButton, False, False, 5)
 		main_vbox.pack_start(buttonBox, False, False, 5)
-		
 
-		
+
+
 		window.show_all()
 
 def main():

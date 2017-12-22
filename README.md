@@ -103,7 +103,7 @@ When starting lit, the following command line arguments are available
 | `sig64`      | Library to make signatures 64 bytes instead of 71 or 72 or something                                                                     |
 | `test`       | Integration tests                                                                                                                        |
 | `uspv`       | Deals with the network layer, sending network messages and filtering what to hand over to `wallit`                                       |
-| `wallit`     | Deals with storing and retreiving utxos, creating and signing transactions                                                               |
+| `wallit`     | Deals with storing and retrieving utxos, creating and signing transactions                                                               |
 | `watchtower` | Unlinkable outsourcing of channel monitoring                                                                                             |
 
 ### Hierarchy of packages

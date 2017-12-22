@@ -61,10 +61,10 @@ func (nd *LitNode) TCPListener(
 				fmt.Printf("Got something that wasn't a LNDC")
 				continue
 			}
-			fmt.Printf("Incomming connection from %x on %s\n",
+			fmt.Printf("Incoming connection from %x on %s\n",
 				newConn.RemotePub.SerializeCompressed(), newConn.RemoteAddr().String())
 
-			// don't save host/port for incomming connections
+			// don't save host/port for incoming connections
 			peerIdx, err := nd.GetPeerIdx(newConn.RemotePub, "")
 			if err != nil {
 				log.Printf("Listener error: %s\n", err.Error())

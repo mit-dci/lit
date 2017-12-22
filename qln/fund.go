@@ -17,7 +17,7 @@ Once state update push/pull messages work that will be added on to
 this process
 
 Note that the first elkrem exchange revokes state 0, which was never actually
-commited to  (there are no HAKDpubs for state 0; those start at state 1.)
+committed to  (there are no HAKDpubs for state 0; those start at state 1.)
 So it's kindof pointless, but you still have to send the right one, because
 elkrem 2 is the parent of elkrems 0 and 1, so that checks 0.
 
@@ -47,7 +47,7 @@ a and c at the same time.
 
 Either of these can be added later without changing much.  The messages
 don't have to change at all, and in the first case you'd change the channel
-pubkey calculation.  In the second it's independant of the fund process.
+pubkey calculation.  In the second it's independent of the fund process.
 
 For now though:
 funding --
@@ -541,7 +541,7 @@ func (nd *LitNode) QChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePeer) {
 }
 
 // RECIPIENT
-// SigProofHandler saves the signature the recipent stores.
+// SigProofHandler saves the signature the recipient stores.
 // In some cases you don't need this message.
 func (nd *LitNode) SigProofHandler(msg lnutil.SigProofMsg, peer *RemotePeer) {
 
