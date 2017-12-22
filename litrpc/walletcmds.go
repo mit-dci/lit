@@ -254,13 +254,33 @@ func (r *LitRPC) ImporTxo(args RawArgs, reply *StatusReply) error {
 			r.Node.DefaultCoin)
 	}
 
-	log.Printf("import to raw wallet type %s\n", wal.Params().Name)
-	err = wal.PushTx(tx)
-	if err != nil {
-		return err
+	// no errors here, just hope it works...?
+	wal.ExportUtxo(ptx)
+
+	log.Printf("import %s to wallet %s\n", ptx.Op.String(), wal.Params().Name)
+
+	reply.Status = ptx.Op.String()
+	return nil
+}
+
+// DumpPriv returns a list of all portxos.
+// currently comes with empty derivation paths and populated private keys,
+// so watch out!
+// TODO: add options to give derivation paths and no keys
+func (r *LitRPC) DumpPriv(args NoArgs, reply *TxidsReply) error {
+
+	var allTxos []*portxo.PorTxo
+	// start off the same as TxoList
+	// TODO make this a separate function? because copy/paste...
+	for _, wal := range r.Node.SubWallet {
+		walTxos, err := wal.UtxoDump()
+		if err != nil {
+			return err
+		}
+		allTxos = append(allTxos, walTxos...)
 	}
 
-	reply.Txids = []string{tx.TxHash().String()}
+	//	reply.Txids = []
 	return nil
 }
 

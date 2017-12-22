@@ -320,3 +320,24 @@ func (lc *litAfClient) RawTx(textArgs []string) error {
 	}
 	return nil
 }
+
+// ------------------ imporTxo
+func (lc *litAfClient) ImporTxo(textArgs []string) error {
+	args := new(litrpc.RawArgs)
+	reply := new(litrpc.StatusReply)
+
+	// there is at least 1 argument; that should be the new fee rate
+	if len(textArgs) == 0 {
+		return fmt.Errorf("ImporTxo needs a hex string")
+	}
+
+	args.TxHex = textArgs[0]
+
+	err := lc.rpccon.Call("LitRPC.ImporTxo", args, reply)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(color.Output, "imported utxo:\n\t%s\n", reply.Status)
+	return nil
+}
