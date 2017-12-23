@@ -143,7 +143,7 @@ func main() {
 
 		recvHbox := ui.NewHorizontalBox()
 		//recvHbox.Append(adrBar, false)
-		recvHbox.Append(adrBar, true) // stretch in order ot look nice
+		recvHbox.Append(adrBar, true) // stretch in order to look nice
 		recvHbox.Append(adrButton, false)
 		box := ui.NewVerticalBox()
 		box.SetPadded(true)
@@ -241,7 +241,7 @@ var sendAdrBar, sendAmtBar, myAdrBar nucular.TextEditor
 var adr string
 var lu *litNucClient
 
-// seriously?? I can't pass the popup mesage content as an arg, only the title?
+// seriously?? I can't pass the popup message content as an arg, only the title?
 // Who wrote this "popupOpen()" func??
 var popupMsg string
 

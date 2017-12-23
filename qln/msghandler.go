@@ -75,7 +75,7 @@ func (nd *LitNode) LNDCReader(peer *RemotePeer) error {
 	var opArr [36]byte
 	// make a local map of outpoints to channel indexes
 	peer.OpMap = make(map[[36]byte]uint32)
-	// inerate through all this peer's channels to extract outpoints
+	// iterate through all this peer's channels to extract outpoints
 	for _, q := range peer.QCs {
 		opArr = lnutil.OutPointToBytes(q.Op)
 		peer.OpMap[opArr] = q.Idx()

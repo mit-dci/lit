@@ -128,7 +128,7 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		return nil
 	}
 
-	// cooperateive close of a channel
+	// cooperative close of a channel
 	if cmd == "close" {
 		err = lc.CloseChannel(args)
 		if err != nil {

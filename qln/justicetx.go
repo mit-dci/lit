@@ -240,7 +240,7 @@ func (nd *LitNode) SyncWatch(qc *Qchan) error {
 
 // send WatchComMsg generates and sends the ComMsg to a watchtower
 func (nd *LitNode) SendWatchComMsg(qc *Qchan, idx uint64) error {
-	// retreive the sig data from db
+	// retrieve the sig data from db
 	txidsig, err := nd.LoadJusticeSig(idx, qc.WatchRefundAdr)
 	if err != nil {
 		return err

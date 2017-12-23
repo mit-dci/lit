@@ -128,7 +128,7 @@ type PushReply struct {
 	StateIndex uint64
 }
 
-// Push is the command to push miney to the other side of the channel.
+// Push is the command to push money to the other side of the channel.
 // Currently waits for the process to complete before returning.
 // Will change to .. tries to send, but may not complete.
 
