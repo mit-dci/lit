@@ -1,6 +1,6 @@
 # lit - a lightning node you can run on your own
-[![Coverage Status](https://coveralls.io/repos/github/mit-dci/lit/badge.svg)](https://coveralls.io/github/mit-dci/lit)
 ![Lit Logo](litlogo145.png)
+[![Coverage Status](https://coveralls.io/repos/github/mit-dci/lit/badge.svg)](https://coveralls.io/github/mit-dci/lit)
 
 Under development, not for use with real money.
 
@@ -52,8 +52,9 @@ go build
 (Note : Windows users can take off ./ but may need to change lit to lit.exe in the second line.)
 ```
 cd GOPATH/src/github.com/mit-dci/lit
-./lit --tn3 my.testnet.node.tld
+./lit --tn3 true
 ```
+The words `true`, `yes`, `1` can be used to specify that lit automatically connect to a set of populated seeds. It can also be replaced by the ip of the remote node you wish to connect to.
 
 ## Using Lightning
 
