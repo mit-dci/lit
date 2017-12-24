@@ -1,7 +1,7 @@
 package wallit
 
 import (
-	"fmt"
+	"log"
 
 	"github.com/adiabat/btcd/btcec"
 	"github.com/adiabat/btcutil"
@@ -24,11 +24,12 @@ Channel refund keys are use 3, peer and index per peer / channel.
 func (w *Wallit) PathPrivkey(kg portxo.KeyGen) *btcec.PrivateKey {
 	// in uspv, we require path depth of 5
 	if kg.Depth != 5 {
+		log.Printf("bad keygen %s\n", kg.String())
 		return nil
 	}
 	priv, err := kg.DerivePrivateKey(w.rootPrivKey)
 	if err != nil {
-		fmt.Printf("PathPrivkey err %s", err.Error())
+		log.Printf("PathPrivkey err %s", err.Error())
 		return nil
 	}
 	return priv

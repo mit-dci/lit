@@ -447,11 +447,11 @@ func (w *Wallit) BuildAndSign(
 	for i, _ := range tx.TxIn {
 		// get key
 		priv := w.PathPrivkey(utxos[i].KeyGen)
-		log.Printf("signing with privkey pub %x\n", priv.PubKey().SerializeCompressed())
 
 		if priv == nil {
 			return nil, fmt.Errorf("SendCoins: nil privkey")
 		}
+		log.Printf("signing with privkey pub %x\n", priv.PubKey().SerializeCompressed())
 
 		// sign into stash.  3 possibilities:  legacy PKH, WPKH, WSH
 		if utxos[i].Mode == portxo.TxoP2PKHComp { // legacy PKH

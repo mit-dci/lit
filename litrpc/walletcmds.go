@@ -269,7 +269,6 @@ func (r *LitRPC) ImporTxo(args RawArgs, reply *StatusReply) error {
 // TODO: add options to give derivation paths and no keys
 func (r *LitRPC) DumpPriv(args NoArgs, reply *TxidsReply) error {
 
-	var allTxos []*portxo.PorTxo
 	// start off the same as TxoList
 	// TODO make this a separate function? because copy/paste...
 	for _, wal := range r.Node.SubWallet {
@@ -277,10 +276,19 @@ func (r *LitRPC) DumpPriv(args NoArgs, reply *TxidsReply) error {
 		if err != nil {
 			return err
 		}
-		allTxos = append(allTxos, walTxos...)
+		for _, txo := range walTxos {
+			priv := wal.GetPriv(txo.KeyGen)
+			// since this is for export to a wallet with a different seed,
+			// remove derivation path
+			txo.KeyGen = portxo.KeyGenEmpty
+			copy(txo.KeyGen.PrivKey[:], priv.D.Bytes())
+			b, err := txo.Bytes()
+			if err != nil {
+				return err
+			}
+			reply.Txids = append(reply.Txids, fmt.Sprintf("%x", b))
+		}
 	}
-
-	//	reply.Txids = []
 	return nil
 }
 

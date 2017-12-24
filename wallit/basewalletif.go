@@ -32,13 +32,6 @@ type UWallet interface {
 }
 */
 
-var (
-	KeyGenForImports = portxo.KeyGen{
-		Depth: 3,
-		Step:  [5]uint32{0xfee154fe, 0, 0, 0, 0},
-	}
-)
-
 // --- implementation of BaseWallet interface ----
 
 func (w *Wallit) GetPriv(k portxo.KeyGen) *btcec.PrivateKey {
@@ -83,6 +76,7 @@ func (w *Wallit) ExportHook() uspv.ChainHook {
 func (w *Wallit) ExportUtxo(u *portxo.PorTxo) {
 
 	// zero value utxo counts as an address export, not utxo export.
+	// is this still a thing?  should remove TODO
 	if u.Value == 0 {
 		err := w.AddPorTxoAdr(u.KeyGen)
 		if err != nil {
@@ -94,13 +88,30 @@ func (w *Wallit) ExportUtxo(u *portxo.PorTxo) {
 		// not match up with the wallet derivation tree.  In this
 		// case we assign a fixed derivation path and subtract
 		if u.KeyGen.Depth == 0 {
-			privImport := u.KeyGen.PrivKey
-			impGen := KeyGenForImports
-			impGen.Step[1] = w.Param.HDCoinType
-			privMix := w.GetPriv(impGen)
 
-			u.KeyGen.PrivKey = lnutil.CombinePrivKeyAndSubtract(
-				privMix, privImport[:])
+			log.Printf("raw priv import: %x\n", u.KeyGen.PrivKey)
+			impGen := portxo.KeyGenForImports
+			impGen.Step[1] = w.Param.HDCoinType
+
+			var privMaskArr [32]byte
+			privMask := w.GetPriv(impGen)
+			copy(privMaskArr[:], privMask.D.Bytes())
+
+			mixedKey := lnutil.SubtractPrivKeys(u.KeyGen.PrivKey, privMaskArr)
+
+			u.KeyGen = impGen
+			u.KeyGen.PrivKey = mixedKey
+
+			log.Printf("keygen: %s\n", u.KeyGen.String())
+			log.Printf("modified to: %x\n", u.KeyGen.PrivKey)
+
+			// check that we can reconstruct the private key
+			log.Printf("%x + %x =\n", privMask.D.Bytes(), mixedKey)
+			lnutil.PrivKeyAddBytes(privMask, mixedKey[:])
+			log.Printf("%x\n", privMask.D.Bytes())
+
+			log.Printf("back? to %x\n", privMask.D.Bytes())
+
 		}
 		// either way, gain the utxo
 		err := w.GainUtxo(*u)

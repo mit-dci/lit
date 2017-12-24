@@ -288,6 +288,9 @@ func (w *Wallit) RegisterWatchOP(op wire.OutPoint) error {
 func (w *Wallit) GainUtxo(u portxo.PorTxo) error {
 	log.Printf("gaining exported utxo %s at height %d\n",
 		u.Op.String(), u.Height)
+
+	log.Printf("gaining priv: %x\n", u.KeyGen.PrivKey)
+
 	// serialize porTxo
 	utxoBytes, err := u.Bytes()
 	if err != nil {

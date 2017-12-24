@@ -3,6 +3,7 @@ package lnutil
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"math/big"
 	"sort"
 
@@ -279,6 +280,22 @@ func CombinePrivKeyAndSubtract(k *btcec.PrivateKey, b []byte) [32]byte {
 	combinedKey.D.Mod(combinedKey.D, btcec.S256().N)
 	// copy this "difference key" and return it.
 	copy(diffKey[:], combinedKey.D.Bytes())
+	return diffKey
+}
+
+// SubtractPrivKeys returns the difference a - b mod n
+func SubtractPrivKeys(a, b [32]byte) [32]byte {
+	var diffKey [32]byte
+
+	privA, _ := btcec.PrivKeyFromBytes(btcec.S256(), a[:])
+	privB, _ := btcec.PrivKeyFromBytes(btcec.S256(), b[:])
+
+	privA.D.Sub(privA.D, privB.D)
+	privA.D.Mod(privA.D, btcec.S256().N)
+
+	copy(diffKey[:], privA.D.Bytes())
+	//
+	log.Printf("%x - %x =\n%x\n", a, b, diffKey)
 	return diffKey
 }
 

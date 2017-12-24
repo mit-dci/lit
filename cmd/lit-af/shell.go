@@ -165,10 +165,10 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		}
 		return nil
 	}
-	if cmd == "dump" { // dump all private keys
-		err = lc.Dump(args)
+	if cmd == "dump" { // dump all private keys in utxo form
+		err = lc.DumpPriv(args)
 		if err != nil {
-			fmt.Fprintf(color.Output, "dump error: %s\n", err)
+			fmt.Fprintf(color.Output, "dumppriv error: %s\n", err)
 		}
 		return nil
 	}
@@ -176,6 +176,13 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		err = lc.RawTx(args)
 		if err != nil {
 			fmt.Fprintf(color.Output, "rawtx error: %s\n", err)
+		}
+		return nil
+	}
+	if cmd == "import" { // import utxo
+		err = lc.ImporTxo(args)
+		if err != nil {
+			fmt.Fprintf(color.Output, "import error: %s\n", err)
 		}
 		return nil
 	}
