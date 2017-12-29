@@ -86,6 +86,7 @@ When starting lit, the following command line arguments are available
 | `-v` or `--verbose`         | Verbose; log everything to stdout as well as the lit.log file.  Lots of text.|
 | `--dir <folderPath>`        | use `folderPath` as the directory.  By default, saves to `~/.lit/` |
 | `-p` or `--rpcport <portNumber>` | listen for RPC clients on port `portNumber`.  Defaults to `8001`.  Useful when you want to run multiple lit nodes on the same computer (also need the `--dir` option) |
+| `-t` or `--tip`          | Re-sync the blockchain from the given height |
 | `-r` or `--reSync`          | try to re-sync to the blockchain from the height given `-tip` |
 
 ## Folders

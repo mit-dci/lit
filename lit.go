@@ -28,12 +28,13 @@ type config struct { // define a struct for usage with go-flags
 	TrackerURL  string `long:"tracker" description:"LN address tracker URL http|https://host:port"`
 	ConfigFile  string
 
-	ReSync  bool `short:"r" long:"reSync" description:"Resync from the given tip."`
+	Resync  bool `short:"r" long:"resync" description:"Resync from the given tip. Requires --tip"`
 	Tower   bool `long:"tower" description:"Watchtower: Run a watching node"`
-	Hard    bool `short:"t" long:"hard" description:"Flag to set networks."`
+	Hard    bool `long:"hard" description:"Flag to set networks."`
 	Verbose bool `short:"v" long:"verbose" description:"Set verbosity to true."`
 
 	Rpcport uint16 `short:"p" long:"rpcport" description:"Set RPC port to connect to"`
+	Tip     int32  `short:"t" long:"tip" description:"Specify tip to begin sync from"`
 
 	Params *coinparam.Params
 }
@@ -45,6 +46,7 @@ var (
 	defaultConfigFilename = "lit.conf"
 	defaultHomeDir        = os.Getenv("HOME")
 	defaultRpcport        = uint16(8001)
+	defaultTip            = int32(-1) // wallit.GetDBSyncHeight()
 )
 
 func fileExists(name string) bool {
@@ -73,7 +75,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	if !lnutil.NopeString(conf.Reghost) {
 		p := &coinparam.RegressionNetParams
 		fmt.Printf("reg: %s\n", conf.Reghost)
-		err = node.LinkBaseWallet(key, 120, conf.ReSync, conf.Tower, conf.Reghost, p)
+		err = node.LinkBaseWallet(key, conf.Tip, conf.Resync, conf.Tower, conf.Reghost, p)
 		if err != nil {
 			return err
 		}
@@ -82,7 +84,8 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	if !lnutil.NopeString(conf.Tn3host) {
 		p := &coinparam.TestNet3Params
 		err = node.LinkBaseWallet(
-			key, 1210000, conf.ReSync, conf.Tower,
+			// key, 1210000, conf.Resync, conf.Tower,
+			key, conf.Tip, conf.Resync, conf.Tower,
 			conf.Tn3host, p)
 		if err != nil {
 			return err
@@ -91,7 +94,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	// try litecoin regtest
 	if !lnutil.NopeString(conf.Litereghost) {
 		p := &coinparam.LiteRegNetParams
-		err = node.LinkBaseWallet(key, 120, conf.ReSync, conf.Tower, conf.Litereghost, p)
+		err = node.LinkBaseWallet(key, conf.Tip, conf.Resync, conf.Tower, conf.Litereghost, p)
 		if err != nil {
 			return err
 		}
@@ -101,7 +104,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	if !lnutil.NopeString(conf.Lt4host) {
 		p := &coinparam.LiteCoinTestNet4Params
 		err = node.LinkBaseWallet(
-			key, p.StartHeight, conf.ReSync, conf.Tower,
+			key, conf.Tip, conf.Resync, conf.Tower, // start height is 48384 for litecoin
 			conf.Lt4host, p)
 		if err != nil {
 			return err
@@ -111,7 +114,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	if !lnutil.NopeString(conf.Tvtchost) {
 		p := &coinparam.VertcoinTestNetParams
 		err = node.LinkBaseWallet(
-			key, 25000, conf.ReSync, conf.Tower,
+			key, conf.Tip, conf.Resync, conf.Tower, // vtc start height is 0
 			conf.Tvtchost, p)
 		if err != nil {
 			return err
@@ -121,7 +124,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	if !lnutil.NopeString(conf.Vtchost) {
 		p := &coinparam.VertcoinParams
 		err = node.LinkBaseWallet(
-			key, p.StartHeight, conf.ReSync, conf.Tower,
+			key, conf.Tip, conf.Resync, conf.Tower,
 			conf.Vtchost, p)
 		if err != nil {
 			return err
@@ -137,6 +140,7 @@ func main() {
 		LitHomeDir: defaultLitHomeDirName,
 		Rpcport:    defaultRpcport,
 		TrackerURL: defaultTrackerURL,
+		Tip:        defaultTip,
 	}
 
 	// Pre-parse the command line options to see if an alternative config
@@ -154,8 +158,32 @@ func main() {
 		}
 	}
 
-	// Load config from file
-	parser := newConfigParser(&conf, flags.Default) //parse
+	if preconf.Resync && preconf.Tip == -1 {
+		log.Fatal("--reSync requires --tip. Exiting.")
+		return
+	}
+	if !preconf.Resync { // set the default tip values
+		if preconf.Tn3host != "" {
+			preconf.Tip = 1210000
+		}
+		if preconf.Reghost != "" {
+			preconf.Tip = 120
+		}
+		if preconf.Lt4host != "" {
+			preconf.Tip = 48384
+		}
+		if preconf.Litereghost != "" {
+			preconf.Tip = 120
+		}
+		if preconf.Vtchost != "" {
+			preconf.Tip = 598752
+		}
+		if preconf.Tvtchost != "" {
+			preconf.Tip = 0
+		}
+	}
+	log.Printf("Default chain header tip %d", preconf.Tip)
+	parser := newConfigParser(&conf, flags.Default)
 
 	_, err = os.Stat(preconf.LitHomeDir) // create directory
 	if err != nil {
