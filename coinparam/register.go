@@ -1,6 +1,7 @@
 package coinparam
 
 import (
+	"encoding/hex"
 	"errors"
 	"math/big"
 	"time"
@@ -311,4 +312,28 @@ func newHashFromStr(hexStr string) *chainhash.Hash {
 		panic(err)
 	}
 	return hash
+}
+
+// Convert a hex-encoded header into and 80 byte array.
+func newHeaderFromStr(hexStr string) [80]byte {
+	// Return error if hash string is too long.
+	if len(hexStr) > 160 {
+		panic("hard-coded header too long")
+	}
+
+	// Hex decoder expects the hash to be a multiple of two.
+	if len(hexStr)%2 != 0 {
+		hexStr = "0" + hexStr
+	}
+
+	// Convert string to bytes.
+	hdrSlice, err := hex.DecodeString(hexStr)
+	if err != nil {
+		panic(err)
+	}
+
+	var headerArr [80]byte
+
+	copy(headerArr[:], hdrSlice)
+	return headerArr
 }

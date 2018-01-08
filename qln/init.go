@@ -85,6 +85,11 @@ func (nd *LitNode) LinkBaseWallet(
 	if nd.SubWallet[WallitIdx] != nil {
 		return fmt.Errorf("coin type %d already linked", WallitIdx)
 	}
+	// see if startheight is below allowed with coinparam
+	if birthHeight < param.StartHeight {
+		return fmt.Errorf("%s birth height give as %d, but parameters start at %d",
+			param.Name, birthHeight, param.StartHeight)
+	}
 
 	// see if there are other wallets already linked
 	if len(nd.SubWallet) != 0 {
