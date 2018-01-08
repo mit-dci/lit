@@ -3,7 +3,6 @@ package lnutil
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"math/big"
 	"sort"
 
@@ -294,8 +293,7 @@ func SubtractPrivKeys(a, b [32]byte) [32]byte {
 	privA.D.Mod(privA.D, btcec.S256().N)
 
 	copy(diffKey[:], privA.D.Bytes())
-	//
-	log.Printf("%x - %x =\n%x\n", a, b, diffKey)
+	// log.Printf("%x - %x =\n%x\n", a, b, diffKey)
 	return diffKey
 }
 
