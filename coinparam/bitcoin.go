@@ -97,7 +97,9 @@ var TestNet3Params = Params{
 	NetMagicBytes: 0x0709110b,
 	DefaultPort:   "18333",
 	DNSSeeds: []string{
-		"testnet-seed.bitcoin.petertodd.org",
+		"testnet-seed.bitcoin.jonasschnelli.ch",
+		"seed.tbtc.petertodd.org",
+		"seed.testnet.bitcoin.sprovoost.nl",
 		"testnet-seed.bluematt.me",
 	},
 

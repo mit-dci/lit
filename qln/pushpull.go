@@ -196,9 +196,9 @@ func (nd LitNode) PushChannel(qc *Qchan, amt uint32) error {
 	// check if this push would lower my balance below minBal
 	if myNewOutputSize < minOutput {
 		qc.ClearToSend <- true
-		return fmt.Errorf("want to push %s but %s available, %s fee, %s minOutput",
+		return fmt.Errorf("want to push %s but %s available after %s fee and %s minOutput",
 			lnutil.SatoshiColor(int64(amt)),
-			lnutil.SatoshiColor(qc.State.MyAmt),
+			lnutil.SatoshiColor(qc.State.MyAmt - qc.State.Fee - minOutput),
 			lnutil.SatoshiColor(qc.State.Fee),
 			lnutil.SatoshiColor(minOutput))
 	}
