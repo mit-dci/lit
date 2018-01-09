@@ -111,11 +111,24 @@ func (s *SPVCon) Connect(remoteNode string) error {
 	if ok {
 		log.Printf("connected to %s", mv.UserAgent)
 	}
+
+	if mv.ProtocolVersion < 70013 {
+		//70014 -> core v0.13.1, so we should be fine
+		return fmt.Errorf("Remote node version: %x too old, exiting.", mv.ProtocolVersion)
+	}
+
+	if strings.Contains(mv.UserAgent, "ABC") {
+		// if we connected through a DNS Peer and it doesn't implement service bit filtering
+		return fmt.Errorf("Remote node %s invalid", mv.UserAgent)
+	}
+
 	log.Printf("remote reports version %x (dec %d)\n",
 		mv.ProtocolVersion, mv.ProtocolVersion)
 
 	// set remote height
 	s.remoteHeight = mv.LastBlock
+	// set remote version
+	s.remoteVersion = uint32(mv.ProtocolVersion)
 	mva := wire.NewMsgVerAck()
 	n, err = wire.WriteMessageWithEncodingN(
 		s.con, mva, s.localVersion,
