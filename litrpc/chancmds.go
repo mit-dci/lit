@@ -123,6 +123,7 @@ func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
 type PushArgs struct {
 	ChanIdx uint32
 	Amt     int64
+	Data    [32]byte
 }
 type PushReply struct {
 	StateIndex uint64
@@ -139,7 +140,7 @@ func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 			"can't push %d max is 1 coin (100000000), min is 1", args.Amt)
 	}
 
-	fmt.Printf("push %d to chan %d\n", args.Amt, args.ChanIdx)
+	fmt.Printf("push %d to chan %d with data %x\n", args.Amt, args.ChanIdx, args.Data)
 
 	// load the whole channel from disk just to see who the peer is
 	// (pretty inefficient)
@@ -180,7 +181,7 @@ func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 	// to the Node.Func() calls.  For now though, set the height here...
 	qc.Height = dummyqc.Height
 
-	err = r.Node.PushChannel(qc, uint32(args.Amt))
+	err = r.Node.PushChannel(qc, uint32(args.Amt), args.Data)
 	if err != nil {
 		return err
 	}

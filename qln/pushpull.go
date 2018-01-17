@@ -149,7 +149,7 @@ func (nd *LitNode) ReSendMsg(qc *Qchan) error {
 }
 
 // PushChannel initiates a state update by sending an DeltaSig
-func (nd LitNode) PushChannel(qc *Qchan, amt uint32) error {
+func (nd LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	// sanity checks
 	if amt >= 1<<30 {
 		return fmt.Errorf("max send 1G sat (1073741823)")
@@ -224,6 +224,8 @@ func (nd LitNode) PushChannel(qc *Qchan, amt uint32) error {
 		return fmt.Errorf("Didn't send.  Recovered though, so try again!")
 	}
 
+	qc.State.Data = data
+
 	qc.State.Delta = int32(-amt)
 	// save to db with ONLY delta changed
 	err = nd.SaveQchanState(qc)
@@ -264,7 +266,7 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 		return err
 	}
 
-	outMsg := lnutil.NewDeltaSigMsg(q.Peer(), q.Op, -q.State.Delta, sig)
+	outMsg := lnutil.NewDeltaSigMsg(q.Peer(), q.Op, -q.State.Delta, sig, q.State.Data)
 	nd.OmniOut <- outMsg
 
 	return nil
@@ -365,6 +367,8 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 	qc.State.StateIdx++
 	// regardless of collision, raise amt
 	qc.State.MyAmt += int64(incomingDelta)
+
+	qc.State.Data = msg.Data
 
 	// verify sig for the next state. only save if this works
 	err = qc.VerifySig(msg.Signature)

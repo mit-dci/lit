@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strconv"
 
@@ -20,9 +21,10 @@ var fundCommand = &Command{
 }
 
 var pushCommand = &Command{
-	Format: fmt.Sprintf("%s%s%s\n", lnutil.White("push"), lnutil.ReqColor("channel idx", "amount"), lnutil.OptColor("times")),
-	Description: fmt.Sprintf("%s\n%s\n",
+	Format: fmt.Sprintf("%s%s%s%s\n", lnutil.White("push"), lnutil.ReqColor("channel idx", "amount"), lnutil.OptColor("times"), lnutil.OptColor("data")),
+	Description: fmt.Sprintf("%s\n%s\n%s\n",
 		"Push the given amount (in satoshis) to the other party on the given channel.",
+		"Optionally, the push operation can be associated with a 32 byte value hex encoded.",
 		"Optionally, the push operation can be repeated <times> number of times."),
 	ShortDescription: "Push the given amount (in satoshis) to the other party on the given channel.\n",
 }
@@ -166,7 +168,7 @@ func (lc *litAfClient) Push(textArgs []string) error {
 	reply := new(litrpc.PushReply)
 
 	if len(textArgs) < 2 {
-		return fmt.Errorf("need args: push chanIdx amt (times)")
+		return fmt.Errorf("need args: push chanIdx amt (times) (data)")
 	}
 
 	// this stuff is all the same as in cclose, should put into a function...
@@ -185,6 +187,18 @@ func (lc *litAfClient) Push(textArgs []string) error {
 		if err != nil {
 			return err
 		}
+	}
+
+	var data [32]byte
+	for i := range data {
+		data[i] = 0
+	}
+	if len(textArgs) > 3 {
+		data, err := hex.DecodeString(textArgs[3])
+		if err != nil {
+			return err
+		}
+		copy(args.Data[:], data[:32])
 	}
 
 	args.ChanIdx = uint32(cIdx)

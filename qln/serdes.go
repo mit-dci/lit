@@ -89,6 +89,13 @@ func (s *StatCom) ToBytes() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// write their data
+	_, err = buf.Write(s.Data[:])
+	if err != nil {
+		return nil, err
+	}
+
 	return buf.Bytes(), nil
 }
 
@@ -140,6 +147,9 @@ func StatComFromBytes(b []byte) (*StatCom, error) {
 
 	// the rest is their sig
 	copy(s.sig[:], buf.Next(64))
+
+	// copy data
+	copy(s.Data[:], buf.Next(32))
 
 	return &s, nil
 }

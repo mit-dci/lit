@@ -482,14 +482,16 @@ type DeltaSigMsg struct {
 	Outpoint  wire.OutPoint
 	Delta     int32
 	Signature [64]byte
+	Data      [32]byte
 }
 
-func NewDeltaSigMsg(peerid uint32, OP wire.OutPoint, DELTA int32, SIG [64]byte) DeltaSigMsg {
+func NewDeltaSigMsg(peerid uint32, OP wire.OutPoint, DELTA int32, SIG [64]byte, data [32]byte) DeltaSigMsg {
 	d := new(DeltaSigMsg)
 	d.PeerIdx = peerid
 	d.Outpoint = OP
 	d.Delta = DELTA
 	d.Signature = SIG
+	d.Data = data
 	return *d
 }
 
