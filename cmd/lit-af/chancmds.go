@@ -47,6 +47,31 @@ var breakCommand = &Command{
 	ShortDescription: "Forcibly break the given channel.\n",
 }
 
+var historyCommand = &Command{
+	Format:           lnutil.White("history"),
+	Description:      "Show all the metadata for justice txs",
+	ShortDescription: "Show all the metadata for justice txs.\n",
+}
+
+func (lc *litAfClient) History(textArgs []string) error {
+	if len(textArgs) > 0 && textArgs[0] == "-h" {
+		fmt.Fprintf(color.Output, historyCommand.Format)
+		fmt.Fprintf(color.Output, historyCommand.Description)
+		return nil
+	}
+
+	args := new(litrpc.StateDumpArgs)
+	reply := new(litrpc.StateDumpReply)
+
+	err := lc.rpccon.Call("LitRPC.StateDump", args, reply)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(color.Output, "%s\n", reply.States)
+	return nil
+}
+
 func (lc *litAfClient) FundChannel(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
 		fmt.Fprintf(color.Output, fundCommand.Format)

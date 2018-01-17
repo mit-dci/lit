@@ -119,6 +119,26 @@ func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
 	return nil
 }
 
+// ------------------------- statedump
+type StateDumpArgs struct {
+	// none
+}
+
+type StateDumpReply struct {
+	States string
+}
+
+// StateDump dumps all of the meta data for the state commitments of a channel
+func (r *LitRPC) StateDump(args StateDumpArgs, reply *StateDumpReply) error {
+	var err error
+	reply.States, err = r.Node.ShowJusticeDB()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // ------------------------- push
 type PushArgs struct {
 	ChanIdx uint32
