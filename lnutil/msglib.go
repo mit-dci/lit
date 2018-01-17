@@ -482,14 +482,16 @@ type DeltaSigMsg struct {
 	Outpoint  wire.OutPoint
 	Delta     int32
 	Signature [64]byte
+	Data      [32]byte
 }
 
-func NewDeltaSigMsg(peerid uint32, OP wire.OutPoint, DELTA int32, SIG [64]byte) DeltaSigMsg {
+func NewDeltaSigMsg(peerid uint32, OP wire.OutPoint, DELTA int32, SIG [64]byte, data [32]byte) DeltaSigMsg {
 	d := new(DeltaSigMsg)
 	d.PeerIdx = peerid
 	d.Outpoint = OP
 	d.Delta = DELTA
 	d.Signature = SIG
+	d.Data = data
 	return *d
 }
 
@@ -510,6 +512,7 @@ func NewDeltaSigMsgFromBytes(b []byte, peerid uint32) (DeltaSigMsg, error) {
 	// deserialize DeltaSig
 	ds.Delta = BtI32(buf.Next(4))
 	copy(ds.Signature[:], buf.Next(64))
+	copy(ds.Data[:], buf.Next(32))
 	return *ds, nil
 }
 
@@ -520,6 +523,7 @@ func (self DeltaSigMsg) Bytes() []byte {
 	msg = append(msg, opArr[:]...)
 	msg = append(msg, I32tB(self.Delta)...)
 	msg = append(msg, self.Signature[:]...)
+	msg = append(msg, self.Data[:]...)
 	return msg
 }
 

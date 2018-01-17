@@ -19,6 +19,7 @@ type ChannelInfo struct {
 	StateNum      uint64 // Most recent commit number
 	PeerIdx, CIdx uint32
 	PeerID        string
+	Data          [32]byte
 }
 type ChannelListReply struct {
 	Channels []ChannelInfo
@@ -55,6 +56,7 @@ func (r *LitRPC) ChannelList(args ChanArgs, reply *ChannelListReply) error {
 		reply.Channels[i].StateNum = q.State.StateIdx
 		reply.Channels[i].PeerIdx = q.KeyGen.Step[3] & 0x7fffffff
 		reply.Channels[i].CIdx = q.KeyGen.Step[4] & 0x7fffffff
+		reply.Channels[i].Data = q.State.Data
 	}
 	return nil
 }
@@ -119,10 +121,31 @@ func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
 	return nil
 }
 
+// ------------------------- statedump
+type StateDumpArgs struct {
+	// none
+}
+
+type StateDumpReply struct {
+	Txs []qln.JusticeTx
+}
+
+// StateDump dumps all of the meta data for the state commitments of a channel
+func (r *LitRPC) StateDump(args StateDumpArgs, reply *StateDumpReply) error {
+	var err error
+	reply.Txs, err = r.Node.DumpJusticeDB()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // ------------------------- push
 type PushArgs struct {
 	ChanIdx uint32
 	Amt     int64
+	Data    [32]byte
 }
 type PushReply struct {
 	StateIndex uint64
@@ -139,7 +162,7 @@ func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 			"can't push %d max is 1 coin (100000000), min is 1", args.Amt)
 	}
 
-	fmt.Printf("push %d to chan %d\n", args.Amt, args.ChanIdx)
+	fmt.Printf("push %d to chan %d with data %x\n", args.Amt, args.ChanIdx, args.Data)
 
 	// load the whole channel from disk just to see who the peer is
 	// (pretty inefficient)
@@ -180,7 +203,7 @@ func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 	// to the Node.Func() calls.  For now though, set the height here...
 	qc.Height = dummyqc.Height
 
-	err = r.Node.PushChannel(qc, uint32(args.Amt))
+	err = r.Node.PushChannel(qc, uint32(args.Amt), args.Data)
 	if err != nil {
 		return err
 	}

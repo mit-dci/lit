@@ -172,6 +172,13 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		}
 		return nil
 	}
+	if cmd == "history" { // dump justice tx history
+		err = lc.History(args)
+		if err != nil {
+			fmt.Fprintf(color.Output, "history error: %s\n", err)
+		}
+		return nil
+	}
 
 	fmt.Fprintf(color.Output, "Command not recognized. type help for command list.\n")
 	return nil
@@ -249,11 +256,11 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		}
 		fmt.Fprintf(
 			color.Output,
-			"%s (peer %d) type %d %s\n\t cap: %s bal: %s h: %d state: %d\n",
+			"%s (peer %d) type %d %s\n\t cap: %s bal: %s h: %d state: %d data: %x\n",
 			lnutil.White(c.CIdx), c.PeerIdx, c.CoinType,
 			lnutil.OutPoint(c.OutPoint),
 			lnutil.SatoshiColor(c.Capacity), lnutil.SatoshiColor(c.MyBalance),
-			c.Height, c.StateNum)
+			c.Height, c.StateNum, c.Data)
 	}
 
 	err = lc.rpccon.Call("LitRPC.TxoList", nil, tReply)
@@ -353,6 +360,7 @@ func (lc *litAfClient) Help(textArgs []string) error {
 		fmt.Fprintf(color.Output, "%s\t%s", pushCommand.Format, pushCommand.ShortDescription)
 		fmt.Fprintf(color.Output, "%s\t%s", closeCommand.Format, closeCommand.ShortDescription)
 		fmt.Fprintf(color.Output, "%s\t%s", breakCommand.Format, breakCommand.ShortDescription)
+		fmt.Fprintf(color.Output, "%s\t%s", historyCommand.Format, historyCommand.ShortDescription)
 		fmt.Fprintf(color.Output, "%s\t%s", offCommand.Format, offCommand.ShortDescription)
 		fmt.Fprintf(color.Output, "%s\t%s", exitCommand.Format, exitCommand.ShortDescription)
 		return nil

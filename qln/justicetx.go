@@ -19,6 +19,59 @@ because we're using the sipa/schnorr delinearization, we don't need to vary the 
 anymore.  We can hand over 1 point per commit & figure everything out from that.
 */
 
+type JusticeTx struct {
+	Sig  [64]byte
+	Txid [16]byte
+	Amt  int64
+	Data [32]byte
+	Pkh  [20]byte
+	Idx  uint64
+}
+
+func (jte *JusticeTx) ToBytes() ([]byte, error) {
+	var buf bytes.Buffer
+
+	// write the sig
+	_, err := buf.Write(jte.Sig[:])
+	if err != nil {
+		return nil, err
+	}
+
+	// write tx id of the bad tx
+	_, err = buf.Write(jte.Txid[:])
+	if err != nil {
+		return nil, err
+	}
+	// write the delta for this tx
+	_, err = buf.Write(lnutil.I64tB(jte.Amt)[:])
+	if err != nil {
+		return nil, err
+	}
+
+	// then the data
+	_, err = buf.Write(jte.Data[:])
+	if err != nil {
+		return nil, err
+	}
+
+	// done
+	return buf.Bytes(), nil
+}
+
+func JusticeTxFromBytes(jte []byte) (JusticeTx, error) {
+	var r JusticeTx
+	if len(jte) < 120 || len(jte) > 120 {
+		return r, fmt.Errorf("JusticeTx data %d bytes, expect 116", len(jte))
+	}
+
+	copy(r.Sig[:], jte[:64])
+	copy(r.Txid[:], jte[64:80])
+	r.Amt = lnutil.BtI64(jte[80:88])
+	copy(r.Data[:], jte[88:])
+
+	return r, nil
+}
+
 // BuildWatchTxidSig builds the partial txid and signature pair which can
 // be exported to the watchtower.
 // This get a channel that is 1 state old.  So we can produce a signature.
@@ -27,8 +80,6 @@ func (nd *LitNode) BuildJusticeSig(q *Qchan) error {
 	if nd.SubWallet[q.Coin()] == nil {
 		return fmt.Errorf("Not connected to coin type %d\n", q.Coin())
 	}
-	// justice-ing should be done in the background...
-	var parTxidSig [80]byte // 16 byte txid and 64 byte signature stuck together
 
 	// in this function, "bad" refers to the hypothetical transaction spending the
 	// com tx.  "justice" is the tx spending the bad tx
@@ -120,15 +171,26 @@ func (nd *LitNode) BuildJusticeSig(q *Qchan) error {
 		return err
 	}
 
-	copy(parTxidSig[:16], badTxid[:16])
-	copy(parTxidSig[16:], sig[:])
+	var jte JusticeTx
+	copy(jte.Sig[:], sig[:])
+	copy(jte.Txid[:], badTxid[:16])
+	jte.Data = q.State.Data
+	jte.Amt = q.State.MyAmt
 
-	return nd.SaveJusticeSig(q.State.StateIdx, q.WatchRefundAdr, parTxidSig)
+	justiceBytes, err := jte.ToBytes()
+	if err != nil {
+		return err
+	}
+
+	var justiceBytesFixed [120]byte
+	copy(justiceBytesFixed[:], justiceBytes[:120])
+
+	return nd.SaveJusticeSig(q.State.StateIdx, q.WatchRefundAdr, justiceBytesFixed)
 }
 
 // SaveJusticeSig save the txid/sig of a justice transaction to the db.  Pretty
 // straightforward
-func (nd *LitNode) SaveJusticeSig(comnum uint64, pkh [20]byte, txidsig [80]byte) error {
+func (nd *LitNode) SaveJusticeSig(comnum uint64, pkh [20]byte, txidsig [120]byte) error {
 	return nd.LitDB.Update(func(btx *bolt.Tx) error {
 		sigs := btx.Bucket(BKTWatch)
 		if sigs == nil {
@@ -144,8 +206,8 @@ func (nd *LitNode) SaveJusticeSig(comnum uint64, pkh [20]byte, txidsig [80]byte)
 	})
 }
 
-func (nd *LitNode) LoadJusticeSig(comnum uint64, pkh [20]byte) ([80]byte, error) {
-	var txidsig [80]byte
+func (nd *LitNode) LoadJusticeSig(comnum uint64, pkh [20]byte) (JusticeTx, error) {
+	var txidsig JusticeTx
 
 	err := nd.LitDB.View(func(btx *bolt.Tx) error {
 		sigs := btx.Bucket(BKTWatch)
@@ -161,10 +223,51 @@ func (nd *LitNode) LoadJusticeSig(comnum uint64, pkh [20]byte) ([80]byte, error)
 		if sigbytes == nil {
 			return fmt.Errorf("state %d not in db under pkh %x", comnum, pkh)
 		}
-		copy(txidsig[:], sigbytes)
+
+		var err error
+		txidsig, err = JusticeTxFromBytes(sigbytes)
+		if err != nil {
+			return err
+		}
+
 		return nil
 	})
+
 	return txidsig, err
+}
+
+func (nd *LitNode) DumpJusticeDB() ([]JusticeTx, error) {
+	var txs []JusticeTx
+
+	err := nd.LitDB.View(func(btx *bolt.Tx) error {
+		sigs := btx.Bucket(BKTWatch)
+		if sigs == nil {
+			return fmt.Errorf("no justice bucket")
+		}
+
+		// go through all pkh buckets
+		return sigs.ForEach(func(k, _ []byte) error {
+			pkhBucket := sigs.Bucket(k)
+			if pkhBucket == nil {
+				return fmt.Errorf("%x not a bucket", k)
+			}
+			return pkhBucket.ForEach(func(idx, txidsig []byte) error {
+				var jtx JusticeTx
+				jtx, err := JusticeTxFromBytes(txidsig)
+				if err != nil {
+					return err
+				}
+
+				copy(jtx.Pkh[:], k[:20])
+				jtx.Idx = lnutil.BtU64(idx)
+
+				txs = append(txs, jtx)
+
+				return nil
+			})
+		})
+	})
+	return txs, err
 }
 
 func (nd *LitNode) ShowJusticeDB() (string, error) {
@@ -184,7 +287,7 @@ func (nd *LitNode) ShowJusticeDB() (string, error) {
 				return fmt.Errorf("%x not a bucket", k)
 			}
 			return pkhBucket.ForEach(func(idx, txidsig []byte) error {
-				s += fmt.Sprintf("\tidx %x\t txidsig: %x\n", idx, txidsig)
+				s += fmt.Sprintf("\tidx %x\t txidsig: %x\n", idx, txidsig[:80])
 				return nil
 			})
 		})
@@ -254,13 +357,8 @@ func (nd *LitNode) SendWatchComMsg(qc *Qchan, idx uint64) error {
 	var peerIdx uint32
 	peerIdx = 0 // should be replaced
 
-	var parTx [16]byte
-	var sig [64]byte
-	copy(parTx[:], txidsig[:16])
-	copy(sig[:], txidsig[16:])
-
 	comMsg := lnutil.NewComMsg(
-		peerIdx, qc.Coin(), qc.WatchRefundAdr, *elk, parTx, sig)
+		peerIdx, qc.Coin(), qc.WatchRefundAdr, *elk, txidsig.Txid, txidsig.Sig)
 
 	// stash to send all?  or just send once each time?  probably should
 	// set up some output buffering

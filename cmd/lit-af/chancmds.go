@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strconv"
 
@@ -20,9 +21,10 @@ var fundCommand = &Command{
 }
 
 var pushCommand = &Command{
-	Format: fmt.Sprintf("%s%s%s\n", lnutil.White("push"), lnutil.ReqColor("channel idx", "amount"), lnutil.OptColor("times")),
-	Description: fmt.Sprintf("%s\n%s\n",
+	Format: fmt.Sprintf("%s%s%s%s\n", lnutil.White("push"), lnutil.ReqColor("channel idx", "amount"), lnutil.OptColor("times"), lnutil.OptColor("data")),
+	Description: fmt.Sprintf("%s\n%s\n%s\n",
 		"Push the given amount (in satoshis) to the other party on the given channel.",
+		"Optionally, the push operation can be associated with a 32 byte value hex encoded.",
 		"Optionally, the push operation can be repeated <times> number of times."),
 	ShortDescription: "Push the given amount (in satoshis) to the other party on the given channel.\n",
 }
@@ -43,6 +45,34 @@ var breakCommand = &Command{
 		"a set number of blocks before you can use the money.",
 		"See also: ", lnutil.White("stop")),
 	ShortDescription: "Forcibly break the given channel.\n",
+}
+
+var historyCommand = &Command{
+	Format:           lnutil.White("history"),
+	Description:      "Show all the metadata for justice txs",
+	ShortDescription: "Show all the metadata for justice txs.\n",
+}
+
+func (lc *litAfClient) History(textArgs []string) error {
+	if len(textArgs) > 0 && textArgs[0] == "-h" {
+		fmt.Fprintf(color.Output, historyCommand.Format)
+		fmt.Fprintf(color.Output, historyCommand.Description)
+		return nil
+	}
+
+	args := new(litrpc.StateDumpArgs)
+	reply := new(litrpc.StateDumpReply)
+
+	err := lc.rpccon.Call("LitRPC.StateDump", args, reply)
+	if err != nil {
+		return err
+	}
+
+	for _, tx := range reply.Txs {
+		fmt.Fprintf(color.Output, "Pkh: %x, Idx: %d, Sig: %x, Txid: %x, Data: %x, Amt: %d\n", tx.Pkh, tx.Idx, tx.Sig, tx.Txid, tx.Data, tx.Amt)
+	}
+
+	return nil
 }
 
 func (lc *litAfClient) FundChannel(textArgs []string) error {
@@ -166,7 +196,7 @@ func (lc *litAfClient) Push(textArgs []string) error {
 	reply := new(litrpc.PushReply)
 
 	if len(textArgs) < 2 {
-		return fmt.Errorf("need args: push chanIdx amt (times)")
+		return fmt.Errorf("need args: push chanIdx amt (times) (data)")
 	}
 
 	// this stuff is all the same as in cclose, should put into a function...
@@ -185,6 +215,18 @@ func (lc *litAfClient) Push(textArgs []string) error {
 		if err != nil {
 			return err
 		}
+	}
+
+	var data [32]byte
+	for i := range data {
+		data[i] = 0
+	}
+	if len(textArgs) > 3 {
+		data, err := hex.DecodeString(textArgs[3])
+		if err != nil {
+			return err
+		}
+		copy(args.Data[:], data[:32])
 	}
 
 	args.ChanIdx = uint32(cIdx)

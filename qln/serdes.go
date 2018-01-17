@@ -89,13 +89,20 @@ func (s *StatCom) ToBytes() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// write their data
+	_, err = buf.Write(s.Data[:])
+	if err != nil {
+		return nil, err
+	}
+
 	return buf.Bytes(), nil
 }
 
 // StatComFromBytes turns 192 bytes into a StatCom
 func StatComFromBytes(b []byte) (*StatCom, error) {
 	var s StatCom
-	if len(b) < 203 || len(b) > 203 {
+	if len(b) < 235 || len(b) > 235 {
 		return nil, fmt.Errorf("StatComFromBytes got %d bytes, expect 203",
 			len(b))
 	}
@@ -140,6 +147,9 @@ func StatComFromBytes(b []byte) (*StatCom, error) {
 
 	// the rest is their sig
 	copy(s.sig[:], buf.Next(64))
+
+	// copy data
+	copy(s.Data[:], buf.Next(32))
 
 	return &s, nil
 }
