@@ -523,6 +523,7 @@ func (self DeltaSigMsg) Bytes() []byte {
 	msg = append(msg, opArr[:]...)
 	msg = append(msg, I32tB(self.Delta)...)
 	msg = append(msg, self.Signature[:]...)
+	msg = append(msg, self.Data[:]...)
 	return msg
 }
 
