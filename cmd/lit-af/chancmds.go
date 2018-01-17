@@ -69,7 +69,7 @@ func (lc *litAfClient) History(textArgs []string) error {
 	}
 
 	for _, tx := range reply.Txs {
-		fmt.Fprintf(color.Output, "Sig: %x, Txid: %x, Data: %x, Amt: %d\n", tx.Sig, tx.Txid, tx.Data, tx.Amt)
+		fmt.Fprintf(color.Output, "Pkh: %x, Idx: %d, Sig: %x, Txid: %x, Data: %x, Amt: %d\n", tx.Pkh, tx.Idx, tx.Sig, tx.Txid, tx.Data, tx.Amt)
 	}
 
 	return nil

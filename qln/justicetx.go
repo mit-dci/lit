@@ -24,6 +24,8 @@ type JusticeTx struct {
 	Txid [16]byte
 	Amt  int64
 	Data [32]byte
+	Pkh  [20]byte
+	Idx  uint64
 }
 
 func (jte *JusticeTx) ToBytes() ([]byte, error) {
@@ -255,6 +257,10 @@ func (nd *LitNode) DumpJusticeDB() ([]JusticeTx, error) {
 				if err != nil {
 					return err
 				}
+
+				copy(jtx.Pkh[:], k[:20])
+				jtx.Idx = lnutil.BtU64(idx)
+
 				txs = append(txs, jtx)
 
 				return nil
