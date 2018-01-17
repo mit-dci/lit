@@ -225,6 +225,7 @@ func (nd LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	}
 
 	qc.State.Data = data
+	fmt.Printf("Sending message %x", data)
 
 	qc.State.Delta = int32(-amt)
 	// save to db with ONLY delta changed
@@ -368,6 +369,7 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 	// regardless of collision, raise amt
 	qc.State.MyAmt += int64(incomingDelta)
 
+	fmt.Printf("Got message %x", msg.Data)
 	qc.State.Data = msg.Data
 
 	// verify sig for the next state. only save if this works

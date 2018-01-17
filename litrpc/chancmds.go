@@ -125,13 +125,13 @@ type StateDumpArgs struct {
 }
 
 type StateDumpReply struct {
-	States string
+	Txs []qln.JusticeTx
 }
 
 // StateDump dumps all of the meta data for the state commitments of a channel
 func (r *LitRPC) StateDump(args StateDumpArgs, reply *StateDumpReply) error {
 	var err error
-	reply.States, err = r.Node.ShowJusticeDB()
+	reply.Txs, err = r.Node.DumpJusticeDB()
 	if err != nil {
 		return err
 	}

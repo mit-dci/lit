@@ -20,10 +20,10 @@ anymore.  We can hand over 1 point per commit & figure everything out from that.
 */
 
 type JusticeTx struct {
-	Sig   [64]byte
-	Txid  [16]byte
-	Delta int32
-	Data  [32]byte
+	Sig  [64]byte
+	Txid [16]byte
+	Amt  int64
+	Data [32]byte
 }
 
 func (jte *JusticeTx) ToBytes() ([]byte, error) {
@@ -41,7 +41,7 @@ func (jte *JusticeTx) ToBytes() ([]byte, error) {
 		return nil, err
 	}
 	// write the delta for this tx
-	_, err = buf.Write(lnutil.I32tB(jte.Delta)[:])
+	_, err = buf.Write(lnutil.I64tB(jte.Amt)[:])
 	if err != nil {
 		return nil, err
 	}
@@ -58,14 +58,14 @@ func (jte *JusticeTx) ToBytes() ([]byte, error) {
 
 func JusticeTxFromBytes(jte []byte) (JusticeTx, error) {
 	var r JusticeTx
-	if len(jte) < 116 || len(jte) > 116 {
-		return r, fmt.Errorf("JusticTx data %d bytes, expect 116", len(jte))
+	if len(jte) < 120 || len(jte) > 120 {
+		return r, fmt.Errorf("JusticeTx data %d bytes, expect 116", len(jte))
 	}
 
 	copy(r.Sig[:], jte[:64])
 	copy(r.Txid[:], jte[64:80])
-	r.Delta = lnutil.BtI32(jte[80:84])
-	copy(r.Data[:], jte[84:])
+	r.Amt = lnutil.BtI64(jte[80:88])
+	copy(r.Data[:], jte[88:])
 
 	return r, nil
 }
@@ -173,22 +173,22 @@ func (nd *LitNode) BuildJusticeSig(q *Qchan) error {
 	copy(jte.Sig[:], sig[:])
 	copy(jte.Txid[:], badTxid[:16])
 	jte.Data = q.State.Data
-	jte.Delta = q.State.Delta
+	jte.Amt = q.State.MyAmt
 
 	justiceBytes, err := jte.ToBytes()
 	if err != nil {
 		return err
 	}
 
-	var justiceBytesFixed [116]byte
-	copy(justiceBytesFixed[:], justiceBytes[:116])
+	var justiceBytesFixed [120]byte
+	copy(justiceBytesFixed[:], justiceBytes[:120])
 
 	return nd.SaveJusticeSig(q.State.StateIdx, q.WatchRefundAdr, justiceBytesFixed)
 }
 
 // SaveJusticeSig save the txid/sig of a justice transaction to the db.  Pretty
 // straightforward
-func (nd *LitNode) SaveJusticeSig(comnum uint64, pkh [20]byte, txidsig [116]byte) error {
+func (nd *LitNode) SaveJusticeSig(comnum uint64, pkh [20]byte, txidsig [120]byte) error {
 	return nd.LitDB.Update(func(btx *bolt.Tx) error {
 		sigs := btx.Bucket(BKTWatch)
 		if sigs == nil {
@@ -232,6 +232,36 @@ func (nd *LitNode) LoadJusticeSig(comnum uint64, pkh [20]byte) (JusticeTx, error
 	})
 
 	return txidsig, err
+}
+
+func (nd *LitNode) DumpJusticeDB() ([]JusticeTx, error) {
+	var txs []JusticeTx
+
+	err := nd.LitDB.View(func(btx *bolt.Tx) error {
+		sigs := btx.Bucket(BKTWatch)
+		if sigs == nil {
+			return fmt.Errorf("no justice bucket")
+		}
+
+		// go through all pkh buckets
+		return sigs.ForEach(func(k, _ []byte) error {
+			pkhBucket := sigs.Bucket(k)
+			if pkhBucket == nil {
+				return fmt.Errorf("%x not a bucket", k)
+			}
+			return pkhBucket.ForEach(func(idx, txidsig []byte) error {
+				var jtx JusticeTx
+				jtx, err := JusticeTxFromBytes(txidsig)
+				if err != nil {
+					return err
+				}
+				txs = append(txs, jtx)
+
+				return nil
+			})
+		})
+	})
+	return txs, err
 }
 
 func (nd *LitNode) ShowJusticeDB() (string, error) {
