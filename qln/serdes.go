@@ -102,7 +102,7 @@ func (s *StatCom) ToBytes() ([]byte, error) {
 // StatComFromBytes turns 192 bytes into a StatCom
 func StatComFromBytes(b []byte) (*StatCom, error) {
 	var s StatCom
-	if len(b) < 203 || len(b) > 203 {
+	if len(b) < 235 || len(b) > 235 {
 		return nil, fmt.Errorf("StatComFromBytes got %d bytes, expect 203",
 			len(b))
 	}
