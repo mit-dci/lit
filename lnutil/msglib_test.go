@@ -306,6 +306,7 @@ func TestCloseReqMsg(t *testing.T) {
 func TestDeltaSigMsg(t *testing.T) {
 	peerid := rand.Uint32()
 	var outPoint [36]byte
+	var empty [32]byte
 	delta := rand.Int31()
 	var sig [64]byte
 
@@ -314,7 +315,7 @@ func TestDeltaSigMsg(t *testing.T) {
 
 	op := *OutPointFromBytes(outPoint)
 
-	msg := NewDeltaSigMsg(peerid, op, delta, sig)
+	msg := NewDeltaSigMsg(peerid, op, delta, sig, empty)
 	b := msg.Bytes()
 
 	msg2, err := NewDeltaSigMsgFromBytes(b, peerid)
