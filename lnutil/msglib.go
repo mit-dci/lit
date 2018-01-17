@@ -512,6 +512,7 @@ func NewDeltaSigMsgFromBytes(b []byte, peerid uint32) (DeltaSigMsg, error) {
 	// deserialize DeltaSig
 	ds.Delta = BtI32(buf.Next(4))
 	copy(ds.Signature[:], buf.Next(64))
+	copy(ds.Data[:], buf.Next(32))
 	return *ds, nil
 }
 
