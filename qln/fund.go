@@ -148,7 +148,7 @@ func (nd *LitNode) FundChannel(
 	nd.InProg.Coin = cointype
 	nd.InProg.mtx.Unlock() // switch to defer
 
-	outMsg := lnutil.NewPointReqMsg(peerIdx, cointype, data)
+	outMsg := lnutil.NewPointReqMsg(peerIdx, cointype)
 
 	nd.OmniOut <- outMsg
 
@@ -303,6 +303,8 @@ func (nd LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 	// based on size
 	q.State.Fee = nd.SubWallet[q.Coin()].Fee() * 1000
 
+	q.State.Data = nd.InProg.Data
+
 	// save channel to db
 	err = nd.SaveQChan(q)
 	if err != nil {
@@ -331,7 +333,7 @@ func (nd LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 	outMsg := lnutil.NewChanDescMsg(
 		msg.Peer(), *nd.InProg.op, q.MyPub, q.MyRefundPub, q.MyHAKDBase,
 		nd.InProg.Coin, nd.InProg.Amt, nd.InProg.InitSend,
-		elkPointZero, elkPointOne, elkPointTwo)
+		elkPointZero, elkPointOne, elkPointTwo, nd.InProg.Data)
 
 	nd.OmniOut <- outMsg
 
@@ -397,6 +399,8 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 	// TODO assumes both parties use same fee
 	qc.State.Fee = wal.Fee() * 1000
 	qc.State.MyAmt = msg.InitPayment
+
+	qc.State.Data = msg.Data
 
 	qc.State.StateIdx = 0
 	// use new ElkPoint for signing

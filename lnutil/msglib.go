@@ -158,14 +158,12 @@ func (self ChatMsg) MsgType() uint8 { return MSGID_TEXTCHAT }
 type PointReqMsg struct {
 	PeerIdx  uint32
 	Cointype uint32
-	Data     [32]byte
 }
 
-func NewPointReqMsg(peerid uint32, cointype uint32, data [32]byte) PointReqMsg {
+func NewPointReqMsg(peerid uint32, cointype uint32) PointReqMsg {
 	p := new(PointReqMsg)
 	p.PeerIdx = peerid
 	p.Cointype = cointype
-	p.Data = data
 	return *p
 }
 
@@ -182,8 +180,6 @@ func NewPointReqMsgFromBytes(b []byte, peerid uint32) (PointReqMsg, error) {
 	coin := buf.Next(4)
 	pr.Cointype = BtU32(coin)
 
-	copy(pr.Data[:], buf.Next(32))
-
 	return *pr, nil
 }
 
@@ -192,7 +188,6 @@ func (self PointReqMsg) Bytes() []byte {
 	msg = append(msg, self.MsgType())
 	coin := U32tB(self.Cointype)
 	msg = append(msg, coin[:]...)
-	msg = append(msg, self.Data[:]...)
 	return msg
 }
 
@@ -259,6 +254,8 @@ type ChanDescMsg struct {
 	ElkZero [33]byte //consider changing into array in future
 	ElkOne  [33]byte
 	ElkTwo  [33]byte
+
+	Data [32]byte
 }
 
 func NewChanDescMsg(
@@ -266,7 +263,7 @@ func NewChanDescMsg(
 	pubkey, refund, hakd [33]byte,
 	cointype uint32,
 	capacity int64, payment int64,
-	ELKZero, ELKOne, ELKTwo [33]byte) ChanDescMsg {
+	ELKZero, ELKOne, ELKTwo [33]byte, data [32]byte) ChanDescMsg {
 
 	cd := new(ChanDescMsg)
 	cd.PeerIdx = peerid
@@ -280,6 +277,7 @@ func NewChanDescMsg(
 	cd.ElkZero = ELKZero
 	cd.ElkOne = ELKOne
 	cd.ElkTwo = ELKTwo
+	cd.Data = data
 	return *cd
 }
 
@@ -287,8 +285,8 @@ func NewChanDescMsgFromBytes(b []byte, peerid uint32) (ChanDescMsg, error) {
 	cm := new(ChanDescMsg)
 	cm.PeerIdx = peerid
 
-	if len(b) < 251 {
-		return *cm, fmt.Errorf("got %d byte channel description, expect 251", len(b))
+	if len(b) < 283 {
+		return *cm, fmt.Errorf("got %d byte channel description, expect 283", len(b))
 	}
 
 	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
@@ -304,6 +302,7 @@ func NewChanDescMsgFromBytes(b []byte, peerid uint32) (ChanDescMsg, error) {
 	copy(cm.ElkZero[:], buf.Next(33))
 	copy(cm.ElkOne[:], buf.Next(33))
 	copy(cm.ElkTwo[:], buf.Next(33))
+	copy(cm.Data[:], buf.Next(32))
 
 	return *cm, nil
 }
@@ -326,6 +325,7 @@ func (self ChanDescMsg) Bytes() []byte {
 	msg = append(msg, self.ElkZero[:]...)
 	msg = append(msg, self.ElkOne[:]...)
 	msg = append(msg, self.ElkTwo[:]...)
+	msg = append(msg, self.Data[:]...)
 	return msg
 }
 
