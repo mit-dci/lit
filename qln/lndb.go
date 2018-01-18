@@ -144,6 +144,8 @@ type InFlightFund struct {
 	done chan uint32
 	// use this to avoid crashiness
 	mtx sync.Mutex
+
+	Data [32]byte
 }
 
 func (inff *InFlightFund) Clear() {

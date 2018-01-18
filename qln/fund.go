@@ -100,7 +100,7 @@ an exact timing for the payment.
 // FundChannel opens a channel with a peer.  Doesn't return until the channel
 // has been created.  Maybe timeout if it takes too long?
 func (nd *LitNode) FundChannel(
-	peerIdx, cointype uint32, ccap, initSend int64) (uint32, error) {
+	peerIdx, cointype uint32, ccap, initSend int64, data [32]byte) (uint32, error) {
 
 	_, ok := nd.SubWallet[cointype]
 	if !ok {
@@ -143,11 +143,12 @@ func (nd *LitNode) FundChannel(
 	nd.InProg.PeerIdx = peerIdx
 	nd.InProg.Amt = ccap
 	nd.InProg.InitSend = initSend
+	nd.InProg.Data = data
 
 	nd.InProg.Coin = cointype
 	nd.InProg.mtx.Unlock() // switch to defer
 
-	outMsg := lnutil.NewPointReqMsg(peerIdx, cointype)
+	outMsg := lnutil.NewPointReqMsg(peerIdx, cointype, data)
 
 	nd.OmniOut <- outMsg
 

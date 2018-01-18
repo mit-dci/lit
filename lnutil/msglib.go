@@ -158,12 +158,14 @@ func (self ChatMsg) MsgType() uint8 { return MSGID_TEXTCHAT }
 type PointReqMsg struct {
 	PeerIdx  uint32
 	Cointype uint32
+	Data     [32]byte
 }
 
-func NewPointReqMsg(peerid uint32, cointype uint32) PointReqMsg {
+func NewPointReqMsg(peerid uint32, cointype uint32, data [32]byte) PointReqMsg {
 	p := new(PointReqMsg)
 	p.PeerIdx = peerid
 	p.Cointype = cointype
+	p.Data = data
 	return *p
 }
 
@@ -180,6 +182,8 @@ func NewPointReqMsgFromBytes(b []byte, peerid uint32) (PointReqMsg, error) {
 	coin := buf.Next(4)
 	pr.Cointype = BtU32(coin)
 
+	copy(pr.Data[:], buf.Next(32))
+
 	return *pr, nil
 }
 
@@ -188,6 +192,7 @@ func (self PointReqMsg) Bytes() []byte {
 	msg = append(msg, self.MsgType())
 	coin := U32tB(self.Cointype)
 	msg = append(msg, coin[:]...)
+	msg = append(msg, self.Data[:]...)
 	return msg
 }
 

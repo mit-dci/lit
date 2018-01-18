@@ -68,6 +68,7 @@ type FundArgs struct {
 	Capacity    int64  // later can be minimum capacity
 	Roundup     int64  // ignore for now; can be used to round-up capacity
 	InitialSend int64  // Initial send of -1 means "ALL"
+	Data        [32]byte
 }
 
 func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
@@ -111,7 +112,7 @@ func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
 	}
 
 	idx, err := r.Node.FundChannel(
-		args.Peer, args.CoinType, args.Capacity, args.InitialSend)
+		args.Peer, args.CoinType, args.Capacity, args.InitialSend, args.Data)
 	if err != nil {
 		return err
 	}
