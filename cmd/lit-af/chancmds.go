@@ -112,9 +112,11 @@ func (lc *litAfClient) FundChannel(textArgs []string) error {
 	if len(textArgs) > 4 {
 		data, err := hex.DecodeString(textArgs[4])
 		if err != nil {
-			return err
+			// Wasn't valid hex, copy directly and truncate
+			copy(args.Data[:], textArgs[3])
+		} else {
+			copy(args.Data[:], data[:])
 		}
-		copy(args.Data[:], data[:32])
 	}
 
 	args.Peer = uint32(peer)
@@ -231,9 +233,11 @@ func (lc *litAfClient) Push(textArgs []string) error {
 	if len(textArgs) > 3 {
 		data, err := hex.DecodeString(textArgs[3])
 		if err != nil {
-			return err
+			// Wasn't valid hex, copy directly and truncate
+			copy(args.Data[:], textArgs[3])
+		} else {
+			copy(args.Data[:], data[:])
 		}
-		copy(args.Data[:], data[:32])
 	}
 
 	args.ChanIdx = uint32(cIdx)
