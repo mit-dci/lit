@@ -1,16 +1,16 @@
 package main
 
 import (
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"log"
 	"net/rpc"
+	"strconv"
 	"net/rpc/jsonrpc"
 	"os"
 	"path/filepath"
 	"strings"
-
-	"golang.org/x/net/websocket"
 
 	"github.com/chzyer/readline"
 	"github.com/fatih/color"
@@ -77,29 +77,20 @@ func main() {
 	lc := new(litAfClient)
 	setConfig(lc)
 
-	//	dialString := fmt.Sprintf("%s:%d", lc.remote, lc.port)
-
-	/*
-		client, err := net.Dial("tcp", dialString)
-		if err != nil {
-			log.Fatal("dialing:", err)
-		}
-		defer client.Close()
-	*/
-
-	//	dialString := fmt.Sprintf("%s:%d", lc.remote, lc.port)
-	origin := "http://127.0.0.1/"
-	urlString := fmt.Sprintf("ws://%s:%d/ws", lc.remote, lc.port)
-	//	url := "ws://127.0.0.1:8000/ws"
-	wsConn, err := websocket.Dial(urlString, "", origin)
+	cert, err := tls.LoadX509KeyPair("../../certs/client.pem", "../../certs/client.key")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Failed to load client keys: %s", err)
 	}
-	defer wsConn.Close()
+	config := tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true}
+	connectString := lc.remote + ":" + strconv.Itoa(int(lc.port))
+	conn, err := tls.Dial("tcp", connectString, &config)
+	if err != nil {
+		log.Fatalf("client dial failed: %s", err)
+	}
+	defer conn.Close()
 
-	lc.rpccon = jsonrpc.NewClient(wsConn)
-
-	go lc.RequestAsync()
+	lc.rpccon = jsonrpc.NewClient(conn)
+	go lc.RequestAsync() // error
 
 	rl, err := readline.NewEx(&readline.Config{
 		Prompt:       lnutil.Prompt("lit-af") + lnutil.White("# "),

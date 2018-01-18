@@ -1,15 +1,11 @@
 package litrpc
 
 import (
-	"bytes"
-	"fmt"
-	"io/ioutil"
+	"crypto/tls"
 	"log"
-	"net/http"
 	"net/rpc"
 	"net/rpc/jsonrpc"
-
-	"golang.org/x/net/websocket"
+	"strconv"
 
 	"github.com/mit-dci/lit/qln"
 )
@@ -29,25 +25,27 @@ type LitRPC struct {
 	OffButton chan bool
 }
 
-func serveWS(ws *websocket.Conn) {
-	body, err := ioutil.ReadAll(ws.Request().Body)
-	if err != nil {
-		log.Printf("Error reading body: %v", err)
-		return
-	}
-
-	log.Printf(string(body))
-	ws.Request().Body = ioutil.NopCloser(bytes.NewBuffer(body))
-
-	jsonrpc.ServeConn(ws)
-}
-
 func RPCListen(rpcl *LitRPC, port uint16) {
 
 	rpc.Register(rpcl)
 
-	listenString := fmt.Sprintf("localhost:%d", port)
-
-	http.Handle("/ws", websocket.Handler(serveWS))
-	log.Fatal(http.ListenAndServe(listenString, nil))
+	cert, err := tls.LoadX509KeyPair("certs/server.pem", "certs/server.key")
+	if err != nil {
+		log.Fatalf("Failed to load keys: %s", err)
+	}
+	conf := tls.Config{Certificates: []tls.Certificate{cert}}
+	listenString := "localhost:" + strconv.Itoa(int(port))
+	listener, err := tls.Listen("tcp", listenString, &conf)
+	if err != nil {
+		log.Fatalf("server error: %s", err)
+	}
+	log.Print("Listening for connections..")
+	conn, err := listener.Accept()
+	if err != nil {
+		log.Printf("accept: %s", err)
+		return
+	}
+	log.Printf("accepted connection from %s", conn.RemoteAddr())
+	defer conn.Close()
+	jsonrpc.ServeConn(conn)
 }
