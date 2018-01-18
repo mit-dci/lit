@@ -77,11 +77,13 @@ func main() {
 	lc := new(litAfClient)
 	setConfig(lc)
 
-	cert, err := tls.LoadX509KeyPair("../../certs/client.pem", "../../certs/client.key")
+	certPath, _ := filepath.Abs("../../certs")
+	cert, err := tls.LoadX509KeyPair(certPath + "/client.pem", certPath + "/client.key")
 	if err != nil {
 		log.Fatalf("Failed to load client keys: %s", err)
 	}
 	config := tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true}
+	// InsecureSkipVerify true to validate self-signed certs
 	connectString := lc.remote + ":" + strconv.Itoa(int(lc.port))
 	conn, err := tls.Dial("tcp", connectString, &config)
 	if err != nil {
