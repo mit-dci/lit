@@ -20,6 +20,7 @@ type ChannelInfo struct {
 	PeerIdx, CIdx uint32
 	PeerID        string
 	Data          [32]byte
+	Pkh           [20]byte
 }
 type ChannelListReply struct {
 	Channels []ChannelInfo
@@ -57,6 +58,7 @@ func (r *LitRPC) ChannelList(args ChanArgs, reply *ChannelListReply) error {
 		reply.Channels[i].PeerIdx = q.KeyGen.Step[3] & 0x7fffffff
 		reply.Channels[i].CIdx = q.KeyGen.Step[4] & 0x7fffffff
 		reply.Channels[i].Data = q.State.Data
+		reply.Channels[i].Pkh = q.WatchRefundAdr
 	}
 	return nil
 }
