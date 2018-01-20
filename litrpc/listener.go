@@ -1,13 +1,17 @@
 package litrpc
 
 import (
-	"crypto/tls"
+	"bytes"
+	//"crypto/tls"
+	"fmt"
+	"io/ioutil"
 	"log"
+	"net/http"
 	"net/rpc"
 	"net/rpc/jsonrpc"
-	"strconv"
 
 	"github.com/mit-dci/lit/qln"
+	"golang.org/x/net/websocket"
 )
 
 /*
@@ -25,27 +29,44 @@ type LitRPC struct {
 	OffButton chan bool
 }
 
+func serveWS(ws *websocket.Conn) {
+	body, err := ioutil.ReadAll(ws.Request().Body)
+	if err != nil {
+		log.Printf("Error reading body: %v", err)
+		return
+	}
+
+	log.Printf(string(body))
+	ws.Request().Body = ioutil.NopCloser(bytes.NewBuffer(body))
+
+	jsonrpc.ServeConn(ws)
+}
+
 func RPCListen(rpcl *LitRPC, port uint16) {
 
 	rpc.Register(rpcl)
 
-	cert, err := tls.LoadX509KeyPair("certs/server.pem", "certs/server.key")
-	if err != nil {
-		log.Fatalf("Failed to load keys: %s", err)
-	}
-	conf := tls.Config{Certificates: []tls.Certificate{cert}}
-	listenString := "localhost:" + strconv.Itoa(int(port))
-	listener, err := tls.Listen("tcp", listenString, &conf)
-	if err != nil {
-		log.Fatalf("server error: %s", err)
-	}
-	log.Print("Listening for connections..")
-	conn, err := listener.Accept()
-	if err != nil {
-		log.Printf("accept: %s", err)
-		return
-	}
-	log.Printf("accepted connection from %s", conn.RemoteAddr())
-	defer conn.Close()
-	jsonrpc.ServeConn(conn)
+	listenString := fmt.Sprintf("localhost:%d", port)
+
+	// cert, err := tls.LoadX509KeyPair("certs/server.pem", "certs/server.key")
+	// if err != nil {
+	// 	log.Fatalf("Failed to load keys: %s", err)
+	// }
+	// conf := tls.Config{Certificates: []tls.Certificate{cert}}
+	// listenString = fmt.Sprintf("localhost:%d", port)
+	// listener, err := tls.Listen("tcp", listenString, &conf)
+	// if err != nil {
+	// 	log.Fatalf("server error: %s", err)
+	// }
+	// log.Print("Listening for connections..")
+	// conn, err := listener.Accept()
+	// if err != nil {
+	// 	log.Printf("accept: %s", err)
+	// 	return
+	// }
+	// log.Printf("accepted connection from %s", conn.RemoteAddr())
+	// defer conn.Close()
+
+	http.Handle("/ws", websocket.Handler(serveWS))
+	log.Fatal(http.ListenAndServeTLS(listenString, "certs/server.pem", "certs/server.key", nil))
 }
