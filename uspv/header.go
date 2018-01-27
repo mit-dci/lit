@@ -11,7 +11,6 @@ import (
 	"io"
 	"log"
 	"math/big"
-	"os"
 
 	"github.com/adiabat/btcd/blockchain"
 
@@ -63,7 +62,7 @@ func (s *SPVCon) GetHeaderAtHeight(h int32) (*wire.BlockHeader, error) {
 	h = h - s.Param.StartHeight
 
 	// seek to that header
-	_, err := s.headerFile.Seek(int64(80*h), os.SEEK_SET)
+	_, err := s.headerFile.Seek(int64(80*h), io.SeekStart)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +102,7 @@ func FindHeader(r io.ReadSeeker, hdr wire.BlockHeader) (int32, error) {
 	var cur wire.BlockHeader
 
 	for tries := 1; tries < 2200; tries++ {
-		offset, err := r.Seek(int64(-80*tries), os.SEEK_END)
+		offset, err := r.Seek(int64(-80*tries), io.SeekEnd)
 		if err != nil {
 			return -1, err
 		}
@@ -173,7 +172,7 @@ func CheckHeaderChain(
 	}
 
 	// seek to start of last header
-	pos, err := r.Seek(-80, os.SEEK_END)
+	pos, err := r.Seek(-80, io.SeekEnd)
 	if err != nil {
 		return 0, err
 	}
@@ -191,10 +190,10 @@ func CheckHeaderChain(
 
 	// load only last epoch if there are a lot on disk
 	if pos > int64(80*(epochLength+1)) {
-		_, err = r.Seek(int64(-80*(epochLength+1)), os.SEEK_END)
+		_, err = r.Seek(int64(-80*(epochLength+1)), io.SeekEnd)
 		numheaders = epochLength + 1
 	} else { // otherwise load everything, start at byte 0
-		_, err = r.Seek(0, os.SEEK_SET)
+		_, err = r.Seek(0, io.SeekStart)
 		numheaders = height - p.StartHeight
 	}
 	if err != nil { // seems like it will always be ok here..?
