@@ -22,7 +22,7 @@ var VertcoinTestNetParams = Params{
 	// Chain parameters
 	DiffCalcFunction: diffVTCtest,
 	MinHeaders:       4032,
-	FeePerByte:       800,
+	FeePerByte:       100,
 	GenesisBlock:     &VertcoinTestnetGenesisBlock,
 	GenesisHash:      &VertcoinTestnetGenesisHash,
 	PowLimit:         liteCoinTestNet4PowLimit,
@@ -94,7 +94,7 @@ var VertcoinParams = Params{
 	AssumeDiffBefore: 602784,
 	DiffCalcFunction: diffVTC,
 	MinHeaders:       4032,
-	FeePerByte:       800,
+	FeePerByte:       100,
 	GenesisBlock:     &VertcoinGenesisBlock,
 	GenesisHash:      &VertcoinGenesisHash,
 	PowLimit:         liteCoinTestNet4PowLimit,
