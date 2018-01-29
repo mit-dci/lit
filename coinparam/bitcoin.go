@@ -23,9 +23,11 @@ var BitcoinParams = Params{
 	},
 
 	// Chain parameters
-	GenesisBlock:             &genesisBlock,
-	GenesisHash:              &genesisHash,
-	PoWFunction:              chainhash.DoubleHashH,
+	GenesisBlock: &genesisBlock,
+	GenesisHash:  &genesisHash,
+	PoWFunction: func(b []byte, height int32) chainhash.Hash {
+		return chainhash.DoubleHashH(b)
+	},
 	DiffCalcFunction:         diffBitcoin,
 	FeePerByte:               80,
 	PowLimit:                 mainPowLimit,
@@ -104,9 +106,11 @@ var TestNet3Params = Params{
 	},
 
 	// Chain parameters
-	GenesisBlock:     &testNet3GenesisBlock,
-	GenesisHash:      &testNet3GenesisHash,
-	PoWFunction:      chainhash.DoubleHashH,
+	GenesisBlock: &testNet3GenesisBlock,
+	GenesisHash:  &testNet3GenesisHash,
+	PoWFunction: func(b []byte, height int32) chainhash.Hash {
+		return chainhash.DoubleHashH(b)
+	},
 	DiffCalcFunction: diffBitcoin,
 	StartHeader: newHeaderFromStr("00000020b39e2c241c3fff2c7bf20bc5c5477dc7cedb" +
 		"2154ccede1944800000000000000b767d1cb09db9e355835b7e94a385a4f82accea85c" +
@@ -168,9 +172,11 @@ var RegressionNetParams = Params{
 	DNSSeeds:      []string{},
 
 	// Chain parameters
-	GenesisBlock:     &regTestGenesisBlock,
-	GenesisHash:      &regTestGenesisHash,
-	PoWFunction:      chainhash.DoubleHashH,
+	GenesisBlock: &regTestGenesisBlock,
+	GenesisHash:  &regTestGenesisHash,
+	PoWFunction: func(b []byte, height int32) chainhash.Hash {
+		return chainhash.DoubleHashH(b)
+	},
 	DiffCalcFunction: diffBitcoin,
 	//	func(r io.ReadSeeker, height, startheight int32, p *Params) (uint32, error) {
 	//		return diffBTC(r, height, startheight, p, false)

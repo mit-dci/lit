@@ -34,7 +34,7 @@ type Params struct {
 	GenesisHash *chainhash.Hash
 
 	// The function used to calculate the proof of work value for a block
-	PoWFunction func(b []byte) chainhash.Hash
+	PoWFunction func(b []byte, height int32) chainhash.Hash
 
 	// The function used to calculate the difficulty of a given block
 	DiffCalcFunction func(
@@ -52,6 +52,11 @@ type Params struct {
 	// This is needed for coins with variable retarget lookbacks that use
 	// StartHeader to offset the beginning of the header chain for SPV
 	AssumeDiffBefore int32
+
+	// The minimum number of headers to pass to the difficulty function.
+	// This is primarily intended for coins that have difficulty functions
+	// without fixed epoch lengths
+	MinHeaders int32
 
 	// Fee per byte for transactions
 	FeePerByte int64
