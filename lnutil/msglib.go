@@ -41,6 +41,9 @@ const (
 	MSGID_WATCH_DESC     = 0x60 // desc describes a new channel
 	MSGID_WATCH_STATEMSG = 0x61 // commsg is a single state in the channel
 	MSGID_WATCH_DELETE   = 0x62 // Watch_clear marks a channel as ok to delete.  No further updates possible.
+
+	//Routing messages
+	MSGID_LINK_DESC = 0x70 // Describes a new channel for routing
 )
 
 //interface that all messages follow, for easy use
@@ -107,6 +110,9 @@ func LitMsgFromBytes(b []byte, peerid uint32) (LitMsg, error) {
 	/*
 		case MSGID_WATCH_DELETE:
 	*/
+
+	case MSGID_LINK_DESC:
+		return NewLinkMsgFromBytes(b, peerid)
 
 	default:
 		return nil, fmt.Errorf("Unknown message of type %d ", msgType)
@@ -869,3 +875,60 @@ func NewWatchDelMsgFromBytes(b []byte, peerIDX uint32) (WatchDelMsg, error) {
 }
 func (self WatchDelMsg) Peer() uint32   { return self.PeerIdx }
 func (self WatchDelMsg) MsgType() uint8 { return MSGID_WATCH_DELETE }
+
+// Link message
+
+type LinkMsg struct {
+	PeerIdx   uint32
+	PKHScript [20]byte // ChanPKH (channel ID)
+	APKH      [20]byte // APKH (A's LN address)
+	ACapacity int64    // ACapacity (A's channel balance)
+	BPKH      [20]byte // BPKH (B's LN address)
+	BCapacity int64    // BCapacity (B's channel balance)
+	CoinType  uint32   // CoinType (Network of the channel)
+	Seq       uint32   // seq (Link state sequence #)
+}
+
+func NewLinkMsgFromBytes(b []byte, peerIDX uint32) (LinkMsg, error) {
+	sm := new(LinkMsg)
+	sm.PeerIdx = peerIDX
+
+	if len(b) < 88 {
+		return *sm, fmt.Errorf("LinkMsg %d bytes, expect 88", len(b))
+	}
+
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
+
+	copy(sm.PKHScript[:], buf.Next(20))
+	copy(sm.APKH[:], buf.Next(20))
+	_ = binary.Read(buf, binary.BigEndian, &sm.ACapacity)
+	copy(sm.BPKH[:], buf.Next(20))
+	_ = binary.Read(buf, binary.BigEndian, &sm.BCapacity)
+	_ = binary.Read(buf, binary.BigEndian, &sm.CoinType)
+	_ = binary.Read(buf, binary.BigEndian, &sm.Seq)
+
+	return *sm, nil
+}
+
+// ToBytes turns a LinkMsg into 88 bytes
+func (self LinkMsg) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.WriteByte(self.MsgType())
+
+	buf.Write(self.PKHScript[:])
+
+	buf.Write(self.APKH[:])
+	binary.Write(&buf, binary.BigEndian, self.ACapacity)
+
+	buf.Write(self.BPKH[:])
+	binary.Write(&buf, binary.BigEndian, self.BCapacity)
+
+	binary.Write(&buf, binary.BigEndian, self.CoinType)
+	binary.Write(&buf, binary.BigEndian, self.Seq)
+
+	return buf.Bytes()
+}
+
+func (self LinkMsg) Peer() uint32   { return self.PeerIdx }
+func (self LinkMsg) MsgType() uint8 { return MSGID_LINK_DESC }
