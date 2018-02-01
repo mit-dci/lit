@@ -2,7 +2,6 @@ package qln
 
 import (
 	"bytes"
-	"fmt"
 	"math"
 	"strconv"
 	"time"
@@ -24,7 +23,6 @@ func (nd *LitNode) InitRouting() {
 		for {
 			nd.cleanStaleChannels()
 			nd.advertiseLinks(seq)
-			fmt.Printf("ChannelMap: %+v", nd.ChannelMap)
 			seq++
 			<-nd.AdvTimeout.C
 		}
