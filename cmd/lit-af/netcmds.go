@@ -31,6 +31,33 @@ var conCommand = &Command{
 	ShortDescription: "Make a connection to another host by connecting to their pubkeyhash\n",
 }
 
+var graphCommand = &Command{
+	Format:           fmt.Sprintf("%s\n", lnutil.White("graph")),
+	Description:      fmt.Sprintf("Dump the channel graph in graphviz DOT format\n"),
+	ShortDescription: "Shows the channel map\n",
+}
+
+// graph gets the channel map
+func (lc *litAfClient) Graph(textArgs []string) error {
+	if len(textArgs) > 0 && textArgs[0] == "-h" {
+		fmt.Fprintf(color.Output, graphCommand.Format)
+		fmt.Fprintf(color.Output, graphCommand.Description)
+		return nil
+	}
+
+	args := new(litrpc.NoArgs)
+	reply := new(litrpc.ChannelGraphReply)
+
+	err := lc.rpccon.Call("LitRPC.GetChannelMap", args, reply)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(color.Output, "%s\n", reply.Graph)
+
+	return nil
+}
+
 // RequestAsync keeps requesting messages from the server.  The server blocks
 // and will send a response once it gets one.  Once the rpc client receives a
 // response, it will immediately request another.

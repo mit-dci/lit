@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"fmt"
 	"math"
+	"strconv"
 	"time"
 
+	"github.com/adiabat/bech32"
+	"github.com/awalterschulze/gographviz"
 	"github.com/btcsuite/fastsha256"
 	"github.com/mit-dci/lit/lnutil"
 )
@@ -26,6 +29,40 @@ func (nd *LitNode) InitRouting() {
 			<-nd.AdvTimeout.C
 		}
 	}()
+}
+
+func (nd *LitNode) VisualiseGraph() string {
+	graph := gographviz.NewGraph()
+	graph.SetName("Lit")
+
+	for pkh, node := range nd.ChannelMap {
+		lnAdr := bech32.Encode("ln", pkh[:])
+		if !graph.IsNode(lnAdr) {
+			graph.AddNode("Lit", lnAdr, nil)
+		}
+
+		for _, channel := range node {
+			theirLnAdr := bech32.Encode("ln", channel.BPKH[:])
+			if !graph.IsNode(theirLnAdr) {
+				graph.AddNode("Lit", theirLnAdr, nil)
+			}
+
+			attrs := make(map[string]string)
+
+			switch channel.CoinType {
+			case 0:
+				attrs["color"] = "orange"
+			case 28:
+				attrs["color"] = "green"
+			}
+
+			attrs["label"] = strconv.FormatUint(uint64(channel.CoinType), 10)
+
+			graph.AddEdge(lnAdr, theirLnAdr, true, attrs)
+		}
+	}
+
+	return "di" + graph.String()
 }
 
 func (nd *LitNode) cleanStaleChannels() {

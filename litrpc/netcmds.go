@@ -136,3 +136,14 @@ func (r *LitRPC) Stop(args NoArgs, reply *StatusReply) error {
 	r.OffButton <- true
 	return nil
 }
+
+// ------------ Dump channel map
+type ChannelGraphReply struct {
+	Graph string
+}
+
+func (r *LitRPC) GetChannelMap(args NoArgs, reply *ChannelGraphReply) error {
+	reply.Graph = r.Node.VisualiseGraph()
+
+	return nil
+}
