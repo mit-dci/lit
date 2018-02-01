@@ -893,8 +893,8 @@ func NewLinkMsgFromBytes(b []byte, peerIDX uint32) (LinkMsg, error) {
 	sm := new(LinkMsg)
 	sm.PeerIdx = peerIDX
 
-	if len(b) < 80 {
-		return *sm, fmt.Errorf("LinkMsg %d bytes, expect 80", len(b))
+	if len(b) < 76 {
+		return *sm, fmt.Errorf("LinkMsg %d bytes, expect 76", len(b))
 	}
 
 	buf := bytes.NewBuffer(b[1:]) // get rid of messageType

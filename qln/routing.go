@@ -2,6 +2,8 @@ package qln
 
 import (
 	"bytes"
+	"fmt"
+	"math"
 	"time"
 
 	"github.com/btcsuite/fastsha256"
@@ -11,7 +13,7 @@ import (
 func (nd *LitNode) InitRouting() {
 	nd.ChannelMap = make(map[[20]byte][]lnutil.LinkMsg)
 
-	nd.AdvTimeout = time.NewTicker(time.Duration(300) * time.Second)
+	nd.AdvTimeout = time.NewTicker(15 * time.Second)
 
 	go func() {
 		seq := uint32(0)
@@ -19,6 +21,7 @@ func (nd *LitNode) InitRouting() {
 		for {
 			nd.cleanStaleChannels()
 			nd.advertiseLinks(seq)
+			fmt.Printf("ChannelMap: %+v", nd.ChannelMap)
 			seq++
 			<-nd.AdvTimeout.C
 		}
@@ -42,7 +45,7 @@ func (nd *LitNode) cleanStaleChannels() {
 }
 
 func (nd *LitNode) advertiseLinks(seq uint32) {
-	for peerIdx, peer := range nd.RemoteCons {
+	for _, peer := range nd.RemoteCons {
 		for _, q := range peer.QCs {
 			if !q.CloseData.Closed && q.State.MyAmt > 0 {
 				var outmsg lnutil.LinkMsg
@@ -64,9 +67,9 @@ func (nd *LitNode) advertiseLinks(seq uint32) {
 				outmsg.ACapacity = q.State.MyAmt
 				copy(outmsg.PKHScript[:], q.Op.Hash.CloneBytes()[:20])
 
-				outmsg.PeerIdx = peerIdx
+				outmsg.PeerIdx = math.MaxUint32
 
-				nd.OmniOut <- outmsg
+				nd.LinkMsgHandler(outmsg)
 			}
 		}
 	}
