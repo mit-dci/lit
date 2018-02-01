@@ -884,17 +884,17 @@ type LinkMsg struct {
 	APKH      [20]byte // APKH (A's LN address)
 	ACapacity int64    // ACapacity (A's channel balance)
 	BPKH      [20]byte // BPKH (B's LN address)
-	BCapacity int64    // BCapacity (B's channel balance)
 	CoinType  uint32   // CoinType (Network of the channel)
 	Seq       uint32   // seq (Link state sequence #)
+	Timestamp int64
 }
 
 func NewLinkMsgFromBytes(b []byte, peerIDX uint32) (LinkMsg, error) {
 	sm := new(LinkMsg)
 	sm.PeerIdx = peerIDX
 
-	if len(b) < 88 {
-		return *sm, fmt.Errorf("LinkMsg %d bytes, expect 88", len(b))
+	if len(b) < 80 {
+		return *sm, fmt.Errorf("LinkMsg %d bytes, expect 80", len(b))
 	}
 
 	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
@@ -903,7 +903,6 @@ func NewLinkMsgFromBytes(b []byte, peerIDX uint32) (LinkMsg, error) {
 	copy(sm.APKH[:], buf.Next(20))
 	_ = binary.Read(buf, binary.BigEndian, &sm.ACapacity)
 	copy(sm.BPKH[:], buf.Next(20))
-	_ = binary.Read(buf, binary.BigEndian, &sm.BCapacity)
 	_ = binary.Read(buf, binary.BigEndian, &sm.CoinType)
 	_ = binary.Read(buf, binary.BigEndian, &sm.Seq)
 
@@ -922,7 +921,6 @@ func (self LinkMsg) Bytes() []byte {
 	binary.Write(&buf, binary.BigEndian, self.ACapacity)
 
 	buf.Write(self.BPKH[:])
-	binary.Write(&buf, binary.BigEndian, self.BCapacity)
 
 	binary.Write(&buf, binary.BigEndian, self.CoinType)
 	binary.Write(&buf, binary.BigEndian, self.Seq)
