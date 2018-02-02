@@ -8,6 +8,7 @@ import json
 import logging
 import random
 import time
+import ssl
 import websocket  # `pip install websocket-client`
 
 logger = logging.getLogger("litrpc")
@@ -21,10 +22,10 @@ class LitConnection():
     def connect(self):
         """Connect to the node. Continue trying for 10 seconds"""
         logger.debug("Opening RPC connection to litnode %s:%s" % (self.ip, self.port))
-        self.ws = websocket.WebSocket()
+        self.ws = websocket.WebSocket(sslopt={"cert_reqs": ssl.CERT_NONE})
         for _ in range(50):
             try:
-                self.ws.connect("ws://%s:%s/ws" % (self.ip, self.port))
+                self.ws.connect("wss://%s:%s/ws" % (self.ip, self.port))
             except ConnectionRefusedError:
                 # lit is not ready to accept connections yet
                 time.sleep(0.25)
