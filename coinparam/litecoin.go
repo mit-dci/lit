@@ -23,7 +23,7 @@ var LiteCoinTestNet4Params = Params{
 	// Chain parameters
 	GenesisBlock: &bc2GenesisBlock, // no it's not
 	GenesisHash:  &liteCoinTestNet4GenesisHash,
-	PoWFunction: func(b []byte) chainhash.Hash {
+	PoWFunction: func(b []byte, height int32) chainhash.Hash {
 		scryptBytes, _ := scrypt.Key(b, b, 1024, 1, 1, 32)
 		asChainHash, _ := chainhash.NewHash(scryptBytes)
 		return *asChainHash
@@ -93,7 +93,7 @@ var LiteRegNetParams = Params{
 	// Chain parameters
 	GenesisBlock: &liteCoinRegTestGenesisBlock, // no it's not
 	GenesisHash:  &liteCoinRegTestGenesisHash,
-	PoWFunction: func(b []byte) chainhash.Hash {
+	PoWFunction: func(b []byte, height int32) chainhash.Hash {
 		scryptBytes, _ := scrypt.Key(b, b, 1024, 1, 1, 32)
 		asChainHash, _ := chainhash.NewHash(scryptBytes)
 		return *asChainHash

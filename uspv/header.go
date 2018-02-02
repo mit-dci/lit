@@ -21,7 +21,7 @@ import (
 
 // checkProofOfWork verifies the header hashes into something
 // lower than specified by the 4-byte bits field.
-func checkProofOfWork(header wire.BlockHeader, p *coinparam.Params) bool {
+func checkProofOfWork(header wire.BlockHeader, p *coinparam.Params, height int32) bool {
 
 	target := blockchain.CompactToBig(header.Bits)
 
@@ -41,7 +41,7 @@ func checkProofOfWork(header wire.BlockHeader, p *coinparam.Params) bool {
 	var buf bytes.Buffer
 	_ = wire.WriteBlockHeader(&buf, 0, &header)
 
-	blockHash := p.PoWFunction(buf.Bytes())
+	blockHash := p.PoWFunction(buf.Bytes(), height)
 
 	hashNum := new(big.Int)
 
@@ -156,22 +156,21 @@ func CheckHeaderChain(
 					"headers %d and %d in header message don't link", i, i-1)
 			}
 		}
-		// check if there's a valid proof of work.  That whole "Bitcoin" thing.
-		if !checkProofOfWork(*hdr, p) {
-			return 0, fmt.Errorf("header %d in message has bad proof of work", i)
-		}
 
 		// check that header version is non-negative (fork detect)
 		if hdr.Version < 0 {
 			return 0, fmt.Errorf(
 				"header %d in message has negative version (hard fork?)", i)
 		}
-
 	}
 	// incoming header message is internally consistent, now check that it
 	// links with what we have on disk
 
 	epochLength := int32(p.TargetTimespan / p.TargetTimePerBlock)
+
+	if p.MinHeaders > 0 {
+		epochLength = p.MinHeaders
+	}
 
 	// seek to start of last header
 	pos, err := r.Seek(-80, os.SEEK_END)
@@ -258,6 +257,11 @@ func CheckHeaderChain(
 	// check difficulty adjustments in the new headers
 	// since we call this many times, append each time
 	for i, hdr := range inHeaders {
+		// check if there's a valid proof of work.  That whole "Bitcoin" thing.
+		if !checkProofOfWork(*hdr, p, height+int32(i)) {
+			return 0, fmt.Errorf("header %d in message has bad proof of work", i)
+		}
+
 		// build slice of "previous" headers
 		prevHeaders = append(prevHeaders, inHeaders[i])
 		rightBits, err := p.DiffCalcFunction(prevHeaders, height+int32(i), p)
