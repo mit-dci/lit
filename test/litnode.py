@@ -9,6 +9,7 @@ and communicate with it over RPC."""
 import logging
 import os
 import subprocess
+import socket
 
 from litpy import litrpc
 
@@ -53,7 +54,7 @@ class LitNode():
 
     def add_rpc_connection(self, ip, port):
         logger.debug("Opening rpc connection to litnode %d: %s:%s" % (self.index, ip, port))
-        self.rpc = litrpc.LitConnection(ip, port)
+        self.rpc = litrpc.LitConnection(ip, port, socket.socket(socket.AF_INET, socket.SOCK_STREAM))
         self.rpc.connect()
 
     def __getattr__(self, name):

@@ -37,15 +37,15 @@ func RPCListen(rpcl *LitRPC, port uint16) {
 	listenString := "localhost:" + strconv.Itoa(int(port))
 	listener, err := tls.Listen("tcp", listenString, &conf)
 	if err != nil {
-		log.Fatalf("server error: %s", err)
+		log.Fatal(err)
 	}
 	log.Print("Listening for connections..")
 	conn, err := listener.Accept()
 	if err != nil {
-		log.Printf("accept: %s", err)
+		log.Printf("Accept error: %s", err)
 		return
 	}
-	log.Printf("accepted connection from %s", conn.RemoteAddr())
+	log.Printf("accepted connection from client %s", conn.RemoteAddr())
 	defer conn.Close()
 	jsonrpc.ServeConn(conn)
 }
