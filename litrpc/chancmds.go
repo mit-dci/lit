@@ -20,6 +20,7 @@ type ChannelInfo struct {
 	PeerIdx, CIdx uint32
 	PeerID        string
 	Data          [32]byte
+	Pkh           [20]byte
 }
 type ChannelListReply struct {
 	Channels []ChannelInfo
@@ -57,6 +58,7 @@ func (r *LitRPC) ChannelList(args ChanArgs, reply *ChannelListReply) error {
 		reply.Channels[i].PeerIdx = q.KeyGen.Step[3] & 0x7fffffff
 		reply.Channels[i].CIdx = q.KeyGen.Step[4] & 0x7fffffff
 		reply.Channels[i].Data = q.State.Data
+		reply.Channels[i].Pkh = q.WatchRefundAdr
 	}
 	return nil
 }
@@ -68,6 +70,7 @@ type FundArgs struct {
 	Capacity    int64  // later can be minimum capacity
 	Roundup     int64  // ignore for now; can be used to round-up capacity
 	InitialSend int64  // Initial send of -1 means "ALL"
+	Data        [32]byte
 }
 
 func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
@@ -111,7 +114,7 @@ func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
 	}
 
 	idx, err := r.Node.FundChannel(
-		args.Peer, args.CoinType, args.Capacity, args.InitialSend)
+		args.Peer, args.CoinType, args.Capacity, args.InitialSend, args.Data)
 	if err != nil {
 		return err
 	}

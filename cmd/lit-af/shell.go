@@ -256,11 +256,11 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		}
 		fmt.Fprintf(
 			color.Output,
-			"%s (peer %d) type %d %s\n\t cap: %s bal: %s h: %d state: %d data: %x\n",
+			"%s (peer %d) type %d %s\n\t cap: %s bal: %s h: %d state: %d data: %x pkh: %x\n",
 			lnutil.White(c.CIdx), c.PeerIdx, c.CoinType,
 			lnutil.OutPoint(c.OutPoint),
 			lnutil.SatoshiColor(c.Capacity), lnutil.SatoshiColor(c.MyBalance),
-			c.Height, c.StateNum, c.Data)
+			c.Height, c.StateNum, c.Data, c.Pkh)
 	}
 
 	err = lc.rpccon.Call("LitRPC.TxoList", nil, tReply)

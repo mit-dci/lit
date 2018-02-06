@@ -144,9 +144,11 @@ func TestChanDescMsg(t *testing.T) {
 
 	op := *OutPointFromBytes(outPoint)
 
+	var data [32]byte
+
 	msg := NewChanDescMsg(peerid, op,
 		pubKey, refundPub, hakd,
-		cointype, capacity, payment, elkZero, elkOne, elkTwo)
+		cointype, capacity, payment, elkZero, elkOne, elkTwo, data)
 	b := msg.Bytes()
 
 	msg2, err := NewChanDescMsgFromBytes(b, peerid)

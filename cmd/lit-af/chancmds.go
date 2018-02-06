@@ -11,12 +11,14 @@ import (
 )
 
 var fundCommand = &Command{
-	Format: fmt.Sprintf("%s%s\n", lnutil.White("fund"),
-		lnutil.ReqColor("peer", "coinType", "capacity", "initialSend")),
-	Description: fmt.Sprintf("%s\n%s\n%s\n",
+	Format: fmt.Sprintf("%s%s%s\n", lnutil.White("fund"),
+		lnutil.ReqColor("peer", "coinType", "capacity", "initialSend"), lnutil.OptColor("data")),
+	Description: fmt.Sprintf("%s\n%s\n%s\n%s\n",
 		"Establish and fund a new lightning channel with the given peer.",
 		"The capacity is the amount of satoshi we insert into the channel,",
-		"and initialSend is the amount we initially hand over to the other party."),
+		"and initialSend is the amount we initially hand over to the other party.",
+		"data is an optional field that can contain 32 bytes of hex to send as part of the channel fund",
+	),
 	ShortDescription: "Establish and fund a new lightning channel with the given peer.\n",
 }
 
@@ -106,6 +108,17 @@ func (lc *litAfClient) FundChannel(textArgs []string) error {
 	if err != nil {
 		return err
 	}
+
+	if len(textArgs) > 4 {
+		data, err := hex.DecodeString(textArgs[4])
+		if err != nil {
+			// Wasn't valid hex, copy directly and truncate
+			copy(args.Data[:], textArgs[3])
+		} else {
+			copy(args.Data[:], data[:])
+		}
+	}
+
 	args.Peer = uint32(peer)
 	args.CoinType = uint32(coinType)
 	args.Capacity = int64(cCap)
@@ -217,16 +230,14 @@ func (lc *litAfClient) Push(textArgs []string) error {
 		}
 	}
 
-	var data [32]byte
-	for i := range data {
-		data[i] = 0
-	}
 	if len(textArgs) > 3 {
 		data, err := hex.DecodeString(textArgs[3])
 		if err != nil {
-			return err
+			// Wasn't valid hex, copy directly and truncate
+			copy(args.Data[:], textArgs[3])
+		} else {
+			copy(args.Data[:], data[:])
 		}
-		copy(args.Data[:], data[:32])
 	}
 
 	args.ChanIdx = uint32(cIdx)
