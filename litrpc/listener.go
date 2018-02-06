@@ -2,6 +2,7 @@ package litrpc
 
 import (
 	"bytes"
+	//"crypto/tls"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -9,9 +10,8 @@ import (
 	"net/rpc"
 	"net/rpc/jsonrpc"
 
-	"golang.org/x/net/websocket"
-
 	"github.com/mit-dci/lit/qln"
+	"golang.org/x/net/websocket"
 )
 
 /*
@@ -48,6 +48,25 @@ func RPCListen(rpcl *LitRPC, port uint16) {
 
 	listenString := fmt.Sprintf("localhost:%d", port)
 
+	// cert, err := tls.LoadX509KeyPair("certs/server.pem", "certs/server.key")
+	// if err != nil {
+	// 	log.Fatalf("Failed to load keys: %s", err)
+	// }
+	// conf := tls.Config{Certificates: []tls.Certificate{cert}}
+	// listenString = fmt.Sprintf("localhost:%d", port)
+	// listener, err := tls.Listen("tcp", listenString, &conf)
+	// if err != nil {
+	// 	log.Fatalf("server error: %s", err)
+	// }
+	// log.Print("Listening for connections..")
+	// conn, err := listener.Accept()
+	// if err != nil {
+	// 	log.Printf("accept: %s", err)
+	// 	return
+	// }
+	// log.Printf("accepted connection from %s", conn.RemoteAddr())
+	// defer conn.Close()
+
 	http.Handle("/ws", websocket.Handler(serveWS))
-	log.Fatal(http.ListenAndServe(listenString, nil))
+	log.Fatal(http.ListenAndServeTLS(listenString, "certs/server.pem", "certs/server.key", nil))
 }

@@ -1,11 +1,14 @@
 package main
 
 import (
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"net/rpc"
 	"net/rpc/jsonrpc"
+	"net/url"
 	"os"
 	"path/filepath"
 
@@ -48,8 +51,25 @@ func main() {
 	setConfig(lu)
 
 	origin := "http://127.0.0.1/"
-	urlString := fmt.Sprintf("ws://%s:%d/ws", lu.remote, lu.port)
-	wsConn, err := websocket.Dial(urlString, "", origin)
+	urlString := fmt.Sprintf("wss://%s:%d/ws", lu.remote, lu.port)
+	parseOrigin, err := url.ParseRequestURI(origin)
+	if err != nil {
+		log.Fatal(err)
+	}
+	parseLocation, _ := url.ParseRequestURI(urlString)
+	if err != nil {
+		log.Fatal(err)
+	}
+	wsConf := &websocket.Config{
+		Origin:   parseOrigin,
+		Location: parseLocation,
+		Header:   http.Header(make(map[string][]string)),
+		Version:  websocket.ProtocolVersionHybi13,
+		TlsConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		},
+	}
+	wsConn, err := websocket.DialConfig(wsConf)
 	if err != nil {
 		log.Fatal(err)
 	}

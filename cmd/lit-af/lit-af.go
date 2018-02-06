@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"log"
@@ -8,13 +9,15 @@ import (
 	"net/rpc/jsonrpc"
 	"os"
 	"path/filepath"
+	//"strconv"
 	"strings"
-
-	"golang.org/x/net/websocket"
+	"net/http"
+	"net/url"
 
 	"github.com/chzyer/readline"
 	"github.com/fatih/color"
 	"github.com/mit-dci/lit/lnutil"
+	"golang.org/x/net/websocket"
 )
 
 /*
@@ -77,28 +80,50 @@ func main() {
 	lc := new(litAfClient)
 	setConfig(lc)
 
-	//	dialString := fmt.Sprintf("%s:%d", lc.remote, lc.port)
-
 	/*
-		client, err := net.Dial("tcp", dialString)
+		certPath, _ := filepath.Abs("../../certs")
+		cert, err := tls.LoadX509KeyPair(certPath + "/client.pem", certPath + "/client.key")
 		if err != nil {
-			log.Fatal("dialing:", err)
+			log.Fatalf("Failed to load client keys: %s", err)
 		}
-		defer client.Close()
+		config := tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true}
+		// InsecureSkipVerify true to validate self-signed certs
+		connectString := lc.remote + ":" + strconv.Itoa(int(lc.port))
+		conn, err := tls.Dial("tcp", connectString, &config)
+		if err != nil {
+			log.Fatalf("client dial failed: %s", err)
+		}
+		defer conn.Close()
+		go lc.RequestAsync()
 	*/
 
-	//	dialString := fmt.Sprintf("%s:%d", lc.remote, lc.port)
+	// ref. https://github.com/golang/net/blob/master/websocket/client.go
 	origin := "http://127.0.0.1/"
-	urlString := fmt.Sprintf("ws://%s:%d/ws", lc.remote, lc.port)
+	urlString := fmt.Sprintf("wss://%s:%d/ws", lc.remote, lc.port)
 	//	url := "ws://127.0.0.1:8000/ws"
-	wsConn, err := websocket.Dial(urlString, "", origin)
+	parseOrigin, err := url.ParseRequestURI(origin)
+	if err != nil {
+		log.Fatal(err)
+	}
+	parseLocation, _ := url.ParseRequestURI(urlString)
+	if err != nil {
+		log.Fatal(err)
+	}
+	wsConf := &websocket.Config {
+		Origin: parseOrigin,
+		Location: parseLocation,
+		Header: http.Header(make(map[string][]string)),
+		Version: websocket.ProtocolVersionHybi13,
+		TlsConfig: &tls.Config {
+			InsecureSkipVerify: true,
+		},
+	}
+	wsConn, err := websocket.DialConfig(wsConf)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer wsConn.Close()
-
 	lc.rpccon = jsonrpc.NewClient(wsConn)
-
 	go lc.RequestAsync()
 
 	rl, err := readline.NewEx(&readline.Config{
