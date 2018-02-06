@@ -3,6 +3,7 @@ package qln
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/adiabat/btcd/btcec"
 	"github.com/adiabat/btcd/wire"
@@ -124,6 +125,9 @@ type LitNode struct {
 
 	// The URL from which lit attempts to resolve the LN address
 	TrackerURL string
+
+	ChannelMap map[[20]byte][]lnutil.LinkMsg
+	AdvTimeout *time.Ticker
 }
 
 type RemotePeer struct {

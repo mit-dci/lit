@@ -47,6 +47,8 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string) (*LitNode, er
 
 	nd.TrackerURL = trackerURL
 
+	nd.InitRouting()
+
 	// optional tower activation
 
 	nd.Tower = new(watchtower.WatchTower)
