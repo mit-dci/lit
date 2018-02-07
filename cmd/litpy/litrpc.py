@@ -8,57 +8,27 @@ import json
 import logging
 import random
 import time
-import socket  # `pip install websocket-client`
-import ssl
+import websocket  # `pip install websocket-client`
+import requests
 
 logger = logging.getLogger("litrpc")
 
-
 class LitConnection():
     """A class representing a connection to a lit node."""
-
-    def __init__(self, ip, port, sock):
+    def __init__(self, ip, port):
         self.ip = ip
         self.port = port
-        self.sock = sock
 
     def connect(self):
         """Connect to the node. Continue trying for 10 seconds"""
-        logger.debug("Opening RPC connection to litnode %s:%s" %
-                     (self.ip, self.port))
-
-        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.sock.connect((self.ip, int(self.port)))
-
-        def handshake(sock):
-
-            # this will trigger the handshake
-            # if sock is already connected
-            new_sock = ssl.wrap_socket(self.sock,
-                                       ciphers="HIGH:-aNULL:-eNULL:-PSK:RC4-SHA:RC4-MD5",
-                                       ssl_version=ssl.PROTOCOL_TLSv1,
-                                       cert_reqs=ssl.CERT_NONE,  # I will verify your certificate
-                                       )
-            return new_sock
-
+        logger.debug("Opening RPC connection to litnode %s:%s" % (self.ip, self.port))
+        self.ws = websocket.WebSocket()
         for _ in range(50):
             try:
-                self.sock = handshake(self.sock)
-                headers = [
-                    'GET %s HTTP/1.1' % ("127.0.0.1"),
-                ]
-                header = '\n'.join(headers)
-                header += '\r\n\r\n'
-                self.sock.sendall(bytes(header, encoding='utf-8'))
-                #self.ws.connect("ws://%s:%s/ws" % (self.ip, self.port))
-
+                self.ws.connect("ws://%s:%s/ws" % (self.ip, self.port))
             except ConnectionRefusedError:
                 # lit is not ready to accept connections yet
                 time.sleep(0.25)
-                continue
-            except ConnectionResetError:
-                print ("FUCK")
-                break
             else:
                 # No exception - we're connected!
                 break
@@ -66,18 +36,16 @@ class LitConnection():
 
     def send_message(self, method, params):
         """Sends a websocket message to the lit node"""
-        logger.debug("Sending rpc message to %s:%s %s(%s)" %
-                     (self.ip, self.port, method, str(params)))
-        self.sock.sendall(json.dumps(bytes({"method": "LitRPC.%s" % method,
-                                            "params": [params],
-                                            "jsonrpc": "2.0"}), encoding='utf-8'))
-        #"id": str(self.msg_id).encode('utf-8')}))
+        logger.debug("Sending rpc message to %s:%s %s(%s)" % (self.ip, self.port, method, str(params)))
+        self.ws.send(json.dumps({"method": "LitRPC.%s" % method,
+                                 "params": [params],
+                                 "jsonrpc": "2.0",
+                                 "id": str(self.msg_id)}))
 
         self.msg_id = self.msg_id + 1 % 10000
 
-        resp = json.loads(self.conn.recv())
-        logger.debug("Recieved rpc response from %s:%s method: %s Response: %s." % (
-            self.ip, self.port, method, str(resp)))
+        resp = json.loads(self.ws.recv())
+        logger.debug("Recieved rpc response from %s:%s method: %s Response: %s." % (self.ip, self.port, method, str(resp)))
         return resp
 
     def __getattr__(self, name):

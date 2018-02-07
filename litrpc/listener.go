@@ -3,6 +3,7 @@ package litrpc
 import (
 	"crypto/tls"
 	"log"
+	"net"
 	"net/rpc"
 	"net/rpc/jsonrpc"
 	"strconv"
@@ -35,17 +36,38 @@ func RPCListen(rpcl *LitRPC, port uint16) {
 	}
 	conf := tls.Config{Certificates: []tls.Certificate{cert}}
 	listenString := "localhost:" + strconv.Itoa(int(port))
-	listener, err := tls.Listen("tcp", listenString, &conf)
+	go initListener(listenString, conf)
+}
+
+func initListener(listenString string, conf tls.Config) {
+	listener, err := tls.Listen("tcp", listenString, &conf) // net.Listener
 	if err != nil {
 		log.Fatal(err)
 	}
 	log.Print("Listening for connections..")
-	conn, err := listener.Accept()
-	if err != nil {
-		log.Printf("Accept error: %s", err)
-		return
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			log.Printf("Accept error: %s", err)
+			return
+		}
+		log.Printf("accepted connection from client %s", conn.RemoteAddr())
+		go handleClient(conn)
 	}
-	log.Printf("accepted connection from client %s", conn.RemoteAddr())
+}
+
+func handleClient(conn net.Conn) {
 	defer conn.Close()
-	jsonrpc.ServeConn(conn)
+	buf := make([]byte, 512)
+	for {
+		log.Print("server: conn: waiting")
+		_, err := conn.Read(buf)
+		if err != nil {
+			log.Println("read error: %s", err)
+			break
+		}
+		jsonrpc.ServeConn(conn)
+	}
+	log.Println("Client Disconnected")
+	return
 }

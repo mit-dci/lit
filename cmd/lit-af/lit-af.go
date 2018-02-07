@@ -85,6 +85,8 @@ func main() {
 	config := tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true}
 	// InsecureSkipVerify true to validate self-signed certs
 	connectString := lc.remote + ":" + strconv.Itoa(int(lc.port))
+	//fmt.Println(connectString)
+	//127.0.0.1:8012
 	conn, err := tls.Dial("tcp", connectString, &config)
 	if err != nil {
 		log.Fatalf("client dial failed: %s", err)
