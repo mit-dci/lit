@@ -57,7 +57,7 @@ class LitConnection():
         return resp
 
     def __getattr__(self, name):
-        """Dispatches any unrecognised messages to the https connection"""
+        """Dispatches any unrecognised messages to the socket connection"""
         def dispatcher(**kwargs):
             return self.send_message(name, kwargs)
         return dispatcher
