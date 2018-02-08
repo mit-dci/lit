@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"log"
@@ -8,8 +9,7 @@ import (
 	"net/rpc/jsonrpc"
 	"os"
 	"path/filepath"
-
-	"golang.org/x/net/websocket"
+	"strconv"
 
 	"github.com/andlabs/ui"
 )
@@ -47,15 +47,22 @@ func main() {
 	lu = new(litUiClient)
 	setConfig(lu)
 
-	origin := "http://127.0.0.1/"
-	urlString := fmt.Sprintf("ws://%s:%d/ws", lu.remote, lu.port)
-	wsConn, err := websocket.Dial(urlString, "", origin)
+	certPath, _ := filepath.Abs("../../certs")
+	cert, err := tls.LoadX509KeyPair(certPath+"/client.pem", certPath+"/client.key")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Failed to load client keys: %s", err)
 	}
-	defer wsConn.Close()
-
-	lu.rpccon = jsonrpc.NewClient(wsConn)
+	config := tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true}
+	// InsecureSkipVerify true to validate self-signed certs
+	connectString := lu.remote + ":" + strconv.Itoa(int(lu.port))
+	//fmt.Println(connectString)
+	//127.0.0.1:8012
+	conn, err := tls.Dial("tcp", connectString, &config)
+	if err != nil {
+		log.Fatalf("client dial failed: %s", err)
+	}
+	defer conn.Close()
+	lu.rpccon = jsonrpc.NewClient(conn)
 
 	firstAdr, err := lu.Address()
 	if err != nil {

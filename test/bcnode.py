@@ -54,7 +54,7 @@ class BCNode():
                     # RPC is still in warmup. Sleep some more.
                     continue
                 # Check that we're running at least the minimum version
-                assert resp.json()['result']['version'] >= self.__class__.min_version
+                #assert resp.json()['result']['version'] >= self.__class__.min_version
                 logger.debug("bcnode %d started" % self.index)
                 break  # break out of loop on success
             except requests.exceptions.ConnectionError as e:

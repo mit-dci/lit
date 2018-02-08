@@ -38,6 +38,7 @@ class TestBasic(LitTest):
 
         self.log.info("Generate 500 blocks to activate segwit")
         self.coinnodes[0].generate(500)
+        print ("Done")
         self.chain_height = 500
         network_info = self.coinnodes[0].getblockchaininfo().json()['result']
         assert_equal(network_info['bip9_softforks']['segwit']['status'], 'active')
