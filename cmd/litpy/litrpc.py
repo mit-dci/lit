@@ -32,7 +32,8 @@ class LitConnection():
         for _ in range(50):
             try:
                 self.ws.connect((HOST, PORT))
-            except ConnectionRefusedError:
+            except Exception as e:
+                print (e)
                 # lit is not ready to accept connections yet
                 time.sleep(0.25)
             else:
@@ -51,7 +52,7 @@ class LitConnection():
 
         self.msg_id = self.msg_id + 1 % 10000
 
-        resp = json.loads(self.ws.recv())
+        resp = json.loads(self.ws.recv().decode('utf-8'))
         logger.debug("Recieved rpc response from %s:%s method: %s Response: %s." % (self.ip, self.port, method, str(resp)))
         return resp
 

@@ -38,6 +38,7 @@ class TestBasic(LitTest):
 
         self.log.info("Generate 500 blocks to activate segwit")
         self.coinnodes[0].generate(500)
+        print ("Done")
         self.chain_height = 500
         network_info = self.coinnodes[0].getblockchaininfo().json()['result']
         assert_equal(network_info['bip9_softforks']['segwit']['status'], 'active')
@@ -57,6 +58,8 @@ class TestBasic(LitTest):
         self.litnodes[1].add_rpc_connection("127.0.0.1", "8002")
 
         self.log.info("Wait until lit nodes are sync'ed")
+        print (self.litnodes[1].get_height(self.coins[0]['code']))
+        print (self.litnodes[0].get_height(self.coins[0]['code']))
         wait_until(lambda: self.litnodes[0].get_height(self.coins[0]['code']) == 500)
         wait_until(lambda: self.litnodes[1].get_height(self.coins[0]['code']) == 500)
 
