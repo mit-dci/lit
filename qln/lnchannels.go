@@ -75,7 +75,27 @@ type StatCom struct {
 	// sig should have a sig.
 	// only one sig is ever stored, to prevent broadcasting the wrong tx.
 	// could add a mutex here... maybe will later.
+
+	ActiveHTLC bool // whether an HTLC exists between the two nodes
 }
+
+// Hashed Timelock Contract for atomic cross-chain swaps
+type HTLC struct {
+	/* HTLC participants channel with currency 1 */
+	qchan1 *Qchan
+	/* HTLC participants channel with currency 2 */
+	qchan2 *Qchan
+	/* Amount being exchanged in channel qchan1*/
+	exchangeAmountQchan1 int32
+	/* Amount being exchanged in channel qchan1*/
+	exchangeAmountQchan2 int32
+	/* The preimage used to lock the initiator's tx */
+	preimage [32]byte
+	/* The hash of the preimage used to lock the initiator's tx */
+	rHash [32]byte
+	/* Amount of time before the HTLC expires */
+	locktime int32
+};
 
 // QCloseData is the output resulting from an un-cooperative close
 // of the channel.  This happens when either party breaks non-cooperatively.

@@ -5,6 +5,7 @@ import (
 
 	"github.com/adiabat/btcd/wire"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/qln"
 )
 
 // minOutput is the minimum output amt, post fee.
@@ -85,6 +86,70 @@ Receive Rev for previous state
 
 */
 
+// HTLC Serialization Method
+func (htlc *qln.HTLC) HTLCToBytes() []byte {
+	var b []byte
+
+	// Struct is qchan1 (4), qchan2 (4), exchangeAmountQchan1 (4)
+	// exchangeAmountQchan2 (4), preimage (32), rHash (32), locktime (4)
+	//
+	// Total Length: 84
+
+	b = append(b, htlc.qchan1...)
+	b = append(b, htlc.qchan2...)
+	b = append(b, lnutil.I32tB(htlc.exchangeAmountQchan1)...)
+	b = append(b, lnutil.I32tB(htlc.exchangeAmountQchan2)...)
+	b = append(b, htlc.preimage[:]...)
+	b = append(b, htlc.rHash[:]...)
+	b = append(b, lnutil.I32tB(htlc.locktime)...)
+
+	return b
+}
+
+// HTLC Deserialization Method
+func HTLCFromBytes(b []byte) (*qln.HTLC, error) {
+	if len(b) != 134 {
+		return nil, fmt.Errorf("%d bytes, need 134", len(b))
+	}
+
+	htlc := new(qln.HTLC)
+
+	// First Field Converted
+	copy(htlc.qchan1[:], b[:4])
+
+	// Second Field Converted
+	copy(htlc.qchan2[:], b[4:8])
+
+	// Third Field Converted
+	hltc.exchangeAmountQchan1 = lnutil.BtI32(b[8:12])
+
+	// Fourth Field Converted
+	hltc.exchangeAmountQchan2 = lnutil.BtI32(b[12:16])
+
+	// Fifth Field Converted
+	copy(htlc.preimage[:], b[16:48])
+
+	// Sixth Field Converted
+	copy(htlc.rHash[:], b[48:80])
+
+	// Seventh Field Converted
+	htlc.Delta = lnutil.BtI32(b[80:84])
+
+	return htlc, nil
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
 // example message struct
 type SigRevMsg struct {
 	Op    wire.OutPoint
@@ -149,7 +214,7 @@ func (nd *LitNode) ReSendMsg(qc *Qchan) error {
 }
 
 // PushChannel initiates a state update by sending an DeltaSig
-func (nd LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
+func (nd LitNode) PushChannel(qc *Qchan, amt uint32) error {
 	// sanity checks
 	if amt >= 1<<30 {
 		return fmt.Errorf("max send 1G sat (1073741823)")
@@ -196,9 +261,9 @@ func (nd LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	// check if this push would lower my balance below minBal
 	if myNewOutputSize < minOutput {
 		qc.ClearToSend <- true
-		return fmt.Errorf("want to push %s but %s available after %s fee and %s minOutput",
+		return fmt.Errorf("want to push %s but %s available, %s fee, %s minOutput",
 			lnutil.SatoshiColor(int64(amt)),
-			lnutil.SatoshiColor(qc.State.MyAmt - qc.State.Fee - minOutput),
+			lnutil.SatoshiColor(qc.State.MyAmt),
 			lnutil.SatoshiColor(qc.State.Fee),
 			lnutil.SatoshiColor(minOutput))
 	}
@@ -223,9 +288,6 @@ func (nd LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 		qc.ClearToSend <- true
 		return fmt.Errorf("Didn't send.  Recovered though, so try again!")
 	}
-
-	qc.State.Data = data
-	fmt.Printf("Sending message %x", data)
 
 	qc.State.Delta = int32(-amt)
 	// save to db with ONLY delta changed
@@ -267,7 +329,7 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 		return err
 	}
 
-	outMsg := lnutil.NewDeltaSigMsg(q.Peer(), q.Op, -q.State.Delta, sig, q.State.Data)
+	outMsg := lnutil.NewDeltaSigMsg(q.Peer(), q.Op, -q.State.Delta, sig)
 	nd.OmniOut <- outMsg
 
 	return nil
@@ -368,9 +430,6 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 	qc.State.StateIdx++
 	// regardless of collision, raise amt
 	qc.State.MyAmt += int64(incomingDelta)
-
-	fmt.Printf("Got message %x", msg.Data)
-	qc.State.Data = msg.Data
 
 	// verify sig for the next state. only save if this works
 	err = qc.VerifySig(msg.Signature)
