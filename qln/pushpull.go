@@ -139,17 +139,6 @@ func HTLCFromBytes(b []byte) (*qln.HTLC, error) {
 
 }
 
-
-
-
-
-
-
-
-
-
-
-
 // example message struct
 type SigRevMsg struct {
 	Op    wire.OutPoint
@@ -704,9 +693,15 @@ func (nd *LitNode) SendREV(q *Qchan) error {
 		return err
 	}
 
-	outMsg := lnutil.NewRevMsg(q.Peer(), q.Op, *elk, n2ElkPoint)
+	//	outMsg := lnutil.NewRevMsg(q.Peer(), q.Op, *elk, n2ElkPoint)
 
-	nd.OmniOut <- outMsg
+	var outM2 lnutil.RevMsg
+	outM2.PeerIdx = q.Peer()
+	outM2.Outpoint = q.Op
+	outM2.Elk = *elk
+	outM2.N2ElkPoint = n2ElkPoint
+
+	nd.OmniOut <- outM2
 
 	return err
 }
