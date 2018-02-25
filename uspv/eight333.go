@@ -17,7 +17,7 @@ const (
 	headerFileName = "headers.bin"
 
 	// version hardcoded for now, probably ok...?
-	// 70012 is for segnet... make this a init var?
+	// 70012 is for segnet... make this an init var?
 	VERSION = 70012
 )
 
@@ -329,7 +329,7 @@ func (s *SPVCon) AskForHeaders() error {
 
 // AskForMerkBlocks requests blocks from current to last
 // right now this asks for 1 block per getData message.
-// Maybe it's faster to ask for many in a each message?
+// Maybe it's faster to ask for many in each message?
 func (s *SPVCon) AskForBlocks() error {
 	var hdr wire.BlockHeader
 

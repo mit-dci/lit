@@ -56,7 +56,7 @@ func (q *Qchan) AdvanceElkrem(elk *chainhash.Hash, n2Elk [33]byte) error {
 	if err != nil {
 		return err
 	}
-	// if ingest was succesful, update the stored elk points
+	// if ingest was successful, update the stored elk points
 	// the already stored "next" point becomes the current point
 	q.State.ElkPoint = q.State.NextElkPoint
 	// n+2 drops to n+1

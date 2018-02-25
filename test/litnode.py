@@ -15,7 +15,7 @@ from litpy import litrpc
 LIT_BIN = "%s/../lit" % os.path.abspath(os.path.dirname(__file__))
 
 logger = logging.getLogger("TestFramework.litnode")
-logger.propogate = False
+logger.propagate = False
 
 class LitNode():
     """A class representing a Lit node"""

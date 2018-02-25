@@ -647,7 +647,7 @@ func (self GapSigRevMsg) Bytes() []byte {
 func (self GapSigRevMsg) Peer() uint32   { return self.PeerIdx }
 func (self GapSigRevMsg) MsgType() uint8 { return MSGID_GAPSIGREV }
 
-//send message accross channel using Elk info
+//send message across channel using Elk info
 type RevMsg struct {
 	PeerIdx    uint32
 	Outpoint   wire.OutPoint

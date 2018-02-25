@@ -125,7 +125,7 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
 	theirAmt = q.Value - s.MyAmt
 
 	// the PKH clear refund also has elkrem points added to mask the PKH.
-	// this changes the txouts at each state to blind sorceror better.
+	// this changes the txouts at each state to blind sorcerer better.
 	if mine { // build MY tx (to verify) (unless breaking)
 		// My tx that I store.  They get funds unencumbered. SH is mine eventually
 		// SH pubkeys are base points combined with the elk point we give them

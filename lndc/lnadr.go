@@ -130,7 +130,7 @@ func (l *LNAdr) Deserialize(s []byte, param *chaincfg.Params) error {
 	b := bytes.NewBuffer(s)
 
 	// Fail if on-disk LNId too short
-	if b.Len() < 24 { // 24 is min lenght
+	if b.Len() < 24 { // 24 is min length
 		return fmt.Errorf("can't read LNId - too short")
 	}
 	// read indicator of pubkey or pubkeyhash

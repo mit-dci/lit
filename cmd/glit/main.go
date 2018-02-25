@@ -125,7 +125,7 @@ func main() {
 
 		sendBtn.OnClicked(func(*ui.Button) {
 			amtString := fmt.Sprintf("%d", sendAmtBox.Value())
-			reponse, err := lu.Send(sendAdrBox.Text(), amtString)
+			response, err := lu.Send(sendAdrBox.Text(), amtString)
 			if err != nil {
 				// you need to make a window for MsgBoxError, but
 				// it doesn't seem to DO anything.  If the window you give
@@ -133,7 +133,7 @@ func main() {
 				dummyWindow := ui.NewWindow("Error!!", 100, 100, false)
 				ui.MsgBoxError(dummyWindow, "Send error", err.Error())
 			} else {
-				statusTextBox.SetText(reponse)
+				statusTextBox.SetText(response)
 			}
 		})
 

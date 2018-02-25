@@ -247,7 +247,7 @@ func (c *LNDConn) authPKH(
 }
 
 // Read reads data from the connection.
-// Read can be made to time out and return a Error with Timeout() == true
+// Read can be made to time out and return an Error with Timeout() == true
 // after a fixed time limit; see SetDeadline and SetReadDeadline.
 // Part of the net.Conn interface.
 func (c *LNDConn) Read(b []byte) (n int, err error) {
@@ -288,7 +288,7 @@ func (c *LNDConn) Read(b []byte) (n int, err error) {
 }
 
 // Write writes data to the connection.
-// Write can be made to time out and return a Error with Timeout() == true
+// Write can be made to time out and return an Error with Timeout() == true
 // after a fixed time limit; see SetDeadline and SetWriteDeadline.
 // Part of the net.Conn interface.
 func (c *LNDConn) Write(b []byte) (n int, err error) {

@@ -148,7 +148,7 @@ func (nd *LitNode) ReSendMsg(qc *Qchan) error {
 	return nd.SendREV(qc)
 }
 
-// PushChannel initiates a state update by sending an DeltaSig
+// PushChannel initiates a state update by sending a DeltaSig
 func (nd LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	// sanity checks
 	if amt >= 1<<30 {
@@ -273,7 +273,7 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 	return nil
 }
 
-// DeltaSigHandler takes in a DeltaSig and responds with an SigRev (normally)
+// DeltaSigHandler takes in a DeltaSig and responds with a SigRev (normally)
 // or a GapSigRev (if there's a collision)
 // Leaves the channel either expecting a Rev (normally) or a GapSigRev (collision)
 func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
@@ -446,7 +446,7 @@ func (nd *LitNode) SendGapSigRev(q *Qchan) error {
 	return nil
 }
 
-// SendSigRev sends an SigRev message based on channel info
+// SendSigRev sends a SigRev message based on channel info
 func (nd *LitNode) SendSigRev(q *Qchan) error {
 
 	// revoke n-1
@@ -550,7 +550,7 @@ func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
 	return nil
 }
 
-// SIGREVHandler takes in an SIGREV and responds with a REV (if everything goes OK)
+// SIGREVHandler takes in a SIGREV and responds with a REV (if everything goes OK)
 // Leaves the channel in a clear / rest state.
 func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 
@@ -652,7 +652,7 @@ func (nd *LitNode) SendREV(q *Qchan) error {
 	return err
 }
 
-// REVHandler takes in an REV and clears the state's prev HAKD.  This is the
+// REVHandler takes in a REV and clears the state's prev HAKD.  This is the
 // final message in the state update process and there is no response.
 // Leaves the channel in a clear / rest state.
 func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {

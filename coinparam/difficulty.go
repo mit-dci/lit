@@ -9,7 +9,7 @@ import (
 )
 
 /* calcDiff returns a bool given two block headers.  This bool is
-true if the correct dificulty adjustment is seen in the "next" header.
+true if the correct difficulty adjustment is seen in the "next" header.
 Only feed it headers n-2016 and n-1, otherwise it will calculate a difficulty
 when no adjustment should take place, and return false.
 Note that the epoch is actually 2015 blocks long, which is confusing. */

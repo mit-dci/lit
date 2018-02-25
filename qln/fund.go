@@ -124,7 +124,7 @@ func (nd *LitNode) FundChannel(
 	}
 	if initSend > ccap {
 		nd.InProg.mtx.Unlock()
-		return 0, fmt.Errorf("Cant send %d in %d capacity channel", initSend, ccap)
+		return 0, fmt.Errorf("Can't send %d in %d capacity channel", initSend, ccap)
 	}
 
 	// TODO - would be convenient if it auto connected to the peer huh
@@ -516,7 +516,7 @@ func (nd *LitNode) QChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePeer) {
 	}
 
 	// tell base wallet about watcher refund address in case that happens
-	// TODO this is weird & ugly... maybe have a export keypath func?
+	// TODO this is weird & ugly... maybe have an export keypath func?
 	nullTxo := new(portxo.PorTxo)
 	nullTxo.Value = 0 // redundant, but explicitly show that this is just for adr
 	nullTxo.KeyGen = qc.KeyGen
