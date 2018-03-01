@@ -48,15 +48,14 @@ func litSetup(conf *config) *[32]byte {
 	preParser := newConfigParser(&preconf, flags.HelpFlag)
 	_, err := preParser.ParseArgs(os.Args)
 	if err != nil {
-		if e, ok := err.(*flags.Error); ok && e.Type == flags.ErrHelp {
-			log.Fatal(err)
-		}
+		log.Fatal(err)
 	}
 
-	// Load config from file
-	parser := newConfigParser(conf, flags.Default) //parse
+	// Load config from file and parse
+	parser := newConfigParser(conf, flags.Default)
 
-	_, err = os.Stat(preconf.LitHomeDir) // create directory
+ 	// create home directory
+	_, err = os.Stat(preconf.LitHomeDir)
 	if err != nil {
 		log.Println("Error while creating a directory")
 	}
