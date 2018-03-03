@@ -12,6 +12,7 @@ import (
 	"github.com/adiabat/btcutil/txsort"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
+	"github.com/mit-dci/lit/consts"
 )
 
 // Build a tx, kindof like with SendCoins, but don't sign or broadcast.
@@ -24,7 +25,7 @@ import (
 func (w *Wallit) MaybeSend(txos []*wire.TxOut, ow bool) ([]*wire.OutPoint, error) {
 	var err error
 	var totalSend int64
-	dustCutoff := int64(20000) // below this amount, just give to miners
+	dustCutoff := consts.DustCutoff // below this amount, just give to miners
 
 	feePerByte := w.FeeRate
 
@@ -262,7 +263,7 @@ func (w *Wallit) PickUtxos(
 	sort.Sort(sort.Reverse(allUtxos))
 
 	// guessing that txs won't be more than 10K here...
-	maxFeeGuess := feePerByte * 10000
+	maxFeeGuess := feePerByte * consts.MaxTxCount
 
 	// first pass of removing candidate utxos; if the next one is bigger than
 	// we need, remove the top one.

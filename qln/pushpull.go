@@ -5,11 +5,8 @@ import (
 
 	"github.com/adiabat/btcd/wire"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/consts"
 )
-
-// minOutput is the minimum output amt, post fee.
-// This (plus fees) is also the minimum channel balance
-const minOutput = 100000
 
 // Grab the coins that are rightfully yours! Plus some more.
 // For right now, spend all outputs from channel close.
@@ -194,23 +191,23 @@ func (nd LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	theirNewOutputSize := qc.Value - (qc.State.MyAmt - int64(amt)) - qc.State.Fee
 
 	// check if this push would lower my balance below minBal
-	if myNewOutputSize < minOutput {
+	if myNewOutputSize < consts.MinOutput {
 		qc.ClearToSend <- true
-		return fmt.Errorf("want to push %s but %s available after %s fee and %s minOutput",
+		return fmt.Errorf("want to push %s but %s available after %s fee and %s consts.MinOutput",
 			lnutil.SatoshiColor(int64(amt)),
-			lnutil.SatoshiColor(qc.State.MyAmt - qc.State.Fee - minOutput),
+			lnutil.SatoshiColor(qc.State.MyAmt - qc.State.Fee - consts.MinOutput),
 			lnutil.SatoshiColor(qc.State.Fee),
-			lnutil.SatoshiColor(minOutput))
+			lnutil.SatoshiColor(consts.MinOutput))
 	}
 	// check if this push is sufficient to get them above minBal
-	if theirNewOutputSize < minOutput {
+	if theirNewOutputSize < consts.MinOutput {
 		qc.ClearToSend <- true
 		return fmt.Errorf(
-			"pushing %s insufficient; counterparty bal %s fee %s minOutput %s",
+			"pushing %s insufficient; counterparty bal %s fee %s consts.MinOutput %s",
 			lnutil.SatoshiColor(int64(amt)),
 			lnutil.SatoshiColor(qc.Value-qc.State.MyAmt),
 			lnutil.SatoshiColor(qc.State.Fee),
-			lnutil.SatoshiColor(minOutput))
+			lnutil.SatoshiColor(consts.MinOutput))
 	}
 
 	// if we got here, but channel is not in rest state, try to fix it.
@@ -349,19 +346,19 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 		return fmt.Errorf("DeltaSigHandler err: delta %d", incomingDelta)
 	}
 
-	// perform minOutput check
+	// perform consts.MinOutput check
 	theirNewOutputSize :=
 		qc.Value - (qc.State.MyAmt + int64(incomingDelta)) - qc.State.Fee
 
 	// check if this push is takes them below minimum output size
-	if theirNewOutputSize < minOutput {
+	if theirNewOutputSize < consts.MinOutput {
 		qc.ClearToSend <- true
 		return fmt.Errorf(
-			"pushing %s reduces them too low; counterparty bal %s fee %s minOutput %s",
+			"pushing %s reduces them too low; counterparty bal %s fee %s consts.MinOutput %s",
 			lnutil.SatoshiColor(int64(incomingDelta)),
 			lnutil.SatoshiColor(qc.Value-qc.State.MyAmt),
 			lnutil.SatoshiColor(qc.State.Fee),
-			lnutil.SatoshiColor(minOutput))
+			lnutil.SatoshiColor(consts.MinOutput))
 	}
 
 	// update to the next state to verify
