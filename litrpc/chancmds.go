@@ -86,7 +86,7 @@ func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
 		return fmt.Errorf("Min channel capacity 1M sat")
 	}
 	if args.InitialSend > args.Capacity {
-		return fmt.Errorf("Cant send %d in %d capacity channel",
+		return fmt.Errorf("Can't send %d in %d capacity channel",
 			args.InitialSend, args.Capacity)
 	}
 

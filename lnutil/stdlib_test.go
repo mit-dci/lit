@@ -80,7 +80,7 @@ func TestU32tB(t *testing.T) {
 
 // BtU32
 //
-// BtU32 has an input of a byte array for arbitrary length(the length is a int type)
+// BtU32 has an input of a byte array for arbitrary length (the length is an int type)
 // If the length of the input is not 4, it returns fixed value.
 // This function tests the length
 func TestLenBInBtU32(t *testing.T) {
@@ -168,7 +168,7 @@ func TestBtU32(t *testing.T) {
 
 // BtI32
 //
-// BtI32 has an input of a byte array for arbitrary length(the length is a int type)
+// BtI32 has an input of a byte array for arbitrary length (the length is an int type)
 // If the length of the input is not 4, it returns fixed value.
 // This function tests the length
 func TestLenBInBtI32(t *testing.T) {
@@ -345,7 +345,7 @@ func TestU64tB(t *testing.T) {
 
 // BtI64
 //
-// BtI64 has an input of a byte array for arbitrary length(the length is a int type)
+// BtI64 has an input of a byte array for arbitrary length (the length is an int type)
 // If the length of the input is not 8, it returns fixed value.
 // This function tests the length
 func TestLenBInBtI64(t *testing.T) {
@@ -450,7 +450,7 @@ func TestBtI64(t *testing.T) {
 
 // BtU64
 //
-// BtU64 has an input of a byte array for arbitrary length(the length is a int type)
+// BtU64 has an input of a byte array for arbitrary length (the length is an int type)
 // If the length of the input is not 8, it returns fixed value.
 // This function tests the length
 func TestLenBInBtU64(t *testing.T) {

@@ -505,7 +505,7 @@ func (w *Wallit) BuildAndSign(
 	return tx, nil
 }
 
-// EstFee gives a fee estimate based on a input / output set and a sat/Byte target.
+// EstFee gives a fee estimate based on an input / output set and a sat/Byte target.
 // It guesses the final tx size based on:
 // Txouts: 8 bytes + pkscript length
 // Total guess on the p2wsh one, see if that's accurate
