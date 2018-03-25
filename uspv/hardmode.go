@@ -2,6 +2,7 @@ package uspv
 
 import (
 	"bytes"
+	"fmt"
 	"log"
 
 	"github.com/adiabat/btcd/chaincfg/chainhash"
@@ -139,6 +140,23 @@ func (s *SPVCon) Refilter(f *bloom.Filter) {
 	}
 }
 
+// can blocks turn to gobs?
+func parseBlock(blk *wire.MsgBlock) string {
+	//	var dels, adds []wire.OutPoint
+	var s string
+	for blockindex, tx := range blk.Transactions {
+		for _, in := range tx.TxIn {
+			if blockindex > 0 { // skip coinbase "spend"
+				s += "-" + in.PreviousOutPoint.String() + "\n"
+			}
+			//			dels = append(dels, in.PreviousOutPoint)
+		}
+		// creates all txos up to index indicated
+		s += "+" + wire.OutPoint{tx.TxHash(), uint32(len(tx.TxOut)) - 1}.String() + "\n"
+	}
+	return s
+}
+
 // IngestBlock is like IngestMerkleBlock but aralphic
 // different enough that it's better to have 2 separate functions
 func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
@@ -187,6 +205,10 @@ func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
 
 	log.Printf("ingested full block %s height %d OK\n",
 		m.Header.BlockHash().String(), hah.height)
+
+	txodelta := parseBlock(m)
+	txodelta += fmt.Sprintf("h: %d\n", hah.height)
+	s.txoFile.Write([]byte(txodelta))
 
 	if hah.final { // check sync end
 		// don't set waitstate; instead, ask for headers again!

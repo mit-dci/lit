@@ -214,6 +214,11 @@ func (s *SPVCon) openHeaderFile(hfn string) error {
 	if err != nil {
 		return err
 	}
+
+	s.txoFile, err = os.OpenFile(hfn+"txos", os.O_CREATE|os.O_RDWR, 0600)
+	if err != nil {
+		return err
+	}
 	log.Printf("opened header file %s\n", s.headerFile.Name())
 	return nil
 }
