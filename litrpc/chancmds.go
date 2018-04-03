@@ -169,7 +169,7 @@ func (r *LitRPC) DualFundChannel(args DualFundArgs, reply *StatusReply) error {
 	}
 
 	result, err := r.Node.DualFundChannel(
-		args.Peer, args.CoinType, args.OurAmount, args.TheirAmount, [33]byte{})
+		args.Peer, args.CoinType, args.OurAmount, args.TheirAmount)
 	if err != nil {
 		return err
 	}

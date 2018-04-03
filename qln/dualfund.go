@@ -77,14 +77,19 @@ A -> B      SigProof
 // DualFundChannel requests a peer to do dual funding. The remote peer can decline.
 
 func (nd *LitNode) DualFundChannel(
-	peerIdx, cointype uint32, ourAmount int64, theirAmount int64, ourChangeAddress [33]byte) (*DualFundingResult, error) {
+	peerIdx, cointype uint32, ourAmount int64, theirAmount int64) (*DualFundingResult, error) {
 
 	nullFundingResult := new(DualFundingResult)
 	nullFundingResult.Error = true
 
-	_, ok := nd.SubWallet[cointype]
+	wal, ok := nd.SubWallet[cointype]
 	if !ok {
 		return nullFundingResult, fmt.Errorf("No wallet of type %d connected", cointype)
+	}
+
+	changeAddr, err := wal.NewAdr()
+	if err != nil {
+		return nullFundingResult, err
 	}
 
 	nd.InProgDual.mtx.Lock()
@@ -121,11 +126,17 @@ func (nd *LitNode) DualFundChannel(
 	nd.InProgDual.Coin = cointype
 	nd.InProgDual.OurAmount = ourAmount
 	nd.InProgDual.TheirAmount = theirAmount
-	nd.InProgDual.OurChangeAddress = ourChangeAddress
+	nd.InProgDual.OurChangeAddress = changeAddr
 
 	nd.InProgDual.mtx.Unlock() // switch to defer
 
-	outMsg := lnutil.NewDualFundingReqMsg(peerIdx, cointype, ourAmount, theirAmount, ourChangeAddress)
+	// Find UTXOs to use
+	utxos, _, err := wal.PickUtxos(ourAmount, 500, wal.Fee(), false)
+	if err != nil {
+		return nil, err
+	}
+
+	outMsg := lnutil.NewDualFundingReqMsg(peerIdx, cointype, ourAmount, theirAmount, changeAddr, utxos)
 
 	nd.OmniOut <- outMsg
 

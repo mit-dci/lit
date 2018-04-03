@@ -7,6 +7,7 @@ import (
 
 	"github.com/adiabat/btcd/chaincfg/chainhash"
 	"github.com/adiabat/btcd/wire"
+	"github.com/mit-dci/lit/portxo"
 )
 
 //id numbers for messages, semi-arbitrary
@@ -963,17 +964,23 @@ type DualFundingReqMsg struct {
 	CoinType            uint32          // Cointype we are funding
 	OurAmount           int64           // The amount we are funding
 	TheirAmount         int64           // The amount we are requesting the counterparty to fund
-	OurChangeAddressPKH [33]byte        // The address we want to receive change for funding
+	OurChangeAddressPKH [20]byte        // The address we want to receive change for funding
 	OurUTXOs            []wire.OutPoint // The UTXOs we will use for funding
 }
 
-func NewDualFundingReqMsg(peerIdx, cointype uint32, ourAmount int64, theirAmount int64, ourChangeAddressPKH [33]byte) DualFundingReqMsg {
+func NewDualFundingReqMsg(peerIdx, cointype uint32, ourAmount int64, theirAmount int64, ourChangeAddressPKH [20]byte, ourTxos []*portxo.PorTxo) DualFundingReqMsg {
 	msg := new(DualFundingReqMsg)
 	msg.PeerIdx = peerIdx
 	msg.CoinType = cointype
 	msg.OurAmount = ourAmount
 	msg.TheirAmount = theirAmount
 	msg.OurChangeAddressPKH = ourChangeAddressPKH
+
+	msg.OurUTXOs = make([]wire.OutPoint, len(ourTxos))
+	for i := 0; i < len(ourTxos); i++ {
+		msg.OurUTXOs[i] = ourTxos[i].Op
+	}
+
 	return *msg
 }
 
@@ -981,8 +988,8 @@ func NewDualFundingReqMsgFromBytes(b []byte, peerIdx uint32) (DualFundingReqMsg,
 	msg := new(DualFundingReqMsg)
 	msg.PeerIdx = peerIdx
 
-	if len(b) < 55 {
-		return *msg, fmt.Errorf("DualFundingReqMsg %d bytes, expect at least 55", len(b))
+	if len(b) < 45 {
+		return *msg, fmt.Errorf("DualFundingReqMsg %d bytes, expect at least 45", len(b))
 	}
 
 	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
@@ -990,11 +997,11 @@ func NewDualFundingReqMsgFromBytes(b []byte, peerIdx uint32) (DualFundingReqMsg,
 	_ = binary.Read(buf, binary.BigEndian, &msg.CoinType)
 	_ = binary.Read(buf, binary.BigEndian, &msg.OurAmount)
 	_ = binary.Read(buf, binary.BigEndian, &msg.TheirAmount)
-	copy(msg.OurChangeAddressPKH[:], buf.Next(33))
+	copy(msg.OurChangeAddressPKH[:], buf.Next(20))
 
 	var utxoCount uint32
 	_ = binary.Read(buf, binary.BigEndian, &utxoCount)
-	expectedLength := uint32(58) + 36*utxoCount
+	expectedLength := uint32(45) + 36*utxoCount
 
 	if uint32(len(b)) < expectedLength {
 		return *msg, fmt.Errorf("DualFundingReqMsg %d bytes, expect at least %d for %d txos", len(b), expectedLength, utxoCount)

@@ -168,7 +168,7 @@ type InFlightDualFund struct {
 	PeerIdx, ChanIdx, Coin               uint32
 	OurAmount, TheirAmount               int64
 	OurOutpoints, TheirOutpoints         []wire.OutPoint
-	OurChangeAddress, TheirChangeAddress [33]byte
+	OurChangeAddress, TheirChangeAddress [20]byte
 	OurSignatures, TheirSignatures       [][60]byte
 
 	done chan *DualFundingResult
@@ -189,8 +189,8 @@ func (inff *InFlightDualFund) Clear() {
 	inff.TheirAmount = 0
 	inff.OurOutpoints = nil
 	inff.TheirOutpoints = nil
-	inff.OurChangeAddress = [33]byte{}
-	inff.TheirChangeAddress = [33]byte{}
+	inff.OurChangeAddress = [20]byte{}
+	inff.TheirChangeAddress = [20]byte{}
 	inff.OurSignatures = nil
 	inff.TheirSignatures = nil
 }
