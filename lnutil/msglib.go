@@ -44,6 +44,13 @@ const (
 
 	//Routing messages
 	MSGID_LINK_DESC = 0x70 // Describes a new channel for routing
+
+	//Dual funding messages
+	MSGID_DUALFUNDINGREQ     = 0x80 // Requests funding details (UTXOs, Change address, Pubkey), including our own details and amount needed.
+	MSGID_DUALFUNDINGRESP    = 0x81 // Responds with funding details
+	MSGID_DUALFUNDINGDECL    = 0x82 // Declines the funding request
+	MSGID_DUALFUNDINGSIGREQ  = 0x83 // Requests signatures for the funding TX while transmitting our own.
+	MSGID_DUALFUNDINGSIGRESP = 0x84 // Responds with funding TX signatures
 )
 
 //interface that all messages follow, for easy use
@@ -113,6 +120,19 @@ func LitMsgFromBytes(b []byte, peerid uint32) (LitMsg, error) {
 
 	case MSGID_LINK_DESC:
 		return NewLinkMsgFromBytes(b, peerid)
+
+	case MSGID_DUALFUNDINGREQ:
+		return NewDualFundingReqMsgFromBytes(b, peerid)
+	case MSGID_DUALFUNDINGDECL:
+		return NewDualFundingDeclMsgFromBytes(b, peerid)
+
+		/*
+			case MSGID_DUALFUNDINGRESP:
+				return NewDualFundingRespMsgFromBytes(b, peerid)
+			case MSGID_DUALFUNDINGSIGREQ:
+				return NewDualFundingSigReqMsgFromBytes(b, peerid)
+			case MSGID_DUALFUNDINGSIGRESP:
+				return NewDualFundingSigRespMsgFromBytes(b, peerid)*/
 
 	default:
 		return nil, fmt.Errorf("Unknown message of type %d ", msgType)
@@ -935,3 +955,121 @@ func (self LinkMsg) Bytes() []byte {
 
 func (self LinkMsg) Peer() uint32   { return self.PeerIdx }
 func (self LinkMsg) MsgType() uint8 { return MSGID_LINK_DESC }
+
+// Dual funding messages
+
+type DualFundingReqMsg struct {
+	PeerIdx             uint32
+	CoinType            uint32          // Cointype we are funding
+	OurAmount           int64           // The amount we are funding
+	TheirAmount         int64           // The amount we are requesting the counterparty to fund
+	OurChangeAddressPKH [33]byte        // The address we want to receive change for funding
+	OurUTXOs            []wire.OutPoint // The UTXOs we will use for funding
+}
+
+func NewDualFundingReqMsg(peerIdx, cointype uint32, ourAmount int64, theirAmount int64, ourChangeAddressPKH [33]byte) DualFundingReqMsg {
+	msg := new(DualFundingReqMsg)
+	msg.PeerIdx = peerIdx
+	msg.CoinType = cointype
+	msg.OurAmount = ourAmount
+	msg.TheirAmount = theirAmount
+	msg.OurChangeAddressPKH = ourChangeAddressPKH
+	return *msg
+}
+
+func NewDualFundingReqMsgFromBytes(b []byte, peerIdx uint32) (DualFundingReqMsg, error) {
+	msg := new(DualFundingReqMsg)
+	msg.PeerIdx = peerIdx
+
+	if len(b) < 55 {
+		return *msg, fmt.Errorf("DualFundingReqMsg %d bytes, expect at least 55", len(b))
+	}
+
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
+
+	_ = binary.Read(buf, binary.BigEndian, &msg.CoinType)
+	_ = binary.Read(buf, binary.BigEndian, &msg.OurAmount)
+	_ = binary.Read(buf, binary.BigEndian, &msg.TheirAmount)
+	copy(msg.OurChangeAddressPKH[:], buf.Next(33))
+
+	var utxoCount uint32
+	_ = binary.Read(buf, binary.BigEndian, &utxoCount)
+	expectedLength := uint32(58) + 36*utxoCount
+
+	if uint32(len(b)) < expectedLength {
+		return *msg, fmt.Errorf("DualFundingReqMsg %d bytes, expect at least %d for %d txos", len(b), expectedLength, utxoCount)
+	}
+
+	msg.OurUTXOs = make([]wire.OutPoint, utxoCount)
+	var op [36]byte
+	for i := uint32(0); i < utxoCount; i++ {
+		copy(op[:], buf.Next(36))
+		msg.OurUTXOs[i] = *OutPointFromBytes(op)
+	}
+
+	return *msg, nil
+}
+
+// ToBytes turns a DualFundingReqMsg into bytes
+func (self DualFundingReqMsg) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.WriteByte(self.MsgType())
+
+	binary.Write(&buf, binary.BigEndian, self.CoinType)
+	binary.Write(&buf, binary.BigEndian, self.OurAmount)
+	binary.Write(&buf, binary.BigEndian, self.TheirAmount)
+	buf.Write(self.OurChangeAddressPKH[:])
+
+	binary.Write(&buf, binary.BigEndian, uint32(len(self.OurUTXOs)))
+
+	for i := 0; i < len(self.OurUTXOs); i++ {
+		opArr := OutPointToBytes(self.OurUTXOs[i])
+		buf.Write(opArr[:])
+	}
+
+	return buf.Bytes()
+}
+
+func (self DualFundingReqMsg) Peer() uint32   { return self.PeerIdx }
+func (self DualFundingReqMsg) MsgType() uint8 { return MSGID_DUALFUNDINGREQ }
+
+type DualFundingDeclMsg struct {
+	PeerIdx uint32
+	Reason  uint8 // Reason for declining the funding request
+}
+
+func NewDualFundingDeclMsg(peerIdx uint32, reason uint8) DualFundingDeclMsg {
+	msg := new(DualFundingDeclMsg)
+	msg.PeerIdx = peerIdx
+	msg.Reason = reason
+	return *msg
+}
+
+func NewDualFundingDeclMsgFromBytes(b []byte, peerIdx uint32) (DualFundingDeclMsg, error) {
+	msg := new(DualFundingDeclMsg)
+	msg.PeerIdx = peerIdx
+
+	if len(b) < 2 {
+		return *msg, fmt.Errorf("DualFundingDeclMsg %d bytes, expect at least 2", len(b))
+	}
+
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
+
+	_ = binary.Read(buf, binary.BigEndian, &msg.Reason)
+
+	return *msg, nil
+}
+
+// ToBytes turns a DualFundingReqMsg into bytes
+func (self DualFundingDeclMsg) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.WriteByte(self.MsgType())
+
+	binary.Write(&buf, binary.BigEndian, self.Reason)
+	return buf.Bytes()
+}
+
+func (self DualFundingDeclMsg) Peer() uint32   { return self.PeerIdx }
+func (self DualFundingDeclMsg) MsgType() uint8 { return MSGID_DUALFUNDINGDECL }

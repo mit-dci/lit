@@ -59,6 +59,9 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string) (*LitNode, er
 	nd.InProg = new(InFlightFund)
 	nd.InProg.done = make(chan uint32, 1)
 
+	nd.InProgDual = new(InFlightDualFund)
+	nd.InProgDual.done = make(chan *DualFundingResult, 1)
+
 	nd.RemoteCons = make(map[uint32]*RemotePeer)
 
 	nd.SubWallet = make(map[uint32]UWallet)

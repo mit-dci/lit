@@ -128,6 +128,15 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		return nil
 	}
 
+	// mutually fund and create a new channel
+	if cmd == "dualfund" {
+		err = lc.DualFundChannel(args)
+		if err != nil {
+			fmt.Fprintf(color.Output, "dualfund error: %s\n", err)
+		}
+		return nil
+	}
+
 	// cooperative close of a channel
 	if cmd == "close" {
 		err = lc.CloseChannel(args)

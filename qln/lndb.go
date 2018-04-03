@@ -114,6 +114,9 @@ type LitNode struct {
 	// (1 at a time for now)
 	InProg *InFlightFund
 
+	// the current channel in process of being dual funded
+	InProgDual *InFlightDualFund
+
 	// Nodes don't have Params; their SubWallets do
 	// Param *chaincfg.Params // network parameters (testnet3, segnet, etc)
 
@@ -158,6 +161,38 @@ func (inff *InFlightFund) Clear() {
 
 	inff.Amt = 0
 	inff.InitSend = 0
+}
+
+// InFlightDualFund is a dual funding transaction that has not yet been broadcast
+type InFlightDualFund struct {
+	PeerIdx, ChanIdx, Coin               uint32
+	OurAmount, TheirAmount               int64
+	OurOutpoints, TheirOutpoints         []wire.OutPoint
+	OurChangeAddress, TheirChangeAddress [33]byte
+	OurSignatures, TheirSignatures       [][60]byte
+
+	done chan *DualFundingResult
+	mtx  sync.Mutex
+}
+
+type DualFundingResult struct {
+	ChannelId     uint32
+	Error         bool
+	Accepted      bool
+	DeclineReason uint8
+}
+
+func (inff *InFlightDualFund) Clear() {
+	inff.PeerIdx = 0
+	inff.ChanIdx = 0
+	inff.OurAmount = 0
+	inff.TheirAmount = 0
+	inff.OurOutpoints = nil
+	inff.TheirOutpoints = nil
+	inff.OurChangeAddress = [33]byte{}
+	inff.TheirChangeAddress = [33]byte{}
+	inff.OurSignatures = nil
+	inff.TheirSignatures = nil
 }
 
 // GetPubHostFromPeerIdx gets the pubkey and internet host name for a peer

@@ -22,6 +22,16 @@ var fundCommand = &Command{
 	ShortDescription: "Establish and fund a new lightning channel with the given peer.\n",
 }
 
+var dualFundCommand = &Command{
+	Format: fmt.Sprintf("%s%s\n", lnutil.White("dualfund"),
+		lnutil.ReqColor("peer", "coinType", "ourAmount", "theirAmount")),
+	Description: fmt.Sprintf("%s\n%s\n%s\n",
+		"Establish and mutually fund a new lightning channel with the given peer.",
+		"The capacity is the sum of the amounts both peers insert into the channel,",
+		"each party will end up with their funded amount in the channel."),
+	ShortDescription: "Establish and mutually fund a new lightning channel with the given peer.\n",
+}
+
 var pushCommand = &Command{
 	Format: fmt.Sprintf("%s%s%s%s\n", lnutil.White("push"), lnutil.ReqColor("channel idx", "amount"), lnutil.OptColor("times"), lnutil.OptColor("data")),
 	Description: fmt.Sprintf("%s\n%s\n%s\n",
@@ -125,6 +135,54 @@ func (lc *litAfClient) FundChannel(textArgs []string) error {
 	args.InitialSend = int64(iSend)
 
 	err = lc.rpccon.Call("LitRPC.FundChannel", args, reply)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(color.Output, "%s\n", reply.Status)
+	return nil
+}
+
+// Mutually fund a channel
+func (lc *litAfClient) DualFundChannel(textArgs []string) error {
+	if len(textArgs) > 0 && textArgs[0] == "-h" {
+		fmt.Fprintf(color.Output, dualFundCommand.Format)
+		fmt.Fprintf(color.Output, dualFundCommand.Description)
+		return nil
+	}
+
+	args := new(litrpc.DualFundArgs)
+	reply := new(litrpc.StatusReply)
+
+	if len(textArgs) < 4 {
+		return fmt.Errorf(dualFundCommand.Format)
+	}
+
+	peer, err := strconv.Atoi(textArgs[0])
+	if err != nil {
+		return err
+	}
+	coinType, err := strconv.Atoi(textArgs[1])
+	if err != nil {
+		return err
+	}
+
+	ourAmt, err := strconv.Atoi(textArgs[2])
+	if err != nil {
+		return err
+	}
+
+	theirAmt, err := strconv.Atoi(textArgs[3])
+	if err != nil {
+		return err
+	}
+
+	args.Peer = uint32(peer)
+	args.CoinType = uint32(coinType)
+	args.OurAmount = int64(ourAmt)
+	args.TheirAmount = int64(theirAmt)
+
+	err = lc.rpccon.Call("LitRPC.DualFundChannel", args, reply)
 	if err != nil {
 		return err
 	}

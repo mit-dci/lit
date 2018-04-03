@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/mit-dci/lit/litrpc"
+
 	"github.com/chzyer/readline"
+	"github.com/mit-dci/lit/litrpc"
 )
 
 func (lc *litAfClient) completePeers(line string) []string {
@@ -73,7 +74,6 @@ func (lc *litAfClient) completeChannelIdx(line string) []string {
 	return names
 }
 
-
 func (lc *litAfClient) NewAutoCompleter() readline.AutoCompleter {
 	var completer = readline.NewPrefixCompleter(
 		readline.PcItem("help",
@@ -86,6 +86,7 @@ func (lc *litAfClient) NewAutoCompleter() readline.AutoCompleter {
 			readline.PcItem("fan"),
 			readline.PcItem("sweep"),
 			readline.PcItem("fund"),
+			readline.PcItem("dualfund"),
 			readline.PcItem("push"),
 			readline.PcItem("close"),
 			readline.PcItem("break"),
@@ -104,6 +105,8 @@ func (lc *litAfClient) NewAutoCompleter() readline.AutoCompleter {
 		readline.PcItem("sweep"),
 		readline.PcItem("fund",
 			readline.PcItemDynamic(lc.completePeers)),
+		readline.PcItem("dualfund",
+			readline.PcItemDynamic(lc.completePeers)),
 		readline.PcItem("push",
 			readline.PcItemDynamic(lc.completeChannelIdx)),
 		readline.PcItem("close",
@@ -113,6 +116,6 @@ func (lc *litAfClient) NewAutoCompleter() readline.AutoCompleter {
 		readline.PcItem("stop"),
 		readline.PcItem("exit"),
 	)
-    
-    return completer
+
+	return completer
 }

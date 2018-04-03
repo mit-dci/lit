@@ -124,6 +124,65 @@ func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
 	return nil
 }
 
+// ------------------------- dual fund
+type DualFundArgs struct {
+	Peer        uint32 // who to make the channel with
+	CoinType    uint32 // what coin to use
+	OurAmount   int64  // what amount we will fund
+	TheirAmount int64  // what amount we request them to fund
+}
+
+func (r *LitRPC) DualFundChannel(args DualFundArgs, reply *StatusReply) error {
+	var err error
+	if r.Node.InProgDual != nil && r.Node.InProgDual.PeerIdx != 0 {
+		return fmt.Errorf("channel with peer %d not done yet", r.Node.InProgDual.PeerIdx)
+	}
+
+	if args.OurAmount <= 0 || args.TheirAmount <= 0 {
+		return fmt.Errorf("Need both our and their amount to be more than zero")
+	}
+	if args.OurAmount+args.TheirAmount < 1000000 { // limit for now
+		return fmt.Errorf("Min channel capacity 1M sat")
+	}
+
+	wal := r.Node.SubWallet[args.CoinType]
+	if wal == nil {
+		return fmt.Errorf("No wallet of cointype %d linked", args.CoinType)
+	}
+
+	nowHeight := wal.CurrentHeight()
+
+	// see if we have enough money before calling the funding function.  Not
+	// strictly required but it's better to fail here instead of after net traffic.
+	// also assume a fee of like 50K sat just to be safe
+	var allPorTxos portxo.TxoSliceByAmt
+	allPorTxos, err = wal.UtxoDump()
+	if err != nil {
+		return err
+	}
+
+	spendable := allPorTxos.SumWitness(nowHeight)
+
+	if args.OurAmount > spendable-50000 {
+		return fmt.Errorf("Our amount to fund is %d but only %d available for channel creation",
+			args.OurAmount, spendable-50000)
+	}
+
+	result, err := r.Node.DualFundChannel(
+		args.Peer, args.CoinType, args.OurAmount, args.TheirAmount, [33]byte{})
+	if err != nil {
+		return err
+	}
+
+	if !result.Accepted {
+		return fmt.Errorf("Peer declined the funding request for reason %d", result.DeclineReason)
+	}
+
+	reply.Status = fmt.Sprintf("funded channel %d", result.ChannelId)
+
+	return nil
+}
+
 // ------------------------- statedump
 type StateDumpArgs struct {
 	// none

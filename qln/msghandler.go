@@ -59,6 +59,9 @@ func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) er
 			nd.LinkMsgHandler(msg.(lnutil.LinkMsg))
 		}
 
+	case 0x80: // Dual Funding messages
+		return nd.DualFundingHandler(msg, peer)
+
 	default:
 		return fmt.Errorf("Unknown message id byte %x &f0", msg.MsgType())
 
@@ -105,6 +108,7 @@ func (nd *LitNode) LNDCReader(peer *RemotePeer) error {
 		var routedMsg lnutil.LitMsg
 		routedMsg, err = lnutil.LitMsgFromBytes(msg, peer.Idx)
 		if err != nil {
+			fmt.Printf("decoding message error with %d: %s\n", peer.Idx, err.Error())
 			return err
 		}
 
@@ -179,6 +183,24 @@ func (nd *LitNode) ChannelHandler(msg lnutil.LitMsg, peer *RemotePeer) error {
 	case lnutil.SigProofMsg: // HERE'S YOUR CHANNEL
 		fmt.Printf("Got channel proof from %x\n", msg.Peer())
 		nd.SigProofHandler(message, peer)
+		return nil
+
+	default:
+		return fmt.Errorf("Unknown message type %x", msg.MsgType())
+	}
+
+}
+
+func (nd *LitNode) DualFundingHandler(msg lnutil.LitMsg, peer *RemotePeer) error {
+	switch message := msg.(type) {
+	case lnutil.DualFundingReqMsg: // DUAL FUNDING REQUEST
+		fmt.Printf("Got dual funding request from %x\n", message.Peer())
+		nd.DualFundingReqHandler(message)
+		return nil
+
+	case lnutil.DualFundingDeclMsg: // DUAL FUNDING DECLINE
+		fmt.Printf("Got dual funding decline from %x\n", msg.Peer())
+		nd.DualFundingDeclHandler(message)
 		return nil
 
 	default:
