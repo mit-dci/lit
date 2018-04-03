@@ -32,6 +32,12 @@ var dualFundCommand = &Command{
 	ShortDescription: "Establish and mutually fund a new lightning channel with the given peer.\n",
 }
 
+var dualFundDeclineCommand = &Command{
+	Format:           fmt.Sprintf("%s\n", lnutil.White("dualfunddecline")),
+	Description:      "Declines the pending dual funding request received from another peer (if any)\n",
+	ShortDescription: "Declines the pending dual funding request received from another peer (if any)\n",
+}
+
 var pushCommand = &Command{
 	Format: fmt.Sprintf("%s%s%s%s\n", lnutil.White("push"), lnutil.ReqColor("channel idx", "amount"), lnutil.OptColor("times"), lnutil.OptColor("data")),
 	Description: fmt.Sprintf("%s\n%s\n%s\n",
@@ -183,6 +189,25 @@ func (lc *litAfClient) DualFundChannel(textArgs []string) error {
 	args.TheirAmount = int64(theirAmt)
 
 	err = lc.rpccon.Call("LitRPC.DualFundChannel", args, reply)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(color.Output, "%s\n", reply.Status)
+	return nil
+}
+
+// Decline mutual funding of a channel
+func (lc *litAfClient) DualFundDecline(textArgs []string) error {
+	if len(textArgs) > 0 && textArgs[0] == "-h" {
+		fmt.Fprintf(color.Output, dualFundDeclineCommand.Format)
+		fmt.Fprintf(color.Output, dualFundDeclineCommand.Description)
+		return nil
+	}
+
+	reply := new(litrpc.StatusReply)
+
+	err := lc.rpccon.Call("LitRPC.DualFundDecline", nil, reply)
 	if err != nil {
 		return err
 	}

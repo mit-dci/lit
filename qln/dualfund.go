@@ -6,6 +6,10 @@ import (
 	"github.com/mit-dci/lit/lnutil"
 )
 
+const (
+	DECLINE_REASON_USER = 0x01 // User manually declined
+)
+
 /* Dual funding process.
 
 Allows a peer to initiate funding with its counterparty, requesting that party
@@ -123,10 +127,11 @@ func (nd *LitNode) DualFundChannel(
 
 	nd.InProgDual.ChanIdx = cIdx
 	nd.InProgDual.PeerIdx = peerIdx
-	nd.InProgDual.Coin = cointype
+	nd.InProgDual.CoinType = cointype
 	nd.InProgDual.OurAmount = ourAmount
 	nd.InProgDual.TheirAmount = theirAmount
 	nd.InProgDual.OurChangeAddress = changeAddr
+	nd.InProgDual.InitiatedByUs = true
 
 	nd.InProgDual.mtx.Unlock() // switch to defer
 
@@ -145,16 +150,30 @@ func (nd *LitNode) DualFundChannel(
 	return idx, nil
 }
 
+// Declines the in progress (received) dual funding request
+func (nd *LitNode) DualFundDecline(reason uint8) {
+	outMsg := lnutil.NewDualFundingDeclMsg(nd.InProgDual.PeerIdx, reason)
+	nd.OmniOut <- outMsg
+	nd.InProgDual.mtx.Lock()
+	nd.InProgDual.Clear()
+	nd.InProgDual.mtx.Unlock()
+	return
+}
+
+func (nd *LitNode) DualFundAccept() {
+
+}
+
 // RECIPIENT
 // DualFundingReqHandler gets a request with the funding data of the remote peer, along with the
 // amount of funding requested to return data for.
 func (nd *LitNode) DualFundingReqHandler(msg lnutil.DualFundingReqMsg) {
 
-	/*cIdx, err := nd.NextChannelIdx()
+	cIdx, err := nd.NextChannelIdx()
 	if err != nil {
 		fmt.Printf("DualFundingReqHandler err %s", err.Error())
 		return
-	}*/
+	}
 
 	_, ok := nd.SubWallet[msg.CoinType]
 	if !ok {
@@ -162,10 +181,15 @@ func (nd *LitNode) DualFundingReqHandler(msg lnutil.DualFundingReqMsg) {
 		return
 	}
 
-	outMsg := lnutil.NewDualFundingDeclMsg(msg.Peer(), 0xFF)
-	nd.OmniOut <- outMsg
-	outMsg.Bytes()
-
+	nd.InProgDual.mtx.Lock()
+	nd.InProgDual.ChanIdx = cIdx
+	nd.InProgDual.PeerIdx = msg.Peer()
+	nd.InProgDual.CoinType = msg.CoinType
+	nd.InProgDual.OurAmount = msg.TheirAmount
+	nd.InProgDual.TheirAmount = msg.OurAmount
+	nd.InProgDual.TheirChangeAddress = msg.OurChangeAddressPKH
+	nd.InProgDual.InitiatedByUs = false
+	nd.InProgDual.mtx.Unlock()
 	return
 }
 

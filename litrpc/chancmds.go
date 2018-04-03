@@ -183,6 +183,49 @@ func (r *LitRPC) DualFundChannel(args DualFundArgs, reply *StatusReply) error {
 	return nil
 }
 
+type DualFundDeclineArgs struct {
+	// none
+}
+
+func (r *LitRPC) DualFundDecline(args DualFundDeclineArgs, reply *StatusReply) error {
+	peerIdx := r.Node.InProgDual.PeerIdx
+
+	if peerIdx == 0 || r.Node.InProgDual.InitiatedByUs {
+		return fmt.Errorf("There is no pending request to reject")
+	}
+
+	r.Node.DualFundDecline(0x01)
+
+	reply.Status = fmt.Sprintf("Succesfully declined funding request from peer %d", peerIdx)
+
+	return nil
+}
+
+type PendingDualFundRequestsArgs struct {
+	// none
+}
+
+type PendingDualFundReply struct {
+	Pending         bool
+	PeerIdx         uint32
+	CoinType        uint32
+	TheirAmount     int64
+	RequestedAmount int64
+}
+
+func (r *LitRPC) PendingDualFund(args PendingDualFundRequestsArgs, reply *PendingDualFundReply) error {
+
+	if r.Node.InProgDual.PeerIdx != 0 && !r.Node.InProgDual.InitiatedByUs {
+		reply.Pending = true
+		reply.TheirAmount = r.Node.InProgDual.TheirAmount
+		reply.RequestedAmount = r.Node.InProgDual.OurAmount
+		reply.PeerIdx = r.Node.InProgDual.PeerIdx
+		reply.CoinType = r.Node.InProgDual.CoinType
+	}
+
+	return nil
+}
+
 // ------------------------- statedump
 type StateDumpArgs struct {
 	// none

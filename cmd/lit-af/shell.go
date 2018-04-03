@@ -137,6 +137,15 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		return nil
 	}
 
+	// mutually fund and create a new channel
+	if cmd == "dualfunddecline" {
+		err = lc.DualFundDecline(args)
+		if err != nil {
+			fmt.Fprintf(color.Output, "dualfunddecline error: %s\n", err)
+		}
+		return nil
+	}
+
 	// cooperative close of a channel
 	if cmd == "close" {
 		err = lc.CloseChannel(args)
@@ -243,6 +252,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	tReply := new(litrpc.TxoListReply)
 	bReply := new(litrpc.BalanceReply)
 	lReply := new(litrpc.ListeningPortsReply)
+	dfReply := new(litrpc.PendingDualFundReply)
 
 	err := lc.rpccon.Call("LitRPC.ListConnections", nil, pReply)
 	if err != nil {
@@ -277,6 +287,21 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 			lnutil.OutPoint(c.OutPoint),
 			lnutil.SatoshiColor(c.Capacity), lnutil.SatoshiColor(c.MyBalance),
 			c.Height, c.StateNum, c.Data, c.Pkh)
+	}
+
+	err = lc.rpccon.Call("LitRPC.PendingDualFund", nil, dfReply)
+	if err != nil {
+		return err
+	}
+	if dfReply.Pending {
+		fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Pending Dual Funding Request:"))
+		fmt.Fprintf(
+			color.Output, "\t%s %d\t%s %d\t%s %s\t%s %s\n\n",
+			lnutil.Header("Peer:"), dfReply.PeerIdx,
+			lnutil.Header("Type:"), dfReply.CoinType,
+			lnutil.Header("Their Amt:"), lnutil.SatoshiColor(dfReply.TheirAmount),
+			lnutil.Header("Req Amt:"), lnutil.SatoshiColor(dfReply.RequestedAmount),
+		)
 	}
 
 	err = lc.rpccon.Call("LitRPC.TxoList", nil, tReply)

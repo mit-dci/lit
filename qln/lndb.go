@@ -165,11 +165,12 @@ func (inff *InFlightFund) Clear() {
 
 // InFlightDualFund is a dual funding transaction that has not yet been broadcast
 type InFlightDualFund struct {
-	PeerIdx, ChanIdx, Coin               uint32
+	PeerIdx, ChanIdx, CoinType           uint32
 	OurAmount, TheirAmount               int64
 	OurOutpoints, TheirOutpoints         []wire.OutPoint
 	OurChangeAddress, TheirChangeAddress [20]byte
 	OurSignatures, TheirSignatures       [][60]byte
+	InitiatedByUs                        bool
 
 	done chan *DualFundingResult
 	mtx  sync.Mutex
@@ -193,6 +194,7 @@ func (inff *InFlightDualFund) Clear() {
 	inff.TheirChangeAddress = [20]byte{}
 	inff.OurSignatures = nil
 	inff.TheirSignatures = nil
+	inff.InitiatedByUs = false
 }
 
 // GetPubHostFromPeerIdx gets the pubkey and internet host name for a peer
