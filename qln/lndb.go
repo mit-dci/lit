@@ -165,12 +165,15 @@ func (inff *InFlightFund) Clear() {
 
 // InFlightDualFund is a dual funding transaction that has not yet been broadcast
 type InFlightDualFund struct {
-	PeerIdx, ChanIdx, CoinType           uint32
-	OurAmount, TheirAmount               int64
-	OurOutpoints, TheirOutpoints         []wire.OutPoint
-	OurChangeAddress, TheirChangeAddress [20]byte
-	OurSignatures, TheirSignatures       [][60]byte
-	InitiatedByUs                        bool
+	PeerIdx, ChanIdx, CoinType              uint32
+	OurAmount, TheirAmount                  int64
+	OurInputs, TheirInputs                  []lnutil.DualFundingInput
+	OurChangeAddress, TheirChangeAddress    [20]byte
+	OurPub, OurRefundPub, OurHAKDBase       [33]byte
+	TheirPub, TheirRefundPub, TheirHAKDBase [33]byte
+
+	OurSignatures, TheirSignatures [][60]byte
+	InitiatedByUs                  bool
 
 	done chan *DualFundingResult
 	mtx  sync.Mutex
@@ -188,10 +191,17 @@ func (inff *InFlightDualFund) Clear() {
 	inff.ChanIdx = 0
 	inff.OurAmount = 0
 	inff.TheirAmount = 0
-	inff.OurOutpoints = nil
-	inff.TheirOutpoints = nil
+	inff.OurInputs = nil
+	inff.TheirInputs = nil
 	inff.OurChangeAddress = [20]byte{}
 	inff.TheirChangeAddress = [20]byte{}
+	inff.OurPub = [33]byte{}
+	inff.OurRefundPub = [33]byte{}
+	inff.OurHAKDBase = [33]byte{}
+	inff.TheirPub = [33]byte{}
+	inff.TheirRefundPub = [33]byte{}
+	inff.TheirHAKDBase = [33]byte{}
+
 	inff.OurSignatures = nil
 	inff.TheirSignatures = nil
 	inff.InitiatedByUs = false

@@ -137,11 +137,20 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		return nil
 	}
 
-	// mutually fund and create a new channel
+	// decline mutually funding
 	if cmd == "dualfunddecline" {
 		err = lc.DualFundDecline(args)
 		if err != nil {
 			fmt.Fprintf(color.Output, "dualfunddecline error: %s\n", err)
+		}
+		return nil
+	}
+
+	// accept mutually funding
+	if cmd == "dualfundaccept" {
+		err = lc.DualFundAccept(args)
+		if err != nil {
+			fmt.Fprintf(color.Output, "dualfundaccept error: %s\n", err)
 		}
 		return nil
 	}

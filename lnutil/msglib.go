@@ -7,7 +7,6 @@ import (
 
 	"github.com/adiabat/btcd/chaincfg/chainhash"
 	"github.com/adiabat/btcd/wire"
-	"github.com/mit-dci/lit/portxo"
 )
 
 //id numbers for messages, semi-arbitrary
@@ -48,7 +47,7 @@ const (
 
 	//Dual funding messages
 	MSGID_DUALFUNDINGREQ     = 0x80 // Requests funding details (UTXOs, Change address, Pubkey), including our own details and amount needed.
-	MSGID_DUALFUNDINGRESP    = 0x81 // Responds with funding details
+	MSGID_DUALFUNDINGACCEPT  = 0x81 // Responds with funding details
 	MSGID_DUALFUNDINGDECL    = 0x82 // Declines the funding request
 	MSGID_DUALFUNDINGSIGREQ  = 0x83 // Requests signatures for the funding TX while transmitting our own.
 	MSGID_DUALFUNDINGSIGRESP = 0x84 // Responds with funding TX signatures
@@ -124,6 +123,8 @@ func LitMsgFromBytes(b []byte, peerid uint32) (LitMsg, error) {
 
 	case MSGID_DUALFUNDINGREQ:
 		return NewDualFundingReqMsgFromBytes(b, peerid)
+	case MSGID_DUALFUNDINGACCEPT:
+		return NewDualFundingAcceptMsgFromBytes(b, peerid)
 	case MSGID_DUALFUNDINGDECL:
 		return NewDualFundingDeclMsgFromBytes(b, peerid)
 
@@ -961,25 +962,32 @@ func (self LinkMsg) MsgType() uint8 { return MSGID_LINK_DESC }
 
 type DualFundingReqMsg struct {
 	PeerIdx             uint32
-	CoinType            uint32          // Cointype we are funding
-	OurAmount           int64           // The amount we are funding
-	TheirAmount         int64           // The amount we are requesting the counterparty to fund
-	OurChangeAddressPKH [20]byte        // The address we want to receive change for funding
-	OurUTXOs            []wire.OutPoint // The UTXOs we will use for funding
+	CoinType            uint32 // Cointype we are funding
+	OurAmount           int64  // The amount we are funding
+	TheirAmount         int64  // The amount we are requesting the counterparty to fund
+	OurPub              [33]byte
+	OurRefundPub        [33]byte
+	OurHAKDBase         [33]byte
+	OurChangeAddressPKH [20]byte           // The address we want to receive change for funding
+	OurInputs           []DualFundingInput // The inputs we will use for funding
 }
 
-func NewDualFundingReqMsg(peerIdx, cointype uint32, ourAmount int64, theirAmount int64, ourChangeAddressPKH [20]byte, ourTxos []*portxo.PorTxo) DualFundingReqMsg {
+type DualFundingInput struct {
+	Outpoint wire.OutPoint
+	Value    int64
+}
+
+func NewDualFundingReqMsg(peerIdx, cointype uint32, ourAmount int64, theirAmount int64, ourPub [33]byte, ourRefundPub [33]byte, ourHAKDBase [33]byte, ourChangeAddressPKH [20]byte, ourInputs []DualFundingInput) DualFundingReqMsg {
 	msg := new(DualFundingReqMsg)
 	msg.PeerIdx = peerIdx
 	msg.CoinType = cointype
 	msg.OurAmount = ourAmount
 	msg.TheirAmount = theirAmount
+	msg.OurPub = ourPub
+	msg.OurRefundPub = ourRefundPub
+	msg.OurHAKDBase = ourHAKDBase
 	msg.OurChangeAddressPKH = ourChangeAddressPKH
-
-	msg.OurUTXOs = make([]wire.OutPoint, len(ourTxos))
-	for i := 0; i < len(ourTxos); i++ {
-		msg.OurUTXOs[i] = ourTxos[i].Op
-	}
+	msg.OurInputs = ourInputs
 
 	return *msg
 }
@@ -988,8 +996,8 @@ func NewDualFundingReqMsgFromBytes(b []byte, peerIdx uint32) (DualFundingReqMsg,
 	msg := new(DualFundingReqMsg)
 	msg.PeerIdx = peerIdx
 
-	if len(b) < 45 {
-		return *msg, fmt.Errorf("DualFundingReqMsg %d bytes, expect at least 45", len(b))
+	if len(b) < 144 {
+		return *msg, fmt.Errorf("DualFundingReqMsg %d bytes, expect at least 144", len(b))
 	}
 
 	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
@@ -997,21 +1005,25 @@ func NewDualFundingReqMsgFromBytes(b []byte, peerIdx uint32) (DualFundingReqMsg,
 	_ = binary.Read(buf, binary.BigEndian, &msg.CoinType)
 	_ = binary.Read(buf, binary.BigEndian, &msg.OurAmount)
 	_ = binary.Read(buf, binary.BigEndian, &msg.TheirAmount)
+	copy(msg.OurPub[:], buf.Next(33))
+	copy(msg.OurRefundPub[:], buf.Next(33))
+	copy(msg.OurHAKDBase[:], buf.Next(33))
 	copy(msg.OurChangeAddressPKH[:], buf.Next(20))
 
 	var utxoCount uint32
 	_ = binary.Read(buf, binary.BigEndian, &utxoCount)
-	expectedLength := uint32(45) + 36*utxoCount
+	expectedLength := uint32(144) + 44*utxoCount
 
 	if uint32(len(b)) < expectedLength {
 		return *msg, fmt.Errorf("DualFundingReqMsg %d bytes, expect at least %d for %d txos", len(b), expectedLength, utxoCount)
 	}
 
-	msg.OurUTXOs = make([]wire.OutPoint, utxoCount)
+	msg.OurInputs = make([]DualFundingInput, utxoCount)
 	var op [36]byte
 	for i := uint32(0); i < utxoCount; i++ {
 		copy(op[:], buf.Next(36))
-		msg.OurUTXOs[i] = *OutPointFromBytes(op)
+		msg.OurInputs[i].Outpoint = *OutPointFromBytes(op)
+		_ = binary.Read(buf, binary.BigEndian, &msg.OurInputs[i].Value)
 	}
 
 	return *msg, nil
@@ -1026,13 +1038,17 @@ func (self DualFundingReqMsg) Bytes() []byte {
 	binary.Write(&buf, binary.BigEndian, self.CoinType)
 	binary.Write(&buf, binary.BigEndian, self.OurAmount)
 	binary.Write(&buf, binary.BigEndian, self.TheirAmount)
+	buf.Write(self.OurPub[:])
+	buf.Write(self.OurRefundPub[:])
+	buf.Write(self.OurHAKDBase[:])
 	buf.Write(self.OurChangeAddressPKH[:])
 
-	binary.Write(&buf, binary.BigEndian, uint32(len(self.OurUTXOs)))
+	binary.Write(&buf, binary.BigEndian, uint32(len(self.OurInputs)))
 
-	for i := 0; i < len(self.OurUTXOs); i++ {
-		opArr := OutPointToBytes(self.OurUTXOs[i])
+	for i := 0; i < len(self.OurInputs); i++ {
+		opArr := OutPointToBytes(self.OurInputs[i].Outpoint)
 		buf.Write(opArr[:])
+		binary.Write(&buf, binary.BigEndian, self.OurInputs[i].Value)
 	}
 
 	return buf.Bytes()
@@ -1080,3 +1096,85 @@ func (self DualFundingDeclMsg) Bytes() []byte {
 
 func (self DualFundingDeclMsg) Peer() uint32   { return self.PeerIdx }
 func (self DualFundingDeclMsg) MsgType() uint8 { return MSGID_DUALFUNDINGDECL }
+
+type DualFundingAcceptMsg struct {
+	PeerIdx             uint32
+	CoinType            uint32 // Cointype we are funding
+	OurPub              [33]byte
+	OurRefundPub        [33]byte
+	OurHAKDBase         [33]byte
+	OurChangeAddressPKH [20]byte           // The address we want to receive change for funding
+	OurInputs           []DualFundingInput // The inputs we will use for funding
+}
+
+func NewDualFundingAcceptMsg(peerIdx uint32, coinType uint32, ourPub [33]byte, ourRefundPub [33]byte, ourHAKDBase [33]byte, ourChangeAddress [20]byte, ourInputs []DualFundingInput) DualFundingAcceptMsg {
+	msg := new(DualFundingAcceptMsg)
+	msg.PeerIdx = peerIdx
+	msg.CoinType = coinType
+	msg.OurPub = ourPub
+	msg.OurRefundPub = ourRefundPub
+	msg.OurHAKDBase = ourHAKDBase
+	msg.OurChangeAddressPKH = ourChangeAddress
+	msg.OurInputs = ourInputs
+	return *msg
+}
+
+func NewDualFundingAcceptMsgFromBytes(b []byte, peerIdx uint32) (DualFundingAcceptMsg, error) {
+	msg := new(DualFundingAcceptMsg)
+	msg.PeerIdx = peerIdx
+
+	if len(b) < 29 {
+		return *msg, fmt.Errorf("DualFundingAcceptMsg %d bytes, expect at least 29", len(b))
+	}
+
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
+
+	_ = binary.Read(buf, binary.BigEndian, &msg.CoinType)
+	copy(msg.OurPub[:], buf.Next(33))
+	copy(msg.OurRefundPub[:], buf.Next(33))
+	copy(msg.OurHAKDBase[:], buf.Next(33))
+	copy(msg.OurChangeAddressPKH[:], buf.Next(20))
+
+	var utxoCount uint32
+	_ = binary.Read(buf, binary.BigEndian, &utxoCount)
+	expectedLength := uint32(29) + 44*utxoCount
+
+	if uint32(len(b)) < expectedLength {
+		return *msg, fmt.Errorf("DualFundingReqMsg %d bytes, expect at least %d for %d txos", len(b), expectedLength, utxoCount)
+	}
+
+	msg.OurInputs = make([]DualFundingInput, utxoCount)
+	var op [36]byte
+	for i := uint32(0); i < utxoCount; i++ {
+		copy(op[:], buf.Next(36))
+		msg.OurInputs[i].Outpoint = *OutPointFromBytes(op)
+		_ = binary.Read(buf, binary.BigEndian, &msg.OurInputs[i].Value)
+	}
+
+	return *msg, nil
+}
+
+// ToBytes turns a DualFundingReqMsg into bytes
+func (self DualFundingAcceptMsg) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.WriteByte(self.MsgType())
+	binary.Write(&buf, binary.BigEndian, self.CoinType)
+	buf.Write(self.OurPub[:])
+	buf.Write(self.OurRefundPub[:])
+	buf.Write(self.OurHAKDBase[:])
+	buf.Write(self.OurChangeAddressPKH[:])
+
+	binary.Write(&buf, binary.BigEndian, uint32(len(self.OurInputs)))
+
+	for i := 0; i < len(self.OurInputs); i++ {
+		opArr := OutPointToBytes(self.OurInputs[i].Outpoint)
+		buf.Write(opArr[:])
+		binary.Write(&buf, binary.BigEndian, self.OurInputs[i].Value)
+	}
+
+	return buf.Bytes()
+}
+
+func (self DualFundingAcceptMsg) Peer() uint32   { return self.PeerIdx }
+func (self DualFundingAcceptMsg) MsgType() uint8 { return MSGID_DUALFUNDINGACCEPT }

@@ -198,6 +198,11 @@ func (nd *LitNode) DualFundingHandler(msg lnutil.LitMsg, peer *RemotePeer) error
 		nd.DualFundingReqHandler(message)
 		return nil
 
+	case lnutil.DualFundingAcceptMsg: // DUAL FUNDING ACCEPT
+		fmt.Printf("Got dual funding acceptance from %x\n", msg.Peer())
+		nd.DualFundingAcceptHandler(message)
+		return nil
+
 	case lnutil.DualFundingDeclMsg: // DUAL FUNDING DECLINE
 		fmt.Printf("Got dual funding decline from %x\n", msg.Peer())
 		nd.DualFundingDeclHandler(message)

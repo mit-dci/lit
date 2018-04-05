@@ -201,6 +201,24 @@ func (r *LitRPC) DualFundDecline(args DualFundDeclineArgs, reply *StatusReply) e
 	return nil
 }
 
+type DualFundAcceptArgs struct {
+	// none
+}
+
+func (r *LitRPC) DualFundAccept(args DualFundAcceptArgs, reply *StatusReply) error {
+	peerIdx := r.Node.InProgDual.PeerIdx
+
+	if peerIdx == 0 || r.Node.InProgDual.InitiatedByUs {
+		return fmt.Errorf("There is no pending request to reject")
+	}
+
+	r.Node.DualFundAccept()
+
+	reply.Status = fmt.Sprintf("Succesfully accepted funding request from peer %d", peerIdx)
+
+	return nil
+}
+
 type PendingDualFundRequestsArgs struct {
 	// none
 }
