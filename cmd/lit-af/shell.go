@@ -130,31 +130,25 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 
 	// mutually fund and create a new channel
 	if cmd == "dualfund" {
-		err = lc.DualFundChannel(args)
+		if (len(args) > 0 && args[0] == "-h") || len(args) == 0 {
+			err = lc.DualFund(args)
+		} else {
+			if args[0] == "start" {
+				err = lc.DualFundChannel(args[1:])
+			} else if args[0] == "decline" {
+				err = lc.DualFundDecline(args[1:])
+			} else if args[0] == "accept" {
+				err = lc.DualFundAccept(args[1:])
+			} else {
+				fmt.Fprintf(color.Output, "dualfund error - unrecognized subcommand %s\n", args[0])
+			}
+		}
+
 		if err != nil {
 			fmt.Fprintf(color.Output, "dualfund error: %s\n", err)
 		}
 		return nil
 	}
-
-	// decline mutually funding
-	if cmd == "dualfunddecline" {
-		err = lc.DualFundDecline(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "dualfunddecline error: %s\n", err)
-		}
-		return nil
-	}
-
-	// accept mutually funding
-	if cmd == "dualfundaccept" {
-		err = lc.DualFundAccept(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "dualfundaccept error: %s\n", err)
-		}
-		return nil
-	}
-
 	// cooperative close of a channel
 	if cmd == "close" {
 		err = lc.CloseChannel(args)
@@ -408,6 +402,7 @@ func (lc *litAfClient) Help(textArgs []string) error {
 		fmt.Fprintf(color.Output, "%s\t%s", conCommand.Format, conCommand.ShortDescription)
 		fmt.Fprintf(color.Output, "%s\t%s", graphCommand.Format, graphCommand.ShortDescription)
 		fmt.Fprintf(color.Output, "%s\t%s", fundCommand.Format, fundCommand.ShortDescription)
+		fmt.Fprintf(color.Output, "%s\t%s", dualFundCommand.Format, dualFundCommand.ShortDescription)
 		fmt.Fprintf(color.Output, "%s\t%s", pushCommand.Format, pushCommand.ShortDescription)
 		fmt.Fprintf(color.Output, "%s\t%s", closeCommand.Format, closeCommand.ShortDescription)
 		fmt.Fprintf(color.Output, "%s\t%s", breakCommand.Format, breakCommand.ShortDescription)

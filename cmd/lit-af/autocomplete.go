@@ -105,8 +105,6 @@ func (lc *litAfClient) NewAutoCompleter() readline.AutoCompleter {
 		readline.PcItem("sweep"),
 		readline.PcItem("fund",
 			readline.PcItemDynamic(lc.completePeers)),
-		readline.PcItem("dualfund",
-			readline.PcItemDynamic(lc.completePeers)),
 		readline.PcItem("push",
 			readline.PcItemDynamic(lc.completeChannelIdx)),
 		readline.PcItem("close",

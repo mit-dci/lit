@@ -171,12 +171,11 @@ type InFlightDualFund struct {
 	OurChangeAddress, TheirChangeAddress    [20]byte
 	OurPub, OurRefundPub, OurHAKDBase       [33]byte
 	TheirPub, TheirRefundPub, TheirHAKDBase [33]byte
-
-	OurSignatures, TheirSignatures [][60]byte
-	InitiatedByUs                  bool
-
-	done chan *DualFundingResult
-	mtx  sync.Mutex
+	OurSignatures, TheirSignatures          [][60]byte
+	InitiatedByUs                           bool
+	OutPoint                                *wire.OutPoint
+	done                                    chan *DualFundingResult
+	mtx                                     sync.Mutex
 }
 
 type DualFundingResult struct {

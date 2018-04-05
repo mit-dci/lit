@@ -158,6 +158,11 @@ func (nd *LitNode) PopulateQchanMap(peer *RemotePeer) error {
 }
 
 func (nd *LitNode) ChannelHandler(msg lnutil.LitMsg, peer *RemotePeer) error {
+	if nd.InProgDual.PeerIdx != 0 { // a dual funding is in progress
+		nd.DualFundingHandler(msg, peer)
+		return nil
+	}
+
 	switch message := msg.(type) {
 	case lnutil.PointReqMsg: // POINT REQUEST
 		fmt.Printf("Got point request from %x\n", message.Peer())
@@ -170,7 +175,6 @@ func (nd *LitNode) ChannelHandler(msg lnutil.LitMsg, peer *RemotePeer) error {
 
 	case lnutil.ChanDescMsg: // CHANNEL DESCRIPTION
 		fmt.Printf("Got channel description from %x\n", msg.Peer())
-
 		nd.QChanDescHandler(message)
 		return nil
 
@@ -206,6 +210,22 @@ func (nd *LitNode) DualFundingHandler(msg lnutil.LitMsg, peer *RemotePeer) error
 	case lnutil.DualFundingDeclMsg: // DUAL FUNDING DECLINE
 		fmt.Printf("Got dual funding decline from %x\n", msg.Peer())
 		nd.DualFundingDeclHandler(message)
+		return nil
+
+	case lnutil.ChanDescMsg: // CHANNEL DESCRIPTION
+		fmt.Printf("Got (dual funding) channel description from %x\n", msg.Peer())
+		nd.DualFundChanDescHandler(message)
+		return nil
+
+	case lnutil.ChanAckMsg: // CHANNEL ACKNOWLEDGE
+		fmt.Printf("Got (dual funding) channel acknowledgement from %x\n", msg.Peer())
+
+		nd.DualFundChanAckHandler(message, peer)
+		return nil
+
+	case lnutil.SigProofMsg: // HERE'S YOUR CHANNEL
+		fmt.Printf("Got (dual funding) channel proof from %x\n", msg.Peer())
+		nd.DualFundSigProofHandler(message, peer)
 		return nil
 
 	default:

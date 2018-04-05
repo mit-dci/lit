@@ -1,12 +1,12 @@
 package qln
 
 import (
-	"bufio"
-	"bytes"
 	"fmt"
 
+	"github.com/adiabat/btcd/btcec"
 	"github.com/adiabat/btcd/wire"
 	"github.com/adiabat/btcutil/txsort"
+	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 )
@@ -322,24 +322,101 @@ func (nd *LitNode) DualFundingAcceptHandler(msg lnutil.DualFundingAcceptMsg) {
 	nd.InProgDual.TheirPub = msg.OurPub
 	nd.InProgDual.TheirRefundPub = msg.OurRefundPub
 	nd.InProgDual.TheirHAKDBase = msg.OurHAKDBase
-	nd.InProgDual.mtx.Unlock()
 
-	// Since we haven't gotten more than this - this is where we end. Build the funding TX and print it out
+	// make channel (not in db) just for keys / elk
+	q := new(Qchan)
+
+	q.Height = -1
+
+	q.Value = nd.InProg.Amt
+
+	q.KeyGen.Depth = 5
+	q.KeyGen.Step[0] = 44 | 1<<31
+	q.KeyGen.Step[1] = nd.InProgDual.CoinType | 1<<31
+	q.KeyGen.Step[2] = UseChannelFund
+	q.KeyGen.Step[3] = nd.InProgDual.PeerIdx | 1<<31
+	q.KeyGen.Step[4] = nd.InProgDual.ChanIdx | 1<<31
+
+	q.MyPub, _ = nd.GetUsePub(q.KeyGen, UseChannelFund)
+	q.MyRefundPub, _ = nd.GetUsePub(q.KeyGen, UseChannelRefund)
+	q.MyHAKDBase, _ = nd.GetUsePub(q.KeyGen, UseChannelHAKDBase)
+
+	// chop up incoming message, save points to channel struct
+	copy(q.TheirPub[:], nd.InProgDual.TheirPub[:])
+	copy(q.TheirRefundPub[:], nd.InProgDual.TheirRefundPub[:])
+	copy(q.TheirHAKDBase[:], nd.InProgDual.TheirHAKDBase[:])
+
+	// make sure their pubkeys are real pubkeys
+	_, err := btcec.ParsePubKey(q.TheirPub[:], btcec.S256())
+	if err != nil {
+		nd.InProgDual.mtx.Unlock()
+		fmt.Printf("PubRespHandler TheirPub err %s", err.Error())
+		return
+	}
+	_, err = btcec.ParsePubKey(q.TheirRefundPub[:], btcec.S256())
+	if err != nil {
+		nd.InProgDual.mtx.Unlock()
+		fmt.Printf("PubRespHandler TheirRefundPub err %s", err.Error())
+		return
+	}
+	_, err = btcec.ParsePubKey(q.TheirHAKDBase[:], btcec.S256())
+	if err != nil {
+		nd.InProgDual.mtx.Unlock()
+		fmt.Printf("PubRespHandler TheirHAKDBase err %s", err.Error())
+		return
+	}
+
+	// derive elkrem sender root from HD keychain
+	elkRoot, _ := nd.GetElkremRoot(q.KeyGen)
+	q.ElkSnd = elkrem.NewElkremSender(elkRoot)
+
+	// Build the funding transaction
 	tx, _ := nd.BuildDualFundingTransaction()
-	var b bytes.Buffer
-	w := bufio.NewWriter(&b)
-	tx.Serialize(w)
-	w.Flush()
-	fmt.Printf("Built the funding TX:\n%x\n", b.Bytes())
 
-	result := new(DualFundingResult)
+	outPoint := wire.OutPoint{tx.TxHash(), 0}
+	nd.InProgDual.OutPoint = &outPoint
+	q.Op = *nd.InProgDual.OutPoint
 
-	result.Accepted = true
+	// create initial state for elkrem points
+	q.State = new(StatCom)
+	q.State.StateIdx = 0
+	q.State.MyAmt = nd.InProgDual.OurAmount
+	// get fee from sub wallet.  Later should make fee per channel and update state
+	// based on size
+	q.State.Fee = nd.SubWallet[q.Coin()].Fee() * 1000
+	q.Value = nd.InProgDual.OurAmount + nd.InProgDual.TheirAmount
 
-	nd.InProgDual.mtx.Lock()
-	nd.InProgDual.done <- result
-	nd.InProgDual.Clear()
-	nd.InProgDual.mtx.Unlock()
+	// save channel to db
+	err = nd.SaveQChan(q)
+	if err != nil {
+		fmt.Printf("PointRespHandler SaveQchanState err %s", err.Error())
+		return
+	}
+
+	// when funding a channel, give them the first *3* elkpoints.
+	elkPointZero, err := q.ElkPoint(false, 0)
+	if err != nil {
+		fmt.Printf("PointRespHandler ElkpointZero err %s", err.Error())
+		return
+	}
+	elkPointOne, err := q.ElkPoint(false, 1)
+	if err != nil {
+		fmt.Printf("PointRespHandler ElkpointOne err %s", err.Error())
+		return
+	}
+
+	elkPointTwo, err := q.N2ElkPointForThem()
+	if err != nil {
+		fmt.Printf("PointRespHandler ElkpointTwo err %s", err.Error())
+		return
+	}
+
+	outMsg := lnutil.NewChanDescMsg(
+		nd.InProgDual.PeerIdx, *nd.InProgDual.OutPoint, q.MyPub, q.MyRefundPub, q.MyHAKDBase,
+		nd.InProgDual.CoinType, nd.InProgDual.OurAmount+nd.InProgDual.TheirAmount, nd.InProgDual.TheirAmount,
+		elkPointZero, elkPointOne, elkPointTwo, q.State.Data)
+
+	nd.OmniOut <- outMsg
 
 	return
 }
@@ -417,4 +494,273 @@ func (nd *LitNode) BuildDualFundingTransaction() (*wire.MsgTx, error) {
 	txsort.InPlaceSort(tx)
 
 	return tx, nil
+}
+
+// RECIPIENT
+// QChanDescHandler takes in a description of a channel output.  It then
+// saves it to the local db, and returns a channel acknowledgement
+func (nd *LitNode) DualFundChanDescHandler(msg lnutil.ChanDescMsg) {
+
+	fmt.Printf("DualFundChanDescHandler\n")
+
+	wal, ok := nd.SubWallet[msg.CoinType]
+	if !ok {
+		fmt.Printf("DualFundChanDescHandler err no wallet for type %d", msg.CoinType)
+		return
+	}
+
+	// deserialize desc
+	op := msg.Outpoint
+	opArr := lnutil.OutPointToBytes(op)
+	amt := msg.Capacity
+
+	cIdx, err := nd.NextChannelIdx()
+	if err != nil {
+		fmt.Printf("DualFundChanDescHandler err %s", err.Error())
+		return
+	}
+
+	qc := new(Qchan)
+
+	qc.Height = -1
+	qc.KeyGen.Depth = 5
+	qc.KeyGen.Step[0] = 44 | 1<<31
+	qc.KeyGen.Step[1] = msg.CoinType | 1<<31
+	qc.KeyGen.Step[2] = UseChannelFund
+	qc.KeyGen.Step[3] = msg.Peer() | 1<<31
+	qc.KeyGen.Step[4] = cIdx | 1<<31
+	qc.Value = amt
+	qc.Mode = portxo.TxoP2WSHComp
+	qc.Op = op
+
+	qc.TheirPub = msg.PubKey
+	qc.TheirRefundPub = msg.RefundPub
+	qc.TheirHAKDBase = msg.HAKDbase
+	qc.MyPub, _ = nd.GetUsePub(qc.KeyGen, UseChannelFund)
+	qc.MyRefundPub, _ = nd.GetUsePub(qc.KeyGen, UseChannelRefund)
+	qc.MyHAKDBase, _ = nd.GetUsePub(qc.KeyGen, UseChannelHAKDBase)
+
+	// it should go into the next bucket and get the right key index.
+	// but we can't actually check that.
+	//	qc, err := nd.SaveFundTx(
+	//		op, amt, peerArr, theirPub, theirRefundPub, theirHAKDbase)
+	//	if err != nil {
+	//		fmt.Printf("QChanDescHandler SaveFundTx err %s", err.Error())
+	//		return
+	//	}
+	fmt.Printf("got multisig output %s amt %d\n", op.String(), amt)
+
+	// create initial state
+	qc.State = new(StatCom)
+	// similar to SIGREV in pushpull
+
+	// TODO assumes both parties use same fee
+	qc.State.Fee = wal.Fee() * 1000
+	qc.State.MyAmt = msg.InitPayment
+
+	qc.State.Data = msg.Data
+
+	qc.State.StateIdx = 0
+	// use new ElkPoint for signing
+	qc.State.ElkPoint = msg.ElkZero
+	qc.State.NextElkPoint = msg.ElkOne
+	qc.State.N2ElkPoint = msg.ElkTwo
+
+	// save new channel to db
+	err = nd.SaveQChan(qc)
+	if err != nil {
+		fmt.Printf("DualFundChanDescHandler err %s", err.Error())
+		return
+	}
+
+	// load ... the thing I just saved.  why?
+	qc, err = nd.GetQchan(opArr)
+	if err != nil {
+		fmt.Printf("DualFundChanDescHandler GetQchan err %s", err.Error())
+		return
+	}
+
+	// when funding a channel, give them the first *2* elkpoints.
+	theirElkPointZero, err := qc.ElkPoint(false, 0)
+	if err != nil {
+		fmt.Printf("DualFundChanDescHandler err %s", err.Error())
+		return
+	}
+	theirElkPointOne, err := qc.ElkPoint(false, 1)
+	if err != nil {
+		fmt.Printf("DualFundChanDescHandler err %s", err.Error())
+		return
+	}
+
+	theirElkPointTwo, err := qc.N2ElkPointForThem()
+	if err != nil {
+		fmt.Printf("DualFundChanDescHandler err %s", err.Error())
+		return
+	}
+
+	sig, err := nd.SignState(qc)
+	if err != nil {
+		fmt.Printf("DualFundChanDescHandler SignState err %s", err.Error())
+		return
+	}
+
+	fmt.Printf("Acking channel...\n")
+
+	outMsg := lnutil.NewChanAckMsg(
+		msg.Peer(), op,
+		theirElkPointZero, theirElkPointOne, theirElkPointTwo,
+		sig)
+	outMsg.Bytes()
+
+	nd.OmniOut <- outMsg
+
+	return
+}
+
+// FUNDER
+// QChanAckHandler takes in an acknowledgement multisig description.
+// when a multisig outpoint is ackd, that causes the funder to sign and broadcast.
+func (nd *LitNode) DualFundChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePeer) {
+	opArr := lnutil.OutPointToBytes(msg.Outpoint)
+	sig := msg.Signature
+
+	// load channel to save their refund address
+	qc, err := nd.GetQchan(opArr)
+	if err != nil {
+		fmt.Printf("DualFundChanAckHandler GetQchan err %s", err.Error())
+		return
+	}
+
+	//	err = qc.IngestElkrem(revElk)
+	//	if err != nil { // this can't happen because it's the first elk... remove?
+	//		fmt.Printf("QChanAckHandler IngestElkrem err %s", err.Error())
+	//		return
+	//	}
+	qc.State.ElkPoint = msg.ElkZero
+	qc.State.NextElkPoint = msg.ElkOne
+	qc.State.N2ElkPoint = msg.ElkTwo
+
+	err = qc.VerifySig(sig)
+	if err != nil {
+		fmt.Printf("DualFundChanAckHandler VerifySig err %s", err.Error())
+		return
+	}
+
+	// verify worked; Save state 1 to DB
+	err = nd.SaveQchanState(qc)
+	if err != nil {
+		fmt.Printf("DualFundChanAckHandler SaveQchanState err %s", err.Error())
+		return
+	}
+
+	// Make sure everything works & is saved, then clear InProg.
+
+	// sign their com tx to send
+	sig, err = nd.SignState(qc)
+	if err != nil {
+		fmt.Printf("DualFundChanAckHandler SignState err %s", err.Error())
+		return
+	}
+
+	// OK to fund.
+	err = nd.SubWallet[qc.Coin()].ReallySend(&qc.Op.Hash)
+	if err != nil {
+		fmt.Printf("DualFundChanAckHandler ReallySend err %s", err.Error())
+		return
+	}
+
+	err = nd.SubWallet[qc.Coin()].WatchThis(qc.Op)
+	if err != nil {
+		fmt.Printf("DualFundChanAckHandler WatchThis err %s", err.Error())
+		return
+	}
+
+	// tell base wallet about watcher refund address in case that happens
+	// TODO this is weird & ugly... maybe have an export keypath func?
+	nullTxo := new(portxo.PorTxo)
+	nullTxo.Value = 0 // redundant, but explicitly show that this is just for adr
+	nullTxo.KeyGen = qc.KeyGen
+	nullTxo.KeyGen.Step[2] = UseChannelWatchRefund
+	nd.SubWallet[qc.Coin()].ExportUtxo(nullTxo)
+
+	// channel creation is ~complete, clear InProg.
+	// We may be asked to re-send the sig-proof
+
+	result := new(DualFundingResult)
+
+	result.Accepted = true
+	result.ChannelId = qc.KeyGen.Step[4] & 0x7fffffff
+
+	nd.InProgDual.mtx.Lock()
+	nd.InProgDual.done <- result
+	nd.InProgDual.Clear()
+	nd.InProgDual.mtx.Unlock()
+
+	peer.QCs[qc.Idx()] = qc
+	peer.OpMap[opArr] = qc.Idx()
+
+	// sig proof should be sent later once there are confirmations.
+	// it'll have an spv proof of the fund tx.
+	// but for now just send the sig.
+
+	outMsg := lnutil.NewSigProofMsg(msg.Peer(), msg.Outpoint, sig)
+
+	nd.OmniOut <- outMsg
+
+	return
+}
+
+// RECIPIENT
+// SigProofHandler saves the signature the recipient stores.
+// In some cases you don't need this message.
+func (nd *LitNode) DualFundSigProofHandler(msg lnutil.SigProofMsg, peer *RemotePeer) {
+
+	op := msg.Outpoint
+	opArr := lnutil.OutPointToBytes(op)
+
+	qc, err := nd.GetQchan(opArr)
+	if err != nil {
+		fmt.Printf("DualFundSigProofHandler err %s", err.Error())
+		return
+	}
+
+	wal, ok := nd.SubWallet[qc.Coin()]
+	if !ok {
+		fmt.Printf("Not connected to coin type %d\n", qc.Coin())
+		return
+	}
+
+	err = qc.VerifySig(msg.Signature)
+	if err != nil {
+		fmt.Printf("DualFundSigProofHandler err %s", err.Error())
+		return
+	}
+
+	// sig OK, save
+	err = nd.SaveQchanState(qc)
+	if err != nil {
+		fmt.Printf("DualFundSigProofHandler err %s", err.Error())
+		return
+	}
+
+	err = wal.WatchThis(op)
+
+	if err != nil {
+		fmt.Printf("DualFundSigProofHandler err %s", err.Error())
+		return
+	}
+
+	// tell base wallet about watcher refund address in case that happens
+	nullTxo := new(portxo.PorTxo)
+	nullTxo.Value = 0 // redundant, but explicitly show that this is just for adr
+	nullTxo.KeyGen = qc.KeyGen
+	nullTxo.KeyGen.Step[2] = UseChannelWatchRefund
+	wal.ExportUtxo(nullTxo)
+
+	peer.QCs[qc.Idx()] = qc
+	peer.OpMap[opArr] = qc.Idx()
+
+	// sig OK; in terms of UI here's where you can say "payment received"
+	// "channel online" etc
+	return
 }

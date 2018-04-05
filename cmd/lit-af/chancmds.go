@@ -23,7 +23,17 @@ var fundCommand = &Command{
 }
 
 var dualFundCommand = &Command{
-	Format: fmt.Sprintf("%s%s\n", lnutil.White("dualfund"),
+	Format: fmt.Sprintf("%s%s%s\n", lnutil.White("dualfund"),
+		lnutil.ReqColor("subcommand"), lnutil.OptColor("parameters...")),
+	Description: fmt.Sprintf("%s\n%s\n",
+		"Commands for establishing and mutually funding a new lightning channel with the given peer.",
+		"Subcommands: start, accept, decline"),
+
+	ShortDescription: "Commands for dual funding\n",
+}
+
+var dualFundStartCommand = &Command{
+	Format: fmt.Sprintf("%s%s\n", lnutil.White("dualfund start"),
 		lnutil.ReqColor("peer", "coinType", "ourAmount", "theirAmount")),
 	Description: fmt.Sprintf("%s\n%s\n%s\n",
 		"Establish and mutually fund a new lightning channel with the given peer.",
@@ -33,13 +43,13 @@ var dualFundCommand = &Command{
 }
 
 var dualFundDeclineCommand = &Command{
-	Format:           fmt.Sprintf("%s\n", lnutil.White("dualfunddecline")),
+	Format:           fmt.Sprintf("%s\n", lnutil.White("dualfund decline")),
 	Description:      "Declines the pending dual funding request received from another peer (if any)\n",
 	ShortDescription: "Declines the pending dual funding request received from another peer (if any)\n",
 }
 
 var dualFundAcceptCommand = &Command{
-	Format:           fmt.Sprintf("%s\n", lnutil.White("dualfundaccept")),
+	Format:           fmt.Sprintf("%s\n", lnutil.White("dualfund accept")),
 	Description:      "Accepts the pending dual funding request received from another peer (if any)\n",
 	ShortDescription: "Accepts the pending dual funding request received from another peer (if any)\n",
 }
@@ -155,11 +165,21 @@ func (lc *litAfClient) FundChannel(textArgs []string) error {
 	return nil
 }
 
-// Mutually fund a channel
-func (lc *litAfClient) DualFundChannel(textArgs []string) error {
+func (lc *litAfClient) DualFund(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
 		fmt.Fprintf(color.Output, dualFundCommand.Format)
 		fmt.Fprintf(color.Output, dualFundCommand.Description)
+		return nil
+	} else {
+		return fmt.Errorf(dualFundCommand.Format)
+	}
+}
+
+// Mutually fund a channel
+func (lc *litAfClient) DualFundChannel(textArgs []string) error {
+	if len(textArgs) > 0 && textArgs[0] == "-h" {
+		fmt.Fprintf(color.Output, dualFundStartCommand.Format)
+		fmt.Fprintf(color.Output, dualFundStartCommand.Description)
 		return nil
 	}
 
@@ -167,7 +187,7 @@ func (lc *litAfClient) DualFundChannel(textArgs []string) error {
 	reply := new(litrpc.StatusReply)
 
 	if len(textArgs) < 4 {
-		return fmt.Errorf(dualFundCommand.Format)
+		return fmt.Errorf(dualFundStartCommand.Format)
 	}
 
 	peer, err := strconv.Atoi(textArgs[0])
