@@ -176,6 +176,7 @@ func (nd *LitNode) DualFundChannel(
 
 	// wait until it's done!
 	idx := <-nd.InProgDual.done
+
 	return idx, nil
 }
 
@@ -411,6 +412,7 @@ func (nd *LitNode) DualFundingAcceptHandler(msg lnutil.DualFundingAcceptMsg) {
 		return
 	}
 
+	nd.InProgDual.mtx.Unlock()
 	outMsg := lnutil.NewChanDescMsg(
 		nd.InProgDual.PeerIdx, *nd.InProgDual.OutPoint, q.MyPub, q.MyRefundPub, q.MyHAKDBase,
 		nd.InProgDual.CoinType, nd.InProgDual.OurAmount+nd.InProgDual.TheirAmount, nd.InProgDual.TheirAmount,
@@ -606,10 +608,18 @@ func (nd *LitNode) DualFundChanDescHandler(msg lnutil.ChanDescMsg) {
 
 	fmt.Printf("Acking channel...\n")
 
-	outMsg := lnutil.NewChanAckMsg(
+	fundingTx, err := nd.BuildDualFundingTransaction()
+	if err != nil {
+		fmt.Printf("DualFundChanDescHandler BuildDualFundingTransaction err %s", err.Error())
+		return
+	}
+
+	wal.SignMyInputs(fundingTx)
+
+	outMsg := lnutil.NewDualFundingChanAckMsg(
 		msg.Peer(), op,
 		theirElkPointZero, theirElkPointOne, theirElkPointTwo,
-		sig)
+		sig, fundingTx)
 	outMsg.Bytes()
 
 	nd.OmniOut <- outMsg
@@ -620,7 +630,7 @@ func (nd *LitNode) DualFundChanDescHandler(msg lnutil.ChanDescMsg) {
 // FUNDER
 // QChanAckHandler takes in an acknowledgement multisig description.
 // when a multisig outpoint is ackd, that causes the funder to sign and broadcast.
-func (nd *LitNode) DualFundChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePeer) {
+func (nd *LitNode) DualFundChanAckHandler(msg lnutil.DualFundingChanAckMsg, peer *RemotePeer) {
 	opArr := lnutil.OutPointToBytes(msg.Outpoint)
 	sig := msg.Signature
 
@@ -663,11 +673,26 @@ func (nd *LitNode) DualFundChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePee
 	}
 
 	// OK to fund.
-	err = nd.SubWallet[qc.Coin()].ReallySend(&qc.Op.Hash)
+	tx, err := nd.BuildDualFundingTransaction()
 	if err != nil {
-		fmt.Printf("DualFundChanAckHandler ReallySend err %s", err.Error())
+		fmt.Printf("DualFundChanAckHandler BuildDualFundingTransaction err %s", err.Error())
 		return
 	}
+	err = nd.SubWallet[qc.Coin()].SignMyInputs(tx)
+	if err != nil {
+		fmt.Printf("DualFundChanAckHandler SignMyInputs err %s", err.Error())
+		return
+	}
+
+	// Add signatures from peer
+	for i := range msg.SignedFundingTx.TxIn {
+		if (msg.SignedFundingTx.TxIn[i].Witness != nil || msg.SignedFundingTx.TxIn[i].SignatureScript != nil) && tx.TxIn[i].Witness == nil && tx.TxIn[i].SignatureScript == nil {
+			tx.TxIn[i].Witness = msg.SignedFundingTx.TxIn[i].Witness
+			tx.TxIn[i].SignatureScript = msg.SignedFundingTx.TxIn[i].SignatureScript
+		}
+	}
+
+	nd.SubWallet[qc.Coin()].DirectSendTx(tx)
 
 	err = nd.SubWallet[qc.Coin()].WatchThis(qc.Op)
 	if err != nil {
@@ -675,6 +700,7 @@ func (nd *LitNode) DualFundChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePee
 		return
 	}
 
+	fmt.Printf("Registering refund address in the wallet\n")
 	// tell base wallet about watcher refund address in case that happens
 	// TODO this is weird & ugly... maybe have an export keypath func?
 	nullTxo := new(portxo.PorTxo)
@@ -685,11 +711,12 @@ func (nd *LitNode) DualFundChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePee
 
 	// channel creation is ~complete, clear InProg.
 	// We may be asked to re-send the sig-proof
-
 	result := new(DualFundingResult)
 
 	result.Accepted = true
 	result.ChannelId = qc.KeyGen.Step[4] & 0x7fffffff
+
+	fmt.Printf("Built result with channel ID %d, committing...\n", result.ChannelId)
 
 	nd.InProgDual.mtx.Lock()
 	nd.InProgDual.done <- result
@@ -702,6 +729,7 @@ func (nd *LitNode) DualFundChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePee
 	// sig proof should be sent later once there are confirmations.
 	// it'll have an spv proof of the fund tx.
 	// but for now just send the sig.
+	fmt.Printf("Sending sigproof\n")
 
 	outMsg := lnutil.NewSigProofMsg(msg.Peer(), msg.Outpoint, sig)
 

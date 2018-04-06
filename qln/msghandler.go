@@ -217,7 +217,7 @@ func (nd *LitNode) DualFundingHandler(msg lnutil.LitMsg, peer *RemotePeer) error
 		nd.DualFundChanDescHandler(message)
 		return nil
 
-	case lnutil.ChanAckMsg: // CHANNEL ACKNOWLEDGE
+	case lnutil.DualFundingChanAckMsg: // CHANNEL ACKNOWLEDGE
 		fmt.Printf("Got (dual funding) channel acknowledgement from %x\n", msg.Peer())
 
 		nd.DualFundChanAckHandler(message, peer)

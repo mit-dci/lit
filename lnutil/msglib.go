@@ -1,6 +1,7 @@
 package lnutil
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/binary"
 	"fmt"
@@ -49,8 +50,7 @@ const (
 	MSGID_DUALFUNDINGREQ     = 0x80 // Requests funding details (UTXOs, Change address, Pubkey), including our own details and amount needed.
 	MSGID_DUALFUNDINGACCEPT  = 0x81 // Responds with funding details
 	MSGID_DUALFUNDINGDECL    = 0x82 // Declines the funding request
-	MSGID_DUALFUNDINGSIGREQ  = 0x83 // Requests signatures for the funding TX while transmitting our own.
-	MSGID_DUALFUNDINGSIGRESP = 0x84 // Responds with funding TX signatures
+	MSGID_DUALFUNDINGCHANACK = 0x83 // Acknowledges channel and sends along signatures for funding
 )
 
 //interface that all messages follow, for easy use
@@ -127,6 +127,8 @@ func LitMsgFromBytes(b []byte, peerid uint32) (LitMsg, error) {
 		return NewDualFundingAcceptMsgFromBytes(b, peerid)
 	case MSGID_DUALFUNDINGDECL:
 		return NewDualFundingDeclMsgFromBytes(b, peerid)
+	case MSGID_DUALFUNDINGCHANACK:
+		return NewDualFundingChanAckMsgFromBytes(b, peerid)
 
 		/*
 			case MSGID_DUALFUNDINGRESP:
@@ -1178,3 +1180,80 @@ func (self DualFundingAcceptMsg) Bytes() []byte {
 
 func (self DualFundingAcceptMsg) Peer() uint32   { return self.PeerIdx }
 func (self DualFundingAcceptMsg) MsgType() uint8 { return MSGID_DUALFUNDINGACCEPT }
+
+//message for channel acknowledgement and funding signatures
+type DualFundingChanAckMsg struct {
+	PeerIdx         uint32
+	Outpoint        wire.OutPoint
+	ElkZero         [33]byte
+	ElkOne          [33]byte
+	ElkTwo          [33]byte
+	Signature       [64]byte
+	SignedFundingTx *wire.MsgTx
+}
+
+func NewDualFundingChanAckMsg(peerid uint32, OP wire.OutPoint, ELKZero [33]byte, ELKOne [33]byte, ELKTwo [33]byte, SIG [64]byte, signedFundingTx *wire.MsgTx) DualFundingChanAckMsg {
+	ca := new(DualFundingChanAckMsg)
+	ca.PeerIdx = peerid
+	ca.Outpoint = OP
+	ca.ElkZero = ELKZero
+	ca.ElkOne = ELKOne
+	ca.ElkTwo = ELKTwo
+	ca.Signature = SIG
+	ca.SignedFundingTx = signedFundingTx
+	return *ca
+}
+
+func NewDualFundingChanAckMsgFromBytes(b []byte, peerid uint32) (DualFundingChanAckMsg, error) {
+	cm := new(DualFundingChanAckMsg)
+	cm.PeerIdx = peerid
+
+	if len(b) < 208 {
+		return *cm, fmt.Errorf("got %d byte DualFundingChanAck, expect 212 or more", len(b))
+	}
+
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
+
+	var op [36]byte
+	copy(op[:], buf.Next(36))
+	cm.Outpoint = *OutPointFromBytes(op)
+	copy(cm.ElkZero[:], buf.Next(33))
+	copy(cm.ElkOne[:], buf.Next(33))
+	copy(cm.ElkTwo[:], buf.Next(33))
+	copy(cm.Signature[:], buf.Next(64))
+
+	var txLen uint64
+	_ = binary.Read(buf, binary.BigEndian, &txLen)
+	expectedLength := uint64(208) + txLen
+
+	if uint64(len(b)) < expectedLength {
+		return *cm, fmt.Errorf("DualFundingChanAckMsg %d bytes, expect at least %d for %d byte tx", len(b), expectedLength, txLen)
+	}
+
+	cm.SignedFundingTx = wire.NewMsgTx()
+	cm.SignedFundingTx.Deserialize(buf)
+
+	return *cm, nil
+}
+
+func (self DualFundingChanAckMsg) Bytes() []byte {
+	var buf bytes.Buffer
+
+	opArr := OutPointToBytes(self.Outpoint)
+	buf.WriteByte(self.MsgType())
+	buf.Write(opArr[:])
+	buf.Write(self.ElkZero[:])
+	buf.Write(self.ElkOne[:])
+	buf.Write(self.ElkTwo[:])
+	buf.Write(self.Signature[:])
+
+	binary.Write(&buf, binary.BigEndian, uint64(self.SignedFundingTx.SerializeSize()))
+	writer := bufio.NewWriter(&buf)
+	self.SignedFundingTx.Serialize(writer)
+	writer.Flush()
+
+	return buf.Bytes()
+}
+
+func (self DualFundingChanAckMsg) Peer() uint32   { return self.PeerIdx }
+func (self DualFundingChanAckMsg) MsgType() uint8 { return MSGID_DUALFUNDINGCHANACK }
