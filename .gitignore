@@ -1,5 +1,6 @@
 lit
 cmd/lit-af/lit-af
+cmd/glit/glit
 cmd/dlcoracle/dlcoracle
 headers.bin
 ln.db
