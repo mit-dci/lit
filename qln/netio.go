@@ -41,6 +41,11 @@ func (nd *LitNode) TCPListener(
 
 	adr := lnutil.LitAdrFromPubkey(idPub)
 
+	err = Announce(idPriv, lisIpPort, adr, nd.TrackerURL)
+	if err != nil {
+		log.Printf("Announcement error %s", err.Error())
+	}
+
 	fmt.Printf("Listening on %s\n", listener.Addr().String())
 	fmt.Printf("Listening with ln address: %s \n", adr)
 
@@ -56,10 +61,10 @@ func (nd *LitNode) TCPListener(
 				fmt.Printf("Got something that wasn't a LNDC")
 				continue
 			}
-			fmt.Printf("Incomming connection from %x on %s\n",
+			fmt.Printf("Incoming connection from %x on %s\n",
 				newConn.RemotePub.SerializeCompressed(), newConn.RemoteAddr().String())
 
-			// don't save host/port for incomming connections
+			// don't save host/port for incoming connections
 			peerIdx, err := nd.GetPeerIdx(newConn.RemotePub, "")
 			if err != nil {
 				log.Printf("Listener error: %s\n", err.Error())
@@ -98,6 +103,14 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 		return fmt.Errorf("ln address %s invalid", who)
 	}
 
+	// If we couldn't deduce a URL, look it up on the tracker
+	if where == "" {
+		where, err = Lookup(who, nd.TrackerURL)
+		if err != nil {
+			return err
+		}
+	}
+
 	// get my private ID key
 	idPriv := nd.IdKey()
 
@@ -110,7 +123,7 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 	}
 
 	// if connect is successful, either query for already existing peer index, or
-	// if the peer is new, make an new index, and save the hostname&port
+	// if the peer is new, make a new index, and save the hostname&port
 
 	// figure out peer index, or assign new one for new peer.  Since
 	// we're connecting out, also specify the hostname&port
@@ -166,8 +179,6 @@ type PeerInfo struct {
 }
 
 func (nd *LitNode) GetConnectedPeerList() []PeerInfo {
-	nd.RemoteMtx.Lock()
-	nd.RemoteMtx.Unlock() //TODO: This unlock is in the wrong place...?
 	var peers []PeerInfo
 	for k, v := range nd.RemoteCons {
 		var newPeer PeerInfo

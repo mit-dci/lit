@@ -15,7 +15,7 @@ from litpy import litrpc
 LIT_BIN = "%s/../lit" % os.path.abspath(os.path.dirname(__file__))
 
 logger = logging.getLogger("TestFramework.litnode")
-logger.propogate = False
+logger.propagate = False
 
 class LitNode():
     """A class representing a Lit node"""
@@ -31,9 +31,9 @@ class LitNode():
         with open(self.data_dir + "/privkey.hex", 'w+') as f:
             f.write("1" * 63 + str(self.index) + "\n")
 
-        self.args = ["-dir", self.data_dir]
+        self.args = ["--dir", self.data_dir]
         # disable auto-connect to testnet3 and litetest4
-        self.args.extend(['-tn3', '', '-lt4', ''])
+        self.args.extend(['--tn3', '', '--lt4', ''])
 
         self.rpc = None
 
@@ -69,3 +69,7 @@ class LitNode():
             if balance['CoinType'] == coin_type:
                 return balance
         raise AssertionError("No balance for coin_type %s" % coin_type)
+
+    def get_height(self, coin_type):
+        # convenience method for grabbing the sync height
+        return self.get_balance(coin_type)['SyncHeight']

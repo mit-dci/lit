@@ -15,7 +15,7 @@ import (
 
 // Init starts up a lit node.  Needs priv key, and a path.
 // Does not activate a subwallet; do that after init.
-func NewLitNode(privKey *[32]byte, path string) (*LitNode, error) {
+func NewLitNode(privKey *[32]byte, path string, trackerURL string) (*LitNode, error) {
 
 	nd := new(LitNode)
 	nd.LitFolder = path
@@ -45,6 +45,10 @@ func NewLitNode(privKey *[32]byte, path string) (*LitNode, error) {
 		return nil, err
 	}
 
+	nd.TrackerURL = trackerURL
+
+	nd.InitRouting()
+
 	// optional tower activation
 
 	nd.Tower = new(watchtower.WatchTower)
@@ -69,7 +73,7 @@ func NewLitNode(privKey *[32]byte, path string) (*LitNode, error) {
 
 // LinkBaseWallet activates a wallet and hooks it into the litnode.
 func (nd *LitNode) LinkBaseWallet(
-	privKey *[32]byte, birthHeight int32, resync bool,
+	privKey *[32]byte, birthHeight int32, resync bool, tower bool,
 	host string, param *coinparam.Params) error {
 
 	rootpriv, err := hdkeychain.NewMaster(privKey[:], param)
@@ -82,6 +86,11 @@ func (nd *LitNode) LinkBaseWallet(
 	// see if we've already attached a wallet for this coin type
 	if nd.SubWallet[WallitIdx] != nil {
 		return fmt.Errorf("coin type %d already linked", WallitIdx)
+	}
+	// see if startheight is below allowed with coinparam
+	if birthHeight < param.StartHeight {
+		return fmt.Errorf("%s birth height give as %d, but parameters start at %d",
+			param.Name, birthHeight, param.StartHeight)
 	}
 
 	// see if there are other wallets already linked
@@ -104,10 +113,12 @@ func (nd *LitNode) LinkBaseWallet(
 	// if this node is running a watchtower, link the watchtower to the
 	// new wallet block events
 
-	err = nd.Tower.HookLink(
-		nd.LitFolder, param, nd.SubWallet[WallitIdx].ExportHook())
-	if err != nil {
-		return err
+	if tower {
+		err = nd.Tower.HookLink(
+			nd.LitFolder, param, nd.SubWallet[WallitIdx].ExportHook())
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

@@ -53,6 +53,12 @@ func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) er
 		if msg.MsgType() == lnutil.MSGID_WATCH_DELETE {
 			nd.Tower.DeleteChannel(msg.(lnutil.WatchDelMsg))
 		}
+
+	case 0x70: // Routing messages
+		if msg.MsgType() == lnutil.MSGID_LINK_DESC {
+			nd.LinkMsgHandler(msg.(lnutil.LinkMsg))
+		}
+
 	default:
 		return fmt.Errorf("Unknown message id byte %x &f0", msg.MsgType())
 
@@ -75,7 +81,7 @@ func (nd *LitNode) LNDCReader(peer *RemotePeer) error {
 	var opArr [36]byte
 	// make a local map of outpoints to channel indexes
 	peer.OpMap = make(map[[36]byte]uint32)
-	// inerate through all this peer's channels to extract outpoints
+	// iterate through all this peer's channels to extract outpoints
 	for _, q := range peer.QCs {
 		opArr = lnutil.OutPointToBytes(q.Op)
 		peer.OpMap[opArr] = q.Idx()

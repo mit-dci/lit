@@ -2,11 +2,10 @@ package coinparam
 
 import (
 	"time"
-	"io"
 
 	"github.com/adiabat/btcd/chaincfg/chainhash"
 	"github.com/adiabat/btcd/wire"
-	
+
 	"golang.org/x/crypto/scrypt"
 )
 
@@ -22,28 +21,26 @@ var LiteCoinTestNet4Params = Params{
 	},
 
 	// Chain parameters
-	GenesisBlock:             &bc2GenesisBlock, // no it's not
-	GenesisHash:              &liteCoinTestNet4GenesisHash,
-	PoWFunction:              func(b []byte) chainhash.Hash {
-                                  scryptBytes, _ := scrypt.Key(b, b, 1024, 1, 1, 32)
-                                  asChainHash, _ := chainhash.NewHash(scryptBytes)
-                                  return *asChainHash
-                              },
-    DiffCalcFunction:         func(r io.ReadSeeker, height, startheight int32, p *Params) (uint32, error) {
-                                  return diffBTC(r, height, startheight, p, true)
-                              },
-    StartHeader:              [80]byte{
-                                    0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-                                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-                                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-                                    0xd9, 0xce, 0xd4, 0xed, 0x11, 0x30, 0xf7, 0xb7, 0xfa, 0xad, 0x9b, 0xe2, 
-                                    0x53, 0x23, 0xff, 0xaf, 0xa3, 0x32, 0x32, 0xa1, 0x7c, 0x3e, 0xdf, 0x6c, 
-                                    0xfd, 0x97, 0xbe, 0xe6, 0xba, 0xfb, 0xdd, 0x97, 0xf6, 0x0b, 0xa1, 0x58, 
-                                    0xf0, 0xff, 0x0f, 0x1e, 0xe1, 0x79, 0x04, 0x00,
-                              },
-    StartHeight:              48384,
-    AssumeDiffBefore:         50401,
-    FeePerByte:               800,
+	GenesisBlock: &bc2GenesisBlock, // no it's not
+	GenesisHash:  &liteCoinTestNet4GenesisHash,
+	PoWFunction: func(b []byte, height int32) chainhash.Hash {
+		scryptBytes, _ := scrypt.Key(b, b, 1024, 1, 1, 32)
+		asChainHash, _ := chainhash.NewHash(scryptBytes)
+		return *asChainHash
+	},
+	DiffCalcFunction: diffBitcoin,
+	StartHeader: [80]byte{
+		0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0xd9, 0xce, 0xd4, 0xed, 0x11, 0x30, 0xf7, 0xb7, 0xfa, 0xad, 0x9b, 0xe2,
+		0x53, 0x23, 0xff, 0xaf, 0xa3, 0x32, 0x32, 0xa1, 0x7c, 0x3e, 0xdf, 0x6c,
+		0xfd, 0x97, 0xbe, 0xe6, 0xba, 0xfb, 0xdd, 0x97, 0xf6, 0x0b, 0xa1, 0x58,
+		0xf0, 0xff, 0x0f, 0x1e, 0xe1, 0x79, 0x04, 0x00,
+	},
+	StartHeight:              48384,
+	AssumeDiffBefore:         50401,
+	FeePerByte:               800,
 	PowLimit:                 liteCoinTestNet4PowLimit,
 	PowLimitBits:             0x1e0fffff,
 	CoinbaseMaturity:         100,
@@ -94,17 +91,15 @@ var LiteRegNetParams = Params{
 	DNSSeeds:      []string{},
 
 	// Chain parameters
-	GenesisBlock:             &liteCoinRegTestGenesisBlock, // no it's not
-	GenesisHash:              &liteCoinRegTestGenesisHash,
-	PoWFunction:              func(b []byte) chainhash.Hash {
-                                  scryptBytes, _ := scrypt.Key(b, b, 1024, 1, 1, 32)
-                                  asChainHash, _ := chainhash.NewHash(scryptBytes)
-                                  return *asChainHash
-                              },
-    DiffCalcFunction:         func(r io.ReadSeeker, height, startheight int32, p *Params) (uint32, error) {
-                                  return diffBTC(r, height, startheight, p, true)
-                              },
-    FeePerByte:               800,
+	GenesisBlock: &liteCoinRegTestGenesisBlock, // no it's not
+	GenesisHash:  &liteCoinRegTestGenesisHash,
+	PoWFunction: func(b []byte, height int32) chainhash.Hash {
+		scryptBytes, _ := scrypt.Key(b, b, 1024, 1, 1, 32)
+		asChainHash, _ := chainhash.NewHash(scryptBytes)
+		return *asChainHash
+	},
+	DiffCalcFunction:         diffBitcoin,
+	FeePerByte:               800,
 	PowLimit:                 regressionPowLimit,
 	PowLimitBits:             0x207fffff,
 	CoinbaseMaturity:         100,

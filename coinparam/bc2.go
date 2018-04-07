@@ -2,7 +2,6 @@ package coinparam
 
 import (
 	"time"
-	"io"
 
 	"github.com/adiabat/btcd/chaincfg/chainhash"
 	"github.com/adiabat/btcd/wire"
@@ -16,13 +15,13 @@ var BC2NetParams = Params{
 	DNSSeeds:      []string{},
 
 	// Chain parameters
-	GenesisBlock:             &bc2GenesisBlock,
-	GenesisHash:              &bc2GenesisHash,
-	PoWFunction:		      chainhash.DoubleHashH,
-    DiffCalcFunction:         func(r io.ReadSeeker, height, startheight int32, p *Params) (uint32, error) {
-                                  return diffBTC(r, height, startheight, p, false)
-                              },
-    FeePerByte:               80,
+	GenesisBlock: &bc2GenesisBlock,
+	GenesisHash:  &bc2GenesisHash,
+	PoWFunction: func(b []byte, height int32) chainhash.Hash {
+		return chainhash.DoubleHashH(b)
+	},
+	DiffCalcFunction:         diffBitcoin,
+	FeePerByte:               80,
 	PowLimit:                 bc2NetPowLimit,
 	PowLimitBits:             0x1d7fffff,
 	CoinbaseMaturity:         10,
@@ -63,6 +62,8 @@ var BC2NetParams = Params{
 	// BIP44 coin type used in the hierarchical deterministic path for
 	// address generation.
 	HDCoinType: 2,
+
+	TestCoin: true,
 }
 
 // bc2GenesisHash is the hash of the first block in the block chain for the

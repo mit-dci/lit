@@ -15,13 +15,12 @@ However, currently adiabat is the maintainer / lead dev and has full access to t
 - Make pull requests to fix these issues
 - Add features (squash them if more than a few commits).  If it's a big change, discuss with people beforehand.  adiabat is on IRC in the various bitcoin-related channels.
 
-### Code practices / philosopy
+### Code practices / philosophy
 
 Imports are scary.  Standard library is better if possible.  More "not invented here" than "invented here" syndrome.
 
 Go is in general pretty strict about formatting with go fmt, so as long as it's been go fmt'ed, there isn't too much to argue about.  That said:
 
-Keep go code to 80 characters per line if feasable.
+Keep go code to 80 characters per line if feasible.
 
 1 letter variable names are OK for "self" in a method, or iterators (i, j, k).  Other in-function variable names should be a bit more descriptive, and names of functions and fields which are exported should have descriptive, CamelCase names.
-

@@ -70,6 +70,96 @@ func TestElkremLess(t *testing.T) {
 	}
 }
 
+// TestElkremIngestLeftFail puts a bed hash in such that the left child will fail
+func TestElkremIngestLeftFail(t *testing.T) {
+	sndr := NewElkremSender(chainhash.DoubleHashH([]byte("elkfailL")))
+	var rcv ElkremReceiver
+	for n := uint64(0); n < 31; n++ {
+		sha, err := sndr.AtIndex(n)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = rcv.AddNext(sha)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// This is correct but we can't check; anything will be accepted
+	sha, err := sndr.AtIndex(31)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// flip all the bits in the first byte
+	sha[0] ^= 0xff
+	err = rcv.AddNext(sha)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// give the right thing here, but it's too late as 31 was wrong
+	sha, err = sndr.AtIndex(32)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = rcv.AddNext(sha)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sha, err = sndr.AtIndex(33)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = rcv.AddNext(sha)
+	if err == nil {
+		t.Fatalf("Should have a left child mismatch, but everything went OK!")
+	}
+}
+
+// TestElkremIngestRightFail puts a bed hash in such that the left child will fail
+func TestElkremIngestRightFail(t *testing.T) {
+	sndr := NewElkremSender(chainhash.DoubleHashH([]byte("elkfailR")))
+	var rcv ElkremReceiver
+	for n := uint64(0); n < 31; n++ {
+		sha, err := sndr.AtIndex(n)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = rcv.AddNext(sha)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// This is correct but we can't check; anything will be accepted
+	sha, err := sndr.AtIndex(31)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = rcv.AddNext(sha)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sha, err = sndr.AtIndex(32)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// flip all the bits in the first byte
+	sha[0] ^= 0xff
+	err = rcv.AddNext(sha)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sha, err = sndr.AtIndex(33)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = rcv.AddNext(sha)
+	if err == nil {
+		t.Fatalf("Should have a right child mismatch, but everything went OK!")
+	}
+}
+
 func TestFixed(t *testing.T) {
 	root, _ := chainhash.NewHashFromStr(
 		"b43614f251760d689adf84211148a40d7dee13967b7109e13c8d1437a4966d58")

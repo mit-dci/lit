@@ -1,17 +1,23 @@
 lit
 cmd/lit-af/lit-af
+cmd/glit/glit
 cmd/dlcoracle/dlcoracle
 headers.bin
 ln.db
 testkey.hex
 utxo.db
 watch.db
+setup.sh
+
 
 *.pyc
 
 #Editor temp files
 \#*
 .\#*
+
+#Windows Specific
+*.exe
 
 ### Vim ###
 # swap

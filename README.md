@@ -1,5 +1,6 @@
-# lit - a lightning node you can run on your pwn
+# lit - a lightning node you can run on your own
 ![Lit Logo](litlogo145.png)
+[![Coverage Status](https://coveralls.io/repos/github/mit-dci/lit/badge.svg)](https://coveralls.io/github/mit-dci/lit)
 
 Under development, not for use with real money.
 
@@ -10,12 +11,12 @@ Under development, not for use with real money.
 
 ### Installing
 
-1. Start by installing Go 
+1. Start by installing Go
  - [Go Installation](https://golang.org/doc/install)
 
 2. Set your Go variables to match your installed paths are set correctly:
 - `.../go/bin` (your install location) is in `$PATH` (Windows: Add the install location into your `PATH` System Variable)
-- `$GOPATH` is set the location of where you want lit (and other projects) to be 
+- `$GOPATH` is set the location of where you want lit (and other projects) to be
 -  optional: If you want to have packages download in a separate location than your installation add `$GOROOT` set to another location (Windows: Add )
 
 3. Download the lit project with `go get github.com/mit-dci/lit`
@@ -37,12 +38,7 @@ cannot find package [packageName]
 ...
 ```
 
-3. For each unfound package, you will need to use go to download these libraries into your GOPATH. For each outer package use `go get` to download the repositories.
-
-i.e.
-```
-go get golang.org/x/crypto
-```
+3. In order to download all missing packages, do `go get ./...` or `go get .`
 
 4. Go back to location of the lit folder if you are not already there ([Step 1](#building)) and try to rebuild the project.
 
@@ -52,18 +48,17 @@ cd cmd/lit-af
 go build
 ```
 
-6. If you run into any more dependency errors, repeat Step 3 by using `go get` for all of the missing packages.
-
-7. To run lit use: 
-(Note : Windows users can take off ./ but may need to change lit to lit.exe in the second line.) 
+6. To run lit use:
+(Note : Windows users can take off ./ but may need to change lit to lit.exe in the second line.)
 ```
-cd GOPATH/src/github.com/mit-dci/lit 
-./lit -spv my.testnet.node.tld
+cd GOPATH/src/github.com/mit-dci/lit
+./lit --tn3 true
 ```
+The words `true`, `yes`, `1` can be used to specify that lit automatically connect to a set of populated seeds. It can also be replaced by the ip of the remote node you wish to connect to.
 
 ## Using Lightning
 
-Great! Now that you are all done setting up lit, you can 
+Great! Now that you are all done setting up lit, you can
 - read about the arguments for starting lit [here](#command-line-arguments)
 - read about the folders for the code and what does what [here](#folders)
 - head over to the [Walkthrough](./WALKTHROUGH.md) to create some lit nodes or
@@ -78,91 +73,39 @@ When starting lit, the following command line arguments are available
 
 #### connecting to networks:
 
--tn3 <nodeHostName>
+| Arguments                   | Details                                                      | Default Port  |
+| --------------------------- |--------------------------------------------------------------| ------------- |
+| `--tn3 <nodeHostName>`      | connect to `nodeHostName`, which is a bitcoin testnet3 node. | 18333         |
+| `--reg <nodeHostName>`      | connect to `nodeHostName`, which is a bitcoin regtest node.  | 18444         |
+| `--lt4 <nodeHostName>`      | connect to `nodeHostName`, which is a litecoin testnet4 node.| 19335         |
 
-connect to nodeHostName, which is a bitcoin testnet3 node.  Default port 18333
+#### other settings:
 
--reg <nodeHostName>
-
-connect to <nodeHostName>, which is a bitcoin regtest node.  Default port 18444
-
--lt4 <nodeHostName>
-
-connect to <nodeHostName>, which is a litecoin testnet4 node.  Default port 19335
-
-#### other settings
-
--ez
-
-use bloom filters unstead of downloading the whole block.  This fucntionality hasn't been maintained for a few months and may not work properly.
-
--v
-
-Verbose; log everything to stdout as well as the lit.log file.  Lots of text.
-
--dir <folderPath>
-
-use <folderPath> as the directory.  By default, saves to ~/.lit/
-
--rpcport <portNumber>
-
-listen for RPC clients on port <portNumber>.  Defaults to 8001.  Useful when you want to run multiple lit nodes on the same computer (also need the -dir option)
-
--tip <height>
-
-start synchronization of the blockchain from <height>.  (probably doesn't work right now)
-
--resync
-
-try to re-sync to the blockchain from the height given -tip
-
+| Arguments                   | Details                                                      |
+| --------------------------- |--------------------------------------------------------------|
+| `-v` or `--verbose`         | Verbose; log everything to stdout as well as the lit.log file.  Lots of text.|
+| `--dir <folderPath>`        | use `folderPath` as the directory.  By default, saves to `~/.lit/` |
+| `-p` or `--rpcport <portNumber>` | listen for RPC clients on port `portNumber`.  Defaults to `8001`.  Useful when you want to run multiple lit nodes on the same computer (also need the `--dir` option) |
+| `-r` or `--reSync`          | try to re-sync to the blockchain from the height given `-tip` |
 
 ## Folders
 
-### cmd
-has some rpc client code to interact with the lit node.  Not much there yet
-
-### elkrem
-a hash-tree for storing log(n) items instead of n
-
-### litbamf
-Lightning Network Browser Actuated Multi-Functionality -- web gui for lit
-
-### litrpc
-websocket based RPC connection
-
-### lndc
-lightning network data connection -- send encrypted / authenticated messages between nodes
-
-### lnutil
-some widely used utility functions
-
-### portxo
-portable utxo format, exchangable between node and base wallet (or between wallets).  Should make this into a BIP once it's more stable.
-
-### powless
-Introduces a web API chainhook in addition to the uspv one
-
-### qln
-A quick channel implementation with databases.  Doesn't do multihop yet.
-
-### sig64
-Library to make signatures 64 bytes instead of 71 or 72 or something
-
-### test
-integration tests
-
-### uspv
-deals with the network layer, sending network messages and filtering what to hand over to wallit
-
-### wallit
-deals with storing and retreiving utxos, creating and signing transactions
-
-### watchtower
-Unlinkable outsourcing of channel monitoring
-
-
-
+| Folder Name  | Details                                                                                                                                  |
+|:-------------|:-----------------------------------------------------------------------------------------------------------------------------------------|
+| `cmd`        | Has some rpc client code to interact with the lit node.  Not much there yet                                                              |
+| `elkrem`     | A hash-tree for storing `log(n)` items instead of n                                                                                      |
+| `litbamf`    | Lightning Network Browser Actuated Multi-Functionality -- web gui for lit                                                                |
+| `litrpc`     | Websocket based RPC connection                                                                                                           |
+| `lndc`       | Lightning network data connection -- send encrypted / authenticated messages between nodes                                               |
+| `lnutil`     | Some widely used utility functions                                                                                                       |
+| `portxo`     | Portable utxo format, exchangable between node and base wallet (or between wallets).  Should make this into a BIP once it's more stable. |
+| `powless`    | Introduces a web API chainhook in addition to the uspv one                                                                               |
+| `qln`        | A quick channel implementation with databases.  Doesn't do multihop yet.                                                                 |
+| `sig64`      | Library to make signatures 64 bytes instead of 71 or 72 or something                                                                     |
+| `test`       | Integration tests                                                                                                                        |
+| `uspv`       | Deals with the network layer, sending network messages and filtering what to hand over to `wallit`                                       |
+| `wallit`     | Deals with storing and retrieving utxos, creating and signing transactions                                                               |
+| `watchtower` | Unlinkable outsourcing of channel monitoring                                                                                             |
 
 ### Hierarchy of packages
 

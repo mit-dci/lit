@@ -28,29 +28,47 @@ func ExtractFromTx(tx *wire.MsgTx, idx uint32) (*PorTxo, error) {
 	u.Mode = TxoUnknownMode // default to unknown mode
 
 	// check if mode can be determined from the pkscript
-	pks := tx.TxOut[idx].PkScript
-
-	// check for p2pkh
-	if len(pks) == 25 && pks[0] == 0x76 && pks[1] == 0xa9 && pks[2] == 0x14 &&
-		pks[23] == 0x88 && pks[24] == 0xac {
-
-		u.Mode = TxoP2PKHComp // assume compressed
-
-	}
-
-	// check for witness key hash
-	if len(pks) == 22 && pks[0] == 0x00 && pks[1] == 0x14 {
-		u.Mode = TxoP2WPKHComp // assume compressed
-	}
-
-	// check for witness script hash
-	if len(pks) == 34 && pks[0] == 0x00 && pks[1] == 0x20 {
-		u.Mode = TxoP2WSHComp // does compressed even mean anything for SH..?
-	}
+	u.Mode = TxoModeFromPkScript(tx.TxOut[idx].PkScript)
 
 	// copy pkscript into portxo
 	u.PkScript = tx.TxOut[idx].PkScript
 
 	//done
 	return u, nil
+}
+
+func TxoModeFromPkScript(script []byte) TxoMode {
+	// start with unknown
+	var mode TxoMode
+
+	mode = TxoUnknownMode
+
+	if script == nil {
+		return mode
+	}
+
+	// check for p2pk
+	if len(script) == 35 && script[0] == 0x21 && script[34] == 0xac {
+		mode = TxoP2PKComp
+	}
+
+	// check for p2pkh
+	if len(script) == 25 && script[0] == 0x76 && script[1] == 0xa9 &&
+		script[2] == 0x14 && script[23] == 0x88 && script[24] == 0xac {
+
+		mode = TxoP2PKHComp // assume compressed
+	}
+
+	// check for witness key hash
+	if len(script) == 22 && script[0] == 0x00 && script[1] == 0x14 {
+		mode = TxoP2WPKHComp // assume compressed
+	}
+
+	// check for witness script hash
+	if len(script) == 34 && script[0] == 0x00 && script[1] == 0x20 {
+		mode = TxoP2WSHComp // does compressed even mean anything for SH..?
+	}
+
+	// couldn't find anything, unknown
+	return mode
 }

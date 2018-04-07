@@ -17,7 +17,7 @@ const (
 	headerFileName = "headers.bin"
 
 	// version hardcoded for now, probably ok...?
-	// 70012 is for segnet... make this a init var?
+	// 70012 is for segnet... make this an init var?
 	VERSION = 70012
 )
 
@@ -158,18 +158,6 @@ func NewRootAndHeight(b chainhash.Hash, h int32) (hah HashAndHeight) {
 	return
 }
 
-func (s *SPVCon) RemoveHeaders(r int32) error {
-	endPos, err := s.headerFile.Seek(0, os.SEEK_END)
-	if err != nil {
-		return err
-	}
-	err = s.headerFile.Truncate(endPos - int64(r*80))
-	if err != nil {
-		return fmt.Errorf("couldn't truncate header file")
-	}
-	return nil
-}
-
 func (s *SPVCon) IngestMerkleBlock(m *wire.MsgMerkleBlock) {
 
 	txids, err := checkMBlock(m) // check self-consistency
@@ -221,11 +209,18 @@ func (s *SPVCon) IngestMerkleBlock(m *wire.MsgMerkleBlock) {
 	return
 }
 
-// IngestHeaders takes in a bunch of headers and appends them to the
-// local header file, checking that they fit.  If there's no headers,
-// it assumes we're done and returns false.  If it worked it assumes there's
-// more to request and returns true.
+// IngestHeaders takes in a bunch of headers, checks them,
+// and if they're OK, appends them to the local header file.
+// If there are no headers, it assumes we're done and returns false.
+// Otherwise it assumes there's more to request and returns true.
 func (s *SPVCon) IngestHeaders(m *wire.MsgHeaders) (bool, error) {
+
+	// headerChainLength is how many headers we give to the
+	// verification function.  In bitcoin you never need more than 2016 previous
+	// headers to figure out the validity of the next; some alcoins need more
+	// though, like 4K or so.
+	//	headerChainLength := 4096
+
 	gotNum := int64(len(m.Headers))
 	if gotNum > 0 {
 		log.Printf("got %d headers. Range:\n%s - %s\n",
@@ -237,114 +232,92 @@ func (s *SPVCon) IngestHeaders(m *wire.MsgHeaders) (bool, error) {
 	}
 
 	s.headerMutex.Lock()
+	// even though we will be doing a bunch without writing, should be
+	// OK performance-wise to keep it locked for this function duration,
+	// because verification is pretty quick.
 	defer s.headerMutex.Unlock()
 
-	var err error
-	// seek to last header
-	_, err = s.headerFile.Seek(-80, os.SEEK_END)
+	reorgHeight, err := CheckHeaderChain(s.headerFile, m.Headers, s.Param)
 	if err != nil {
-		return false, err
-	}
-	var last wire.BlockHeader
-	err = last.Deserialize(s.headerFile)
-	if err != nil {
-		return false, err
-	}
-	prevHash := last.BlockHash()
-
-	endPos, err := s.headerFile.Seek(0, os.SEEK_END)
-	if err != nil {
-		return false, err
-	}
-	tip := int32(endPos/80) + (s.headerStartHeight - 1) // move back 1 header length to read
-
-	// check first header returned to make sure it fits on the end
-	// of our header file
-	if !m.Headers[0].PrevBlock.IsEqual(&prevHash) {
-		// delete 100 headers if this happens!  Dumb reorg.
-		log.Printf("reorg? header msg doesn't fit. points to %s, expect %s",
-			m.Headers[0].PrevBlock.String(), prevHash.String())
-		if endPos < 8160 {
-			// jeez I give up, back to genesis
-			s.headerFile.Truncate(160)
-		} else {
-			err = s.headerFile.Truncate(endPos - 8000)
-			if err != nil {
-				return false, fmt.Errorf("couldn't truncate header file")
-			}
+		// insufficient depth reorg means we're still trying to sync up?
+		// really, the re-org hasn't been proven; if the remote node
+		// provides us with a new block we'll ask again.
+		if reorgHeight == -1 {
+			log.Printf("Header error: %s\n", err.Error())
+			return false, nil
 		}
-		return true, fmt.Errorf("Truncated header file to try again")
+		// some other error
+		return false, err
 	}
 
+	// truncate header file if reorg happens
+	if reorgHeight != 0 {
+		fileHeight := reorgHeight - s.Param.StartHeight
+		err = s.headerFile.Truncate(int64(fileHeight) * 80)
+		if err != nil {
+			return false, err
+		}
+
+		// also we need to tell the upstream modules that a reorg happened
+		s.CurrentHeightChan <- reorgHeight
+		s.syncHeight = reorgHeight
+	}
+
+	// a header message is all or nothing; if we think there's something
+	// wrong with it, we don't take any of their headers
 	for _, resphdr := range m.Headers {
 		// write to end of file
 		err = resphdr.Serialize(s.headerFile)
 		if err != nil {
 			return false, err
 		}
-		// advance chain tip
-		tip++
-		// check last header
-		worked := CheckHeader(s.headerFile, tip, s.headerStartHeight, s.Param)
-		if !worked {
-			if endPos < 8160 {
-				// jeez I give up, back to genesis
-				s.headerFile.Truncate(160)
-			} else {
-				err = s.headerFile.Truncate(endPos - 8000)
-				if err != nil {
-					return false, fmt.Errorf("couldn't truncate header file")
-				}
-			}
-			// probably should disconnect from spv node at this point,
-			// since they're giving us invalid headers.
-			return true, fmt.Errorf(
-				"Header %d - %s doesn't fit, dropping 100 headers.",
-				tip, resphdr.BlockHash().String())
-		}
 	}
-	log.Printf("Headers to height %d OK.", tip)
+	log.Printf("Added %d headers OK.", len(m.Headers))
 	return true, nil
 }
 
 func (s *SPVCon) AskForHeaders() error {
-	var hdr wire.BlockHeader
 	ghdr := wire.NewMsgGetHeaders()
 	ghdr.ProtocolVersion = s.localVersion
 
-	s.headerMutex.Lock() // start header file ops
-	info, err := s.headerFile.Stat()
-	if err != nil {
-		return err
-	}
-	headerFileSize := info.Size()
-	if headerFileSize == 0 || headerFileSize%80 != 0 { // header file broken
-		// try to fix it!
-		s.headerFile.Truncate(headerFileSize - (headerFileSize % 80))
-		log.Printf("ERROR: Header file not a multiple of 80 bytes. Truncating")
-	}
+	tipheight := s.GetHeaderTipHeight()
+	log.Printf("got header tip height %d\n", tipheight)
+	// get tip header, as well as a few older ones (inefficient...?)
+	// yes, inefficient; really we should use "getheaders" and skip some of this
 
-	// seek to 80 bytes from end of file
-	ns, err := s.headerFile.Seek(-80, os.SEEK_END)
+	tipheader, err := s.GetHeaderAtHeight(tipheight)
 	if err != nil {
-		log.Printf("can't seek\n")
+		log.Printf("AskForHeaders GetHeaderAtHeight error\n")
 		return err
 	}
 
-	log.Printf("sought to offset %d (should be near the end\n", ns)
-
-	// get header from last 80 bytes of file
-	err = hdr.Deserialize(s.headerFile)
+	tHash := tipheader.BlockHash()
+	err = ghdr.AddBlockLocatorHash(&tHash)
 	if err != nil {
-		log.Printf("can't Deserialize")
 		return err
 	}
-	s.headerMutex.Unlock() // done with header file
 
-	cHash := hdr.BlockHash()
-	err = ghdr.AddBlockLocatorHash(&cHash)
-	if err != nil {
-		return err
+	backnum := int32(1)
+
+	// add more blockhashes in there if we're high enough
+	for tipheight > s.Param.StartHeight+backnum {
+		backhdr, err := s.GetHeaderAtHeight(tipheight - backnum)
+		if err != nil {
+			return err
+		}
+		backhash := backhdr.BlockHash()
+
+		err = ghdr.AddBlockLocatorHash(&backhash)
+		if err != nil {
+			return err
+		}
+
+		// send the most recent 10 blockhashes, then get sparse
+		if backnum > 10 {
+			backnum <<= 2
+		} else {
+			backnum++
+		}
 	}
 
 	log.Printf("get headers message has %d header hashes, first one is %s\n",
@@ -356,12 +329,15 @@ func (s *SPVCon) AskForHeaders() error {
 
 // AskForMerkBlocks requests blocks from current to last
 // right now this asks for 1 block per getData message.
-// Maybe it's faster to ask for many in a each message?
+// Maybe it's faster to ask for many in each message?
 func (s *SPVCon) AskForBlocks() error {
 	var hdr wire.BlockHeader
 
 	s.headerMutex.Lock() // lock just to check filesize
 	stat, err := os.Stat(s.headerFile.Name())
+	if err != nil {
+		return err
+	}
 	s.headerMutex.Unlock() // checked, unlock
 	endPos := stat.Size()
 

@@ -14,7 +14,7 @@ import (
 )
 
 // BuildJusticeTx takes the badTx and IdxSig found by IngestTx, and returns a
-// Justice transaction moving funds with great vengance & furious anger.
+// Justice transaction moving funds with great vengeance & furious anger.
 // Re-opens the DB which just was closed by IngestTx, but since this almost never
 // happens, we need to end IngestTx as quickly as possible.
 // Note that you should flag the channel for deletion after the JusticeTx is broadcast.

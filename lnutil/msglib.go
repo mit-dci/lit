@@ -41,13 +41,16 @@ const (
 	MSGID_WATCH_DESC     = 0x60 // desc describes a new channel
 	MSGID_WATCH_STATEMSG = 0x61 // commsg is a single state in the channel
 	MSGID_WATCH_DELETE   = 0x62 // Watch_clear marks a channel as ok to delete.  No further updates possible.
+
+	//Routing messages
+	MSGID_LINK_DESC = 0x70 // Describes a new channel for routing
 )
 
 //interface that all messages follow, for easy use
 type LitMsg interface {
 	Peer() uint32   //return PeerIdx
 	MsgType() uint8 //returns Message Type (see constants above)
-	Bytes() []byte  //returnns data of message as []byte with the MsgType() preceeding it
+	Bytes() []byte  //returns data of message as []byte with the MsgType() preceding it
 }
 
 func LitMsgEqual(msg LitMsg, msg2 LitMsg) bool {
@@ -107,6 +110,9 @@ func LitMsgFromBytes(b []byte, peerid uint32) (LitMsg, error) {
 	/*
 		case MSGID_WATCH_DELETE:
 	*/
+
+	case MSGID_LINK_DESC:
+		return NewLinkMsgFromBytes(b, peerid)
 
 	default:
 		return nil, fmt.Errorf("Unknown message of type %d ", msgType)
@@ -254,6 +260,8 @@ type ChanDescMsg struct {
 	ElkZero [33]byte //consider changing into array in future
 	ElkOne  [33]byte
 	ElkTwo  [33]byte
+
+	Data [32]byte
 }
 
 func NewChanDescMsg(
@@ -261,7 +269,7 @@ func NewChanDescMsg(
 	pubkey, refund, hakd [33]byte,
 	cointype uint32,
 	capacity int64, payment int64,
-	ELKZero, ELKOne, ELKTwo [33]byte) ChanDescMsg {
+	ELKZero, ELKOne, ELKTwo [33]byte, data [32]byte) ChanDescMsg {
 
 	cd := new(ChanDescMsg)
 	cd.PeerIdx = peerid
@@ -275,6 +283,7 @@ func NewChanDescMsg(
 	cd.ElkZero = ELKZero
 	cd.ElkOne = ELKOne
 	cd.ElkTwo = ELKTwo
+	cd.Data = data
 	return *cd
 }
 
@@ -282,8 +291,8 @@ func NewChanDescMsgFromBytes(b []byte, peerid uint32) (ChanDescMsg, error) {
 	cm := new(ChanDescMsg)
 	cm.PeerIdx = peerid
 
-	if len(b) < 251 {
-		return *cm, fmt.Errorf("got %d byte channel description, expect 251", len(b))
+	if len(b) < 283 {
+		return *cm, fmt.Errorf("got %d byte channel description, expect 283", len(b))
 	}
 
 	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
@@ -299,6 +308,7 @@ func NewChanDescMsgFromBytes(b []byte, peerid uint32) (ChanDescMsg, error) {
 	copy(cm.ElkZero[:], buf.Next(33))
 	copy(cm.ElkOne[:], buf.Next(33))
 	copy(cm.ElkTwo[:], buf.Next(33))
+	copy(cm.Data[:], buf.Next(32))
 
 	return *cm, nil
 }
@@ -321,6 +331,7 @@ func (self ChanDescMsg) Bytes() []byte {
 	msg = append(msg, self.ElkZero[:]...)
 	msg = append(msg, self.ElkOne[:]...)
 	msg = append(msg, self.ElkTwo[:]...)
+	msg = append(msg, self.Data[:]...)
 	return msg
 }
 
@@ -482,14 +493,16 @@ type DeltaSigMsg struct {
 	Outpoint  wire.OutPoint
 	Delta     int32
 	Signature [64]byte
+	Data      [32]byte
 }
 
-func NewDeltaSigMsg(peerid uint32, OP wire.OutPoint, DELTA int32, SIG [64]byte) DeltaSigMsg {
+func NewDeltaSigMsg(peerid uint32, OP wire.OutPoint, DELTA int32, SIG [64]byte, data [32]byte) DeltaSigMsg {
 	d := new(DeltaSigMsg)
 	d.PeerIdx = peerid
 	d.Outpoint = OP
 	d.Delta = DELTA
 	d.Signature = SIG
+	d.Data = data
 	return *d
 }
 
@@ -510,6 +523,7 @@ func NewDeltaSigMsgFromBytes(b []byte, peerid uint32) (DeltaSigMsg, error) {
 	// deserialize DeltaSig
 	ds.Delta = BtI32(buf.Next(4))
 	copy(ds.Signature[:], buf.Next(64))
+	copy(ds.Data[:], buf.Next(32))
 	return *ds, nil
 }
 
@@ -520,6 +534,7 @@ func (self DeltaSigMsg) Bytes() []byte {
 	msg = append(msg, opArr[:]...)
 	msg = append(msg, I32tB(self.Delta)...)
 	msg = append(msg, self.Signature[:]...)
+	msg = append(msg, self.Data[:]...)
 	return msg
 }
 
@@ -632,7 +647,7 @@ func (self GapSigRevMsg) Bytes() []byte {
 func (self GapSigRevMsg) Peer() uint32   { return self.PeerIdx }
 func (self GapSigRevMsg) MsgType() uint8 { return MSGID_GAPSIGREV }
 
-//send message accross channel using Elk info
+//send message across channel using Elk info
 type RevMsg struct {
 	PeerIdx    uint32
 	Outpoint   wire.OutPoint
@@ -654,7 +669,7 @@ func NewRevMsgFromBytes(b []byte, peerId uint32) (RevMsg, error) {
 	rv.PeerIdx = peerId
 
 	if len(b) < 102 {
-		return *rv, fmt.Errorf("got %d b yte REV, expect 102", len(b))
+		return *rv, fmt.Errorf("got %d byte REV, expect 102", len(b))
 	}
 
 	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
@@ -793,7 +808,7 @@ func NewComMsg(peerIdx, cointype uint32, destPKH [20]byte,
 	return *cm
 }
 
-// ComMsgFromBytes turns 132 bytes into a SorceMsg
+// ComMsgFromBytes turns 132 bytes into a SourceMsg
 // Silently fails with wrong size input.
 func NewWatchStateMsgFromBytes(b []byte, peerIDX uint32) (WatchStateMsg, error) {
 	sm := new(WatchStateMsg)
@@ -846,7 +861,7 @@ func (self WatchDelMsg) Bytes() []byte {
 	return buf.Bytes()
 }
 
-// ComMsgFromBytes turns 132 bytes into a SorceMsg
+// ComMsgFromBytes turns 132 bytes into a SourceMsg
 // Silently fails with wrong size input.
 func NewWatchDelMsgFromBytes(b []byte, peerIDX uint32) (WatchDelMsg, error) {
 	sm := new(WatchDelMsg)
@@ -865,3 +880,58 @@ func NewWatchDelMsgFromBytes(b []byte, peerIDX uint32) (WatchDelMsg, error) {
 }
 func (self WatchDelMsg) Peer() uint32   { return self.PeerIdx }
 func (self WatchDelMsg) MsgType() uint8 { return MSGID_WATCH_DELETE }
+
+// Link message
+
+type LinkMsg struct {
+	PeerIdx   uint32
+	PKHScript [20]byte // ChanPKH (channel ID)
+	APKH      [20]byte // APKH (A's LN address)
+	ACapacity int64    // ACapacity (A's channel balance)
+	BPKH      [20]byte // BPKH (B's LN address)
+	CoinType  uint32   // CoinType (Network of the channel)
+	Seq       uint32   // seq (Link state sequence #)
+	Timestamp int64
+}
+
+func NewLinkMsgFromBytes(b []byte, peerIDX uint32) (LinkMsg, error) {
+	sm := new(LinkMsg)
+	sm.PeerIdx = peerIDX
+
+	if len(b) < 76 {
+		return *sm, fmt.Errorf("LinkMsg %d bytes, expect 76", len(b))
+	}
+
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
+
+	copy(sm.PKHScript[:], buf.Next(20))
+	copy(sm.APKH[:], buf.Next(20))
+	_ = binary.Read(buf, binary.BigEndian, &sm.ACapacity)
+	copy(sm.BPKH[:], buf.Next(20))
+	_ = binary.Read(buf, binary.BigEndian, &sm.CoinType)
+	_ = binary.Read(buf, binary.BigEndian, &sm.Seq)
+
+	return *sm, nil
+}
+
+// ToBytes turns a LinkMsg into 88 bytes
+func (self LinkMsg) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.WriteByte(self.MsgType())
+
+	buf.Write(self.PKHScript[:])
+
+	buf.Write(self.APKH[:])
+	binary.Write(&buf, binary.BigEndian, self.ACapacity)
+
+	buf.Write(self.BPKH[:])
+
+	binary.Write(&buf, binary.BigEndian, self.CoinType)
+	binary.Write(&buf, binary.BigEndian, self.Seq)
+
+	return buf.Bytes()
+}
+
+func (self LinkMsg) Peer() uint32   { return self.PeerIdx }
+func (self LinkMsg) MsgType() uint8 { return MSGID_LINK_DESC }

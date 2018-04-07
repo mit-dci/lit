@@ -65,6 +65,10 @@ func (s *SPVCon) incomingMessageHandler() {
 func (s *SPVCon) outgoingMessageHandler() {
 	for {
 		msg := <-s.outMsgQueue
+		if msg == nil {
+			log.Printf("ERROR: nil message to outgoingMessageHandler\n")
+			continue
+		}
 		n, err := wire.WriteMessageWithEncodingN(s.con, msg, s.localVersion,
 			wire.BitcoinNet(s.Param.NetMagicBytes), wire.LatestEncoding)
 
@@ -109,6 +113,8 @@ func (s *SPVCon) fPositiveHandler() {
 		}
 	}
 }
+
+// REORG TODO: how to detect reorgs and send them up to wallet layer
 
 func (s *SPVCon) HeaderHandler(m *wire.MsgHeaders) {
 	moar, err := s.IngestHeaders(m)
@@ -197,9 +203,10 @@ func (s *SPVCon) GetDataHandler(m *wire.MsgGetData) {
 		// I don't think they'll request non-witness anyway.
 		if thing.Type == wire.InvTypeWitnessTx || thing.Type == wire.InvTypeTx {
 			tx, ok := s.TxMap[thing.Hash]
-			if !ok {
-				log.Printf("tx %s requested by we don't have it\n",
+			if !ok || tx == nil {
+				log.Printf("tx %s requested but we don't have it\n",
 					thing.Hash.String())
+				continue
 			}
 			s.outMsgQueue <- tx
 			sent++

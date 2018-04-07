@@ -247,13 +247,13 @@ func (c *LNDConn) authPKH(
 }
 
 // Read reads data from the connection.
-// Read can be made to time out and return a Error with Timeout() == true
+// Read can be made to time out and return an Error with Timeout() == true
 // after a fixed time limit; see SetDeadline and SetReadDeadline.
 // Part of the net.Conn interface.
 func (c *LNDConn) Read(b []byte) (n int, err error) {
 	// In order to reconcile the differences between the record abstraction
 	// of our AEAD connection, and the stream abstraction of TCP, we maintain
-	// an intermediate read buffer. If this buffer becomes depleated, then
+	// an intermediate read buffer. If this buffer becomes depleted, then
 	// we read the next record, and feed it into the buffer. Otherwise, we
 	// read directly from the buffer.
 	if c.readBuf.Len() == 0 {
@@ -288,7 +288,7 @@ func (c *LNDConn) Read(b []byte) (n int, err error) {
 }
 
 // Write writes data to the connection.
-// Write can be made to time out and return a Error with Timeout() == true
+// Write can be made to time out and return an Error with Timeout() == true
 // after a fixed time limit; see SetDeadline and SetWriteDeadline.
 // Part of the net.Conn interface.
 func (c *LNDConn) Write(b []byte) (n int, err error) {

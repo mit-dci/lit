@@ -1,14 +1,11 @@
 package litrpc
 
 import (
-	"errors"
 	"fmt"
-
-	"golang.org/x/crypto/ripemd160"
 
 	"github.com/adiabat/bech32"
 	"github.com/adiabat/btcd/wire"
-	"github.com/adiabat/btcutil/base58"
+	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 )
 
@@ -35,6 +32,7 @@ type CoinBalReply struct {
 	ChanTotal   int64 // total balance in channels
 	TxoTotal    int64 // all utxos
 	MatureWitty int64 // confirmed, spendable and witness
+	FeeRate     int64 // fee per byte
 }
 
 type BalanceReply struct {
@@ -56,8 +54,10 @@ func (r *LitRPC) Balance(args *NoArgs, reply *BalanceReply) error {
 		var cbr CoinBalReply
 
 		cbr.CoinType = cointype
-
+		// get wallet height
 		cbr.SyncHeight = wal.CurrentHeight()
+		// also current fee rate
+		cbr.FeeRate = wal.Fee()
 
 		allTxos, err = wal.UtxoDump()
 		if err != nil {
@@ -74,6 +74,7 @@ func (r *LitRPC) Balance(args *NoArgs, reply *BalanceReply) error {
 				cbr.ChanTotal += q.State.MyAmt
 			}
 		}
+
 		// I thought slices were pointery enough that I could put this line
 		// near the top.  Guess not.
 		reply.Balances = append(reply.Balances, cbr)
@@ -311,9 +312,8 @@ func (r *LitRPC) SetFee(args *SetFeeArgs, reply *FeeReply) error {
 	return nil
 }
 
-// Fee gets th fee rate for a wallet.  If you try to set a negative
-// fee rate, it will return the current rate.
-func (r *LitRPC) Fee(args *FeeArgs, reply *FeeReply) error {
+// Fee gets the fee rate for a wallet.
+func (r *LitRPC) GetFee(args *FeeArgs, reply *FeeReply) error {
 	// if cointype is 0, use the node's default coin
 	if args.CoinType == 0 {
 		args.CoinType = r.Node.DefaultCoin
@@ -390,10 +390,7 @@ func (r *LitRPC) Address(args *AddressArgs, reply *AddressReply) error {
 
 		param := r.Node.SubWallet[ctypesPerAdr[i]].Params()
 
-		oldadr, err := oldAddressPubKeyHash(a[:], param.PubKeyHashAddrID)
-		if err != nil {
-			return err
-		}
+		oldadr := lnutil.OldAddressFromPKH(a, param.PubKeyHashAddrID)
 		reply.LegacyAddresses[i] = oldadr
 
 		// convert 20-byte PKH to a bech32 segwit v0 address
@@ -408,10 +405,10 @@ func (r *LitRPC) Address(args *AddressArgs, reply *AddressReply) error {
 	return nil
 }
 
-func oldAddressPubKeyHash(pkHash []byte, netID byte) (string, error) {
-	// Check for a valid pubkey hash length.
-	if len(pkHash) != ripemd160.Size {
-		return "", errors.New("pkHash must be 20 bytes")
-	}
-	return base58.CheckEncode(pkHash, netID), nil
-}
+//func oldAddressPubKeyHash(pkHash []byte, netID byte) (string, error) {
+//	// Check for a valid pubkey hash length.
+//	if len(pkHash) != ripemd160.Size {
+//		return "", errors.New("pkHash must be 20 bytes")
+//	}
+//	return base58.CheckEncode(pkHash, netID), nil
+//}

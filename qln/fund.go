@@ -17,7 +17,7 @@ Once state update push/pull messages work that will be added on to
 this process
 
 Note that the first elkrem exchange revokes state 0, which was never actually
-commited to  (there are no HAKDpubs for state 0; those start at state 1.)
+committed to  (there are no HAKDpubs for state 0; those start at state 1.)
 So it's kindof pointless, but you still have to send the right one, because
 elkrem 2 is the parent of elkrems 0 and 1, so that checks 0.
 
@@ -47,7 +47,7 @@ a and c at the same time.
 
 Either of these can be added later without changing much.  The messages
 don't have to change at all, and in the first case you'd change the channel
-pubkey calculation.  In the second it's independant of the fund process.
+pubkey calculation.  In the second it's independent of the fund process.
 
 For now though:
 funding --
@@ -100,7 +100,7 @@ an exact timing for the payment.
 // FundChannel opens a channel with a peer.  Doesn't return until the channel
 // has been created.  Maybe timeout if it takes too long?
 func (nd *LitNode) FundChannel(
-	peerIdx, cointype uint32, ccap, initSend int64) (uint32, error) {
+	peerIdx, cointype uint32, ccap, initSend int64, data [32]byte) (uint32, error) {
 
 	_, ok := nd.SubWallet[cointype]
 	if !ok {
@@ -124,7 +124,7 @@ func (nd *LitNode) FundChannel(
 	}
 	if initSend > ccap {
 		nd.InProg.mtx.Unlock()
-		return 0, fmt.Errorf("Cant send %d in %d capacity channel", initSend, ccap)
+		return 0, fmt.Errorf("Can't send %d in %d capacity channel", initSend, ccap)
 	}
 
 	// TODO - would be convenient if it auto connected to the peer huh
@@ -143,6 +143,7 @@ func (nd *LitNode) FundChannel(
 	nd.InProg.PeerIdx = peerIdx
 	nd.InProg.Amt = ccap
 	nd.InProg.InitSend = initSend
+	nd.InProg.Data = data
 
 	nd.InProg.Coin = cointype
 	nd.InProg.mtx.Unlock() // switch to defer
@@ -302,6 +303,8 @@ func (nd LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 	// based on size
 	q.State.Fee = nd.SubWallet[q.Coin()].Fee() * 1000
 
+	q.State.Data = nd.InProg.Data
+
 	// save channel to db
 	err = nd.SaveQChan(q)
 	if err != nil {
@@ -330,7 +333,7 @@ func (nd LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 	outMsg := lnutil.NewChanDescMsg(
 		msg.Peer(), *nd.InProg.op, q.MyPub, q.MyRefundPub, q.MyHAKDBase,
 		nd.InProg.Coin, nd.InProg.Amt, nd.InProg.InitSend,
-		elkPointZero, elkPointOne, elkPointTwo)
+		elkPointZero, elkPointOne, elkPointTwo, nd.InProg.Data)
 
 	nd.OmniOut <- outMsg
 
@@ -396,6 +399,8 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 	// TODO assumes both parties use same fee
 	qc.State.Fee = wal.Fee() * 1000
 	qc.State.MyAmt = msg.InitPayment
+
+	qc.State.Data = msg.Data
 
 	qc.State.StateIdx = 0
 	// use new ElkPoint for signing
@@ -511,7 +516,7 @@ func (nd *LitNode) QChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePeer) {
 	}
 
 	// tell base wallet about watcher refund address in case that happens
-	// TODO this is weird & ugly... maybe have a export keypath func?
+	// TODO this is weird & ugly... maybe have an export keypath func?
 	nullTxo := new(portxo.PorTxo)
 	nullTxo.Value = 0 // redundant, but explicitly show that this is just for adr
 	nullTxo.KeyGen = qc.KeyGen
@@ -541,7 +546,7 @@ func (nd *LitNode) QChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePeer) {
 }
 
 // RECIPIENT
-// SigProofHandler saves the signature the recipent stores.
+// SigProofHandler saves the signature the recipient stores.
 // In some cases you don't need this message.
 func (nd *LitNode) SigProofHandler(msg lnutil.SigProofMsg, peer *RemotePeer) {
 

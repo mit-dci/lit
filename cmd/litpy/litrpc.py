@@ -44,7 +44,7 @@ class LitConnection():
         self.msg_id = self.msg_id + 1 % 10000
 
         resp = json.loads(self.ws.recv())
-        logger.debug("Recieved rpc response from %s:%s method: %s Response: %s." % (self.ip, self.port, method, str(resp)))
+        logger.debug("Received rpc response from %s:%s method: %s Response: %s." % (self.ip, self.port, method, str(resp)))
         return resp
 
     def __getattr__(self, name):

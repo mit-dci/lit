@@ -1,11 +1,10 @@
 package coinparam
 
 import (
+	"encoding/hex"
 	"errors"
 	"math/big"
 	"time"
-	"io"
-	"log"
 
 	"github.com/adiabat/btcd/chaincfg/chainhash"
 	"github.com/adiabat/btcd/wire"
@@ -33,26 +32,34 @@ type Params struct {
 
 	// GenesisHash is the starting block hash.
 	GenesisHash *chainhash.Hash
-	
+
 	// The function used to calculate the proof of work value for a block
-	PoWFunction func(b []byte) chainhash.Hash
-  
-    // The function used to calculate the difficulty of a given block
-    DiffCalcFunction func(r io.ReadSeeker, height, startheight int32, p *Params) (uint32, error)
-  
-    // The block header to start downloading blocks from
-    StartHeader [80]byte
-  
-    // The height of the StartHash
-    StartHeight int32
-  
-    // Assume the difficulty bits are valid before this header height
-    // This is needed for coins with variable retarget lookbacks that use 
-    // StartHeader to offset the beginning of the header chain for SPV
-    AssumeDiffBefore int32
-  
-    // Fee per byte for transactions
-    FeePerByte int64
+	PoWFunction func(b []byte, height int32) chainhash.Hash
+
+	// The function used to calculate the difficulty of a given block
+	DiffCalcFunction func(
+		headers []*wire.BlockHeader, height int32, p *Params) (uint32, error)
+
+	//DiffCalcFunction func(r io.ReadSeeker, height, startheight int32, p *Params) (uint32, error)
+
+	// The block header to start downloading blocks from
+	StartHeader [80]byte
+
+	// The height of the StartHash
+	StartHeight int32
+
+	// Assume the difficulty bits are valid before this header height
+	// This is needed for coins with variable retarget lookbacks that use
+	// StartHeader to offset the beginning of the header chain for SPV
+	AssumeDiffBefore int32
+
+	// The minimum number of headers to pass to the difficulty function.
+	// This is primarily intended for coins that have difficulty functions
+	// without fixed epoch lengths
+	MinHeaders int32
+
+	// Fee per byte for transactions
+	FeePerByte int64
 
 	// PowLimit defines the highest allowed proof of work value for a block
 	// as a uint256.
@@ -130,6 +137,11 @@ type Params struct {
 	// BIP44 coin type used in the hierarchical deterministic path for
 	// address generation.
 	HDCoinType uint32
+
+	// TestCoin, when true, indicates that the network deals with money that
+	// isn't worth anything.  This can be useful to skip over security code,
+	//
+	TestCoin bool
 }
 
 // These variables are the chain proof-of-work limit parameters for each default
@@ -242,7 +254,6 @@ var (
 // If that prefix isn't registered, it returns an error.
 func PrefixToCoinType(prefix string) (uint32, error) {
 	coinType, ok := bech32Prefixes[prefix]
-	log.Printf("wow: ")
 	if !ok {
 		return 0, ErrUnknownPrefix
 	}
@@ -306,4 +317,28 @@ func newHashFromStr(hexStr string) *chainhash.Hash {
 		panic(err)
 	}
 	return hash
+}
+
+// Convert a hex-encoded header into and 80 byte array.
+func newHeaderFromStr(hexStr string) [80]byte {
+	// Return error if hash string is too long.
+	if len(hexStr) > 160 {
+		panic("hard-coded header too long")
+	}
+
+	// Hex decoder expects the hash to be a multiple of two.
+	if len(hexStr)%2 != 0 {
+		hexStr = "0" + hexStr
+	}
+
+	// Convert string to bytes.
+	hdrSlice, err := hex.DecodeString(hexStr)
+	if err != nil {
+		panic(err)
+	}
+
+	var headerArr [80]byte
+
+	copy(headerArr[:], hdrSlice)
+	return headerArr
 }

@@ -43,14 +43,15 @@ func (l *LNAdr) String() string {
 // pkh part and network part, adding the network part if needed
 func SplitAdrString(adr string) (string, string) {
 
-	if !strings.ContainsRune(adr, '@') {
-		adr += "@localhost:2448"
-	}
-	if !strings.ContainsRune(adr, ':') {
+	if !strings.ContainsRune(adr, ':') && strings.ContainsRune(adr, '@') {
 		adr += ":2448"
 	}
 
 	idHost := strings.Split(adr, "@")
+
+	if len(idHost) == 1 {
+		return idHost[0], ""
+	}
 
 	return idHost[0], idHost[1]
 }
@@ -129,7 +130,7 @@ func (l *LNAdr) Deserialize(s []byte, param *chaincfg.Params) error {
 	b := bytes.NewBuffer(s)
 
 	// Fail if on-disk LNId too short
-	if b.Len() < 24 { // 24 is min lenght
+	if b.Len() < 24 { // 24 is min length
 		return fmt.Errorf("can't read LNId - too short")
 	}
 	// read indicator of pubkey or pubkeyhash

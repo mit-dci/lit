@@ -3,7 +3,7 @@
 ## Lit 0.0 Walkthrough
 
 This walkthrough is to set people up who want to send payments over channels on a test network. If you haven't already, make sure to go to the [README](./README.md) for setup instructions.
- 
+
 ### Step 1: Files in place
 
 Make sure you have built both the `lit` and `lit-af` (in `cmd/lit-af`) packages with `go build`
@@ -29,22 +29,22 @@ alice@pi2:~/gofolder/src/github.com/mit-dci/lit$ cd cmd/lit-af
 alice@pi2:~/gofolder/src/github.com/mit-dci/lit/cmd/lit-af$ go build
 alice@pi2:~/gofolder/src/github.com/mit-dci/lit/cmd/lit-af$ cp lit-af ~/anode/
 alice@pi2:~/gofolder/src/github.com/mit-dci/lit/cmd/lit-af$ cd ~/anode/
-alice@pi2:~/anode$ 
+alice@pi2:~/anode$
 ```
 
 ### Step 2: Run lit and sync up
 
-Alice starts running lit (with `./lit -spv fullnode.net`) and syncs up to the blockchain.  The lit node will print lots of stuff on the screen, but can't be controlled from here.
+Alice starts running lit (with `./lit --tn3 fullnode.net`) and syncs up to the blockchain.  The lit node will print lots of stuff on the screen, but can't be controlled from here.
 
 Alice connects to her full node, fullnode.net.  By default this is on testnet3, using port 18333.
 
 ```
-alice@pi2:~/anode$ ./lit -spv fullnode.net
-lit node v0.0
+alice@pi2:~/anode$ ./lit --tn3 fullnode.net -v
+lit node v0.1
 -h for list of options.
 No file testkey.hex, generating.
-passphrase: 
-repeat passphrase: 
+passphrase:
+repeat passphrase:
 
 WARNING!! Key file not encrypted!!
 ```
@@ -54,7 +54,7 @@ Here Alice can type a passphrase to secure the wallet the newborn lit node is ge
 Now in another window, alice connects to the lit node over RPC using `./lit-af`
 
 ```
-alice@pi2:~/anode$ ./lit-af 
+alice@pi2:~/anode$ ./lit-af
 lit-af# ls
 entered command: ls
 
@@ -124,7 +124,7 @@ This opens a channel with peer 1 (Alice) with a channel capacity of 50,000,000 s
 use ls again to see that the channel is there, it will be labeled channel 1.
 
 ```
-lit-af# push 1 200000 
+lit-af# push 1 200000
 ```
 
 This pushes 200,000 satoshis to the other side of the channel.  You can do this 200 trillion times before the channel needs to be closed.  (Actually, since I don't think you can send that many payments, the software will probably crash if you do manage to exceed 2^48)

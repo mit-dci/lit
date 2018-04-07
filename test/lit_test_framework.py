@@ -20,6 +20,7 @@ import traceback
 
 from bcnode import BCNode, LCNode
 from litnode import LitNode
+from utils import wait_until
 
 COINS = {
     "reg": {
@@ -27,7 +28,7 @@ COINS = {
         "code": 257,
         "feerate": 80,
         "class": BCNode,
-        "wallit_code": "-reg"
+        "wallit_code": "--reg"
     },
     "ltr": {
         "longname": "Litecoin_regtest",
@@ -223,18 +224,3 @@ class LitTest():
         rpc_logger.propagate = False
         rpc_logger.addHandler(fh)
         rpc_logger.addHandler(ch)
-
-def wait_until(predicate, *, attempts=float('inf'), timeout=float('inf')):
-    if attempts == float('inf') and timeout == float('inf'):
-        timeout = 60
-    attempt = 0
-    elapsed = 0
-
-    while attempt < attempts and elapsed < timeout:
-        if predicate():
-            return True
-        attempt += 1
-        elapsed += 0.25
-        time.sleep(0.25)
-
-    raise AssertionError("wait_until() timed out")

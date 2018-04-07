@@ -236,7 +236,7 @@ func TestComboCommit(t *testing.T) {
 	// input: CombinablePubKeySlice contains
 	//   PubKey: pubKeyCmpd0
 	//   PubKey: pubKeyCmpd1
-	// want: wantH, hcainhash.Hash
+	// want: wantH, chainhash.Hash
 	inPubKey0, _ := btcec.ParsePubKey(pubKeyCmpd0[:], btcec.S256())
 	inPubKey1, _ := btcec.ParsePubKey(pubKeyCmpd1[:], btcec.S256())
 	var c CombinablePubKeySlice = []*btcec.PublicKey{inPubKey0, inPubKey1}

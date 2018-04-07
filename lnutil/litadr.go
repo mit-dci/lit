@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/adiabat/bech32"
+	"github.com/adiabat/btcutil/base58"
 	"github.com/btcsuite/fastsha256"
 )
 
@@ -105,4 +106,9 @@ func LitAdrBytes(adr string) ([]byte, error) {
 		return nil, err
 	}
 	return truncPKH, nil
+}
+
+// OldAddressFromPKH returns a base58 string from a 20 byte pubkey hash
+func OldAddressFromPKH(pkHash [20]byte, netID byte) string {
+	return base58.CheckEncode(pkHash[:], netID)
 }

@@ -3,6 +3,7 @@ package qln
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/adiabat/btcd/btcec"
 	"github.com/adiabat/btcd/wire"
@@ -121,6 +122,12 @@ type LitNode struct {
 
 	// The port(s) in which it listens for incoming connections
 	LisIpPorts []string
+
+	// The URL from which lit attempts to resolve the LN address
+	TrackerURL string
+
+	ChannelMap map[[20]byte][]lnutil.LinkMsg
+	AdvTimeout *time.Ticker
 }
 
 type RemotePeer struct {
@@ -141,6 +148,8 @@ type InFlightFund struct {
 	done chan uint32
 	// use this to avoid crashiness
 	mtx sync.Mutex
+
+	Data [32]byte
 }
 
 func (inff *InFlightFund) Clear() {
@@ -680,11 +689,11 @@ func (nd *LitNode) GetQchanOPfromIdx(cIdx uint32) ([36]byte, error) {
 	err := nd.LitDB.View(func(btx *bolt.Tx) error {
 		cmp := btx.Bucket(BKTChanMap)
 		if cmp == nil {
-			return fmt.Errorf("no chanel map")
+			return fmt.Errorf("no channel map")
 		}
 		op := cmp.Get(lnutil.U32tB(cIdx))
 		if op == nil {
-			return fmt.Errorf("no chanel %d in db", cIdx)
+			return fmt.Errorf("no channel %d in db", cIdx)
 		}
 		copy(rOp[:], op)
 		return nil
