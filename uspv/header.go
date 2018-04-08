@@ -257,24 +257,26 @@ func CheckHeaderChain(
 	// check difficulty adjustments in the new headers
 	// since we call this many times, append each time
 	for i, hdr := range inHeaders {
-		// check if there's a valid proof of work.  That whole "Bitcoin" thing.
-		if !checkProofOfWork(*hdr, p, height+int32(i)) {
-			return 0, fmt.Errorf("header %d in message has bad proof of work", i)
-		}
+		if height+int32(i) > p.AssumeDiffBefore {
+			// check if there's a valid proof of work.  That whole "Bitcoin" thing.
+			if !checkProofOfWork(*hdr, p, height+int32(i)) {
+				return 0, fmt.Errorf("header %d in message has bad proof of work", i)
+			}
 
-		// build slice of "previous" headers
-		prevHeaders = append(prevHeaders, inHeaders[i])
-		rightBits, err := p.DiffCalcFunction(prevHeaders, height+int32(i), p)
-		if err != nil {
-			return 0, fmt.Errorf("Error calculating Block %d %s difficuly. %s",
-				int(height)+i, hdr.BlockHash().String(), err.Error())
-		}
+			// build slice of "previous" headers
+			prevHeaders = append(prevHeaders, inHeaders[i])
+			rightBits, err := p.DiffCalcFunction(prevHeaders, height+int32(i), p)
+			if err != nil {
+				return 0, fmt.Errorf("Error calculating Block %d %s difficuly. %s",
+					int(height)+i, hdr.BlockHash().String(), err.Error())
+			}
 
-		// vertcoin diff adjustment not yet implemented
-		// TODO - get rid of coin specific workaround
-		if hdr.Bits != rightBits && (p.Name != "vtctest" && p.Name != "vtc") {
-			return 0, fmt.Errorf("Block %d %s incorrect difficuly.  Read %x, expect %x",
-				int(height)+i, hdr.BlockHash().String(), hdr.Bits, rightBits)
+			// vertcoin diff adjustment not yet implemented
+			// TODO - get rid of coin specific workaround
+			if hdr.Bits != rightBits && (p.Name != "vtctest" && p.Name != "vtc") {
+				return 0, fmt.Errorf("Block %d %s incorrect difficuly.  Read %x, expect %x",
+					int(height)+i, hdr.BlockHash().String(), hdr.Bits, rightBits)
+			}
 		}
 	}
 
