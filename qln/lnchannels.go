@@ -211,8 +211,11 @@ func (nd *LitNode) GetDHSecret(q *Qchan) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	priv := nd.SubWallet[q.Coin()].GetPriv(q.KeyGen)
-	// not sure what happens if this breaks.  Maybe it always works.
+	priv, err := nd.SubWallet[q.Coin()].GetPriv(q.KeyGen)
+	// if this breaks, return
+	if err != nil {
+		return nil, err
+	}
 
 	return btcec.GenerateSharedSecret(priv, theirPub), nil
 }

@@ -131,7 +131,10 @@ func (nd *LitNode) BuildJusticeSig(q *Qchan) error {
 	kg := q.KeyGen
 	kg.Step[2] = UseChannelHAKDBase
 	// get HAKD base scalar
-	privBase := nd.SubWallet[q.Coin()].GetPriv(kg)
+	privBase, err := nd.SubWallet[q.Coin()].GetPriv(kg)
+	if err != nil {
+		return err
+	}
 	// combine elk & HAKD base to make signing key
 	combinedPrivKey := lnutil.CombinePrivKeyWithBytes(privBase, elkScalar[:])
 
