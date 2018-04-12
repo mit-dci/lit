@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 
 	"github.com/mit-dci/lit/dlc"
+	"github.com/mit-dci/lit/lnutil"
 )
 
 type ListOraclesArgs struct {
@@ -77,7 +78,7 @@ type NewContractArgs struct {
 }
 
 type NewContractReply struct {
-	Contract *dlc.DlcContract
+	Contract *lnutil.DlcContract
 }
 
 func (r *LitRPC) NewContract(args NewContractArgs, reply *NewContractReply) error {
@@ -96,7 +97,7 @@ type ListContractsArgs struct {
 }
 
 type ListContractsReply struct {
-	Contracts []*dlc.DlcContract
+	Contracts []*lnutil.DlcContract
 }
 
 // ListOracles will return all contracts know to LIT
@@ -116,7 +117,7 @@ type GetContractArgs struct {
 }
 
 type GetContractReply struct {
-	Contract *dlc.DlcContract
+	Contract *lnutil.DlcContract
 }
 
 func (r *LitRPC) GetContract(args GetContractArgs, reply *GetContractReply) error {
@@ -229,6 +230,68 @@ func (r *LitRPC) SetContractSettlementDivision(args SetContractSettlementDivisio
 	var err error
 
 	err = r.Node.DlcManager.SetContractSettlementDivision(args.CIdx, args.ValueFullyOurs, args.ValueFullyTheirs)
+	if err != nil {
+		return err
+	}
+
+	reply.Success = true
+	return nil
+}
+
+type SetContractCoinTypeArgs struct {
+	CIdx     uint64
+	CoinType uint32
+}
+
+type SetContractCoinTypeReply struct {
+	Success bool
+}
+
+func (r *LitRPC) SetContractCoinType(args SetContractCoinTypeArgs, reply *SetContractCoinTypeReply) error {
+	var err error
+
+	err = r.Node.DlcManager.SetContractCoinType(args.CIdx, args.CoinType)
+	if err != nil {
+		return err
+	}
+
+	reply.Success = true
+	return nil
+}
+
+type OfferContractArgs struct {
+	CIdx    uint64
+	PeerIdx uint32
+}
+
+type OfferContractReply struct {
+	Success bool
+}
+
+func (r *LitRPC) OfferContract(args OfferContractArgs, reply *OfferContractReply) error {
+	var err error
+
+	err = r.Node.OfferDlc(args.PeerIdx, args.CIdx)
+	if err != nil {
+		return err
+	}
+
+	reply.Success = true
+	return nil
+}
+
+type DeclineContractArgs struct {
+	CIdx uint64
+}
+
+type DeclineContractReply struct {
+	Success bool
+}
+
+func (r *LitRPC) DeclineContract(args DeclineContractArgs, reply *DeclineContractReply) error {
+	var err error
+
+	err = r.Node.DeclineDlc(args.CIdx)
 	if err != nil {
 		return err
 	}

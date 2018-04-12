@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/boltdb/bolt"
+	"github.com/mit-dci/lit/lnutil"
 )
 
 // const strings for db usage
@@ -115,7 +116,7 @@ func (mgr *DlcManager) ListOracles() ([]*DlcOracle, error) {
 	return oracles, nil
 }
 
-func (mgr *DlcManager) SaveContract(c *DlcContract) error {
+func (mgr *DlcManager) SaveContract(c *lnutil.DlcContract) error {
 	err := mgr.DLCDB.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(BKTContracts)
 
@@ -139,8 +140,8 @@ func (mgr *DlcManager) SaveContract(c *DlcContract) error {
 	return nil
 }
 
-func (mgr *DlcManager) LoadContract(idx uint64) (*DlcContract, error) {
-	c := new(DlcContract)
+func (mgr *DlcManager) LoadContract(idx uint64) (*lnutil.DlcContract, error) {
+	c := new(lnutil.DlcContract)
 
 	err := mgr.DLCDB.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(BKTContracts)
@@ -154,7 +155,7 @@ func (mgr *DlcManager) LoadContract(idx uint64) (*DlcContract, error) {
 			return fmt.Errorf("Contract %d does not exist", idx)
 		}
 		var err error
-		c, err = DlcContractFromBytes(v)
+		c, err = lnutil.DlcContractFromBytes(v)
 		if err != nil {
 			return err
 		}
@@ -170,15 +171,15 @@ func (mgr *DlcManager) LoadContract(idx uint64) (*DlcContract, error) {
 
 }
 
-func (mgr *DlcManager) ListContracts() ([]*DlcContract, error) {
-	contracts := make([]*DlcContract, 0)
+func (mgr *DlcManager) ListContracts() ([]*lnutil.DlcContract, error) {
+	contracts := make([]*lnutil.DlcContract, 0)
 	err := mgr.DLCDB.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(BKTContracts)
 		c := b.Cursor()
 
 		for k, v := c.First(); k != nil; k, v = c.Next() {
 			buf := bytes.NewBuffer(k)
-			c, err := DlcContractFromBytes(v)
+			c, err := lnutil.DlcContractFromBytes(v)
 			if err != nil {
 				return err
 			}

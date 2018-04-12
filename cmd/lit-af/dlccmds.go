@@ -1,12 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"strconv"
 	"time"
 
 	"github.com/fatih/color"
-	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/lnutil"
 )
@@ -65,7 +65,7 @@ var addOracleCommand = &Command{
 var contractCommand = &Command{
 	Format: fmt.Sprintf("%s%s%s\n", lnutil.White("dlc contract"),
 		lnutil.ReqColor("subcommand"), lnutil.OptColor("parameters...")),
-	Description: fmt.Sprintf("%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n",
+	Description: fmt.Sprintf("%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n",
 		"Command for managing contracts. Subcommand can be one of:",
 		fmt.Sprintf("%-20s\t%s", lnutil.White("new"), "Adds a new draft contract"),
 		fmt.Sprintf("%-20s\t%s", lnutil.White("view"), "Views a contract"),
@@ -74,6 +74,9 @@ var contractCommand = &Command{
 		fmt.Sprintf("%-20s\t%s", lnutil.White("settime"), "Sets the settlement time of a contract"),
 		fmt.Sprintf("%-20s\t%s", lnutil.White("setfunding"), "Sets the funding parameters of a contract"),
 		fmt.Sprintf("%-20s\t%s", lnutil.White("setdivision"), "Sets the settlement division of a contract"),
+		fmt.Sprintf("%-20s\t%s", lnutil.White("setcointype"), "Sets the cointype of a contract"),
+		fmt.Sprintf("%-20s\t%s", lnutil.White("offer"), "Offer a draft contract to one of your peers"),
+		fmt.Sprintf("%-20s\t%s", lnutil.White("decline"), "Decline a contract sent to you"),
 		fmt.Sprintf("%-20s\t%s", lnutil.White("ls"), "Shows a list of known contracts"),
 	),
 	ShortDescription: "Manages oracles for the Discreet Log Contracts.\n",
@@ -153,6 +156,35 @@ var setContractSettlementDivisionCommand = &Command{
 		fmt.Sprintf("%-10s %s", lnutil.White("valueAllForThem"), "The outcome with which our peer will be entitled to the full contract value"),
 	),
 	ShortDescription: "Sets the edge values of the oracle data for dividing the funds\n",
+}
+var setContractCoinTypeCommand = &Command{
+	Format: fmt.Sprintf("%s%s\n", lnutil.White("dlc contract setcointype"),
+		lnutil.ReqColor("cid", "cointype")),
+	Description: fmt.Sprintf("%s\n%s\n%s\n",
+		"Sets the values of the oracle data that will result in the full contract funds being paid to either peer",
+		fmt.Sprintf("%-10s %s", lnutil.White("cid"), "The ID of the contract"),
+		fmt.Sprintf("%-10s %s", lnutil.White("cointype"), "The ID of the coin type to use for the contract"),
+	),
+	ShortDescription: "Sets the edge values of the oracle data for dividing the funds\n",
+}
+var declineContractCommand = &Command{
+	Format: fmt.Sprintf("%s%s\n", lnutil.White("dlc contract decline"),
+		lnutil.ReqColor("cid")),
+	Description: fmt.Sprintf("%s\n%s\n",
+		"Declines a contract offered to you",
+		fmt.Sprintf("%-10s %s", lnutil.White("cid"), "The ID of the contract to decline"),
+	),
+	ShortDescription: "Declines a contract offered to you\n",
+}
+var offerContractCommand = &Command{
+	Format: fmt.Sprintf("%s%s\n", lnutil.White("dlc contract offer"),
+		lnutil.ReqColor("cid", "peer")),
+	Description: fmt.Sprintf("%s\n%s\n%s\n",
+		"Offers a contract to one of your peers",
+		fmt.Sprintf("%-10s %s", lnutil.White("cid"), "The ID of the contract"),
+		fmt.Sprintf("%-10s %s", lnutil.White("cointype"), "The ID of the peer to offer the contract to"),
+	),
+	ShortDescription: "Offers a contract to one of your peers\n",
 }
 
 func (lc *litAfClient) Dlc(textArgs []string) error {
@@ -300,6 +332,18 @@ func (lc *litAfClient) DlcContract(textArgs []string) error {
 
 	if len(textArgs) > 0 && textArgs[0] == "setdivision" {
 		return lc.DlcSetContractSettlementDivision(textArgs[1:])
+	}
+
+	if len(textArgs) > 0 && textArgs[0] == "setcointype" {
+		return lc.DlcSetContractCoinType(textArgs[1:])
+	}
+
+	if len(textArgs) > 0 && textArgs[0] == "offer" {
+		return lc.DlcOfferContract(textArgs[1:])
+	}
+
+	if len(textArgs) > 0 && textArgs[0] == "decline" {
+		return lc.DlcDeclineContract(textArgs[1:])
 	}
 	return fmt.Errorf(contractCommand.Format)
 }
@@ -512,6 +556,42 @@ func (lc *litAfClient) DlcSetContractFunding(textArgs []string) error {
 	return nil
 }
 
+func (lc *litAfClient) DlcSetContractCoinType(textArgs []string) error {
+	if len(textArgs) > 0 && textArgs[0] == "-h" {
+		fmt.Fprintf(color.Output, setContractCoinTypeCommand.Format)
+		fmt.Fprintf(color.Output, setContractCoinTypeCommand.Description)
+		return nil
+	}
+
+	if len(textArgs) < 2 {
+		return fmt.Errorf(setContractCoinTypeCommand.Format)
+	}
+
+	args := new(litrpc.SetContractCoinTypeArgs)
+	reply := new(litrpc.SetContractCoinTypeReply)
+
+	cIdx, err := strconv.ParseUint(textArgs[0], 10, 64)
+	if err != nil {
+		return err
+	}
+	cointype, err := strconv.ParseUint(textArgs[1], 10, 64)
+	if err != nil {
+		return err
+	}
+
+	args.CIdx = cIdx
+	args.CoinType = uint32(cointype)
+
+	err = lc.rpccon.Call("LitRPC.SetContractCoinType", args, reply)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprint(color.Output, "Cointype set successfully\n")
+
+	return nil
+}
+
 func (lc *litAfClient) DlcSetContractSettlementDivision(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
 		fmt.Fprintf(color.Output, setContractSettlementDivisionCommand.Format)
@@ -552,7 +632,74 @@ func (lc *litAfClient) DlcSetContractSettlementDivision(textArgs []string) error
 	return nil
 }
 
-func PrintContract(c *dlc.DlcContract) {
+func (lc *litAfClient) DlcOfferContract(textArgs []string) error {
+	if len(textArgs) > 0 && textArgs[0] == "-h" {
+		fmt.Fprintf(color.Output, offerContractCommand.Format)
+		fmt.Fprintf(color.Output, offerContractCommand.Description)
+		return nil
+	}
+
+	if len(textArgs) < 2 {
+		return fmt.Errorf(offerContractCommand.Format)
+	}
+
+	args := new(litrpc.OfferContractArgs)
+	reply := new(litrpc.OfferContractReply)
+
+	cIdx, err := strconv.ParseUint(textArgs[0], 10, 64)
+	if err != nil {
+		return err
+	}
+	peerIdx, err := strconv.ParseUint(textArgs[1], 10, 64)
+	if err != nil {
+		return err
+	}
+
+	args.CIdx = cIdx
+	args.PeerIdx = uint32(peerIdx)
+
+	err = lc.rpccon.Call("LitRPC.OfferContract", args, reply)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprint(color.Output, "Offer sent set succesfully\n")
+
+	return nil
+}
+
+func (lc *litAfClient) DlcDeclineContract(textArgs []string) error {
+	if len(textArgs) > 0 && textArgs[0] == "-h" {
+		fmt.Fprintf(color.Output, declineContractCommand.Format)
+		fmt.Fprintf(color.Output, declineContractCommand.Description)
+		return nil
+	}
+
+	if len(textArgs) < 1 {
+		return fmt.Errorf(declineContractCommand.Format)
+	}
+
+	args := new(litrpc.DeclineContractArgs)
+	reply := new(litrpc.DeclineContractArgs)
+
+	cIdx, err := strconv.ParseUint(textArgs[0], 10, 64)
+	if err != nil {
+		return err
+	}
+
+	args.CIdx = cIdx
+
+	err = lc.rpccon.Call("LitRPC.DeclineContract", args, reply)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprint(color.Output, "Offer declined succesfully\n")
+
+	return nil
+}
+
+func PrintContract(c *lnutil.DlcContract) {
 	fmt.Fprintf(color.Output, "%-30s : %d\n", lnutil.White("Index"), c.Idx)
 	fmt.Fprintf(color.Output, "%-30s : [%x...%x] [%x...%x] [%x...%x]\n", lnutil.White("Oracle keys"), c.OracleA[:2], c.OracleA[31:], c.OracleB[:2], c.OracleB[31:], c.OracleQ[:2], c.OracleQ[31:])
 	fmt.Fprintf(color.Output, "%-30s : %04x\n", lnutil.White("Oracle feed"), c.OracleDataFeed)
@@ -561,17 +708,27 @@ func PrintContract(c *dlc.DlcContract) {
 	fmt.Fprintf(color.Output, "%-30s : %d\n", lnutil.White("Funded by peer"), c.TheirFundingAmount)
 	fmt.Fprintf(color.Output, "%-30s : %d\n", lnutil.White("Value 100% us"), c.ValueAllOurs)
 	fmt.Fprintf(color.Output, "%-30s : %d\n", lnutil.White("Value 100% peer"), c.ValueAllTheirs)
+	fmt.Fprintf(color.Output, "%-30s : %d\n", lnutil.White("Coin type"), c.CoinType)
+
+	peer := "None"
+	if len(bytes.Trim(c.RemoteNodePub[:], "\x00")) > 0 {
+		peer = lnutil.LitAdrFromPubkey(c.RemoteNodePub)
+	}
+
+	fmt.Fprintf(color.Output, "%-30s : %s\n", lnutil.White("Peer"), peer)
 
 	status := "Draft"
 	switch c.Status {
-	case dlc.ContractStatusActive:
+	case lnutil.ContractStatusActive:
 		status = "Active"
-	case dlc.ContractStatusClosed:
+	case lnutil.ContractStatusClosed:
 		status = "Closed"
-	case dlc.ContractStatusOfferedByMe:
+	case lnutil.ContractStatusOfferedByMe:
 		status = "Sent offer, awaiting reply"
-	case dlc.ContractStatusOfferedToMe:
+	case lnutil.ContractStatusOfferedToMe:
 		status = "Received offer, awaiting reply"
+	case lnutil.ContractStatusDeclined:
+		status = "Declined"
 	}
 
 	fmt.Fprintf(color.Output, "%-30s : %s\n", lnutil.White("Status"), status)
