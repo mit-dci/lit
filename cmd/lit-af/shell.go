@@ -119,6 +119,15 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		}
 		return nil
 	}
+
+	if cmd == "dlc" { // connect to lnd host
+		err = lc.Dlc(args)
+		if err != nil {
+			fmt.Fprintf(color.Output, "dlc error: %s\n", err)
+		}
+		return nil
+	}
+
 	// fund and create a new channel
 	if cmd == "fund" {
 		err = lc.FundChannel(args)
@@ -364,6 +373,7 @@ func (lc *litAfClient) Help(textArgs []string) error {
 		fmt.Fprintf(color.Output, "%s\t%s", lisCommand.Format, lisCommand.ShortDescription)
 		fmt.Fprintf(color.Output, "%s\t%s", conCommand.Format, conCommand.ShortDescription)
 		fmt.Fprintf(color.Output, "%s\t%s", graphCommand.Format, graphCommand.ShortDescription)
+		fmt.Fprintf(color.Output, "%s\t%s", dlcCommand.Format, dlcCommand.ShortDescription)
 		fmt.Fprintf(color.Output, "%s\t%s", fundCommand.Format, fundCommand.ShortDescription)
 		fmt.Fprintf(color.Output, "%s\t%s", pushCommand.Format, pushCommand.ShortDescription)
 		fmt.Fprintf(color.Output, "%s\t%s", closeCommand.Format, closeCommand.ShortDescription)

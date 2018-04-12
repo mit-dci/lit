@@ -44,6 +44,12 @@ const (
 
 	//Routing messages
 	MSGID_LINK_DESC = 0x70 // Describes a new channel for routing
+
+	//Discreet log contracts messages
+	MSGID_DLC_OFFER        = 0x90 // Offer a contract
+	MSGID_DLC_ACCEPTOFFER  = 0x91 // Accept the contract
+	MSGID_DLC_DECLINEOFFER = 0x92 // Decline the contract
+
 )
 
 //interface that all messages follow, for easy use
@@ -935,3 +941,149 @@ func (self LinkMsg) Bytes() []byte {
 
 func (self LinkMsg) Peer() uint32   { return self.PeerIdx }
 func (self LinkMsg) MsgType() uint8 { return MSGID_LINK_DESC }
+
+// Discreet log contract offer
+type DlcOfferMsg struct {
+	PeerIdx             uint32
+	CoinType            uint32
+	OurAmount           uint64            // The amount we will fund
+	TheirAmount         uint64            // The amount we expect the peer to fund
+	ValueAllOurs        uint64            // The oraclized value that entitles us to the full contract's value
+	ValueAllTheirs      uint64            // The oraclized value that entitles the remote peer to the full contract's value
+	OurSettlementPub    [33]byte          // The public key the contract should pay out to
+	OurChangeAddressPKH [20]byte          // The address we want to receive change for funding
+	OraclePub           [33]byte          // The public key of the oracle that's to be used
+	OracleOts           [33]byte          // The one-time-signing key of the oracle that is to be used
+	OurInputs           []DlcFundingInput // The inputs we will use for funding
+}
+
+type DlcFundingInput struct {
+	Outpoint wire.OutPoint
+	Value    int64
+}
+
+func NewDlcOfferMsg(peerIdx, cointype uint32, ourAmount, theirAmount, valueAllOurs, valueAllTheirs uint64, ourSettlementPub [33]byte, ourChangeAddressPKH [20]byte, oraclePub [33]byte, oracleOts [33]byte, ourInputs []DlcFundingInput) DlcOfferMsg {
+	msg := new(DlcOfferMsg)
+	msg.PeerIdx = peerIdx
+	msg.CoinType = cointype
+	msg.OurAmount = ourAmount
+	msg.TheirAmount = theirAmount
+	msg.ValueAllOurs = valueAllOurs
+	msg.ValueAllTheirs = valueAllTheirs
+	msg.OurSettlementPub = ourSettlementPub
+	msg.OurChangeAddressPKH = ourChangeAddressPKH
+	msg.OraclePub = oraclePub
+	msg.OracleOts = oracleOts
+	msg.OurInputs = ourInputs
+
+	return *msg
+}
+
+func DlcOfferMsgFromBytes(b []byte, peerIDX uint32) (DlcOfferMsg, error) {
+	sm := new(DlcOfferMsg)
+	sm.PeerIdx = peerIDX
+
+	if len(b) < 164 {
+		return *sm, fmt.Errorf("DlcOfferMsg %d bytes, expect at least 164", len(b))
+	}
+
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
+
+	_ = binary.Read(buf, binary.BigEndian, &sm.CoinType)
+	_ = binary.Read(buf, binary.BigEndian, &sm.OurAmount)
+	_ = binary.Read(buf, binary.BigEndian, &sm.TheirAmount)
+	_ = binary.Read(buf, binary.BigEndian, &sm.ValueAllOurs)
+	_ = binary.Read(buf, binary.BigEndian, &sm.ValueAllTheirs)
+	copy(sm.OurSettlementPub[:], buf.Next(33))
+	copy(sm.OurChangeAddressPKH[:], buf.Next(20))
+	copy(sm.OraclePub[:], buf.Next(20))
+	copy(sm.OracleOts[:], buf.Next(20))
+
+	var utxoCount uint32
+	_ = binary.Read(buf, binary.BigEndian, &utxoCount)
+	expectedLength := uint32(164) + 44*utxoCount
+
+	if uint32(len(b)) < expectedLength {
+		return *sm, fmt.Errorf("DlcOfferMsg %d bytes, expect at least %d for %d txos", len(b), expectedLength, utxoCount)
+	}
+
+	sm.OurInputs = make([]DlcFundingInput, utxoCount)
+	var op [36]byte
+	for i := uint32(0); i < utxoCount; i++ {
+		copy(op[:], buf.Next(36))
+		sm.OurInputs[i].Outpoint = *OutPointFromBytes(op)
+		_ = binary.Read(buf, binary.BigEndian, &sm.OurInputs[i].Value)
+	}
+
+	return *sm, nil
+}
+
+func (self DlcOfferMsg) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.WriteByte(self.MsgType())
+
+	binary.Write(&buf, binary.BigEndian, self.CoinType)
+	binary.Write(&buf, binary.BigEndian, self.OurAmount)
+	binary.Write(&buf, binary.BigEndian, self.TheirAmount)
+	binary.Write(&buf, binary.BigEndian, self.ValueAllOurs)
+	binary.Write(&buf, binary.BigEndian, self.ValueAllTheirs)
+
+	copy(self.OurSettlementPub[:], buf.Next(33))
+	copy(self.OurChangeAddressPKH[:], buf.Next(20))
+	copy(self.OraclePub[:], buf.Next(20))
+	copy(self.OracleOts[:], buf.Next(20))
+
+	binary.Write(&buf, binary.BigEndian, uint32(len(self.OurInputs)))
+
+	for i := 0; i < len(self.OurInputs); i++ {
+		opArr := OutPointToBytes(self.OurInputs[i].Outpoint)
+		buf.Write(opArr[:])
+		binary.Write(&buf, binary.BigEndian, self.OurInputs[i].Value)
+	}
+
+	return buf.Bytes()
+}
+
+func (self DlcOfferMsg) Peer() uint32   { return self.PeerIdx }
+func (self DlcOfferMsg) MsgType() uint8 { return MSGID_DLC_OFFER }
+
+type DlcOfferDeclMsg struct {
+	PeerIdx uint32
+	Reason  uint8 // Reason for declining the funding request
+}
+
+func NewDlcOfferDeclMsg(peerIdx uint32, reason uint8) DlcOfferDeclMsg {
+	msg := new(DlcOfferDeclMsg)
+	msg.PeerIdx = peerIdx
+	msg.Reason = reason
+	return *msg
+}
+
+func NewDlcOfferDeclMsgFromBytes(b []byte, peerIdx uint32) (DlcOfferDeclMsg, error) {
+	msg := new(DlcOfferDeclMsg)
+	msg.PeerIdx = peerIdx
+
+	if len(b) < 2 {
+		return *msg, fmt.Errorf("DlcOfferDeclMsg %d bytes, expect at least 2", len(b))
+	}
+
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
+
+	_ = binary.Read(buf, binary.BigEndian, &msg.Reason)
+
+	return *msg, nil
+}
+
+// ToBytes turns a DualFundingReqMsg into bytes
+func (self DlcOfferDeclMsg) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.WriteByte(self.MsgType())
+
+	binary.Write(&buf, binary.BigEndian, self.Reason)
+	return buf.Bytes()
+}
+
+func (self DlcOfferDeclMsg) Peer() uint32   { return self.PeerIdx }
+func (self DlcOfferDeclMsg) MsgType() uint8 { return MSGID_DLC_DECLINEOFFER }

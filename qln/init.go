@@ -7,6 +7,7 @@ import (
 	"github.com/adiabat/btcutil/hdkeychain"
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/coinparam"
+	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/wallit"
@@ -52,6 +53,11 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string) (*LitNode, er
 	// optional tower activation
 
 	nd.Tower = new(watchtower.WatchTower)
+
+	nd.DlcManager, err = dlc.NewManager(filepath.Join(nd.LitFolder, "dlc.db"))
+	if err != nil {
+		return nil, err
+	}
 
 	// make maps and channels
 	nd.UserMessageBox = make(chan string, 32)

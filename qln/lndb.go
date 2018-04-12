@@ -9,6 +9,7 @@ import (
 	"github.com/adiabat/btcd/wire"
 	"github.com/adiabat/btcutil"
 	"github.com/boltdb/bolt"
+	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
@@ -90,6 +91,9 @@ type LitNode struct {
 
 	// all nodes have a watchtower.  but could have a tower without a node
 	Tower watchtower.Watcher
+
+	// discreet log contract manager
+	DlcManager *dlc.DlcManager
 
 	// BaseWallet is the underlying wallet which keeps track of utxos, secrets,
 	// and network i/o
