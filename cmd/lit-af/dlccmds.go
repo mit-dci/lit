@@ -65,13 +65,15 @@ var addOracleCommand = &Command{
 var contractCommand = &Command{
 	Format: fmt.Sprintf("%s%s%s\n", lnutil.White("dlc contract"),
 		lnutil.ReqColor("subcommand"), lnutil.OptColor("parameters...")),
-	Description: fmt.Sprintf("%s\n%s\n%s\n%s\n%s\n%s\n%s\n",
+	Description: fmt.Sprintf("%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n",
 		"Command for managing contracts. Subcommand can be one of:",
 		fmt.Sprintf("%-20s\t%s", lnutil.White("new"), "Adds a new draft contract"),
 		fmt.Sprintf("%-20s\t%s", lnutil.White("view"), "Views a contract"),
 		fmt.Sprintf("%-20s\t%s", lnutil.White("setoracle"), "Sets a contract to use a particular oracle"),
 		fmt.Sprintf("%-20s\t%s", lnutil.White("setdatafeed"), "Sets the data feed to use for the contract"),
 		fmt.Sprintf("%-20s\t%s", lnutil.White("settime"), "Sets the settlement time of a contract"),
+		fmt.Sprintf("%-20s\t%s", lnutil.White("setfunding"), "Sets the funding parameters of a contract"),
+		fmt.Sprintf("%-20s\t%s", lnutil.White("setdivision"), "Sets the settlement division of a contract"),
 		fmt.Sprintf("%-20s\t%s", lnutil.White("ls"), "Shows a list of known contracts"),
 	),
 	ShortDescription: "Manages oracles for the Discreet Log Contracts.\n",
@@ -132,9 +134,10 @@ var setContractSettlementTimeCommand = &Command{
 }
 var setContractFundingCommand = &Command{
 	Format: fmt.Sprintf("%s%s\n", lnutil.White("dlc contract setfunding"),
-		lnutil.ReqColor("ourAmount", "theirAmount")),
-	Description: fmt.Sprintf("%s\n%s\n%s\n",
+		lnutil.ReqColor("cid", "ourAmount", "theirAmount")),
+	Description: fmt.Sprintf("%s\n%s\n%s\n%s\n",
 		"Sets the amounts both parties in the contract will fund",
+		fmt.Sprintf("%-10s %s", lnutil.White("cid"), "The ID of the contract"),
 		fmt.Sprintf("%-10s %s", lnutil.White("ourAmount"), "The amount we will fund"),
 		fmt.Sprintf("%-10s %s", lnutil.White("theirAmount"), "The amount our peer will fund"),
 	),
@@ -142,9 +145,10 @@ var setContractFundingCommand = &Command{
 }
 var setContractSettlementDivisionCommand = &Command{
 	Format: fmt.Sprintf("%s%s\n", lnutil.White("dlc contract setdivision"),
-		lnutil.ReqColor("valueAllForUs", "valueAllForThem")),
-	Description: fmt.Sprintf("%s\n%s\n%s\n",
+		lnutil.ReqColor("cid", "valueAllForUs", "valueAllForThem")),
+	Description: fmt.Sprintf("%s\n%s\n%s\n%s\n",
 		"Sets the values of the oracle data that will result in the full contract funds being paid to either peer",
+		fmt.Sprintf("%-10s %s", lnutil.White("cid"), "The ID of the contract"),
 		fmt.Sprintf("%-10s %s", lnutil.White("valueAllForUs"), "The outcome with which we will be entitled to the full contract value"),
 		fmt.Sprintf("%-10s %s", lnutil.White("valueAllForThem"), "The outcome with which our peer will be entitled to the full contract value"),
 	),
@@ -289,6 +293,14 @@ func (lc *litAfClient) DlcContract(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "settime" {
 		return lc.DlcSetContractSettlementTime(textArgs[1:])
 	}
+
+	if len(textArgs) > 0 && textArgs[0] == "setfunding" {
+		return lc.DlcSetContractFunding(textArgs[1:])
+	}
+
+	if len(textArgs) > 0 && textArgs[0] == "setdivision" {
+		return lc.DlcSetContractSettlementDivision(textArgs[1:])
+	}
 	return fmt.Errorf(contractCommand.Format)
 }
 
@@ -362,7 +374,7 @@ func (lc *litAfClient) DlcSetContractOracle(textArgs []string) error {
 		return nil
 	}
 
-	if len(textArgs) < 1 {
+	if len(textArgs) < 2 {
 		return fmt.Errorf(setContractOracleCommand.Format)
 	}
 
@@ -397,7 +409,7 @@ func (lc *litAfClient) DlcSetContractDatafeed(textArgs []string) error {
 		return nil
 	}
 
-	if len(textArgs) < 1 {
+	if len(textArgs) < 2 {
 		return fmt.Errorf(setContractDatafeedCommand.Format)
 	}
 
@@ -432,7 +444,7 @@ func (lc *litAfClient) DlcSetContractSettlementTime(textArgs []string) error {
 		return nil
 	}
 
-	if len(textArgs) < 1 {
+	if len(textArgs) < 2 {
 		return fmt.Errorf(setContractSettlementTimeCommand.Format)
 	}
 
@@ -456,6 +468,86 @@ func (lc *litAfClient) DlcSetContractSettlementTime(textArgs []string) error {
 	}
 
 	fmt.Fprint(color.Output, "Settlement time set succesfully\n")
+
+	return nil
+}
+
+func (lc *litAfClient) DlcSetContractFunding(textArgs []string) error {
+	if len(textArgs) > 0 && textArgs[0] == "-h" {
+		fmt.Fprintf(color.Output, setContractFundingCommand.Format)
+		fmt.Fprintf(color.Output, setContractFundingCommand.Description)
+		return nil
+	}
+
+	if len(textArgs) < 3 {
+		return fmt.Errorf(setContractFundingCommand.Format)
+	}
+
+	args := new(litrpc.SetContractFundingArgs)
+	reply := new(litrpc.SetContractFundingReply)
+
+	cIdx, err := strconv.ParseUint(textArgs[0], 10, 64)
+	if err != nil {
+		return err
+	}
+	ourAmount, err := strconv.ParseUint(textArgs[1], 10, 64)
+	if err != nil {
+		return err
+	}
+	theirAmount, err := strconv.ParseUint(textArgs[2], 10, 64)
+	if err != nil {
+		return err
+	}
+	args.CIdx = cIdx
+	args.OurAmount = ourAmount
+	args.TheirAmount = theirAmount
+
+	err = lc.rpccon.Call("LitRPC.SetContractFunding", args, reply)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprint(color.Output, "Funding set succesfully\n")
+
+	return nil
+}
+
+func (lc *litAfClient) DlcSetContractSettlementDivision(textArgs []string) error {
+	if len(textArgs) > 0 && textArgs[0] == "-h" {
+		fmt.Fprintf(color.Output, setContractSettlementDivisionCommand.Format)
+		fmt.Fprintf(color.Output, setContractSettlementDivisionCommand.Description)
+		return nil
+	}
+
+	if len(textArgs) < 3 {
+		return fmt.Errorf(setContractSettlementDivisionCommand.Format)
+	}
+
+	args := new(litrpc.SetContractSettlementDivisionArgs)
+	reply := new(litrpc.SetContractSettlementDivisionReply)
+
+	cIdx, err := strconv.ParseUint(textArgs[0], 10, 64)
+	if err != nil {
+		return err
+	}
+	fullyOurs, err := strconv.ParseUint(textArgs[1], 10, 64)
+	if err != nil {
+		return err
+	}
+	fullyTheirs, err := strconv.ParseUint(textArgs[2], 10, 64)
+	if err != nil {
+		return err
+	}
+	args.CIdx = cIdx
+	args.ValueFullyOurs = fullyOurs
+	args.ValueFullyTheirs = fullyTheirs
+
+	err = lc.rpccon.Call("LitRPC.SetContractSettlementDivision", args, reply)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprint(color.Output, "Funding set succesfully\n")
 
 	return nil
 }

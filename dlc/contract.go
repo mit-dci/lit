@@ -173,3 +173,31 @@ func (mgr *DlcManager) SetContractDatafeed(cIdx, feed uint64) error {
 
 	return nil
 }
+
+func (mgr *DlcManager) SetContractFunding(cIdx, ourAmount, theirAmount uint64) error {
+	c, err := mgr.LoadContract(cIdx)
+	if err != nil {
+		return err
+	}
+
+	c.OurFundingAmount = ourAmount
+	c.TheirFundingAmount = theirAmount
+
+	mgr.SaveContract(c)
+
+	return nil
+}
+
+func (mgr *DlcManager) SetContractSettlementDivision(cIdx, valueAllOurs, valueAllTheirs uint64) error {
+	c, err := mgr.LoadContract(cIdx)
+	if err != nil {
+		return err
+	}
+
+	c.ValueAllOurs = valueAllOurs
+	c.ValueAllTheirs = valueAllTheirs
+
+	mgr.SaveContract(c)
+
+	return nil
+}

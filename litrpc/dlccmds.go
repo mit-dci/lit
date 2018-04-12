@@ -192,3 +192,47 @@ func (r *LitRPC) SetContractSettlementTime(args SetContractSettlementTimeArgs, r
 	reply.Success = true
 	return nil
 }
+
+type SetContractFundingArgs struct {
+	CIdx        uint64
+	OurAmount   uint64
+	TheirAmount uint64
+}
+
+type SetContractFundingReply struct {
+	Success bool
+}
+
+func (r *LitRPC) SetContractFunding(args SetContractFundingArgs, reply *SetContractFundingReply) error {
+	var err error
+
+	err = r.Node.DlcManager.SetContractFunding(args.CIdx, args.OurAmount, args.TheirAmount)
+	if err != nil {
+		return err
+	}
+
+	reply.Success = true
+	return nil
+}
+
+type SetContractSettlementDivisionArgs struct {
+	CIdx             uint64
+	ValueFullyOurs   uint64
+	ValueFullyTheirs uint64
+}
+
+type SetContractSettlementDivisionReply struct {
+	Success bool
+}
+
+func (r *LitRPC) SetContractSettlementDivision(args SetContractSettlementDivisionArgs, reply *SetContractSettlementDivisionReply) error {
+	var err error
+
+	err = r.Node.DlcManager.SetContractSettlementDivision(args.CIdx, args.ValueFullyOurs, args.ValueFullyTheirs)
+	if err != nil {
+		return err
+	}
+
+	reply.Success = true
+	return nil
+}
