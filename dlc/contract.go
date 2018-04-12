@@ -12,7 +12,8 @@ type DlcContractStatus int
 
 const (
 	ContractStatusDraft DlcContractStatus = iota
-	ContractStatusOffered
+	ContractStatusOfferedByMe
+	ContractStatusOfferedToMe
 	ContractStatusActive
 	ContractStatusClosed
 )

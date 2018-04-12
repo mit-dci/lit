@@ -568,8 +568,10 @@ func PrintContract(c *dlc.DlcContract) {
 		status = "Active"
 	case dlc.ContractStatusClosed:
 		status = "Closed"
-	case dlc.ContractStatusOffered:
-		status = "Offered, awaiting reply"
+	case dlc.ContractStatusOfferedByMe:
+		status = "Sent offer, awaiting reply"
+	case dlc.ContractStatusOfferedToMe:
+		status = "Received offer, awaiting reply"
 	}
 
 	fmt.Fprintf(color.Output, "%-30s : %s\n", lnutil.White("Status"), status)
