@@ -8,7 +8,7 @@ import (
 	"net/http"
 )
 
-type Oracle struct {
+type DlcOracle struct {
 	Idx     uint64   // Index of the oracle for refencing in commands
 	A, B, Q [33]byte // public keys of the oracle
 	Name    string   // Name of the oracle for display purposes
@@ -16,13 +16,13 @@ type Oracle struct {
 }
 
 // This manually imports an oracle using the three keys (A, B, Q) concatenated and a name for reference purposes
-func (mgr *DlcManager) AddOracle(keys [99]byte, name string) (*Oracle, error) {
+func (mgr *DlcManager) AddOracle(keys [99]byte, name string) (*DlcOracle, error) {
 	var err error
 
-	o := new(Oracle)
+	o := new(DlcOracle)
 	copy(o.A[:], keys[:33])
-	copy(o.B[:], keys[34:66])
-	copy(o.Q[:], keys[67:])
+	copy(o.B[:], keys[33:66])
+	copy(o.Q[:], keys[66:])
 	o.Url = ""
 	o.Name = name
 	err = mgr.SaveOracle(o)
@@ -33,14 +33,14 @@ func (mgr *DlcManager) AddOracle(keys [99]byte, name string) (*Oracle, error) {
 	return o, nil
 }
 
-type OracleRestPubkeyResponse struct {
+type DlcOracleRestPubkeyResponse struct {
 	AHex string `json:"A"`
 	BHex string `json:"B"`
 	QHex string `json:"Q"`
 }
 
 // This imports an oracle using a REST endpoint
-func (mgr *DlcManager) ImportOracle(url string, name string) (*Oracle, error) {
+func (mgr *DlcManager) ImportOracle(url string, name string) (*DlcOracle, error) {
 	req, err := http.NewRequest("GET", url+"/api/pubkey", nil)
 	if err != nil {
 		return nil, err
@@ -52,13 +52,13 @@ func (mgr *DlcManager) ImportOracle(url string, name string) (*Oracle, error) {
 	}
 	defer resp.Body.Close()
 
-	var response OracleRestPubkeyResponse
+	var response DlcOracleRestPubkeyResponse
 
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return nil, err
 	}
 
-	o := new(Oracle)
+	o := new(DlcOracle)
 	A, err := hex.DecodeString(response.AHex)
 	if err != nil {
 		return nil, err
@@ -87,8 +87,9 @@ func (mgr *DlcManager) ImportOracle(url string, name string) (*Oracle, error) {
 	return o, nil
 }
 
-func OracleFromBuffer(buf *bytes.Buffer) (*Oracle, error) {
-	o := new(Oracle)
+func DlcOracleFromBytes(b []byte) (*DlcOracle, error) {
+	buf := bytes.NewBuffer(b)
+	o := new(DlcOracle)
 
 	copy(o.A[:], buf.Next(33))
 	copy(o.B[:], buf.Next(33))
@@ -111,12 +112,7 @@ func OracleFromBuffer(buf *bytes.Buffer) (*Oracle, error) {
 	return o, nil
 }
 
-func OracleFromBytes(b []byte) (*Oracle, error) {
-	buf := bytes.NewBuffer(b)
-	return OracleFromBuffer(buf)
-}
-
-func (self *Oracle) Bytes() []byte {
+func (self *DlcOracle) Bytes() []byte {
 	var buf bytes.Buffer
 
 	buf.Write(self.A[:])

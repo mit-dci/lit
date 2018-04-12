@@ -10,7 +10,8 @@ import (
 
 // const strings for db usage
 var (
-	BKTOracles = []byte("Oracles")
+	BKTOracles   = []byte("Oracles")
+	BKTContracts = []byte("Contracts")
 )
 
 func (mgr *DlcManager) InitDB(dbPath string) error {
@@ -24,20 +25,25 @@ func (mgr *DlcManager) InitDB(dbPath string) error {
 	// Ensure buckets exist that we need
 	err = mgr.DLCDB.Update(func(tx *bolt.Tx) error {
 		_, err = tx.CreateBucketIfNotExists(BKTOracles)
+		if err != nil {
+			return err
+		}
+		_, err = tx.CreateBucketIfNotExists(BKTContracts)
 		return err
 	})
 
 	return nil
 }
 
-func (mgr *DlcManager) SaveOracle(o *Oracle) error {
-	var index uint64
+func (mgr *DlcManager) SaveOracle(o *DlcOracle) error {
 	err := mgr.DLCDB.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(BKTOracles)
 
-		index, _ = b.NextSequence()
+		if o.Idx == 0 {
+			o.Idx, _ = b.NextSequence()
+		}
 		var wb bytes.Buffer
-		binary.Write(&wb, binary.BigEndian, index)
+		binary.Write(&wb, binary.BigEndian, o.Idx)
 		err := b.Put(wb.Bytes(), o.Bytes())
 
 		if err != nil {
@@ -50,12 +56,11 @@ func (mgr *DlcManager) SaveOracle(o *Oracle) error {
 	if err != nil {
 		return err
 	}
-	o.Idx = index
 	return nil
 }
 
-func (mgr *DlcManager) LoadOracle(idx uint64) (*Oracle, error) {
-	o := new(Oracle)
+func (mgr *DlcManager) LoadOracle(idx uint64) (*DlcOracle, error) {
+	o := new(DlcOracle)
 
 	err := mgr.DLCDB.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(BKTOracles)
@@ -69,11 +74,11 @@ func (mgr *DlcManager) LoadOracle(idx uint64) (*Oracle, error) {
 			return fmt.Errorf("Oracle %d does not exist", idx)
 		}
 		var err error
-		o, err = OracleFromBytes(v)
+		o, err = DlcOracleFromBytes(v)
 		if err != nil {
 			return err
 		}
-
+		o.Idx = idx
 		return nil
 	})
 
@@ -85,15 +90,15 @@ func (mgr *DlcManager) LoadOracle(idx uint64) (*Oracle, error) {
 
 }
 
-func (mgr *DlcManager) LoadAllOracles() ([]*Oracle, error) {
-	oracles := make([]*Oracle, 0)
+func (mgr *DlcManager) ListOracles() ([]*DlcOracle, error) {
+	oracles := make([]*DlcOracle, 0)
 	err := mgr.DLCDB.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(BKTOracles)
 		c := b.Cursor()
 
 		for k, v := c.First(); k != nil; k, v = c.Next() {
 			buf := bytes.NewBuffer(k)
-			o, err := OracleFromBytes(v)
+			o, err := DlcOracleFromBytes(v)
 			if err != nil {
 				return err
 			}
@@ -108,4 +113,84 @@ func (mgr *DlcManager) LoadAllOracles() ([]*Oracle, error) {
 	}
 
 	return oracles, nil
+}
+
+func (mgr *DlcManager) SaveContract(c *DlcContract) error {
+	err := mgr.DLCDB.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket(BKTContracts)
+
+		if c.Idx == 0 {
+			c.Idx, _ = b.NextSequence()
+		}
+		var wb bytes.Buffer
+		binary.Write(&wb, binary.BigEndian, c.Idx)
+		err := b.Put(wb.Bytes(), c.Bytes())
+
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (mgr *DlcManager) LoadContract(idx uint64) (*DlcContract, error) {
+	c := new(DlcContract)
+
+	err := mgr.DLCDB.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(BKTContracts)
+
+		var wb bytes.Buffer
+		binary.Write(&wb, binary.BigEndian, idx)
+
+		v := b.Get(wb.Bytes())
+
+		if v == nil {
+			return fmt.Errorf("Contract %d does not exist", idx)
+		}
+		var err error
+		c, err = DlcContractFromBytes(v)
+		if err != nil {
+			return err
+		}
+		c.Idx = idx
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return c, nil
+
+}
+
+func (mgr *DlcManager) ListContracts() ([]*DlcContract, error) {
+	contracts := make([]*DlcContract, 0)
+	err := mgr.DLCDB.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(BKTContracts)
+		c := b.Cursor()
+
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			buf := bytes.NewBuffer(k)
+			c, err := DlcContractFromBytes(v)
+			if err != nil {
+				return err
+			}
+			binary.Read(buf, binary.BigEndian, &c.Idx)
+			contracts = append(contracts, c)
+		}
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return contracts, nil
 }

@@ -6,19 +6,19 @@ import (
 	"github.com/mit-dci/lit/dlc"
 )
 
-// ------------------------- statedump
 type ListOraclesArgs struct {
 	// none
 }
 
 type ListOraclesReply struct {
-	Oracles []*dlc.Oracle
+	Oracles []*dlc.DlcOracle
 }
 
 // ListOracles will return all oracles know to LIT
 func (r *LitRPC) ListOracles(args ListOraclesArgs, reply *ListOraclesReply) error {
 	var err error
-	reply.Oracles, err = r.Node.DlcManager.LoadAllOracles()
+
+	reply.Oracles, err = r.Node.DlcManager.ListOracles()
 	if err != nil {
 		return err
 	}
@@ -32,7 +32,7 @@ type ImportOracleArgs struct {
 }
 
 type ImportOracleReply struct {
-	Oracle *dlc.Oracle
+	Oracle *dlc.DlcOracle
 }
 
 func (r *LitRPC) ImportOracle(args ImportOracleArgs, reply *ImportOracleReply) error {
@@ -51,7 +51,7 @@ type AddOracleArgs struct {
 }
 
 type AddOracleReply struct {
-	Oracle *dlc.Oracle
+	Oracle *dlc.DlcOracle
 }
 
 func (r *LitRPC) AddOracle(args AddOracleArgs, reply *AddOracleReply) error {
@@ -69,5 +69,126 @@ func (r *LitRPC) AddOracle(args AddOracleArgs, reply *AddOracleReply) error {
 		return err
 	}
 
+	return nil
+}
+
+type NewContractArgs struct {
+	// empty
+}
+
+type NewContractReply struct {
+	Contract *dlc.DlcContract
+}
+
+func (r *LitRPC) NewContract(args NewContractArgs, reply *NewContractReply) error {
+	var err error
+
+	reply.Contract, err = r.Node.DlcManager.AddContract()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type ListContractsArgs struct {
+	// none
+}
+
+type ListContractsReply struct {
+	Contracts []*dlc.DlcContract
+}
+
+// ListOracles will return all contracts know to LIT
+func (r *LitRPC) ListContracts(args ListContractsArgs, reply *ListContractsReply) error {
+	var err error
+
+	reply.Contracts, err = r.Node.DlcManager.ListContracts()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type GetContractArgs struct {
+	Idx uint64
+}
+
+type GetContractReply struct {
+	Contract *dlc.DlcContract
+}
+
+func (r *LitRPC) GetContract(args GetContractArgs, reply *GetContractReply) error {
+	var err error
+
+	reply.Contract, err = r.Node.DlcManager.LoadContract(args.Idx)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type SetContractOracleArgs struct {
+	CIdx uint64
+	OIdx uint64
+}
+
+type SetContractOracleReply struct {
+	Success bool
+}
+
+func (r *LitRPC) SetContractOracle(args SetContractOracleArgs, reply *SetContractOracleReply) error {
+	var err error
+
+	err = r.Node.DlcManager.SetContractOracle(args.CIdx, args.OIdx)
+	if err != nil {
+		return err
+	}
+
+	reply.Success = true
+	return nil
+}
+
+type SetContractDatafeedArgs struct {
+	CIdx uint64
+	Feed uint64
+}
+
+type SetContractDatafeedReply struct {
+	Success bool
+}
+
+func (r *LitRPC) SetContractDatafeed(args SetContractDatafeedArgs, reply *SetContractDatafeedReply) error {
+	var err error
+
+	err = r.Node.DlcManager.SetContractDatafeed(args.CIdx, args.Feed)
+	if err != nil {
+		return err
+	}
+
+	reply.Success = true
+	return nil
+}
+
+type SetContractSettlementTimeArgs struct {
+	CIdx uint64
+	Time uint64
+}
+
+type SetContractSettlementTimeReply struct {
+	Success bool
+}
+
+func (r *LitRPC) SetContractSettlementTime(args SetContractSettlementTimeArgs, reply *SetContractSettlementTimeReply) error {
+	var err error
+
+	err = r.Node.DlcManager.SetContractSettlementTime(args.CIdx, args.Time)
+	if err != nil {
+		return err
+	}
+
+	reply.Success = true
 	return nil
 }
