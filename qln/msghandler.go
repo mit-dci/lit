@@ -63,8 +63,11 @@ func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) er
 		if msg.MsgType() == lnutil.MSGID_DLC_OFFER {
 			nd.DlcOfferHandler(msg.(lnutil.DlcOfferMsg), peer)
 		}
+		if msg.MsgType() == lnutil.MSGID_DLC_ACCEPTOFFER {
+			nd.DlcAcceptHandler(msg.(lnutil.DlcOfferAcceptMsg), peer)
+		}
 		if msg.MsgType() == lnutil.MSGID_DLC_DECLINEOFFER {
-			nd.DlcDeclineHandler(msg.(lnutil.DlcOfferDeclMsg), peer)
+			nd.DlcDeclineHandler(msg.(lnutil.DlcOfferDeclineMsg), peer)
 		}
 
 	default:

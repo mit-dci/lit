@@ -1,6 +1,10 @@
 package dlc
 
 import (
+	"bytes"
+	"crypto/rand"
+	"fmt"
+
 	"github.com/mit-dci/lit/lnutil"
 )
 
@@ -10,12 +14,28 @@ func (mgr *DlcManager) AddContract() (*lnutil.DlcContract, error) {
 
 	c := new(lnutil.DlcContract)
 	c.Status = lnutil.ContractStatusDraft
+	rand.Read(c.PubKey[:])
 	err = mgr.SaveContract(c)
 	if err != nil {
 		return nil, err
 	}
 
 	return c, nil
+}
+
+func (mgr *DlcManager) FindContractByKey(key [33]byte) (*lnutil.DlcContract, error) {
+	contracts, err := mgr.ListContracts()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, c := range contracts {
+		if bytes.Equal(c.PubKey[:], key[:]) {
+			return c, nil
+		}
+	}
+
+	return nil, fmt.Errorf("Contract not found")
 }
 
 func (mgr *DlcManager) SetContractOracle(cIdx, oIdx uint64) error {
@@ -30,8 +50,6 @@ func (mgr *DlcManager) SetContractOracle(cIdx, oIdx uint64) error {
 	}
 
 	c.OracleA = o.A
-	c.OracleB = o.B
-	c.OracleQ = o.Q
 
 	mgr.SaveContract(c)
 
@@ -57,9 +75,39 @@ func (mgr *DlcManager) SetContractDatafeed(cIdx, feed uint64) error {
 		return err
 	}
 
-	c.OracleDataFeed = feed
+	if c.OracleTimestamp == 0 {
+		return fmt.Errorf("You need to set the settlement timestamp first, otherwise no R point can be retrieved for the feed")
+	}
 
-	mgr.SaveContract(c)
+	o, err := mgr.FindOracleByKey(c.OracleA)
+	if err != nil {
+		return err
+	}
+
+	c.OracleR, err = o.FetchRPoint(feed, c.OracleTimestamp)
+	if err != nil {
+		return err
+	}
+
+	err = mgr.SaveContract(c)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (mgr *DlcManager) SetContractRPoint(cIdx uint64, rPoint [33]byte) error {
+	c, err := mgr.LoadContract(cIdx)
+	if err != nil {
+		return err
+	}
+
+	c.OracleR = rPoint
+
+	err = mgr.SaveContract(c)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

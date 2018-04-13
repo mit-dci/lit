@@ -11,7 +11,6 @@ type DlcManager struct {
 func NewManager(dbPath string) (*DlcManager, error) {
 
 	var mgr DlcManager
-
 	err := mgr.InitDB(dbPath)
 	if err != nil {
 		return nil, err

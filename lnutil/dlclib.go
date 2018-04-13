@@ -15,19 +15,21 @@ const (
 	ContractStatusOfferedByMe DlcContractStatus = 1
 	ContractStatusOfferedToMe DlcContractStatus = 2
 	ContractStatusDeclined    DlcContractStatus = 3
-	ContractStatusActive      DlcContractStatus = 4
-	ContractStatusClosed      DlcContractStatus = 5
+	ContractStatusAccepted    DlcContractStatus = 4
+	ContractStatusActive      DlcContractStatus = 5
+	ContractStatusClosed      DlcContractStatus = 6
 )
 
 type DlcContract struct {
 	Idx                                  uint64                    // Index of the contract for referencing in commands
+	PeerIdx                              uint32                    // Index of the peer we've offered the contract to or received the contract from
+	PubKey                               [33]byte                  // Key of the contract
 	CoinType                             uint32                    // Coin type
-	OracleA, OracleB, OracleQ            [33]byte                  // Pub keys of the oracle
-	OracleDataFeed, OracleTimestamp      uint64                    // The data feed and time we use for contract settlement
+	OracleA, OracleR                     [33]byte                  // Pub keys of the oracle
+	OracleTimestamp                      uint64                    // The time we expect the oracle to publish
 	ValueAllOurs, ValueAllTheirs         uint64                    // The value of the datafeed based on which all money in the contract goes to either party
 	OurFundingAmount, TheirFundingAmount uint64                    // The amounts either side are funding
 	OurPayoutPKH, TheirPayoutPKH         [20]byte                  // PKH to which the contracts are supposed to pay out
-	RemoteNodePub                        [33]byte                  // Pubkey of the peer we've offered the contract to or received the contract from
 	Status                               DlcContractStatus         // Status of the contract
 	OurFundingInputs, TheirFundingInputs []DlcContractFundingInput // Outpoints used to fund the contract
 }
@@ -41,11 +43,11 @@ func DlcContractFromBytes(b []byte) (*DlcContract, error) {
 	buf := bytes.NewBuffer(b)
 	c := new(DlcContract)
 
+	copy(c.PubKey[:], buf.Next(33))
 	copy(c.OracleA[:], buf.Next(33))
-	copy(c.OracleB[:], buf.Next(33))
-	copy(c.OracleQ[:], buf.Next(33))
+	copy(c.OracleR[:], buf.Next(33))
 
-	_ = binary.Read(buf, binary.BigEndian, &c.OracleDataFeed)
+	_ = binary.Read(buf, binary.BigEndian, &c.PeerIdx)
 	_ = binary.Read(buf, binary.BigEndian, &c.OracleTimestamp)
 	_ = binary.Read(buf, binary.BigEndian, &c.ValueAllOurs)
 	_ = binary.Read(buf, binary.BigEndian, &c.ValueAllTheirs)
@@ -83,17 +85,16 @@ func DlcContractFromBytes(b []byte) (*DlcContract, error) {
 	}
 
 	_ = binary.Read(buf, binary.BigEndian, &c.CoinType)
-	copy(c.RemoteNodePub[:], buf.Next(33))
 	return c, nil
 }
 
 func (self *DlcContract) Bytes() []byte {
 	var buf bytes.Buffer
 
+	buf.Write(self.PubKey[:])
 	buf.Write(self.OracleA[:])
-	buf.Write(self.OracleB[:])
-	buf.Write(self.OracleQ[:])
-	binary.Write(&buf, binary.BigEndian, self.OracleDataFeed)
+	buf.Write(self.OracleR[:])
+	binary.Write(&buf, binary.BigEndian, self.PeerIdx)
 	binary.Write(&buf, binary.BigEndian, self.OracleTimestamp)
 	binary.Write(&buf, binary.BigEndian, self.ValueAllOurs)
 	binary.Write(&buf, binary.BigEndian, self.ValueAllTheirs)
@@ -124,8 +125,5 @@ func (self *DlcContract) Bytes() []byte {
 	}
 
 	binary.Write(&buf, binary.BigEndian, self.CoinType)
-
-	buf.Write(self.RemoteNodePub[:])
-
 	return buf.Bytes()
 }

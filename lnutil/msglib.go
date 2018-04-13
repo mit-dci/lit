@@ -122,8 +122,10 @@ func LitMsgFromBytes(b []byte, peerid uint32) (LitMsg, error) {
 
 	case MSGID_DLC_OFFER:
 		return NewDlcOfferMsgFromBytes(b, peerid)
+	case MSGID_DLC_ACCEPTOFFER:
+		return NewDlcOfferAcceptMsgFromBytes(b, peerid)
 	case MSGID_DLC_DECLINEOFFER:
-		return NewDlcOfferDeclMsgFromBytes(b, peerid)
+		return NewDlcOfferDeclineMsgFromBytes(b, peerid)
 
 	default:
 		return nil, fmt.Errorf("Unknown message of type %d ", msgType)
@@ -983,42 +985,90 @@ func (self DlcOfferMsg) Bytes() []byte {
 func (self DlcOfferMsg) Peer() uint32   { return self.PeerIdx }
 func (self DlcOfferMsg) MsgType() uint8 { return MSGID_DLC_OFFER }
 
-type DlcOfferDeclMsg struct {
-	PeerIdx uint32
-	Reason  uint8 // Reason for declining the funding request
+type DlcOfferDeclineMsg struct {
+	PeerIdx        uint32
+	Reason         uint8 // Reason for declining the funding request
+	ContractPubKey [33]byte
 }
 
-func NewDlcOfferDeclMsg(peerIdx uint32, reason uint8) DlcOfferDeclMsg {
-	msg := new(DlcOfferDeclMsg)
+func NewDlcOfferDeclineMsg(peerIdx uint32, reason uint8, contractPubKey [33]byte) DlcOfferDeclineMsg {
+	msg := new(DlcOfferDeclineMsg)
 	msg.PeerIdx = peerIdx
 	msg.Reason = reason
+	msg.ContractPubKey = contractPubKey
 	return *msg
 }
 
-func NewDlcOfferDeclMsgFromBytes(b []byte, peerIdx uint32) (DlcOfferDeclMsg, error) {
-	msg := new(DlcOfferDeclMsg)
+func NewDlcOfferDeclineMsgFromBytes(b []byte, peerIdx uint32) (DlcOfferDeclineMsg, error) {
+	msg := new(DlcOfferDeclineMsg)
 	msg.PeerIdx = peerIdx
 
 	if len(b) < 2 {
-		return *msg, fmt.Errorf("DlcOfferDeclMsg %d bytes, expect at least 2", len(b))
+		return *msg, fmt.Errorf("DlcOfferDeclineMsg %d bytes, expect at least 2", len(b))
 	}
 
 	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
 
 	_ = binary.Read(buf, binary.BigEndian, &msg.Reason)
+	copy(msg.ContractPubKey[:], buf.Next(33))
 
 	return *msg, nil
 }
 
 // ToBytes turns a DualFundingReqMsg into bytes
-func (self DlcOfferDeclMsg) Bytes() []byte {
+func (self DlcOfferDeclineMsg) Bytes() []byte {
 	var buf bytes.Buffer
 
 	buf.WriteByte(self.MsgType())
 
 	binary.Write(&buf, binary.BigEndian, self.Reason)
+	buf.Write(self.ContractPubKey[:])
 	return buf.Bytes()
 }
 
-func (self DlcOfferDeclMsg) Peer() uint32   { return self.PeerIdx }
-func (self DlcOfferDeclMsg) MsgType() uint8 { return MSGID_DLC_DECLINEOFFER }
+func (self DlcOfferDeclineMsg) Peer() uint32   { return self.PeerIdx }
+func (self DlcOfferDeclineMsg) MsgType() uint8 { return MSGID_DLC_DECLINEOFFER }
+
+// Signature for a particular settlement transaction
+type DlcContractSettlementSignature struct {
+	Outcome   uint64   // The oracle value for which transaction these are the signatures
+	Signature [64]byte // The signature for the transaction
+}
+
+type DlcOfferAcceptMsg struct {
+	PeerIdx        uint32
+	ContractPubKey [33]byte
+}
+
+func NewDlcOfferAcceptMsg(peerIdx uint32, contractPubKey [33]byte) DlcOfferAcceptMsg {
+	msg := new(DlcOfferAcceptMsg)
+	msg.PeerIdx = peerIdx
+	msg.ContractPubKey = contractPubKey
+	return *msg
+}
+
+func NewDlcOfferAcceptMsgFromBytes(b []byte, peerIdx uint32) (DlcOfferAcceptMsg, error) {
+	msg := new(DlcOfferAcceptMsg)
+	msg.PeerIdx = peerIdx
+
+	if len(b) < 34 {
+		return *msg, fmt.Errorf("DlcOfferAcceptMsg %d bytes, expect at least 34", len(b))
+	}
+
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
+	copy(msg.ContractPubKey[:], buf.Next(33))
+
+	return *msg, nil
+}
+
+// ToBytes turns a DualFundingReqMsg into bytes
+func (self DlcOfferAcceptMsg) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.WriteByte(self.MsgType())
+	buf.Write(self.ContractPubKey[:])
+	return buf.Bytes()
+}
+
+func (self DlcOfferAcceptMsg) Peer() uint32   { return self.PeerIdx }
+func (self DlcOfferAcceptMsg) MsgType() uint8 { return MSGID_DLC_ACCEPTOFFER }

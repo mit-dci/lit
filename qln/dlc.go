@@ -1,11 +1,20 @@
 package qln
 
 import (
-	"bytes"
 	"fmt"
 
 	"github.com/mit-dci/lit/lnutil"
 )
+
+func (nd *LitNode) AddContract() (*lnutil.DlcContract, error) {
+
+	c, err := nd.DlcManager.AddContract()
+	if err != nil {
+		return nil, err
+	}
+
+	return c, nil
+}
 
 func (nd *LitNode) OfferDlc(peerIdx uint32, cIdx uint64) error {
 	c, err := nd.DlcManager.LoadContract(cIdx)
@@ -14,12 +23,8 @@ func (nd *LitNode) OfferDlc(peerIdx uint32, cIdx uint64) error {
 	}
 
 	msg := lnutil.NewDlcOfferMsg(peerIdx, c)
-	for _, peer := range nd.RemoteCons {
-		if peer.Idx == peerIdx {
-			copy(c.RemoteNodePub[:], peer.Con.RemotePub.SerializeCompressed())
-		}
-	}
 	c.Status = lnutil.ContractStatusOfferedByMe
+	c.PeerIdx = peerIdx
 
 	err = nd.DlcManager.SaveContract(c)
 	if err != nil {
@@ -37,14 +42,7 @@ func (nd *LitNode) DeclineDlc(cIdx uint64) error {
 		return err
 	}
 
-	peerIdx := uint32(0)
-	for _, peer := range nd.RemoteCons {
-		if bytes.Equal(c.RemoteNodePub[:], peer.Con.RemotePub.SerializeCompressed()) {
-			peerIdx = peer.Idx
-			break
-		}
-	}
-	msg := lnutil.NewDlcOfferDeclMsg(peerIdx, 0x01)
+	msg := lnutil.NewDlcOfferDeclineMsg(c.PeerIdx, 0x01, c.PubKey)
 	c.Status = lnutil.ContractStatusDeclined
 
 	err = nd.DlcManager.SaveContract(c)
@@ -57,14 +55,30 @@ func (nd *LitNode) DeclineDlc(cIdx uint64) error {
 	return nil
 }
 
-func (nd *LitNode) DlcOfferHandler(msg lnutil.DlcOfferMsg, peer *RemotePeer) {
-	fmt.Println("DlcOfferHandler")
+func (nd *LitNode) AcceptDlc(cIdx uint64) error {
+	c, err := nd.DlcManager.LoadContract(cIdx)
+	if err != nil {
+		return err
+	}
 
+	msg := lnutil.NewDlcOfferAcceptMsg(c.PeerIdx, c.PubKey)
+	c.Status = lnutil.ContractStatusAccepted
+
+	err = nd.DlcManager.SaveContract(c)
+	if err != nil {
+		return err
+	}
+
+	nd.OmniOut <- msg
+
+	return nil
+}
+
+func (nd *LitNode) DlcOfferHandler(msg lnutil.DlcOfferMsg, peer *RemotePeer) {
 	c := new(lnutil.DlcContract)
 
-	copy(c.RemoteNodePub[:], peer.Con.RemotePub.SerializeCompressed())
+	c.PeerIdx = peer.Idx
 	c.Status = lnutil.ContractStatusOfferedToMe
-
 	// Reverse copy from the contract we received
 	c.OurFundingAmount = msg.Contract.TheirFundingAmount
 	c.TheirFundingAmount = msg.Contract.OurFundingAmount
@@ -78,10 +92,9 @@ func (nd *LitNode) DlcOfferHandler(msg lnutil.DlcOfferMsg, peer *RemotePeer) {
 	// Copy
 	c.CoinType = msg.Contract.CoinType
 	c.OracleA = msg.Contract.OracleA
-	c.OracleB = msg.Contract.OracleB
-	c.OracleQ = msg.Contract.OracleQ
-	c.OracleDataFeed = msg.Contract.OracleDataFeed
+	c.OracleR = msg.Contract.OracleR
 	c.OracleTimestamp = msg.Contract.OracleTimestamp
+	c.PubKey = msg.Contract.PubKey
 
 	err := nd.DlcManager.SaveContract(c)
 	if err != nil {
@@ -90,24 +103,33 @@ func (nd *LitNode) DlcOfferHandler(msg lnutil.DlcOfferMsg, peer *RemotePeer) {
 	}
 }
 
-func (nd *LitNode) DlcDeclineHandler(msg lnutil.DlcOfferDeclMsg, peer *RemotePeer) {
-	fmt.Println("DlcDeclineHandler")
-
-	contracts, err := nd.DlcManager.ListContracts()
+func (nd *LitNode) DlcDeclineHandler(msg lnutil.DlcOfferDeclineMsg, peer *RemotePeer) {
+	c, err := nd.DlcManager.FindContractByKey(msg.ContractPubKey)
 	if err != nil {
-		fmt.Printf("DlcDeclineHandler ListContracts err %s\n", err.Error())
+		fmt.Printf("DlcDeclineHandler FindContract err %s\n", err.Error())
 		return
 	}
 
-	for _, c := range contracts {
-		if bytes.Equal(c.RemoteNodePub[:], peer.Con.RemotePub.SerializeCompressed()) {
-			c.Status = lnutil.ContractStatusDeclined
-			err = nd.DlcManager.SaveContract(c)
-			if err != nil {
-				fmt.Printf("DlcDeclineHandler SaveContract err %s\n", err.Error())
-				return
-			}
-		}
+	c.Status = lnutil.ContractStatusDeclined
+	err = nd.DlcManager.SaveContract(c)
+	if err != nil {
+		fmt.Printf("DlcDeclineHandler SaveContract err %s\n", err.Error())
+		return
+	}
+}
+
+func (nd *LitNode) DlcAcceptHandler(msg lnutil.DlcOfferAcceptMsg, peer *RemotePeer) {
+	c, err := nd.DlcManager.FindContractByKey(msg.ContractPubKey)
+	if err != nil {
+		fmt.Printf("DlcAcceptHandler FindContract err %s\n", err.Error())
+		return
+	}
+
+	c.Status = lnutil.ContractStatusAccepted
+	err = nd.DlcManager.SaveContract(c)
+	if err != nil {
+		fmt.Printf("DlcAcceptHandler SaveContract err %s\n", err.Error())
+		return
 	}
 
 }

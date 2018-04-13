@@ -47,7 +47,7 @@ func (r *LitRPC) ImportOracle(args ImportOracleArgs, reply *ImportOracleReply) e
 }
 
 type AddOracleArgs struct {
-	Keys string
+	Key  string
 	Name string
 }
 
@@ -57,15 +57,15 @@ type AddOracleReply struct {
 
 func (r *LitRPC) AddOracle(args AddOracleArgs, reply *AddOracleReply) error {
 	var err error
-	parsedKeys, err := hex.DecodeString(args.Keys)
+	parsedKey, err := hex.DecodeString(args.Key)
 	if err != nil {
 		return err
 	}
 
-	var keys [99]byte
-	copy(keys[:], parsedKeys)
+	var key [33]byte
+	copy(key[:], parsedKey)
 
-	reply.Oracle, err = r.Node.DlcManager.AddOracle(keys, args.Name)
+	reply.Oracle, err = r.Node.DlcManager.AddOracle(key, args.Name)
 	if err != nil {
 		return err
 	}
@@ -84,7 +84,7 @@ type NewContractReply struct {
 func (r *LitRPC) NewContract(args NewContractArgs, reply *NewContractReply) error {
 	var err error
 
-	reply.Contract, err = r.Node.DlcManager.AddContract()
+	reply.Contract, err = r.Node.AddContract()
 	if err != nil {
 		return err
 	}
@@ -165,6 +165,27 @@ func (r *LitRPC) SetContractDatafeed(args SetContractDatafeedArgs, reply *SetCon
 	var err error
 
 	err = r.Node.DlcManager.SetContractDatafeed(args.CIdx, args.Feed)
+	if err != nil {
+		return err
+	}
+
+	reply.Success = true
+	return nil
+}
+
+type SetContractRPointArgs struct {
+	CIdx   uint64
+	RPoint [33]byte
+}
+
+type SetContractRPointReply struct {
+	Success bool
+}
+
+func (r *LitRPC) SetContractRPoint(args SetContractRPointArgs, reply *SetContractRPointReply) error {
+	var err error
+
+	err = r.Node.DlcManager.SetContractRPoint(args.CIdx, args.RPoint)
 	if err != nil {
 		return err
 	}
@@ -292,6 +313,26 @@ func (r *LitRPC) DeclineContract(args DeclineContractArgs, reply *DeclineContrac
 	var err error
 
 	err = r.Node.DeclineDlc(args.CIdx)
+	if err != nil {
+		return err
+	}
+
+	reply.Success = true
+	return nil
+}
+
+type AcceptContractArgs struct {
+	CIdx uint64
+}
+
+type AcceptContractReply struct {
+	Success bool
+}
+
+func (r *LitRPC) AcceptContract(args AcceptContractArgs, reply *AcceptContractReply) error {
+	var err error
+
+	err = r.Node.AcceptDlc(args.CIdx)
 	if err != nil {
 		return err
 	}
