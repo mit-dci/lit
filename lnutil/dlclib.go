@@ -3,7 +3,6 @@ package lnutil
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 
 	"github.com/adiabat/btcd/wire"
 )
@@ -27,16 +26,17 @@ type DlcContract struct {
 	CoinType                             uint32                    // Coin type
 	OracleA, OracleR                     [33]byte                  // Pub keys of the oracle
 	OracleTimestamp                      uint64                    // The time we expect the oracle to publish
-	ValueAllOurs, ValueAllTheirs         uint64                    // The value of the datafeed based on which all money in the contract goes to either party
-	OurFundingAmount, TheirFundingAmount uint64                    // The amounts either side are funding
-	OurPayoutPKH, TheirPayoutPKH         [20]byte                  // PKH to which the contracts are supposed to pay out
+	ValueAllOurs, ValueAllTheirs         int64                     // The value of the datafeed based on which all money in the contract goes to either party
+	OurFundingAmount, TheirFundingAmount int64                     // The amounts either side are funding
+	OurChangePKH, TheirChangePKH         [20]byte                  // PKH to which the contracts funding change should go
+	OurPayoutPub, TheirPayoutPub         [33]byte                  // Pubkey to which the contracts are supposed to pay out
 	Status                               DlcContractStatus         // Status of the contract
 	OurFundingInputs, TheirFundingInputs []DlcContractFundingInput // Outpoints used to fund the contract
 }
 
 type DlcContractFundingInput struct {
 	Outpoint wire.OutPoint
-	Value    uint64
+	Value    int64
 }
 
 func DlcContractFromBytes(b []byte) (*DlcContract, error) {
@@ -54,12 +54,11 @@ func DlcContractFromBytes(b []byte) (*DlcContract, error) {
 	_ = binary.Read(buf, binary.BigEndian, &c.OurFundingAmount)
 	_ = binary.Read(buf, binary.BigEndian, &c.TheirFundingAmount)
 
-	copy(c.OurPayoutPKH[:], buf.Next(20))
-	copy(c.TheirPayoutPKH[:], buf.Next(20))
+	copy(c.OurPayoutPub[:], buf.Next(33))
+	copy(c.TheirPayoutPub[:], buf.Next(33))
 
 	var status int32
 	_ = binary.Read(buf, binary.BigEndian, &status)
-	fmt.Printf("Read byte for status: %d\n", status)
 
 	c.Status = DlcContractStatus(status)
 
@@ -78,13 +77,17 @@ func DlcContractFromBytes(b []byte) (*DlcContract, error) {
 	_ = binary.Read(buf, binary.BigEndian, &theirInputsLen)
 
 	c.TheirFundingInputs = make([]DlcContractFundingInput, theirInputsLen)
-	for i := uint32(0); i < ourInputsLen; i++ {
+	for i := uint32(0); i < theirInputsLen; i++ {
 		copy(op[:], buf.Next(36))
-		c.OurFundingInputs[i].Outpoint = *OutPointFromBytes(op)
-		_ = binary.Read(buf, binary.BigEndian, &c.OurFundingInputs[i].Value)
+		c.TheirFundingInputs[i].Outpoint = *OutPointFromBytes(op)
+		_ = binary.Read(buf, binary.BigEndian, &c.TheirFundingInputs[i].Value)
 	}
 
 	_ = binary.Read(buf, binary.BigEndian, &c.CoinType)
+
+	copy(c.OurChangePKH[:], buf.Next(20))
+	copy(c.TheirChangePKH[:], buf.Next(20))
+
 	return c, nil
 }
 
@@ -100,10 +103,9 @@ func (self *DlcContract) Bytes() []byte {
 	binary.Write(&buf, binary.BigEndian, self.ValueAllTheirs)
 	binary.Write(&buf, binary.BigEndian, self.OurFundingAmount)
 	binary.Write(&buf, binary.BigEndian, self.TheirFundingAmount)
-	buf.Write(self.OurPayoutPKH[:])
-	buf.Write(self.TheirPayoutPKH[:])
+	buf.Write(self.OurPayoutPub[:])
+	buf.Write(self.TheirPayoutPub[:])
 	var status = int32(self.Status)
-	fmt.Printf("Writing byte for status: %d\n", status)
 	binary.Write(&buf, binary.BigEndian, status)
 
 	ourInputsLen := uint32(len(self.OurFundingInputs))
@@ -125,5 +127,9 @@ func (self *DlcContract) Bytes() []byte {
 	}
 
 	binary.Write(&buf, binary.BigEndian, self.CoinType)
+
+	buf.Write(self.OurChangePKH[:])
+	buf.Write(self.TheirChangePKH[:])
+
 	return buf.Bytes()
 }

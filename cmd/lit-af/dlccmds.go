@@ -599,11 +599,11 @@ func (lc *litAfClient) DlcSetContractFunding(textArgs []string) error {
 	if err != nil {
 		return err
 	}
-	ourAmount, err := strconv.ParseUint(textArgs[1], 10, 64)
+	ourAmount, err := strconv.ParseInt(textArgs[1], 10, 64)
 	if err != nil {
 		return err
 	}
-	theirAmount, err := strconv.ParseUint(textArgs[2], 10, 64)
+	theirAmount, err := strconv.ParseInt(textArgs[2], 10, 64)
 	if err != nil {
 		return err
 	}
@@ -675,11 +675,11 @@ func (lc *litAfClient) DlcSetContractSettlementDivision(textArgs []string) error
 	if err != nil {
 		return err
 	}
-	fullyOurs, err := strconv.ParseUint(textArgs[1], 10, 64)
+	fullyOurs, err := strconv.ParseInt(textArgs[1], 10, 64)
 	if err != nil {
 		return err
 	}
-	fullyTheirs, err := strconv.ParseUint(textArgs[2], 10, 64)
+	fullyTheirs, err := strconv.ParseInt(textArgs[2], 10, 64)
 	if err != nil {
 		return err
 	}

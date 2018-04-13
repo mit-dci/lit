@@ -1036,14 +1036,18 @@ type DlcContractSettlementSignature struct {
 }
 
 type DlcOfferAcceptMsg struct {
-	PeerIdx        uint32
-	ContractPubKey [33]byte
+	PeerIdx              uint32
+	ContractPubKey       [33]byte
+	FundingInputs        []DlcContractFundingInput
+	SettlementSignatures []DlcContractSettlementSignature
 }
 
-func NewDlcOfferAcceptMsg(peerIdx uint32, contractPubKey [33]byte) DlcOfferAcceptMsg {
+func NewDlcOfferAcceptMsg(contract *DlcContract, signatures []DlcContractSettlementSignature) DlcOfferAcceptMsg {
 	msg := new(DlcOfferAcceptMsg)
-	msg.PeerIdx = peerIdx
-	msg.ContractPubKey = contractPubKey
+	msg.PeerIdx = contract.PeerIdx
+	msg.ContractPubKey = contract.PubKey
+	msg.FundingInputs = contract.OurFundingInputs
+	copy(msg.SettlementSignatures[:], signatures[:])
 	return *msg
 }
 
@@ -1058,6 +1062,28 @@ func NewDlcOfferAcceptMsgFromBytes(b []byte, peerIdx uint32) (DlcOfferAcceptMsg,
 	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
 	copy(msg.ContractPubKey[:], buf.Next(33))
 
+	var inputCount uint32
+	binary.Read(buf, binary.BigEndian, &inputCount)
+
+	msg.FundingInputs = make([]DlcContractFundingInput, inputCount)
+	var op [36]byte
+	for i := uint32(0); i < inputCount; i++ {
+		binary.Read(buf, binary.BigEndian, &msg.FundingInputs[i].Value)
+		copy(op[:], buf.Next(36))
+		msg.FundingInputs[i].Outpoint = *OutPointFromBytes(op)
+
+	}
+
+	var signatureCount uint32
+	binary.Read(buf, binary.BigEndian, &signatureCount)
+
+	msg.SettlementSignatures = make([]DlcContractSettlementSignature, signatureCount)
+
+	for i := uint32(0); i < signatureCount; i++ {
+		binary.Read(buf, binary.BigEndian, &msg.SettlementSignatures[i].Outcome)
+		copy(msg.SettlementSignatures[i].Signature[:], buf.Next(64))
+	}
+
 	return *msg, nil
 }
 
@@ -1067,6 +1093,24 @@ func (self DlcOfferAcceptMsg) Bytes() []byte {
 
 	buf.WriteByte(self.MsgType())
 	buf.Write(self.ContractPubKey[:])
+
+	inputCount := uint32(len(self.FundingInputs))
+	binary.Write(&buf, binary.BigEndian, inputCount)
+
+	for i := uint32(0); i < inputCount; i++ {
+		binary.Write(&buf, binary.BigEndian, self.FundingInputs[i].Value)
+		op := OutPointToBytes(self.FundingInputs[i].Outpoint)
+		buf.Write(op[:])
+
+	}
+
+	signatureCount := uint32(len(self.SettlementSignatures))
+	binary.Write(&buf, binary.BigEndian, signatureCount)
+
+	for i := uint32(0); i < signatureCount; i++ {
+		binary.Write(&buf, binary.BigEndian, self.SettlementSignatures[i].Outcome)
+		buf.Write(self.SettlementSignatures[i].Signature[:])
+	}
 	return buf.Bytes()
 }
 

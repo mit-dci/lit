@@ -112,7 +112,7 @@ func (mgr *DlcManager) SetContractRPoint(cIdx uint64, rPoint [33]byte) error {
 	return nil
 }
 
-func (mgr *DlcManager) SetContractFunding(cIdx, ourAmount, theirAmount uint64) error {
+func (mgr *DlcManager) SetContractFunding(cIdx uint64, ourAmount, theirAmount int64) error {
 	c, err := mgr.LoadContract(cIdx)
 	if err != nil {
 		return err
@@ -126,7 +126,7 @@ func (mgr *DlcManager) SetContractFunding(cIdx, ourAmount, theirAmount uint64) e
 	return nil
 }
 
-func (mgr *DlcManager) SetContractSettlementDivision(cIdx, valueAllOurs, valueAllTheirs uint64) error {
+func (mgr *DlcManager) SetContractSettlementDivision(cIdx uint64, valueAllOurs, valueAllTheirs int64) error {
 	c, err := mgr.LoadContract(cIdx)
 	if err != nil {
 		return err

@@ -217,8 +217,8 @@ func (r *LitRPC) SetContractSettlementTime(args SetContractSettlementTimeArgs, r
 
 type SetContractFundingArgs struct {
 	CIdx        uint64
-	OurAmount   uint64
-	TheirAmount uint64
+	OurAmount   int64
+	TheirAmount int64
 }
 
 type SetContractFundingReply struct {
@@ -239,8 +239,8 @@ func (r *LitRPC) SetContractFunding(args SetContractFundingArgs, reply *SetContr
 
 type SetContractSettlementDivisionArgs struct {
 	CIdx             uint64
-	ValueFullyOurs   uint64
-	ValueFullyTheirs uint64
+	ValueFullyOurs   int64
+	ValueFullyTheirs int64
 }
 
 type SetContractSettlementDivisionReply struct {

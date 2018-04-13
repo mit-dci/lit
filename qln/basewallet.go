@@ -93,6 +93,12 @@ type UWallet interface {
 	// ===== TESTING / SPAMMING ONLY, these funcs will not be in the real interface
 	// Sweep sends lots of txs (uint32 of them) to the specified address.
 	Sweep([]byte, uint32) ([]*chainhash.Hash, error)
+
+	PickUtxos(amtWanted, outputByteSize, feePerByte int64, ow bool) (portxo.TxoSliceByBip69, int64, error)
+
+	SignMyInputs(tx *wire.MsgTx) error
+
+	DirectSendTx(tx *wire.MsgTx) error
 }
 
 // GetUsePub gets a pubkey from the base wallet, but first modifies

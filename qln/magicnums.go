@@ -9,6 +9,8 @@ const (
 	UseChannelWatchRefund = 31 | hdkeychain.HardenedKeyStart
 	UseChannelHAKDBase    = 40 | hdkeychain.HardenedKeyStart
 	UseChannelElkrem      = 8888 | hdkeychain.HardenedKeyStart
+
+	UseContractPayout = 50 | hdkeychain.HardenedKeyStart
 	// links Id and channel. replaces UseChannelFund
 
 	UseIdKey = 111 | hdkeychain.HardenedKeyStart
