@@ -308,7 +308,6 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 
 		// just return the elkScalar and let
 		// something modify it before export due to the seq=1 flag.
-
 		shTxo.PkScript = script
 		shTxo.Value = tx.TxOut[shIdx].Value
 		shTxo.Mode = portxo.TxoP2WSHComp

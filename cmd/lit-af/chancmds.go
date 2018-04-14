@@ -254,35 +254,3 @@ func (lc *litAfClient) Push(textArgs []string) error {
 
 	return nil
 }
-
-func (lc *litAfClient) Dump(textArgs []string) error {
-	pReply := new(litrpc.DumpReply)
-	pArgs := new(litrpc.NoArgs)
-
-	err := lc.rpccon.Call("LitRPC.DumpPrivs", pArgs, pReply)
-	if err != nil {
-		return err
-	}
-	fmt.Fprintf(color.Output, "Private keys for all channels and utxos:\n")
-
-	// Display DumpPriv info
-	for i, t := range pReply.Privs {
-		fmt.Fprintf(color.Output, "%d %s h:%d amt:%s %s ",
-			i, lnutil.OutPoint(t.OutPoint), t.Height,
-			lnutil.SatoshiColor(t.Amt), t.CoinType)
-		if t.Delay != 0 {
-			fmt.Fprintf(color.Output, " delay: %d", t.Delay)
-		}
-		if !t.Witty {
-			fmt.Fprintf(color.Output, " non-witness")
-		}
-		if len(t.PairKey) > 1 {
-			fmt.Fprintf(
-				color.Output, "\nPair Pubkey: %s", lnutil.Green(t.PairKey))
-		}
-		fmt.Fprintf(color.Output, "\n\tprivkey: %s", lnutil.Red(t.WIF))
-		fmt.Fprintf(color.Output, "\n")
-	}
-
-	return nil
-}

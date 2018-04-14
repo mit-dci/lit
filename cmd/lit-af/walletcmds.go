@@ -296,3 +296,100 @@ func (lc *litAfClient) Address(textArgs []string) error {
 	return nil
 
 }
+
+// ------------------ send raw tx
+func (lc *litAfClient) RawTx(textArgs []string) error {
+	args := new(litrpc.RawArgs)
+	reply := new(litrpc.TxidsReply)
+
+	// there is at least 1 argument; that should be the new fee rate
+	if len(textArgs) == 0 {
+		return fmt.Errorf("raw needs a hex string")
+	}
+
+	args.TxHex = textArgs[0]
+
+	err := lc.rpccon.Call("LitRPC.PushRawTx", args, reply)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(color.Output, "sent txid(s):\n")
+	for i, t := range reply.Txids {
+		fmt.Fprintf(color.Output, "\t%d %s\n", i, t)
+	}
+	return nil
+}
+
+// ------------------ imporTxo
+func (lc *litAfClient) ImporTxo(textArgs []string) error {
+	args := new(litrpc.RawArgs)
+	reply := new(litrpc.StatusReply)
+
+	// there is at least 1 argument; that should be the new fee rate
+	if len(textArgs) == 0 {
+		return fmt.Errorf("ImporTxo needs a hex string")
+	}
+
+	args.TxHex = textArgs[0]
+
+	err := lc.rpccon.Call("LitRPC.ImporTxo", args, reply)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(color.Output, "imported utxo:\n\t%s\n", reply.Status)
+	return nil
+}
+
+// DumpPriv exports all utxos with private keys
+func (lc *litAfClient) DumpPriv(textArgs []string) error {
+
+	args := new(litrpc.NoArgs)
+	// not actually txids, just a slice of strings...
+	reply := new(litrpc.TxidsReply)
+
+	err := lc.rpccon.Call("LitRPC.DumpPriv", args, reply)
+	if err != nil {
+		return err
+	}
+
+	for i, txoString := range reply.Txids {
+		fmt.Printf("\tutxo %d: %s\n", i, txoString)
+	}
+
+	return nil
+}
+
+// Dump is deprecated... should add options to dumppriv to allow wifs
+func (lc *litAfClient) DumpOld(textArgs []string) error {
+	pReply := new(litrpc.DumpReply)
+	pArgs := new(litrpc.NoArgs)
+
+	err := lc.rpccon.Call("LitRPC.DumpPrivs", pArgs, pReply)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(color.Output, "Private keys for all channels and utxos:\n")
+
+	// Display DumpPriv info
+	for i, t := range pReply.Privs {
+		fmt.Fprintf(color.Output, "%d %s h:%d amt:%s %s ",
+			i, lnutil.OutPoint(t.OutPoint), t.Height,
+			lnutil.SatoshiColor(t.Amt), t.CoinType)
+		if t.Delay != 0 {
+			fmt.Fprintf(color.Output, " delay: %d", t.Delay)
+		}
+		if !t.Witty {
+			fmt.Fprintf(color.Output, " non-witness")
+		}
+		if len(t.PairKey) > 1 {
+			fmt.Fprintf(
+				color.Output, "\nPair Pubkey: %s", lnutil.Green(t.PairKey))
+		}
+		fmt.Fprintf(color.Output, "\n\tprivkey: %s", lnutil.Red(t.WIF))
+		fmt.Fprintf(color.Output, "\n")
+	}
+
+	return nil
+}
