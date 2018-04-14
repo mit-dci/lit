@@ -266,14 +266,14 @@ func CheckHeaderChain(
 		prevHeaders = append(prevHeaders, inHeaders[i])
 		rightBits, err := p.DiffCalcFunction(prevHeaders, height+int32(i), p)
 		if err != nil {
-			return 0, fmt.Errorf("Error calculating Block %d %s difficuly. %s",
+			return 0, fmt.Errorf("Error calculating Block %d %s difficulty. %s",
 				int(height)+i, hdr.BlockHash().String(), err.Error())
 		}
 
 		// vertcoin diff adjustment not yet implemented
 		// TODO - get rid of coin specific workaround
 		if hdr.Bits != rightBits && (p.Name != "vtctest" && p.Name != "vtc") {
-			return 0, fmt.Errorf("Block %d %s incorrect difficuly.  Read %x, expect %x",
+			return 0, fmt.Errorf("Block %d %s incorrect difficulty.  Read %x, expect %x",
 				int(height)+i, hdr.BlockHash().String(), hdr.Bits, rightBits)
 		}
 	}
