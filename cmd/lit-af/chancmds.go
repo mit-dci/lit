@@ -22,6 +22,15 @@ var fundCommand = &Command{
 	ShortDescription: "Establish and fund a new lightning channel with the given peer.\n",
 }
 
+var watchCommand = &Command{
+	Format: fmt.Sprintf("%s%s\n", lnutil.White("watch"),
+		lnutil.ReqColor("channel idx", "watchPeerIdx")),
+	Description: fmt.Sprintf("%s\n%s\n%s%s\n",
+		"Send channel data to a watcher",
+		"The watcher can defend your channel while you're offline."),
+	ShortDescription: "Send channel watch data to watcher.\n",
+}
+
 var pushCommand = &Command{
 	Format: fmt.Sprintf("%s%s%s%s\n", lnutil.White("push"), lnutil.ReqColor("channel idx", "amount"), lnutil.OptColor("times"), lnutil.OptColor("data")),
 	Description: fmt.Sprintf("%s\n%s\n%s\n",
@@ -283,6 +292,44 @@ func (lc *litAfClient) Dump(textArgs []string) error {
 		fmt.Fprintf(color.Output, "\n\tprivkey: %s", lnutil.Red(t.WIF))
 		fmt.Fprintf(color.Output, "\n")
 	}
+
+	return nil
+}
+
+func (lc *litAfClient) Watch(textArgs []string) error {
+	if len(textArgs) > 0 && textArgs[0] == "-h" {
+		fmt.Fprintf(color.Output, watchCommand.Format)
+		fmt.Fprintf(color.Output, watchCommand.Description)
+		return nil
+	}
+
+	args := new(litrpc.WatchArgs)
+	reply := new(litrpc.WatchReply)
+
+	if len(textArgs) < 2 {
+		return fmt.Errorf("need args: watch chanIdx watchPeer")
+	}
+
+	cIdx, err := strconv.Atoi(textArgs[0])
+	if err != nil {
+		return err
+	}
+
+	peer, err := strconv.Atoi(textArgs[1])
+	if err != nil {
+		return err
+	}
+
+	args.ChanIdx = uint32(cIdx)
+	args.SendToPeer = uint32(peer)
+
+	err = lc.rpccon.Call("LitRPC.Watch", args, reply)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(color.Output, "Send channel %d data to peer %d\n",
+		args.ChanIdx, args.SendToPeer)
 
 	return nil
 }
