@@ -69,7 +69,15 @@ func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) er
 		if msg.MsgType() == lnutil.MSGID_DLC_DECLINEOFFER {
 			nd.DlcDeclineHandler(msg.(lnutil.DlcOfferDeclineMsg), peer)
 		}
-
+		if msg.MsgType() == lnutil.MSGID_DLC_CONTRACTACK {
+			nd.DlcContractAckHandler(msg.(lnutil.DlcContractAckMsg), peer)
+		}
+		if msg.MsgType() == lnutil.MSGID_DLC_CONTRACTFUNDINGSIGS {
+			nd.DlcFundingSigsHandler(msg.(lnutil.DlcContractFundingSigsMsg), peer)
+		}
+		if msg.MsgType() == lnutil.MSGID_DLC_SIGPROOF {
+			nd.DlcSigProofHandler(msg.(lnutil.DlcContractSigProofMsg), peer)
+		}
 	default:
 		return fmt.Errorf("Unknown message id byte %x &f0", msg.MsgType())
 

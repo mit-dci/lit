@@ -132,9 +132,42 @@ func (mgr *DlcManager) SetContractSettlementDivision(cIdx uint64, valueAllOurs, 
 		return err
 	}
 
-	c.ValueAllOurs = valueAllOurs
-	c.ValueAllTheirs = valueAllTheirs
+	rangeMin := valueAllTheirs - (valueAllOurs - valueAllTheirs)
+	rangeMax := valueAllOurs + (valueAllOurs - valueAllTheirs)
+	oursHighest := true
+	if valueAllTheirs > valueAllOurs {
+		oursHighest = false
+		rangeMin = valueAllOurs - (valueAllTheirs - valueAllOurs)
+		rangeMax = valueAllTheirs + (valueAllTheirs - valueAllOurs)
+	}
+	if rangeMin < 0 {
+		rangeMin = 0
+	}
 
+	fmt.Printf("Creating division from %d to %d\n", rangeMin, rangeMax)
+
+	totalContractValue := c.OurFundingAmount + c.TheirFundingAmount
+
+	c.Division = make([]lnutil.DlcContractDivision, rangeMax-rangeMin+1)
+	for i := rangeMin; i <= rangeMax; i++ {
+		c.Division[i-rangeMin].OracleValue = i
+
+		if (oursHighest && i >= valueAllOurs) || (!oursHighest && i <= valueAllOurs) {
+			c.Division[i-rangeMin].ValueOurs = totalContractValue
+			continue
+		}
+
+		if (oursHighest && i <= valueAllTheirs) || (!oursHighest && i >= valueAllTheirs) {
+			c.Division[i-rangeMin].ValueOurs = 0
+			continue
+		}
+
+		if oursHighest {
+			c.Division[i-rangeMin].ValueOurs = int64(float64(totalContractValue) / float64(valueAllOurs-valueAllTheirs) * float64(i-valueAllTheirs))
+		} else {
+			c.Division[i-rangeMin].ValueOurs = int64(totalContractValue) - int64(float64(totalContractValue)/float64(valueAllTheirs-valueAllOurs)*float64(i-valueAllOurs))
+		}
+	}
 	mgr.SaveContract(c)
 
 	return nil

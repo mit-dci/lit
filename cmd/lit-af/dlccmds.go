@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/fatih/color"
@@ -65,10 +66,11 @@ var addOracleCommand = &Command{
 var contractCommand = &Command{
 	Format: fmt.Sprintf("%s%s%s\n", lnutil.White("dlc contract"),
 		lnutil.ReqColor("subcommand"), lnutil.OptColor("parameters...")),
-	Description: fmt.Sprintf("%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n",
+	Description: fmt.Sprintf("%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n",
 		"Command for managing contracts. Subcommand can be one of:",
 		fmt.Sprintf("%-20s %s", lnutil.White("new"), "Adds a new draft contract"),
 		fmt.Sprintf("%-20s %s", lnutil.White("view"), "Views a contract"),
+		fmt.Sprintf("%-20s %s", lnutil.White("viewpayout"), "Views the payout table of a contract"),
 		fmt.Sprintf("%-20s %s", lnutil.White("setoracle"), "Sets a contract to use a particular oracle"),
 		fmt.Sprintf("%-20s %s", lnutil.White("settime"), "Sets the settlement time of a contract"),
 		fmt.Sprintf("%-20s %s", lnutil.White("setdatafeed"), "Sets the data feed to use for the contract, will fetch the R point"),
@@ -103,6 +105,19 @@ var viewContractCommand = &Command{
 		fmt.Sprintf("%-10s %s", lnutil.White("id"), "The ID of the contract to view"),
 	),
 	ShortDescription: "Views the current status of a contract\n",
+}
+
+var viewContractPayoutCommand = &Command{
+	Format: fmt.Sprintf("%s%s%s%s\n", lnutil.White("dlc contract viewpayout"),
+		lnutil.ReqColor("id"), lnutil.ReqColor("start"), lnutil.ReqColor("end"), lnutil.ReqColor("increment")),
+	Description: fmt.Sprintf("%s\n%s\n%s\n%s\n",
+		"Views the payout table of a contract",
+		fmt.Sprintf("%-10s %s", lnutil.White("id"), "The ID of the contract to view"),
+		fmt.Sprintf("%-10s %s", lnutil.White("start"), "The start value to print payout data for"),
+		fmt.Sprintf("%-10s %s", lnutil.White("end"), "The end value to print payout data for"),
+		fmt.Sprintf("%-10s %s", lnutil.White("increment"), "Print every X oracle value (1 = all)"),
+	),
+	ShortDescription: "Views the payout table of a contract\n",
 }
 
 var setContractOracleCommand = &Command{
@@ -336,6 +351,10 @@ func (lc *litAfClient) DlcContract(textArgs []string) error {
 		return lc.DlcViewContract(textArgs[1:])
 	}
 
+	if len(textArgs) > 0 && textArgs[0] == "viewpayout" {
+		return lc.DlcViewContractPayout(textArgs[1:])
+	}
+
 	if len(textArgs) > 0 && textArgs[0] == "setoracle" {
 		return lc.DlcSetContractOracle(textArgs[1:])
 	}
@@ -438,6 +457,48 @@ func (lc *litAfClient) DlcViewContract(textArgs []string) error {
 	}
 
 	PrintContract(reply.Contract)
+	return nil
+}
+
+func (lc *litAfClient) DlcViewContractPayout(textArgs []string) error {
+	if len(textArgs) > 0 && textArgs[0] == "-h" {
+		fmt.Fprintf(color.Output, viewContractPayoutCommand.Format)
+		fmt.Fprintf(color.Output, viewContractPayoutCommand.Description)
+		return nil
+	}
+
+	if len(textArgs) < 4 {
+		return fmt.Errorf(viewContractPayoutCommand.Format)
+	}
+
+	args := new(litrpc.GetContractArgs)
+	reply := new(litrpc.GetContractReply)
+
+	cIdx, err := strconv.ParseUint(textArgs[0], 10, 64)
+	if err != nil {
+		return err
+	}
+	start, err := strconv.ParseInt(textArgs[1], 10, 64)
+	if err != nil {
+		return err
+	}
+	end, err := strconv.ParseInt(textArgs[2], 10, 64)
+	if err != nil {
+		return err
+	}
+	increment, err := strconv.ParseInt(textArgs[3], 10, 64)
+	if err != nil {
+		return err
+	}
+
+	args.Idx = cIdx
+
+	err = lc.rpccon.Call("LitRPC.GetContract", args, reply)
+	if err != nil {
+		return err
+	}
+
+	PrintPayout(reply.Contract, start, end, increment)
 	return nil
 }
 
@@ -803,8 +864,6 @@ func PrintContract(c *lnutil.DlcContract) {
 	fmt.Fprintf(color.Output, "%-30s : %s\n", lnutil.White("Settlement time"), time.Unix(int64(c.OracleTimestamp), 0).UTC().Format(time.UnixDate))
 	fmt.Fprintf(color.Output, "%-30s : %d\n", lnutil.White("Funded by us"), c.OurFundingAmount)
 	fmt.Fprintf(color.Output, "%-30s : %d\n", lnutil.White("Funded by peer"), c.TheirFundingAmount)
-	fmt.Fprintf(color.Output, "%-30s : %d\n", lnutil.White("Value 100% us"), c.ValueAllOurs)
-	fmt.Fprintf(color.Output, "%-30s : %d\n", lnutil.White("Value 100% peer"), c.ValueAllTheirs)
 	fmt.Fprintf(color.Output, "%-30s : %d\n", lnutil.White("Coin type"), c.CoinType)
 
 	peer := "None"
@@ -830,6 +889,18 @@ func PrintContract(c *lnutil.DlcContract) {
 		status = "Declined"
 	}
 
-	fmt.Fprintf(color.Output, "%-30s : %s\n", lnutil.White("Status"), status)
+	fmt.Fprintf(color.Output, "%-30s : %s\n\n", lnutil.White("Status"), status)
 
+	increment := int64(len(c.Division) / 10)
+	PrintPayout(c, 0, int64(len(c.Division)), increment)
+}
+
+func PrintPayout(c *lnutil.DlcContract, start, end, increment int64) {
+	fmt.Fprintf(color.Output, "Payout division:\n\n")
+	fmt.Fprintf(color.Output, "%-20s | %-20s | %-20s\n", "Oracle value", "Our payout", "Their payout")
+	fmt.Fprintf(color.Output, "%s\n", strings.Repeat("-", 66))
+
+	for i := start; i < end; i += increment {
+		fmt.Fprintf(color.Output, "%20d | %20d | %20d\n", c.Division[i].OracleValue, c.Division[i].ValueOurs, c.OurFundingAmount+c.TheirFundingAmount-c.Division[i].ValueOurs)
+	}
 }

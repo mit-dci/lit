@@ -1,6 +1,7 @@
 package lnutil
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/binary"
 	"fmt"
@@ -46,10 +47,12 @@ const (
 	MSGID_LINK_DESC = 0x70 // Describes a new channel for routing
 
 	//Discreet log contracts messages
-	MSGID_DLC_OFFER        = 0x90 // Offer a contract
-	MSGID_DLC_ACCEPTOFFER  = 0x91 // Accept the contract
-	MSGID_DLC_DECLINEOFFER = 0x92 // Decline the contract
-
+	MSGID_DLC_OFFER               = 0x90 // Offer a contract
+	MSGID_DLC_ACCEPTOFFER         = 0x91 // Accept the contract
+	MSGID_DLC_DECLINEOFFER        = 0x92 // Decline the contract
+	MSGID_DLC_CONTRACTACK         = 0x93 // Acknowledge an acceptance
+	MSGID_DLC_CONTRACTFUNDINGSIGS = 0x94 // Funding signatures
+	MSGID_DLC_SIGPROOF            = 0x95 // Sigproof
 )
 
 //interface that all messages follow, for easy use
@@ -126,6 +129,12 @@ func LitMsgFromBytes(b []byte, peerid uint32) (LitMsg, error) {
 		return NewDlcOfferAcceptMsgFromBytes(b, peerid)
 	case MSGID_DLC_DECLINEOFFER:
 		return NewDlcOfferDeclineMsgFromBytes(b, peerid)
+	case MSGID_DLC_CONTRACTACK:
+		return NewDlcContractAckMsgFromBytes(b, peerid)
+	case MSGID_DLC_CONTRACTFUNDINGSIGS:
+		return NewDlcContractFundingSigsMsgFromBytes(b, peerid)
+	case MSGID_DLC_SIGPROOF:
+		return NewDlcContractSigProofMsgFromBytes(b, peerid)
 
 	default:
 		return nil, fmt.Errorf("Unknown message of type %d ", msgType)
@@ -1031,13 +1040,14 @@ func (self DlcOfferDeclineMsg) MsgType() uint8 { return MSGID_DLC_DECLINEOFFER }
 
 // Signature for a particular settlement transaction
 type DlcContractSettlementSignature struct {
-	Outcome   uint64   // The oracle value for which transaction these are the signatures
-	Signature [64]byte // The signature for the transaction
+	Outcome   int64  // The oracle value for which transaction these are the signatures
+	Signature []byte // The signature for the transaction
 }
 
 type DlcOfferAcceptMsg struct {
 	PeerIdx              uint32
 	ContractPubKey       [33]byte
+	MyChangePKH          [20]byte
 	FundingInputs        []DlcContractFundingInput
 	SettlementSignatures []DlcContractSettlementSignature
 }
@@ -1047,7 +1057,8 @@ func NewDlcOfferAcceptMsg(contract *DlcContract, signatures []DlcContractSettlem
 	msg.PeerIdx = contract.PeerIdx
 	msg.ContractPubKey = contract.PubKey
 	msg.FundingInputs = contract.OurFundingInputs
-	copy(msg.SettlementSignatures[:], signatures[:])
+	msg.MyChangePKH = contract.OurChangePKH
+	msg.SettlementSignatures = signatures
 	return *msg
 }
 
@@ -1061,6 +1072,7 @@ func NewDlcOfferAcceptMsgFromBytes(b []byte, peerIdx uint32) (DlcOfferAcceptMsg,
 
 	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
 	copy(msg.ContractPubKey[:], buf.Next(33))
+	copy(msg.MyChangePKH[:], buf.Next(20))
 
 	var inputCount uint32
 	binary.Read(buf, binary.BigEndian, &inputCount)
@@ -1076,12 +1088,16 @@ func NewDlcOfferAcceptMsgFromBytes(b []byte, peerIdx uint32) (DlcOfferAcceptMsg,
 
 	var signatureCount uint32
 	binary.Read(buf, binary.BigEndian, &signatureCount)
-
+	fmt.Printf("Read signatureCount: %d", signatureCount)
 	msg.SettlementSignatures = make([]DlcContractSettlementSignature, signatureCount)
 
+	var sigLen uint32
 	for i := uint32(0); i < signatureCount; i++ {
 		binary.Read(buf, binary.BigEndian, &msg.SettlementSignatures[i].Outcome)
-		copy(msg.SettlementSignatures[i].Signature[:], buf.Next(64))
+		binary.Read(buf, binary.BigEndian, &sigLen)
+		msg.SettlementSignatures[i].Signature = make([]byte, int(sigLen))
+		copy(msg.SettlementSignatures[i].Signature, buf.Next(int(sigLen)))
+		//fmt.Printf("Read signature: %x", msg.SettlementSignatures[i].Signature)
 	}
 
 	return *msg, nil
@@ -1093,6 +1109,7 @@ func (self DlcOfferAcceptMsg) Bytes() []byte {
 
 	buf.WriteByte(self.MsgType())
 	buf.Write(self.ContractPubKey[:])
+	buf.Write(self.MyChangePKH[:])
 
 	inputCount := uint32(len(self.FundingInputs))
 	binary.Write(&buf, binary.BigEndian, inputCount)
@@ -1109,10 +1126,171 @@ func (self DlcOfferAcceptMsg) Bytes() []byte {
 
 	for i := uint32(0); i < signatureCount; i++ {
 		binary.Write(&buf, binary.BigEndian, self.SettlementSignatures[i].Outcome)
-		buf.Write(self.SettlementSignatures[i].Signature[:])
+		sigLen := uint32(len(self.SettlementSignatures[i].Signature))
+		binary.Write(&buf, binary.BigEndian, sigLen)
+		buf.Write(self.SettlementSignatures[i].Signature)
 	}
 	return buf.Bytes()
 }
 
 func (self DlcOfferAcceptMsg) Peer() uint32   { return self.PeerIdx }
 func (self DlcOfferAcceptMsg) MsgType() uint8 { return MSGID_DLC_ACCEPTOFFER }
+
+type DlcContractAckMsg struct {
+	PeerIdx              uint32
+	ContractPubKey       [33]byte
+	SettlementSignatures []DlcContractSettlementSignature
+}
+
+func NewDlcContractAckMsg(contract *DlcContract, signatures []DlcContractSettlementSignature) DlcContractAckMsg {
+	msg := new(DlcContractAckMsg)
+	msg.PeerIdx = contract.PeerIdx
+	msg.ContractPubKey = contract.PubKey
+	msg.SettlementSignatures = signatures
+	return *msg
+}
+
+func NewDlcContractAckMsgFromBytes(b []byte, peerIdx uint32) (DlcContractAckMsg, error) {
+	msg := new(DlcContractAckMsg)
+	msg.PeerIdx = peerIdx
+
+	// TODO
+	if len(b) < 34 {
+		return *msg, fmt.Errorf("DlcContractAckMsg %d bytes, expect at least 34", len(b))
+	}
+
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
+	copy(msg.ContractPubKey[:], buf.Next(33))
+
+	var signatureCount uint32
+	binary.Read(buf, binary.BigEndian, &signatureCount)
+	msg.SettlementSignatures = make([]DlcContractSettlementSignature, signatureCount)
+
+	var sigLen uint32
+	for i := uint32(0); i < signatureCount; i++ {
+		binary.Read(buf, binary.BigEndian, &msg.SettlementSignatures[i].Outcome)
+		binary.Read(buf, binary.BigEndian, &sigLen)
+		msg.SettlementSignatures[i].Signature = make([]byte, int(sigLen))
+		copy(msg.SettlementSignatures[i].Signature, buf.Next(int(sigLen)))
+	}
+
+	return *msg, nil
+}
+
+// ToBytes turns a DlcContractAckMsg into bytes
+func (self DlcContractAckMsg) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.WriteByte(self.MsgType())
+	buf.Write(self.ContractPubKey[:])
+
+	signatureCount := uint32(len(self.SettlementSignatures))
+	binary.Write(&buf, binary.BigEndian, signatureCount)
+
+	for i := uint32(0); i < signatureCount; i++ {
+		binary.Write(&buf, binary.BigEndian, self.SettlementSignatures[i].Outcome)
+		sigLen := uint32(len(self.SettlementSignatures[i].Signature))
+		binary.Write(&buf, binary.BigEndian, sigLen)
+		buf.Write(self.SettlementSignatures[i].Signature)
+	}
+	return buf.Bytes()
+}
+
+func (self DlcContractAckMsg) Peer() uint32   { return self.PeerIdx }
+func (self DlcContractAckMsg) MsgType() uint8 { return MSGID_DLC_CONTRACTACK }
+
+type DlcContractFundingSigsMsg struct {
+	PeerIdx         uint32
+	ContractPubKey  [33]byte
+	SignedFundingTx *wire.MsgTx
+}
+
+func NewDlcContractFundingSigsMsg(contract *DlcContract, signedTx *wire.MsgTx) DlcContractFundingSigsMsg {
+	msg := new(DlcContractFundingSigsMsg)
+	msg.PeerIdx = contract.PeerIdx
+	msg.ContractPubKey = contract.PubKey
+	msg.SignedFundingTx = signedTx
+	return *msg
+}
+
+func NewDlcContractFundingSigsMsgFromBytes(b []byte, peerIdx uint32) (DlcContractFundingSigsMsg, error) {
+	msg := new(DlcContractFundingSigsMsg)
+	msg.PeerIdx = peerIdx
+
+	// TODO
+	if len(b) < 34 {
+		return *msg, fmt.Errorf("DlcContractFundingSigsMsg %d bytes, expect at least 34", len(b))
+	}
+
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
+	copy(msg.ContractPubKey[:], buf.Next(33))
+
+	msg.SignedFundingTx = wire.NewMsgTx()
+	msg.SignedFundingTx.Deserialize(buf)
+
+	return *msg, nil
+}
+
+// ToBytes turns a DlcContractAckMsg into bytes
+func (self DlcContractFundingSigsMsg) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.WriteByte(self.MsgType())
+	buf.Write(self.ContractPubKey[:])
+
+	writer := bufio.NewWriter(&buf)
+	self.SignedFundingTx.Serialize(writer)
+	writer.Flush()
+	return buf.Bytes()
+}
+
+func (self DlcContractFundingSigsMsg) Peer() uint32   { return self.PeerIdx }
+func (self DlcContractFundingSigsMsg) MsgType() uint8 { return MSGID_DLC_CONTRACTFUNDINGSIGS }
+
+type DlcContractSigProofMsg struct {
+	PeerIdx         uint32
+	ContractPubKey  [33]byte
+	SignedFundingTx *wire.MsgTx
+}
+
+func NewDlcContractSigProofMsg(contract *DlcContract, signedTx *wire.MsgTx) DlcContractSigProofMsg {
+	msg := new(DlcContractSigProofMsg)
+	msg.PeerIdx = contract.PeerIdx
+	msg.ContractPubKey = contract.PubKey
+	msg.SignedFundingTx = signedTx
+	return *msg
+}
+
+func NewDlcContractSigProofMsgFromBytes(b []byte, peerIdx uint32) (DlcContractSigProofMsg, error) {
+	msg := new(DlcContractSigProofMsg)
+	msg.PeerIdx = peerIdx
+
+	// TODO
+	if len(b) < 34 {
+		return *msg, fmt.Errorf("DlcContractSigProofMsg %d bytes, expect at least 34", len(b))
+	}
+
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
+	copy(msg.ContractPubKey[:], buf.Next(33))
+
+	msg.SignedFundingTx = wire.NewMsgTx()
+	msg.SignedFundingTx.Deserialize(buf)
+
+	return *msg, nil
+}
+
+// ToBytes turns a DlcContractAckMsg into bytes
+func (self DlcContractSigProofMsg) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.WriteByte(self.MsgType())
+	buf.Write(self.ContractPubKey[:])
+
+	writer := bufio.NewWriter(&buf)
+	self.SignedFundingTx.Serialize(writer)
+	writer.Flush()
+	return buf.Bytes()
+}
+
+func (self DlcContractSigProofMsg) Peer() uint32   { return self.PeerIdx }
+func (self DlcContractSigProofMsg) MsgType() uint8 { return MSGID_DLC_SIGPROOF }
