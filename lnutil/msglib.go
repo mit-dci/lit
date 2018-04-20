@@ -1049,6 +1049,7 @@ type DlcOfferAcceptMsg struct {
 	ContractPubKey       [33]byte
 	OurChangePKH         [20]byte
 	OurFundMultisigPub   [33]byte
+	OurPayoutPub         [33]byte
 	FundingInputs        []DlcContractFundingInput
 	SettlementSignatures []DlcContractSettlementSignature
 }
@@ -1060,6 +1061,7 @@ func NewDlcOfferAcceptMsg(contract *DlcContract, signatures []DlcContractSettlem
 	msg.FundingInputs = contract.OurFundingInputs
 	msg.OurChangePKH = contract.OurChangePKH
 	msg.OurFundMultisigPub = contract.OurFundMultisigPub
+	msg.OurPayoutPub = contract.OurPayoutPub
 	msg.SettlementSignatures = signatures
 	return *msg
 }
@@ -1076,6 +1078,7 @@ func NewDlcOfferAcceptMsgFromBytes(b []byte, peerIdx uint32) (DlcOfferAcceptMsg,
 	copy(msg.ContractPubKey[:], buf.Next(33))
 	copy(msg.OurChangePKH[:], buf.Next(20))
 	copy(msg.OurFundMultisigPub[:], buf.Next(33))
+	copy(msg.OurPayoutPub[:], buf.Next(33))
 
 	inputCount, _ := wire.ReadVarInt(buf, 0)
 
@@ -1109,6 +1112,7 @@ func (self DlcOfferAcceptMsg) Bytes() []byte {
 	buf.Write(self.ContractPubKey[:])
 	buf.Write(self.OurChangePKH[:])
 	buf.Write(self.OurFundMultisigPub[:])
+	buf.Write(self.OurPayoutPub[:])
 
 	inputCount := uint64(len(self.FundingInputs))
 	wire.WriteVarInt(&buf, 0, inputCount)

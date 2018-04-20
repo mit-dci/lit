@@ -209,6 +209,7 @@ func (nd *LitNode) DlcAcceptHandler(msg lnutil.DlcOfferAcceptMsg, peer *RemotePe
 	c.TheirFundingInputs = msg.FundingInputs
 	c.TheirSettlementSignatures = msg.SettlementSignatures
 	c.TheirFundMultisigPub = msg.OurFundMultisigPub
+	c.TheirPayoutPub = msg.OurPayoutPub
 	c.Status = lnutil.ContractStatusAccepted
 	err = nd.DlcManager.SaveContract(c)
 	if err != nil {
@@ -367,7 +368,8 @@ func (nd *LitNode) SignSettlementDivisions(c *lnutil.DlcContract) ([]lnutil.DlcC
 
 	returnValue := make([]lnutil.DlcContractSettlementSignature, len(c.Division))
 	for i, d := range c.Division {
-		tx, err := lnutil.SettlementTx(c, d, contractInput, true)
+		tx, err := lnutil.SettlementTx(c, d, contractInput, true, (d.OracleValue == 12080))
+
 		sig, err := nd.SignSettlementTx(c, tx, priv)
 		if err != nil {
 			return nil, err
@@ -499,17 +501,23 @@ func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oracleSig [32]
 
 	contractInput := wire.OutPoint{fundingTx.TxHash(), 0}
 
-	settleTx, err := lnutil.SettlementTx(c, *d, contractInput, false)
+	settleTx, err := lnutil.SettlementTx(c, *d, contractInput, false, true)
 	if err != nil {
 		fmt.Printf("SettleContract SettlementTx err %s\n", err.Error())
 		return err
 	}
+
+	fmt.Printf("SettleTX Before signing: %s\n", settleTx.TxHash().String())
+	lnutil.PrintTx(settleTx)
 
 	mySig, err := nd.SignSettlementTx(c, settleTx, priv)
 	if err != nil {
 		log.Printf("SettleContract SignSettlementTx err %s", err.Error())
 		return err
 	}
+
+	fmt.Printf("SettleTX After getting my signature: %s\n", settleTx.TxHash().String())
+	lnutil.PrintTx(settleTx)
 
 	myBigSig := sig64.SigDecompress(mySig)
 
@@ -526,10 +534,6 @@ func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oracleSig [32]
 		return err
 	}
 
-	fmt.Printf("FundTXScript: %x\n", pre)
-	fmt.Printf("mySig: %x\n", myBigSig)
-	fmt.Printf("theirSig: %x\n", theirBigSig)
-
 	// swap if needed
 	if swap {
 		settleTx.TxIn[0].Witness = SpendMultiSigWitStack(pre, theirBigSig, myBigSig)
@@ -537,8 +541,7 @@ func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oracleSig [32]
 		settleTx.TxIn[0].Witness = SpendMultiSigWitStack(pre, myBigSig, theirBigSig)
 	}
 
-	fmt.Printf("Settlement TX has witness: %t\n", settleTx.HasWitness())
-	fmt.Printf("Settlement TX that i am about to publish:\n")
+	fmt.Printf("SettleTX before publish: %s\n", settleTx.TxHash().String())
 	lnutil.PrintTx(settleTx)
 
 	// Settlement TX should be valid here, so publish it.
