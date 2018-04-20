@@ -81,6 +81,30 @@ func (nd *LitNode) SignSimpleClose(q *Qchan, tx *wire.MsgTx) ([64]byte, error) {
 	return sig64.SigCompress(mySig)
 }
 
+// SignSimpleClose signs the given simpleClose tx, given the other signature
+// Tx is modified in place.
+func (nd *LitNode) SignSettlementTx(c *lnutil.DlcContract, tx *wire.MsgTx, priv *btcec.PrivateKey) ([64]byte, error) {
+
+	var sig [64]byte
+	// make hash cache
+	hCache := txscript.NewTxSigHashes(tx)
+
+	// generate script preimage for signing (ignore key order)
+	pre, _, err := lnutil.FundTxScript(c.OurFundMultisigPub, c.TheirFundMultisigPub)
+	if err != nil {
+		return sig, err
+	}
+	// generate sig
+	mySig, err := txscript.RawTxInWitnessSignature(
+		tx, hCache, 0, c.TheirFundingAmount+c.OurFundingAmount, pre, txscript.SigHashAll, priv)
+	if err != nil {
+		return sig, err
+	}
+	// truncate sig (last byte is sighash type, always sighashAll)
+	mySig = mySig[:len(mySig)-1]
+	return sig64.SigCompress(mySig)
+}
+
 // SignNextState generates your signature for their state.
 func (nd *LitNode) SignState(q *Qchan) ([64]byte, error) {
 

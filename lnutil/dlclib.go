@@ -5,6 +5,11 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"math/big"
+
+	"github.com/adiabat/btcd/btcec"
+	"github.com/adiabat/btcd/chaincfg/chainhash"
+	"github.com/adiabat/btcutil"
 
 	"github.com/adiabat/btcd/txscript"
 	"github.com/adiabat/btcd/wire"
@@ -22,6 +27,9 @@ const (
 	ContractStatusActive       DlcContractStatus = 6
 	ContractStatusClosed       DlcContractStatus = 7
 )
+
+// scalarSize is the size of an encoded big endian scalar.
+const scalarSize = 32
 
 type DlcContract struct {
 	Idx                                      uint64                           // Index of the contract for referencing in commands
@@ -58,11 +66,33 @@ func DlcContractFromBytes(b []byte) (*DlcContract, error) {
 	copy(c.OracleA[:], buf.Next(33))
 	copy(c.OracleR[:], buf.Next(33))
 
-	_ = binary.Read(buf, binary.BigEndian, &c.PeerIdx)
-	_ = binary.Read(buf, binary.BigEndian, &c.CoinType)
-	_ = binary.Read(buf, binary.BigEndian, &c.OracleTimestamp)
-	_ = binary.Read(buf, binary.BigEndian, &c.OurFundingAmount)
-	_ = binary.Read(buf, binary.BigEndian, &c.TheirFundingAmount)
+	peerIdx, err := wire.ReadVarInt(buf, 0)
+	if err != nil {
+		fmt.Println("Error while deserializing varint for peerIdx")
+		return nil, err
+	}
+	c.PeerIdx = uint32(peerIdx)
+
+	coinType, err := wire.ReadVarInt(buf, 0)
+	if err != nil {
+		fmt.Println("Error while deserializing varint for coinType")
+		return nil, err
+	}
+	c.CoinType = uint32(coinType)
+	c.OracleTimestamp, err = wire.ReadVarInt(buf, 0)
+	if err != nil {
+		return nil, err
+	}
+	ourFundingAmount, err := wire.ReadVarInt(buf, 0)
+	if err != nil {
+		return nil, err
+	}
+	c.OurFundingAmount = int64(ourFundingAmount)
+	theirFundingAmount, err := wire.ReadVarInt(buf, 0)
+	if err != nil {
+		return nil, err
+	}
+	c.TheirFundingAmount = int64(theirFundingAmount)
 
 	copy(c.OurChangePKH[:], buf.Next(20))
 	copy(c.TheirChangePKH[:], buf.Next(20))
@@ -73,52 +103,80 @@ func DlcContractFromBytes(b []byte) (*DlcContract, error) {
 	copy(c.OurPayoutPub[:], buf.Next(33))
 	copy(c.TheirPayoutPub[:], buf.Next(33))
 
-	var status int32
-	_ = binary.Read(buf, binary.BigEndian, &status)
+	status, err := wire.ReadVarInt(buf, 0)
+	if err != nil {
+		fmt.Println("Error while deserializing varint for status")
+		return nil, err
+	}
 
 	c.Status = DlcContractStatus(status)
 
-	var ourInputsLen uint32
-	_ = binary.Read(buf, binary.BigEndian, &ourInputsLen)
-	fmt.Printf("[R] Our input len: [%d]\n", ourInputsLen)
+	ourInputsLen, err := wire.ReadVarInt(buf, 0)
+	if err != nil {
+		return nil, err
+	}
 
 	c.OurFundingInputs = make([]DlcContractFundingInput, ourInputsLen)
 	var op [36]byte
-	for i := uint32(0); i < ourInputsLen; i++ {
+	for i := uint64(0); i < ourInputsLen; i++ {
 		copy(op[:], buf.Next(36))
 		c.OurFundingInputs[i].Outpoint = *OutPointFromBytes(op)
-		_ = binary.Read(buf, binary.BigEndian, &c.OurFundingInputs[i].Value)
+		inputValue, err := wire.ReadVarInt(buf, 0)
+		if err != nil {
+			return nil, err
+		}
+		c.OurFundingInputs[i].Value = int64(inputValue)
 	}
 
-	var theirInputsLen uint32
-	_ = binary.Read(buf, binary.BigEndian, &theirInputsLen)
-	fmt.Printf("[R] Their input len: [%d]\n", theirInputsLen)
+	theirInputsLen, err := wire.ReadVarInt(buf, 0)
+	if err != nil {
+		return nil, err
+	}
 
 	c.TheirFundingInputs = make([]DlcContractFundingInput, theirInputsLen)
-	for i := uint32(0); i < theirInputsLen; i++ {
+	for i := uint64(0); i < theirInputsLen; i++ {
 		copy(op[:], buf.Next(36))
 		c.TheirFundingInputs[i].Outpoint = *OutPointFromBytes(op)
-		_ = binary.Read(buf, binary.BigEndian, &c.TheirFundingInputs[i].Value)
+		inputValue, err := wire.ReadVarInt(buf, 0)
+		if err != nil {
+
+			return nil, err
+		}
+		c.TheirFundingInputs[i].Value = int64(inputValue)
 	}
 
-	var divisionLen uint32
-	_ = binary.Read(buf, binary.BigEndian, &divisionLen)
+	divisionLen, err := wire.ReadVarInt(buf, 0)
+	if err != nil {
+		return nil, err
+	}
+
 	c.Division = make([]DlcContractDivision, divisionLen)
-	for i := uint32(0); i < divisionLen; i++ {
-		_ = binary.Read(buf, binary.BigEndian, &c.Division[i].OracleValue)
-		_ = binary.Read(buf, binary.BigEndian, &c.Division[i].ValueOurs)
+	for i := uint64(0); i < divisionLen; i++ {
+		oracleValue, err := wire.ReadVarInt(buf, 0)
+		if err != nil {
+			return nil, err
+		}
+		valueOurs, err := wire.ReadVarInt(buf, 0)
+		if err != nil {
+			return nil, err
+		}
+		c.Division[i].OracleValue = int64(oracleValue)
+		c.Division[i].ValueOurs = int64(valueOurs)
 	}
 
-	var theirSigCount uint32
-	_ = binary.Read(buf, binary.BigEndian, &theirSigCount)
+	theirSigCount, err := wire.ReadVarInt(buf, 0)
+	if err != nil {
+		return nil, err
+	}
 	c.TheirSettlementSignatures = make([]DlcContractSettlementSignature, theirSigCount)
 
-	var sigLen uint32
-	for i := uint32(0); i < theirSigCount; i++ {
-		_ = binary.Read(buf, binary.BigEndian, &c.TheirSettlementSignatures[i].Outcome)
-		_ = binary.Read(buf, binary.BigEndian, &sigLen)
-		c.TheirSettlementSignatures[i].Signature = make([]byte, sigLen)
-		copy(c.TheirSettlementSignatures[i].Signature, buf.Next(int(sigLen)))
+	for i := uint64(0); i < theirSigCount; i++ {
+		outcome, err := wire.ReadVarInt(buf, 0)
+		if err != nil {
+			return nil, err
+		}
+		c.TheirSettlementSignatures[i].Outcome = int64(outcome)
+		copy(c.TheirSettlementSignatures[i].Signature[:], buf.Next(64))
 	}
 
 	return c, nil
@@ -126,15 +184,14 @@ func DlcContractFromBytes(b []byte) (*DlcContract, error) {
 
 func (self *DlcContract) Bytes() []byte {
 	var buf bytes.Buffer
-
 	buf.Write(self.PubKey[:])
 	buf.Write(self.OracleA[:])
 	buf.Write(self.OracleR[:])
-	binary.Write(&buf, binary.BigEndian, self.PeerIdx)
-	binary.Write(&buf, binary.BigEndian, self.CoinType)
-	binary.Write(&buf, binary.BigEndian, self.OracleTimestamp)
-	binary.Write(&buf, binary.BigEndian, self.OurFundingAmount)
-	binary.Write(&buf, binary.BigEndian, self.TheirFundingAmount)
+	wire.WriteVarInt(&buf, 0, uint64(self.PeerIdx))
+	wire.WriteVarInt(&buf, 0, uint64(self.CoinType))
+	wire.WriteVarInt(&buf, 0, uint64(self.OracleTimestamp))
+	wire.WriteVarInt(&buf, 0, uint64(self.OurFundingAmount))
+	wire.WriteVarInt(&buf, 0, uint64(self.TheirFundingAmount))
 
 	buf.Write(self.OurChangePKH[:])
 	buf.Write(self.TheirChangePKH[:])
@@ -143,49 +200,65 @@ func (self *DlcContract) Bytes() []byte {
 	buf.Write(self.OurPayoutPub[:])
 	buf.Write(self.TheirPayoutPub[:])
 
-	var status = int32(self.Status)
-	binary.Write(&buf, binary.BigEndian, status)
+	var status = uint64(self.Status)
+	wire.WriteVarInt(&buf, 0, status)
 
-	ourInputsLen := uint32(len(self.OurFundingInputs))
-	fmt.Printf("[W] Our input len: [%d]\n", ourInputsLen)
-	binary.Write(&buf, binary.BigEndian, ourInputsLen)
+	ourInputsLen := uint64(len(self.OurFundingInputs))
+	wire.WriteVarInt(&buf, 0, ourInputsLen)
 
 	for i := 0; i < len(self.OurFundingInputs); i++ {
 		opArr := OutPointToBytes(self.OurFundingInputs[i].Outpoint)
 		buf.Write(opArr[:])
-		binary.Write(&buf, binary.BigEndian, self.OurFundingInputs[i].Value)
+		wire.WriteVarInt(&buf, 0, uint64(self.OurFundingInputs[i].Value))
 	}
 
-	theirInputsLen := uint32(len(self.TheirFundingInputs))
-	fmt.Printf("[W] Their input len: [%d]\n", theirInputsLen)
-	binary.Write(&buf, binary.BigEndian, theirInputsLen)
+	theirInputsLen := uint64(len(self.TheirFundingInputs))
+	wire.WriteVarInt(&buf, 0, theirInputsLen)
 
 	for i := 0; i < len(self.TheirFundingInputs); i++ {
 		opArr := OutPointToBytes(self.TheirFundingInputs[i].Outpoint)
 		buf.Write(opArr[:])
-		binary.Write(&buf, binary.BigEndian, self.TheirFundingInputs[i].Value)
+		wire.WriteVarInt(&buf, 0, uint64(self.TheirFundingInputs[i].Value))
 	}
 
-	divisionLen := uint32(len(self.Division))
-	binary.Write(&buf, binary.BigEndian, divisionLen)
+	divisionLen := uint64(len(self.Division))
+	wire.WriteVarInt(&buf, 0, divisionLen)
 
 	for i := 0; i < len(self.Division); i++ {
-		binary.Write(&buf, binary.BigEndian, self.Division[i].OracleValue)
-		binary.Write(&buf, binary.BigEndian, self.Division[i].ValueOurs)
+		wire.WriteVarInt(&buf, 0, uint64(self.Division[i].OracleValue))
+		wire.WriteVarInt(&buf, 0, uint64(self.Division[i].ValueOurs))
 	}
 
-	theirSigLen := uint32(len(self.TheirSettlementSignatures))
-	binary.Write(&buf, binary.BigEndian, theirSigLen)
+	theirSigLen := uint64(len(self.TheirSettlementSignatures))
+	wire.WriteVarInt(&buf, 0, theirSigLen)
 
 	for i := 0; i < len(self.TheirSettlementSignatures); i++ {
-		binary.Write(&buf, binary.BigEndian, self.TheirSettlementSignatures[i].Outcome)
-		binary.Write(&buf, binary.BigEndian, uint32(len(self.TheirSettlementSignatures[i].Signature)))
-		buf.Write(self.TheirSettlementSignatures[i].Signature)
+		wire.WriteVarInt(&buf, 0, uint64(self.TheirSettlementSignatures[i].Outcome))
+		buf.Write(self.TheirSettlementSignatures[i].Signature[:])
 	}
 
-	fmt.Printf("Serialized contract: %x\n", buf.Bytes())
-
 	return buf.Bytes()
+}
+
+func (c DlcContract) GetDivision(value int64) (*DlcContractDivision, error) {
+	for _, d := range c.Division {
+		if d.OracleValue == value {
+			return &d, nil
+		}
+	}
+
+	return nil, fmt.Errorf("Division not found in contract")
+}
+
+func (c DlcContract) GetTheirSettlementSignature(value int64) ([64]byte, error) {
+
+	for _, s := range c.TheirSettlementSignatures {
+		if s.Outcome == value {
+			return s.Signature, nil
+		}
+	}
+
+	return [64]byte{}, fmt.Errorf("Signature not found in contract")
 }
 
 func PrintTx(tx *wire.MsgTx) {
@@ -239,4 +312,142 @@ func DlcCommitScript(pubKeyPeer, pubKeyOracleSig, ourPubKey [33]byte, delay uint
 	// never any errors we care about here.
 	s, _ := builder.Script()
 	return s
+}
+
+// BigIntToEncodedBytes converts a big integer into its corresponding
+// 32 byte little endian representation.
+func BigIntToEncodedBytes(a *big.Int) *[32]byte {
+	s := new([32]byte)
+	if a == nil {
+		return s
+	}
+	// Caveat: a can be longer than 32 bytes.
+	aB := a.Bytes()
+
+	// If we have a short byte string, expand
+	// it so that it's long enough.
+	aBLen := len(aB)
+	if aBLen < scalarSize {
+		diff := scalarSize - aBLen
+		for i := 0; i < diff; i++ {
+			aB = append([]byte{0x00}, aB...)
+		}
+	}
+
+	for i := 0; i < scalarSize; i++ {
+		s[i] = aB[i]
+	}
+
+	return s
+}
+
+// Compute the predicted signature s*G
+// it's just R - h(R||m)A
+func DlcCalcOracleSignaturePubKey(msg []byte, oracleA, oracleR [33]byte) ([33]byte, error) {
+	var sigPub [33]byte
+
+	curve := btcec.S256()
+	Pub, err := btcec.ParsePubKey(oracleA[:], curve)
+	if err != nil {
+		return sigPub, err
+	}
+	R, err := btcec.ParsePubKey(oracleR[:], curve)
+	if err != nil {
+		return sigPub, err
+	}
+
+	// h = Hash(R || m)
+	Rpxb := BigIntToEncodedBytes(R.X)
+	hashInput := make([]byte, 0, scalarSize*2)
+	hashInput = append(hashInput, Rpxb[:]...)
+	hashInput = append(hashInput, msg...)
+	h := chainhash.HashB(hashInput)
+
+	// h * A
+	Pub.X, Pub.Y = curve.ScalarMult(Pub.X, Pub.Y, h)
+
+	// this works?
+	Pub.Y.Neg(Pub.Y)
+	//	Pub.Y = Pub.Y.Neg()
+
+	Pub.Y.Mod(Pub.Y, curve.P)
+
+	sG := new(btcec.PublicKey)
+
+	// Pub has been negated; add it to R
+	sG.X, sG.Y = curve.Add(R.X, R.Y, Pub.X, Pub.Y)
+
+	copy(sigPub[:], sG.SerializeCompressed())
+
+	return sigPub, nil
+}
+
+// Ours = the one we generate & sign. Theirs (ours = false) = the one they generated, so we can use their sigs
+func SettlementTx(c *DlcContract, d DlcContractDivision, contractInput wire.OutPoint, ours bool) (*wire.MsgTx, error) {
+
+	tx := wire.NewMsgTx()
+	// set version 2, for op_csv
+	tx.Version = 2
+
+	tx.AddTxIn(wire.NewTxIn(&contractInput, nil, nil))
+
+	totalFee := int64(1000) // TODO: Calculate
+	feeEach := int64(float64(totalFee) / float64(2))
+	feeOurs := feeEach
+	feeTheirs := feeEach
+	valueOurs := d.ValueOurs
+	// We don't have enough to pay for a fee. We get 0, our contract partner pays the rest of the fee
+	if valueOurs < feeEach {
+		feeOurs = valueOurs
+		valueOurs = 0
+	} else {
+		valueOurs = d.ValueOurs - feeOurs
+	}
+	totalContractValue := c.TheirFundingAmount + c.OurFundingAmount
+	valueTheirs := totalContractValue - d.ValueOurs
+
+	if valueTheirs < feeEach {
+		feeTheirs = valueTheirs
+		valueTheirs = 0
+		feeOurs = totalFee - feeTheirs
+		valueOurs = d.ValueOurs - feeOurs
+	} else {
+		valueTheirs -= feeTheirs
+	}
+
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, uint64(0))
+	binary.Write(&buf, binary.BigEndian, uint64(0))
+	binary.Write(&buf, binary.BigEndian, uint64(0))
+	binary.Write(&buf, binary.BigEndian, d.OracleValue)
+	oracleSigPub, err := DlcCalcOracleSignaturePubKey(buf.Bytes(), c.OracleA, c.OracleR)
+	if err != nil {
+		return nil, err
+	}
+
+	// Ours = the one we generate & sign. Theirs (ours = false) = the one they generated, so we can use their sigs
+	if ours {
+		if valueTheirs > 0 {
+			tx.AddTxOut(DlcOutput(c.TheirPayoutPub, oracleSigPub, c.OurPayoutPub, valueTheirs-(totalFee-feeOurs)))
+		}
+
+		if valueOurs > 0 {
+			var ourPayoutPKH [20]byte
+			copy(ourPayoutPKH[:], btcutil.Hash160(c.OurPayoutPub[:]))
+
+			tx.AddTxOut(wire.NewTxOut(valueOurs-feeOurs, DirectWPKHScriptFromPKH(ourPayoutPKH)))
+		}
+	} else {
+		if valueOurs > 0 {
+			tx.AddTxOut(DlcOutput(c.OurPayoutPub, oracleSigPub, c.TheirPayoutPub, valueOurs-(totalFee-feeTheirs)))
+		}
+
+		if valueTheirs > 0 {
+			var theirPayoutPKH [20]byte
+			copy(theirPayoutPKH[:], btcutil.Hash160(c.TheirPayoutPub[:]))
+			tx.AddTxOut(wire.NewTxOut(valueTheirs-feeTheirs, DirectWPKHScriptFromPKH(theirPayoutPKH)))
+		}
+	}
+
+	return tx, nil
 }

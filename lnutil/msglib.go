@@ -1040,14 +1040,15 @@ func (self DlcOfferDeclineMsg) MsgType() uint8 { return MSGID_DLC_DECLINEOFFER }
 
 // Signature for a particular settlement transaction
 type DlcContractSettlementSignature struct {
-	Outcome   int64  // The oracle value for which transaction these are the signatures
-	Signature []byte // The signature for the transaction
+	Outcome   int64    // The oracle value for which transaction these are the signatures
+	Signature [64]byte // The signature for the transaction
 }
 
 type DlcOfferAcceptMsg struct {
 	PeerIdx              uint32
 	ContractPubKey       [33]byte
-	MyChangePKH          [20]byte
+	OurChangePKH         [20]byte
+	OurFundMultisigPub   [33]byte
 	FundingInputs        []DlcContractFundingInput
 	SettlementSignatures []DlcContractSettlementSignature
 }
@@ -1057,7 +1058,8 @@ func NewDlcOfferAcceptMsg(contract *DlcContract, signatures []DlcContractSettlem
 	msg.PeerIdx = contract.PeerIdx
 	msg.ContractPubKey = contract.PubKey
 	msg.FundingInputs = contract.OurFundingInputs
-	msg.MyChangePKH = contract.OurChangePKH
+	msg.OurChangePKH = contract.OurChangePKH
+	msg.OurFundMultisigPub = contract.OurFundMultisigPub
 	msg.SettlementSignatures = signatures
 	return *msg
 }
@@ -1072,32 +1074,28 @@ func NewDlcOfferAcceptMsgFromBytes(b []byte, peerIdx uint32) (DlcOfferAcceptMsg,
 
 	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
 	copy(msg.ContractPubKey[:], buf.Next(33))
-	copy(msg.MyChangePKH[:], buf.Next(20))
+	copy(msg.OurChangePKH[:], buf.Next(20))
+	copy(msg.OurFundMultisigPub[:], buf.Next(33))
 
-	var inputCount uint32
-	binary.Read(buf, binary.BigEndian, &inputCount)
+	inputCount, _ := wire.ReadVarInt(buf, 0)
 
 	msg.FundingInputs = make([]DlcContractFundingInput, inputCount)
 	var op [36]byte
-	for i := uint32(0); i < inputCount; i++ {
-		binary.Read(buf, binary.BigEndian, &msg.FundingInputs[i].Value)
+	for i := uint64(0); i < inputCount; i++ {
+		val, _ := wire.ReadVarInt(buf, 0)
+		msg.FundingInputs[i].Value = int64(val)
 		copy(op[:], buf.Next(36))
 		msg.FundingInputs[i].Outpoint = *OutPointFromBytes(op)
 
 	}
 
-	var signatureCount uint32
-	binary.Read(buf, binary.BigEndian, &signatureCount)
-	fmt.Printf("Read signatureCount: %d", signatureCount)
+	signatureCount, _ := wire.ReadVarInt(buf, 0)
 	msg.SettlementSignatures = make([]DlcContractSettlementSignature, signatureCount)
 
-	var sigLen uint32
-	for i := uint32(0); i < signatureCount; i++ {
-		binary.Read(buf, binary.BigEndian, &msg.SettlementSignatures[i].Outcome)
-		binary.Read(buf, binary.BigEndian, &sigLen)
-		msg.SettlementSignatures[i].Signature = make([]byte, int(sigLen))
-		copy(msg.SettlementSignatures[i].Signature, buf.Next(int(sigLen)))
-		//fmt.Printf("Read signature: %x", msg.SettlementSignatures[i].Signature)
+	for i := uint64(0); i < signatureCount; i++ {
+		val, _ := wire.ReadVarInt(buf, 0)
+		msg.SettlementSignatures[i].Outcome = int64(val)
+		copy(msg.SettlementSignatures[i].Signature[:], buf.Next(64))
 	}
 
 	return *msg, nil
@@ -1109,26 +1107,24 @@ func (self DlcOfferAcceptMsg) Bytes() []byte {
 
 	buf.WriteByte(self.MsgType())
 	buf.Write(self.ContractPubKey[:])
-	buf.Write(self.MyChangePKH[:])
+	buf.Write(self.OurChangePKH[:])
+	buf.Write(self.OurFundMultisigPub[:])
 
-	inputCount := uint32(len(self.FundingInputs))
-	binary.Write(&buf, binary.BigEndian, inputCount)
+	inputCount := uint64(len(self.FundingInputs))
+	wire.WriteVarInt(&buf, 0, inputCount)
 
-	for i := uint32(0); i < inputCount; i++ {
-		binary.Write(&buf, binary.BigEndian, self.FundingInputs[i].Value)
+	for i := uint64(0); i < inputCount; i++ {
+		wire.WriteVarInt(&buf, 0, uint64(self.FundingInputs[i].Value))
 		op := OutPointToBytes(self.FundingInputs[i].Outpoint)
 		buf.Write(op[:])
-
 	}
 
-	signatureCount := uint32(len(self.SettlementSignatures))
-	binary.Write(&buf, binary.BigEndian, signatureCount)
+	signatureCount := uint64(len(self.SettlementSignatures))
+	wire.WriteVarInt(&buf, 0, signatureCount)
 
-	for i := uint32(0); i < signatureCount; i++ {
-		binary.Write(&buf, binary.BigEndian, self.SettlementSignatures[i].Outcome)
-		sigLen := uint32(len(self.SettlementSignatures[i].Signature))
-		binary.Write(&buf, binary.BigEndian, sigLen)
-		buf.Write(self.SettlementSignatures[i].Signature)
+	for i := uint64(0); i < signatureCount; i++ {
+		wire.WriteVarInt(&buf, 0, uint64(self.SettlementSignatures[i].Outcome))
+		buf.Write(self.SettlementSignatures[i].Signature[:])
 	}
 	return buf.Bytes()
 }
@@ -1166,12 +1162,9 @@ func NewDlcContractAckMsgFromBytes(b []byte, peerIdx uint32) (DlcContractAckMsg,
 	binary.Read(buf, binary.BigEndian, &signatureCount)
 	msg.SettlementSignatures = make([]DlcContractSettlementSignature, signatureCount)
 
-	var sigLen uint32
 	for i := uint32(0); i < signatureCount; i++ {
 		binary.Read(buf, binary.BigEndian, &msg.SettlementSignatures[i].Outcome)
-		binary.Read(buf, binary.BigEndian, &sigLen)
-		msg.SettlementSignatures[i].Signature = make([]byte, int(sigLen))
-		copy(msg.SettlementSignatures[i].Signature, buf.Next(int(sigLen)))
+		copy(msg.SettlementSignatures[i].Signature[:], buf.Next(64))
 	}
 
 	return *msg, nil
@@ -1189,9 +1182,7 @@ func (self DlcContractAckMsg) Bytes() []byte {
 
 	for i := uint32(0); i < signatureCount; i++ {
 		binary.Write(&buf, binary.BigEndian, self.SettlementSignatures[i].Outcome)
-		sigLen := uint32(len(self.SettlementSignatures[i].Signature))
-		binary.Write(&buf, binary.BigEndian, sigLen)
-		buf.Write(self.SettlementSignatures[i].Signature)
+		buf.Write(self.SettlementSignatures[i].Signature[:])
 	}
 	return buf.Bytes()
 }

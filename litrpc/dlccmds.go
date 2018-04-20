@@ -340,3 +340,25 @@ func (r *LitRPC) AcceptContract(args AcceptContractArgs, reply *AcceptContractRe
 	reply.Success = true
 	return nil
 }
+
+type SettleContractArgs struct {
+	CIdx        uint64
+	OracleValue int64
+	OracleSig   [32]byte
+}
+
+type SettleContractReply struct {
+	Success bool
+}
+
+func (r *LitRPC) SettleContract(args SettleContractArgs, reply *SettleContractReply) error {
+	var err error
+
+	err = r.Node.SettleContract(args.CIdx, args.OracleValue, args.OracleSig)
+	if err != nil {
+		return err
+	}
+
+	reply.Success = true
+	return nil
+}
