@@ -383,7 +383,7 @@ func DlcCalcOracleSignaturePubKey(msg []byte, oracleA, oracleR [33]byte) ([33]by
 }
 
 // Ours = the one we generate & sign. Theirs (ours = false) = the one they generated, so we can use their sigs
-func SettlementTx(c *DlcContract, d DlcContractDivision, contractInput wire.OutPoint, ours bool, debug bool) (*wire.MsgTx, error) {
+func SettlementTx(c *DlcContract, d DlcContractDivision, contractInput wire.OutPoint, ours bool) (*wire.MsgTx, error) {
 
 	tx := wire.NewMsgTx()
 	// set version 2, for op_csv
@@ -424,18 +424,6 @@ func SettlementTx(c *DlcContract, d DlcContractDivision, contractInput wire.OutP
 	if err != nil {
 		return nil, err
 	}
-
-	if debug {
-		fmt.Printf("== Building settlement TX ==\n")
-		fmt.Printf("Ours: %t\n", ours)
-		fmt.Printf("TheirPayoutPub: %x\n", c.TheirPayoutPub)
-		fmt.Printf("OurPayoutPub: %x\n", c.OurPayoutPub)
-		fmt.Printf("oracleSigPub: %x\n", oracleSigPub)
-		fmt.Printf("valueTheirs: %d\n", valueTheirs)
-		fmt.Printf("valueOurs: %d\n", valueOurs)
-		fmt.Printf("feeTheirs: %d\n", feeTheirs)
-		fmt.Printf("feeOurs: %d\n", feeOurs)
-	}
 	// Ours = the one we generate & sign. Theirs (ours = false) = the one they generated, so we can use their sigs
 	if ours {
 		if valueTheirs > 0 {
@@ -459,10 +447,6 @@ func SettlementTx(c *DlcContract, d DlcContractDivision, contractInput wire.OutP
 			tx.AddTxOut(wire.NewTxOut(valueTheirs, DirectWPKHScriptFromPKH(theirPayoutPKH)))
 		}
 	}
-	if debug {
-		fmt.Printf("Tx hash: %s", tx.TxHash().String())
-		fmt.Printf("Tx raw:\n")
-		PrintTx(tx)
-	}
+
 	return tx, nil
 }
