@@ -105,6 +105,23 @@ func (nd *LitNode) SignSettlementTx(c *lnutil.DlcContract, tx *wire.MsgTx, priv 
 	return sig64.SigCompress(mySig)
 }
 
+func (nd *LitNode) SignClaimTx(settlementTx, claimTx *wire.MsgTx, priv *btcec.PrivateKey) ([64]byte, error) {
+
+	var sig [64]byte
+	// make hash cache
+	hCache := txscript.NewTxSigHashes(claimTx)
+
+	// generate sig
+	mySig, err := txscript.RawTxInWitnessSignature(
+		claimTx, hCache, 0, settlementTx.TxOut[0].Value, settlementTx.TxOut[0].PkScript, txscript.SigHashAll, priv)
+	if err != nil {
+		return sig, err
+	}
+	// truncate sig (last byte is sighash type, always sighashAll)
+	mySig = mySig[:len(mySig)-1]
+	return sig64.SigCompress(mySig)
+}
+
 // SignNextState generates your signature for their state.
 func (nd *LitNode) SignState(q *Qchan) ([64]byte, error) {
 

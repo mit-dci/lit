@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/adiabat/btcd/btcec"
 	"github.com/adiabat/btcd/txscript"
 	"github.com/adiabat/btcd/wire"
 	"github.com/adiabat/btcutil/txsort"
@@ -539,11 +540,32 @@ func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oracleSig [32]
 	// Settlement TX should be valid here, so publish it.
 	err = wal.DirectSendTx(settleTx)
 	if err != nil {
-		log.Printf("SettleContract DirectSendTx err %s", err.Error())
+		log.Printf("SettleContract DirectSendTx (settle) err %s", err.Error())
 		return err
 	}
 
 	// TODO: Claim the contract settlement output back to our wallet - otherwise the peer can claim it after locktime.
+	txClaim := wire.NewMsgTx()
+	txClaim.Version = 2
+
+	settleOutpoint := wire.OutPoint{settleTx.TxHash(), 0}
+	txClaim.AddTxIn(wire.NewTxIn(&settleOutpoint, nil, nil))
+
+	addr, err := wal.NewAdr()
+	txClaim.AddTxOut(wire.NewTxOut(d.ValueOurs-500, lnutil.DirectWPKHScriptFromPKH(addr)))
+
+	kg.Step[2] = UseContractPayout
+	privSpend := wal.GetPriv(kg)
+	privOracle, _ := btcec.PrivKeyFromBytes(btcec.S256(), oracleSig[:])
+	privContractOutput := lnutil.CombinePrivateKeys(privSpend, privOracle)
+
+	nd.SignClaimTx(settleTx, txClaim, privContractOutput)
+	// Claim TX should be valid here, so publish it.
+	err = wal.DirectSendTx(txClaim)
+	if err != nil {
+		log.Printf("SettleContract DirectSendTx (claim) err %s", err.Error())
+		return err
+	}
 
 	return nil
 }
