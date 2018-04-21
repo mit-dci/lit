@@ -383,20 +383,11 @@ func (nd *LitNode) SignSettlementDivisions(c *lnutil.DlcContract) ([]lnutil.DlcC
 }
 
 func (nd *LitNode) BuildDlcFundingTransaction(c *lnutil.DlcContract) (wire.MsgTx, error) {
-
 	// make the tx
 	tx := wire.NewMsgTx()
 
-	w, ok := nd.SubWallet[c.CoinType]
-	if !ok {
-		err := fmt.Errorf("BuildDlcFundingTransaction err no wallet for type %d", c.CoinType)
-		return *tx, err
-	}
-
 	// set version 2, for op_csv
 	tx.Version = 2
-	// set the time, the way core does.
-	tx.LockTime = uint32(w.CurrentHeight())
 
 	// add all the txins
 	var ourInputTotal int64
@@ -552,12 +543,15 @@ func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oracleSig [32]
 	txClaim.AddTxIn(wire.NewTxIn(&settleOutpoint, nil, nil))
 
 	addr, err := wal.NewAdr()
-	txClaim.AddTxOut(wire.NewTxOut(d.ValueOurs-500, lnutil.DirectWPKHScriptFromPKH(addr)))
+	txClaim.AddTxOut(wire.NewTxOut(d.ValueOurs-1000, lnutil.DirectWPKHScriptFromPKH(addr))) // todo calc fee - fee is double here because the contract output already had the fee deducted in the settlement TX
 
 	kg.Step[2] = UseContractPayout
 	privSpend := wal.GetPriv(kg)
 	privOracle, _ := btcec.PrivKeyFromBytes(btcec.S256(), oracleSig[:])
 	privContractOutput := lnutil.CombinePrivateKeys(privSpend, privOracle)
+
+	fmt.Printf("ClaimTX before publish: %s\n", txClaim.TxHash().String())
+	lnutil.PrintTx(txClaim)
 
 	nd.SignClaimTx(settleTx, txClaim, privContractOutput)
 	// Claim TX should be valid here, so publish it.
