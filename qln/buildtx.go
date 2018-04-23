@@ -26,6 +26,9 @@ func GetStateIdxFromTx(tx *wire.MsgTx, x uint64) uint64 {
 		return 0
 	}
 	// check that indicating high bytes are correct.  If not, return 0
+	// do we change this part to not only check the high bits but the mid bits too?
+	// rbf signal -> ffffffff - 2 , not rbf -> ffffffff - 1
+	// if tx.TxIn[0].Sequence>>24 != 0xff || tx.LockTime>>24 != 0x21 {
 	if tx.TxIn[0].Sequence>>24 != 0xff || tx.LockTime>>24 != 0x21 {
 		//		fmt.Printf("sequence byte %x, locktime byte %x\n",
 		//			tx.TxIn[0].Sequence>>24, tx.LockTime>>24 != 0x21)
@@ -33,9 +36,16 @@ func GetStateIdxFromTx(tx *wire.MsgTx, x uint64) uint64 {
 	}
 	// high 24 bits sequence, low 24 bits locktime
 	seqBits := uint64(tx.TxIn[0].Sequence & 0x00ffffff)
+	// why do we do this?
+	// low order bits of the high order seq must be checked for rbf
+	// idx >> 47 == 10 ie idx >> 48 == 0 -> rbf
+	// idx >> 48 == 1  -> rbf = false
+	// if (rbf == true) { which it is by default
+	// seqBits := uint32(idx>>24) + uint32(10)
+	// }
 	timeBits := uint64(tx.LockTime & 0x00ffffff)
 
-	return (seqBits<<24 | timeBits) ^ x
+	return (seqBits<<24 | timeBits) ^ x // Added the +10 for rbf (sig 2)
 }
 
 // SetStateIdxBits modifies the tx in place, setting the sequence and locktime
@@ -55,6 +65,7 @@ func SetStateIdxBits(tx *wire.MsgTx, idx, x uint64) error {
 	idx = idx ^ x
 	// high 24 bits sequence, low 24 bits locktime
 	seqBits := uint32(idx >> 24)
+	// low order bits of the high order seq must be checked for rbf
 	timeBits := uint32(idx & 0x00ffffff)
 
 	tx.TxIn[0].Sequence = seqBits | seqMask

@@ -44,6 +44,9 @@ type Wallit struct {
 	// current fee per byte
 	FeeRate int64
 
+	// Replace-By-Fee
+	Rbf bool
+
 	// From here, comes everything. It's a secret to everybody.
 	rootPrivKey *hdkeychain.ExtendedKey
 }

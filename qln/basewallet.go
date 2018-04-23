@@ -51,6 +51,8 @@ type UWallet interface {
 	// sent through LetMeKnow
 	ReallySend(txid *chainhash.Hash) error
 
+	MakeRbfTx(txos []*wire.TxOut, onlyWit bool) (error)
+
 	// NahDontSend cancels the MaybeSend transaction.
 	NahDontSend(txid *chainhash.Hash) error
 
@@ -89,6 +91,9 @@ type UWallet interface {
 
 	// Set fee rate
 	SetFee(int64) int64
+
+	// Set rbf bool
+	SetRbf(bool)
 
 	// ===== TESTING / SPAMMING ONLY, these funcs will not be in the real interface
 	// Sweep sends lots of txs (uint32 of them) to the specified address.

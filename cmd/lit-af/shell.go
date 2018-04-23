@@ -19,9 +19,9 @@ var lsCommand = &Command{
 }
 
 var exitCommand = &Command{
-	Format:           lnutil.White("exit\n"),
-	Description:      fmt.Sprintf("Alias: %s\nExit the interactive shell.\n", lnutil.White("quit")),
-	ShortDescription: fmt.Sprintf("Alias: %s\nExit the interactive shell.\n", lnutil.White("quit")),
+	Format:           lnutil.White("exit/quit\n"),
+	Description:      fmt.Sprintf("Exit the interactive shell.\n"), // weird spaces due to the absence of a tab character
+	ShortDescription: fmt.Sprintf("Exit the interactive shell.\n"),
 }
 
 var helpCommand = &Command{
@@ -30,8 +30,15 @@ var helpCommand = &Command{
 	ShortDescription: "Show information about a given command\n",
 }
 
+// fee x returns error if the fee hasn't ben already set
+var feeCommand = &Command{
+	Format:           fmt.Sprintf("%s%s\n", lnutil.White("fee"), lnutil.ReqColor("amount")),
+	Description:      "Set fee in satoshis/byte for a given transaction\n",
+	ShortDescription: "Set fee in satoshis/byte for a given transaction\n",
+}
+
 var offCommand = &Command{
-	Format:           lnutil.White("off"),
+	Format:           lnutil.White("off\n"),
 	Description:      "Shut down the lit node.\n",
 	ShortDescription: "Shut down the lit node.\n",
 }
@@ -98,7 +105,7 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 	}
 
 	if cmd == "off" { // stop remote node
-		// actually returns an error
+		// actually returns an error (RequestAsync)
 		return lc.Stop(args)
 	}
 
@@ -366,6 +373,7 @@ func (lc *litAfClient) Help(textArgs []string) error {
 		fmt.Fprintf(color.Output, "%s\t%s", lsCommand.Format, lsCommand.ShortDescription)
 		fmt.Fprintf(color.Output, "%s\t%s", addressCommand.Format, addressCommand.ShortDescription)
 		fmt.Fprintf(color.Output, "%s\t%s", sendCommand.Format, sendCommand.ShortDescription)
+		fmt.Fprintf(color.Output, "%s\t%s", feeCommand.Format, feeCommand.ShortDescription)
 		fmt.Fprintf(color.Output, "%s\t%s", fanCommand.Format, fanCommand.ShortDescription)
 		fmt.Fprintf(color.Output, "%s\t%s", sweepCommand.Format, sweepCommand.ShortDescription)
 		fmt.Fprintf(color.Output, "%s\t%s", lisCommand.Format, lisCommand.ShortDescription)

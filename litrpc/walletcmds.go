@@ -18,6 +18,7 @@ type StatusReply struct {
 
 type NoArgs struct {
 	// nothin
+	// what does this arg do?
 }
 
 type CoinArgs struct {
@@ -135,8 +136,9 @@ type SendArgs struct {
 
 func (r *LitRPC) Send(args SendArgs, reply *TxidsReply) error {
 	var err error
-
 	nOutputs := len(args.DestAddrs)
+	// funnily enough, sending to multiple address doesn't work
+	// will remove in the next commit. TODO
 	if nOutputs < 1 {
 		return fmt.Errorf("No destination address specified")
 	}
@@ -163,8 +165,8 @@ func (r *LitRPC) Send(args SendArgs, reply *TxidsReply) error {
 
 	txOuts := make([]*wire.TxOut, nOutputs)
 	for i, s := range args.DestAddrs {
-		if args.Amts[i] < 10000 {
-			return fmt.Errorf("Amt %d less than min 10000", args.Amts[i])
+		if args.Amts[i] < 20000 {
+			return fmt.Errorf("Amt %d less than min 20000", args.Amts[i])
 		}
 
 		outScript, err := AdrStringToOutscript(s)
@@ -175,13 +177,22 @@ func (r *LitRPC) Send(args SendArgs, reply *TxidsReply) error {
 		txOuts[i] = wire.NewTxOut(args.Amts[i], outScript)
 	}
 
+	rbf := true // set rbf to true coz why not
+	// test set rbf, setting rbf as a param would require us to change a few files
+	// we shall do that hehe
+	wal.SetRbf(rbf)
 	// we don't care if it's witness or not
 	ops, err := wal.MaybeSend(txOuts, false)
 	if err != nil {
 		return err
 	}
 
-	err = wal.ReallySend(&ops[0].Hash)
+	// err = wal.ReallySend(&ops[0].Hash)
+	// if err != nil {
+	// 	return err
+	// }
+
+	err = wal.MakeRbfTx(txOuts, false)
 	if err != nil {
 		return err
 	}
@@ -297,6 +308,8 @@ type FeeReply struct {
 // SetFee allows you to set a fee rate for a wallet.
 func (r *LitRPC) SetFee(args *SetFeeArgs, reply *FeeReply) error {
 	// if cointype is 0, use the node's default coin
+	// Note: negative values for uint32 inputs are subtracted from 2**32
+	// TODO RBF
 	if args.CoinType == 0 {
 		args.CoinType = r.Node.DefaultCoin
 	}
@@ -308,7 +321,7 @@ func (r *LitRPC) SetFee(args *SetFeeArgs, reply *FeeReply) error {
 	if !ok {
 		return fmt.Errorf("no connnected wallet for coin type %d", args.CoinType)
 	}
-	reply.CurrentFee = wal.SetFee(args.Fee)
+	reply.CurrentFee = wal.SetFee(args.Fee) // default fee is 80 sat/byte for now
 	return nil
 }
 
