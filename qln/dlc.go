@@ -1,6 +1,7 @@
 package qln
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 
@@ -27,6 +28,40 @@ func (nd *LitNode) OfferDlc(peerIdx uint32, cIdx uint64) error {
 	c, err := nd.DlcManager.LoadContract(cIdx)
 	if err != nil {
 		return err
+	}
+
+	if c.Status != lnutil.ContractStatusDraft {
+		return fmt.Errorf("You cannot offer a contract to someone that is not in draft stage")
+	}
+
+	if !nd.ConnectedToPeer(peerIdx) {
+		return fmt.Errorf("You are not connected to peer %d, do that first", peerIdx)
+	}
+
+	var nullBytes [33]byte
+	// Check if everything's set
+	if bytes.Equal(nullBytes[:], c.OracleA[:]) {
+		return fmt.Errorf("You need to set an oracle for the contract before offering it")
+	}
+
+	if bytes.Equal(nullBytes[:], c.OracleR[:]) {
+		return fmt.Errorf("You need to set an R-point for the contract before offering it")
+	}
+
+	if c.OracleTimestamp == 0 {
+		return fmt.Errorf("You need to set a settlement time for the contract before offering it")
+	}
+
+	if c.CoinType == 0 {
+		return fmt.Errorf("You need to set a coin type for the contract before offering it")
+	}
+
+	if c.Division == nil {
+		return fmt.Errorf("You need to set a payout division for the contract before offering it")
+	}
+
+	if c.OurFundingAmount+c.TheirFundingAmount == 0 {
+		return fmt.Errorf("You need to set a funding amount for the peers in contract before offering it")
 	}
 
 	c.PeerIdx = peerIdx
@@ -74,6 +109,14 @@ func (nd *LitNode) DeclineDlc(cIdx uint64) error {
 		return err
 	}
 
+	if c.Status != lnutil.ContractStatusOfferedToMe {
+		return fmt.Errorf("You cannot decline a contract unless it is in the 'Offered/Awaiting reply' state")
+	}
+
+	if !nd.ConnectedToPeer(c.PeerIdx) {
+		return fmt.Errorf("You are not connected to peer %d, do that first", c.PeerIdx)
+	}
+
 	msg := lnutil.NewDlcOfferDeclineMsg(c.PeerIdx, 0x01, c.PubKey)
 	c.Status = lnutil.ContractStatusDeclined
 
@@ -91,6 +134,14 @@ func (nd *LitNode) AcceptDlc(cIdx uint64) error {
 	c, err := nd.DlcManager.LoadContract(cIdx)
 	if err != nil {
 		return err
+	}
+
+	if c.Status != lnutil.ContractStatusOfferedToMe {
+		return fmt.Errorf("You cannot decline a contract unless it is in the 'Offered/Awaiting reply' state")
+	}
+
+	if !nd.ConnectedToPeer(c.PeerIdx) {
+		return fmt.Errorf("You are not connected to peer %d, do that first", c.PeerIdx)
 	}
 
 	// Fund the contract
