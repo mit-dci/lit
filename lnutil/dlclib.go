@@ -48,6 +48,7 @@ type DlcContract struct {
 	Status                                   DlcContractStatus                // Status of the contract
 	OurFundingInputs, TheirFundingInputs     []DlcContractFundingInput        // Outpoints used to fund the contract
 	TheirSettlementSignatures                []DlcContractSettlementSignature // Signatures for the settlement transactions
+	FundingOutpoint                          wire.OutPoint                    // The outpoint of the funding TX we want to spend in the settlement - for easier monitoring
 }
 
 // DlcContractDivision describes a single division of the contract. If the oracle predicts OracleValue, we receive ValueOurs
@@ -184,6 +185,9 @@ func DlcContractFromBytes(b []byte) (*DlcContract, error) {
 		copy(c.TheirSettlementSignatures[i].Signature[:], buf.Next(64))
 	}
 
+	copy(op[:], buf.Next(36))
+	c.FundingOutpoint = *OutPointFromBytes(op)
+
 	return c, nil
 }
 
@@ -242,6 +246,9 @@ func (self *DlcContract) Bytes() []byte {
 		wire.WriteVarInt(&buf, 0, uint64(self.TheirSettlementSignatures[i].Outcome))
 		buf.Write(self.TheirSettlementSignatures[i].Signature[:])
 	}
+
+	opArr := OutPointToBytes(self.FundingOutpoint)
+	buf.Write(opArr[:])
 
 	return buf.Bytes()
 }
@@ -404,13 +411,13 @@ func computePubKey(pubA, pubR [33]byte, msg []byte) ([33]byte, error) {
 }
 
 // SettlementTx returns the transaction to settle the contract. ours = the one we generate & sign. Theirs (ours = false) = the one they generated, so we can use their sigs
-func SettlementTx(c *DlcContract, d DlcContractDivision, contractInput wire.OutPoint, ours bool) (*wire.MsgTx, error) {
+func SettlementTx(c *DlcContract, d DlcContractDivision, ours bool) (*wire.MsgTx, error) {
 
 	tx := wire.NewMsgTx()
 	// set version 2, for op_csv
 	tx.Version = 2
 
-	tx.AddTxIn(wire.NewTxIn(&contractInput, nil, nil))
+	tx.AddTxIn(wire.NewTxIn(&c.FundingOutpoint, nil, nil))
 
 	totalFee := int64(1000) // TODO: Calculate
 	feeEach := int64(float64(totalFee) / float64(2))

@@ -348,6 +348,12 @@ func (nd *LitNode) DlcFundingSigsHandler(msg lnutil.DlcContractFundingSigsMsg, p
 
 	wal.DirectSendTx(msg.SignedFundingTx)
 
+	err = wal.WatchThis(c.FundingOutpoint)
+	if err != nil {
+		fmt.Printf("DlcFundingSigsHandler WatchThis err %s\n", err.Error())
+		return
+	}
+
 	c.Status = lnutil.ContractStatusActive
 	err = nd.DlcManager.SaveContract(c)
 	if err != nil {
@@ -368,6 +374,17 @@ func (nd *LitNode) DlcSigProofHandler(msg lnutil.DlcContractSigProofMsg, peer *R
 	}
 
 	// TODO: Check signatures
+	wal, ok := nd.SubWallet[c.CoinType]
+	if !ok {
+		fmt.Printf("DlcSigProofHandler No wallet for cointype %d\n", c.CoinType)
+		return
+	}
+
+	err = wal.WatchThis(c.FundingOutpoint)
+	if err != nil {
+		fmt.Printf("DlcSigProofHandler WatchThis err %s\n", err.Error())
+		return
+	}
 
 	c.Status = lnutil.ContractStatusActive
 	err = nd.DlcManager.SaveContract(c)
@@ -400,12 +417,11 @@ func (nd *LitNode) SignSettlementDivisions(c *lnutil.DlcContract) ([]lnutil.DlcC
 	if err != nil {
 		return nil, err
 	}
-
-	contractInput := wire.OutPoint{fundingTx.TxHash(), 0}
+	c.FundingOutpoint = wire.OutPoint{fundingTx.TxHash(), 0}
 
 	returnValue := make([]lnutil.DlcContractSettlementSignature, len(c.Division))
 	for i, d := range c.Division {
-		tx, err := lnutil.SettlementTx(c, d, contractInput, true)
+		tx, err := lnutil.SettlementTx(c, d, true)
 
 		sig, err := nd.SignSettlementTx(c, tx, priv)
 		if err != nil {
@@ -498,12 +514,6 @@ func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oracleSig [32]
 		return [32]byte{}, [32]byte{}, err
 	}
 
-	fundingTx, err := nd.BuildDlcFundingTransaction(c)
-	if err != nil {
-		fmt.Printf("SettleContract BuildDlcFundingTransaction err %s\n", err.Error())
-		return [32]byte{}, [32]byte{}, err
-	}
-
 	wal, ok := nd.SubWallet[c.CoinType]
 	if !ok {
 		return [32]byte{}, [32]byte{}, fmt.Errorf("SettleContract Wallet of type %d not found", c.CoinType)
@@ -522,9 +532,7 @@ func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oracleSig [32]
 		return [32]byte{}, [32]byte{}, fmt.Errorf("SettleContract Could not get private key for contract %d", c.Idx)
 	}
 
-	contractInput := wire.OutPoint{fundingTx.TxHash(), 0}
-
-	settleTx, err := lnutil.SettlementTx(c, *d, contractInput, false)
+	settleTx, err := lnutil.SettlementTx(c, *d, false)
 	if err != nil {
 		fmt.Printf("SettleContract SettlementTx err %s\n", err.Error())
 		return [32]byte{}, [32]byte{}, err

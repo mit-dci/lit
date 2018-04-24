@@ -1,9 +1,13 @@
 package qln
 
 import (
+	"bytes"
 	"fmt"
 
+	"github.com/adiabat/btcd/txscript"
+	"github.com/adiabat/btcd/wire"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/portxo"
 )
 
 // handles stuff that comes in over the wire.  Not user-initiated.
@@ -286,6 +290,32 @@ func (nd *LitNode) OPEventHandler(OPEventChan chan lnutil.OutPointEvent) {
 				theQ = q
 			}
 		}
+
+		var theC *lnutil.DlcContract
+
+		if theQ == nil {
+			// Check if this is a contract output
+			contracts, err := nd.DlcManager.ListContracts()
+			if err != nil {
+				fmt.Printf("contract db error: %s\n", err.Error())
+				continue
+			}
+			for _, c := range contracts {
+				if lnutil.OutPointsEqual(c.FundingOutpoint, curOPEvent.Op) {
+					theC = c
+				}
+			}
+
+		}
+
+		if theC != nil {
+			err := nd.HandleContractOPEvent(theC, &curOPEvent)
+			if err != nil {
+				fmt.Printf("HandleContractOPEvent error: %s\n", err.Error())
+			}
+			continue
+		}
+
 		// end if no associated channel
 		if theQ == nil {
 			fmt.Printf("OPEvent %s doesn't match any channel\n",
@@ -345,4 +375,62 @@ func (nd *LitNode) OPEventHandler(OPEventChan chan lnutil.OutPointEvent) {
 			}
 		}
 	}
+}
+
+func (nd *LitNode) HandleContractOPEvent(c *lnutil.DlcContract, opEvent *lnutil.OutPointEvent) error {
+	fmt.Printf("Received OPEvent for contract %d!\n", c.Idx)
+	if opEvent.Tx != nil {
+		wal, ok := nd.SubWallet[c.CoinType]
+		if !ok {
+			return fmt.Errorf("Could not find associated wallet for type %d", c.CoinType)
+		}
+
+		pkhIsMine := false
+		pkhIdx := uint32(0)
+		value := int64(0)
+		myPKHPkSript := lnutil.DirectWPKHScript(c.OurPayoutPub)
+		for i, out := range opEvent.Tx.TxOut {
+			if bytes.Equal(myPKHPkSript, out.PkScript) {
+				pkhIdx = uint32(i)
+				pkhIsMine = true
+				value = out.Value
+			}
+		}
+
+		if pkhIsMine {
+			// We need to claim this.
+			txClaim := wire.NewMsgTx()
+			txClaim.Version = 2
+
+			settleOutpoint := wire.OutPoint{opEvent.Tx.TxHash(), pkhIdx}
+			txClaim.AddTxIn(wire.NewTxIn(&settleOutpoint, nil, nil))
+
+			addr, err := wal.NewAdr()
+			if err != nil {
+				return err
+			}
+			txClaim.AddTxOut(wire.NewTxOut(value-500, lnutil.DirectWPKHScriptFromPKH(addr))) // todo calc fee
+
+			var kg portxo.KeyGen
+			kg.Depth = 5
+			kg.Step[0] = 44 | 1<<31
+			kg.Step[1] = c.CoinType | 1<<31
+			kg.Step[2] = UseContractPayout
+			kg.Step[3] = c.PeerIdx | 1<<31
+			kg.Step[4] = uint32(c.Idx) | 1<<31
+			priv := wal.GetPriv(kg)
+
+			// make hash cache
+			hCache := txscript.NewTxSigHashes(txClaim)
+
+			// generate sig
+			txClaim.TxIn[0].Witness, err = txscript.WitnessScript(txClaim, hCache, 0, value, myPKHPkSript, txscript.SigHashAll, priv, true)
+			if err != nil {
+				return err
+			}
+			wal.DirectSendTx(txClaim)
+		}
+
+	}
+	return nil
 }
