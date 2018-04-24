@@ -400,6 +400,8 @@ func (w *Wallit) BuildDontSign(
 	return tx, nil
 }
 
+// SignMyInputs finds the inputs in a transaction that came from our own wallet, and signs them with our private keys.
+// Will modify the transaction in place, but will ignore inputs that we can't sign and leave them unsigned.
 func (w *Wallit) SignMyInputs(tx *wire.MsgTx) error {
 
 	// generate tx-wide hashCache for segwit stuff

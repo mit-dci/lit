@@ -81,8 +81,7 @@ func (nd *LitNode) SignSimpleClose(q *Qchan, tx *wire.MsgTx) ([64]byte, error) {
 	return sig64.SigCompress(mySig)
 }
 
-// SignSimpleClose signs the given simpleClose tx, given the other signature
-// Tx is modified in place.
+// SignSettlementTx signs the given settlement tx based on the passed contract using the passed private key. Tx is modified in place.
 func (nd *LitNode) SignSettlementTx(c *lnutil.DlcContract, tx *wire.MsgTx, priv *btcec.PrivateKey) ([64]byte, error) {
 
 	var sig [64]byte
@@ -105,6 +104,9 @@ func (nd *LitNode) SignSettlementTx(c *lnutil.DlcContract, tx *wire.MsgTx, priv 
 	return sig64.SigCompress(mySig)
 }
 
+// SignClaimTx signs the given claim tx based on the passed preimage and value using the passed private key. Tx is modified in place.
+// timeout=false means it's a regular claim, timeout=true means we're claiming an output that has expired (for instance if someone)
+// published the wrong settlement TX, we can claim this output back to our wallet after the timelock expired.
 func (nd *LitNode) SignClaimTx(claimTx *wire.MsgTx, value int64, pre []byte, priv *btcec.PrivateKey, timeout bool) error {
 
 	// make hash cache

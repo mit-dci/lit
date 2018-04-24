@@ -120,7 +120,7 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		return nil
 	}
 
-	if cmd == "dlc" { // connect to lnd host
+	if cmd == "dlc" { // the root command for Discreet log contracts
 		err = lc.Dlc(args)
 		if err != nil {
 			fmt.Fprintf(color.Output, "dlc error: %s\n", err)

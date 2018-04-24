@@ -15,6 +15,7 @@ import (
 	"github.com/adiabat/btcd/wire"
 )
 
+// DlcContractStatus is an enumeration containing the various statuses a contract can have
 type DlcContractStatus int
 
 const (
@@ -31,6 +32,7 @@ const (
 // scalarSize is the size of an encoded big endian scalar.
 const scalarSize = 32
 
+// DlcContract is a struct containing all elements to work with a Discreet Log Contract. This struct is stored in the database
 type DlcContract struct {
 	Idx                                      uint64                           // Index of the contract for referencing in commands
 	PeerIdx                                  uint32                           // Index of the peer we've offered the contract to or received the contract from
@@ -48,16 +50,19 @@ type DlcContract struct {
 	TheirSettlementSignatures                []DlcContractSettlementSignature // Signatures for the settlement transactions
 }
 
+// DlcContractDivision describes a single division of the contract. If the oracle predicts OracleValue, we receive ValueOurs
 type DlcContractDivision struct {
 	OracleValue int64
 	ValueOurs   int64
 }
 
+// DlcContractFundingInput describes a UTXO that is offered to fund the contract with
 type DlcContractFundingInput struct {
 	Outpoint wire.OutPoint
 	Value    int64
 }
 
+// DlcContractFromBytes deserializes a byte array back into a DlcContract struct
 func DlcContractFromBytes(b []byte) (*DlcContract, error) {
 	buf := bytes.NewBuffer(b)
 	c := new(DlcContract)
@@ -182,6 +187,7 @@ func DlcContractFromBytes(b []byte) (*DlcContract, error) {
 	return c, nil
 }
 
+// Bytes serializes a DlcContract struct into a byte array
 func (self *DlcContract) Bytes() []byte {
 	var buf bytes.Buffer
 	buf.Write(self.PubKey[:])
@@ -240,6 +246,7 @@ func (self *DlcContract) Bytes() []byte {
 	return buf.Bytes()
 }
 
+// GetDivision loops over all division specifications inside the contract and returns the one matching the requested oracle value
 func (c DlcContract) GetDivision(value int64) (*DlcContractDivision, error) {
 	for _, d := range c.Division {
 		if d.OracleValue == value {
@@ -250,6 +257,8 @@ func (c DlcContract) GetDivision(value int64) (*DlcContractDivision, error) {
 	return nil, fmt.Errorf("Division not found in contract")
 }
 
+// GetTheirSettlementSignature loops over all stored settlement signatures from the counter party and
+// returns the one matching the requested oracle value
 func (c DlcContract) GetTheirSettlementSignature(value int64) ([64]byte, error) {
 
 	for _, s := range c.TheirSettlementSignatures {
@@ -261,6 +270,7 @@ func (c DlcContract) GetTheirSettlementSignature(value int64) ([64]byte, error) 
 	return [64]byte{}, fmt.Errorf("Signature not found in contract")
 }
 
+// PrintTx prints out a transaction as serialized byte array to StdOut
 func PrintTx(tx *wire.MsgTx) {
 	var buf bytes.Buffer
 	w := bufio.NewWriter(&buf)
@@ -269,6 +279,7 @@ func PrintTx(tx *wire.MsgTx) {
 	fmt.Printf("%x\n", buf.Bytes())
 }
 
+// DlcOutput returns a Txo for a particular value that pays to (PubKeyPeer+PubKeyOracleSig or (OurPubKey and TimeDelay))
 func DlcOutput(pubKeyPeer, pubKeyOracleSig, ourPubKey [33]byte, value int64) *wire.TxOut {
 	scriptBytes := DlcCommitScript(pubKeyPeer, pubKeyOracleSig, ourPubKey, 5)
 	scriptBytes = P2WSHify(scriptBytes)
@@ -290,7 +301,6 @@ func DlcCommitScript(pubKeyPeer, pubKeyOracleSig, ourPubKey [33]byte, delay uint
 
 	// Combine pubKey and Oracle Sig
 	combinedPubKey := CombinePubs(pubKeyPeer, pubKeyOracleSig)
-	fmt.Printf("Combined Pub in CommitScript: [%x]", combinedPubKey)
 
 	builder.AddData(combinedPubKey[:])
 
@@ -312,12 +322,7 @@ func DlcCommitScript(pubKeyPeer, pubKeyOracleSig, ourPubKey [33]byte, delay uint
 	builder.AddOp(txscript.OP_CHECKSIG)
 
 	// never any errors we care about here.
-	s, err := builder.Script()
-	if err != nil {
-		fmt.Printf("Error in DLC Script!!: %s", err.Error())
-	}
-
-	fmt.Printf("Returning DLC Commit Script: %x\n", s)
+	s, _ := builder.Script()
 
 	return s
 }
@@ -349,7 +354,7 @@ func BigIntToEncodedBytes(a *big.Int) *[32]byte {
 	return s
 }
 
-// Compute the predicted signature s*G
+// DlcCalcOracleSignaturePubKey computes the predicted signature s*G
 // it's just R - h(R||m)A
 func DlcCalcOracleSignaturePubKey(msg []byte, oracleA, oracleR [33]byte) ([33]byte, error) {
 	return computePubKey(oracleA, oracleR, msg)
@@ -398,7 +403,7 @@ func computePubKey(pubA, pubR [33]byte, msg []byte) ([33]byte, error) {
 	return returnValue, nil
 }
 
-// Ours = the one we generate & sign. Theirs (ours = false) = the one they generated, so we can use their sigs
+// SettlementTx returns the transaction to settle the contract. ours = the one we generate & sign. Theirs (ours = false) = the one they generated, so we can use their sigs
 func SettlementTx(c *DlcContract, d DlcContractDivision, contractInput wire.OutPoint, ours bool) (*wire.MsgTx, error) {
 
 	tx := wire.NewMsgTx()
@@ -440,8 +445,6 @@ func SettlementTx(c *DlcContract, d DlcContractDivision, contractInput wire.OutP
 	if err != nil {
 		return nil, err
 	}
-
-	fmt.Printf("Oracle Sig Pub in SettlementTx: [%x]", oracleSigPub)
 
 	// Ours = the one we generate & sign. Theirs (ours = false) = the one they generated, so we can use their sigs
 	if ours {

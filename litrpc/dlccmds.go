@@ -15,7 +15,7 @@ type ListOraclesReply struct {
 	Oracles []*dlc.DlcOracle
 }
 
-// ListOracles will return all oracles know to LIT
+// ListOracles returns all oracles know to LIT
 func (r *LitRPC) ListOracles(args ListOraclesArgs, reply *ListOraclesReply) error {
 	var err error
 
@@ -36,6 +36,7 @@ type ImportOracleReply struct {
 	Oracle *dlc.DlcOracle
 }
 
+// ImportOracle imports an oracle from a REST API
 func (r *LitRPC) ImportOracle(args ImportOracleArgs, reply *ImportOracleReply) error {
 	var err error
 	reply.Oracle, err = r.Node.DlcManager.ImportOracle(args.Url, args.Name)
@@ -55,6 +56,7 @@ type AddOracleReply struct {
 	Oracle *dlc.DlcOracle
 }
 
+// AddOracle manually adds an oracle from its PubKey A
 func (r *LitRPC) AddOracle(args AddOracleArgs, reply *AddOracleReply) error {
 	var err error
 	parsedKey, err := hex.DecodeString(args.Key)
@@ -81,6 +83,7 @@ type NewContractReply struct {
 	Contract *lnutil.DlcContract
 }
 
+// NewContract creates a new draft contract
 func (r *LitRPC) NewContract(args NewContractArgs, reply *NewContractReply) error {
 	var err error
 
@@ -100,7 +103,7 @@ type ListContractsReply struct {
 	Contracts []*lnutil.DlcContract
 }
 
-// ListOracles will return all contracts know to LIT
+// ListContracts returns all contracts know to LIT
 func (r *LitRPC) ListContracts(args ListContractsArgs, reply *ListContractsReply) error {
 	var err error
 
@@ -120,6 +123,7 @@ type GetContractReply struct {
 	Contract *lnutil.DlcContract
 }
 
+// GetContract returns a single contract based on its index
 func (r *LitRPC) GetContract(args GetContractArgs, reply *GetContractReply) error {
 	var err error
 
@@ -140,6 +144,7 @@ type SetContractOracleReply struct {
 	Success bool
 }
 
+// SetContractOracle assigns a known oracle to a (new) contract
 func (r *LitRPC) SetContractOracle(args SetContractOracleArgs, reply *SetContractOracleReply) error {
 	var err error
 
@@ -161,6 +166,7 @@ type SetContractDatafeedReply struct {
 	Success bool
 }
 
+// SetContractDatafeed sets a data feed by index to a contract, which is then used to fetch the R-point from the oracle's REST API
 func (r *LitRPC) SetContractDatafeed(args SetContractDatafeedArgs, reply *SetContractDatafeedReply) error {
 	var err error
 
@@ -182,6 +188,7 @@ type SetContractRPointReply struct {
 	Success bool
 }
 
+// SetContractRPoint manually sets the R-point for the contract using a pubkey
 func (r *LitRPC) SetContractRPoint(args SetContractRPointArgs, reply *SetContractRPointReply) error {
 	var err error
 
@@ -203,6 +210,7 @@ type SetContractSettlementTimeReply struct {
 	Success bool
 }
 
+// SetContractSettlementTime sets the time this contract will settle (the unix epoch)
 func (r *LitRPC) SetContractSettlementTime(args SetContractSettlementTimeArgs, reply *SetContractSettlementTimeReply) error {
 	var err error
 
@@ -225,6 +233,8 @@ type SetContractFundingReply struct {
 	Success bool
 }
 
+// SetContractFunding sets the division in funding the channel. The arguments decide how much we're funding and how much we expect
+// the peer we offer the contract to to fund
 func (r *LitRPC) SetContractFunding(args SetContractFundingArgs, reply *SetContractFundingReply) error {
 	var err error
 
@@ -247,6 +257,8 @@ type SetContractSettlementDivisionReply struct {
 	Success bool
 }
 
+// SetContractSettlementDivision sets how the contract is settled. The parameters indicate at what value the full contract funds are ours,
+// and at what value they are full funds are for our peer. Between those values, the contract will divide the contract funds linearly
 func (r *LitRPC) SetContractSettlementDivision(args SetContractSettlementDivisionArgs, reply *SetContractSettlementDivisionReply) error {
 	var err error
 
@@ -268,6 +280,8 @@ type SetContractCoinTypeReply struct {
 	Success bool
 }
 
+// SetContractCoinType sets the coin type the contract will be in. Note that a peer that doesn't have a wallet of that type will automatically
+// decline the contract.
 func (r *LitRPC) SetContractCoinType(args SetContractCoinTypeArgs, reply *SetContractCoinTypeReply) error {
 	var err error
 
@@ -289,6 +303,7 @@ type OfferContractReply struct {
 	Success bool
 }
 
+// OfferContract offers a contract to a (connected) peer
 func (r *LitRPC) OfferContract(args OfferContractArgs, reply *OfferContractReply) error {
 	var err error
 
@@ -309,6 +324,7 @@ type DeclineContractReply struct {
 	Success bool
 }
 
+// DeclineContract declines an offered contract
 func (r *LitRPC) DeclineContract(args DeclineContractArgs, reply *DeclineContractReply) error {
 	var err error
 
@@ -329,6 +345,7 @@ type AcceptContractReply struct {
 	Success bool
 }
 
+// AcceptContract accepts an offered contract and will initiate a signature-exchange for settlement and then for funding
 func (r *LitRPC) AcceptContract(args AcceptContractArgs, reply *AcceptContractReply) error {
 	var err error
 
@@ -353,6 +370,8 @@ type SettleContractReply struct {
 	ClaimTxHash  [32]byte
 }
 
+// SettleContract uses the value and signature from the oracle to settle the contract and send the equivalent settlement
+// transaction to the blockchain. It will subsequently claim the contract output back to our wallet
 func (r *LitRPC) SettleContract(args SettleContractArgs, reply *SettleContractReply) error {
 	var err error
 

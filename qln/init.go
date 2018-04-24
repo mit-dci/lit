@@ -54,6 +54,7 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string) (*LitNode, er
 
 	nd.Tower = new(watchtower.WatchTower)
 
+	// Create a new manager for the discreet log contracts
 	nd.DlcManager, err = dlc.NewManager(filepath.Join(nd.LitFolder, "dlc.db"))
 	if err != nil {
 		return nil, err

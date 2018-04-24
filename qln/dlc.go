@@ -123,8 +123,6 @@ func (nd *LitNode) AcceptDlc(cIdx uint64) error {
 		return err
 	}
 
-	fmt.Printf("Sending acceptance. Our funding input length: [%d] - Their funding input length: [%d]", len(c.OurFundingInputs), len(c.TheirFundingInputs))
-
 	msg := lnutil.NewDlcOfferAcceptMsg(c, sigs)
 	c.Status = lnutil.ContractStatusAccepted
 
@@ -295,19 +293,6 @@ func (nd *LitNode) DlcFundingSigsHandler(msg lnutil.DlcContractFundingSigsMsg, p
 		return
 	}
 
-	fmt.Printf("Received funding TX:\n")
-	lnutil.PrintTx(msg.SignedFundingTx)
-	fmt.Printf("Received hash: %s\n", msg.SignedFundingTx.TxHash().String())
-
-	ftx, err := nd.BuildDlcFundingTransaction(c)
-	if err != nil {
-		fmt.Printf("DlcFundingSigsHandler BuildDlcFundingTransaction err %s\n", err.Error())
-		return
-	}
-	fmt.Printf("Self-generated funding TX:\n")
-	lnutil.PrintTx(&ftx)
-	fmt.Printf("Self-generated hash: %s\n", ftx.TxHash().String())
-
 	wal.SignMyInputs(msg.SignedFundingTx)
 
 	wal.DirectSendTx(msg.SignedFundingTx)
@@ -420,8 +405,6 @@ func (nd *LitNode) BuildDlcFundingTransaction(c *lnutil.DlcContract) (wire.MsgTx
 	copy(txos[1:], tx.TxOut)
 	tx.TxOut = txos
 
-	fmt.Printf("Returning funding TX: %s\n", tx.TxHash().String())
-	lnutil.PrintTx(tx)
 	return *tx, nil
 
 }
@@ -451,7 +434,6 @@ func (nd *LitNode) FundContract(c *lnutil.DlcContract) error {
 }
 
 func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oracleSig [32]byte) ([32]byte, [32]byte, error) {
-	fmt.Printf("Settling contract %d on value %d (sig: %x)\n", cIdx, oracleValue, oracleSig)
 
 	c, err := nd.DlcManager.LoadContract(cIdx)
 	if err != nil {
@@ -525,9 +507,6 @@ func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oracleSig [32]
 		settleTx.TxIn[0].Witness = SpendMultiSigWitStack(pre, myBigSig, theirBigSig)
 	}
 
-	fmt.Printf("SettleTX before publish: %s\n", settleTx.TxHash().String())
-	lnutil.PrintTx(settleTx)
-
 	// Settlement TX should be valid here, so publish it.
 	err = wal.DirectSendTx(settleTx)
 	if err != nil {
@@ -556,19 +535,12 @@ func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oracleSig [32]
 	var pubSpendBytes [33]byte
 	copy(pubSpendBytes[:], pubSpend.SerializeCompressed())
 
-	fmt.Printf("Oracle Pub in ClaimTx: [%x]\n", pubOracleBytes)
-	fmt.Printf("Combined Pub in ClaimTx: [%x]\n", lnutil.CombinePubs(pubSpendBytes, pubOracleBytes))
-	fmt.Printf("Pubkey from privContractOutput: [%x]\n", privContractOutput.PubKey().SerializeCompressed())
-
 	settleScript := lnutil.DlcCommitScript(c.OurPayoutPub, pubOracleBytes, c.TheirPayoutPub, 5)
 	err = nd.SignClaimTx(txClaim, settleTx.TxOut[0].Value, settleScript, privContractOutput, false)
 	if err != nil {
 		log.Printf("SettleContract SignClaimTx err %s", err.Error())
 		return [32]byte{}, [32]byte{}, err
 	}
-
-	fmt.Printf("ClaimTX before publish: %s\n", txClaim.TxHash().String())
-	lnutil.PrintTx(txClaim)
 
 	// Claim TX should be valid here, so publish it.
 	err = wal.DirectSendTx(txClaim)

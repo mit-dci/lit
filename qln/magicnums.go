@@ -10,8 +10,8 @@ const (
 	UseChannelHAKDBase    = 40 | hdkeychain.HardenedKeyStart
 	UseChannelElkrem      = 8888 | hdkeychain.HardenedKeyStart
 
-	UseContractPayout       = 50 | hdkeychain.HardenedKeyStart
-	UseContractFundMultisig = 51 | hdkeychain.HardenedKeyStart
+	UseContractPayout       = 50 | hdkeychain.HardenedKeyStart // key derivation path for contract payout keys (the keys the contract pays TO)
+	UseContractFundMultisig = 51 | hdkeychain.HardenedKeyStart // key derivation path for contract spending keys (the keys the contract pays FROM, and the funding TX pays TO)
 	// links Id and channel. replaces UseChannelFund
 
 	UseIdKey = 111 | hdkeychain.HardenedKeyStart

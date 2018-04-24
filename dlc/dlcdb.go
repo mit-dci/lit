@@ -15,6 +15,7 @@ var (
 	BKTContracts = []byte("Contracts")
 )
 
+// InitDB initializes the database for Discreet Log Contract storage
 func (mgr *DlcManager) InitDB(dbPath string) error {
 	var err error
 
@@ -36,6 +37,7 @@ func (mgr *DlcManager) InitDB(dbPath string) error {
 	return nil
 }
 
+// SaveOracle saves an oracle into the database. Generates a new index if the passed oracle doesn't have one
 func (mgr *DlcManager) SaveOracle(o *DlcOracle) error {
 	err := mgr.DLCDB.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(BKTOracles)
@@ -60,6 +62,7 @@ func (mgr *DlcManager) SaveOracle(o *DlcOracle) error {
 	return nil
 }
 
+// LoadOracle loads an oracle from the database by index.
 func (mgr *DlcManager) LoadOracle(idx uint64) (*DlcOracle, error) {
 	o := new(DlcOracle)
 
@@ -91,6 +94,7 @@ func (mgr *DlcManager) LoadOracle(idx uint64) (*DlcOracle, error) {
 
 }
 
+// ListOracles loads all oracles from the database and returns them as an array
 func (mgr *DlcManager) ListOracles() ([]*DlcOracle, error) {
 	oracles := make([]*DlcOracle, 0)
 	err := mgr.DLCDB.View(func(tx *bolt.Tx) error {
@@ -116,6 +120,7 @@ func (mgr *DlcManager) ListOracles() ([]*DlcOracle, error) {
 	return oracles, nil
 }
 
+// SaveContract saves a contract into the database. Will generate a new index if the passed object doesn't have one.
 func (mgr *DlcManager) SaveContract(c *lnutil.DlcContract) error {
 	err := mgr.DLCDB.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(BKTContracts)
@@ -140,6 +145,7 @@ func (mgr *DlcManager) SaveContract(c *lnutil.DlcContract) error {
 	return nil
 }
 
+// LoadContract loads a contract from the database by index.
 func (mgr *DlcManager) LoadContract(idx uint64) (*lnutil.DlcContract, error) {
 	c := new(lnutil.DlcContract)
 
@@ -171,6 +177,7 @@ func (mgr *DlcManager) LoadContract(idx uint64) (*lnutil.DlcContract, error) {
 
 }
 
+// ListContracts loads all contracts from the database
 func (mgr *DlcManager) ListContracts() ([]*lnutil.DlcContract, error) {
 	contracts := make([]*lnutil.DlcContract, 0)
 	err := mgr.DLCDB.View(func(tx *bolt.Tx) error {
