@@ -348,13 +348,15 @@ type SettleContractArgs struct {
 }
 
 type SettleContractReply struct {
-	Success bool
+	Success      bool
+	SettleTxHash [32]byte
+	ClaimTxHash  [32]byte
 }
 
 func (r *LitRPC) SettleContract(args SettleContractArgs, reply *SettleContractReply) error {
 	var err error
 
-	err = r.Node.SettleContract(args.CIdx, args.OracleValue, args.OracleSig)
+	reply.SettleTxHash, reply.ClaimTxHash, err = r.Node.SettleContract(args.CIdx, args.OracleValue, args.OracleSig)
 	if err != nil {
 		return err
 	}

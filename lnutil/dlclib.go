@@ -290,6 +290,8 @@ func DlcCommitScript(pubKeyPeer, pubKeyOracleSig, ourPubKey [33]byte, delay uint
 
 	// Combine pubKey and Oracle Sig
 	combinedPubKey := CombinePubs(pubKeyPeer, pubKeyOracleSig)
+	fmt.Printf("Combined Pub in CommitScript: [%x]", combinedPubKey)
+
 	builder.AddData(combinedPubKey[:])
 
 	// 0, so revoked
@@ -310,7 +312,13 @@ func DlcCommitScript(pubKeyPeer, pubKeyOracleSig, ourPubKey [33]byte, delay uint
 	builder.AddOp(txscript.OP_CHECKSIG)
 
 	// never any errors we care about here.
-	s, _ := builder.Script()
+	s, err := builder.Script()
+	if err != nil {
+		fmt.Printf("Error in DLC Script!!: %s", err.Error())
+	}
+
+	fmt.Printf("Returning DLC Commit Script: %x\n", s)
+
 	return s
 }
 
@@ -344,42 +352,50 @@ func BigIntToEncodedBytes(a *big.Int) *[32]byte {
 // Compute the predicted signature s*G
 // it's just R - h(R||m)A
 func DlcCalcOracleSignaturePubKey(msg []byte, oracleA, oracleR [33]byte) ([33]byte, error) {
-	var sigPub [33]byte
+	return computePubKey(oracleA, oracleR, msg)
+}
 
+// calculates P = pubR - h(msg, pubR)pubA
+func computePubKey(pubA, pubR [33]byte, msg []byte) ([33]byte, error) {
+	var returnValue [33]byte
+
+	// Hardcode curve
 	curve := btcec.S256()
-	Pub, err := btcec.ParsePubKey(oracleA[:], curve)
+
+	A, err := btcec.ParsePubKey(pubA[:], curve)
 	if err != nil {
-		return sigPub, err
-	}
-	R, err := btcec.ParsePubKey(oracleR[:], curve)
-	if err != nil {
-		return sigPub, err
+		return returnValue, err
 	}
 
-	// h = Hash(R || m)
-	Rpxb := BigIntToEncodedBytes(R.X)
-	hashInput := make([]byte, 0, scalarSize*2)
-	hashInput = append(hashInput, Rpxb[:]...)
-	hashInput = append(hashInput, msg...)
-	h := chainhash.HashB(hashInput)
+	R, err := btcec.ParsePubKey(pubR[:], curve)
+	if err != nil {
+		return returnValue, err
+	}
 
-	// h * A
-	Pub.X, Pub.Y = curve.ScalarMult(Pub.X, Pub.Y, h)
+	// e = Hash(messageType, oraclePubQ)
+	var hashInput []byte
+	hashInput = append(msg, R.X.Bytes()...)
+	e := chainhash.HashB(hashInput)
 
-	// this works?
-	Pub.Y.Neg(Pub.Y)
-	//	Pub.Y = Pub.Y.Neg()
+	bigE := new(big.Int).SetBytes(e)
 
-	Pub.Y.Mod(Pub.Y, curve.P)
+	if bigE.Cmp(curve.N) >= 0 {
+		return returnValue, fmt.Errorf("hash of (msg, pubR) too big")
+	}
 
-	sG := new(btcec.PublicKey)
+	// e * B
+	A.X, A.Y = curve.ScalarMult(A.X, A.Y, e)
 
-	// Pub has been negated; add it to R
-	sG.X, sG.Y = curve.Add(R.X, R.Y, Pub.X, Pub.Y)
+	A.Y.Neg(A.Y)
 
-	copy(sigPub[:], sG.SerializeCompressed())
+	A.Y.Mod(A.Y, curve.P)
 
-	return sigPub, nil
+	P := new(btcec.PublicKey)
+
+	// add to R
+	P.X, P.Y = curve.Add(A.X, A.Y, R.X, R.Y)
+	copy(returnValue[:], P.SerializeCompressed())
+	return returnValue, nil
 }
 
 // Ours = the one we generate & sign. Theirs (ours = false) = the one they generated, so we can use their sigs
@@ -424,6 +440,9 @@ func SettlementTx(c *DlcContract, d DlcContractDivision, contractInput wire.OutP
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Printf("Oracle Sig Pub in SettlementTx: [%x]", oracleSigPub)
+
 	// Ours = the one we generate & sign. Theirs (ours = false) = the one they generated, so we can use their sigs
 	if ours {
 		if valueTheirs > 0 {

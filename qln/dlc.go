@@ -44,7 +44,7 @@ func (nd *LitNode) OfferDlc(peerIdx uint32, cIdx uint64) error {
 		return err
 	}
 
-	c.OurPayoutPub, err = nd.GetUsePub(kg, UseContractFundMultisig)
+	c.OurPayoutPub, err = nd.GetUsePub(kg, UseContractPayout)
 	if err != nil {
 		return err
 	}
@@ -450,30 +450,30 @@ func (nd *LitNode) FundContract(c *lnutil.DlcContract) error {
 	return nil
 }
 
-func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oracleSig [32]byte) error {
+func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oracleSig [32]byte) ([32]byte, [32]byte, error) {
 	fmt.Printf("Settling contract %d on value %d (sig: %x)\n", cIdx, oracleValue, oracleSig)
 
 	c, err := nd.DlcManager.LoadContract(cIdx)
 	if err != nil {
 		fmt.Printf("SettleContract FindContract err %s\n", err.Error())
-		return err
+		return [32]byte{}, [32]byte{}, err
 	}
 
 	d, err := c.GetDivision(oracleValue)
 	if err != nil {
 		fmt.Printf("SettleContract GetDivision err %s\n", err.Error())
-		return err
+		return [32]byte{}, [32]byte{}, err
 	}
 
 	fundingTx, err := nd.BuildDlcFundingTransaction(c)
 	if err != nil {
 		fmt.Printf("SettleContract BuildDlcFundingTransaction err %s\n", err.Error())
-		return err
+		return [32]byte{}, [32]byte{}, err
 	}
 
 	wal, ok := nd.SubWallet[c.CoinType]
 	if !ok {
-		return fmt.Errorf("SettleContract Wallet of type %d not found", c.CoinType)
+		return [32]byte{}, [32]byte{}, fmt.Errorf("SettleContract Wallet of type %d not found", c.CoinType)
 	}
 
 	var kg portxo.KeyGen
@@ -486,7 +486,7 @@ func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oracleSig [32]
 
 	priv := wal.GetPriv(kg)
 	if priv == nil {
-		return fmt.Errorf("SettleContract Could not get private key for contract %d", c.Idx)
+		return [32]byte{}, [32]byte{}, fmt.Errorf("SettleContract Could not get private key for contract %d", c.Idx)
 	}
 
 	contractInput := wire.OutPoint{fundingTx.TxHash(), 0}
@@ -494,13 +494,13 @@ func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oracleSig [32]
 	settleTx, err := lnutil.SettlementTx(c, *d, contractInput, false)
 	if err != nil {
 		fmt.Printf("SettleContract SettlementTx err %s\n", err.Error())
-		return err
+		return [32]byte{}, [32]byte{}, err
 	}
 
 	mySig, err := nd.SignSettlementTx(c, settleTx, priv)
 	if err != nil {
 		log.Printf("SettleContract SignSettlementTx err %s", err.Error())
-		return err
+		return [32]byte{}, [32]byte{}, err
 	}
 
 	myBigSig := sig64.SigDecompress(mySig)
@@ -515,7 +515,7 @@ func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oracleSig [32]
 	pre, swap, err := lnutil.FundTxScript(c.OurFundMultisigPub, c.TheirFundMultisigPub)
 	if err != nil {
 		log.Printf("SettleContract FundTxScript err %s", err.Error())
-		return err
+		return [32]byte{}, [32]byte{}, err
 	}
 
 	// swap if needed
@@ -532,7 +532,7 @@ func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oracleSig [32]
 	err = wal.DirectSendTx(settleTx)
 	if err != nil {
 		log.Printf("SettleContract DirectSendTx (settle) err %s", err.Error())
-		return err
+		return [32]byte{}, [32]byte{}, err
 	}
 
 	// TODO: Claim the contract settlement output back to our wallet - otherwise the peer can claim it after locktime.
@@ -547,19 +547,34 @@ func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oracleSig [32]
 
 	kg.Step[2] = UseContractPayout
 	privSpend := wal.GetPriv(kg)
-	privOracle, _ := btcec.PrivKeyFromBytes(btcec.S256(), oracleSig[:])
+	pubSpend := wal.GetPub(kg)
+	privOracle, pubOracle := btcec.PrivKeyFromBytes(btcec.S256(), oracleSig[:])
 	privContractOutput := lnutil.CombinePrivateKeys(privSpend, privOracle)
+
+	var pubOracleBytes [33]byte
+	copy(pubOracleBytes[:], pubOracle.SerializeCompressed())
+	var pubSpendBytes [33]byte
+	copy(pubSpendBytes[:], pubSpend.SerializeCompressed())
+
+	fmt.Printf("Oracle Pub in ClaimTx: [%x]\n", pubOracleBytes)
+	fmt.Printf("Combined Pub in ClaimTx: [%x]\n", lnutil.CombinePubs(pubSpendBytes, pubOracleBytes))
+	fmt.Printf("Pubkey from privContractOutput: [%x]\n", privContractOutput.PubKey().SerializeCompressed())
+
+	settleScript := lnutil.DlcCommitScript(c.OurPayoutPub, pubOracleBytes, c.TheirPayoutPub, 5)
+	err = nd.SignClaimTx(txClaim, settleTx.TxOut[0].Value, settleScript, privContractOutput, false)
+	if err != nil {
+		log.Printf("SettleContract SignClaimTx err %s", err.Error())
+		return [32]byte{}, [32]byte{}, err
+	}
 
 	fmt.Printf("ClaimTX before publish: %s\n", txClaim.TxHash().String())
 	lnutil.PrintTx(txClaim)
 
-	nd.SignClaimTx(settleTx, txClaim, privContractOutput)
 	// Claim TX should be valid here, so publish it.
 	err = wal.DirectSendTx(txClaim)
 	if err != nil {
 		log.Printf("SettleContract DirectSendTx (claim) err %s", err.Error())
-		return err
+		return [32]byte{}, [32]byte{}, err
 	}
-
-	return nil
+	return settleTx.TxHash(), txClaim.TxHash(), nil
 }

@@ -105,21 +105,26 @@ func (nd *LitNode) SignSettlementTx(c *lnutil.DlcContract, tx *wire.MsgTx, priv 
 	return sig64.SigCompress(mySig)
 }
 
-func (nd *LitNode) SignClaimTx(settlementTx, claimTx *wire.MsgTx, priv *btcec.PrivateKey) error {
+func (nd *LitNode) SignClaimTx(claimTx *wire.MsgTx, value int64, pre []byte, priv *btcec.PrivateKey, timeout bool) error {
 
 	// make hash cache
 	hCache := txscript.NewTxSigHashes(claimTx)
 
 	// generate sig
 	mySig, err := txscript.RawTxInWitnessSignature(
-		claimTx, hCache, 0, settlementTx.TxOut[0].Value, settlementTx.TxOut[0].PkScript, txscript.SigHashAll, priv)
+		claimTx, hCache, 0, value, pre, txscript.SigHashAll, priv)
 	if err != nil {
 		return err
 	}
 
-	witStash := make([][]byte, 2)
+	witStash := make([][]byte, 3)
 	witStash[0] = mySig
-	witStash[1] = settlementTx.TxOut[0].PkScript
+	if timeout {
+		witStash[1] = nil
+	} else {
+		witStash[1] = []byte{0x01}
+	}
+	witStash[2] = pre
 	claimTx.TxIn[0].Witness = witStash
 	return nil
 }
