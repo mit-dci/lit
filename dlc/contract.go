@@ -42,17 +42,25 @@ func (mgr *DlcManager) FindContractByKey(key [33]byte) (*lnutil.DlcContract, err
 // SetContractOracle assigns a particular oracle to a contract - used for determining which pubkey A to use and can also
 // allow for fetching R-points automatically when the oracle was imported from a REST api
 func (mgr *DlcManager) SetContractOracle(cIdx, oIdx uint64) error {
-	o, err := mgr.LoadOracle(oIdx)
-	if err != nil {
-		return err
-	}
 
 	c, err := mgr.LoadContract(cIdx)
 	if err != nil {
 		return err
 	}
 
+	if c.Status != lnutil.ContractStatusDraft {
+		return fmt.Errorf("You cannot change or set the oracle unless the contract is in Draft state")
+	}
+
+	o, err := mgr.LoadOracle(oIdx)
+	if err != nil {
+		return err
+	}
+
 	c.OracleA = o.A
+
+	// Reset the R point when changing the oracle
+	c.OracleR = [33]byte{}
 
 	mgr.SaveContract(c)
 
@@ -67,7 +75,14 @@ func (mgr *DlcManager) SetContractSettlementTime(cIdx, time uint64) error {
 		return err
 	}
 
+	if c.Status != lnutil.ContractStatusDraft {
+		return fmt.Errorf("You cannot change or set the settlement time unless the contract is in Draft state")
+	}
+
 	c.OracleTimestamp = time
+
+	// Reset the R point
+	c.OracleR = [33]byte{}
 
 	mgr.SaveContract(c)
 
@@ -80,6 +95,10 @@ func (mgr *DlcManager) SetContractDatafeed(cIdx, feed uint64) error {
 	c, err := mgr.LoadContract(cIdx)
 	if err != nil {
 		return err
+	}
+
+	if c.Status != lnutil.ContractStatusDraft {
+		return fmt.Errorf("You cannot change or set the Datafeed unless the contract is in Draft state")
 	}
 
 	if c.OracleTimestamp == 0 {
@@ -110,6 +129,10 @@ func (mgr *DlcManager) SetContractRPoint(cIdx uint64, rPoint [33]byte) error {
 		return err
 	}
 
+	if c.Status != lnutil.ContractStatusDraft {
+		return fmt.Errorf("You cannot change or set the R-point unless the contract is in Draft state")
+	}
+
 	c.OracleR = rPoint
 
 	err = mgr.SaveContract(c)
@@ -128,8 +151,15 @@ func (mgr *DlcManager) SetContractFunding(cIdx uint64, ourAmount, theirAmount in
 		return err
 	}
 
+	if c.Status != lnutil.ContractStatusDraft {
+		return fmt.Errorf("You cannot change or set the funding unless the contract is in Draft state")
+	}
+
 	c.OurFundingAmount = ourAmount
 	c.TheirFundingAmount = theirAmount
+
+	// If the funding changes, the division needs to be re-set.
+	c.Division = nil
 
 	mgr.SaveContract(c)
 
@@ -145,6 +175,10 @@ func (mgr *DlcManager) SetContractSettlementDivision(cIdx uint64, valueAllOurs, 
 		return err
 	}
 
+	if c.Status != lnutil.ContractStatusDraft {
+		return fmt.Errorf("You cannot change or set the division unless the contract is in Draft state")
+	}
+
 	rangeMin := valueAllTheirs - (valueAllOurs - valueAllTheirs)
 	rangeMax := valueAllOurs + (valueAllOurs - valueAllTheirs)
 	oursHighest := true
@@ -156,8 +190,6 @@ func (mgr *DlcManager) SetContractSettlementDivision(cIdx uint64, valueAllOurs, 
 	if rangeMin < 0 {
 		rangeMin = 0
 	}
-
-	fmt.Printf("Creating division from %d to %d\n", rangeMin, rangeMax)
 
 	totalContractValue := c.OurFundingAmount + c.TheirFundingAmount
 
@@ -191,6 +223,10 @@ func (mgr *DlcManager) SetContractCoinType(cIdx uint64, cointype uint32) error {
 	c, err := mgr.LoadContract(cIdx)
 	if err != nil {
 		return err
+	}
+
+	if c.Status != lnutil.ContractStatusDraft {
+		return fmt.Errorf("You cannot change or set the coin type unless the contract is in Draft state")
 	}
 
 	c.CoinType = cointype
