@@ -103,7 +103,7 @@ func (nd *LitNode) OfferDlc(peerIdx uint32, cIdx uint64) error {
 	return nil
 }
 
-func (nd *LitNode) DeclineDlc(cIdx uint64) error {
+func (nd *LitNode) DeclineDlc(cIdx uint64, reason uint8) error {
 	c, err := nd.DlcManager.LoadContract(cIdx)
 	if err != nil {
 		return err
@@ -117,7 +117,7 @@ func (nd *LitNode) DeclineDlc(cIdx uint64) error {
 		return fmt.Errorf("You are not connected to peer %d, do that first", c.PeerIdx)
 	}
 
-	msg := lnutil.NewDlcOfferDeclineMsg(c.PeerIdx, 0x01, c.PubKey)
+	msg := lnutil.NewDlcOfferDeclineMsg(c.PeerIdx, reason, c.PubKey)
 	c.Status = lnutil.ContractStatusDeclined
 
 	err = nd.DlcManager.SaveContract(c)
@@ -223,10 +223,10 @@ func (nd *LitNode) DlcOfferHandler(msg lnutil.DlcOfferMsg, peer *RemotePeer) {
 		return
 	}
 
-	c, err = nd.DlcManager.FindContractByKey(msg.Contract.PubKey)
-	if err != nil {
-		fmt.Printf("DlcOfferHandler FindContract err %s\n", err.Error())
-		return
+	_, ok := nd.SubWallet[msg.Contract.CoinType]
+	if !ok {
+		// We don't have this coin type, automatically decline
+		nd.DeclineDlc(c.Idx, 0x02)
 	}
 
 }

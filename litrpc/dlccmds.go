@@ -328,7 +328,7 @@ type DeclineContractReply struct {
 func (r *LitRPC) DeclineContract(args DeclineContractArgs, reply *DeclineContractReply) error {
 	var err error
 
-	err = r.Node.DeclineDlc(args.CIdx)
+	err = r.Node.DeclineDlc(args.CIdx, 0x01)
 	if err != nil {
 		return err
 	}
