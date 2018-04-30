@@ -15,10 +15,13 @@ import (
 var dlcCommand = &Command{
 	Format: fmt.Sprintf("%s%s%s\n", lnutil.White("dlc"),
 		lnutil.ReqColor("subcommand"), lnutil.OptColor("parameters...")),
-	Description: fmt.Sprintf("%s\n%s\n%s\n",
-		"Command for working with discreet log contracts. Subcommand can be one of:",
-		fmt.Sprintf("%-10s %s", lnutil.White("oracle"), "Command to manage oracles"),
-		fmt.Sprintf("%-10s %s", lnutil.White("contract"), "Command to manage contracts"),
+	Description: fmt.Sprintf("%s%2\n%s\n%s\n",
+		"Command for working with discreet log contracts. ",
+		"Subcommand can be one of:",
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("oracle"), "Command to manage oracles"),
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("contract"), "Command to manage contracts"),
 	),
 	ShortDescription: "Command for working with Discreet Log Contracts.\n",
 }
@@ -28,9 +31,15 @@ var oracleCommand = &Command{
 		lnutil.ReqColor("subcommand"), lnutil.OptColor("parameters...")),
 	Description: fmt.Sprintf("%s\n%s\n%s\n%s\n",
 		"Command for managing oracles. Subcommand can be one of:",
-		fmt.Sprintf("%-20s %s", lnutil.White("add"), "Adds a new oracle by manually providing the pubkey"),
-		fmt.Sprintf("%-20s %s", lnutil.White("import"), "Imports a new oracle using a URL to its REST interface"),
-		fmt.Sprintf("%-20s %s", lnutil.White("ls"), "Shows a list of known oracles"),
+		fmt.Sprintf("%-20s %s",
+			lnutil.White("add"),
+			"Adds a new oracle by manually providing the pubkey"),
+		fmt.Sprintf("%-20s %s",
+			lnutil.White("import"),
+			"Imports a new oracle using a URL to its REST interface"),
+		fmt.Sprintf("%-20s %s",
+			lnutil.White("ls"),
+			"Shows a list of known oracles"),
 	),
 	ShortDescription: "Manages oracles for the Discreet Log Contracts.\n",
 }
@@ -46,8 +55,12 @@ var importOracleCommand = &Command{
 		lnutil.ReqColor("url"), lnutil.ReqColor("name")),
 	Description: fmt.Sprintf("%s\n%s\n%s\n",
 		"Imports a new oracle using a URL to its REST interface",
-		fmt.Sprintf("%-20s %s", lnutil.White("url"), "URL to the root of the publishes dlcoracle REST interface"),
-		fmt.Sprintf("%-20s %s", lnutil.White("name"), "Name under which to register the oracle in LIT"),
+		fmt.Sprintf("%-20s %s",
+			lnutil.White("url"),
+			"URL to the root of the publishes dlcoracle REST interface"),
+		fmt.Sprintf("%-20s %s",
+			lnutil.White("name"),
+			"Name under which to register the oracle in LIT"),
 	),
 	ShortDescription: "Imports a new oracle into LIT from a REST interface\n",
 }
@@ -57,8 +70,12 @@ var addOracleCommand = &Command{
 		lnutil.ReqColor("keys"), lnutil.ReqColor("name")),
 	Description: fmt.Sprintf("%s\n%s\n%s\n",
 		"Adds a new oracle by entering the pubkeys manually",
-		fmt.Sprintf("%-20s %s", lnutil.White("keys"), "Public key for the oracle (33 bytes in hex)"),
-		fmt.Sprintf("%-20s %s", lnutil.White("name"), "Name under which to register the oracle in LIT"),
+		fmt.Sprintf("%-20s %s",
+			lnutil.White("keys"),
+			"Public key for the oracle (33 bytes in hex)"),
+		fmt.Sprintf("%-20s %s",
+			lnutil.White("name"),
+			"Name under which to register the oracle in LIT"),
 	),
 	ShortDescription: "Adds a new oracle into LIT\n",
 }
@@ -66,22 +83,51 @@ var addOracleCommand = &Command{
 var contractCommand = &Command{
 	Format: fmt.Sprintf("%s%s%s\n", lnutil.White("dlc contract"),
 		lnutil.ReqColor("subcommand"), lnutil.OptColor("parameters...")),
-	Description: fmt.Sprintf("%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n",
+	Description: fmt.Sprintf("%s\n%s\n%s\n%s\n%s\n%s\n"+
+		"%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n",
 		"Command for managing contracts. Subcommand can be one of:",
-		fmt.Sprintf("%-20s %s", lnutil.White("new"), "Adds a new draft contract"),
-		fmt.Sprintf("%-20s %s", lnutil.White("view"), "Views a contract"),
-		fmt.Sprintf("%-20s %s", lnutil.White("viewpayout"), "Views the payout table of a contract"),
-		fmt.Sprintf("%-20s %s", lnutil.White("setoracle"), "Sets a contract to use a particular oracle"),
-		fmt.Sprintf("%-20s %s", lnutil.White("settime"), "Sets the settlement time of a contract"),
-		fmt.Sprintf("%-20s %s", lnutil.White("setdatafeed"), "Sets the data feed to use for the contract, will fetch the R point"),
-		fmt.Sprintf("%-20s %s", lnutil.White("setrpoint"), "Sets the R point manually"),
-		fmt.Sprintf("%-20s %s", lnutil.White("setfunding"), "Sets the funding parameters of a contract"),
-		fmt.Sprintf("%-20s %s", lnutil.White("setdivision"), "Sets the settlement division of a contract"),
-		fmt.Sprintf("%-20s %s", lnutil.White("setcointype"), "Sets the cointype of a contract"),
-		fmt.Sprintf("%-20s %s", lnutil.White("offer"), "Offer a draft contract to one of your peers"),
-		fmt.Sprintf("%-20s %s", lnutil.White("decline"), "Decline a contract sent to you"),
-		fmt.Sprintf("%-20s %s", lnutil.White("settle"), "Settles the contract"),
-		fmt.Sprintf("%-20s %s", lnutil.White("ls"), "Shows a list of known contracts"),
+		fmt.Sprintf("%-20s %s",
+			lnutil.White("new"),
+			"Adds a new draft contract"),
+		fmt.Sprintf("%-20s %s",
+			lnutil.White("view"),
+			"Views a contract"),
+		fmt.Sprintf("%-20s %s",
+			lnutil.White("viewpayout"),
+			"Views the payout table of a contract"),
+		fmt.Sprintf("%-20s %s",
+			lnutil.White("setoracle"),
+			"Sets a contract to use a particular oracle"),
+		fmt.Sprintf("%-20s %s",
+			lnutil.White("settime"),
+			"Sets the settlement time of a contract"),
+		fmt.Sprintf("%-20s %s",
+			lnutil.White("setdatafeed"),
+			"Sets the data feed to use, will fetch the R point"),
+		fmt.Sprintf("%-20s %s",
+			lnutil.White("setrpoint"),
+			"Sets the R point manually"),
+		fmt.Sprintf("%-20s %s",
+			lnutil.White("setfunding"),
+			"Sets the funding parameters of a contract"),
+		fmt.Sprintf("%-20s %s",
+			lnutil.White("setdivision"),
+			"Sets the settlement division of a contract"),
+		fmt.Sprintf("%-20s %s",
+			lnutil.White("setcointype"),
+			"Sets the cointype of a contract"),
+		fmt.Sprintf("%-20s %s",
+			lnutil.White("offer"),
+			"Offer a draft contract to one of your peers"),
+		fmt.Sprintf("%-20s %s",
+			lnutil.White("decline"),
+			"Decline a contract sent to you"),
+		fmt.Sprintf("%-20s %s",
+			lnutil.White("settle"),
+			"Settles the contract"),
+		fmt.Sprintf("%-20s %s",
+			lnutil.White("ls"),
+			"Shows a list of known contracts"),
 	),
 	ShortDescription: "Manages oracles for the Discreet Log Contracts.\n",
 }
@@ -103,20 +149,31 @@ var viewContractCommand = &Command{
 		lnutil.ReqColor("id")),
 	Description: fmt.Sprintf("%s\n%s\n",
 		"Views the current status of a contract",
-		fmt.Sprintf("%-10s %s", lnutil.White("id"), "The ID of the contract to view"),
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("id"),
+			"The ID of the contract to view"),
 	),
 	ShortDescription: "Views the current status of a contract\n",
 }
 
 var viewContractPayoutCommand = &Command{
 	Format: fmt.Sprintf("%s%s%s%s\n", lnutil.White("dlc contract viewpayout"),
-		lnutil.ReqColor("id"), lnutil.ReqColor("start"), lnutil.ReqColor("end"), lnutil.ReqColor("increment")),
+		lnutil.ReqColor("id"), lnutil.ReqColor("start"),
+		lnutil.ReqColor("end"), lnutil.ReqColor("increment")),
 	Description: fmt.Sprintf("%s\n%s\n%s\n%s\n",
 		"Views the payout table of a contract",
-		fmt.Sprintf("%-10s %s", lnutil.White("id"), "The ID of the contract to view"),
-		fmt.Sprintf("%-10s %s", lnutil.White("start"), "The start value to print payout data for"),
-		fmt.Sprintf("%-10s %s", lnutil.White("end"), "The end value to print payout data for"),
-		fmt.Sprintf("%-10s %s", lnutil.White("increment"), "Print every X oracle value (1 = all)"),
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("id"),
+			"The ID of the contract to view"),
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("start"),
+			"The start value to print payout data for"),
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("end"),
+			"The end value to print payout data for"),
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("increment"),
+			"Print every X oracle value (1 = all)"),
 	),
 	ShortDescription: "Views the payout table of a contract\n",
 }
@@ -126,8 +183,12 @@ var setContractOracleCommand = &Command{
 		lnutil.ReqColor("cid", "oid")),
 	Description: fmt.Sprintf("%s\n%s\n%s\n",
 		"Configures a contract for using a specific oracle",
-		fmt.Sprintf("%-10s %s", lnutil.White("cid"), "The ID of the contract"),
-		fmt.Sprintf("%-10s %s", lnutil.White("oid"), "The ID of the oracle"),
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("cid"),
+			"The ID of the contract"),
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("oid"),
+			"The ID of the oracle"),
 	),
 	ShortDescription: "Configures a contract for using a specific oracle\n",
 }
@@ -137,8 +198,12 @@ var setContractDatafeedCommand = &Command{
 		lnutil.ReqColor("cid", "feed")),
 	Description: fmt.Sprintf("%s\n%s\n%s\n",
 		"Sets the data feed to use for the contract",
-		fmt.Sprintf("%-10s %s", lnutil.White("cid"), "The ID of the contract"),
-		fmt.Sprintf("%-10s %s", lnutil.White("feed"), "The ID of the data feed (provided by the oracle)"),
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("cid"),
+			"The ID of the contract"),
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("feed"),
+			"The ID of the data feed (provided by the oracle)"),
 	),
 	ShortDescription: "Sets the data feed to use for the contract\n",
 }
@@ -148,8 +213,12 @@ var setContractRPointCommand = &Command{
 		lnutil.ReqColor("cid", "rpoint")),
 	Description: fmt.Sprintf("%s\n%s\n%s\n",
 		"Sets the R point to use for the contract",
-		fmt.Sprintf("%-10s %s", lnutil.White("cid"), "The ID of the contract"),
-		fmt.Sprintf("%-10s %s", lnutil.White("rpoint"), "The Rpoint of the publication to use (33 byte in hex)"),
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("cid"),
+			"The ID of the contract"),
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("rpoint"),
+			"The Rpoint of the publication to use (33 byte in hex)"),
 	),
 	ShortDescription: "Sets the R point to use for the contract\n",
 }
@@ -159,8 +228,12 @@ var setContractSettlementTimeCommand = &Command{
 		lnutil.ReqColor("cid", "time")),
 	Description: fmt.Sprintf("%s\n%s\n%s\n",
 		"Sets the settlement time for the contract",
-		fmt.Sprintf("%-10s %s", lnutil.White("cid"), "The ID of the contract"),
-		fmt.Sprintf("%-10s %s", lnutil.White("time"), "The settlement time (unix timestamp)"),
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("cid"),
+			"The ID of the contract"),
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("time"),
+			"The settlement time (unix timestamp)"),
 	),
 	ShortDescription: "Sets the settlement time for the contract\n",
 }
@@ -169,39 +242,60 @@ var setContractFundingCommand = &Command{
 		lnutil.ReqColor("cid", "ourAmount", "theirAmount")),
 	Description: fmt.Sprintf("%s\n%s\n%s\n%s\n",
 		"Sets the amounts both parties in the contract will fund",
-		fmt.Sprintf("%-10s %s", lnutil.White("cid"), "The ID of the contract"),
-		fmt.Sprintf("%-10s %s", lnutil.White("ourAmount"), "The amount we will fund"),
-		fmt.Sprintf("%-10s %s", lnutil.White("theirAmount"), "The amount our peer will fund"),
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("cid"),
+			"The ID of the contract"),
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("ourAmount"),
+			"The amount we will fund"),
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("theirAmount"),
+			"The amount our peer will fund"),
 	),
-	ShortDescription: "Sets the amounts both parties in the contract will fund\n",
+	ShortDescription: "Sets the amount both parties will fund\n",
 }
-var setContractSettlementDivisionCommand = &Command{
+var setContractDivisionCommand = &Command{
 	Format: fmt.Sprintf("%s%s\n", lnutil.White("dlc contract setdivision"),
 		lnutil.ReqColor("cid", "valueAllForUs", "valueAllForThem")),
 	Description: fmt.Sprintf("%s\n%s\n%s\n%s\n",
-		"Sets the values of the oracle data that will result in the full contract funds being paid to either peer",
-		fmt.Sprintf("%-10s %s", lnutil.White("cid"), "The ID of the contract"),
-		fmt.Sprintf("%-10s %s", lnutil.White("valueAllForUs"), "The outcome with which we will be entitled to the full contract value"),
-		fmt.Sprintf("%-10s %s", lnutil.White("valueAllForThem"), "The outcome with which our peer will be entitled to the full contract value"),
+		"Sets the values of the oracle data that will result in the full"+
+			"contract funds being paid to either peer",
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("cid"),
+			"The ID of the contract"),
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("valueAllForUs"),
+			"The outcome with which we will be entitled to the full"+
+				" contract value"),
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("valueAllForThem"),
+			"The outcome with which our peer will be entitled to the full"+
+				" contract value"),
 	),
-	ShortDescription: "Sets the edge values of the oracle data for dividing the funds\n",
+	ShortDescription: "Sets the edge values for dividing the funds\n",
 }
 var setContractCoinTypeCommand = &Command{
 	Format: fmt.Sprintf("%s%s\n", lnutil.White("dlc contract setcointype"),
 		lnutil.ReqColor("cid", "cointype")),
 	Description: fmt.Sprintf("%s\n%s\n%s\n",
-		"Sets the values of the oracle data that will result in the full contract funds being paid to either peer",
-		fmt.Sprintf("%-10s %s", lnutil.White("cid"), "The ID of the contract"),
-		fmt.Sprintf("%-10s %s", lnutil.White("cointype"), "The ID of the coin type to use for the contract"),
+		"Sets the coin type to use for the contract",
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("cid"),
+			"The ID of the contract"),
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("cointype"),
+			"The ID of the coin type to use for the contract"),
 	),
-	ShortDescription: "Sets the edge values of the oracle data for dividing the funds\n",
+	ShortDescription: "Sets the coin type to use for the contract\n",
 }
 var declineContractCommand = &Command{
 	Format: fmt.Sprintf("%s%s\n", lnutil.White("dlc contract decline"),
 		lnutil.ReqColor("cid")),
 	Description: fmt.Sprintf("%s\n%s\n",
 		"Declines a contract offered to you",
-		fmt.Sprintf("%-10s %s", lnutil.White("cid"), "The ID of the contract to decline"),
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("cid"),
+			"The ID of the contract to decline"),
 	),
 	ShortDescription: "Declines a contract offered to you\n",
 }
@@ -210,7 +304,9 @@ var acceptContractCommand = &Command{
 		lnutil.ReqColor("cid")),
 	Description: fmt.Sprintf("%s\n%s\n",
 		"Accepts a contract offered to you",
-		fmt.Sprintf("%-10s %s", lnutil.White("cid"), "The ID of the contract to accept"),
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("cid"),
+			"The ID of the contract to accept"),
 	),
 	ShortDescription: "Accepts a contract offered to you\n",
 }
@@ -219,8 +315,12 @@ var offerContractCommand = &Command{
 		lnutil.ReqColor("cid", "peer")),
 	Description: fmt.Sprintf("%s\n%s\n%s\n",
 		"Offers a contract to one of your peers",
-		fmt.Sprintf("%-10s %s", lnutil.White("cid"), "The ID of the contract"),
-		fmt.Sprintf("%-10s %s", lnutil.White("cointype"), "The ID of the peer to offer the contract to"),
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("cid"),
+			"The ID of the contract"),
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("cointype"),
+			"The ID of the peer to offer the contract to"),
 	),
 	ShortDescription: "Offers a contract to one of your peers\n",
 }
@@ -229,11 +329,17 @@ var settleContractCommand = &Command{
 		lnutil.ReqColor("cid", "oracleValue", "oracleSig")),
 	Description: fmt.Sprintf("%s\n%s\n%s\n%s\n",
 		"Settles the contract based on a value and signature from the oracle",
-		fmt.Sprintf("%-20s %s", lnutil.White("cid"), "The ID of the contract"),
-		fmt.Sprintf("%-20s %s", lnutil.White("oracleValue"), "The value the oracle published"),
-		fmt.Sprintf("%-20s %s", lnutil.White("oracleSig"), "The signature from the oracle"),
+		fmt.Sprintf("%-20s %s",
+			lnutil.White("cid"),
+			"The ID of the contract"),
+		fmt.Sprintf("%-20s %s",
+			lnutil.White("oracleValue"),
+			"The value the oracle published"),
+		fmt.Sprintf("%-20s %s",
+			lnutil.White("oracleSig"),
+			"The signature from the oracle"),
 	),
-	ShortDescription: "Settles the contract based on a value and signature from the oracle\n",
+	ShortDescription: "Settles the contract\n",
 }
 
 func (lc *litAfClient) Dlc(textArgs []string) error {
@@ -286,7 +392,8 @@ func (lc *litAfClient) DlcListOracles(textArgs []string) error {
 		fmt.Println("No oracles found")
 	}
 	for _, o := range reply.Oracles {
-		fmt.Fprintf(color.Output, "%04d: [%x...%x...%x]  %s\n", o.Idx, o.A[:2], o.A[15:16], o.A[31:], o.Name)
+		fmt.Fprintf(color.Output, "%04d: [%x...%x...%x]  %s\n",
+			o.Idx, o.A[:2], o.A[15:16], o.A[31:], o.Name)
 	}
 
 	return nil
@@ -314,7 +421,8 @@ func (lc *litAfClient) DlcImportOracle(textArgs []string) error {
 		return err
 	}
 
-	fmt.Fprintf(color.Output, "Oracle succesfully registered under ID %d\n", reply.Oracle.Idx)
+	fmt.Fprintf(color.Output, "Oracle succesfully registered under ID %d\n",
+		reply.Oracle.Idx)
 	return nil
 }
 
@@ -340,7 +448,8 @@ func (lc *litAfClient) DlcAddOracle(textArgs []string) error {
 		return err
 	}
 
-	fmt.Fprintf(color.Output, "Oracle succesfully registered under ID %d\n", reply.Oracle.Idx)
+	fmt.Fprintf(color.Output, "Oracle succesfully registered under ID %d\n",
+		reply.Oracle.Idx)
 	return nil
 }
 
@@ -388,7 +497,7 @@ func (lc *litAfClient) DlcContract(textArgs []string) error {
 	}
 
 	if len(textArgs) > 0 && textArgs[0] == "setdivision" {
-		return lc.DlcSetContractSettlementDivision(textArgs[1:])
+		return lc.DlcSetContractDivision(textArgs[1:])
 	}
 
 	if len(textArgs) > 0 && textArgs[0] == "setcointype" {
@@ -734,19 +843,19 @@ func (lc *litAfClient) DlcSetContractCoinType(textArgs []string) error {
 	return nil
 }
 
-func (lc *litAfClient) DlcSetContractSettlementDivision(textArgs []string) error {
+func (lc *litAfClient) DlcSetContractDivision(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Fprintf(color.Output, setContractSettlementDivisionCommand.Format)
-		fmt.Fprintf(color.Output, setContractSettlementDivisionCommand.Description)
+		fmt.Fprintf(color.Output, setContractDivisionCommand.Format)
+		fmt.Fprintf(color.Output, setContractDivisionCommand.Description)
 		return nil
 	}
 
 	if len(textArgs) < 3 {
-		return fmt.Errorf(setContractSettlementDivisionCommand.Format)
+		return fmt.Errorf(setContractDivisionCommand.Format)
 	}
 
-	args := new(litrpc.SetContractSettlementDivisionArgs)
-	reply := new(litrpc.SetContractSettlementDivisionReply)
+	args := new(litrpc.SetContractDivisionArgs)
+	reply := new(litrpc.SetContractDivisionReply)
 
 	cIdx, err := strconv.ParseUint(textArgs[0], 10, 64)
 	if err != nil {
@@ -764,7 +873,7 @@ func (lc *litAfClient) DlcSetContractSettlementDivision(textArgs []string) error
 	args.ValueFullyOurs = fullyOurs
 	args.ValueFullyTheirs = fullyTheirs
 
-	err = lc.rpccon.Call("LitRPC.SetContractSettlementDivision", args, reply)
+	err = lc.rpccon.Call("LitRPC.SetContractDivision", args, reply)
 	if err != nil {
 		return err
 	}
@@ -918,12 +1027,21 @@ func (lc *litAfClient) DlcSettleContract(textArgs []string) error {
 
 func PrintContract(c *lnutil.DlcContract) {
 	fmt.Fprintf(color.Output, "%-30s : %d\n", lnutil.White("Index"), c.Idx)
-	fmt.Fprintf(color.Output, "%-30s : [%x...%x...%x]\n", lnutil.White("Oracle public key"), c.OracleA[:2], c.OracleA[15:16], c.OracleA[31:])
-	fmt.Fprintf(color.Output, "%-30s : [%x...%x...%x]\n", lnutil.White("Oracle R-point"), c.OracleR[:2], c.OracleR[15:16], c.OracleR[31:])
-	fmt.Fprintf(color.Output, "%-30s : %s\n", lnutil.White("Settlement time"), time.Unix(int64(c.OracleTimestamp), 0).UTC().Format(time.UnixDate))
-	fmt.Fprintf(color.Output, "%-30s : %d\n", lnutil.White("Funded by us"), c.OurFundingAmount)
-	fmt.Fprintf(color.Output, "%-30s : %d\n", lnutil.White("Funded by peer"), c.TheirFundingAmount)
-	fmt.Fprintf(color.Output, "%-30s : %d\n", lnutil.White("Coin type"), c.CoinType)
+	fmt.Fprintf(color.Output, "%-30s : [%x...%x...%x]\n",
+		lnutil.White("Oracle public key"),
+		c.OracleA[:2], c.OracleA[15:16], c.OracleA[31:])
+	fmt.Fprintf(color.Output, "%-30s : [%x...%x...%x]\n",
+		lnutil.White("Oracle R-point"), c.OracleR[:2],
+		c.OracleR[15:16], c.OracleR[31:])
+	fmt.Fprintf(color.Output, "%-30s : %s\n",
+		lnutil.White("Settlement time"),
+		time.Unix(int64(c.OracleTimestamp), 0).UTC().Format(time.UnixDate))
+	fmt.Fprintf(color.Output, "%-30s : %d\n",
+		lnutil.White("Funded by us"), c.OurFundingAmount)
+	fmt.Fprintf(color.Output, "%-30s : %d\n",
+		lnutil.White("Funded by peer"), c.TheirFundingAmount)
+	fmt.Fprintf(color.Output, "%-30s : %d\n",
+		lnutil.White("Coin type"), c.CoinType)
 
 	peer := "None"
 	if c.PeerIdx > 0 {
@@ -956,10 +1074,13 @@ func PrintContract(c *lnutil.DlcContract) {
 
 func PrintPayout(c *lnutil.DlcContract, start, end, increment int64) {
 	fmt.Fprintf(color.Output, "Payout division:\n\n")
-	fmt.Fprintf(color.Output, "%-20s | %-20s | %-20s\n", "Oracle value", "Our payout", "Their payout")
+	fmt.Fprintf(color.Output, "%-20s | %-20s | %-20s\n",
+		"Oracle value", "Our payout", "Their payout")
 	fmt.Fprintf(color.Output, "%s\n", strings.Repeat("-", 66))
 
 	for i := start; i < end; i += increment {
-		fmt.Fprintf(color.Output, "%20d | %20d | %20d\n", c.Division[i].OracleValue, c.Division[i].ValueOurs, c.OurFundingAmount+c.TheirFundingAmount-c.Division[i].ValueOurs)
+		fmt.Fprintf(color.Output, "%20d | %20d | %20d\n",
+			c.Division[i].OracleValue, c.Division[i].ValueOurs,
+			c.OurFundingAmount+c.TheirFundingAmount-c.Division[i].ValueOurs)
 	}
 }

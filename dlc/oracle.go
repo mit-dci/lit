@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 )
 
 // DlcOracle contains the identifying data of an Oracle
@@ -18,7 +17,8 @@ type DlcOracle struct {
 	Url  string   // Base URL of the oracle, if its REST based (optional)
 }
 
-// AddOracle manually imports an oracle using the pubkey (A) and a name for reference purposes
+// AddOracle manually imports an oracle using the pubkey (A) and a name for
+// reference purposes
 func (mgr *DlcManager) AddOracle(key [33]byte, name string) (*DlcOracle, error) {
 	var err error
 
@@ -50,12 +50,14 @@ func (mgr *DlcManager) FindOracleByKey(key [33]byte) (*DlcOracle, error) {
 	return nil, fmt.Errorf("Oracle not found")
 }
 
-// DlcOracleRestPubkeyResponse is the response format for the REST API that returns the pubkey
+// DlcOracleRestPubkeyResponse is the response format for the REST API that
+// returns the pubkey
 type DlcOracleRestPubkeyResponse struct {
 	AHex string `json:"A"`
 }
 
-// ImportOracle imports an oracle using a REST endpoint. It will save the oracle in the database and give it the passed name.
+// ImportOracle imports an oracle using a REST endpoint. It will save the oracle
+// in the database and give it the passed name.
 func (mgr *DlcManager) ImportOracle(url string, name string) (*DlcOracle, error) {
 	req, err := http.NewRequest("GET", url+"/api/pubkey", nil)
 	if err != nil {
@@ -91,19 +93,25 @@ func (mgr *DlcManager) ImportOracle(url string, name string) (*DlcOracle, error)
 	return o, nil
 }
 
-// DlcOracleRPointResponse is the response format for the REST API that returns the R-point
+// DlcOracleRPointResponse is the response format for the REST API that returns
+// the R-point
 type DlcOracleRPointResponse struct {
 	RHex string `json:"R"`
 }
 
-// FetchRPoint retrieves the R-point based on datafeedID and timestamp (unix epoch) from the REST API of the oracle.
+// FetchRPoint retrieves the R-point based on datafeedID and timestamp
+// (unix epoch) from the REST API of the oracle.
 func (o *DlcOracle) FetchRPoint(datafeedId, timestamp uint64) ([33]byte, error) {
 	var rPoint [33]byte
 	if len(o.Url) == 0 {
-		return rPoint, fmt.Errorf("Oracle was not imported from the web - cannot fetch R point. Enter manually using the [dlc contract setrpoint] command")
+		return rPoint, fmt.Errorf("Oracle was not imported from the web -" +
+			" cannot fetch R point. Enter manually using the" +
+			" [dlc contract setrpoint] command")
 	}
 
-	req, err := http.NewRequest("GET", o.Url+"/api/rpoint/"+strconv.FormatUint(datafeedId, 10)+"/"+strconv.FormatUint(timestamp, 10), nil)
+	url := fmt.Sprintf("%s/api/rpoint/%d/%d", o.Url, datafeedId, timestamp)
+
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return rPoint, err
 	}
@@ -130,7 +138,8 @@ func (o *DlcOracle) FetchRPoint(datafeedId, timestamp uint64) ([33]byte, error) 
 
 }
 
-// DlcOracleFromBytes parses a byte array that was serialized using DlcOracle.Bytes() back into a DlcOracle struct
+// DlcOracleFromBytes parses a byte array that was serialized using
+// DlcOracle.Bytes() back into a DlcOracle struct
 func DlcOracleFromBytes(b []byte) (*DlcOracle, error) {
 	buf := bytes.NewBuffer(b)
 	o := new(DlcOracle)

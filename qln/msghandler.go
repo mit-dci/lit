@@ -77,7 +77,8 @@ func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) er
 			nd.DlcContractAckHandler(msg.(lnutil.DlcContractAckMsg), peer)
 		}
 		if msg.MsgType() == lnutil.MSGID_DLC_CONTRACTFUNDINGSIGS {
-			nd.DlcFundingSigsHandler(msg.(lnutil.DlcContractFundingSigsMsg), peer)
+			nd.DlcFundingSigsHandler(
+				msg.(lnutil.DlcContractFundingSigsMsg), peer)
 		}
 		if msg.MsgType() == lnutil.MSGID_DLC_SIGPROOF {
 			nd.DlcSigProofHandler(msg.(lnutil.DlcContractSigProofMsg), peer)
@@ -377,12 +378,15 @@ func (nd *LitNode) OPEventHandler(OPEventChan chan lnutil.OutPointEvent) {
 	}
 }
 
-func (nd *LitNode) HandleContractOPEvent(c *lnutil.DlcContract, opEvent *lnutil.OutPointEvent) error {
+func (nd *LitNode) HandleContractOPEvent(c *lnutil.DlcContract,
+	opEvent *lnutil.OutPointEvent) error {
+
 	fmt.Printf("Received OPEvent for contract %d!\n", c.Idx)
 	if opEvent.Tx != nil {
 		wal, ok := nd.SubWallet[c.CoinType]
 		if !ok {
-			return fmt.Errorf("Could not find associated wallet for type %d", c.CoinType)
+			return fmt.Errorf("Could not find associated wallet"+
+				" for type %d", c.CoinType)
 		}
 
 		pkhIsMine := false
@@ -409,7 +413,8 @@ func (nd *LitNode) HandleContractOPEvent(c *lnutil.DlcContract, opEvent *lnutil.
 			if err != nil {
 				return err
 			}
-			txClaim.AddTxOut(wire.NewTxOut(value-500, lnutil.DirectWPKHScriptFromPKH(addr))) // todo calc fee
+			txClaim.AddTxOut(wire.NewTxOut(value-500,
+				lnutil.DirectWPKHScriptFromPKH(addr))) // todo calc fee
 
 			var kg portxo.KeyGen
 			kg.Depth = 5
@@ -424,7 +429,9 @@ func (nd *LitNode) HandleContractOPEvent(c *lnutil.DlcContract, opEvent *lnutil.
 			hCache := txscript.NewTxSigHashes(txClaim)
 
 			// generate sig
-			txClaim.TxIn[0].Witness, err = txscript.WitnessScript(txClaim, hCache, 0, value, myPKHPkSript, txscript.SigHashAll, priv, true)
+			txClaim.TxIn[0].Witness, err = txscript.WitnessScript(txClaim,
+				hCache, 0, value, myPKHPkSript, txscript.SigHashAll, priv, true)
+
 			if err != nil {
 				return err
 			}

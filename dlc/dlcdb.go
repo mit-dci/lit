@@ -37,7 +37,8 @@ func (mgr *DlcManager) InitDB(dbPath string) error {
 	return nil
 }
 
-// SaveOracle saves an oracle into the database. Generates a new index if the passed oracle doesn't have one
+// SaveOracle saves an oracle into the database. Generates a new index if the
+// passed oracle doesn't have one
 func (mgr *DlcManager) SaveOracle(o *DlcOracle) error {
 	err := mgr.DLCDB.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(BKTOracles)
@@ -120,7 +121,8 @@ func (mgr *DlcManager) ListOracles() ([]*DlcOracle, error) {
 	return oracles, nil
 }
 
-// SaveContract saves a contract into the database. Will generate a new index if the passed object doesn't have one.
+// SaveContract saves a contract into the database. Will generate a new index
+// if the passed object doesn't have one.
 func (mgr *DlcManager) SaveContract(c *lnutil.DlcContract) error {
 	err := mgr.DLCDB.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(BKTContracts)

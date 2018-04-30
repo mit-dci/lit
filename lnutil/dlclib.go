@@ -13,7 +13,8 @@ import (
 	"github.com/adiabat/btcd/wire"
 )
 
-// DlcContractStatus is an enumeration containing the various statuses a contract can have
+// DlcContractStatus is an enumeration containing the various statuses a
+// contract can have
 type DlcContractStatus int
 
 const (
@@ -30,33 +31,56 @@ const (
 // scalarSize is the size of an encoded big endian scalar.
 const scalarSize = 32
 
-// DlcContract is a struct containing all elements to work with a Discreet Log Contract. This struct is stored in the database
+// DlcContract is a struct containing all elements to work with a Discreet
+// Log Contract. This struct is stored in the database
 type DlcContract struct {
-	Idx                                      uint64                           // Index of the contract for referencing in commands
-	TheirIdx                                 uint64                           // Index of the contract on the other peer (so we can reference it in messages)
-	PeerIdx                                  uint32                           // Index of the peer we've offered the contract to or received the contract from
-	CoinType                                 uint32                           // Coin type
-	OracleA, OracleR                         [33]byte                         // Pub keys of the oracle
-	OracleTimestamp                          uint64                           // The time we expect the oracle to publish
-	Division                                 []DlcContractDivision            // The payout specification
-	OurFundingAmount, TheirFundingAmount     int64                            // The amounts either side are funding
-	OurChangePKH, TheirChangePKH             [20]byte                         // PKH to which the contracts funding change should go
-	OurFundMultisigPub, TheirFundMultisigPub [33]byte                         // Pubkey used in the funding multisig output
-	OurPayoutBase, TheirPayoutBase           [33]byte                         // Pubkey to be used in the commit script (combined with oracle pubkey or CSV timeout)
-	OurPayoutPKH, TheirPayoutPKH             [20]byte                         // Pubkeyhash to which the contract pays out (directly)
-	Status                                   DlcContractStatus                // Status of the contract
-	OurFundingInputs, TheirFundingInputs     []DlcContractFundingInput        // Outpoints used to fund the contract
-	TheirSettlementSignatures                []DlcContractSettlementSignature // Signatures for the settlement transactions
-	FundingOutpoint                          wire.OutPoint                    // The outpoint of the funding TX we want to spend in the settlement - for easier monitoring
+	// Index of the contract for referencing in commands
+	Idx uint64
+	// Index of the contract on the other peer (so we can reference it in
+	// messages)
+	TheirIdx uint64
+	// Index of the peer we've offered the contract to or received the contract
+	// from
+	PeerIdx uint32
+	// Coin type
+	CoinType uint32
+	// Pub keys of the oracle and the R point used in the contract
+	OracleA, OracleR [33]byte
+	// The time we expect the oracle to publish
+	OracleTimestamp uint64
+	// The payout specification
+	Division []DlcContractDivision
+	// The amounts either side are funding
+	OurFundingAmount, TheirFundingAmount int64
+	// PKH to which the contracts funding change should go
+	OurChangePKH, TheirChangePKH [20]byte
+	// Pubkey used in the funding multisig output
+	OurFundMultisigPub, TheirFundMultisigPub [33]byte
+	// Pubkey to be used in the commit script (combined with oracle pubkey
+	// or CSV timeout)
+	OurPayoutBase, TheirPayoutBase [33]byte
+	// Pubkeyhash to which the contract pays out (directly)
+	OurPayoutPKH, TheirPayoutPKH [20]byte
+	// Status of the contract
+	Status DlcContractStatus
+	// Outpoints used to fund the contract
+	OurFundingInputs, TheirFundingInputs []DlcContractFundingInput
+	// Signatures for the settlement transactions
+	TheirSettlementSignatures []DlcContractSettlementSignature
+	// The outpoint of the funding TX we want to spend in the settlement
+	// for easier monitoring
+	FundingOutpoint wire.OutPoint
 }
 
-// DlcContractDivision describes a single division of the contract. If the oracle predicts OracleValue, we receive ValueOurs
+// DlcContractDivision describes a single division of the contract. If the
+// oracle predicts OracleValue, we receive ValueOurs
 type DlcContractDivision struct {
 	OracleValue int64
 	ValueOurs   int64
 }
 
-// DlcContractFundingInput describes a UTXO that is offered to fund the contract with
+// DlcContractFundingInput describes a UTXO that is offered to fund the
+// contract with
 type DlcContractFundingInput struct {
 	Outpoint wire.OutPoint
 	Value    int64
@@ -189,7 +213,8 @@ func DlcContractFromBytes(b []byte) (*DlcContract, error) {
 	if err != nil {
 		return nil, err
 	}
-	c.TheirSettlementSignatures = make([]DlcContractSettlementSignature, theirSigCount)
+	c.TheirSettlementSignatures = make([]DlcContractSettlementSignature,
+		theirSigCount)
 
 	for i := uint64(0); i < theirSigCount; i++ {
 		outcome, err := wire.ReadVarInt(buf, 0)
@@ -262,7 +287,8 @@ func (self *DlcContract) Bytes() []byte {
 	wire.WriteVarInt(&buf, 0, theirSigLen)
 
 	for i := 0; i < len(self.TheirSettlementSignatures); i++ {
-		wire.WriteVarInt(&buf, 0, uint64(self.TheirSettlementSignatures[i].Outcome))
+		outcome := uint64(self.TheirSettlementSignatures[i].Outcome)
+		wire.WriteVarInt(&buf, 0, outcome)
 		buf.Write(self.TheirSettlementSignatures[i].Signature[:])
 	}
 
@@ -272,7 +298,8 @@ func (self *DlcContract) Bytes() []byte {
 	return buf.Bytes()
 }
 
-// GetDivision loops over all division specifications inside the contract and returns the one matching the requested oracle value
+// GetDivision loops over all division specifications inside the contract and
+// returns the one matching the requested oracle value
 func (c DlcContract) GetDivision(value int64) (*DlcContractDivision, error) {
 	for _, d := range c.Division {
 		if d.OracleValue == value {
@@ -356,7 +383,8 @@ func BigIntToEncodedBytes(a *big.Int) *[32]byte {
 
 // DlcCalcOracleSignaturePubKey computes the predicted signature s*G
 // it's just R - h(R||m)A
-func DlcCalcOracleSignaturePubKey(msg []byte, oracleA, oracleR [33]byte) ([33]byte, error) {
+func DlcCalcOracleSignaturePubKey(msg []byte, oracleA,
+	oracleR [33]byte) ([33]byte, error) {
 	return computePubKey(oracleA, oracleR, msg)
 }
 
@@ -403,8 +431,11 @@ func computePubKey(pubA, pubR [33]byte, msg []byte) ([33]byte, error) {
 	return returnValue, nil
 }
 
-// SettlementTx returns the transaction to settle the contract. ours = the one we generate & sign. Theirs (ours = false) = the one they generated, so we can use their sigs
-func SettlementTx(c *DlcContract, d DlcContractDivision, ours bool) (*wire.MsgTx, error) {
+// SettlementTx returns the transaction to settle the contract. ours = the one
+// we generate & sign. Theirs (ours = false) = the one they generated, so we can
+// use their sigs
+func SettlementTx(c *DlcContract, d DlcContractDivision,
+	ours bool) (*wire.MsgTx, error) {
 
 	tx := wire.NewMsgTx()
 	// set version 2, for op_csv
@@ -417,7 +448,8 @@ func SettlementTx(c *DlcContract, d DlcContractDivision, ours bool) (*wire.MsgTx
 	feeOurs := feeEach
 	feeTheirs := feeEach
 	valueOurs := d.ValueOurs
-	// We don't have enough to pay for a fee. We get 0, our contract partner pays the rest of the fee
+	// We don't have enough to pay for a fee. We get 0, our contract partner
+	// pays the rest of the fee
 	if valueOurs < feeEach {
 		feeOurs = valueOurs
 		valueOurs = 0
@@ -441,27 +473,33 @@ func SettlementTx(c *DlcContract, d DlcContractDivision, ours bool) (*wire.MsgTx
 	binary.Write(&buf, binary.BigEndian, uint64(0))
 	binary.Write(&buf, binary.BigEndian, uint64(0))
 	binary.Write(&buf, binary.BigEndian, d.OracleValue)
-	oracleSigPub, err := DlcCalcOracleSignaturePubKey(buf.Bytes(), c.OracleA, c.OracleR)
+	oracleSigPub, err := DlcCalcOracleSignaturePubKey(buf.Bytes(),
+		c.OracleA, c.OracleR)
 	if err != nil {
 		return nil, err
 	}
 
-	// Ours = the one we generate & sign. Theirs (ours = false) = the one they generated, so we can use their sigs
+	// Ours = the one we generate & sign. Theirs (ours = false) = the one they
+	// generated, so we can use their sigs
 	if ours {
 		if valueTheirs > 0 {
-			tx.AddTxOut(DlcOutput(c.TheirPayoutBase, oracleSigPub, c.OurPayoutBase, valueTheirs))
+			tx.AddTxOut(DlcOutput(c.TheirPayoutBase, oracleSigPub,
+				c.OurPayoutBase, valueTheirs))
 		}
 
 		if valueOurs > 0 {
-			tx.AddTxOut(wire.NewTxOut(valueOurs, DirectWPKHScriptFromPKH(c.OurPayoutPKH)))
+			tx.AddTxOut(wire.NewTxOut(valueOurs,
+				DirectWPKHScriptFromPKH(c.OurPayoutPKH)))
 		}
 	} else {
 		if valueOurs > 0 {
-			tx.AddTxOut(DlcOutput(c.OurPayoutBase, oracleSigPub, c.TheirPayoutBase, valueOurs))
+			tx.AddTxOut(DlcOutput(c.OurPayoutBase, oracleSigPub,
+				c.TheirPayoutBase, valueOurs))
 		}
 
 		if valueTheirs > 0 {
-			tx.AddTxOut(wire.NewTxOut(valueTheirs, DirectWPKHScriptFromPKH(c.TheirPayoutPKH)))
+			tx.AddTxOut(wire.NewTxOut(valueTheirs,
+				DirectWPKHScriptFromPKH(c.TheirPayoutPKH)))
 		}
 	}
 

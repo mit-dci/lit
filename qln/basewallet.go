@@ -94,7 +94,8 @@ type UWallet interface {
 	// Sweep sends lots of txs (uint32 of them) to the specified address.
 	Sweep([]byte, uint32) ([]*chainhash.Hash, error)
 
-	PickUtxos(amtWanted, outputByteSize, feePerByte int64, ow bool) (portxo.TxoSliceByBip69, int64, error)
+	PickUtxos(amtWanted, outputByteSize,
+		feePerByte int64, ow bool) (portxo.TxoSliceByBip69, int64, error)
 
 	SignMyInputs(tx *wire.MsgTx) error
 
