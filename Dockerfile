@@ -13,6 +13,7 @@ WORKDIR /usr/local/go/src/github.com/mit-dci/lit/cmd/lit-af
 RUN go build
 
 FROM alpine
+RUN apk add --no-cache ca-certificates
 WORKDIR /app
 RUN cd /app
 COPY --from=build /usr/local/go/src/github.com/mit-dci/lit/lit /app/bin/lit
