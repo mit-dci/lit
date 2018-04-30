@@ -10,8 +10,9 @@ const (
 	UseChannelHAKDBase    = 40 | hdkeychain.HardenedKeyStart
 	UseChannelElkrem      = 8888 | hdkeychain.HardenedKeyStart
 
-	UseContractPayout       = 50 | hdkeychain.HardenedKeyStart // key derivation path for contract payout keys (the keys the contract pays TO)
+	UseContractPayoutBase   = 50 | hdkeychain.HardenedKeyStart // key derivation path for contract payout keys (the keys the contract pays TO combined with the oracle's signature)
 	UseContractFundMultisig = 51 | hdkeychain.HardenedKeyStart // key derivation path for contract spending keys (the keys the contract pays FROM, and the funding TX pays TO)
+	UseContractPayoutPKH    = 52 | hdkeychain.HardenedKeyStart // key derivation path for contract payout PKH (the hash the contract pays TO)
 	// links Id and channel. replaces UseChannelFund
 
 	UseIdKey = 111 | hdkeychain.HardenedKeyStart

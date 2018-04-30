@@ -388,7 +388,7 @@ func (nd *LitNode) HandleContractOPEvent(c *lnutil.DlcContract, opEvent *lnutil.
 		pkhIsMine := false
 		pkhIdx := uint32(0)
 		value := int64(0)
-		myPKHPkSript := lnutil.DirectWPKHScript(c.OurPayoutPub)
+		myPKHPkSript := lnutil.DirectWPKHScriptFromPKH(c.OurPayoutPKH)
 		for i, out := range opEvent.Tx.TxOut {
 			if bytes.Equal(myPKHPkSript, out.PkScript) {
 				pkhIdx = uint32(i)
@@ -415,7 +415,7 @@ func (nd *LitNode) HandleContractOPEvent(c *lnutil.DlcContract, opEvent *lnutil.
 			kg.Depth = 5
 			kg.Step[0] = 44 | 1<<31
 			kg.Step[1] = c.CoinType | 1<<31
-			kg.Step[2] = UseContractPayout
+			kg.Step[2] = UseContractPayoutPKH
 			kg.Step[3] = c.PeerIdx | 1<<31
 			kg.Step[4] = uint32(c.Idx) | 1<<31
 			priv := wal.GetPriv(kg)

@@ -1,14 +1,15 @@
 package qln
 
 import (
-	"bytes"
 	"fmt"
 	"log"
 
 	"github.com/adiabat/btcd/btcec"
 	"github.com/adiabat/btcd/txscript"
 	"github.com/adiabat/btcd/wire"
+	"github.com/adiabat/btcutil"
 	"github.com/adiabat/btcutil/txsort"
+	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/sig64"
@@ -40,11 +41,11 @@ func (nd *LitNode) OfferDlc(peerIdx uint32, cIdx uint64) error {
 
 	var nullBytes [33]byte
 	// Check if everything's set
-	if bytes.Equal(nullBytes[:], c.OracleA[:]) {
+	if c.OracleA == nullBytes {
 		return fmt.Errorf("You need to set an oracle for the contract before offering it")
 	}
 
-	if bytes.Equal(nullBytes[:], c.OracleR[:]) {
+	if c.OracleR == nullBytes {
 		return fmt.Errorf("You need to set an R-point for the contract before offering it")
 	}
 
@@ -52,7 +53,7 @@ func (nd *LitNode) OfferDlc(peerIdx uint32, cIdx uint64) error {
 		return fmt.Errorf("You need to set a settlement time for the contract before offering it")
 	}
 
-	if c.CoinType == 0 {
+	if c.CoinType == dlc.COINTYPE_NOT_SET {
 		return fmt.Errorf("You need to set a coin type for the contract before offering it")
 	}
 
@@ -79,7 +80,7 @@ func (nd *LitNode) OfferDlc(peerIdx uint32, cIdx uint64) error {
 		return err
 	}
 
-	c.OurPayoutPub, err = nd.GetUsePub(kg, UseContractPayout)
+	c.OurPayoutBase, err = nd.GetUsePub(kg, UseContractPayoutBase)
 	if err != nil {
 		return err
 	}
@@ -117,7 +118,7 @@ func (nd *LitNode) DeclineDlc(cIdx uint64, reason uint8) error {
 		return fmt.Errorf("You are not connected to peer %d, do that first", c.PeerIdx)
 	}
 
-	msg := lnutil.NewDlcOfferDeclineMsg(c.PeerIdx, reason, c.PubKey)
+	msg := lnutil.NewDlcOfferDeclineMsg(c.PeerIdx, reason, c.TheirIdx)
 	c.Status = lnutil.ContractStatusDeclined
 
 	err = nd.DlcManager.SaveContract(c)
@@ -163,7 +164,16 @@ func (nd *LitNode) AcceptDlc(cIdx uint64) error {
 		return err
 	}
 
-	c.OurPayoutPub, err = nd.GetUsePub(kg, UseContractPayout)
+	c.OurPayoutBase, err = nd.GetUsePub(kg, UseContractPayoutBase)
+	if err != nil {
+		return err
+	}
+
+	ourPayoutPKHKey, err := nd.GetUsePub(kg, UseContractPayoutPKH)
+	if err != nil {
+		return err
+	}
+	copy(c.OurPayoutPKH[:], btcutil.Hash160(ourPayoutPKHKey[:]))
 	if err != nil {
 		return err
 	}
@@ -199,10 +209,11 @@ func (nd *LitNode) DlcOfferHandler(msg lnutil.DlcOfferMsg, peer *RemotePeer) {
 	c.TheirFundingInputs = msg.Contract.OurFundingInputs
 	c.OurFundMultisigPub = msg.Contract.TheirFundMultisigPub
 	c.TheirFundMultisigPub = msg.Contract.OurFundMultisigPub
-	c.OurPayoutPub = msg.Contract.TheirPayoutPub
-	c.TheirPayoutPub = msg.Contract.OurPayoutPub
+	c.OurPayoutBase = msg.Contract.TheirPayoutBase
+	c.TheirPayoutBase = msg.Contract.OurPayoutBase
 	c.OurChangePKH = msg.Contract.TheirChangePKH
 	c.TheirChangePKH = msg.Contract.OurChangePKH
+	c.TheirIdx = msg.Contract.Idx
 
 	c.Division = make([]lnutil.DlcContractDivision, len(msg.Contract.Division))
 	for i := 0; i < len(msg.Contract.Division); i++ {
@@ -215,7 +226,6 @@ func (nd *LitNode) DlcOfferHandler(msg lnutil.DlcOfferMsg, peer *RemotePeer) {
 	c.OracleA = msg.Contract.OracleA
 	c.OracleR = msg.Contract.OracleR
 	c.OracleTimestamp = msg.Contract.OracleTimestamp
-	c.PubKey = msg.Contract.PubKey
 
 	err := nd.DlcManager.SaveContract(c)
 	if err != nil {
@@ -232,7 +242,7 @@ func (nd *LitNode) DlcOfferHandler(msg lnutil.DlcOfferMsg, peer *RemotePeer) {
 }
 
 func (nd *LitNode) DlcDeclineHandler(msg lnutil.DlcOfferDeclineMsg, peer *RemotePeer) {
-	c, err := nd.DlcManager.FindContractByKey(msg.ContractPubKey)
+	c, err := nd.DlcManager.LoadContract(msg.Idx)
 	if err != nil {
 		fmt.Printf("DlcDeclineHandler FindContract err %s\n", err.Error())
 		return
@@ -247,7 +257,7 @@ func (nd *LitNode) DlcDeclineHandler(msg lnutil.DlcOfferDeclineMsg, peer *Remote
 }
 
 func (nd *LitNode) DlcAcceptHandler(msg lnutil.DlcOfferAcceptMsg, peer *RemotePeer) error {
-	c, err := nd.DlcManager.FindContractByKey(msg.ContractPubKey)
+	c, err := nd.DlcManager.LoadContract(msg.Idx)
 	if err != nil {
 		fmt.Printf("DlcAcceptHandler FindContract err %s\n", err.Error())
 		return err
@@ -259,7 +269,10 @@ func (nd *LitNode) DlcAcceptHandler(msg lnutil.DlcOfferAcceptMsg, peer *RemotePe
 	c.TheirFundingInputs = msg.FundingInputs
 	c.TheirSettlementSignatures = msg.SettlementSignatures
 	c.TheirFundMultisigPub = msg.OurFundMultisigPub
-	c.TheirPayoutPub = msg.OurPayoutPub
+	c.TheirPayoutBase = msg.OurPayoutBase
+	c.TheirPayoutPKH = msg.OurPayoutPKH
+	c.TheirIdx = msg.OurIdx
+
 	c.Status = lnutil.ContractStatusAccepted
 	err = nd.DlcManager.SaveContract(c)
 	if err != nil {
@@ -288,7 +301,7 @@ func (nd *LitNode) DlcAcceptHandler(msg lnutil.DlcOfferAcceptMsg, peer *RemotePe
 }
 
 func (nd *LitNode) DlcContractAckHandler(msg lnutil.DlcContractAckMsg, peer *RemotePeer) {
-	c, err := nd.DlcManager.FindContractByKey(msg.ContractPubKey)
+	c, err := nd.DlcManager.LoadContract(msg.Idx)
 	if err != nil {
 		fmt.Printf("DlcContractAckHandler FindContract err %s\n", err.Error())
 		return
@@ -329,7 +342,7 @@ func (nd *LitNode) DlcContractAckHandler(msg lnutil.DlcContractAckMsg, peer *Rem
 }
 
 func (nd *LitNode) DlcFundingSigsHandler(msg lnutil.DlcContractFundingSigsMsg, peer *RemotePeer) {
-	c, err := nd.DlcManager.FindContractByKey(msg.ContractPubKey)
+	c, err := nd.DlcManager.LoadContract(msg.Idx)
 	if err != nil {
 		fmt.Printf("DlcFundingSigsHandler FindContract err %s\n", err.Error())
 		return
@@ -367,7 +380,7 @@ func (nd *LitNode) DlcFundingSigsHandler(msg lnutil.DlcContractFundingSigsMsg, p
 }
 
 func (nd *LitNode) DlcSigProofHandler(msg lnutil.DlcContractSigProofMsg, peer *RemotePeer) {
-	c, err := nd.DlcManager.FindContractByKey(msg.ContractPubKey)
+	c, err := nd.DlcManager.LoadContract(msg.Idx)
 	if err != nil {
 		fmt.Printf("DlcSigProofHandler FindContract err %s\n", err.Error())
 		return
@@ -583,7 +596,7 @@ func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oracleSig [32]
 	addr, err := wal.NewAdr()
 	txClaim.AddTxOut(wire.NewTxOut(d.ValueOurs-1000, lnutil.DirectWPKHScriptFromPKH(addr))) // todo calc fee - fee is double here because the contract output already had the fee deducted in the settlement TX
 
-	kg.Step[2] = UseContractPayout
+	kg.Step[2] = UseContractPayoutBase
 	privSpend := wal.GetPriv(kg)
 	pubSpend := wal.GetPub(kg)
 	privOracle, pubOracle := btcec.PrivKeyFromBytes(btcec.S256(), oracleSig[:])
@@ -594,7 +607,7 @@ func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oracleSig [32]
 	var pubSpendBytes [33]byte
 	copy(pubSpendBytes[:], pubSpend.SerializeCompressed())
 
-	settleScript := lnutil.DlcCommitScript(c.OurPayoutPub, pubOracleBytes, c.TheirPayoutPub, 5)
+	settleScript := lnutil.DlcCommitScript(c.OurPayoutBase, pubOracleBytes, c.TheirPayoutBase, 5)
 	err = nd.SignClaimTx(txClaim, settleTx.TxOut[0].Value, settleScript, privContractOutput, false)
 	if err != nil {
 		log.Printf("SettleContract SignClaimTx err %s", err.Error())

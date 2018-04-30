@@ -1001,18 +1001,19 @@ func (msg DlcOfferMsg) Peer() uint32 { return msg.PeerIdx }
 func (msg DlcOfferMsg) MsgType() uint8 { return MSGID_DLC_OFFER }
 
 type DlcOfferDeclineMsg struct {
-	PeerIdx        uint32
-	Reason         uint8 // Reason for declining the funding request
-	ContractPubKey [33]byte
+	PeerIdx uint32
+	Idx     uint64 // The contract we are declining (indexing on the peer receiving this message)
+	Reason  uint8  // Reason for declining the funding request
+
 }
 
 // NewDlcOfferDeclineMsg creates a new DlcOfferDeclineMsg based on a peer, a reason for declining and the key of the
 // contract we're declining
-func NewDlcOfferDeclineMsg(peerIdx uint32, reason uint8, contractPubKey [33]byte) DlcOfferDeclineMsg {
+func NewDlcOfferDeclineMsg(peerIdx uint32, reason uint8, theirIdx uint64) DlcOfferDeclineMsg {
 	msg := new(DlcOfferDeclineMsg)
 	msg.PeerIdx = peerIdx
 	msg.Reason = reason
-	msg.ContractPubKey = contractPubKey
+	msg.Idx = theirIdx
 	return *msg
 }
 
@@ -1028,7 +1029,7 @@ func NewDlcOfferDeclineMsgFromBytes(b []byte, peerIdx uint32) (DlcOfferDeclineMs
 	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
 
 	_ = binary.Read(buf, binary.BigEndian, &msg.Reason)
-	copy(msg.ContractPubKey[:], buf.Next(33))
+	msg.Idx, _ = wire.ReadVarInt(buf, 0)
 
 	return *msg, nil
 }
@@ -1040,7 +1041,7 @@ func (msg DlcOfferDeclineMsg) Bytes() []byte {
 	buf.WriteByte(msg.MsgType())
 
 	binary.Write(&buf, binary.BigEndian, msg.Reason)
-	buf.Write(msg.ContractPubKey[:])
+	wire.WriteVarInt(&buf, 0, msg.Idx)
 	return buf.Bytes()
 }
 
@@ -1059,10 +1060,12 @@ type DlcContractSettlementSignature struct {
 // DlcOfferAcceptMsg is a message indicating we are accepting the contract
 type DlcOfferAcceptMsg struct {
 	PeerIdx              uint32                           // Index of the peer we are forming the contract with
-	ContractPubKey       [33]byte                         // The key of the contract (we don't know the index of this contract on the other side)
+	Idx                  uint64                           // The index of the contract on the peer we're receiving this message on
+	OurIdx               uint64                           // The index of the contract on our side, so they know how to reference it
 	OurChangePKH         [20]byte                         // The PKH we want the change from funding to be paid back to
 	OurFundMultisigPub   [33]byte                         // The Pubkey that is part of the multisig for spending the contract funds
-	OurPayoutPub         [33]byte                         // The Pubkey to be paid to in the contract settlement
+	OurPayoutBase        [33]byte                         // The Pubkey to be used to in the contract settlement
+	OurPayoutPKH         [20]byte                         // The PKH to be paid to in the contract settlement
 	FundingInputs        []DlcContractFundingInput        // The UTXOs we are using to fund the contract
 	SettlementSignatures []DlcContractSettlementSignature // The signatures for settling the contract at various values
 }
@@ -1071,11 +1074,13 @@ type DlcOfferAcceptMsg struct {
 func NewDlcOfferAcceptMsg(contract *DlcContract, signatures []DlcContractSettlementSignature) DlcOfferAcceptMsg {
 	msg := new(DlcOfferAcceptMsg)
 	msg.PeerIdx = contract.PeerIdx
-	msg.ContractPubKey = contract.PubKey
+	msg.Idx = contract.TheirIdx
+	msg.OurIdx = contract.Idx
 	msg.FundingInputs = contract.OurFundingInputs
 	msg.OurChangePKH = contract.OurChangePKH
 	msg.OurFundMultisigPub = contract.OurFundMultisigPub
-	msg.OurPayoutPub = contract.OurPayoutPub
+	msg.OurPayoutBase = contract.OurPayoutBase
+	msg.OurPayoutPKH = contract.OurPayoutPKH
 	msg.SettlementSignatures = signatures
 	return *msg
 }
@@ -1090,10 +1095,13 @@ func NewDlcOfferAcceptMsgFromBytes(b []byte, peerIdx uint32) (DlcOfferAcceptMsg,
 	}
 
 	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
-	copy(msg.ContractPubKey[:], buf.Next(33))
+	msg.Idx, _ = wire.ReadVarInt(buf, 0)
+	msg.OurIdx, _ = wire.ReadVarInt(buf, 0)
+
 	copy(msg.OurChangePKH[:], buf.Next(20))
 	copy(msg.OurFundMultisigPub[:], buf.Next(33))
-	copy(msg.OurPayoutPub[:], buf.Next(33))
+	copy(msg.OurPayoutBase[:], buf.Next(33))
+	copy(msg.OurPayoutPKH[:], buf.Next(20))
 
 	inputCount, _ := wire.ReadVarInt(buf, 0)
 
@@ -1124,10 +1132,14 @@ func (msg DlcOfferAcceptMsg) Bytes() []byte {
 	var buf bytes.Buffer
 
 	buf.WriteByte(msg.MsgType())
-	buf.Write(msg.ContractPubKey[:])
+
+	wire.WriteVarInt(&buf, 0, msg.Idx)
+	wire.WriteVarInt(&buf, 0, msg.OurIdx)
+
 	buf.Write(msg.OurChangePKH[:])
 	buf.Write(msg.OurFundMultisigPub[:])
-	buf.Write(msg.OurPayoutPub[:])
+	buf.Write(msg.OurPayoutBase[:])
+	buf.Write(msg.OurPayoutPKH[:])
 
 	inputCount := uint64(len(msg.FundingInputs))
 	wire.WriteVarInt(&buf, 0, inputCount)
@@ -1158,7 +1170,7 @@ func (msg DlcOfferAcceptMsg) MsgType() uint8 { return MSGID_DLC_ACCEPTOFFER }
 // is acknowledged. Includes the signatures from this peer for the settlement TXes.
 type DlcContractAckMsg struct {
 	PeerIdx              uint32                           // Peer we're sending the Ack to (or received it from)
-	ContractPubKey       [33]byte                         // The key of the contract that was acknowledged
+	Idx                  uint64                           // The index of the contract we're acknowledging
 	SettlementSignatures []DlcContractSettlementSignature // The settlement signatures of the party acknowledging
 }
 
@@ -1166,7 +1178,7 @@ type DlcContractAckMsg struct {
 func NewDlcContractAckMsg(contract *DlcContract, signatures []DlcContractSettlementSignature) DlcContractAckMsg {
 	msg := new(DlcContractAckMsg)
 	msg.PeerIdx = contract.PeerIdx
-	msg.ContractPubKey = contract.PubKey
+	msg.Idx = contract.TheirIdx
 	msg.SettlementSignatures = signatures
 	return *msg
 }
@@ -1182,7 +1194,7 @@ func NewDlcContractAckMsgFromBytes(b []byte, peerIdx uint32) (DlcContractAckMsg,
 	}
 
 	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
-	copy(msg.ContractPubKey[:], buf.Next(33))
+	msg.Idx, _ = wire.ReadVarInt(buf, 0)
 
 	var signatureCount uint32
 	binary.Read(buf, binary.BigEndian, &signatureCount)
@@ -1201,7 +1213,7 @@ func (msg DlcContractAckMsg) Bytes() []byte {
 	var buf bytes.Buffer
 
 	buf.WriteByte(msg.MsgType())
-	buf.Write(msg.ContractPubKey[:])
+	wire.WriteVarInt(&buf, 0, msg.Idx)
 
 	signatureCount := uint32(len(msg.SettlementSignatures))
 	binary.Write(&buf, binary.BigEndian, signatureCount)
@@ -1224,7 +1236,7 @@ func (msg DlcContractAckMsg) MsgType() uint8 { return MSGID_DLC_CONTRACTACK }
 // contract into the actual contract output.
 type DlcContractFundingSigsMsg struct {
 	PeerIdx         uint32      // Peer we're exchanging the message with
-	ContractPubKey  [33]byte    // The key of the concerning contract
+	Idx             uint64      // The index of the concerning contract
 	SignedFundingTx *wire.MsgTx // The funding TX containing the signatures
 }
 
@@ -1232,7 +1244,7 @@ type DlcContractFundingSigsMsg struct {
 func NewDlcContractFundingSigsMsg(contract *DlcContract, signedTx *wire.MsgTx) DlcContractFundingSigsMsg {
 	msg := new(DlcContractFundingSigsMsg)
 	msg.PeerIdx = contract.PeerIdx
-	msg.ContractPubKey = contract.PubKey
+	msg.Idx = contract.TheirIdx
 	msg.SignedFundingTx = signedTx
 	return *msg
 }
@@ -1248,7 +1260,7 @@ func NewDlcContractFundingSigsMsgFromBytes(b []byte, peerIdx uint32) (DlcContrac
 	}
 
 	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
-	copy(msg.ContractPubKey[:], buf.Next(33))
+	msg.Idx, _ = wire.ReadVarInt(buf, 0)
 
 	msg.SignedFundingTx = wire.NewMsgTx()
 	msg.SignedFundingTx.Deserialize(buf)
@@ -1261,7 +1273,7 @@ func (msg DlcContractFundingSigsMsg) Bytes() []byte {
 	var buf bytes.Buffer
 
 	buf.WriteByte(msg.MsgType())
-	buf.Write(msg.ContractPubKey[:])
+	wire.WriteVarInt(&buf, 0, msg.Idx)
 
 	writer := bufio.NewWriter(&buf)
 	msg.SignedFundingTx.Serialize(writer)
@@ -1279,7 +1291,7 @@ func (msg DlcContractFundingSigsMsg) MsgType() uint8 { return MSGID_DLC_CONTRACT
 // funding transaction that has already been published to the blockchain
 type DlcContractSigProofMsg struct {
 	PeerIdx         uint32      // The index of the peer we're communicating with
-	ContractPubKey  [33]byte    // The contract we're communicating about
+	Idx             uint64      // The contract we're communicating about
 	SignedFundingTx *wire.MsgTx // The fully signed funding transaction
 }
 
@@ -1287,7 +1299,7 @@ type DlcContractSigProofMsg struct {
 func NewDlcContractSigProofMsg(contract *DlcContract, signedTx *wire.MsgTx) DlcContractSigProofMsg {
 	msg := new(DlcContractSigProofMsg)
 	msg.PeerIdx = contract.PeerIdx
-	msg.ContractPubKey = contract.PubKey
+	msg.Idx = contract.TheirIdx
 	msg.SignedFundingTx = signedTx
 	return *msg
 }
@@ -1303,7 +1315,7 @@ func NewDlcContractSigProofMsgFromBytes(b []byte, peerIdx uint32) (DlcContractSi
 	}
 
 	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
-	copy(msg.ContractPubKey[:], buf.Next(33))
+	msg.Idx, _ = wire.ReadVarInt(buf, 0)
 
 	msg.SignedFundingTx = wire.NewMsgTx()
 	msg.SignedFundingTx.Deserialize(buf)
@@ -1316,7 +1328,7 @@ func (msg DlcContractSigProofMsg) Bytes() []byte {
 	var buf bytes.Buffer
 
 	buf.WriteByte(msg.MsgType())
-	buf.Write(msg.ContractPubKey[:])
+	wire.WriteVarInt(&buf, 0, msg.Idx)
 
 	writer := bufio.NewWriter(&buf)
 	msg.SignedFundingTx.Serialize(writer)

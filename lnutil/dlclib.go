@@ -9,9 +9,7 @@ import (
 
 	"github.com/adiabat/btcd/btcec"
 	"github.com/adiabat/btcd/chaincfg/chainhash"
-	"github.com/adiabat/btcutil"
 
-	"github.com/adiabat/btcd/txscript"
 	"github.com/adiabat/btcd/wire"
 )
 
@@ -35,8 +33,8 @@ const scalarSize = 32
 // DlcContract is a struct containing all elements to work with a Discreet Log Contract. This struct is stored in the database
 type DlcContract struct {
 	Idx                                      uint64                           // Index of the contract for referencing in commands
+	TheirIdx                                 uint64                           // Index of the contract on the other peer (so we can reference it in messages)
 	PeerIdx                                  uint32                           // Index of the peer we've offered the contract to or received the contract from
-	PubKey                                   [33]byte                         // Key of the contract
 	CoinType                                 uint32                           // Coin type
 	OracleA, OracleR                         [33]byte                         // Pub keys of the oracle
 	OracleTimestamp                          uint64                           // The time we expect the oracle to publish
@@ -44,7 +42,8 @@ type DlcContract struct {
 	OurFundingAmount, TheirFundingAmount     int64                            // The amounts either side are funding
 	OurChangePKH, TheirChangePKH             [20]byte                         // PKH to which the contracts funding change should go
 	OurFundMultisigPub, TheirFundMultisigPub [33]byte                         // Pubkey used in the funding multisig output
-	OurPayoutPub, TheirPayoutPub             [33]byte                         // Pubkey to which the contracts are supposed to pay out
+	OurPayoutBase, TheirPayoutBase           [33]byte                         // Pubkey to be used in the commit script (combined with oracle pubkey or CSV timeout)
+	OurPayoutPKH, TheirPayoutPKH             [20]byte                         // Pubkeyhash to which the contract pays out (directly)
 	Status                                   DlcContractStatus                // Status of the contract
 	OurFundingInputs, TheirFundingInputs     []DlcContractFundingInput        // Outpoints used to fund the contract
 	TheirSettlementSignatures                []DlcContractSettlementSignature // Signatures for the settlement transactions
@@ -68,7 +67,20 @@ func DlcContractFromBytes(b []byte) (*DlcContract, error) {
 	buf := bytes.NewBuffer(b)
 	c := new(DlcContract)
 
-	copy(c.PubKey[:], buf.Next(33))
+	ourIdx, err := wire.ReadVarInt(buf, 0)
+	if err != nil {
+		fmt.Println("Error while deserializing varint for theirIdx")
+		return nil, err
+	}
+	c.Idx = ourIdx
+
+	theirIdx, err := wire.ReadVarInt(buf, 0)
+	if err != nil {
+		fmt.Println("Error while deserializing varint for theirIdx")
+		return nil, err
+	}
+	c.TheirIdx = theirIdx
+
 	copy(c.OracleA[:], buf.Next(33))
 	copy(c.OracleR[:], buf.Next(33))
 
@@ -106,8 +118,11 @@ func DlcContractFromBytes(b []byte) (*DlcContract, error) {
 	copy(c.OurFundMultisigPub[:], buf.Next(33))
 	copy(c.TheirFundMultisigPub[:], buf.Next(33))
 
-	copy(c.OurPayoutPub[:], buf.Next(33))
-	copy(c.TheirPayoutPub[:], buf.Next(33))
+	copy(c.OurPayoutBase[:], buf.Next(33))
+	copy(c.TheirPayoutBase[:], buf.Next(33))
+
+	copy(c.OurPayoutPKH[:], buf.Next(20))
+	copy(c.TheirPayoutPKH[:], buf.Next(20))
 
 	status, err := wire.ReadVarInt(buf, 0)
 	if err != nil {
@@ -194,7 +209,9 @@ func DlcContractFromBytes(b []byte) (*DlcContract, error) {
 // Bytes serializes a DlcContract struct into a byte array
 func (self *DlcContract) Bytes() []byte {
 	var buf bytes.Buffer
-	buf.Write(self.PubKey[:])
+
+	wire.WriteVarInt(&buf, 0, uint64(self.Idx))
+	wire.WriteVarInt(&buf, 0, uint64(self.TheirIdx))
 	buf.Write(self.OracleA[:])
 	buf.Write(self.OracleR[:])
 	wire.WriteVarInt(&buf, 0, uint64(self.PeerIdx))
@@ -207,8 +224,10 @@ func (self *DlcContract) Bytes() []byte {
 	buf.Write(self.TheirChangePKH[:])
 	buf.Write(self.OurFundMultisigPub[:])
 	buf.Write(self.TheirFundMultisigPub[:])
-	buf.Write(self.OurPayoutPub[:])
-	buf.Write(self.TheirPayoutPub[:])
+	buf.Write(self.OurPayoutBase[:])
+	buf.Write(self.TheirPayoutBase[:])
+	buf.Write(self.OurPayoutPKH[:])
+	buf.Write(self.TheirPayoutPKH[:])
 
 	var status = uint64(self.Status)
 	wire.WriteVarInt(&buf, 0, status)
@@ -264,12 +283,12 @@ func (c DlcContract) GetDivision(value int64) (*DlcContractDivision, error) {
 	return nil, fmt.Errorf("Division not found in contract")
 }
 
-// GetTheirSettlementSignature loops over all stored settlement signatures from the counter party and
-// returns the one matching the requested oracle value
-func (c DlcContract) GetTheirSettlementSignature(value int64) ([64]byte, error) {
+// GetTheirSettlementSignature loops over all stored settlement signatures from
+// the counter party and returns the one matching the requested oracle value
+func (c DlcContract) GetTheirSettlementSignature(val int64) ([64]byte, error) {
 
 	for _, s := range c.TheirSettlementSignatures {
-		if s.Outcome == value {
+		if s.Outcome == val {
 			return s.Signature, nil
 		}
 	}
@@ -286,56 +305,30 @@ func PrintTx(tx *wire.MsgTx) {
 	fmt.Printf("%x\n", buf.Bytes())
 }
 
-// DlcOutput returns a Txo for a particular value that pays to (PubKeyPeer+PubKeyOracleSig or (OurPubKey and TimeDelay))
-func DlcOutput(pubKeyPeer, pubKeyOracleSig, ourPubKey [33]byte, value int64) *wire.TxOut {
-	scriptBytes := DlcCommitScript(pubKeyPeer, pubKeyOracleSig, ourPubKey, 5)
+// DlcOutput returns a Txo for a particular value that pays to
+// (PubKeyPeer+PubKeyOracleSig or (OurPubKey and TimeDelay))
+func DlcOutput(pkPeer, pkOracleSig, pkOurs [33]byte, value int64) *wire.TxOut {
+	scriptBytes := DlcCommitScript(pkPeer, pkOracleSig, pkOurs, 5)
 	scriptBytes = P2WSHify(scriptBytes)
 
 	return wire.NewTxOut(value, scriptBytes)
 }
 
-// DLC Commit script makes a script that pays to (PubKeyPeer+PubKeyOracleSig or (OurPubKey and TimeDelay))
-// We send this over (signed) to the other side. If they publish the TX with the correct script they can use
-// The oracle's signature and their own private key to claim the funds from the output. However,
-// If they send the wrong one, they won't be able to claim the funds - and we can claim them once the
-// Time delay has passed.
-func DlcCommitScript(pubKeyPeer, pubKeyOracleSig, ourPubKey [33]byte, delay uint16) []byte {
-	builder := txscript.NewScriptBuilder()
-
-	// 1 for penalty / revoked, 0 for timeout
-	// 1, so timeout
-	builder.AddOp(txscript.OP_IF)
-
+// DlcCommitScript makes a script that pays to (PubKeyPeer+PubKeyOracleSig or
+// (OurPubKey and TimeDelay)). We send this over (signed) to the other side. If
+// they publish the TX with the correct script they can use the oracle's
+// signature and their own private key to claim the funds from the output.
+// However, if they send the wrong one, they won't be able to claim the funds
+// and we can claim them once the time delay has passed.
+func DlcCommitScript(pubKeyPeer, pubKeyOracleSig, ourPubKey [33]byte,
+	delay uint16) []byte {
 	// Combine pubKey and Oracle Sig
 	combinedPubKey := CombinePubs(pubKeyPeer, pubKeyOracleSig)
-
-	builder.AddData(combinedPubKey[:])
-
-	// 0, so revoked
-	builder.AddOp(txscript.OP_ELSE)
-
-	// CSV delay
-	builder.AddInt64(int64(delay))
-	// CSV check, fails here if too early
-	builder.AddOp(txscript.OP_NOP3) // really OP_CHECKSEQUENCEVERIFY
-	// Drop delay value
-	builder.AddOp(txscript.OP_DROP)
-	// push timeout key
-	builder.AddData(ourPubKey[:])
-
-	builder.AddOp(txscript.OP_ENDIF)
-
-	// check whatever pubkey is left on the stack
-	builder.AddOp(txscript.OP_CHECKSIG)
-
-	// never any errors we care about here.
-	s, _ := builder.Script()
-
-	return s
+	return CommitScript(combinedPubKey, ourPubKey, delay)
 }
 
 // BigIntToEncodedBytes converts a big integer into its corresponding
-// 32 byte little endian representation.
+// 32 byte big endian representation.
 func BigIntToEncodedBytes(a *big.Int) *[32]byte {
 	s := new([32]byte)
 	if a == nil {
@@ -456,24 +449,19 @@ func SettlementTx(c *DlcContract, d DlcContractDivision, ours bool) (*wire.MsgTx
 	// Ours = the one we generate & sign. Theirs (ours = false) = the one they generated, so we can use their sigs
 	if ours {
 		if valueTheirs > 0 {
-			tx.AddTxOut(DlcOutput(c.TheirPayoutPub, oracleSigPub, c.OurPayoutPub, valueTheirs))
+			tx.AddTxOut(DlcOutput(c.TheirPayoutBase, oracleSigPub, c.OurPayoutBase, valueTheirs))
 		}
 
 		if valueOurs > 0 {
-			var ourPayoutPKH [20]byte
-			copy(ourPayoutPKH[:], btcutil.Hash160(c.OurPayoutPub[:]))
-
-			tx.AddTxOut(wire.NewTxOut(valueOurs, DirectWPKHScriptFromPKH(ourPayoutPKH)))
+			tx.AddTxOut(wire.NewTxOut(valueOurs, DirectWPKHScriptFromPKH(c.OurPayoutPKH)))
 		}
 	} else {
 		if valueOurs > 0 {
-			tx.AddTxOut(DlcOutput(c.OurPayoutPub, oracleSigPub, c.TheirPayoutPub, valueOurs))
+			tx.AddTxOut(DlcOutput(c.OurPayoutBase, oracleSigPub, c.TheirPayoutBase, valueOurs))
 		}
 
 		if valueTheirs > 0 {
-			var theirPayoutPKH [20]byte
-			copy(theirPayoutPKH[:], btcutil.Hash160(c.TheirPayoutPub[:]))
-			tx.AddTxOut(wire.NewTxOut(valueTheirs, DirectWPKHScriptFromPKH(theirPayoutPKH)))
+			tx.AddTxOut(wire.NewTxOut(valueTheirs, DirectWPKHScriptFromPKH(c.TheirPayoutPKH)))
 		}
 	}
 

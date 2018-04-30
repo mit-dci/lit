@@ -1,12 +1,12 @@
 package dlc
 
 import (
-	"bytes"
-	"crypto/rand"
 	"fmt"
 
 	"github.com/mit-dci/lit/lnutil"
 )
+
+var COINTYPE_NOT_SET = ^uint32(0) // Max Uint
 
 // AddContract starts a new draft contract
 func (mgr *DlcManager) AddContract() (*lnutil.DlcContract, error) {
@@ -14,29 +14,13 @@ func (mgr *DlcManager) AddContract() (*lnutil.DlcContract, error) {
 
 	c := new(lnutil.DlcContract)
 	c.Status = lnutil.ContractStatusDraft
-	rand.Read(c.PubKey[:])
+	c.CoinType = COINTYPE_NOT_SET
 	err = mgr.SaveContract(c)
 	if err != nil {
 		return nil, err
 	}
 
 	return c, nil
-}
-
-// FindContractByKey finds a contract by its generated PubKey
-func (mgr *DlcManager) FindContractByKey(key [33]byte) (*lnutil.DlcContract, error) {
-	contracts, err := mgr.ListContracts()
-	if err != nil {
-		return nil, err
-	}
-
-	for _, c := range contracts {
-		if bytes.Equal(c.PubKey[:], key[:]) {
-			return c, nil
-		}
-	}
-
-	return nil, fmt.Errorf("Contract not found")
 }
 
 // SetContractOracle assigns a particular oracle to a contract - used for determining which pubkey A to use and can also
