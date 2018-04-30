@@ -6,7 +6,7 @@ import (
 	"github.com/mit-dci/lit/lnutil"
 )
 
-var COINTYPE_NOT_SET = ^uint32(0) // Max Uint
+const COINTYPE_NOT_SET = ^uint32(0) // Max Uint
 
 // AddContract starts a new draft contract
 func (mgr *DlcManager) AddContract() (*lnutil.DlcContract, error) {
