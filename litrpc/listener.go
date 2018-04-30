@@ -42,11 +42,11 @@ func serveWS(ws *websocket.Conn) {
 	jsonrpc.ServeConn(ws)
 }
 
-func RPCListen(rpcl *LitRPC, host string, port uint16) {
+func RPCListen(rpcl *LitRPC, port uint16) {
 
 	rpc.Register(rpcl)
 
-	listenString := fmt.Sprintf("%s:%d", host, port)
+	listenString := fmt.Sprintf("localhost:%d", port)
 
 	http.Handle("/ws", websocket.Handler(serveWS))
 	log.Fatal(http.ListenAndServe(listenString, nil))
