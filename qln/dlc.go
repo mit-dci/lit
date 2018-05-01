@@ -521,6 +521,13 @@ func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oracleSig [32]
 		return [32]byte{}, [32]byte{}, err
 	}
 
+	c.Status = lnutil.ContractStatusSettling
+	err = nd.DlcManager.SaveContract(c)
+	if err != nil {
+		fmt.Printf("SettleContract SaveContract err %s\n", err.Error())
+		return [32]byte{}, [32]byte{}, err
+	}
+
 	d, err := c.GetDivision(oracleValue)
 	if err != nil {
 		fmt.Printf("SettleContract GetDivision err %s\n", err.Error())
@@ -618,6 +625,12 @@ func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oracleSig [32]
 	err = wal.DirectSendTx(txClaim)
 	if err != nil {
 		log.Printf("SettleContract DirectSendTx (claim) err %s", err.Error())
+		return [32]byte{}, [32]byte{}, err
+	}
+
+	c.Status = lnutil.ContractStatusClosed
+	err = nd.DlcManager.SaveContract(c)
+	if err != nil {
 		return [32]byte{}, [32]byte{}, err
 	}
 	return settleTx.TxHash(), txClaim.TxHash(), nil

@@ -402,6 +402,13 @@ func (nd *LitNode) HandleContractOPEvent(c *lnutil.DlcContract,
 		}
 
 		if pkhIsMine {
+			c.Status = lnutil.ContractStatusSettling
+			err := nd.DlcManager.SaveContract(c)
+			if err != nil {
+				fmt.Printf("HandleContractOPEvent SaveContract err %s\n", err.Error())
+				return err
+			}
+
 			// We need to claim this.
 			txClaim := wire.NewMsgTx()
 			txClaim.Version = 2
@@ -436,6 +443,12 @@ func (nd *LitNode) HandleContractOPEvent(c *lnutil.DlcContract,
 				return err
 			}
 			wal.DirectSendTx(txClaim)
+
+			c.Status = lnutil.ContractStatusClosed
+			err = nd.DlcManager.SaveContract(c)
+			if err != nil {
+				return err
+			}
 		}
 
 	}
