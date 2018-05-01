@@ -400,12 +400,98 @@ func (w *Wallit) BuildDontSign(
 	return tx, nil
 }
 
+// SignMyInputs finds the inputs in a transaction that came from our own wallet, and signs them with our private keys.
+// Will modify the transaction in place, but will ignore inputs that we can't sign and leave them unsigned.
+func (w *Wallit) SignMyInputs(tx *wire.MsgTx) error {
+
+	// generate tx-wide hashCache for segwit stuff
+	// might not be needed (non-witness) but make it anyway
+	hCache := txscript.NewTxSigHashes(tx)
+	// make the stashes for signatures / witnesses
+	sigStash := make([][]byte, len(tx.TxIn))
+	witStash := make([][][]byte, len(tx.TxIn))
+
+	var allUtxos portxo.TxoSliceByAmt
+	allUtxos, err := w.GetAllUtxos()
+
+	for i := range tx.TxIn {
+		var utxo *portxo.PorTxo
+		for j := range allUtxos {
+			if allUtxos[j].Op.Hash.IsEqual(&tx.TxIn[i].PreviousOutPoint.Hash) && allUtxos[j].Op.Index == tx.TxIn[i].PreviousOutPoint.Index {
+				utxo = allUtxos[j]
+				break
+			}
+		}
+
+		if utxo == nil {
+			// Not my input, or at least i don't have it in my DB
+			continue
+		}
+
+		// get key
+		priv := w.PathPrivkey(utxo.KeyGen)
+		log.Printf("signing with privkey pub %x\n", priv.PubKey().SerializeCompressed())
+
+		if priv == nil {
+			return fmt.Errorf("SignMyInputs: nil privkey")
+		}
+
+		// sign into stash.  3 possibilities:  legacy PKH, WPKH, WSH
+		if utxo.Mode == portxo.TxoP2PKHComp { // legacy PKH
+			sigStash[i], err = txscript.SignatureScript(tx, i,
+				utxo.PkScript, txscript.SigHashAll, priv, true)
+			if err != nil {
+				return err
+			}
+		}
+		if utxo.Mode == portxo.TxoP2WPKHComp { // witness PKH
+			witStash[i], err = txscript.WitnessScript(tx, hCache, i,
+				utxo.Value, utxo.PkScript, txscript.SigHashAll, priv, true)
+			if err != nil {
+				return err
+			}
+		}
+		if utxo.Mode == portxo.TxoP2WSHComp { // witness script hash
+			sig, err := txscript.RawTxInWitnessSignature(tx, hCache, i,
+				utxo.Value, utxo.PkScript, txscript.SigHashAll, priv)
+			if err != nil {
+				return err
+			}
+			// witness stack has the signature, items, then the previous full script
+			witStash[i] = make([][]byte, 2+len(utxo.PreSigStack))
+
+			// sig comes first (pushed to stack last)
+			witStash[i][0] = sig
+
+			// after stack comes PostSigStack items
+			for j, element := range utxo.PreSigStack {
+				witStash[i][j+1] = element
+			}
+
+			// last stack item is the pkscript
+			witStash[i][len(witStash[i])-1] = utxo.PkScript
+		}
+
+	}
+	// swap sigs into sigScripts in txins
+	for i, txin := range tx.TxIn {
+		if sigStash[i] != nil {
+			txin.SignatureScript = sigStash[i]
+		}
+		if witStash[i] != nil {
+			txin.Witness = witStash[i]
+			txin.SignatureScript = nil
+		}
+	}
+
+	return nil
+}
+
 // Build and sign builds a tx from a slice of utxos and txOuts.
 // It then signs all the inputs and returns the tx.  Should
 // pretty much always work for any inputs.
 func (w *Wallit) BuildAndSign(
 	utxos []*portxo.PorTxo, txos []*wire.TxOut, nlt uint32) (*wire.MsgTx, error) {
-	var err error
 
 	if len(utxos) == 0 || len(txos) == 0 {
 		return nil, fmt.Errorf("BuildAndSign args no utxos or txos")
@@ -437,69 +523,7 @@ func (w *Wallit) BuildAndSign(
 	// sort txouts in place before signing.  txins are already sorted from above
 	txsort.InPlaceSort(tx)
 
-	// generate tx-wide hashCache for segwit stuff
-	// might not be needed (non-witness) but make it anyway
-	hCache := txscript.NewTxSigHashes(tx)
-	// make the stashes for signatures / witnesses
-	sigStash := make([][]byte, len(utxos))
-	witStash := make([][][]byte, len(utxos))
-
-	for i, _ := range tx.TxIn {
-		// get key
-		priv := w.PathPrivkey(utxos[i].KeyGen)
-		log.Printf("signing with privkey pub %x\n", priv.PubKey().SerializeCompressed())
-
-		if priv == nil {
-			return nil, fmt.Errorf("SendCoins: nil privkey")
-		}
-
-		// sign into stash.  3 possibilities:  legacy PKH, WPKH, WSH
-		if utxos[i].Mode == portxo.TxoP2PKHComp { // legacy PKH
-			sigStash[i], err = txscript.SignatureScript(tx, i,
-				utxos[i].PkScript, txscript.SigHashAll, priv, true)
-			if err != nil {
-				return nil, err
-			}
-		}
-		if utxos[i].Mode == portxo.TxoP2WPKHComp { // witness PKH
-			witStash[i], err = txscript.WitnessScript(tx, hCache, i,
-				utxos[i].Value, utxos[i].PkScript, txscript.SigHashAll, priv, true)
-			if err != nil {
-				return nil, err
-			}
-		}
-		if utxos[i].Mode == portxo.TxoP2WSHComp { // witness script hash
-			sig, err := txscript.RawTxInWitnessSignature(tx, hCache, i,
-				utxos[i].Value, utxos[i].PkScript, txscript.SigHashAll, priv)
-			if err != nil {
-				return nil, err
-			}
-			// witness stack has the signature, items, then the previous full script
-			witStash[i] = make([][]byte, 2+len(utxos[i].PreSigStack))
-
-			// sig comes first (pushed to stack last)
-			witStash[i][0] = sig
-
-			// after stack comes PostSigStack items
-			for j, element := range utxos[i].PreSigStack {
-				witStash[i][j+1] = element
-			}
-
-			// last stack item is the pkscript
-			witStash[i][len(witStash[i])-1] = utxos[i].PkScript
-		}
-
-	}
-	// swap sigs into sigScripts in txins
-	for i, txin := range tx.TxIn {
-		if sigStash[i] != nil {
-			txin.SignatureScript = sigStash[i]
-		}
-		if witStash[i] != nil {
-			txin.Witness = witStash[i]
-			txin.SignatureScript = nil
-		}
-	}
+	w.SignMyInputs(tx)
 
 	log.Printf("tx: %s", TxToString(tx))
 	return tx, nil
