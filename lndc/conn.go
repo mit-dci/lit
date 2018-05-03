@@ -307,7 +307,7 @@ func (c *LNDConn) Write(b []byte) (n int, err error) {
 	if err != nil {
 		return 0, err
 	}
-	if len(ctext) > 65530 {
+	if len(ctext) > maxMsgSize {
 		return 0, fmt.Errorf("Write to %x too long, %d bytes",
 			c.RemotePub.SerializeCompressed(), len(ctext))
 	}
