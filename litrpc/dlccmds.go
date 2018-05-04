@@ -267,6 +267,15 @@ type SetContractDivisionArgs struct {
 	ValueFullyTheirs int64
 }
 
+type SetContractFwdArgs struct {
+	CIdx uint64
+
+	ImBuyer bool
+
+	AssetQuantity int64
+	FundAmt       int64
+}
+
 type SetContractDivisionReply struct {
 	Success bool
 }

@@ -32,6 +32,33 @@ const (
 // scalarSize is the size of an encoded big endian scalar.
 const scalarSize = 32
 
+// DlcFwdOffer is a proposed contract that has not yet been accepted or funded
+// This is an offer for a specific contract template: it is a bitcoin (or other
+// coin) settled forward, which is symmetrically funded
+type DlcFwdOffer struct {
+	// Index of the contract for referencing in commands
+	Idx uint64
+	// Index of the peer offering to / from
+	PeerIdx uint32
+	// Coin type
+	CoinType uint32
+	// Pub keys of the oracle and the R point used in the contract
+	OracleA, OracleR [33]byte
+
+	// time of expected settlement
+	SettlementTime uint64
+	// if true, I'm the 'buyer' of the foward asset (and I'm short bitcoin)
+	ImBuyer bool
+	// amount of funding, in sats, each party contributes
+	FundAmt int64
+	// amount of asset to be delivered at settlement time
+	// note that initial price is FundAmt / AssetQuantity
+	AssetQuantity int64
+
+	// slice of my payouts for given oracle prices
+	Payouts []DlcContractDivision
+}
+
 // DlcContract is a struct containing all elements to work with a Discreet
 // Log Contract. This struct is stored in the database
 type DlcContract struct {
