@@ -52,6 +52,23 @@ type DlcOffer interface {
 	Bytes() []byte
 
 	IsAccepted() bool
+	SetAccepted()
+	// Creates a new contract from this offer
+	CreateContract() *DlcContract
+	// Checks if this offer is equal to the provided contract in terms
+	// of payout, oracle keys and settlement time. Used for auto-accepting
+	EqualsContract(c *DlcContract) bool
+}
+
+func DlcOfferFromBytes(b []byte) (DlcOffer, error) {
+	offerType := b[0] // first byte signifies what type of message is
+
+	switch offerType {
+	case OFFERTYPE_FORWARD:
+		return DlcFwdOfferFromBytes(b[1:])
+	default:
+		return nil, fmt.Errorf("Unknown offer of type %d ", offerType)
+	}
 }
 
 // DlcFwdOffer is an offer for a specific contract template: it is a bitcoin (or other
@@ -182,16 +199,58 @@ func (o *DlcFwdOffer) SetIdx(idx uint64) { o.OIdx = idx }
 func (o *DlcFwdOffer) TheirIdx() uint64  { return o.TheirOIdx }
 func (o *DlcFwdOffer) Peer() uint32      { return o.PeerIdx }
 func (o *DlcFwdOffer) IsAccepted() bool  { return o.Accepted }
+func (o *DlcFwdOffer) SetAccepted()      { o.Accepted = true }
+func (o *DlcFwdOffer) CreateContract() *DlcContract {
+	c := new(DlcContract)
 
-func DlcOfferFromBytes(b []byte) (DlcOffer, error) {
-	offerType := b[0] // first byte signifies what type of message is
+	c.CoinType = o.CoinType
+	c.OracleA = o.OracleA
+	c.OracleR = o.OracleR
+	c.OracleTimestamp = o.SettlementTime
+	BuildPayouts(o)
+	c.Division = o.Payouts
+	c.Status = ContractStatusDraft
+	c.OurFundingAmount = o.FundAmt
+	c.TheirFundingAmount = o.FundAmt
+	return c
+}
+func (o *DlcFwdOffer) EqualsContract(c *DlcContract) bool {
+	return true
+}
 
-	switch offerType {
-	case OFFERTYPE_FORWARD:
-		return DlcFwdOfferFromBytes(b[1:])
-	default:
-		return nil, fmt.Errorf("Unknown offer of type %d ", offerType)
+// Build payouts populates the payout schedule for a forward offer
+func BuildPayouts(o *DlcFwdOffer) error {
+
+	var price, maxPrice, oracleStep int64
+
+	// clear out payout schedule just in case one's already there
+	o.Payouts = make([]DlcContractDivision, 0)
+
+	// use a coarse oracle that rounds asset prices to the neares 100 satoshis
+	// the oracle must also use the same price stepping
+	oracleStep = 100
+	// max out at 100K (corresponds to asset price of 1000 per bitcoin)
+	// this is very ugly to hard-code here but we can leave it until we implement
+	// a more complex oracle price signing, such as base/mantissa.
+	maxPrice = 100000
+
+	for price = 0; price <= maxPrice; price += oracleStep {
+		var div DlcContractDivision
+		div.OracleValue = price
+		// generally, the buyer gets the asset quantity times the oracle's price
+		div.ValueOurs = o.AssetQuantity * price
+		// if that exceeds total contract funds, they get everything
+		if div.ValueOurs > o.FundAmt*2 {
+			div.ValueOurs = o.FundAmt * 2
+		}
+		if !o.ImBuyer {
+			// if I am the seller, instead I get whatever is left (which could be 0)
+			div.ValueOurs = (o.FundAmt * 2) - div.ValueOurs
+		}
+		o.Payouts = append(o.Payouts, div)
 	}
+
+	return nil
 }
 
 // DlcContract is a struct containing all elements to work with a Discreet

@@ -84,6 +84,8 @@ func (nd *LitNode) DlcAcceptDraftOffer(oIdx uint64) error {
 	if err != nil {
 		return err
 	}
+	o.SetAccepted()
+	nd.DlcManager.SaveOffer(o)
 
 	msg := lnutil.NewDlcDraftOfferAcceptMsg(o.Peer(), o.TheirIdx())
 
@@ -106,6 +108,14 @@ func (nd *LitNode) DlcDraftOfferDeclineHandler(msg lnutil.DlcDraftOfferDeclineMs
 func (nd *LitNode) DlcDraftOfferAcceptHandler(msg lnutil.DlcDraftOfferAcceptMsg, peer *RemotePeer) error {
 
 	// Create contract matching the offer and send it to the peer.
+	o, err := nd.DlcManager.LoadOffer(msg.Idx)
+	if err != nil {
+		return err
+	}
+
+	c := o.CreateContract()
+	nd.DlcManager.SaveContract(c)
+	nd.OfferDlc(o.Peer(), c.Idx)
 
 	// Finally, drop the offer since it's been accepted, and converted
 	// into a contract. We no longer need it.
@@ -327,6 +337,25 @@ func (nd *LitNode) DlcOfferHandler(msg lnutil.DlcOfferMsg, peer *RemotePeer) {
 	if !ok {
 		// We don't have this coin type, automatically decline
 		nd.DeclineDlc(c.Idx, 0x02)
+	}
+
+	// If there is a known, accepted offer in our data matching the same
+	// Oracle and payout data, then we can accept it automatically.
+	offers, err := nd.DlcManager.ListOffers()
+	if err != nil {
+		fmt.Printf("DlcOfferHandler ListOffers err %s\n", err.Error())
+		return
+	}
+
+	for _, o := range offers {
+		if o.IsAccepted() {
+			if o.EqualsContract(c) {
+				fmt.Printf("Auto accepting contract %d based on offer %d", c.Idx, o.Idx())
+				nd.AcceptDlc(c.Idx)
+				nd.DlcManager.DeleteOffer(o.Idx())
+				break
+			}
+		}
 	}
 
 }
