@@ -53,6 +53,9 @@ const (
 	MSGID_DLC_CONTRACTACK         = 0x93 // Acknowledge an acceptance
 	MSGID_DLC_CONTRACTFUNDINGSIGS = 0x94 // Funding signatures
 	MSGID_DLC_SIGPROOF            = 0x95 // Sigproof
+	MSGID_DLC_DRAFTOFFER          = 0x96 // Draft offer
+	MSGID_DLC_DECLINEDRAFTOFFER   = 0x97 // Draft offer decline
+	MSGID_DLC_ACCEPTDRAFTOFFER    = 0x98 // Draft offer accept
 )
 
 //interface that all messages follow, for easy use
@@ -135,6 +138,12 @@ func LitMsgFromBytes(b []byte, peerid uint32) (LitMsg, error) {
 		return NewDlcContractFundingSigsMsgFromBytes(b, peerid)
 	case MSGID_DLC_SIGPROOF:
 		return NewDlcContractSigProofMsgFromBytes(b, peerid)
+	case MSGID_DLC_DRAFTOFFER:
+		return NewDlcDraftOfferMsgFromBytes(b, peerid)
+	case MSGID_DLC_ACCEPTDRAFTOFFER:
+		return NewDlcDraftOfferAcceptMsgFromBytes(b, peerid)
+	case MSGID_DLC_DECLINEDRAFTOFFER:
+		return NewDlcDraftOfferDeclineMsgFromBytes(b, peerid)
 
 	default:
 		return nil, fmt.Errorf("Unknown message of type %d ", msgType)
@@ -957,6 +966,139 @@ func (self LinkMsg) Bytes() []byte {
 
 func (self LinkMsg) Peer() uint32   { return self.PeerIdx }
 func (self LinkMsg) MsgType() uint8 { return MSGID_LINK_DESC }
+
+// DlcDraftOfferMsg is the message we send to a peer to offer that peer a
+// particular contract offer (DlcOffer). This is not yet a draft contract, but
+// describes parameters to a specific offer type (currently only a forward)
+type DlcDraftOfferMsg struct {
+	PeerIdx uint32
+	Offer   DlcOffer
+}
+
+// NewDlcOfferMsg creates a new DlcOfferMsg based on a peer and contract
+func NewDlcDraftOfferMsg(peerIdx uint32, offer DlcOffer) DlcDraftOfferMsg {
+	msg := new(DlcDraftOfferMsg)
+	msg.PeerIdx = peerIdx
+	msg.Offer = offer
+	return *msg
+}
+
+// NewDlcOfferMsgFromBytes parses a byte array back into a DlcOfferMsg
+func NewDlcDraftOfferMsgFromBytes(b []byte, peerIDX uint32) (DlcDraftOfferMsg, error) {
+	sm := new(DlcDraftOfferMsg)
+	sm.PeerIdx = peerIDX
+	sm.Offer, _ = DlcOfferFromBytes(b[1:])
+	return *sm, nil
+}
+
+// Bytes serializes a DlcOfferMsg into a byte array
+func (msg DlcDraftOfferMsg) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.WriteByte(msg.MsgType())
+	buf.Write(msg.Offer.Bytes())
+
+	return buf.Bytes()
+}
+
+func (self DlcDraftOfferMsg) Peer() uint32   { return self.PeerIdx }
+func (self DlcDraftOfferMsg) MsgType() uint8 { return MSGID_DLC_DRAFTOFFER }
+
+type DlcDraftOfferDeclineMsg struct {
+	PeerIdx uint32
+	Idx     uint64 // The contract we are declining
+}
+
+// NewDlcDraftOfferDeclineMsg creates a new DlcOfferDeclineMsg based on a peer, a
+// reason for declining and the index of the contract we're declining
+func NewDlcDraftOfferDeclineMsg(peerIdx uint32, theirIdx uint64) DlcDraftOfferDeclineMsg {
+	msg := new(DlcDraftOfferDeclineMsg)
+	msg.PeerIdx = peerIdx
+	msg.Idx = theirIdx
+	return *msg
+}
+
+// NewDlcDraftOfferDeclineMsgFromBytes deserializes a byte array into a
+// DlcDraftOfferDeclineMsg
+func NewDlcDraftOfferDeclineMsgFromBytes(b []byte,
+	peerIdx uint32) (DlcDraftOfferDeclineMsg, error) {
+
+	msg := new(DlcDraftOfferDeclineMsg)
+	msg.PeerIdx = peerIdx
+
+	if len(b) < 2 {
+		return *msg, fmt.Errorf("DlcOfferDeclineMsg %d bytes, expect at"+
+			" least 2", len(b))
+	}
+
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
+	msg.Idx, _ = wire.ReadVarInt(buf, 0)
+
+	return *msg, nil
+}
+
+// Bytes serializes a DlcOfferDeclineMsg into a byte array
+func (msg DlcDraftOfferDeclineMsg) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.WriteByte(msg.MsgType())
+	wire.WriteVarInt(&buf, 0, msg.Idx)
+	return buf.Bytes()
+}
+
+// Peer returns the peer index this message was received from/sent to
+func (msg DlcDraftOfferDeclineMsg) Peer() uint32 { return msg.PeerIdx }
+
+// MsgType returns the type of this message
+func (msg DlcDraftOfferDeclineMsg) MsgType() uint8 { return MSGID_DLC_DECLINEDRAFTOFFER }
+
+type DlcDraftOfferAcceptMsg struct {
+	PeerIdx uint32
+	Idx     uint64 // The contract we are accepting
+}
+
+// NewDlcDraftOfferAcceptMsg creates a new DlcOfferAcceptMsg based on a peer and
+// the index of the contract we're accepting
+func NewDlcDraftOfferAcceptMsg(peerIdx uint32, theirIdx uint64) DlcDraftOfferAcceptMsg {
+	msg := new(DlcDraftOfferAcceptMsg)
+	msg.PeerIdx = peerIdx
+	msg.Idx = theirIdx
+	return *msg
+}
+
+// NewDlcDraftOfferAcceptMsgFromBytes deserializes a byte array into a
+// DlcDraftOfferAcceptMsg
+func NewDlcDraftOfferAcceptMsgFromBytes(b []byte,
+	peerIdx uint32) (DlcDraftOfferAcceptMsg, error) {
+
+	msg := new(DlcDraftOfferAcceptMsg)
+	msg.PeerIdx = peerIdx
+
+	if len(b) < 2 {
+		return *msg, fmt.Errorf("DlcOfferAcceptMsg %d bytes, expect at"+
+			" least 2", len(b))
+	}
+
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
+	msg.Idx, _ = wire.ReadVarInt(buf, 0)
+
+	return *msg, nil
+}
+
+// Bytes serializes a DlcOfferAcceptMsg into a byte array
+func (msg DlcDraftOfferAcceptMsg) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.WriteByte(msg.MsgType())
+	wire.WriteVarInt(&buf, 0, msg.Idx)
+	return buf.Bytes()
+}
+
+// Peer returns the peer index this message was received from/sent to
+func (msg DlcDraftOfferAcceptMsg) Peer() uint32 { return msg.PeerIdx }
+
+// MsgType returns the type of this message
+func (msg DlcDraftOfferAcceptMsg) MsgType() uint8 { return MSGID_DLC_ACCEPTDRAFTOFFER }
 
 // DlcOfferMsg is the message we send to a peer to offer that peer a
 // particular contract

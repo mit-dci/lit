@@ -98,6 +98,101 @@ func (r *LitRPC) NewContract(args NewContractArgs,
 	return nil
 }
 
+type NewForwardOfferArgs struct {
+	Offer *lnutil.DlcFwdOffer
+}
+
+type NewForwardOfferReply struct {
+	Offer *lnutil.DlcFwdOffer
+}
+
+// NewForwardOffer creates a new offer (before the draft contract) of a
+// Forward contract
+func (r *LitRPC) NewForwardOffer(args NewForwardOfferArgs,
+	reply *NewForwardOfferReply) error {
+
+	err := r.Node.DlcManager.SaveOffer(args.Offer)
+	if err != nil {
+		return err
+	}
+
+	reply.Offer = args.Offer
+	err = r.Node.DlcSendDraftOffer(reply.Offer.Idx())
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type ListOffersArgs struct {
+	// none
+}
+
+type ListOffersReply struct {
+	Offers []lnutil.DlcOffer
+}
+
+// NewForwardOffer creates a new offer (before the draft contract) of a
+// Forward contract
+func (r *LitRPC) ListOffers(args ListOffersArgs,
+	reply *ListOffersReply) error {
+
+	offers, err := r.Node.DlcManager.ListOffers()
+	if err != nil {
+		return err
+	}
+
+	reply.Offers = offers
+
+	return nil
+}
+
+type DeclineOfferArgs struct {
+	OIdx uint64
+}
+
+type DeclineOfferReply struct {
+	Success bool
+}
+
+// NewForwardOffer creates a new offer (before the draft contract) of a
+// Forward contract
+func (r *LitRPC) DeclineOffer(args DeclineOfferArgs,
+	reply *DeclineOfferReply) error {
+
+	err := r.Node.DlcDeclineDraftOffer(args.OIdx)
+	if err != nil {
+		return err
+	}
+
+	reply.Success = true
+
+	return nil
+}
+
+type AcceptOfferArgs struct {
+	OIdx uint64
+}
+
+type AcceptOfferReply struct {
+	Success bool
+}
+
+// NewForwardOffer creates a new offer (before the draft contract) of a
+// Forward contract
+func (r *LitRPC) AcceptOffer(args AcceptOfferArgs,
+	reply *AcceptOfferReply) error {
+
+	err := r.Node.DlcAcceptDraftOffer(args.OIdx)
+	if err != nil {
+		return err
+	}
+
+	reply.Success = true
+
+	return nil
+}
+
 type ListContractsArgs struct {
 	// none
 }

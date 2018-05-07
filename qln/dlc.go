@@ -25,6 +25,96 @@ func (nd *LitNode) AddContract() (*lnutil.DlcContract, error) {
 	return c, nil
 }
 
+func (nd *LitNode) DlcSendDraftOffer(oIdx uint64) error {
+	fmt.Printf("Loading Offer: %d\n", oIdx)
+
+	o, err := nd.DlcManager.LoadOffer(oIdx)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Creating new msg from Offer: %d\n", o.Idx())
+
+	msg := lnutil.NewDlcDraftOfferMsg(o.Peer(), o)
+
+	fmt.Printf("Sending offer\n")
+	nd.OmniOut <- msg
+
+	return nil
+}
+
+func (nd *LitNode) DlcDraftOfferHandler(msg lnutil.DlcDraftOfferMsg, peer *RemotePeer) error {
+
+	switch msg.Offer.OfferType() {
+	case lnutil.OFFERTYPE_FORWARD:
+		var fwdOffer = msg.Offer.(*lnutil.DlcFwdOffer)
+		// Reverse fields
+		fwdOffer.ImBuyer = !fwdOffer.ImBuyer
+		fwdOffer.TheirOIdx = fwdOffer.OIdx
+		fwdOffer.OIdx = 0
+		err := nd.DlcManager.SaveOffer(fwdOffer)
+		if err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("Received unknown offer type %d\n", msg.Offer.OfferType())
+	}
+
+	return nil
+
+}
+
+func (nd *LitNode) DlcDeclineDraftOffer(oIdx uint64) error {
+	o, err := nd.DlcManager.LoadOffer(oIdx)
+	if err != nil {
+		return err
+	}
+
+	msg := lnutil.NewDlcDraftOfferDeclineMsg(o.Peer(), o.TheirIdx())
+
+	nd.OmniOut <- msg
+
+	nd.DlcManager.DeleteOffer(oIdx)
+
+	return nil
+}
+
+func (nd *LitNode) DlcAcceptDraftOffer(oIdx uint64) error {
+	o, err := nd.DlcManager.LoadOffer(oIdx)
+	if err != nil {
+		return err
+	}
+
+	msg := lnutil.NewDlcDraftOfferAcceptMsg(o.Peer(), o.TheirIdx())
+
+	nd.OmniOut <- msg
+
+	return nil
+}
+
+func (nd *LitNode) DlcDraftOfferDeclineHandler(msg lnutil.DlcDraftOfferDeclineMsg, peer *RemotePeer) error {
+
+	fmt.Printf("Received decline for offer: %d\n", msg.Idx)
+
+	// Drop the offer since it's been declined, we no longer need it.
+	nd.DlcManager.DeleteOffer(msg.Idx)
+
+	return nil
+
+}
+
+func (nd *LitNode) DlcDraftOfferAcceptHandler(msg lnutil.DlcDraftOfferAcceptMsg, peer *RemotePeer) error {
+
+	// Create contract matching the offer and send it to the peer.
+
+	// Finally, drop the offer since it's been accepted, and converted
+	// into a contract. We no longer need it.
+	nd.DlcManager.DeleteOffer(msg.Idx)
+
+	return nil
+
+}
+
 func (nd *LitNode) OfferDlc(peerIdx uint32, cIdx uint64) error {
 	c, err := nd.DlcManager.LoadContract(cIdx)
 	if err != nil {
