@@ -51,6 +51,7 @@ func (nd *LitNode) DlcDraftOfferHandler(msg lnutil.DlcDraftOfferMsg, peer *Remot
 		// Reverse fields
 		fwdOffer.ImBuyer = !fwdOffer.ImBuyer
 		fwdOffer.TheirOIdx = fwdOffer.OIdx
+		fwdOffer.PeerIdx = peer.Idx
 		fwdOffer.OIdx = 0
 		err := nd.DlcManager.SaveOffer(fwdOffer)
 		if err != nil {
