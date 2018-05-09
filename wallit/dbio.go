@@ -64,35 +64,44 @@ func (w *Wallit) AddPorTxoAdr(kg portxo.KeyGen) error {
 	})
 }
 
+// getNumberOfKeys retrieves the number of p2pkh keys in the database and check whether
+// the maximum number of keys was reach or not.
+func (w *Wallit) GetNumberOfKeys() (uint32, error) {
+	// Could be placed somewhere else, perhaps it's conf ?
+	var maxKeys = uint32(1 << 20) // the reasonable limit of addresses belonging to one Wallit
+	var numKeys uint32 = 0
+
+	err := w.StateDB.View(func(btx *bolt.Tx) error {
+		sta := btx.Bucket(BKTState)
+
+		if sta == nil {
+			return fmt.Errorf("no state bucket")
+		}
+		numKeys = lnutil.BtU32(sta.Get(KEYNumKeys))
+
+		return nil
+	})
+	if err == nil && numKeys > maxKeys {
+		err = fmt.Errorf("got %d keys stored, expect something reasonable", numKeys)
+	}
+
+	return numKeys, err
+}
+
 // AdrDump returns all the addresses in the wallit.
 // currently returns 20 byte arrays, which
 // can then be converted somewhere else into bech32 addresses (or old base58)
 func (w *Wallit) AdrDump() ([][20]byte, error) {
-	var i, last uint32 // number of addresses made so far
 	var adrSlice [][20]byte
 
-	err := w.StateDB.View(func(btx *bolt.Tx) error {
-		sta := btx.Bucket(BKTState)
-		if sta == nil {
-			return fmt.Errorf("no state bucket")
-		}
-
-		oldNBytes := sta.Get(KEYNumKeys)
-		last = lnutil.BtU32(oldNBytes)
-		// update the db with number of created keys
-		return nil
-	})
+	numKeys, err := w.GetNumberOfKeys()
 	if err != nil {
 		return nil, err
 	}
-
-	if last > 1<<20 {
-		return nil, fmt.Errorf("Got %d keys stored, expect something reasonable", last)
-	}
-
+	// update the db with number of created keys
 	// TODO: maybe store address hashes instead of recomputing them
 	// can speed things up a lot here, at a pretty small disk cost
-	for i = 0; i < last; i++ {
+	for i := uint32(0); i < numKeys; i++ {
 		nKg := GetWalletKeygen(i, w.Param.HDCoinType)
 		nAdr160 := w.PathPubHash160(nKg)
 
@@ -110,35 +119,22 @@ func (w *Wallit) NewAdr160() ([20]byte, error) {
 		return empty160, fmt.Errorf("NewAdr error: nil param")
 	}
 
-	var n uint32 // number of addresses made so far
-
-	err = w.StateDB.View(func(btx *bolt.Tx) error {
-		sta := btx.Bucket(BKTState)
-		if sta == nil {
-			return fmt.Errorf("no state bucket")
-		}
-
-		oldNBytes := sta.Get(KEYNumKeys)
-		n = lnutil.BtU32(oldNBytes)
-		// update the db with number of created keys
-		return nil
-	})
-	if n > 1<<30 {
-		return empty160, fmt.Errorf("Got %d keys stored, expect something reasonable", n)
+	numKeys, err := w.GetNumberOfKeys()
+	if err != nil {
+		return empty160, err
 	}
-
-	nKg := GetWalletKeygen(n, w.Param.HDCoinType)
+	nKg := GetWalletKeygen(numKeys, w.Param.HDCoinType)
 	nAdr160 := w.PathPubHash160(nKg)
 
 	if nAdr160 == empty160 {
 		return empty160, fmt.Errorf("NewAdr error: got nil h160")
 	}
-	log.Printf("adr %d hash is %x\n", n, nAdr160)
+	log.Printf("adr %d hash is %x\n", numKeys, nAdr160)
 
 	kgBytes := nKg.Bytes()
 
 	// total number of keys (now +1) into 4 bytes
-	nKeyNumBytes := lnutil.U32tB(n + 1)
+	nKeyNumBytes := lnutil.U32tB(numKeys + 1)
 
 	// write to db file
 	err = w.StateDB.Update(func(btx *bolt.Tx) error {

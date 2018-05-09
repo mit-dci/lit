@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"io"
 
 	"github.com/adiabat/btcd/chaincfg/chainhash"
 	"github.com/adiabat/btcd/wire"
@@ -380,7 +381,7 @@ func (s *SPVCon) AskForBlocks() error {
 		// load header from file
 		s.headerMutex.Lock() // seek to header we need
 		_, err = s.headerFile.Seek(
-			int64((reqHeight-s.headerStartHeight)*80), os.SEEK_SET)
+			int64((reqHeight-s.headerStartHeight)*80), io.SeekStart)
 		if err != nil {
 			return err
 		}
