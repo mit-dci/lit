@@ -305,63 +305,6 @@ func (r *LitRPC) SetContractRPoint(args SetContractRPointArgs,
 	return nil
 }
 
-type SetContractSettlementTimeArgs struct {
-	CIdx uint64
-	Time uint64
-}
-
-type SetContractSettlementTimeReply struct {
-	Success bool
-}
-
-// SetContractSettlementTime sets the time this contract will settle (the
-// unix epoch)
-func (r *LitRPC) SetContractSettlementTime(args SetContractSettlementTimeArgs,
-	reply *SetContractSettlementTimeReply) error {
-	var err error
-
-	err = r.Node.DlcManager.SetContractSettlementTime(args.CIdx, args.Time)
-	if err != nil {
-		return err
-	}
-
-	reply.Success = true
-	return nil
-}
-
-type SetContractFundingArgs struct {
-	CIdx        uint64
-	OurAmount   int64
-	TheirAmount int64
-}
-
-type SetContractFundingReply struct {
-	Success bool
-}
-
-// SetContractFunding sets the division in funding the channel. The arguments
-// decide how much we're funding and how much we expect the peer we offer the
-// contract to to fund
-func (r *LitRPC) SetContractFunding(args SetContractFundingArgs,
-	reply *SetContractFundingReply) error {
-	var err error
-
-	err = r.Node.DlcManager.SetContractFunding(args.CIdx,
-		args.OurAmount, args.TheirAmount)
-	if err != nil {
-		return err
-	}
-
-	reply.Success = true
-	return nil
-}
-
-type SetContractDivisionArgs struct {
-	CIdx             uint64
-	ValueFullyOurs   int64
-	ValueFullyTheirs int64
-}
-
 type SetContractFwdArgs struct {
 	CIdx uint64
 
@@ -371,49 +314,39 @@ type SetContractFwdArgs struct {
 	FundAmt       int64
 }
 
-type SetContractDivisionReply struct {
-	Success bool
-}
-
-// SetContractDivision sets how the contract is settled. The parameters indicate
-// at what value the full contract funds are ours, and at what value they are
-// full funds are for our peer. Between those values, the contract will divide
-// the contract funds linearly
-func (r *LitRPC) SetContractDivision(args SetContractDivisionArgs,
-	reply *SetContractDivisionReply) error {
-	var err error
-
-	err = r.Node.DlcManager.SetContractDivision(args.CIdx,
-		args.ValueFullyOurs, args.ValueFullyTheirs)
-	if err != nil {
-		return err
-	}
-
-	reply.Success = true
-	return nil
-}
-
-type SetContractCoinTypeArgs struct {
-	CIdx     uint64
+type SetContractFundingAndDivisionArgs struct {
+	CIdx             uint64
+	OurAmount        int64
+	TheirAmount      int64
+	ValueFullyOurs   int64
+	ValueFullyTheirs int64
+	Time             uint64
 	CoinType uint32
 }
 
-type SetContractCoinTypeReply struct {
+type SetContractFundingAndDivisionReply struct {
 	Success bool
 }
 
-// SetContractCoinType sets the coin type the contract will be in. Note that a
+// SetContractFundingAndDivision sets the arguments which decide how much we're
+// funding and how much we expect the peer we offer the contract to to fund.
+// It also sets how the contract is settled. The parameters indicate
+// at what value the full contract funds are ours, and at what value they are
+// full funds are for our peer. Between those values, the contract will divide
+// the contract funds linearly
+// ContractCoinType sets the coin type the contract will be in. Note that a
 // peer that doesn't have a wallet of that type will automatically decline the
 // contract.
-func (r *LitRPC) SetContractCoinType(args SetContractCoinTypeArgs,
-	reply *SetContractCoinTypeReply) error {
-	var err error
 
-	err = r.Node.DlcManager.SetContractCoinType(args.CIdx, args.CoinType)
+func (r *LitRPC) SetContractFundingAndDivision(args SetContractFundingAndDivisionArgs,
+	reply *SetContractFundingAndDivisionReply) error {
+	var err error
+	err = r.Node.DlcManager.SetContractFundingAndDivision(args.CIdx,
+		args.OurAmount, args.TheirAmount, args.ValueFullyOurs,
+		args.ValueFullyTheirs, args.Time, args.CoinType)
 	if err != nil {
 		return err
 	}
-
 	reply.Success = true
 	return nil
 }

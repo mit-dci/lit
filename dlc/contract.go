@@ -53,28 +53,6 @@ func (mgr *DlcManager) SetContractOracle(cIdx, oIdx uint64) error {
 	return nil
 }
 
-// SetContractSettlementTime sets the unix epoch at which the oracle will sign a
-// message containing the value the contract pays out on.
-func (mgr *DlcManager) SetContractSettlementTime(cIdx, time uint64) error {
-	c, err := mgr.LoadContract(cIdx)
-	if err != nil {
-		return err
-	}
-
-	if c.Status != lnutil.ContractStatusDraft {
-		return fmt.Errorf("You cannot change or set the settlement time" +
-			" unless the contract is in Draft state")
-	}
-
-	c.OracleTimestamp = time
-
-	// Reset the R point
-	c.OracleR = [33]byte{}
-
-	mgr.SaveContract(c)
-
-	return nil
-}
 
 // SetContractDatafeed will automatically fetch the R-point from the REST API,
 // if an oracle is imported from a REST API. You need to set the settlement time
@@ -135,45 +113,31 @@ func (mgr *DlcManager) SetContractRPoint(cIdx uint64, rPoint [33]byte) error {
 	return nil
 }
 
-// SetContractFunding sets the funding to the contract. It will specify how much
-// we (the offering party) are funding, as well as
-func (mgr *DlcManager) SetContractFunding(cIdx uint64, our, their int64) error {
+// SetContractFundingAndDivision sets the funding and division parameters
+// to the contract. It will specify how much
+// we (the offering party) are willing to fund, as well as what they are.
+// It also sets the division of the contract settlement ie if the
+// oraclized value is valueAllOurs, then the entire value of the contract is
+// payable to us. If the oraclized value is valueAllTheirs, then the entire
+// value is paid to our peer. Between those, the value is divided linearly.
+
+func (mgr *DlcManager) SetContractFundingAndDivision(cIdx uint64, our, their,
+	valueAllOurs, valueAllTheirs int64, time uint64, cointype uint32) error {
 	c, err := mgr.LoadContract(cIdx)
 	if err != nil {
 		return err
 	}
-
 	if c.Status != lnutil.ContractStatusDraft {
 		return fmt.Errorf("You cannot change or set the funding unless the" +
 			" contract is in Draft state")
 	}
 
+	c.CoinType = cointype
 	c.OurFundingAmount = our
 	c.TheirFundingAmount = their
-
-	// If the funding changes, the division needs to be re-set.
-	c.Division = nil
-
-	mgr.SaveContract(c)
-
-	return nil
-}
-
-// SetContractDivision sets the division of the contract settlement. If the
-// oraclized value is valueAllOurs, then the entire value of the contract is
-// payable to us. If the oraclized value is valueAllTheirs, then the entire
-// value is paid to our peer. Between those, the value is divided linearly.
-func (mgr *DlcManager) SetContractDivision(cIdx uint64,
-	valueAllOurs, valueAllTheirs int64) error {
-	c, err := mgr.LoadContract(cIdx)
-	if err != nil {
-		return err
-	}
-
-	if c.Status != lnutil.ContractStatusDraft {
-		return fmt.Errorf("You cannot change or set the division unless" +
-			" the contract is in Draft state")
-	}
+	c.OracleTimestamp = time
+	c.OracleR = [33]byte{} // Reset the R point
+	c.Division = nil // If the funding changes, the division needs to be re-set.
 
 	rangeMin := valueAllTheirs - (valueAllOurs - valueAllTheirs)
 	rangeMax := valueAllOurs + (valueAllOurs - valueAllTheirs)
@@ -221,26 +185,7 @@ func (mgr *DlcManager) SetContractDivision(cIdx uint64,
 		}
 
 	}
-	mgr.SaveContract(c)
-
-	return nil
-}
-
-// SetContractCoinType sets the cointype for a particular contract
-func (mgr *DlcManager) SetContractCoinType(cIdx uint64, cointype uint32) error {
-	c, err := mgr.LoadContract(cIdx)
-	if err != nil {
-		return err
-	}
-
-	if c.Status != lnutil.ContractStatusDraft {
-		return fmt.Errorf("You cannot change or set the coin type unless" +
-			" the contract is in Draft state")
-	}
-
-	c.CoinType = cointype
 
 	mgr.SaveContract(c)
-
 	return nil
 }
