@@ -83,7 +83,7 @@ var addOracleCommand = &Command{
 var contractCommand = &Command{
 	Format: fmt.Sprintf("%s%s%s\n", lnutil.White("dlc contract"),
 		lnutil.ReqColor("subcommand"), lnutil.OptColor("parameters...")),
-	Description: fmt.Sprintf("%s\n%s\n%s\n%s\n%s\n%s\n"+
+	Description: fmt.Sprintf("%s\n%s\n%s\n%s\n%s\n"+
 		"%s\n%s\n%s\n%s\n%s\n%s\n",
 		"Command for managing contracts. Subcommand can be one of:",
 		fmt.Sprintf("%-20s %s",
@@ -93,15 +93,11 @@ var contractCommand = &Command{
 			lnutil.White("view"),
 			"Views a contract"),
 		fmt.Sprintf("%-20s %s",
-			lnutil.White("setparams"),
-			"Sets the funding, division, settlement time and cointype " +
-			"parameters for a new contract"),
-		fmt.Sprintf("%-20s %s",
 			lnutil.White("viewpayout"),
 			"Views the payout table of a contract"),
 		fmt.Sprintf("%-20s %s",
-			lnutil.White("setoracle"),
-			"Sets a contract to use a particular oracle"),
+			lnutil.White("setparams"),
+			"Sets the parameters for a new contract"),
 		fmt.Sprintf("%-20s %s",
 			lnutil.White("setdatafeed"),
 			"Sets the data feed to use, will fetch the R point"),
@@ -170,21 +166,6 @@ var viewContractPayoutCommand = &Command{
 	ShortDescription: "Views the payout table of a contract\n",
 }
 
-var setContractOracleCommand = &Command{
-	Format: fmt.Sprintf("%s%s\n", lnutil.White("dlc contract setoracle"),
-		lnutil.ReqColor("cid", "oid")),
-	Description: fmt.Sprintf("%s\n%s\n%s\n",
-		"Configures a contract for using a specific oracle",
-		fmt.Sprintf("%-10s %s",
-			lnutil.White("cid"),
-			"The ID of the contract"),
-		fmt.Sprintf("%-10s %s",
-			lnutil.White("oid"),
-			"The ID of the oracle"),
-	),
-	ShortDescription: "Configures a contract for using a specific oracle\n",
-}
-
 var setContractDatafeedCommand = &Command{
 	Format: fmt.Sprintf("%s%s\n", lnutil.White("dlc contract setdatafeed"),
 		lnutil.ReqColor("cid", "feed")),
@@ -215,16 +196,19 @@ var setContractRPointCommand = &Command{
 	ShortDescription: "Sets the R point to use for the contract\n",
 }
 
-var SetContractFundingAndDivisionCommand = &Command{
+var SetContractParamsCommand = &Command{
 	Format: fmt.Sprintf("%s%s\n", lnutil.White("dlc contract setparams"),
-		lnutil.ReqColor("cid", "ourAmount", "theirAmount", "valueAllForUs", "valueAllForThem", "time")),
-	Description: fmt.Sprintf("%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n",
-		"Sets the amounts both parties in the contract will fund and"+
-			"the values of the oracle data that will result in the full"+
-			"contract funds being paid to either peer",
+		lnutil.ReqColor("cid", "cointype", "ourAmount", "theirAmount", "valueAllForUs", "valueAllForThem", "time")),
+	Description: fmt.Sprintf("%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n",
+		"Sets the various parameters of a draft contract: " +
+		"The cointype, the amounts funded by us and the counterparty, " +
+		"the outcomes entitling full payouts, the settlement time and the oracle\n",
 		fmt.Sprintf("%-10s %s",
 			lnutil.White("cid"),
 			"The ID of the contract"),
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("cointype"),
+			"The ID of the coin type to use for the contract"),
 		fmt.Sprintf("%-10s %s",
 			lnutil.White("ourAmount"),
 			"The amount we will fund"),
@@ -243,8 +227,8 @@ var SetContractFundingAndDivisionCommand = &Command{
 			lnutil.White("time"),
 			"The settlement time (unix timestamp)"),
 		fmt.Sprintf("%-10s %s",
-			lnutil.White("cointype"),
-			"The ID of the coin type to use for the contract"),
+			lnutil.White("oid"),
+			"The ID of the oracle"),
 	),
 	ShortDescription: "Sets the amount both parties will fund along with" +
 		"the edge values for dividing the funds, the settlement time stamp\n" +
@@ -438,10 +422,6 @@ func (lc *litAfClient) DlcContract(textArgs []string) error {
 		return lc.DlcViewContractPayout(textArgs[1:])
 	}
 
-	if len(textArgs) > 0 && textArgs[0] == "setoracle" {
-		return lc.DlcSetContractOracle(textArgs[1:])
-	}
-
 	if len(textArgs) > 0 && textArgs[0] == "setdatafeed" {
 		return lc.DlcSetContractDatafeed(textArgs[1:])
 	}
@@ -451,7 +431,7 @@ func (lc *litAfClient) DlcContract(textArgs []string) error {
 	}
 
 	if len(textArgs) > 0 && textArgs[0] == "setparams" {
-		return lc.DlcSetContractFundingAndDivision(textArgs[1:])
+		return lc.DlcSetContractParams(textArgs[1:])
 	}
 
 	if len(textArgs) > 0 && textArgs[0] == "offer" {
@@ -577,41 +557,6 @@ func (lc *litAfClient) DlcViewContractPayout(textArgs []string) error {
 	return nil
 }
 
-func (lc *litAfClient) DlcSetContractOracle(textArgs []string) error {
-	if len(textArgs) > 0 && textArgs[0] == "help" {
-		fmt.Fprintf(color.Output, setContractOracleCommand.Format)
-		fmt.Fprintf(color.Output, setContractOracleCommand.Description)
-		return nil
-	}
-
-	if len(textArgs) < 2 {
-		return fmt.Errorf(setContractOracleCommand.Format)
-	}
-
-	args := new(litrpc.SetContractOracleArgs)
-	reply := new(litrpc.SetContractOracleReply)
-
-	cIdx, err := strconv.ParseUint(textArgs[0], 10, 64)
-	if err != nil {
-		return err
-	}
-	oIdx, err := strconv.ParseUint(textArgs[1], 10, 64)
-	if err != nil {
-		return err
-	}
-	args.CIdx = cIdx
-	args.OIdx = oIdx
-
-	err = lc.rpccon.Call("LitRPC.SetContractOracle", args, reply)
-	if err != nil {
-		return err
-	}
-
-	fmt.Fprint(color.Output, "Oracle set succesfully\n")
-
-	return nil
-}
-
 func (lc *litAfClient) DlcSetContractDatafeed(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "help" {
 		fmt.Fprintf(color.Output, setContractDatafeedCommand.Format)
@@ -682,63 +627,72 @@ func (lc *litAfClient) DlcSetContractRPoint(textArgs []string) error {
 	return nil
 }
 
-func (lc *litAfClient) DlcSetContractFundingAndDivision(textArgs []string) error {
+func (lc *litAfClient) DlcSetContractParams(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "help" {
-		fmt.Fprintf(color.Output, SetContractFundingAndDivisionCommand.Format)
-		fmt.Fprintf(color.Output, SetContractFundingAndDivisionCommand.Description)
+		fmt.Fprintf(color.Output, SetContractParamsCommand.Format)
+		fmt.Fprintf(color.Output, SetContractParamsCommand.Description)
 		return nil
 	}
 
 	if len(textArgs) < 6 {
-		return fmt.Errorf(SetContractFundingAndDivisionCommand.Format)
+		return fmt.Errorf(SetContractParamsCommand.Format)
 	}
 
-	args := new(litrpc.SetContractFundingAndDivisionArgs)
-	reply := new(litrpc.SetContractFundingAndDivisionReply)
+	args := new(litrpc.SetContractParamsArgs)
+	reply := new(litrpc.SetContractParamsReply)
 
 	cIdx, err := strconv.ParseUint(textArgs[0], 10, 64)
 	if err != nil {
 		return err
 	}
-	ourAmount, err := strconv.ParseInt(textArgs[1], 10, 64)
+	cointype, err := strconv.ParseUint(textArgs[1], 10, 64)
 	if err != nil {
 		return err
 	}
-	theirAmount, err := strconv.ParseInt(textArgs[2], 10, 64)
+	ourAmount, err := strconv.ParseInt(textArgs[2], 10, 64)
 	if err != nil {
 		return err
 	}
-	fullyOurs, err := strconv.ParseInt(textArgs[3], 10, 64)
+	theirAmount, err := strconv.ParseInt(textArgs[3], 10, 64)
 	if err != nil {
 		return err
 	}
-	fullyTheirs, err := strconv.ParseInt(textArgs[4], 10, 64)
+	fullyOurs, err := strconv.ParseInt(textArgs[4], 10, 64)
 	if err != nil {
 		return err
 	}
-	time, err := strconv.ParseUint(textArgs[5], 10, 64)
+	fullyTheirs, err := strconv.ParseInt(textArgs[5], 10, 64)
 	if err != nil {
 		return err
 	}
-	cointype, err := strconv.ParseUint(textArgs[6], 10, 64)
+	time, err := strconv.ParseUint(textArgs[6], 10, 64)
+	if err != nil {
+		return err
+	}
+	oIdx, err := strconv.ParseUint(textArgs[7], 10, 64)
 	if err != nil {
 		return err
 	}
 
 	args.CIdx = cIdx
+	args.CoinType = uint32(cointype)
 	args.OurAmount = ourAmount
 	args.TheirAmount = theirAmount
 	args.ValueFullyOurs = fullyOurs
 	args.ValueFullyTheirs = fullyTheirs
 	args.Time = time
-	args.CoinType = uint32(cointype)
+	args.OIdx = oIdx
 
-	err = lc.rpccon.Call("LitRPC.SetContractFundingAndDivision", args, reply)
+	err = lc.rpccon.Call("LitRPC.SetContractParams", args, reply)
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprint(color.Output, "Funding, Division and Settlement time set succesfully\n")
+	fmt.Fprintf(color.Output, "Our Funding (sat) set to %d and their funding set"+
+		" to%d\nOur full value (sat) set to %d and their full value set to %d\n"+
+		"Settlement time (unix) set to %d\nCointype set to %d\n", args.OurAmount,
+		args.TheirAmount, args.ValueFullyOurs, args.ValueFullyTheirs,
+		args.Time, args.CoinType)
 
 	return nil
 }

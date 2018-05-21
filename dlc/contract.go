@@ -53,7 +53,6 @@ func (mgr *DlcManager) SetContractOracle(cIdx, oIdx uint64) error {
 	return nil
 }
 
-
 // SetContractDatafeed will automatically fetch the R-point from the REST API,
 // if an oracle is imported from a REST API. You need to set the settlement time
 // first, becuase the R point is a key unique for the time and feed
@@ -113,16 +112,21 @@ func (mgr *DlcManager) SetContractRPoint(cIdx uint64, rPoint [33]byte) error {
 	return nil
 }
 
-// SetContractFundingAndDivision sets the funding and division parameters
-// to the contract. It will specify how much
-// we (the offering party) are willing to fund, as well as what they are.
-// It also sets the division of the contract settlement ie if the
-// oraclized value is valueAllOurs, then the entire value of the contract is
-// payable to us. If the oraclized value is valueAllTheirs, then the entire
-// value is paid to our peer. Between those, the value is divided linearly.
+// SetContractParams sets the parameters of the contract.
+// We specify how much we (the offering party) are willing to fund,
+// as well as what they are. We set the division of the contract
+// settlement ie if the oraclized value is valueAllOurs, then the entire
+// value of the contract is payable to us. If the oraclized value is
+// valueAllTheirs, then the entire value is paid to our peer. Between
+// those, the value is divided linearly. We set the unix epoch
+// at which the oracle will sign a message containing the value the
+// contract pays out on using <time> and we assign a particular oracle
+// to a contract - used for determining which pubkey A to use and can
+// also allow for fetching R-points automatically when the oracle was
+// imported from a REST api
 
-func (mgr *DlcManager) SetContractFundingAndDivision(cIdx uint64, our, their,
-	valueAllOurs, valueAllTheirs int64, time uint64, cointype uint32) error {
+func (mgr *DlcManager) SetContractParams(cIdx uint64, cointype uint32, our, their,
+	valueAllOurs, valueAllTheirs int64, time uint64, oIdx uint64) error {
 	c, err := mgr.LoadContract(cIdx)
 	if err != nil {
 		return err
@@ -136,6 +140,12 @@ func (mgr *DlcManager) SetContractFundingAndDivision(cIdx uint64, our, their,
 	c.OurFundingAmount = our
 	c.TheirFundingAmount = their
 	c.OracleTimestamp = time
+
+	o, err := mgr.LoadOracle(oIdx)
+	if err != nil {
+		return err
+	}
+	c.OracleA = o.A
 	c.OracleR = [33]byte{} // Reset the R point
 	c.Division = nil // If the funding changes, the division needs to be re-set.
 
@@ -181,9 +191,7 @@ func (mgr *DlcManager) SetContractFundingAndDivision(cIdx uint64, our, their,
 			fCurInRange := float64(i - valueAllOurs)
 			c.Division[idx].ValueOurs = int64(totalContractValue)
 			c.Division[idx].ValueOurs -= int64(fTotal / fRange * fCurInRange)
-
 		}
-
 	}
 
 	mgr.SaveContract(c)

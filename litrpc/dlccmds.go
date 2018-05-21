@@ -235,29 +235,6 @@ func (r *LitRPC) GetContract(args GetContractArgs,
 	return nil
 }
 
-type SetContractOracleArgs struct {
-	CIdx uint64
-	OIdx uint64
-}
-
-type SetContractOracleReply struct {
-	Success bool
-}
-
-// SetContractOracle assigns a known oracle to a (new) contract
-func (r *LitRPC) SetContractOracle(args SetContractOracleArgs,
-	reply *SetContractOracleReply) error {
-	var err error
-
-	err = r.Node.DlcManager.SetContractOracle(args.CIdx, args.OIdx)
-	if err != nil {
-		return err
-	}
-
-	reply.Success = true
-	return nil
-}
-
 type SetContractDatafeedArgs struct {
 	CIdx uint64
 	Feed uint64
@@ -314,36 +291,37 @@ type SetContractFwdArgs struct {
 	FundAmt       int64
 }
 
-type SetContractFundingAndDivisionArgs struct {
+type SetContractParamsArgs struct {
 	CIdx             uint64
 	OurAmount        int64
 	TheirAmount      int64
 	ValueFullyOurs   int64
 	ValueFullyTheirs int64
 	Time             uint64
-	CoinType uint32
+	CoinType         uint32
+	OIdx             uint64
 }
 
-type SetContractFundingAndDivisionReply struct {
+type SetContractParamsReply struct {
 	Success bool
 }
 
-// SetContractFundingAndDivision sets the arguments which decide how much we're
-// funding and how much we expect the peer we offer the contract to to fund.
-// It also sets how the contract is settled. The parameters indicate
-// at what value the full contract funds are ours, and at what value they are
-// full funds are for our peer. Between those values, the contract will divide
-// the contract funds linearly
-// ContractCoinType sets the coin type the contract will be in. Note that a
-// peer that doesn't have a wallet of that type will automatically decline the
-// contract.
+// SetContractParams sets all the parameters applicable to a contract
+// 1. Channel ID
+// 2. CoinType
+// 3. How much we're funding
+// 4. How much we expect the peer to fund
+// 5. At what value the full contract funds are ours
+// 6. At what value the full contract funds are theirs
+// 7. Settlement time in Unix Epoch
+// 8. Oracle ID
 
-func (r *LitRPC) SetContractFundingAndDivision(args SetContractFundingAndDivisionArgs,
-	reply *SetContractFundingAndDivisionReply) error {
+func (r *LitRPC) SetContractParams(args SetContractParamsArgs,
+	reply *SetContractParamsReply) error {
 	var err error
-	err = r.Node.DlcManager.SetContractFundingAndDivision(args.CIdx,
+	err = r.Node.DlcManager.SetContractParams(args.CIdx, args.CoinType,
 		args.OurAmount, args.TheirAmount, args.ValueFullyOurs,
-		args.ValueFullyTheirs, args.Time, args.CoinType)
+		args.ValueFullyTheirs, args.Time, args.OIdx)
 	if err != nil {
 		return err
 	}
