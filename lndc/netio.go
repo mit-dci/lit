@@ -8,6 +8,10 @@ import (
 	"net"
 )
 
+// maxMsgSize is the longest message supported.  This is payload size, not
+// encrypted size.
+const maxMsgSize = 1 << 24
+
 // New & improved tcp open session.
 // There's connector A and listener B.  Once the connection is set up there's no
 // difference, but there can be during the setup.
@@ -55,7 +59,7 @@ import (
 // readClear reads the next length-prefixed message from the underlying raw
 // TCP connection.
 func readClear(c net.Conn) ([]byte, error) {
-	var msgLen uint16
+	var msgLen uint32
 
 	if err := binary.Read(c, binary.BigEndian, &msgLen); err != nil {
 		return nil, err
@@ -71,13 +75,13 @@ func readClear(c net.Conn) ([]byte, error) {
 
 // writeClear writes the passed message with a prefixed 2-byte length header.
 func writeClear(conn net.Conn, msg []byte) (int, error) {
-	if len(msg) > 65530 {
+	if len(msg) > maxMsgSize {
 		return 0, fmt.Errorf("lmsg too long, %d bytes", len(msg))
 	}
 
 	// Add 2 byte length header (pbx doesn't need it) and send over TCP.
 	var msgBuf bytes.Buffer
-	if err := binary.Write(&msgBuf, binary.BigEndian, uint16(len(msg))); err != nil {
+	if err := binary.Write(&msgBuf, binary.BigEndian, uint32(len(msg))); err != nil {
 		return 0, err
 	}
 
