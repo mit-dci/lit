@@ -268,7 +268,8 @@ func (w *Wallit) PickUtxos(
 	// we need, remove the top one.
 	for len(allUtxos) > 1 &&
 		allUtxos[1].Value > amtWanted+maxFeeGuess &&
-		allUtxos[1].Height > 100 {
+		allUtxos[1].Height > 100 &&
+		!(ow && allUtxos[1].Mode&portxo.FlagTxoWitness == 0) {
 		allUtxos = allUtxos[1:]
 	}
 
@@ -281,7 +282,9 @@ func (w *Wallit) PickUtxos(
 		allUtxos[2].Height > 100 && // since sorted, don't need to check [1]
 		allUtxos[1].Mature(curHeight) &&
 		allUtxos[2].Mature(curHeight) &&
-		allUtxos[1].Value+allUtxos[2].Value > amtWanted+maxFeeGuess {
+		allUtxos[1].Value+allUtxos[2].Value > amtWanted+maxFeeGuess &&
+		!(ow && allUtxos[2].Mode&portxo.FlagTxoWitness == 0) &&
+		!(ow && allUtxos[1].Mode&portxo.FlagTxoWitness == 0) {
 		log.Printf("remaining utxo list, in order:\n")
 		for _, u := range allUtxos {
 			log.Printf("\t h: %d amt: %d\n", u.Height, u.Value)
