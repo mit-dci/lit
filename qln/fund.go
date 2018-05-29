@@ -8,6 +8,7 @@ import (
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
+	"github.com/mit-dci/lit/consts"
 )
 
 /*
@@ -118,7 +119,7 @@ func (nd *LitNode) FundChannel(
 		nd.InProg.mtx.Unlock()
 		return 0, fmt.Errorf("Can't have negative send or capacity")
 	}
-	if ccap < 1000000 { // limit for now
+	if ccap < consts.MinChanCapacity { // limit for now
 		nd.InProg.mtx.Unlock()
 		return 0, fmt.Errorf("Min channel capacity 1M sat")
 	}

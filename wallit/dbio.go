@@ -13,6 +13,7 @@ import (
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
+	"github.com/mit-dci/lit/consts"
 )
 
 // const strings for db usage
@@ -86,7 +87,7 @@ func (w *Wallit) AdrDump() ([][20]byte, error) {
 		return nil, err
 	}
 
-	if last > 1<<20 {
+	if last > consts.MaxKeys {
 		return nil, fmt.Errorf("Got %d keys stored, expect something reasonable", last)
 	}
 
@@ -443,8 +444,8 @@ func (w *Wallit) IngestMany(txs []*wire.MsgTx, height int32) (uint32, error) {
 	// spendTxIdx tells which tx (in the txs slice) the utxo loss came from
 	spentTxIdx := make([]uint32, 0, len(txs))
 
-	if len(txs) < 1 || len(txs) > 1000000 {
-		return 0, fmt.Errorf("tried to ingest %d txs, expect 1 to 1M", len(txs))
+	if len(txs) < 1 || len(txs) > consts.MaxTxLen {
+		return 0, fmt.Errorf("tried to ingest %d txs, expect 1 to %d", len(txs), consts.MaxTxLen)
 	}
 
 	// initial in-ram work on all txs.

@@ -7,6 +7,7 @@ import (
 	"github.com/adiabat/btcd/wire"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
+	"github.com/mit-dci/lit/consts"
 )
 
 type TxidsReply struct {
@@ -163,8 +164,8 @@ func (r *LitRPC) Send(args SendArgs, reply *TxidsReply) error {
 
 	txOuts := make([]*wire.TxOut, nOutputs)
 	for i, s := range args.DestAddrs {
-		if args.Amts[i] < 10000 {
-			return fmt.Errorf("Amt %d less than min 10000", args.Amts[i])
+		if args.Amts[i] < consts.MinSendAmt {
+			return fmt.Errorf("Amt %d less than minimum send amount %d", args.Amts[i], consts.MinSendAmt)
 		}
 
 		outScript, err := AdrStringToOutscript(s)
