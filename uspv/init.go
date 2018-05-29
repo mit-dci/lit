@@ -117,9 +117,92 @@ func (s *SPVCon) Connect(remoteNode string) error {
 		return fmt.Errorf("Remote node version: %x too old, exiting.", mv.ProtocolVersion)
 	}
 
-	if strings.Contains(mv.UserAgent, "ABC") {
+	if strings.Contains(mv.UserAgent, "ABC") || strings.Contains(mv.UserAgent, "BUCash"){
 		// if we connected through a DNS Peer and it doesn't implement service bit filtering
-		return fmt.Errorf("Remote node %s invalid", mv.UserAgent)
+		for _, seed := range s.Param.DNSSeeds {
+			seedAdrs, err = net.LookupHost(seed)
+			if err == nil {
+				// got em
+				log.Printf("Got %d IPs from DNS seed %s\n", len(seedAdrs), seed)
+				break
+			}
+			// gotta keep trying for those IPs
+			log.Println("DNS seed %s error", seed)
+		}
+
+		if len(seedAdrs) == 0 {
+			// never got any IPs from DNS seeds; give up
+			return fmt.Errorf(
+				"Can't connect: No functioning DNS seeds for %s", s.Param.Name)
+		}
+		// now have some IPs, go through and try to connect to one.
+		var connected bool
+		for i, ip := range seedAdrs {
+			log.Printf("Looks like you connected to a spam node %d time(s). Reconnecting..", i+1)
+			log.Printf("Attempting connection to node at %s\n",
+				ip+":"+s.Param.DefaultPort)
+			s.con, err = net.Dial("tcp", ip+":"+s.Param.DefaultPort)
+			if err != nil {
+				log.Println(err.Error())
+			} else {
+				connected = true
+			}
+			if !connected && i == len(seedAdrs)-1 {
+				break
+			} else if !connected {
+				continue
+			}
+
+			// assign version bits for local node
+			s.localVersion = VERSION
+			myMsgVer, err := wire.NewMsgVersionFromConn(s.con, 0, 0)
+			if err != nil {
+				return err
+			}
+			err = myMsgVer.AddUserAgent("lit", "v0.1")
+			if err != nil {
+				return err
+			}
+			// must set this to enable SPV stuff
+			myMsgVer.AddService(wire.SFNodeBloom)
+			// set this to enable segWit
+			myMsgVer.AddService(wire.SFNodeWitness)
+			// this actually sends
+			n, err := wire.WriteMessageWithEncodingN(
+				s.con, myMsgVer, s.localVersion,
+				wire.BitcoinNet(s.Param.NetMagicBytes), wire.LatestEncoding)
+			if err != nil {
+				return err
+			}
+			s.WBytes += uint64(n)
+			log.Printf("wrote %d byte version message to %s\n",
+				n, s.con.RemoteAddr().String())
+			n, m, b, err := wire.ReadMessageWithEncodingN(
+				s.con, s.localVersion,
+				wire.BitcoinNet(s.Param.NetMagicBytes), wire.LatestEncoding)
+			if err != nil {
+				return err
+			}
+			s.RBytes += uint64(n)
+			log.Printf("got %d byte response %x\n command: %s\n", n, b, m.Command())
+
+			mv, ok := m.(*wire.MsgVersion)
+			if ok {
+				log.Printf("connected to %s", mv.UserAgent)
+			}
+			if strings.Contains(mv.UserAgent, "ABC") {
+				// if we connected through a DNS Peer and it doesn't implement service bit filtering
+				fmt.Println("Found Bcash node. Trying again")
+				continue
+			}
+			if mv.ProtocolVersion < 70013 {
+				//70014 -> core v0.13.1, so we should be fine
+				// all checks done, we're good
+				continue
+			} else {
+				break
+			}
+		}
 	}
 
 	log.Printf("remote reports version %x (dec %d)\n",
