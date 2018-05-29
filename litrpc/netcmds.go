@@ -21,7 +21,7 @@ type ListeningPortsReply struct {
 
 func (r *LitRPC) Listen(args ListenArgs, reply *ListeningPortsReply) error {
 	if args.Port == "" {
-		args.Port = ":2448"
+		args.Port = ":9735"
 	}
 	_, err := r.Node.TCPListener(args.Port)
 	if err != nil {
