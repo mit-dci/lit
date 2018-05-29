@@ -7,6 +7,7 @@ import (
 	"github.com/adiabat/btcutil"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/qln"
+	"github.com/mit-dci/lit/consts"
 )
 
 type ChannelInfo struct {
@@ -82,7 +83,7 @@ func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
 	if args.InitialSend < 0 || args.Capacity < 0 {
 		return fmt.Errorf("Can't have negative send or capacity")
 	}
-	if args.Capacity < 1000000 { // limit for now
+	if args.Capacity < consts.MinChanCapacity { // limit for now
 		return fmt.Errorf("Min channel capacity 1M sat")
 	}
 	if args.InitialSend > args.Capacity {
@@ -108,9 +109,9 @@ func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
 
 	spendable := allPorTxos.SumWitness(nowHeight)
 
-	if args.Capacity > spendable-50000 {
+	if args.Capacity > spendable-consts.SafeFee {
 		return fmt.Errorf("Wanted %d but %d available for channel creation",
-			args.Capacity, spendable-50000)
+			args.Capacity, spendable-consts.SafeFee)
 	}
 
 	idx, err := r.Node.FundChannel(
@@ -159,8 +160,7 @@ type PushReply struct {
 // Will change to .. tries to send, but may not complete.
 
 func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
-
-	if args.Amt > 100000000 || args.Amt < 1 {
+	if args.Amt > consts.MaxChanCapacity || args.Amt < 1 {
 		return fmt.Errorf(
 			"can't push %d max is 1 coin (100000000), min is 1", args.Amt)
 	}

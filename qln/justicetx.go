@@ -299,8 +299,11 @@ func (nd *LitNode) ShowJusticeDB() (string, error) {
 }
 
 // SendWatch syncs up the remote watchtower with all justice signatures
-func (nd *LitNode) SyncWatch(qc *Qchan) error {
+func (nd *LitNode) SyncWatch(qc *Qchan, watchPeer uint32) error {
 
+	if !nd.ConnectedToPeer(watchPeer) {
+		return fmt.Errorf("SyncWatch: not connected to peer %d", watchPeer)
+	}
 	// if watchUpTo isn't 2 behind the state number, there's nothing to send
 	// kindof confusing inequality: can't send state 0 info to watcher when at
 	// state 1.  State 0 needs special handling.
@@ -310,22 +313,16 @@ func (nd *LitNode) SyncWatch(qc *Qchan) error {
 	}
 	// send initial description if we haven't sent anything yet
 	if qc.State.WatchUpTo == 0 {
-		var peerIdx uint32
-		peerIdx = 0 // should be replaced
-
-		desc := lnutil.NewWatchDescMsg(peerIdx, qc.Coin(),
+		desc := lnutil.NewWatchDescMsg(watchPeer, qc.Coin(),
 			qc.WatchRefundAdr, qc.Delay, 5000, qc.TheirHAKDBase, qc.MyHAKDBase)
 
-		_, err := nd.WatchCon.Write(desc.Bytes())
-		if err != nil {
-			return err
-		}
+		nd.OmniOut <- desc
 		// after sending description, must send at least states 0 and 1.
-		err = nd.SendWatchComMsg(qc, 0)
+		err := nd.SendWatchComMsg(qc, 0, watchPeer)
 		if err != nil {
 			return err
 		}
-		err = nd.SendWatchComMsg(qc, 1)
+		err = nd.SendWatchComMsg(qc, 1, watchPeer)
 		if err != nil {
 			return err
 		}
@@ -335,7 +332,7 @@ func (nd *LitNode) SyncWatch(qc *Qchan) error {
 	for qc.State.WatchUpTo < qc.State.StateIdx-1 {
 		// increment watchupto number
 		qc.State.WatchUpTo++
-		err := nd.SendWatchComMsg(qc, qc.State.WatchUpTo)
+		err := nd.SendWatchComMsg(qc, qc.State.WatchUpTo, watchPeer)
 		if err != nil {
 			return err
 		}
@@ -345,7 +342,7 @@ func (nd *LitNode) SyncWatch(qc *Qchan) error {
 }
 
 // send WatchComMsg generates and sends the ComMsg to a watchtower
-func (nd *LitNode) SendWatchComMsg(qc *Qchan, idx uint64) error {
+func (nd *LitNode) SendWatchComMsg(qc *Qchan, idx uint64, watchPeer uint32) error {
 	// retrieve the sig data from db
 	txidsig, err := nd.LoadJusticeSig(idx, qc.WatchRefundAdr)
 	if err != nil {
@@ -357,15 +354,9 @@ func (nd *LitNode) SendWatchComMsg(qc *Qchan, idx uint64) error {
 		return err
 	}
 
-	var peerIdx uint32
-	peerIdx = 0 // should be replaced
-
 	comMsg := lnutil.NewComMsg(
-		peerIdx, qc.Coin(), qc.WatchRefundAdr, *elk, txidsig.Txid, txidsig.Sig)
+		watchPeer, qc.Coin(), qc.WatchRefundAdr, *elk, txidsig.Txid, txidsig.Sig)
 
-	// stash to send all?  or just send once each time?  probably should
-	// set up some output buffering
-
-	_, err = nd.WatchCon.Write(comMsg.Bytes())
+	nd.OmniOut <- comMsg
 	return err
 }

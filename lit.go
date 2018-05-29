@@ -32,6 +32,7 @@ type config struct { // define a struct for usage with go-flags
 	Verbose bool `short:"v" long:"verbose" description:"Set verbosity to true."`
 
 	Rpcport uint16 `short:"p" long:"rpcport" description:"Set RPC port to connect to"`
+	Rpchost string `short:"h" long:"rpchost" description:"Set RPC host to listen to"`
 
 	Params *coinparam.Params
 }
@@ -43,6 +44,7 @@ var (
 	defaultConfigFilename = "lit.conf"
 	defaultHomeDir        = os.Getenv("HOME")
 	defaultRpcport        = uint16(8001)
+	defaultRpchost        = "localhost"
 )
 
 func fileExists(name string) bool {
@@ -134,6 +136,7 @@ func main() {
 	conf := config{
 		LitHomeDir: defaultLitHomeDirName,
 		Rpcport:    defaultRpcport,
+		Rpchost:    defaultRpchost,
 		TrackerURL: defaultTrackerURL,
 	}
 
@@ -156,7 +159,7 @@ func main() {
 	rpcl.Node = node
 	rpcl.OffButton = make(chan bool, 1)
 
-	go litrpc.RPCListen(rpcl, conf.Rpcport)
+	go litrpc.RPCListen(rpcl, conf.Rpchost, conf.Rpcport)
 	litbamf.BamfListen(conf.Rpcport, conf.LitHomeDir)
 
 	<-rpcl.OffButton

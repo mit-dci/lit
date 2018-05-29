@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/consts"
 
 	"github.com/adiabat/btcd/wire"
 	"github.com/adiabat/btcutil/txsort"
@@ -85,10 +86,10 @@ func (q *Qchan) SimpleCloseTx() (*wire.MsgTx, error) {
 	theirOutput := wire.NewTxOut(theirAmt, theirScript)
 
 	// check output amounts (should never fail)
-	if myAmt < minOutput {
+	if myAmt < consts.MinOutput {
 		return nil, fmt.Errorf("SimpleCloseTx: my output amt %d too low", myAmt)
 	}
-	if theirAmt < minOutput {
+	if theirAmt < consts.MinOutput {
 		return nil, fmt.Errorf("SimpleCloseTx: their output amt %d too low", myAmt)
 	}
 
@@ -166,10 +167,10 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
 
 	// check amounts.  Nonzero amounts below the minOutput is an error.
 	// Shouldn't happen and means some checks in push/pull went wrong.
-	if fancyAmt != 0 && fancyAmt < minOutput {
+	if fancyAmt != 0 && fancyAmt < consts.MinOutput {
 		return nil, fmt.Errorf("SH amt %d too low", fancyAmt)
 	}
-	if pkhAmt != 0 && pkhAmt < minOutput {
+	if pkhAmt != 0 && pkhAmt < consts.MinOutput {
 		return nil, fmt.Errorf("PKH amt %d too low", pkhAmt)
 	}
 
