@@ -27,7 +27,10 @@ func (nd *LitNode) SignBreakTx(q *Qchan) (*wire.MsgTx, error) {
 	}
 
 	// get private signing key
-	priv := nd.SubWallet[q.Coin()].GetPriv(q.KeyGen)
+	priv, err := nd.SubWallet[q.Coin()].GetPriv(q.KeyGen)
+	if err != nil {
+		return nil, err
+	}
 	// generate sig.
 	mySig, err := txscript.RawTxInWitnessSignature(
 		tx, hCache, 0, q.Value, pre, txscript.SigHashAll, priv)
@@ -69,7 +72,10 @@ func (nd *LitNode) SignSimpleClose(q *Qchan, tx *wire.MsgTx) ([64]byte, error) {
 		return sig, err
 	}
 	// get private signing key
-	priv := nd.SubWallet[q.Coin()].GetPriv(q.KeyGen)
+	priv, err := nd.SubWallet[q.Coin()].GetPriv(q.KeyGen)
+	if err != nil {
+		return sig, err
+	}
 	// generate sig
 	mySig, err := txscript.RawTxInWitnessSignature(
 		tx, hCache, 0, q.Value, pre, txscript.SigHashAll, priv)
@@ -169,7 +175,10 @@ func (nd *LitNode) SignState(q *Qchan) ([64]byte, error) {
 	}
 
 	// get private signing key
-	priv := nd.SubWallet[q.Coin()].GetPriv(q.KeyGen)
+	priv, err := nd.SubWallet[q.Coin()].GetPriv(q.KeyGen)
+		if err != nil {
+		return sig, err
+	}
 
 	// generate sig.
 	bigSig, err := txscript.RawTxInWitnessSignature(

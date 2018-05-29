@@ -290,7 +290,10 @@ func (r *LitRPC) DumpPrivs(args NoArgs, reply *DumpReply) error {
 		thisTxo.Witty = true
 		thisTxo.PairKey = fmt.Sprintf("%x", qc.TheirPub)
 
-		priv := wal.GetPriv(qc.KeyGen)
+		priv, err := wal.GetPriv(qc.KeyGen)
+		if err != nil {
+			return err
+		}
 		wif := btcutil.WIF{priv, true, wal.Params().PrivateKeyID}
 		thisTxo.WIF = wif.String()
 
@@ -317,7 +320,10 @@ func (r *LitRPC) DumpPrivs(args NoArgs, reply *DumpReply) error {
 				theseTxos[i].Delay = u.Height + int32(u.Seq) - syncHeight
 			}
 			theseTxos[i].Witty = u.Mode&portxo.FlagTxoWitness != 0
-			priv := wal.GetPriv(u.KeyGen)
+			priv, err := wal.GetPriv(u.KeyGen)
+			if err != nil {
+				return err
+			}
 			wif := btcutil.WIF{priv, true, wal.Params().PrivateKeyID}
 
 			theseTxos[i].WIF = wif.String()

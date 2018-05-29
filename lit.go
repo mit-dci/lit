@@ -143,7 +143,7 @@ func main() {
 	key := litSetup(&conf)
 
 	// Setup LN node.  Activate Tower if in hard mode.
-	// give node and below file pathof lit home directoy
+	// give node and below file pathof lit home directory
 	node, err := qln.NewLitNode(key, conf.LitHomeDir, conf.TrackerURL)
 	if err != nil {
 		log.Fatal(err)

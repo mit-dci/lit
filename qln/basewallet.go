@@ -20,7 +20,7 @@ type UWallet interface {
 
 	// Have GetPriv for now.  Maybe later get rid of this and have
 	// the underlying wallet sign?
-	GetPriv(k portxo.KeyGen) *btcec.PrivateKey
+	GetPriv(k portxo.KeyGen) (*btcec.PrivateKey, error)
 
 	// Send a tx out to the network.  Maybe could replace?  Maybe not.
 	// Needed for channel break / cooperative close.  Maybe grabs.

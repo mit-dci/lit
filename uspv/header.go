@@ -262,7 +262,6 @@ func CheckHeaderChain(
 			if !checkProofOfWork(*hdr, p, height+int32(i)) {
 				return 0, fmt.Errorf("header %d in message has bad proof of work", i)
 			}
-
 			// build slice of "previous" headers
 			prevHeaders = append(prevHeaders, inHeaders[i])
 			rightBits, err := p.DiffCalcFunction(prevHeaders, height+int32(i), p)
