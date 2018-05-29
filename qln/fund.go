@@ -213,7 +213,7 @@ func (nd *LitNode) PointReqHandler(msg lnutil.PointReqMsg) {
 
 // FUNDER
 // PointRespHandler takes in a point response, and returns a channel description
-func (nd LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
+func (nd *LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 
 	nd.InProg.mtx.Lock()
 	defer nd.InProg.mtx.Unlock()
