@@ -541,12 +541,10 @@ func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
 	q.State.StateIdx -= 2
 	q.State.MyAmt = prevAmt
 
-	go func() {
-		err = nd.BuildJusticeSig(q)
-		if err != nil {
-			fmt.Printf("GapSigRevHandler BuildJusticeSig err %s", err.Error())
-		}
-	}()
+	err = nd.BuildJusticeSig(q)
+	if err != nil {
+		fmt.Printf("GapSigRevHandler BuildJusticeSig err %s", err.Error())
+	}
 
 	return nil
 }
@@ -620,12 +618,10 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 	qc.State.StateIdx--
 	qc.State.MyAmt = prevAmt
 
-	go func() {
-		err = nd.BuildJusticeSig(qc)
-		if err != nil {
-			fmt.Printf("SigRevHandler BuildJusticeSig err %s", err.Error())
-		}
-	}()
+	err = nd.BuildJusticeSig(qc)
+	if err != nil {
+		fmt.Printf("SigRevHandler BuildJusticeSig err %s", err.Error())
+	}
 
 	// done updating channel, no new messages expected.  Set clear to send
 	qc.ClearToSend <- true
@@ -693,12 +689,10 @@ func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {
 	// the justice signature
 	qc.State.StateIdx--      // back one state
 	qc.State.MyAmt = prevAmt // use stashed previous state amount
-	go func() {
-		err = nd.BuildJusticeSig(qc)
-		if err != nil {
-			fmt.Printf("RevHandler BuildJusticeSig err %s", err.Error())
-		}
-	}()
+	err = nd.BuildJusticeSig(qc)
+	if err != nil {
+		fmt.Printf("RevHandler BuildJusticeSig err %s", err.Error())
+	}
 
 	// got rev, assert clear to send
 	qc.ClearToSend <- true
