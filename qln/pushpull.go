@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/adiabat/btcd/wire"
-	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/consts"
+	"github.com/mit-dci/lit/lnutil"
 )
 
 // Grab the coins that are rightfully yours! Plus some more.
@@ -195,11 +195,7 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 		qc.ClearToSend <- true
 		return fmt.Errorf("want to push %s but %s available after %s fee and %s consts.MinOutput",
 			lnutil.SatoshiColor(int64(amt)),
-<<<<<<< HEAD
-			lnutil.SatoshiColor(qc.State.MyAmt - qc.State.Fee - consts.MinOutput),
-=======
 			lnutil.SatoshiColor(qc.State.MyAmt-qc.State.Fee-minOutput),
->>>>>>> 27b0f30
 			lnutil.SatoshiColor(qc.State.Fee),
 			lnutil.SatoshiColor(consts.MinOutput))
 	}
