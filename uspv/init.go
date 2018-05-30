@@ -13,7 +13,7 @@ import (
 	"github.com/mit-dci/lit/lnutil"
 )
 
-func GetSeedAdrs(s *SPVCon, remoteNode string) error {
+func (s *SPVCon) GetSeedAdrs(remoteNode string) error {
 	var err error
 	// slice of IP addrs returned from the DNS seed
 	var seedAdrs []string
@@ -48,7 +48,7 @@ func GetSeedAdrs(s *SPVCon, remoteNode string) error {
 				}
 			}
 
-			err = ConnectToSeedAdrs(s, seedAdrs)
+			err = s.ConnectToSeedAdrs(seedAdrs)
 			if err != nil {
 				if i != len(s.Param.DNSSeeds)-1 {
 					continue
@@ -69,14 +69,14 @@ func GetSeedAdrs(s *SPVCon, remoteNode string) error {
 		if err != nil {
 			return err
 		}
-		err := Handshake(s, nil)
+		err := s.Handshake(nil)
 		if err != nil {
 			return err
 		}
 	}
 	return nil
 }
-func ConnectToSeedAdrs(s *SPVCon, seedAdrs []string) error {
+func (s *SPVCon) ConnectToSeedAdrs( seedAdrs []string) error {
 	// now have some IPs, go through and try to connect to one.
 	var err error
 	var connected bool
@@ -94,7 +94,7 @@ func ConnectToSeedAdrs(s *SPVCon, seedAdrs []string) error {
 			connected = true
 		}
 		if connected {
-			err := Handshake(s, seedAdrs)
+			err := s.Handshake(seedAdrs)
 			if err != nil {
 				continue
 			}
@@ -104,7 +104,7 @@ func ConnectToSeedAdrs(s *SPVCon, seedAdrs []string) error {
 	return nil
 }
 
-func Handshake(s *SPVCon, seedAdrs []string) error {
+func (s *SPVCon) Handshake(seedAdrs []string) error {
 	// assign version bits for local node
 	s.localVersion = VERSION
 	myMsgVer, err := wire.NewMsgVersionFromConn(s.con, 0, 0)
@@ -151,7 +151,7 @@ func Handshake(s *SPVCon, seedAdrs []string) error {
 	if !(strings.Contains(mv.UserAgent, "Satoshi") || strings.Contains(mv.UserAgent, "btcd")) && (len(seedAdrs) != 0) {
 		// TODO: improve this filtering criterion
 		seedAdrs = seedAdrs[1:] // delete the one we tried with
-		err = ConnectToSeedAdrs(s, seedAdrs)
+		err = s.ConnectToSeedAdrs(seedAdrs)
 		if err != nil {
 			return fmt.Errorf("Couldn't connect to any seed!")
 		}
@@ -178,7 +178,7 @@ func Handshake(s *SPVCon, seedAdrs []string) error {
 
 // Connect dials out and connects to full nodes.
 func (s *SPVCon) Connect(remoteNode string) error {
-	err := GetSeedAdrs(s, remoteNode)
+	err := s.GetSeedAdrs(remoteNode)
 	if err != nil {
 		return fmt.Errorf("Couldn't connect to the node you provided!")
 	}
