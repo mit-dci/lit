@@ -432,7 +432,10 @@ func (nd *LitNode) HandleContractOPEvent(c *lnutil.DlcContract,
 			kg.Step[2] = UseContractPayoutPKH
 			kg.Step[3] = c.PeerIdx | 1<<31
 			kg.Step[4] = uint32(c.Idx) | 1<<31
-			priv := wal.GetPriv(kg)
+			priv, err := wal.GetPriv(kg)
+			if err != nil {
+				return err
+			}
 
 			// make hash cache
 			hCache := txscript.NewTxSigHashes(txClaim)
