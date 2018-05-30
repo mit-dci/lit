@@ -54,7 +54,7 @@ func litSetup(conf *config) *[32]byte {
 	// Load config from file and parse
 	parser := newConfigParser(conf, flags.Default)
 
- 	// create home directory
+	// create home directory
 	_, err = os.Stat(preconf.LitHomeDir)
 	if err != nil {
 		log.Println("Error while creating a directory")
@@ -65,7 +65,7 @@ func litSetup(conf *config) *[32]byte {
 		log.Println("Creating a new config file")
 		err := createDefaultConfigFile(preconf.LitHomeDir) // Source of error
 		if err != nil {
-			log.Println("Error creating a default config file: %v\n")
+			log.Printf("Error creating a default config file: %v", preconf.LitHomeDir)
 			log.Fatal(err)
 		}
 	}
