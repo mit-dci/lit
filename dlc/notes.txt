@@ -1,0 +1,34 @@
+Hi - I'm putting notes here, not sure other best place to put them
+
+I added an offer struct, DlcFwdOffer.  I think using this will make things easier.  It's a contract before the contract is funded, so doesn't have outpoints, etc
+It's for the specific contract template that we'll use here.  That way, the DlcContract struct can stay the same for many different contract types and be more generic, but the contract templates can be in different offer structs.  This one is the forward contract.
+
+For the forward contract, the user input parameters are:
+
+are you the buyer or seller
+quanity of the asset to purchase
+settlement time
+initial funding amount
+
+Both parties fund it equally, so the buyer gets their asset delivery with an up to 50% decline in the price of bitcoin (or a 2X increase in the asset price)
+
+Settlement time would be good to get out of the UI, but we can leave it for now if needed.
+With this setup, the "initial price" of the asset being purchased is actually more of a UI term, and doesn't really show up in the back end.  The initial price is basically funding amount / asset quanity.  But that division can be done at the UI level to show users the price of what they're buying.  For the software, we just deal with how many dollars are to be delivered, and how much funding is in the contract.
+
+here's an example.
+
+Alice wants to buy 75 USD for delivery next friday.  She offers 937500 satoshis for this contract, and Bob accepts, also putting in 937500 satoshis.
+Given the asset quantity of 75, and the fundin amount of 937500, the implied initial price of the USD is 12500 sat, or 8000 USD per bitcoin.
+
+A week later, the oracle reports a USD price of 9090 sat; (the price of 1 BTC has risen to 11000 USD).  The contrat executes, where Alice's payout is assetQuantity*oraclePrice, or 75*9090.  She gets 681750 sat.  There are 1875000 sat total in the contract, so Bob gets the remaining 1193250 sat. 
+
+result - 
+Alice: 681750 Bob: 1193250
+(USD)	75        131.27
+
+
+I haven't changed the litRPC files, but I suggest combining some RPC calls into one call for building the FwdOffer.  
+That combines the SetContractFunding and SetContractDivision calls, which in the forward case are linked enough that UI-wise they'll both happen from the same user action.
+ Maybe combine settlement time in as well.  One call to make the offer would be nice; there could be other calls for different contract types once there is something other than the bitcoin settled forward.
+
+OK hope that gives a good idea of how I think it can work.  The oracle step size is ugly but OK for now until there's nicer granularity.

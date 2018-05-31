@@ -13,6 +13,7 @@ import (
 var (
 	BKTOracles   = []byte("Oracles")
 	BKTContracts = []byte("Contracts")
+	BKTOffers    = []byte("Offers")
 )
 
 // InitDB initializes the database for Discreet Log Contract storage
@@ -27,6 +28,10 @@ func (mgr *DlcManager) InitDB(dbPath string) error {
 	// Ensure buckets exist that we need
 	err = mgr.DLCDB.Update(func(tx *bolt.Tx) error {
 		_, err = tx.CreateBucketIfNotExists(BKTOracles)
+		if err != nil {
+			return err
+		}
+		_, err = tx.CreateBucketIfNotExists(BKTOffers)
 		if err != nil {
 			return err
 		}
@@ -203,4 +208,113 @@ func (mgr *DlcManager) ListContracts() ([]*lnutil.DlcContract, error) {
 	}
 
 	return contracts, nil
+}
+
+// SaveOffer saves an offer into the database. Will generate a new index
+// if the passed object doesn't have one.
+func (mgr *DlcManager) SaveOffer(o lnutil.DlcOffer) error {
+	err := mgr.DLCDB.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket(BKTOffers)
+
+		if o.Idx() == 0 {
+			idx, _ := b.NextSequence()
+			o.SetIdx(idx)
+		}
+		var wb bytes.Buffer
+		binary.Write(&wb, binary.BigEndian, o.Idx())
+		err := b.Put(wb.Bytes(), o.Bytes())
+
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// DeleteOffer drops an offer from the database.
+func (mgr *DlcManager) DeleteOffer(idx uint64) error {
+	err := mgr.DLCDB.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket(BKTOffers)
+
+		var wb bytes.Buffer
+		binary.Write(&wb, binary.BigEndian, idx)
+		err := b.Delete(wb.Bytes())
+
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// LoadOffer loads an offer from the database by index.
+func (mgr *DlcManager) LoadOffer(idx uint64) (lnutil.DlcOffer, error) {
+	var o lnutil.DlcOffer
+
+	err := mgr.DLCDB.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(BKTOffers)
+
+		var wb bytes.Buffer
+		binary.Write(&wb, binary.BigEndian, idx)
+
+		v := b.Get(wb.Bytes())
+
+		if v == nil {
+			return fmt.Errorf("Offer %d does not exist", idx)
+		}
+		var err error
+		o, err = lnutil.DlcOfferFromBytes(v)
+		if err != nil {
+			return err
+		}
+		o.SetIdx(idx)
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return o, nil
+
+}
+
+// ListContracts loads all contracts from the database
+func (mgr *DlcManager) ListOffers() ([]lnutil.DlcOffer, error) {
+	offers := make([]lnutil.DlcOffer, 0)
+	err := mgr.DLCDB.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(BKTOffers)
+		c := b.Cursor()
+
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			buf := bytes.NewBuffer(k)
+			o, err := lnutil.DlcOfferFromBytes(v)
+			if err != nil {
+				return err
+			}
+			var idx uint64
+			binary.Read(buf, binary.BigEndian, &idx)
+			o.SetIdx(idx)
+			offers = append(offers, o)
+		}
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return offers, nil
 }

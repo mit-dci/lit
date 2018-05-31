@@ -65,23 +65,32 @@ func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) er
 
 	case 0x90: // Discreet log contract messages
 		if msg.MsgType() == lnutil.MSGID_DLC_OFFER {
-			nd.DlcOfferHandler(msg.(lnutil.DlcOfferMsg), peer)
+			return nd.DlcOfferHandler(msg.(lnutil.DlcOfferMsg), peer)
 		}
 		if msg.MsgType() == lnutil.MSGID_DLC_ACCEPTOFFER {
-			nd.DlcAcceptHandler(msg.(lnutil.DlcOfferAcceptMsg), peer)
+			return nd.DlcAcceptHandler(msg.(lnutil.DlcOfferAcceptMsg), peer)
 		}
 		if msg.MsgType() == lnutil.MSGID_DLC_DECLINEOFFER {
-			nd.DlcDeclineHandler(msg.(lnutil.DlcOfferDeclineMsg), peer)
+			return nd.DlcDeclineHandler(msg.(lnutil.DlcOfferDeclineMsg), peer)
 		}
 		if msg.MsgType() == lnutil.MSGID_DLC_CONTRACTACK {
-			nd.DlcContractAckHandler(msg.(lnutil.DlcContractAckMsg), peer)
+			return nd.DlcContractAckHandler(msg.(lnutil.DlcContractAckMsg), peer)
 		}
 		if msg.MsgType() == lnutil.MSGID_DLC_CONTRACTFUNDINGSIGS {
-			nd.DlcFundingSigsHandler(
+			return nd.DlcFundingSigsHandler(
 				msg.(lnutil.DlcContractFundingSigsMsg), peer)
 		}
 		if msg.MsgType() == lnutil.MSGID_DLC_SIGPROOF {
-			nd.DlcSigProofHandler(msg.(lnutil.DlcContractSigProofMsg), peer)
+			return nd.DlcSigProofHandler(msg.(lnutil.DlcContractSigProofMsg), peer)
+		}
+		if msg.MsgType() == lnutil.MSGID_DLC_DRAFTOFFER {
+			return nd.DlcDraftOfferHandler(msg.(lnutil.DlcDraftOfferMsg), peer)
+		}
+		if msg.MsgType() == lnutil.MSGID_DLC_DECLINEDRAFTOFFER {
+			return nd.DlcDraftOfferDeclineHandler(msg.(lnutil.DlcDraftOfferDeclineMsg), peer)
+		}
+		if msg.MsgType() == lnutil.MSGID_DLC_ACCEPTDRAFTOFFER {
+			return nd.DlcDraftOfferAcceptHandler(msg.(lnutil.DlcDraftOfferAcceptMsg), peer)
 		}
 	default:
 		return fmt.Errorf("Unknown message id byte %x &f0", msg.MsgType())
@@ -112,7 +121,8 @@ func (nd *LitNode) LNDCReader(peer *RemotePeer) error {
 	}
 
 	for {
-		msg := make([]byte, 65535)
+
+		msg := make([]byte, 1<<24)
 		//	fmt.Printf("read message from %x\n", l.RemoteLNId)
 		n, err := peer.Con.Read(msg)
 		if err != nil {
@@ -124,7 +134,7 @@ func (nd *LitNode) LNDCReader(peer *RemotePeer) error {
 		}
 		msg = msg[:n]
 
-		fmt.Printf("decrypted message is %x\n", msg)
+		//fmt.Printf("decrypted message is %x\n", msg)
 
 		var routedMsg lnutil.LitMsg
 		routedMsg, err = lnutil.LitMsgFromBytes(msg, peer.Idx)
@@ -132,10 +142,9 @@ func (nd *LitNode) LNDCReader(peer *RemotePeer) error {
 			return err
 		}
 
-		fmt.Printf("peerIdx is %d\n", routedMsg.Peer())
-		fmt.Printf("routed bytes %x\n", routedMsg.Bytes())
-
-		fmt.Printf("message type %x\n", routedMsg.MsgType())
+		//fmt.Printf("peerIdx is %d\n", routedMsg.Peer())
+		//fmt.Printf("routed bytes %x\n", routedMsg.Bytes())
+		fmt.Printf("Received message [%x] from peer [%d]\n", routedMsg.MsgType(), routedMsg.Peer())
 
 		var chanIdx uint32
 		chanIdx = 0
@@ -147,7 +156,7 @@ func (nd *LitNode) LNDCReader(peer *RemotePeer) error {
 			}
 		}
 
-		fmt.Printf("chanIdx is %x\n", chanIdx)
+		//fmt.Printf("chanIdx is %x\n", chanIdx)
 
 		if chanIdx != 0 {
 			err = nd.PeerHandler(routedMsg, peer.QCs[chanIdx], peer)

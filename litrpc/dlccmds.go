@@ -98,6 +98,101 @@ func (r *LitRPC) NewContract(args NewContractArgs,
 	return nil
 }
 
+type NewForwardOfferArgs struct {
+	Offer *lnutil.DlcFwdOffer
+}
+
+type NewForwardOfferReply struct {
+	Offer *lnutil.DlcFwdOffer
+}
+
+// NewForwardOffer creates a new offer (before the draft contract) of a
+// Forward contract
+func (r *LitRPC) NewForwardOffer(args NewForwardOfferArgs,
+	reply *NewForwardOfferReply) error {
+
+	err := r.Node.DlcManager.SaveOffer(args.Offer)
+	if err != nil {
+		return err
+	}
+
+	reply.Offer = args.Offer
+	err = r.Node.DlcSendDraftOffer(reply.Offer.Idx())
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type ListOffersArgs struct {
+	// none
+}
+
+type ListOffersReply struct {
+	Offers []lnutil.DlcOffer
+}
+
+// NewForwardOffer creates a new offer (before the draft contract) of a
+// Forward contract
+func (r *LitRPC) ListOffers(args ListOffersArgs,
+	reply *ListOffersReply) error {
+
+	offers, err := r.Node.DlcManager.ListOffers()
+	if err != nil {
+		return err
+	}
+
+	reply.Offers = offers
+
+	return nil
+}
+
+type DeclineOfferArgs struct {
+	OIdx uint64
+}
+
+type DeclineOfferReply struct {
+	Success bool
+}
+
+// NewForwardOffer creates a new offer (before the draft contract) of a
+// Forward contract
+func (r *LitRPC) DeclineOffer(args DeclineOfferArgs,
+	reply *DeclineOfferReply) error {
+
+	err := r.Node.DlcDeclineDraftOffer(args.OIdx)
+	if err != nil {
+		return err
+	}
+
+	reply.Success = true
+
+	return nil
+}
+
+type AcceptOfferArgs struct {
+	OIdx uint64
+}
+
+type AcceptOfferReply struct {
+	Success bool
+}
+
+// NewForwardOffer creates a new offer (before the draft contract) of a
+// Forward contract
+func (r *LitRPC) AcceptOffer(args AcceptOfferArgs,
+	reply *AcceptOfferReply) error {
+
+	err := r.Node.DlcAcceptDraftOffer(args.OIdx)
+	if err != nil {
+		return err
+	}
+
+	reply.Success = true
+
+	return nil
+}
+
 type ListContractsArgs struct {
 	// none
 }
@@ -137,29 +232,6 @@ func (r *LitRPC) GetContract(args GetContractArgs,
 		return err
 	}
 
-	return nil
-}
-
-type SetContractOracleArgs struct {
-	CIdx uint64
-	OIdx uint64
-}
-
-type SetContractOracleReply struct {
-	Success bool
-}
-
-// SetContractOracle assigns a known oracle to a (new) contract
-func (r *LitRPC) SetContractOracle(args SetContractOracleArgs,
-	reply *SetContractOracleReply) error {
-	var err error
-
-	err = r.Node.DlcManager.SetContractOracle(args.CIdx, args.OIdx)
-	if err != nil {
-		return err
-	}
-
-	reply.Success = true
 	return nil
 }
 
@@ -210,106 +282,49 @@ func (r *LitRPC) SetContractRPoint(args SetContractRPointArgs,
 	return nil
 }
 
-type SetContractSettlementTimeArgs struct {
+type SetContractFwdArgs struct {
 	CIdx uint64
-	Time uint64
+
+	ImBuyer bool
+
+	AssetQuantity int64
+	FundAmt       int64
 }
 
-type SetContractSettlementTimeReply struct {
-	Success bool
-}
-
-// SetContractSettlementTime sets the time this contract will settle (the
-// unix epoch)
-func (r *LitRPC) SetContractSettlementTime(args SetContractSettlementTimeArgs,
-	reply *SetContractSettlementTimeReply) error {
-	var err error
-
-	err = r.Node.DlcManager.SetContractSettlementTime(args.CIdx, args.Time)
-	if err != nil {
-		return err
-	}
-
-	reply.Success = true
-	return nil
-}
-
-type SetContractFundingArgs struct {
-	CIdx        uint64
-	OurAmount   int64
-	TheirAmount int64
-}
-
-type SetContractFundingReply struct {
-	Success bool
-}
-
-// SetContractFunding sets the division in funding the channel. The arguments
-// decide how much we're funding and how much we expect the peer we offer the
-// contract to to fund
-func (r *LitRPC) SetContractFunding(args SetContractFundingArgs,
-	reply *SetContractFundingReply) error {
-	var err error
-
-	err = r.Node.DlcManager.SetContractFunding(args.CIdx,
-		args.OurAmount, args.TheirAmount)
-	if err != nil {
-		return err
-	}
-
-	reply.Success = true
-	return nil
-}
-
-type SetContractDivisionArgs struct {
+type SetContractParamsArgs struct {
 	CIdx             uint64
+	OurAmount        int64
+	TheirAmount      int64
 	ValueFullyOurs   int64
 	ValueFullyTheirs int64
+	Time             uint64
+	CoinType         uint32
+	OIdx             uint64
 }
 
-type SetContractDivisionReply struct {
+type SetContractParamsReply struct {
 	Success bool
 }
 
-// SetContractDivision sets how the contract is settled. The parameters indicate
-// at what value the full contract funds are ours, and at what value they are
-// full funds are for our peer. Between those values, the contract will divide
-// the contract funds linearly
-func (r *LitRPC) SetContractDivision(args SetContractDivisionArgs,
-	reply *SetContractDivisionReply) error {
-	var err error
+// SetContractParams sets all the parameters applicable to a contract
+// 1. Channel ID
+// 2. CoinType
+// 3. How much we're funding
+// 4. How much we expect the peer to fund
+// 5. At what value the full contract funds are ours
+// 6. At what value the full contract funds are theirs
+// 7. Settlement time in Unix Epoch
+// 8. Oracle ID
 
-	err = r.Node.DlcManager.SetContractDivision(args.CIdx,
-		args.ValueFullyOurs, args.ValueFullyTheirs)
+func (r *LitRPC) SetContractParams(args SetContractParamsArgs,
+	reply *SetContractParamsReply) error {
+	var err error
+	err = r.Node.DlcManager.SetContractParams(args.CIdx, args.CoinType,
+		args.OurAmount, args.TheirAmount, args.ValueFullyOurs,
+		args.ValueFullyTheirs, args.Time, args.OIdx)
 	if err != nil {
 		return err
 	}
-
-	reply.Success = true
-	return nil
-}
-
-type SetContractCoinTypeArgs struct {
-	CIdx     uint64
-	CoinType uint32
-}
-
-type SetContractCoinTypeReply struct {
-	Success bool
-}
-
-// SetContractCoinType sets the coin type the contract will be in. Note that a
-// peer that doesn't have a wallet of that type will automatically decline the
-// contract.
-func (r *LitRPC) SetContractCoinType(args SetContractCoinTypeArgs,
-	reply *SetContractCoinTypeReply) error {
-	var err error
-
-	err = r.Node.DlcManager.SetContractCoinType(args.CIdx, args.CoinType)
-	if err != nil {
-		return err
-	}
-
 	reply.Success = true
 	return nil
 }
