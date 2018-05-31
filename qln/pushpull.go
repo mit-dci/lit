@@ -288,7 +288,7 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 		collision = true
 	}
 
-	fmt.Printf("COLLISION is (%b)\n", collision)
+	fmt.Printf("COLLISION is (%t)\n", collision)
 
 	// load state from disk
 	err := nd.ReloadQchanState(qc)
