@@ -1,7 +1,11 @@
 package uspv
 
 import (
+	"encoding/json"
 	"log"
+	"os"
+	"time"
+	"strconv"
 
 	"github.com/adiabat/btcd/wire"
 	"github.com/adiabat/btcutil/bloom"
@@ -25,8 +29,12 @@ func (s *SPVCon) incomingMessageHandler() {
 			s.remoteVersion = uint32(m.ProtocolVersion) // weird cast! bug?
 		case *wire.MsgVerAck:
 			log.Printf("Got verack.  Whatever.\n")
+		case *wire.MsgGetAddr: // what case is this?
+			log.Printf("Got getaddr. Do nothing since we aren't a full node.")
+			// read this info and store somewhere.
 		case *wire.MsgAddr:
 			log.Printf("got %d addresses.\n", len(m.AddrList))
+			s.AddrListHandler(m)
 		case *wire.MsgPing:
 			// log.Printf("Got a ping message.  We should pong back or they will kick us off.")
 			go s.PongBack(m.Nonce)
@@ -179,7 +187,7 @@ func (s *SPVCon) TxHandler(tx *wire.MsgTx) {
 	//	}
 	//	if len(dubs) > 0 {
 	//		for i, dub := range dubs {
-	//			fmt.Printf("dub %d known tx %s and new tx %s are exclusive!!!\n",
+	//			log.Printf("dub %d known tx %s and new tx %s are exclusive!!!\n",
 	//				i, dub.String(), m.TxSha().String())
 	//		}
 	//	}
@@ -250,6 +258,38 @@ func (s *SPVCon) InvHandler(m *wire.MsgInv) {
 	}
 }
 
+func (s *SPVCon) AddrListHandler(m *wire.MsgAddr) {
+	err := s.CreatePeerFile() // create a peers.json file over at testnet3/ vtc/ etc.
+	if err != nil {
+		log.Println("Error while trying to create a file")
+	}
+
+	storedAddrs, err := s.GetNodes() // get the list of Nodes
+	if err != nil {
+		log.Printf("AddrListHandler error: %s", err.Error())
+		return
+	}
+	var dontSaveThis bool
+	for _, addresses := range m.AddrList {
+		now := time.Now()
+		if addresses.Timestamp.After(now.Add(time.Minute * 10)) { // some stuff specified by btcd
+			addresses.Timestamp = now.Add(-1 * time.Hour * 24 * 5)
+		}
+		for _, storedAddr := range storedAddrs {
+			x, _ := strconv.Atoi(s.Param.DefaultPort)
+			if (storedAddr.IP.Equal(addresses.IP)) && (int(addresses.Port) == x) {
+				dontSaveThis = true
+				break
+			}
+		}
+		if !dontSaveThis {
+			// lets append to storedAddrs if the address is not already in the list
+			storedAddrs = append(storedAddrs, *addresses)
+		}
+	}
+	s.WriteIpToFile(storedAddrs) // lets write storedAddrs to peers.json
+}
+
 func (s *SPVCon) PongBack(nonce uint64) {
 	mpong := wire.NewMsgPong(nonce)
 
@@ -261,4 +301,60 @@ func (s *SPVCon) SendFilter(f *bloom.Filter) {
 	s.outMsgQueue <- f.MsgFilterLoad()
 
 	return
+}
+
+func (s *SPVCon) WriteIpToFile(storedAddrs []wire.NetAddress) {
+
+	if _, err := os.Stat(s.nodeFile); !os.IsNotExist(err) {
+		err := os.Remove(s.nodeFile) // delete the file if it already exists
+		if err != nil {
+			log.Println("File deletion error. Exiting")
+			return
+		}
+	}
+	file, err := os.Create(s.nodeFile) // create a new file
+	if err != nil {
+		log.Println("File creation error. Exiting")
+		return
+	}
+	file.Close() // lets close the file and open in append mode
+	file, err = os.OpenFile(s.nodeFile, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Println(err)
+	}
+	_, err = file.WriteString("[") // we need to write this the first time around
+	if err != nil {
+		log.Println("Saving starting character failed. Quitting")
+		return
+	}
+
+	for j, values := range storedAddrs {
+
+		dest, err := json.Marshal(values)
+		if err != nil {
+			log.Println("Converting to a JSON object failed")
+		}
+
+		if values.IP.String() != "<nil>" {
+			_, err := file.WriteString(string(dest))
+			if err != nil {
+				log.Println("Appending to a file failed")
+			}
+
+			if j < len(storedAddrs)-1 {
+				_, err := file.WriteString(",\n") // separate the json objects
+				if err != nil {
+					log.Println("Failed to write Newline")
+				}
+			}
+			if j == len(storedAddrs)-1 { // this is the last line, close the json object
+				_, err := file.WriteString("\n]")
+				if err != nil {
+					log.Println("Saving ending characters failed. Quitting")
+					break
+				}
+			}
+		}
+	}
+	file.Close()
 }

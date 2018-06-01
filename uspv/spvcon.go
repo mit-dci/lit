@@ -21,7 +21,8 @@ type SPVCon struct {
 
 	headerMutex       sync.Mutex
 	headerFile        *os.File // file for SPV headers
-	headerStartHeight int32    // first header on disk is nth header in chain
+	nodeFile          string // remember to change this
+	headerStartHeight int32 // first header on disk is nth header in chain
 
 	syncHeight int32 // internal, in memory synchronization height
 

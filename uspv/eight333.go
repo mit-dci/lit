@@ -136,6 +136,7 @@ func (s *SPVCon) AskForTx(txid chainhash.Hash) {
 	//	}
 	gdata.AddInvVect(inv)
 	log.Printf("asking for tx %s\n", txid.String())
+	// s.outMsgQueue <- wire.NewMsgGetAddr() // get list of all peers connected to the remote node
 	s.outMsgQueue <- gdata
 }
 
@@ -324,6 +325,14 @@ func (s *SPVCon) AskForHeaders() error {
 		len(ghdr.BlockLocatorHashes), ghdr.BlockLocatorHashes[0].String())
 
 	s.outMsgQueue <- ghdr
+	return nil
+}
+
+// AskForNodes asks for the list of connected peers from a remote node.
+// This should then result in istuff being tored in the peers.json file
+func (s *SPVCon) AskForNodes() error {
+	message := wire.NewMsgGetAddr()
+	s.outMsgQueue <- message
 	return nil
 }
 

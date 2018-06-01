@@ -2,21 +2,48 @@ package uspv
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/adiabat/btcd/wire"
 	"github.com/mit-dci/lit/lnutil"
 )
 
-// Connect dials out and connects to full nodes.
+func (s *SPVCon) CreatePeerFile() error {
+	if _, err := os.Stat(s.nodeFile); os.IsNotExist(err) {
+		os.Mkdir("./peers", 0700)
+		file, err := os.Create(s.nodeFile)
+		file.Close()
+		if err != nil {
+			log.Println("File creation error. Exiting")
+			return err
+		}
+		return nil
+	}
+	return nil
+}
+
+func (s *SPVCon) GetNodes() ([]wire.NetAddress, error) {
+	var addresses []wire.NetAddress
+	raw, err := ioutil.ReadFile(s.nodeFile)
+	if err != nil {
+		return nil, err
+	}
+	json.Unmarshal(raw, &addresses)
+	return addresses, nil
+}
+
 func (s *SPVCon) Connect(remoteNode string) error {
 	var err error
-
+	flag := 0
+	log.Println("Its coming over here")
+	log.Println(remoteNode)
 	// slice of IP addrs returned from the DNS seed
 	var seedAdrs []string
 	// if remoteNode is "yes" but no IP specified, use DNS seed
@@ -29,39 +56,77 @@ func (s *SPVCon) Connect(remoteNode string) error {
 				"Can't connect: No known DNS seeds for %s", s.Param.Name)
 		}
 
-		// go through seeds to get a list of IP addrs
-		for _, seed := range s.Param.DNSSeeds {
-			seedAdrs, err = net.LookupHost(seed)
-			if err == nil {
-				// got em
-				log.Printf("Got %d IPs from DNS seed %s\n", len(seedAdrs), seed)
-				break
+		// before this part, I want to see if I can connect to stuff over in the peers file
+
+		if _, err := os.Stat(s.nodeFile); os.IsNotExist(err) {
+			log.Println("Peers file doesn't exist") // set flag to 1 sicne peers doesn't exist
+		} else {
+			log.Println("Reading from peers file")
+			readvalues, err := s.GetNodes()
+			if err != nil {
+				log.Println(err)
+				return err
 			}
-			// gotta keep trying for those IPs
-			log.Println("DNS seed %s error", seed)
+			for _, ve := range readvalues {
+				// do what we want with the IPs, which is to try connecting to them.
+				if ve.IP.String() != "<nil>" {
+					log.Printf("Attempting to connect to %s:%d", ve.IP.String(), int(ve.Port))
+					if strconv.Itoa(int(ve.Port)) == s.Param.DefaultPort { // to handle different protocols
+						_, err := net.LookupHost(ve.IP.String())
+						if err != nil {
+							log.Println("Fatal Error while connecting to remote node. Trying again.")
+							continue
+						}
+						remoteNode = "[" + ve.IP.String() + "]" + ":"+ s.Param.DefaultPort
+						s.con, err = net.Dial("tcp", remoteNode)
+						if err != nil {
+							log.Println(err.Error())
+							continue
+						}
+						flag = 1
+						break
+					}
+				}
+			}
+		}
+		// end the part where I connect to the stuff over at peers.json
+
+		if flag != 1 {
+			// go through seeds to get a list of IP addrs
+			for _, seed := range s.Param.DNSSeeds {
+				seedAdrs, err = net.LookupHost(seed)
+				if err == nil {
+					// got em
+					log.Printf("Got %d IPs from DNS seed %s\n", len(seedAdrs), seed)
+					break
+				}
+				// gotta keep trying for those IPs
+				log.Println("DNS seed %s error", seed)
+			}
+
+			if len(seedAdrs) == 0 {
+				// never got any IPs from DNS seeds; give up
+				return fmt.Errorf(
+					"Can't connect: No functioning DNS seeds for %s", s.Param.Name)
+			}
+			// now have some IPs, go through and try to connect to one.
+			var connected bool
+			for _, ip := range seedAdrs {
+				log.Printf("Attempting connection to node at %s\n",
+					ip+":"+s.Param.DefaultPort)
+				s.con, err = net.Dial("tcp", ip+":"+s.Param.DefaultPort)
+				if err != nil {
+					log.Println(err.Error())
+				} else {
+					connected = true
+					break
+				}
+			}
+			if !connected {
+				return fmt.Errorf("Tried all IPs from DNS seed, none worked")
+			}
 		}
 
-		if len(seedAdrs) == 0 {
-			// never got any IPs from DNS seeds; give up
-			return fmt.Errorf(
-				"Can't connect: No functioning DNS seeds for %s", s.Param.Name)
-		}
-		// now have some IPs, go through and try to connect to one.
-		var connected bool
-		for _, ip := range seedAdrs {
-			log.Printf("Attempting connection to node at %s\n",
-				ip+":"+s.Param.DefaultPort)
-			s.con, err = net.Dial("tcp", ip+":"+s.Param.DefaultPort)
-			if err != nil {
-				log.Println(err.Error())
-			} else {
-				connected = true
-				break
-			}
-		}
-		if !connected {
-			return fmt.Errorf("Tried all IPs from DNS seed, none worked")
-		}
 	} else { // else connect to user-specified node
 		if !strings.Contains(remoteNode, ":") {
 			remoteNode = remoteNode + ":" + s.Param.DefaultPort
