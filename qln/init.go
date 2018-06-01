@@ -2,7 +2,6 @@ package qln
 
 import (
 	"fmt"
-	"log"
 	"path/filepath"
 
 	"github.com/adiabat/btcutil"
@@ -123,7 +122,6 @@ func (nd *LitNode) LinkBaseWallet(
 		var pkh [20]byte
 		pkhSlice := btcutil.Hash160(qChan.MyRefundPub[:])
 		copy(pkh[:], pkhSlice)
-		log.Printf("Re-registering %x", pkh)
 		nd.SubWallet[WallitIdx].ExportHook().RegisterAddress(pkh)
 	}
 
