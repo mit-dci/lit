@@ -384,7 +384,7 @@ func (lc *litAfClient) DlcListOracles(textArgs []string) error {
 	args := new(litrpc.ListOraclesArgs)
 	reply := new(litrpc.ListOraclesReply)
 
-	err := lc.rpccon.Call("LitRPC.ListOracles", args, reply)
+	err := lc.Call("LitRPC.ListOracles", args, reply)
 	if err != nil {
 		return err
 	}
@@ -416,7 +416,7 @@ func (lc *litAfClient) DlcImportOracle(textArgs []string) error {
 	args.Url = textArgs[0]
 	args.Name = textArgs[1]
 
-	err := lc.rpccon.Call("LitRPC.ImportOracle", args, reply)
+	err := lc.Call("LitRPC.ImportOracle", args, reply)
 	if err != nil {
 		return err
 	}
@@ -443,7 +443,7 @@ func (lc *litAfClient) DlcAddOracle(textArgs []string) error {
 	args.Key = textArgs[0]
 	args.Name = textArgs[1]
 
-	err := lc.rpccon.Call("LitRPC.AddOracle", args, reply)
+	err := lc.Call("LitRPC.AddOracle", args, reply)
 	if err != nil {
 		return err
 	}
@@ -526,7 +526,7 @@ func (lc *litAfClient) DlcListContracts(textArgs []string) error {
 	args := new(litrpc.ListContractsArgs)
 	reply := new(litrpc.ListContractsReply)
 
-	err := lc.rpccon.Call("LitRPC.ListContracts", args, reply)
+	err := lc.Call("LitRPC.ListContracts", args, reply)
 	if err != nil {
 		return err
 	}
@@ -546,7 +546,7 @@ func (lc *litAfClient) DlcNewContract(textArgs []string) error {
 	args := new(litrpc.NewContractArgs)
 	reply := new(litrpc.NewContractReply)
 
-	err := lc.rpccon.Call("LitRPC.NewContract", args, reply)
+	err := lc.Call("LitRPC.NewContract", args, reply)
 	if err != nil {
 		return err
 	}
@@ -576,7 +576,7 @@ func (lc *litAfClient) DlcViewContract(textArgs []string) error {
 	}
 	args.Idx = cIdx
 
-	err = lc.rpccon.Call("LitRPC.GetContract", args, reply)
+	err = lc.Call("LitRPC.GetContract", args, reply)
 	if err != nil {
 		return err
 	}
@@ -618,7 +618,7 @@ func (lc *litAfClient) DlcViewContractPayout(textArgs []string) error {
 
 	args.Idx = cIdx
 
-	err = lc.rpccon.Call("LitRPC.GetContract", args, reply)
+	err = lc.Call("LitRPC.GetContract", args, reply)
 	if err != nil {
 		return err
 	}
@@ -652,7 +652,7 @@ func (lc *litAfClient) DlcSetContractOracle(textArgs []string) error {
 	args.CIdx = cIdx
 	args.OIdx = oIdx
 
-	err = lc.rpccon.Call("LitRPC.SetContractOracle", args, reply)
+	err = lc.Call("LitRPC.SetContractOracle", args, reply)
 	if err != nil {
 		return err
 	}
@@ -687,7 +687,7 @@ func (lc *litAfClient) DlcSetContractDatafeed(textArgs []string) error {
 	args.CIdx = cIdx
 	args.Feed = feed
 
-	err = lc.rpccon.Call("LitRPC.SetContractDatafeed", args, reply)
+	err = lc.Call("LitRPC.SetContractDatafeed", args, reply)
 	if err != nil {
 		return err
 	}
@@ -722,7 +722,7 @@ func (lc *litAfClient) DlcSetContractRPoint(textArgs []string) error {
 	args.CIdx = cIdx
 	copy(args.RPoint[:], rPoint[:])
 
-	err = lc.rpccon.Call("LitRPC.SetContractRPoint", args, reply)
+	err = lc.Call("LitRPC.SetContractRPoint", args, reply)
 	if err != nil {
 		return err
 	}
@@ -757,7 +757,7 @@ func (lc *litAfClient) DlcSetContractSettlementTime(textArgs []string) error {
 	args.CIdx = cIdx
 	args.Time = time
 
-	err = lc.rpccon.Call("LitRPC.SetContractSettlementTime", args, reply)
+	err = lc.Call("LitRPC.SetContractSettlementTime", args, reply)
 	if err != nil {
 		return err
 	}
@@ -797,7 +797,7 @@ func (lc *litAfClient) DlcSetContractFunding(textArgs []string) error {
 	args.OurAmount = ourAmount
 	args.TheirAmount = theirAmount
 
-	err = lc.rpccon.Call("LitRPC.SetContractFunding", args, reply)
+	err = lc.Call("LitRPC.SetContractFunding", args, reply)
 	if err != nil {
 		return err
 	}
@@ -833,7 +833,7 @@ func (lc *litAfClient) DlcSetContractCoinType(textArgs []string) error {
 	args.CIdx = cIdx
 	args.CoinType = uint32(cointype)
 
-	err = lc.rpccon.Call("LitRPC.SetContractCoinType", args, reply)
+	err = lc.Call("LitRPC.SetContractCoinType", args, reply)
 	if err != nil {
 		return err
 	}
@@ -873,7 +873,7 @@ func (lc *litAfClient) DlcSetContractDivision(textArgs []string) error {
 	args.ValueFullyOurs = fullyOurs
 	args.ValueFullyTheirs = fullyTheirs
 
-	err = lc.rpccon.Call("LitRPC.SetContractDivision", args, reply)
+	err = lc.Call("LitRPC.SetContractDivision", args, reply)
 	if err != nil {
 		return err
 	}
@@ -909,7 +909,7 @@ func (lc *litAfClient) DlcOfferContract(textArgs []string) error {
 	args.CIdx = cIdx
 	args.PeerIdx = uint32(peerIdx)
 
-	err = lc.rpccon.Call("LitRPC.OfferContract", args, reply)
+	err = lc.Call("LitRPC.OfferContract", args, reply)
 	if err != nil {
 		return err
 	}
@@ -940,7 +940,7 @@ func (lc *litAfClient) DlcDeclineContract(textArgs []string) error {
 
 	args.CIdx = cIdx
 
-	err = lc.rpccon.Call("LitRPC.DeclineContract", args, reply)
+	err = lc.Call("LitRPC.DeclineContract", args, reply)
 	if err != nil {
 		return err
 	}
@@ -971,7 +971,7 @@ func (lc *litAfClient) DlcAcceptContract(textArgs []string) error {
 
 	args.CIdx = cIdx
 
-	err = lc.rpccon.Call("LitRPC.AcceptContract", args, reply)
+	err = lc.Call("LitRPC.AcceptContract", args, reply)
 	if err != nil {
 		return err
 	}
@@ -1015,7 +1015,7 @@ func (lc *litAfClient) DlcSettleContract(textArgs []string) error {
 
 	copy(args.OracleSig[:], oracleSigBytes)
 
-	err = lc.rpccon.Call("LitRPC.SettleContract", args, reply)
+	err = lc.Call("LitRPC.SettleContract", args, reply)
 	if err != nil {
 		return err
 	}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -9,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"golang.org/x/net/websocket"
 
@@ -138,4 +140,15 @@ func main() {
 	//		log.Fatal("rpc call error:", err)
 	//	}
 	//	fmt.Printf("Sent bal req, response: txototal %d\n", br.TxoTotal)
+}
+
+func (lc *litAfClient) Call(serviceMethod string, args interface{}, reply interface{}) error {
+	c := make(chan error, 1)
+	go func() { c <- lc.rpccon.Call(serviceMethod, args, &reply) }()
+	select {
+	case err := <-c:
+		return err
+	case <-time.After(time.Second * 10):
+		return errors.New("RPC call timed out")
+	}
 }
