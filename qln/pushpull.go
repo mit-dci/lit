@@ -67,7 +67,7 @@ DeltaSig collision handling:
 
 Send a DeltaSig.  Delta < 0.
 Receive a DeltaSig with Delta < 0; need to send a GapSigRev
-COLLISION: Set the collision flag (delta-(1<<30))
+COLLISION: Set the collision flag (delta-(130))
 update amount with increment from received deltaSig
 verify received signature & save to disk, update state number
 *your delta value stays the same*
@@ -146,7 +146,7 @@ func (nd *LitNode) ReSendMsg(qc *Qchan) error {
 }
 
 // PushChannel initiates a state update by sending a DeltaSig
-func (nd LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
+func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	// sanity checks
 	if amt >= 1<<30 {
 		return fmt.Errorf("max send 1G sat (1073741823)")
@@ -537,12 +537,10 @@ func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
 	q.State.StateIdx -= 2
 	q.State.MyAmt = prevAmt
 
-	go func() {
-		err = nd.BuildJusticeSig(q)
-		if err != nil {
-			fmt.Printf("GapSigRevHandler BuildJusticeSig err %s", err.Error())
-		}
-	}()
+	err = nd.BuildJusticeSig(q)
+	if err != nil {
+		fmt.Printf("GapSigRevHandler BuildJusticeSig err %s", err.Error())
+	}
 
 	return nil
 }
@@ -616,12 +614,10 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 	qc.State.StateIdx--
 	qc.State.MyAmt = prevAmt
 
-	go func() {
-		err = nd.BuildJusticeSig(qc)
-		if err != nil {
-			fmt.Printf("SigRevHandler BuildJusticeSig err %s", err.Error())
-		}
-	}()
+	err = nd.BuildJusticeSig(qc)
+	if err != nil {
+		fmt.Printf("SigRevHandler BuildJusticeSig err %s", err.Error())
+	}
 
 	// done updating channel, no new messages expected.  Set clear to send
 	qc.ClearToSend <- true
@@ -689,12 +685,10 @@ func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {
 	// the justice signature
 	qc.State.StateIdx--      // back one state
 	qc.State.MyAmt = prevAmt // use stashed previous state amount
-	go func() {
-		err = nd.BuildJusticeSig(qc)
-		if err != nil {
-			fmt.Printf("RevHandler BuildJusticeSig err %s", err.Error())
-		}
-	}()
+	err = nd.BuildJusticeSig(qc)
+	if err != nil {
+		fmt.Printf("RevHandler BuildJusticeSig err %s", err.Error())
+	}
 
 	// got rev, assert clear to send
 	qc.ClearToSend <- true
