@@ -13,74 +13,32 @@ import (
 	"github.com/mit-dci/lit/lnutil"
 )
 
-func (s *SPVCon) GetSeedAdrs(remoteNode string) error {
+func (s *SPVCon) GetSeedAdrs(seed string) ([]string, error) {
 	var err error
-	// slice of IP addrs returned from the DNS seed
-	var seedAdrs []string
-	// if remoteNode is "yes" but no IP specified, use DNS seed
-	if lnutil.YupString(remoteNode) {
-		// connect to DNS seed based node
-		log.Printf("Attempting connection based on DNS seed\n")
-		if len(s.Param.DNSSeeds) == 0 {
-			// no available DNS seeds
-			return fmt.Errorf(
-				"Can't connect: No known DNS seeds for %s", s.Param.Name)
-		}
+	var seedAdrs []string // slice of IP addrs returned from the DNS seed
+	log.Printf("Attempting to retrieve peers to connect to based on DNS Seed\n")
 
-		// go through seeds to get a list of IP addrs
-		for i, seed := range s.Param.DNSSeeds {
-			seedAdrs, err = net.LookupHost(seed)
-			if err == nil {
-				// got em
-				log.Printf("Got %d IPs from DNS seed %s\n", len(seedAdrs), seed)
-			} else {
-				// gotta keep trying for those IPs
-				continue
-			}
-
-			if len(seedAdrs) == 0 {
-				if i != len(s.Param.DNSSeeds)-1 {
-					continue
-				} else {
-					// never got any IPs from DNS seeds; give up
-					return fmt.Errorf(
-						"Can't connect: No functioning DNS seeds for %s", s.Param.Name)
-				}
-			}
-
-			err = s.ConnectToSeedAdrs(seedAdrs)
-			if err != nil {
-				if i != len(s.Param.DNSSeeds)-1 {
-					continue
-				} else {
-					return fmt.Errorf("Couldn't connect to all seeds with all DNS Peers. Try later or give your own peer!")
-				}
-			}
-			return nil
-		}
-		return nil
-	} else { // else connect to user-specified node
-		if !strings.Contains(remoteNode, ":") {
-			remoteNode = remoteNode + ":" + s.Param.DefaultPort
-		}
-
-		// open TCP connection to specified host
-		s.con, err = net.Dial("tcp", remoteNode)
-		if err != nil {
-			return err
-		}
-		err := s.Handshake(nil)
-		if err != nil {
-			return err
-		}
+	seedAdrs, err = net.LookupHost(seed)
+	if err == nil {
+		log.Printf("Got %d IPs from DNS seed %s\n", len(seedAdrs), seed)
+		// got seedAdrs, but it may be empty
+	} else {
+		return nil, fmt.Errorf("Have difficulty trying to conenct to %s. Going to the next seed", seed)
 	}
-	return nil
+
+	if len(seedAdrs) == 0 {
+		// check whether seedAdrs is not empty
+		return nil, fmt.Errorf("No peers found conencted to %s. Continuing.", seed)
+	}
+	return seedAdrs, nil
+	// return the seedAdrs here
 }
-func (s *SPVCon) ConnectToSeedAdrs( seedAdrs []string) error {
+
+func (s *SPVCon) DialNode(seedAdrs []string) error {
 	// now have some IPs, go through and try to connect to one.
 	var err error
-	var connected bool
 	for i, ip := range seedAdrs {
+		// try to connect to all nodes in this range
 		log.Printf("Attempting connection to node at %s\n",
 			ip+":"+s.Param.DefaultPort)
 		s.con, err = net.Dial("tcp", ip+":"+s.Param.DefaultPort)
@@ -88,18 +46,10 @@ func (s *SPVCon) ConnectToSeedAdrs( seedAdrs []string) error {
 			log.Println(err.Error())
 			continue
 		} else if i == len(seedAdrs)-1 {
-			connected = false
+			// all nodes have been exhausted, we move on to the next one, if any.
 			return fmt.Errorf(" Tried to connect to all seed Addresses from peer. Failed")
-		} else {
-			connected = true
 		}
-		if connected {
-			err := s.Handshake(seedAdrs)
-			if err != nil {
-				continue
-			}
-			break
-		}
+		break
 	}
 	return nil
 }
@@ -145,16 +95,12 @@ func (s *SPVCon) Handshake(seedAdrs []string) error {
 
 	if mv.ProtocolVersion < 70013 {
 		//70014 -> core v0.13.1, so we should be fine
-		return fmt.Errorf("Remote node version: %x too old, exiting.", mv.ProtocolVersion)
+		return fmt.Errorf("Remote node version: %x too old, disconnecting.", mv.ProtocolVersion)
 	}
 
 	if !(strings.Contains(mv.UserAgent, "Satoshi") || strings.Contains(mv.UserAgent, "btcd")) && (len(seedAdrs) != 0) {
 		// TODO: improve this filtering criterion
-		seedAdrs = seedAdrs[1:] // delete the one we tried with
-		err = s.ConnectToSeedAdrs(seedAdrs)
-		if err != nil {
-			return fmt.Errorf("Couldn't connect to any seed!")
-		}
+		return fmt.Errorf("Couldn't connect to this node. Returning!")
 	}
 
 	log.Printf("remote reports version %x (dec %d)\n",
@@ -178,9 +124,48 @@ func (s *SPVCon) Handshake(seedAdrs []string) error {
 
 // Connect dials out and connects to full nodes.
 func (s *SPVCon) Connect(remoteNode string) error {
-	err := s.GetSeedAdrs(remoteNode)
-	if err != nil {
-		return fmt.Errorf("Couldn't connect to the node you provided!")
+	var err error
+	if lnutil.YupString(remoteNode) {
+		// if remoteNode is "yes" but no IP specified, use DNS seed
+		if len(s.Param.DNSSeeds) == 0 {
+			// no available DNS seeds
+			return fmt.Errorf(
+				"Can't connect: No known DNS seeds for %s", s.Param.Name)
+		}
+		listofDNSSeeds := s.Param.DNSSeeds
+		for len(listofDNSSeeds) != 0 {
+			seed := listofDNSSeeds[0]
+			seedAdrs, err := s.GetSeedAdrs(seed)
+			if err != nil {
+				return err
+			}
+			err = s.DialNode(seedAdrs)
+			if err != nil {
+				listofDNSSeeds = listofDNSSeeds[1:]
+				continue
+			}
+			err = s.Handshake(seedAdrs)
+			if err != nil {
+				// means we either have a sapm node or didn't get a resonse. So we Try again
+				log.Println(err)
+				log.Println("Couldn't establish connection with node. Proceeding to the next one")
+				continue
+			}
+			break
+		}
+	} else { // else connect to user-specified node
+		if !strings.Contains(remoteNode, ":") {
+			remoteNode = remoteNode + ":" + s.Param.DefaultPort
+		}
+		// open TCP connection to specified host
+		s.con, err = net.Dial("tcp", remoteNode)
+		if err != nil {
+			return err
+		}
+		err := s.Handshake(nil)
+		if err != nil {
+			return err
+		}
 	}
 
 	s.inMsgQueue = make(chan wire.Message)
