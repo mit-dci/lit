@@ -137,7 +137,7 @@ func (s *SPVCon) Connect(remoteNode string) error {
 		if !strings.Contains(remoteNode, ":") {
 			remoteNode = remoteNode + ":" + s.Param.DefaultPort
 		}
-		listOfNodes = append(listOfNodes, remoteNode)
+		listOfNodes = []string{remoteNode}
 	}
 
 	for len(listOfNodes) != 0 {
@@ -148,6 +148,10 @@ func (s *SPVCon) Connect(remoteNode string) error {
 		}
 		err = s.Handshake(listOfNodes)
 		if err != nil {
+			if len(listOfNodes) == 1 { // when the list is empty, error out
+				return fmt.Errorf("Couldn't establish connection with remote node. Exiting.")
+				break
+			}
 			// means we either have a sapm node or didn't get a resonse. So we Try again
 			log.Println(err)
 			log.Println("Couldn't establish connection with node. Proceeding to the next one")
