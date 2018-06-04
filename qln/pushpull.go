@@ -67,7 +67,7 @@ DeltaSig collision handling:
 
 Send a DeltaSig.  Delta < 0.
 Receive a DeltaSig with Delta < 0; need to send a GapSigRev
-COLLISION: Set the collision flag (delta-(1<<30))
+COLLISION: Set the collision flag (delta-(130))
 update amount with increment from received deltaSig
 verify received signature & save to disk, update state number
 *your delta value stays the same*
@@ -195,7 +195,7 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 		qc.ClearToSend <- true
 		return fmt.Errorf("want to push %s but %s available after %s fee and %s consts.MinOutput",
 			lnutil.SatoshiColor(int64(amt)),
-			lnutil.SatoshiColor(qc.State.MyAmt-qc.State.Fee-consts.minOutput),
+			lnutil.SatoshiColor(qc.State.MyAmt-qc.State.Fee-consts.MinOutput),
 			lnutil.SatoshiColor(qc.State.Fee),
 			lnutil.SatoshiColor(consts.MinOutput))
 	}
@@ -288,7 +288,7 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 		collision = true
 	}
 
-	fmt.Printf("COLLISION is (%s)\n", collision)
+	fmt.Printf("COLLISION is (%t)\n", collision)
 
 	// load state from disk
 	err := nd.ReloadQchanState(qc)

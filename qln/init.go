@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/adiabat/btcutil"
 	"github.com/adiabat/btcutil/hdkeychain"
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/coinparam"
@@ -110,6 +111,19 @@ func (nd *LitNode) LinkBaseWallet(
 	// be the first & default
 	nd.SubWallet[WallitIdx] = wallit.NewWallit(
 		rootpriv, birthHeight, resync, host, nd.LitFolder, param)
+
+	// re-register channel addresses
+	qChans, err := nd.GetAllQchans()
+	if err != nil {
+		return err
+	}
+
+	for _, qChan := range qChans {
+		var pkh [20]byte
+		pkhSlice := btcutil.Hash160(qChan.MyRefundPub[:])
+		copy(pkh[:], pkhSlice)
+		nd.SubWallet[WallitIdx].ExportHook().RegisterAddress(pkh)
+	}
 
 	go nd.OPEventHandler(nd.SubWallet[WallitIdx].LetMeKnow())
 

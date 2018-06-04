@@ -149,7 +149,7 @@ func (w *WatchTower) NewChannel(m lnutil.WatchDescMsg) error {
 		// save truncated descriptor for static info (drop elk0)
 		wdBytes := m.Bytes()
 		if len(wdBytes) < 96 {
-			return fmt.Errorf("watchdescriptor %d bytes, expect 96")
+			return fmt.Errorf("watchdescriptor %d bytes, expect 96", len(wdBytes))
 		}
 		chanBucket.Put(KEYStatic, wdBytes[:96])
 		log.Printf("saved new channel to pkh %x\n", m.DestPKHScript)

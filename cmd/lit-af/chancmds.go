@@ -25,7 +25,7 @@ var fundCommand = &Command{
 var watchCommand = &Command{
 	Format: fmt.Sprintf("%s%s\n", lnutil.White("watch"),
 		lnutil.ReqColor("channel idx", "watchPeerIdx")),
-	Description: fmt.Sprintf("%s\n%s\n%s%s\n",
+	Description: fmt.Sprintf("%s\n%s\n",
 		"Send channel data to a watcher",
 		"The watcher can defend your channel while you're offline."),
 	ShortDescription: "Send channel watch data to watcher.\n",
