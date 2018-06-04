@@ -48,7 +48,7 @@ func (s *SPVCon) incomingMessageHandler() {
 		case *wire.MsgNotFound:
 			log.Printf("Got not found response from remote:")
 			for i, thing := range m.InvList {
-				log.Printf("\t$d) %s: %s", i, thing.Type, thing.Hash)
+				log.Printf("\t%d) %s: %s", i, thing.Type, thing.Hash)
 			}
 		case *wire.MsgGetData:
 			s.GetDataHandler(m)

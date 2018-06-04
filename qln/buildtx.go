@@ -3,8 +3,8 @@ package qln
 import (
 	"fmt"
 
-	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/consts"
+	"github.com/mit-dci/lit/lnutil"
 
 	"github.com/adiabat/btcd/wire"
 	"github.com/adiabat/btcutil/txsort"

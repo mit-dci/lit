@@ -15,7 +15,7 @@ import (
 var dlcCommand = &Command{
 	Format: fmt.Sprintf("%s%s%s\n", lnutil.White("dlc"),
 		lnutil.ReqColor("subcommand"), lnutil.OptColor("parameters...")),
-	Description: fmt.Sprintf("%s%2\n%s\n%s\n",
+	Description: fmt.Sprintf("%s\n%s\n%s\n%s\n",
 		"Command for working with discreet log contracts. ",
 		"Subcommand can be one of:",
 		fmt.Sprintf("%-10s %s",
@@ -157,10 +157,10 @@ var viewContractCommand = &Command{
 }
 
 var viewContractPayoutCommand = &Command{
-	Format: fmt.Sprintf("%s%s%s%s\n", lnutil.White("dlc contract viewpayout"),
+	Format: fmt.Sprintf("%s%s%s%s%s\n", lnutil.White("dlc contract viewpayout"),
 		lnutil.ReqColor("id"), lnutil.ReqColor("start"),
 		lnutil.ReqColor("end"), lnutil.ReqColor("increment")),
-	Description: fmt.Sprintf("%s\n%s\n%s\n%s\n",
+	Description: fmt.Sprintf("%s\n%s\n%s\n%s\n%s\n",
 		"Views the payout table of a contract",
 		fmt.Sprintf("%-10s %s",
 			lnutil.White("id"),
