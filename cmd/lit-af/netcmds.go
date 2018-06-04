@@ -48,7 +48,7 @@ func (lc *litAfClient) Graph(textArgs []string) error {
 	args := new(litrpc.NoArgs)
 	reply := new(litrpc.ChannelGraphReply)
 
-	err := lc.rpccon.Call("LitRPC.GetChannelMap", args, reply)
+	err := lc.Call("LitRPC.GetChannelMap", args, reply)
 	if err != nil {
 		return err
 	}
@@ -66,7 +66,7 @@ func (lc *litAfClient) RequestAsync() {
 		args := new(litrpc.NoArgs)
 		reply := new(litrpc.StatusReply)
 
-		err := lc.rpccon.Call("LitRPC.GetMessages", args, reply)
+		err := lc.Call("LitRPC.GetMessages", args, reply)
 		if err != nil {
 			fmt.Fprintf(color.Output, "RequestAsync error %s\n", lnutil.Red(err.Error()))
 			break
@@ -97,7 +97,7 @@ func (lc *litAfClient) Lis(textArgs []string) error {
 		}
 	}
 
-	err := lc.rpccon.Call("LitRPC.Listen", args, reply)
+	err := lc.Call("LitRPC.Listen", args, reply)
 	if err != nil {
 		return err
 	}
@@ -126,7 +126,7 @@ func (lc *litAfClient) Connect(textArgs []string) error {
 
 	args.LNAddr = textArgs[0]
 
-	err := lc.rpccon.Call("LitRPC.Connect", args, reply)
+	err := lc.Call("LitRPC.Connect", args, reply)
 	if err != nil {
 		return err
 	}
@@ -162,7 +162,7 @@ func (lc *litAfClient) Say(textArgs []string) error {
 
 	args.Peer = uint32(peerIdx)
 
-	err = lc.rpccon.Call("LitRPC.Say", args, reply)
+	err = lc.Call("LitRPC.Say", args, reply)
 	if err != nil {
 		return err
 	}
