@@ -66,7 +66,7 @@ func (lc *litAfClient) RequestAsync() {
 		args := new(litrpc.NoArgs)
 		reply := new(litrpc.StatusReply)
 
-		err := lc.Call("LitRPC.GetMessages", args, reply)
+		err := lc.rpccon.Call("LitRPC.GetMessages", args, reply)
 		if err != nil {
 			fmt.Fprintf(color.Output, "RequestAsync error %s\n", lnutil.Red(err.Error()))
 			break
