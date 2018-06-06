@@ -33,7 +33,7 @@ type config struct { // define a struct for usage with go-flags
 
 	Rpcport uint16 `short:"p" long:"rpcport" description:"Set RPC port to connect to"`
 	Tip     int32  `short:"t" long:"tip" description:"Specify tip to begin sync from"`
-	Rpchost string `short:"h" long:"rpchost" description:"Set RPC host to listen to"`
+	Rpchost string `long:"rpchost" description:"Set RPC host to listen to"`
 
 	Params *coinparam.Params
 }
