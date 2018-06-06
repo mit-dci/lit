@@ -84,7 +84,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	if !lnutil.NopeString(conf.Tn3host) {
 		p := &coinparam.TestNet3Params
 		err = node.LinkBaseWallet(
-			key, 1256000, conf.ReSync, conf.Tower,
+			key, 1256000, conf.Resync, conf.Tower,
 			conf.Tn3host, p)
 		if err != nil {
 			return err
