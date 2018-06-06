@@ -32,7 +32,7 @@ type config struct { // define a struct for usage with go-flags
 	Verbose bool `short:"v" long:"verbose" description:"Set verbosity to true."`
 
 	Rpcport uint16 `short:"p" long:"rpcport" description:"Set RPC port to connect to"`
-	Rpchost string `short:"h" long:"rpchost" description:"Set RPC host to listen to"`
+	Rpchost string `long:"rpchost" description:"Set RPC host to listen to"`
 
 	Params *coinparam.Params
 }
