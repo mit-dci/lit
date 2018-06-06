@@ -13,6 +13,9 @@ import (
 	"github.com/mit-dci/lit/lnutil"
 )
 
+// GetListOfNodes contacts all DNSSeeds for the coin specified and then contacts
+// each one of them in order to receive a list of ips and then returns a combined
+// list
 func (s *SPVCon) GetListOfNodes() ([]string, error) {
 	var listOfNodes []string // slice of IP addrs returned from the DNS seed
 	log.Printf("Attempting to retrieve peers to connect to based on DNS Seed\n")
@@ -35,6 +38,7 @@ func (s *SPVCon) GetListOfNodes() ([]string, error) {
 	return listOfNodes, nil
 }
 
+// DialNode receives a list of node ips and then tries to connect to them one by one.
 func (s *SPVCon) DialNode(listOfNodes []string) error {
 	// now have some IPs, go through and try to connect to one.
 	var err error
@@ -123,7 +127,10 @@ func (s *SPVCon) Handshake(listOfNodes []string) error {
 	return nil
 }
 
-// Connect dials out and connects to full nodes.
+// Connect dials out and connects to full nodes. Calls GetListOfNodes to get the
+// list of nodes if the user has specified a YupString. Else, moves on to dial
+// the node to see if its up and establishes a conneciton followed by Handshake()
+// which sends out wire messages, checks for version string to prevent spam, etc.
 func (s *SPVCon) Connect(remoteNode string) error {
 	var err error
 	var listOfNodes []string
@@ -140,25 +147,41 @@ func (s *SPVCon) Connect(remoteNode string) error {
 		listOfNodes = []string{remoteNode}
 	}
 
+	handShakeFailed := false //need to be in this scope to access it here
+	connEstablished := false
 	for len(listOfNodes) != 0 {
 		err = s.DialNode(listOfNodes)
 		if err != nil {
+			log.Printf("Couldn't dial node %s, Moving on", listOfNodes[0])
 			listOfNodes = listOfNodes[1:]
 			continue
 		}
 		err = s.Handshake(listOfNodes)
 		if err != nil {
+			handShakeFailed = true
+			log.Printf("Handshake with %s failed. Moving on.", listOfNodes[0])
 			if len(listOfNodes) == 1 { // when the list is empty, error out
-				return fmt.Errorf("Couldn't establish connection with remote node. Exiting.")
-				break
+				return fmt.Errorf("Couldn't establish connection with any remote node. Exiting.")
 			}
 			// means we either have a sapm node or didn't get a resonse. So we Try again
 			log.Println(err)
 			log.Println("Couldn't establish connection with node. Proceeding to the next one")
 			listOfNodes = listOfNodes[1:]
+			connEstablished = false
+		} else {
+			connEstablished = true
+		}
+		if connEstablished { // connection should be established, still checking for safety
+			break
+		} else {
 			continue
 		}
-		break
+	}
+
+	if handShakeFailed && !connEstablished {
+		// this case is when the last node fails and we continue, only to exit the
+		// loop and execute below code, which is unnecessary.
+		return fmt.Errorf("Couldn't establish connection with any remote node. Exiting.")
 	}
 	s.inMsgQueue = make(chan wire.Message)
 	go s.incomingMessageHandler()
