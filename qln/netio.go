@@ -123,7 +123,7 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 	}
 
 	// if connect is successful, either query for already existing peer index, or
-	// if the peer is new, make an new index, and save the hostname&port
+	// if the peer is new, make a new index, and save the hostname&port
 
 	// figure out peer index, or assign new one for new peer.  Since
 	// we're connecting out, also specify the hostname&port

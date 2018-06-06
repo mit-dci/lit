@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/adiabat/btcutil"
 	"github.com/adiabat/btcutil/hdkeychain"
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/coinparam"
+	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/wallit"
@@ -47,9 +49,17 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string) (*LitNode, er
 
 	nd.TrackerURL = trackerURL
 
+	nd.InitRouting()
+
 	// optional tower activation
 
 	nd.Tower = new(watchtower.WatchTower)
+
+	// Create a new manager for the discreet log contracts
+	nd.DlcManager, err = dlc.NewManager(filepath.Join(nd.LitFolder, "dlc.db"))
+	if err != nil {
+		return nil, err
+	}
 
 	// make maps and channels
 	nd.UserMessageBox = make(chan string, 32)
@@ -85,6 +95,11 @@ func (nd *LitNode) LinkBaseWallet(
 	if nd.SubWallet[WallitIdx] != nil {
 		return fmt.Errorf("coin type %d already linked", WallitIdx)
 	}
+	// see if startheight is below allowed with coinparam
+	if birthHeight < param.StartHeight {
+		return fmt.Errorf("%s birth height give as %d, but parameters start at %d",
+			param.Name, birthHeight, param.StartHeight)
+	}
 
 	// see if there are other wallets already linked
 	if len(nd.SubWallet) != 0 {
@@ -96,6 +111,19 @@ func (nd *LitNode) LinkBaseWallet(
 	// be the first & default
 	nd.SubWallet[WallitIdx] = wallit.NewWallit(
 		rootpriv, birthHeight, resync, host, nd.LitFolder, param)
+
+	// re-register channel addresses
+	qChans, err := nd.GetAllQchans()
+	if err != nil {
+		return err
+	}
+
+	for _, qChan := range qChans {
+		var pkh [20]byte
+		pkhSlice := btcutil.Hash160(qChan.MyRefundPub[:])
+		copy(pkh[:], pkhSlice)
+		nd.SubWallet[WallitIdx].ExportHook().RegisterAddress(pkh)
+	}
 
 	go nd.OPEventHandler(nd.SubWallet[WallitIdx].LetMeKnow())
 

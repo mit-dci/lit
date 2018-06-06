@@ -55,6 +55,8 @@ type StatCom struct {
 
 	Fee int64 // symmetric fee in absolute satoshis
 
+	Data [32]byte
+
 	// their Amt is the utxo.Value minus this
 	Delta int32 // fund amount in-transit; is negative for the pusher
 	// Delta for when the channel is in a collision state which needs to be resolved
@@ -209,8 +211,11 @@ func (nd *LitNode) GetDHSecret(q *Qchan) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	priv := nd.SubWallet[q.Coin()].GetPriv(q.KeyGen)
-	// not sure what happens if this breaks.  Maybe it always works.
+	priv, err := nd.SubWallet[q.Coin()].GetPriv(q.KeyGen)
+	// if this breaks, return
+	if err != nil {
+		return nil, err
+	}
 
 	return btcec.GenerateSharedSecret(priv, theirPub), nil
 }

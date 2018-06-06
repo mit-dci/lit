@@ -7,6 +7,7 @@ import (
 	"github.com/adiabat/btcutil"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/qln"
+	"github.com/mit-dci/lit/consts"
 )
 
 type ChannelInfo struct {
@@ -19,6 +20,8 @@ type ChannelInfo struct {
 	StateNum      uint64 // Most recent commit number
 	PeerIdx, CIdx uint32
 	PeerID        string
+	Data          [32]byte
+	Pkh           [20]byte
 }
 type ChannelListReply struct {
 	Channels []ChannelInfo
@@ -55,6 +58,8 @@ func (r *LitRPC) ChannelList(args ChanArgs, reply *ChannelListReply) error {
 		reply.Channels[i].StateNum = q.State.StateIdx
 		reply.Channels[i].PeerIdx = q.KeyGen.Step[3] & 0x7fffffff
 		reply.Channels[i].CIdx = q.KeyGen.Step[4] & 0x7fffffff
+		reply.Channels[i].Data = q.State.Data
+		reply.Channels[i].Pkh = q.WatchRefundAdr
 	}
 	return nil
 }
@@ -66,6 +71,7 @@ type FundArgs struct {
 	Capacity    int64  // later can be minimum capacity
 	Roundup     int64  // ignore for now; can be used to round-up capacity
 	InitialSend int64  // Initial send of -1 means "ALL"
+	Data        [32]byte
 }
 
 func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
@@ -77,11 +83,11 @@ func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
 	if args.InitialSend < 0 || args.Capacity < 0 {
 		return fmt.Errorf("Can't have negative send or capacity")
 	}
-	if args.Capacity < 1000000 { // limit for now
+	if args.Capacity < consts.MinChanCapacity { // limit for now
 		return fmt.Errorf("Min channel capacity 1M sat")
 	}
 	if args.InitialSend > args.Capacity {
-		return fmt.Errorf("Cant send %d in %d capacity channel",
+		return fmt.Errorf("Can't send %d in %d capacity channel",
 			args.InitialSend, args.Capacity)
 	}
 
@@ -103,13 +109,13 @@ func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
 
 	spendable := allPorTxos.SumWitness(nowHeight)
 
-	if args.Capacity > spendable-50000 {
+	if args.Capacity > spendable-consts.SafeFee {
 		return fmt.Errorf("Wanted %d but %d available for channel creation",
-			args.Capacity, spendable-50000)
+			args.Capacity, spendable-consts.SafeFee)
 	}
 
 	idx, err := r.Node.FundChannel(
-		args.Peer, args.CoinType, args.Capacity, args.InitialSend)
+		args.Peer, args.CoinType, args.Capacity, args.InitialSend, args.Data)
 	if err != nil {
 		return err
 	}
@@ -119,10 +125,31 @@ func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
 	return nil
 }
 
+// ------------------------- statedump
+type StateDumpArgs struct {
+	// none
+}
+
+type StateDumpReply struct {
+	Txs []qln.JusticeTx
+}
+
+// StateDump dumps all of the meta data for the state commitments of a channel
+func (r *LitRPC) StateDump(args StateDumpArgs, reply *StateDumpReply) error {
+	var err error
+	reply.Txs, err = r.Node.DumpJusticeDB()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // ------------------------- push
 type PushArgs struct {
 	ChanIdx uint32
 	Amt     int64
+	Data    [32]byte
 }
 type PushReply struct {
 	StateIndex uint64
@@ -133,13 +160,12 @@ type PushReply struct {
 // Will change to .. tries to send, but may not complete.
 
 func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
-
-	if args.Amt > 100000000 || args.Amt < 1 {
+	if args.Amt > consts.MaxChanCapacity || args.Amt < 1 {
 		return fmt.Errorf(
 			"can't push %d max is 1 coin (100000000), min is 1", args.Amt)
 	}
 
-	fmt.Printf("push %d to chan %d\n", args.Amt, args.ChanIdx)
+	fmt.Printf("push %d to chan %d with data %x\n", args.Amt, args.ChanIdx, args.Data)
 
 	// load the whole channel from disk just to see who the peer is
 	// (pretty inefficient)
@@ -180,7 +206,7 @@ func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 	// to the Node.Func() calls.  For now though, set the height here...
 	qc.Height = dummyqc.Height
 
-	err = r.Node.PushChannel(qc, uint32(args.Amt))
+	err = r.Node.PushChannel(qc, uint32(args.Amt), args.Data)
 	if err != nil {
 		return err
 	}
@@ -264,7 +290,10 @@ func (r *LitRPC) DumpPrivs(args NoArgs, reply *DumpReply) error {
 		thisTxo.Witty = true
 		thisTxo.PairKey = fmt.Sprintf("%x", qc.TheirPub)
 
-		priv := wal.GetPriv(qc.KeyGen)
+		priv, err := wal.GetPriv(qc.KeyGen)
+		if err != nil {
+			return err
+		}
 		wif := btcutil.WIF{priv, true, wal.Params().PrivateKeyID}
 		thisTxo.WIF = wif.String()
 
@@ -291,7 +320,10 @@ func (r *LitRPC) DumpPrivs(args NoArgs, reply *DumpReply) error {
 				theseTxos[i].Delay = u.Height + int32(u.Seq) - syncHeight
 			}
 			theseTxos[i].Witty = u.Mode&portxo.FlagTxoWitness != 0
-			priv := wal.GetPriv(u.KeyGen)
+			priv, err := wal.GetPriv(u.KeyGen)
+			if err != nil {
+				return err
+			}
 			wif := btcutil.WIF{priv, true, wal.Params().PrivateKeyID}
 
 			theseTxos[i].WIF = wif.String()

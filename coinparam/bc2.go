@@ -15,9 +15,11 @@ var BC2NetParams = Params{
 	DNSSeeds:      []string{},
 
 	// Chain parameters
-	GenesisBlock:             &bc2GenesisBlock,
-	GenesisHash:              &bc2GenesisHash,
-	PoWFunction:              chainhash.DoubleHashH,
+	GenesisBlock: &bc2GenesisBlock,
+	GenesisHash:  &bc2GenesisHash,
+	PoWFunction: func(b []byte, height int32) chainhash.Hash {
+		return chainhash.DoubleHashH(b)
+	},
 	DiffCalcFunction:         diffBitcoin,
 	FeePerByte:               80,
 	PowLimit:                 bc2NetPowLimit,

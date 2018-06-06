@@ -8,6 +8,7 @@ import (
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
+	"github.com/mit-dci/lit/consts"
 )
 
 /*
@@ -100,7 +101,7 @@ an exact timing for the payment.
 // FundChannel opens a channel with a peer.  Doesn't return until the channel
 // has been created.  Maybe timeout if it takes too long?
 func (nd *LitNode) FundChannel(
-	peerIdx, cointype uint32, ccap, initSend int64) (uint32, error) {
+	peerIdx, cointype uint32, ccap, initSend int64, data [32]byte) (uint32, error) {
 
 	_, ok := nd.SubWallet[cointype]
 	if !ok {
@@ -118,13 +119,13 @@ func (nd *LitNode) FundChannel(
 		nd.InProg.mtx.Unlock()
 		return 0, fmt.Errorf("Can't have negative send or capacity")
 	}
-	if ccap < 1000000 { // limit for now
+	if ccap < consts.MinChanCapacity { // limit for now
 		nd.InProg.mtx.Unlock()
 		return 0, fmt.Errorf("Min channel capacity 1M sat")
 	}
 	if initSend > ccap {
 		nd.InProg.mtx.Unlock()
-		return 0, fmt.Errorf("Cant send %d in %d capacity channel", initSend, ccap)
+		return 0, fmt.Errorf("Can't send %d in %d capacity channel", initSend, ccap)
 	}
 
 	// TODO - would be convenient if it auto connected to the peer huh
@@ -143,6 +144,7 @@ func (nd *LitNode) FundChannel(
 	nd.InProg.PeerIdx = peerIdx
 	nd.InProg.Amt = ccap
 	nd.InProg.InitSend = initSend
+	nd.InProg.Data = data
 
 	nd.InProg.Coin = cointype
 	nd.InProg.mtx.Unlock() // switch to defer
@@ -211,7 +213,7 @@ func (nd *LitNode) PointReqHandler(msg lnutil.PointReqMsg) {
 
 // FUNDER
 // PointRespHandler takes in a point response, and returns a channel description
-func (nd LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
+func (nd *LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 
 	nd.InProg.mtx.Lock()
 	defer nd.InProg.mtx.Unlock()
@@ -302,6 +304,8 @@ func (nd LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 	// based on size
 	q.State.Fee = nd.SubWallet[q.Coin()].Fee() * 1000
 
+	q.State.Data = nd.InProg.Data
+
 	// save channel to db
 	err = nd.SaveQChan(q)
 	if err != nil {
@@ -330,7 +334,7 @@ func (nd LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 	outMsg := lnutil.NewChanDescMsg(
 		msg.Peer(), *nd.InProg.op, q.MyPub, q.MyRefundPub, q.MyHAKDBase,
 		nd.InProg.Coin, nd.InProg.Amt, nd.InProg.InitSend,
-		elkPointZero, elkPointOne, elkPointTwo)
+		elkPointZero, elkPointOne, elkPointTwo, nd.InProg.Data)
 
 	nd.OmniOut <- outMsg
 
@@ -396,6 +400,8 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 	// TODO assumes both parties use same fee
 	qc.State.Fee = wal.Fee() * 1000
 	qc.State.MyAmt = msg.InitPayment
+
+	qc.State.Data = msg.Data
 
 	qc.State.StateIdx = 0
 	// use new ElkPoint for signing
@@ -511,7 +517,7 @@ func (nd *LitNode) QChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePeer) {
 	}
 
 	// tell base wallet about watcher refund address in case that happens
-	// TODO this is weird & ugly... maybe have a export keypath func?
+	// TODO this is weird & ugly... maybe have an export keypath func?
 	nullTxo := new(portxo.PorTxo)
 	nullTxo.Value = 0 // redundant, but explicitly show that this is just for adr
 	nullTxo.KeyGen = qc.KeyGen

@@ -3,11 +3,13 @@ package qln
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/adiabat/btcd/btcec"
 	"github.com/adiabat/btcd/wire"
 	"github.com/adiabat/btcutil"
 	"github.com/boltdb/bolt"
+	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
@@ -90,6 +92,9 @@ type LitNode struct {
 	// all nodes have a watchtower.  but could have a tower without a node
 	Tower watchtower.Watcher
 
+	// discreet log contract manager
+	DlcManager *dlc.DlcManager
+
 	// BaseWallet is the underlying wallet which keeps track of utxos, secrets,
 	// and network i/o
 	// map of cointypes to wallets
@@ -124,6 +129,9 @@ type LitNode struct {
 
 	// The URL from which lit attempts to resolve the LN address
 	TrackerURL string
+
+	ChannelMap map[[20]byte][]lnutil.LinkMsg
+	AdvTimeout *time.Ticker
 }
 
 type RemotePeer struct {
@@ -144,6 +152,8 @@ type InFlightFund struct {
 	done chan uint32
 	// use this to avoid crashiness
 	mtx sync.Mutex
+
+	Data [32]byte
 }
 
 func (inff *InFlightFund) Clear() {

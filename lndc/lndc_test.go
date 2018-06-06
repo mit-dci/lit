@@ -40,7 +40,7 @@ func TestConnectionCorrectness(t *testing.T) {
 	var dialErr error
 
 	// Initiate a connection with a separate goroutine, and listen with our
-	// main one. If both errors are nil, then encryption+auth was succesful.
+	// main one. If both errors are nil, then encryption+auth was successful.
 	wg.Add(1)
 	go func() {
 		dialErr = conn.Dial(remotePriv, listener.Addr().String(), myAddress)

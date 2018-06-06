@@ -1,5 +1,6 @@
 # lit - a lightning node you can run on your own
 ![Lit Logo](litlogo145.png)
+
 [![Coverage Status](https://coveralls.io/repos/github/mit-dci/lit/badge.svg)](https://coveralls.io/github/mit-dci/lit)
 
 Under development, not for use with real money.
@@ -67,9 +68,8 @@ Great! Now that you are all done setting up lit, you can
 
 
 ## Command line arguments
-(a lit.conf file is not yet implemented but is on the TODO list)
 
-When starting lit, the following command line arguments are available
+When starting lit, the following command line arguments are available. The following commands may also be specified in lit.conf which is automatically generated on startup.
 
 #### connecting to networks:
 
@@ -87,7 +87,7 @@ When starting lit, the following command line arguments are available
 | `--dir <folderPath>`        | use `folderPath` as the directory.  By default, saves to `~/.lit/` |
 | `-p` or `--rpcport <portNumber>` | listen for RPC clients on port `portNumber`.  Defaults to `8001`.  Useful when you want to run multiple lit nodes on the same computer (also need the `--dir` option) |
 | `-t` or `--tip`          | Re-sync the blockchain from the given height |
-| `-r` or `--reSync`          | try to re-sync to the blockchain from the height given `-tip` |
+| `-r` or `--reSync`          | try to re-sync to the blockchain |
 
 ## Folders
 

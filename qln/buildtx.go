@@ -3,6 +3,7 @@ package qln
 import (
 	"fmt"
 
+	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
 
 	"github.com/adiabat/btcd/wire"
@@ -85,10 +86,10 @@ func (q *Qchan) SimpleCloseTx() (*wire.MsgTx, error) {
 	theirOutput := wire.NewTxOut(theirAmt, theirScript)
 
 	// check output amounts (should never fail)
-	if myAmt < minOutput {
+	if myAmt < consts.MinOutput {
 		return nil, fmt.Errorf("SimpleCloseTx: my output amt %d too low", myAmt)
 	}
-	if theirAmt < minOutput {
+	if theirAmt < consts.MinOutput {
 		return nil, fmt.Errorf("SimpleCloseTx: their output amt %d too low", myAmt)
 	}
 
@@ -125,7 +126,7 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
 	theirAmt = q.Value - s.MyAmt
 
 	// the PKH clear refund also has elkrem points added to mask the PKH.
-	// this changes the txouts at each state to blind sorceror better.
+	// this changes the txouts at each state to blind sorcerer better.
 	if mine { // build MY tx (to verify) (unless breaking)
 		// My tx that I store.  They get funds unencumbered. SH is mine eventually
 		// SH pubkeys are base points combined with the elk point we give them
@@ -166,10 +167,10 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
 
 	// check amounts.  Nonzero amounts below the minOutput is an error.
 	// Shouldn't happen and means some checks in push/pull went wrong.
-	if fancyAmt != 0 && fancyAmt < minOutput {
+	if fancyAmt != 0 && fancyAmt < consts.MinOutput {
 		return nil, fmt.Errorf("SH amt %d too low", fancyAmt)
 	}
-	if pkhAmt != 0 && pkhAmt < minOutput {
+	if pkhAmt != 0 && pkhAmt < consts.MinOutput {
 		return nil, fmt.Errorf("PKH amt %d too low", pkhAmt)
 	}
 

@@ -23,9 +23,11 @@ var BitcoinParams = Params{
 	},
 
 	// Chain parameters
-	GenesisBlock:             &genesisBlock,
-	GenesisHash:              &genesisHash,
-	PoWFunction:              chainhash.DoubleHashH,
+	GenesisBlock: &genesisBlock,
+	GenesisHash:  &genesisHash,
+	PoWFunction: func(b []byte, height int32) chainhash.Hash {
+		return chainhash.DoubleHashH(b)
+	},
 	DiffCalcFunction:         diffBitcoin,
 	FeePerByte:               80,
 	PowLimit:                 mainPowLimit,
@@ -97,26 +99,23 @@ var TestNet3Params = Params{
 	NetMagicBytes: 0x0709110b,
 	DefaultPort:   "18333",
 	DNSSeeds: []string{
-		"testnet-seed.bitcoin.petertodd.org",
+		"testnet-seed.bitcoin.jonasschnelli.ch",
+		"seed.tbtc.petertodd.org",
+		"seed.testnet.bitcoin.sprovoost.nl",
 		"testnet-seed.bluematt.me",
 	},
 
 	// Chain parameters
-	GenesisBlock:     &testNet3GenesisBlock,
-	GenesisHash:      &testNet3GenesisHash,
-	PoWFunction:      chainhash.DoubleHashH,
-	DiffCalcFunction: diffBitcoin,
-	StartHeader: [80]byte{
-		0x00, 0x00, 0x00, 0x20, 0xda, 0x33, 0x92, 0x5b, 0x1f, 0x7a, 0x55,
-		0xe9, 0xfa, 0x8e, 0x6c, 0x95, 0x5a, 0x20, 0xea, 0x09, 0x41, 0x48,
-		0xb6, 0x0c, 0x5c, 0x88, 0xf6, 0x9a, 0x4f, 0x50, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x36, 0x73, 0xb7, 0xb6, 0xce, 0x81, 0x57, 0xd3,
-		0xcf, 0xca, 0xf4, 0x15, 0xb6, 0x74, 0x09, 0x18, 0xdf, 0x76, 0x10,
-		0xa8, 0x76, 0x9d, 0x70, 0x33, 0x4a, 0xa9, 0xab, 0xd9, 0xc9, 0x41,
-		0xb2, 0x5e, 0x76, 0x21, 0x21, 0x58, 0x80, 0xba, 0x37, 0x1a, 0x85,
-		0xbf, 0x96, 0x46,
+	GenesisBlock: &testNet3GenesisBlock,
+	GenesisHash:  &testNet3GenesisHash,
+	PoWFunction: func(b []byte, height int32) chainhash.Hash {
+		return chainhash.DoubleHashH(b)
 	},
-	StartHeight:              1032192,
+	DiffCalcFunction: diffBitcoin,
+	StartHeader: newHeaderFromStr("00000020b39e2c241c3fff2c7bf20bc5c5477dc7cedb" +
+		"2154ccede1944800000000000000b767d1cb09db9e355835b7e94a385a4f82accea85c" +
+		"ac5e6b067096bbd5dcf055fba7415aa313081a91ffefce"),
+	StartHeight:              1255968,
 	FeePerByte:               80,
 	PowLimit:                 testNet3PowLimit,
 	PowLimitBits:             0x1d00ffff,
@@ -173,9 +172,11 @@ var RegressionNetParams = Params{
 	DNSSeeds:      []string{},
 
 	// Chain parameters
-	GenesisBlock:     &regTestGenesisBlock,
-	GenesisHash:      &regTestGenesisHash,
-	PoWFunction:      chainhash.DoubleHashH,
+	GenesisBlock: &regTestGenesisBlock,
+	GenesisHash:  &regTestGenesisHash,
+	PoWFunction: func(b []byte, height int32) chainhash.Hash {
+		return chainhash.DoubleHashH(b)
+	},
 	DiffCalcFunction: diffBitcoin,
 	//	func(r io.ReadSeeker, height, startheight int32, p *Params) (uint32, error) {
 	//		return diffBTC(r, height, startheight, p, false)
@@ -212,7 +213,7 @@ var RegressionNetParams = Params{
 	PubKeyHashAddrID: 0x6f, // starts with m or n
 	ScriptHashAddrID: 0xc4, // starts with 2
 	PrivateKeyID:     0xef, // starts with 9 (uncompressed) or c (compressed)
-	Bech32Prefix:     "rt",
+	Bech32Prefix:     "bcrt",
 
 	// BIP32 hierarchical deterministic extended key magics
 	HDPrivateKeyID: [4]byte{0x04, 0x35, 0x83, 0x94}, // starts with tprv

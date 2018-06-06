@@ -7,6 +7,8 @@ import (
 	"github.com/adiabat/btcd/wire"
 
 	"github.com/bitgoin/lyra2rev2"
+	"github.com/vertcoin/lyra2re"
+	"golang.org/x/crypto/scrypt"
 )
 
 var VertcoinTestNetParams = Params{
@@ -18,12 +20,13 @@ var VertcoinTestNetParams = Params{
 	},
 
 	// Chain parameters
-	DiffCalcFunction: diffVTCdummy,
-	FeePerByte:       800,
+	DiffCalcFunction: diffVTCtest,
+	MinHeaders:       4032,
+	FeePerByte:       100,
 	GenesisBlock:     &VertcoinTestnetGenesisBlock,
 	GenesisHash:      &VertcoinTestnetGenesisHash,
 	PowLimit:         liteCoinTestNet4PowLimit,
-	PoWFunction: func(b []byte) chainhash.Hash {
+	PoWFunction: func(b []byte, height int32) chainhash.Hash {
 		lyraBytes, _ := lyra2rev2.Sum(b)
 		asChainHash, _ := chainhash.NewHash(lyraBytes)
 		return *asChainHash
@@ -89,14 +92,24 @@ var VertcoinParams = Params{
 	},
 	StartHeight:      598752,
 	AssumeDiffBefore: 602784,
-	DiffCalcFunction: diffVTCdummy,
-	FeePerByte:       800,
+	DiffCalcFunction: diffVTC,
+	MinHeaders:       4032,
+	FeePerByte:       100,
 	GenesisBlock:     &VertcoinGenesisBlock,
 	GenesisHash:      &VertcoinGenesisHash,
 	PowLimit:         liteCoinTestNet4PowLimit,
-	PoWFunction: func(b []byte) chainhash.Hash {
-		lyraBytes, _ := lyra2rev2.Sum(b)
-		asChainHash, _ := chainhash.NewHash(lyraBytes)
+	PoWFunction: func(b []byte, height int32) chainhash.Hash {
+		var hashBytes []byte
+
+		if height >= 347000 {
+			hashBytes, _ = lyra2rev2.Sum(b)
+		} else if height >= 208301 {
+			hashBytes, _ = lyra2re.Sum(b)
+		} else {
+			hashBytes, _ = scrypt.Key(b, b, 2048, 1, 1, 32)
+		}
+
+		asChainHash, _ := chainhash.NewHash(hashBytes)
 		return *asChainHash
 	},
 	PowLimitBits:             0x1e0fffff,

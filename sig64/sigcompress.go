@@ -6,7 +6,7 @@ import "fmt"
 // But I've lived with it.  But with this, the (txid, sig) pair is slightly over
 // 100 bytes, so that bugs me even more, because it'd be really nice to have the
 // state data be exactly 100 bytes.  So these functions "compress" the signatures
-// into 65 bytes, and restore back into the ~71 byte normal lenght.
+// into 65 bytes, and restore back into the ~71 byte normal length.
 
 func SigCompress(sig []byte) (csig [64]byte, err error) {
 	if len(sig) < 68 || len(sig) > 72 {

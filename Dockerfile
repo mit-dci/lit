@@ -1,4 +1,4 @@
-FROM golang:alpine
+FROM golang:alpine as build
 
 RUN apk update && apk upgrade && \
     apk add --no-cache bash git openssh gcc musl-dev
@@ -11,5 +11,14 @@ WORKDIR /usr/local/go/src/github.com/mit-dci/lit
 RUN go build
 WORKDIR /usr/local/go/src/github.com/mit-dci/lit/cmd/lit-af
 RUN go build
+
+FROM alpine
+RUN apk add --no-cache ca-certificates
+WORKDIR /app
+RUN cd /app
+COPY --from=build /usr/local/go/src/github.com/mit-dci/lit/lit /app/bin/lit
+COPY --from=build /usr/local/go/src/github.com/mit-dci/lit/cmd/lit-af/lit-af /app/bin/lit-af
+
 EXPOSE 8001
-ENTRYPOINT ["/usr/local/go/src/github.com/mit-dci/lit/lit"]
+
+CMD ["bin/lit"]

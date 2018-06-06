@@ -44,6 +44,7 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 	if len(cmdslice) > 1 {
 		args = cmdslice[1:]
 	}
+
 	if cmd == "exit" || cmd == "quit" {
 		return lc.Exit(args)
 	}
@@ -52,6 +53,13 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		err = lc.Help(args)
 		if err != nil {
 			fmt.Fprintf(color.Output, "help error: %s\n", err)
+		}
+		return nil
+	}
+	if cmd == "watch" {
+		err = lc.Watch(args)
+		if err != nil {
+			fmt.Fprintf(color.Output, "watch error: %s\n", err)
 		}
 		return nil
 	}
@@ -119,6 +127,15 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		}
 		return nil
 	}
+
+	if cmd == "dlc" { // the root command for Discreet log contracts
+		err = lc.Dlc(args)
+		if err != nil {
+			fmt.Fprintf(color.Output, "dlc error: %s\n", err)
+		}
+		return nil
+	}
+
 	// fund and create a new channel
 	if cmd == "fund" {
 		err = lc.FundChannel(args)
@@ -172,6 +189,20 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		}
 		return nil
 	}
+	if cmd == "history" { // dump justice tx history
+		err = lc.History(args)
+		if err != nil {
+			fmt.Fprintf(color.Output, "history error: %s\n", err)
+		}
+		return nil
+	}
+	if cmd == "graph" { // dump graphviz for channels
+		err = lc.Graph(args)
+		if err != nil {
+			fmt.Fprintf(color.Output, "graph error: %s\n", err)
+		}
+		return nil
+	}
 
 	fmt.Fprintf(color.Output, "Command not recognized. type help for command list.\n")
 	return nil
@@ -221,7 +252,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	bReply := new(litrpc.BalanceReply)
 	lReply := new(litrpc.ListeningPortsReply)
 
-	err := lc.rpccon.Call("LitRPC.ListConnections", nil, pReply)
+	err := lc.Call("LitRPC.ListConnections", nil, pReply)
 	if err != nil {
 		return err
 	}
@@ -233,7 +264,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		}
 	}
 
-	err = lc.rpccon.Call("LitRPC.ChannelList", nil, cReply)
+	err = lc.Call("LitRPC.ChannelList", nil, cReply)
 	if err != nil {
 		return err
 	}
@@ -249,14 +280,14 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		}
 		fmt.Fprintf(
 			color.Output,
-			"%s (peer %d) type %d %s\n\t cap: %s bal: %s h: %d state: %d\n",
+			"%s (peer %d) type %d %s\n\t cap: %s bal: %s h: %d state: %d data: %x pkh: %x\n",
 			lnutil.White(c.CIdx), c.PeerIdx, c.CoinType,
 			lnutil.OutPoint(c.OutPoint),
 			lnutil.SatoshiColor(c.Capacity), lnutil.SatoshiColor(c.MyBalance),
-			c.Height, c.StateNum)
+			c.Height, c.StateNum, c.Data, c.Pkh)
 	}
 
-	err = lc.rpccon.Call("LitRPC.TxoList", nil, tReply)
+	err = lc.Call("LitRPC.TxoList", nil, tReply)
 	if err != nil {
 		return err
 	}
@@ -276,7 +307,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		fmt.Fprintf(color.Output, "\n")
 	}
 
-	err = lc.rpccon.Call("LitRPC.GetListeningPorts", nil, lReply)
+	err = lc.Call("LitRPC.GetListeningPorts", nil, lReply)
 	if err != nil {
 		return err
 	}
@@ -287,7 +318,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 			lnutil.White(lReply.LisIpPorts), lReply.Adr)
 	}
 
-	err = lc.rpccon.Call("LitRPC.Address", nil, aReply)
+	err = lc.Call("LitRPC.Address", nil, aReply)
 	if err != nil {
 		return err
 	}
@@ -297,7 +328,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 			lnutil.Address(a), lnutil.Address(aReply.LegacyAddresses[i]))
 	}
 
-	err = lc.rpccon.Call("LitRPC.Balance", nil, bReply)
+	err = lc.Call("LitRPC.Balance", nil, bReply)
 	if err != nil {
 		return err
 	}
@@ -326,7 +357,7 @@ func (lc *litAfClient) Stop(textArgs []string) error {
 
 	reply := new(litrpc.StatusReply)
 
-	err := lc.rpccon.Call("LitRPC.Stop", nil, reply)
+	err := lc.Call("LitRPC.Stop", nil, reply)
 	if err != nil {
 		return err
 	}
@@ -349,10 +380,14 @@ func (lc *litAfClient) Help(textArgs []string) error {
 		fmt.Fprintf(color.Output, "%s\t%s", sweepCommand.Format, sweepCommand.ShortDescription)
 		fmt.Fprintf(color.Output, "%s\t%s", lisCommand.Format, lisCommand.ShortDescription)
 		fmt.Fprintf(color.Output, "%s\t%s", conCommand.Format, conCommand.ShortDescription)
+		fmt.Fprintf(color.Output, "%s\t%s", graphCommand.Format, graphCommand.ShortDescription)
+		fmt.Fprintf(color.Output, "%s\t%s", dlcCommand.Format, dlcCommand.ShortDescription)
 		fmt.Fprintf(color.Output, "%s\t%s", fundCommand.Format, fundCommand.ShortDescription)
+		fmt.Fprintf(color.Output, "%s\t%s", watchCommand.Format, watchCommand.ShortDescription)
 		fmt.Fprintf(color.Output, "%s\t%s", pushCommand.Format, pushCommand.ShortDescription)
 		fmt.Fprintf(color.Output, "%s\t%s", closeCommand.Format, closeCommand.ShortDescription)
 		fmt.Fprintf(color.Output, "%s\t%s", breakCommand.Format, breakCommand.ShortDescription)
+		fmt.Fprintf(color.Output, "%s\t%s", historyCommand.Format, historyCommand.ShortDescription)
 		fmt.Fprintf(color.Output, "%s\t%s", offCommand.Format, offCommand.ShortDescription)
 		fmt.Fprintf(color.Output, "%s\t%s", exitCommand.Format, exitCommand.ShortDescription)
 		return nil
