@@ -243,11 +243,15 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	}
 	// move unlock to here so that delta is saved before
 
+	log.Printf("PushChannel: Sending DeltaSig")
+
 	err = nd.SendDeltaSig(qc)
 	if err != nil {
 		// don't clear; something is wrong with the network
 		return err
 	}
+
+	log.Printf("PushChannel: Done: sent DeltaSig")
 
 	fmt.Printf("got pre CTS... \n")
 	// block until clear to send is full again
