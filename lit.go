@@ -39,7 +39,7 @@ type config struct { // define a struct for usage with go-flags
 
 var (
 	defaultLitHomeDirName = os.Getenv("HOME") + "/.lit"
-	defaultTrackerURL     = "http://ni.media.mit.edu:46580"
+	defaultTrackerURL     = "http://hubris.media.mit.edu:46580"
 	defaultKeyFileName    = "privkey.hex"
 	defaultConfigFilename = "lit.conf"
 	defaultHomeDir        = os.Getenv("HOME")
