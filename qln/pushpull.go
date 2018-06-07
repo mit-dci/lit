@@ -1,6 +1,7 @@
 package qln
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/adiabat/btcd/wire"
@@ -158,12 +159,14 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	// see if channel is busy, error if so, lock if not
 	// lock this channel
 
-	select {
+	<-qc.ClearToSend
+
+	/*select {
 	case <-qc.ClearToSend:
-	// keep going
-	default:
+		// keep going
+		default:
 		return fmt.Errorf("Channel %d busy", qc.Idx())
-	}
+	}*/
 	// ClearToSend is now empty
 
 	// reload from disk here, after unlock
@@ -225,6 +228,11 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	fmt.Printf("Sending message %x", data)
 
 	qc.State.Delta = int32(-amt)
+
+	if qc.State.Delta == 0 {
+		return errors.New("PushChannel: Delta cannot be zero")
+	}
+
 	// save to db with ONLY delta changed
 	err = nd.SaveQchanState(qc)
 	if err != nil {
@@ -262,6 +270,10 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 	sig, err := nd.SignState(q)
 	if err != nil {
 		return err
+	}
+
+	if q.State.Delta == 0 {
+		return errors.New("Delta cannot be zero")
 	}
 
 	outMsg := lnutil.NewDeltaSigMsg(q.Peer(), q.Op, -q.State.Delta, sig, q.State.Data)
