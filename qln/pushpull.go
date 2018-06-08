@@ -160,8 +160,15 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	// see if channel is busy, error if so, lock if not
 	// lock this channel
 
-	<-qc.ClearToSend
-	qc.ChanMtx.Lock()
+	for {
+		qc.ChanMtx.Lock()
+		select {
+		case <-qc.ClearToSend:
+			break
+		default:
+			qc.ChanMtx.Unlock()
+		}
+	}
 
 	/*select {
 	case <-qc.ClearToSend:
