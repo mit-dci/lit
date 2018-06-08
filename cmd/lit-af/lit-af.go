@@ -101,8 +101,6 @@ func main() {
 
 	lc.rpccon = jsonrpc.NewClient(wsConn)
 
-	go lc.RequestAsync()
-
 	rl, err := readline.NewEx(&readline.Config{
 		Prompt:       lnutil.Prompt("lit-af") + lnutil.White("# "),
 		HistoryFile:  filepath.Join(lc.litHomeDir, historyFilename),
@@ -112,7 +110,7 @@ func main() {
 		log.Fatal(err)
 	}
 	defer rl.Close()
-
+	go lc.RequestAsync()
 	// main shell loop
 	for {
 		// setup reader with max 4K input chars
