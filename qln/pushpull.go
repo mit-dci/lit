@@ -157,7 +157,7 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 		return fmt.Errorf("have to send non-zero amount")
 	}
 
-	// see if channel is busy, error if so, lock if not
+	// see if channel is busy
 	// lock this channel
 	cts := false
 	for !cts {
@@ -169,13 +169,6 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 			qc.ChanMtx.Unlock()
 		}
 	}
-
-	/*select {
-	case <-qc.ClearToSend:
-		// keep going
-		default:
-		return fmt.Errorf("Channel %d busy", qc.Idx())
-	}*/
 	// ClearToSend is now empty
 
 	// reload from disk here, after unlock
