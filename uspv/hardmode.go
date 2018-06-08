@@ -156,7 +156,7 @@ func parseBlock(blk *wire.MsgBlock) string {
 		s += "+" + wire.OutPoint{tx.TxHash(), uint32(len(tx.TxOut)) - 1}.String()
 
 		for i, out := range tx.TxOut {
-			if !IsUnspendable(out) {
+			if IsUnspendable(out) {
 				s += "z" + fmt.Sprintf("%d", i)
 			}
 		}
