@@ -161,7 +161,6 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	// lock this channel
 
 	qc.ChanMtx.Lock()
-	defer qc.ChanMtx.Unlock()
 
 	<-qc.ClearToSend
 
@@ -177,6 +176,7 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	err := nd.ReloadQchanState(qc)
 	if err != nil {
 		// don't clear to send here; something is wrong with the channel
+		qc.ChanMtx.Unlock()
 		return err
 	}
 
@@ -184,11 +184,13 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	wal, ok := nd.SubWallet[qc.Coin()]
 	if !ok {
 		qc.ClearToSend <- true
+		qc.ChanMtx.Unlock()
 		return fmt.Errorf("Not connected to coin type %d\n", qc.Coin())
 	}
 
 	if !wal.Params().TestCoin && qc.Height < 100 {
 		qc.ClearToSend <- true
+		qc.ChanMtx.Unlock()
 		return fmt.Errorf(
 			"height %d; must wait min 1 conf for non-test coin\n", qc.Height)
 	}
@@ -200,6 +202,7 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	// check if this push would lower my balance below minBal
 	if myNewOutputSize < consts.MinOutput {
 		qc.ClearToSend <- true
+		qc.ChanMtx.Unlock()
 		return fmt.Errorf("want to push %s but %s available after %s fee and %s consts.MinOutput",
 			lnutil.SatoshiColor(int64(amt)),
 			lnutil.SatoshiColor(qc.State.MyAmt-qc.State.Fee-consts.MinOutput),
@@ -209,6 +212,7 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	// check if this push is sufficient to get them above minBal
 	if theirNewOutputSize < consts.MinOutput {
 		qc.ClearToSend <- true
+		qc.ChanMtx.Unlock()
 		return fmt.Errorf(
 			"pushing %s insufficient; counterparty bal %s fee %s consts.MinOutput %s",
 			lnutil.SatoshiColor(int64(amt)),
@@ -222,9 +226,11 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 		err = nd.ReSendMsg(qc)
 		if err != nil {
 			qc.ClearToSend <- true
+			qc.ChanMtx.Unlock()
 			return err
 		}
 		qc.ClearToSend <- true
+		qc.ChanMtx.Unlock()
 		return fmt.Errorf("Didn't send.  Recovered though, so try again!")
 	}
 
@@ -234,6 +240,7 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	qc.State.Delta = int32(-amt)
 
 	if qc.State.Delta == 0 {
+		qc.ChanMtx.Unlock()
 		return errors.New("PushChannel: Delta cannot be zero")
 	}
 
@@ -241,6 +248,7 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	err = nd.SaveQchanState(qc)
 	if err != nil {
 		// don't clear to send here; something is wrong with the channel
+		qc.ChanMtx.Unlock()
 		return err
 	}
 	// move unlock to here so that delta is saved before
@@ -249,6 +257,7 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 
 	err = nd.SendDeltaSig(qc)
 	if err != nil {
+		qc.ChanMtx.Unlock()
 		// don't clear; something is wrong with the network
 		return err
 	}
@@ -259,6 +268,7 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	// block until clear to send is full again
 	qc.ChanMtx.Unlock()
 	<-qc.ClearToSend
+
 	fmt.Printf("got post CTS... \n")
 	// since we cleared with that statement, fill it again before returning
 	qc.ClearToSend <- true
