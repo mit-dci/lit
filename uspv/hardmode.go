@@ -151,10 +151,34 @@ func parseBlock(blk *wire.MsgBlock) string {
 			}
 			//			dels = append(dels, in.PreviousOutPoint)
 		}
+
 		// creates all txos up to index indicated
-		s += "+" + wire.OutPoint{tx.TxHash(), uint32(len(tx.TxOut)) - 1}.String() + "\n"
+		s += "+" + wire.OutPoint{tx.TxHash(), uint32(len(tx.TxOut)) - 1}.String()
+
+		for i, out := range tx.TxOut {
+			if !IsUnspendable(out) {
+				s += "z" + fmt.Sprintf("%d", i)
+			}
+		}
+
+		s += "\n"
+
 	}
 	return s
+}
+
+func IsUnspendable(o *wire.TxOut) bool {
+	if o == nil {
+		return true
+	}
+	if len(o.PkScript) == 0 || len(o.PkScript) > 10000 {
+		return true
+	}
+	if o.PkScript[0] == 0x6a { // OP_RETURN is 0x6a
+		return true
+	}
+
+	return false
 }
 
 // IngestBlock is like IngestMerkleBlock but aralphic
