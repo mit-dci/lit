@@ -266,11 +266,22 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	fmt.Printf("got pre CTS... \n")
 	// block until clear to send is full again
 	qc.ChanMtx.Unlock()
-	<-qc.ClearToSend
+
+	cts = false
+	for !cts {
+		qc.ChanMtx.Lock()
+		select {
+		case <-qc.ClearToSend:
+			cts = true
+		default:
+			qc.ChanMtx.Unlock()
+		}
+	}
 
 	fmt.Printf("got post CTS... \n")
 	// since we cleared with that statement, fill it again before returning
 	qc.ClearToSend <- true
+	qc.ChanMtx.Unlock()
 
 	return nil
 }
