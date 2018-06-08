@@ -3,6 +3,7 @@ package qln
 import (
 	"bytes"
 	"fmt"
+	"sync"
 
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
@@ -41,6 +42,7 @@ type Qchan struct {
 	State *StatCom // S current state of channel
 
 	ClearToSend chan bool // send a true here when you get a rev
+	ChanMtx     sync.Mutex
 	// exists only in ram, doesn't touch disk
 }
 
