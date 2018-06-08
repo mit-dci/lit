@@ -308,9 +308,6 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 // or a GapSigRev (if there's a collision)
 // Leaves the channel either expecting a Rev (normally) or a GapSigRev (collision)
 func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
-	qc.ChanMtx.Lock()
-	defer qc.ChanMtx.Unlock()
-
 	log.Printf("Got DeltaSig: %v", msg)
 
 	var collision bool
@@ -521,9 +518,6 @@ func (nd *LitNode) SendSigRev(q *Qchan) error {
 // GapSigRevHandler takes in a GapSigRev, responds with a Rev, and
 // leaves the channel in a state expecting a Rev.
 func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
-	q.ChanMtx.Lock()
-	defer q.ChanMtx.Unlock()
-
 	log.Printf("Got GapSigRev: %v", msg)
 
 	// load qchan & state from DB
@@ -594,9 +588,6 @@ func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
 // SIGREVHandler takes in a SIGREV and responds with a REV (if everything goes OK)
 // Leaves the channel in a clear / rest state.
 func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
-	qc.ChanMtx.Lock()
-	defer qc.ChanMtx.Unlock()
-
 	log.Printf("Got SigRev: %v", msg)
 
 	// load qchan & state from DB
@@ -701,9 +692,6 @@ func (nd *LitNode) SendREV(q *Qchan) error {
 // final message in the state update process and there is no response.
 // Leaves the channel in a clear / rest state.
 func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {
-	qc.ChanMtx.Lock()
-	defer qc.ChanMtx.Unlock()
-
 	log.Printf("Got Rev: %v", msg)
 
 	// load qchan & state from DB
