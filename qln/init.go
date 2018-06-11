@@ -73,8 +73,11 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string) (*LitNode, er
 
 	nd.OmniOut = make(chan lnutil.LitMsg, 10)
 	nd.OmniIn = make(chan lnutil.LitMsg, 10)
+
 	//	go nd.OmniHandler()
 	go nd.OutMessager()
+
+	nd.AutoReconnect()
 
 	return nd, nil
 }
