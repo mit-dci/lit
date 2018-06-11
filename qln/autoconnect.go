@@ -12,13 +12,13 @@ import (
 // AutoReconnect will start listening for incoming connections
 // and attempt to automatically reconnect to all
 // previously known peers.
-func (nd *LitNode) AutoReconnect(listenPort string) {
+func (nd *LitNode) AutoReconnect(listenPort string, interval int64) {
 	// Listen myself
 	// TODO : configurable port for this?
 	nd.TCPListener(listenPort)
 
 	// Reconnect to other nodes after a timeout
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(time.Duration(interval) * time.Second)
 	go func() {
 		for range ticker.C {
 			var empty [33]byte

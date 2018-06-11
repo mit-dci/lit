@@ -34,21 +34,23 @@ type config struct { // define a struct for usage with go-flags
 	Rpcport uint16 `short:"p" long:"rpcport" description:"Set RPC port to connect to"`
 	Rpchost string `long:"rpchost" description:"Set RPC host to listen to"`
 
-	AutoReconnect  bool   `short:"arc" long:"autoReconnect" description:"Attempts to automatically reconnect to known peers every minute."`
-	AutoListenPort string `short:"alp" long:"autoListenPort" description:"When auto reconnect enabled, starts listening on this port"`
-	Params         *coinparam.Params
+	AutoReconnect         bool   `long:"autoReconnect" description:"Attempts to automatically reconnect to known peers periodically."`
+	AutoReconnectInterval int64  `long:"autoReconnectInterval" description:"The interval (in seconds) the reconnect logic should be executed"`
+	AutoListenPort        string `long:"autoListenPort" description:"When auto reconnect enabled, starts listening on this port"`
+	Params                *coinparam.Params
 }
 
 var (
-	defaultLitHomeDirName = os.Getenv("HOME") + "/.lit"
-	defaultTrackerURL     = "http://ni.media.mit.edu:46580"
-	defaultKeyFileName    = "privkey.hex"
-	defaultConfigFilename = "lit.conf"
-	defaultHomeDir        = os.Getenv("HOME")
-	defaultRpcport        = uint16(8001)
-	defaultRpchost        = "localhost"
-	defaultAutoReconnect  = false
-	defaultAutoListenPort = ":2448"
+	defaultLitHomeDirName        = os.Getenv("HOME") + "/.lit"
+	defaultTrackerURL            = "http://ni.media.mit.edu:46580"
+	defaultKeyFileName           = "privkey.hex"
+	defaultConfigFilename        = "lit.conf"
+	defaultHomeDir               = os.Getenv("HOME")
+	defaultRpcport               = uint16(8001)
+	defaultRpchost               = "localhost"
+	defaultAutoReconnect         = false
+	defaultAutoListenPort        = ":2448"
+	defaultAutoReconnectInterval = int64(60)
 )
 
 func fileExists(name string) bool {
@@ -137,19 +139,20 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 func main() {
 
 	conf := config{
-		LitHomeDir:     defaultLitHomeDirName,
-		Rpcport:        defaultRpcport,
-		Rpchost:        defaultRpchost,
-		TrackerURL:     defaultTrackerURL,
-		AutoReconnect:  defaultAutoReconnect,
-		AutoListenPort: defaultAutoListenPort,
+		LitHomeDir:            defaultLitHomeDirName,
+		Rpcport:               defaultRpcport,
+		Rpchost:               defaultRpchost,
+		TrackerURL:            defaultTrackerURL,
+		AutoReconnect:         defaultAutoReconnect,
+		AutoListenPort:        defaultAutoListenPort,
+		AutoReconnectInterval: defaultAutoReconnectInterval,
 	}
 
 	key := litSetup(&conf)
 
 	// Setup LN node.  Activate Tower if in hard mode.
 	// give node and below file pathof lit home directory
-	node, err := qln.NewLitNode(key, conf.LitHomeDir, conf.TrackerURL, conf.AutoReconnect, conf.AutoListenPort)
+	node, err := qln.NewLitNode(key, conf.LitHomeDir, conf.TrackerURL, conf.AutoReconnect, conf.AutoListenPort, conf.AutoReconnectInterval)
 	if err != nil {
 		log.Fatal(err)
 	}
