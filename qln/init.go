@@ -17,7 +17,7 @@ import (
 
 // Init starts up a lit node.  Needs priv key, and a path.
 // Does not activate a subwallet; do that after init.
-func NewLitNode(privKey *[32]byte, path string, trackerURL string) (*LitNode, error) {
+func NewLitNode(privKey *[32]byte, path string, trackerURL string, autoReconnect bool, autoListenPort string) (*LitNode, error) {
 
 	nd := new(LitNode)
 	nd.LitFolder = path
@@ -77,7 +77,9 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string) (*LitNode, er
 	//	go nd.OmniHandler()
 	go nd.OutMessager()
 
-	nd.AutoReconnect()
+	if autoReconnect {
+		nd.AutoReconnect(autoListenPort)
+	}
 
 	return nd, nil
 }
