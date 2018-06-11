@@ -182,14 +182,14 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	// check that channel is confirmed, if non-test coin
 	wal, ok := nd.SubWallet[qc.Coin()]
 	if !ok {
-		qc.ChanMtx.Unlock()
 		qc.ClearToSend <- true
+		qc.ChanMtx.Unlock()
 		return fmt.Errorf("Not connected to coin type %d\n", qc.Coin())
 	}
 
 	if !wal.Params().TestCoin && qc.Height < 100 {
-		qc.ChanMtx.Unlock()
 		qc.ClearToSend <- true
+		qc.ChanMtx.Unlock()
 		return fmt.Errorf(
 			"height %d; must wait min 1 conf for non-test coin\n", qc.Height)
 	}
@@ -200,8 +200,8 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 
 	// check if this push would lower my balance below minBal
 	if myNewOutputSize < consts.MinOutput {
-		qc.ChanMtx.Unlock()
 		qc.ClearToSend <- true
+		qc.ChanMtx.Unlock()
 		return fmt.Errorf("want to push %s but %s available after %s fee and %s consts.MinOutput",
 			lnutil.SatoshiColor(int64(amt)),
 			lnutil.SatoshiColor(qc.State.MyAmt-qc.State.Fee-consts.MinOutput),
@@ -210,8 +210,8 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	}
 	// check if this push is sufficient to get them above minBal
 	if theirNewOutputSize < consts.MinOutput {
-		qc.ChanMtx.Unlock()
 		qc.ClearToSend <- true
+		qc.ChanMtx.Unlock()
 		return fmt.Errorf(
 			"pushing %s insufficient; counterparty bal %s fee %s consts.MinOutput %s",
 			lnutil.SatoshiColor(int64(amt)),
@@ -224,12 +224,11 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	if qc.State.Delta != 0 {
 		err = nd.ReSendMsg(qc)
 		if err != nil {
-			qc.ChanMtx.Unlock()
 			qc.ClearToSend <- true
+			qc.ChanMtx.Unlock()
 			return err
 		}
 		qc.ChanMtx.Unlock()
-		qc.ClearToSend <- true
 		return fmt.Errorf("Didn't send.  Recovered though, so try again!")
 	}
 
