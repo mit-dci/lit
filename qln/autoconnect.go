@@ -14,17 +14,22 @@ import (
 // previously known peers.
 func (nd *LitNode) AutoReconnect(listenPort string, interval int64) {
 	// Listen myself
-	// TODO : configurable port for this?
 	nd.TCPListener(listenPort)
 
 	// Reconnect to other nodes after a timeout
 	ticker := time.NewTicker(time.Duration(interval) * time.Second)
 	go func() {
 		for range ticker.C {
+			fmt.Println("Reconnecting to known peers")
 			var empty [33]byte
 			i := uint32(0)
-			pubKey, _ := nd.GetPubHostFromPeerIdx(i)
 			for {
+				pubKey, _ := nd.GetPubHostFromPeerIdx(i)
+				if pubKey == empty {
+					fmt.Printf("Done, tried %d hosts\n", i)
+					break
+				}
+				i++
 				alreadyConnected := false
 
 				nd.RemoteMtx.Lock()
@@ -46,11 +51,6 @@ func (nd *LitNode) AutoReconnect(listenPort string, interval int64) {
 
 				if err != nil {
 					fmt.Printf("Could not restore connection to %s: %s\n", adr, err.Error())
-				}
-				i++
-				pubKey, _ = nd.GetPubHostFromPeerIdx(i)
-				if pubKey == empty {
-					break
 				}
 			}
 		}
