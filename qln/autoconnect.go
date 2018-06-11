@@ -1,7 +1,6 @@
 package qln
 
 import (
-	"bytes"
 	"fmt"
 	"time"
 
@@ -13,34 +12,29 @@ import (
 // and attempt to automatically reconnect to all
 // previously known peers.
 func (nd *LitNode) AutoReconnect(listenPort string, interval int64) {
-	// Listen myself
+	// Listen myself after a timeout
 	nd.TCPListener(listenPort)
 
-	// Reconnect to other nodes after a timeout
+	// Reconnect to other nodes after an interval
 	ticker := time.NewTicker(time.Duration(interval) * time.Second)
 	go func() {
-		for range ticker.C {
+		for {
 			fmt.Println("Reconnecting to known peers")
 			var empty [33]byte
-			i := uint32(0)
+			i := uint32(1)
 			for {
 				pubKey, _ := nd.GetPubHostFromPeerIdx(i)
 				if pubKey == empty {
-					fmt.Printf("Done, tried %d hosts\n", i)
+					fmt.Printf("Done, tried %d hosts\n", i-1)
 					break
 				}
-				i++
-				alreadyConnected := false
 
 				nd.RemoteMtx.Lock()
-				for _, con := range nd.RemoteCons {
-					if bytes.Equal(con.Con.RemotePub.SerializeCompressed(), pubKey[:]) {
-						alreadyConnected = true
-					}
-				}
+				_, alreadyConnected := nd.RemoteCons[i]
 				nd.RemoteMtx.Unlock()
 
 				if alreadyConnected {
+					i++
 					continue
 				}
 
@@ -52,7 +46,11 @@ func (nd *LitNode) AutoReconnect(listenPort string, interval int64) {
 				if err != nil {
 					fmt.Printf("Could not restore connection to %s: %s\n", adr, err.Error())
 				}
+
+				i++
+
 			}
+			<-ticker.C
 		}
 	}()
 

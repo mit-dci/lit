@@ -152,7 +152,7 @@ func main() {
 
 	// Setup LN node.  Activate Tower if in hard mode.
 	// give node and below file pathof lit home directory
-	node, err := qln.NewLitNode(key, conf.LitHomeDir, conf.TrackerURL, conf.AutoReconnect, conf.AutoListenPort, conf.AutoReconnectInterval)
+	node, err := qln.NewLitNode(key, conf.LitHomeDir, conf.TrackerURL)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -169,6 +169,10 @@ func main() {
 
 	go litrpc.RPCListen(rpcl, conf.Rpchost, conf.Rpcport)
 	litbamf.BamfListen(conf.Rpcport, conf.LitHomeDir)
+
+	if conf.AutoReconnect {
+		node.AutoReconnect(conf.AutoListenPort, conf.AutoReconnectInterval)
+	}
 
 	<-rpcl.OffButton
 	fmt.Printf("Got stop request\n")
