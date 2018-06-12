@@ -235,6 +235,8 @@ func (nd *LitNode) CloseHandler(msg lnutil.LitMsg) error {
 // need a go routine for each qchan.
 
 func (nd *LitNode) PushPullHandler(routedMsg lnutil.LitMsg, q *Qchan) error {
+	q.ChanMtx.Lock()
+	defer q.ChanMtx.Unlock()
 	switch message := routedMsg.(type) {
 	case lnutil.DeltaSigMsg:
 		fmt.Printf("Got DELTASIG from %x\n", routedMsg.Peer())

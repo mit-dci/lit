@@ -2,6 +2,7 @@ package qln
 
 import (
 	"fmt"
+	"log"
 	"path/filepath"
 
 	"github.com/adiabat/btcutil"
@@ -124,6 +125,10 @@ func (nd *LitNode) LinkBaseWallet(
 		pkhSlice := btcutil.Hash160(qChan.MyRefundPub[:])
 		copy(pkh[:], pkhSlice)
 		nd.SubWallet[WallitIdx].ExportHook().RegisterAddress(pkh)
+
+		log.Printf("Registering outpoint %v", qChan.PorTxo.Op)
+
+		nd.SubWallet[WallitIdx].WatchThis(qChan.PorTxo.Op)
 	}
 
 	go nd.OPEventHandler(nd.SubWallet[WallitIdx].LetMeKnow())
