@@ -9,9 +9,9 @@ import (
 	"github.com/adiabat/btcd/wire"
 	"github.com/adiabat/btcutil"
 	"github.com/boltdb/bolt"
+	"github.com/mit-dci/lit/brontide"
 	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/elkrem"
-	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/watchtower"
 )
@@ -107,9 +107,6 @@ type LitNode struct {
 	RemoteCons map[uint32]*RemotePeer
 	RemoteMtx  sync.Mutex
 
-	// WatchCon is currently just for the watchtower
-	WatchCon *lndc.LNDConn // merge these later
-
 	// OmniChan is the channel for the OmniHandler
 	OmniIn  chan lnutil.LitMsg
 	OmniOut chan lnutil.LitMsg
@@ -137,7 +134,7 @@ type LitNode struct {
 type RemotePeer struct {
 	Idx      uint32 // the peer index
 	Nickname string
-	Con      *lndc.LNDConn
+	Con      *brontide.Conn
 	QCs      map[uint32]*Qchan   // keep map of all peer's channels in ram
 	OpMap    map[[36]byte]uint32 // quick lookup for channels
 }
