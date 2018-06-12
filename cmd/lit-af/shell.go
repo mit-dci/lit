@@ -36,6 +36,13 @@ var offCommand = &Command{
 	ShortDescription: "Shut down the lit node.\n",
 }
 
+func parseErr(err error, str string) error {
+	if err != nil {
+		fmt.Fprintf(color.Output, "%s error: %s\n", str, err)
+	}
+	return nil
+}
+
 // Shellparse parses user input and hands it to command functions if matching
 func (lc *litAfClient) Shellparse(cmdslice []string) error {
 	var err error
@@ -51,51 +58,33 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 	// help gives you really terse help.  Just a list of commands.
 	if cmd == "help" {
 		err = lc.Help(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "help error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "help")
 	}
 	if cmd == "watch" {
 		err = lc.Watch(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "watch error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "watch")
 	}
 	// address a new address and displays it
 	if cmd == "adr" {
 		err = lc.Address(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "adr error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "adr")
 	}
 
 	// ls shows the current set of utxos, addresses and score
 	if cmd == "ls" {
 		err = lc.Ls(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "ls error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "ls")
 	}
 
 	// send sends coins to the address specified
 	if cmd == "send" {
 		err = lc.Send(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "send error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "send")
 	}
 
 	if cmd == "lis" { // listen for lnd peers
 		err = lc.Lis(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "lis error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "lis")
 	}
 
 	if cmd == "off" { // stop remote node
@@ -105,103 +94,64 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 
 	if cmd == "sweep" { // make lots of 1-in 1-out txs
 		err = lc.Sweep(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "sweep error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "sweep")
 	}
 
 	// push money in a channel away from you
 	if cmd == "push" {
 		err = lc.Push(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "push error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "push")
 	}
 
 	if cmd == "con" { // connect to lnd host
 		err = lc.Connect(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "con error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "con")
 	}
 
 	if cmd == "dlc" { // the root command for Discreet log contracts
 		err = lc.Dlc(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "dlc error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "dlc")
 	}
 
 	// fund and create a new channel
 	if cmd == "fund" {
 		err = lc.FundChannel(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "fund error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "fund")
 	}
 
 	// cooperative close of a channel
 	if cmd == "close" {
 		err = lc.CloseChannel(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "close error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "close")
 	}
 	if cmd == "break" {
 		err = lc.BreakChannel(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "break error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "break")
 	}
 	if cmd == "say" {
 		err = lc.Say(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "say error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "say")
 	}
 
 	if cmd == "fan" { // fan-out tx
 		err = lc.Fan(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "fan error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "fan")
 	}
 	if cmd == "fee" { // get fee rate for a wallet
 		err = lc.Fee(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "fee error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "fee")
 	}
 	if cmd == "dump" { // dump all private keys
 		err = lc.Dump(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "dump error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "dump")
 	}
 	if cmd == "history" { // dump justice tx history
 		err = lc.History(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "history error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "history")
 	}
 	if cmd == "graph" { // dump graphviz for channels
 		err = lc.Graph(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "graph error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "grpah")
 	}
 
 	fmt.Fprintf(color.Output, "Command not recognized. type help for command list.\n")
@@ -368,28 +318,17 @@ func (lc *litAfClient) Stop(textArgs []string) error {
 	return fmt.Errorf("stopped remote lit node")
 }
 
+func printHelp(commands []*Command) {
+	for _, command := range commands {
+		fmt.Fprintf(color.Output, "%s\t%s", command.Format, command.ShortDescription)
+	}
+}
+
 func (lc *litAfClient) Help(textArgs []string) error {
 	if len(textArgs) == 0 {
 		fmt.Fprintf(color.Output, "commands:\n")
-		fmt.Fprintf(color.Output, "%s\t%s", helpCommand.Format, helpCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", sayCommand.Format, sayCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", lsCommand.Format, lsCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", addressCommand.Format, addressCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", sendCommand.Format, sendCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", fanCommand.Format, fanCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", sweepCommand.Format, sweepCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", lisCommand.Format, lisCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", conCommand.Format, conCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", graphCommand.Format, graphCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", dlcCommand.Format, dlcCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", fundCommand.Format, fundCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", watchCommand.Format, watchCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", pushCommand.Format, pushCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", closeCommand.Format, closeCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", breakCommand.Format, breakCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", historyCommand.Format, historyCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", offCommand.Format, offCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", exitCommand.Format, exitCommand.ShortDescription)
+		listofCommands := []*Command{helpCommand, sayCommand, lsCommand, addressCommand, sendCommand, fanCommand, sweepCommand, lisCommand, conCommand, dlcCommand, fundCommand, watchCommand, pushCommand, closeCommand, breakCommand, historyCommand, offCommand, exitCommand}
+		printHelp(listofCommands)
 		return nil
 	}
 
