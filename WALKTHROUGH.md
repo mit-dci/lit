@@ -1,5 +1,7 @@
 2017-01-09 Lit sortof works on testnet.  There are known bugs / omissions / errors, and also unknown ones!  Reporting bugs / crashes is helpful, and fixing them is even more helpful.
 
+2018-06-12 Updated to use new addresses and command formats.  Lit also works much better than it did in the above note.
+
 ## Lit 0.0 Walkthrough
 
 This walkthrough is to set people up who want to send payments over channels on a test network. If you haven't already, make sure to go to the [README](./README.md) for setup instructions.
@@ -57,9 +59,8 @@ Now in another window, alice connects to the lit node over RPC using `./lit-af`
 alice@pi2:~/anode$ ./lit-af
 lit-af# ls
 entered command: ls
-
 	Addresses:
-0 H5qcg9CudN1KyHKx5h1R87tspxmZ4rPSypQ6w (muUy8o3VHrofZ5YjnyJjLkMufvckVyAWWs)
+0 tb1q39stxtf6udwnjpatadylkgakf8q9und06we8ew (mt3LiAN4EjaHQGeHWLoTHgDUtafALwL6Zv)
 	Utxo: 0 Conf:0 Channel: 0
 Sync Height 1060000
 
@@ -76,8 +77,7 @@ Alice sets her node to listen:
 ```
 lit-af# lis
 entered command: lis
-
-listening on :2448 with key n1ozwFWDbZXKYjqwySv3VaTxNZvdVmQcam
+listening on ln1pmclh89haeswrw0unf8awuyqeu4t2uell58nea@:2448
 ```
 
 n1ozwFWDbZXKYjqwySv3VaTxNZvdVmQcam is Alice's node-ID (This format will change soon).  She's listening on port 2448, but any port can be specified with the `lis` command.
@@ -85,9 +85,8 @@ n1ozwFWDbZXKYjqwySv3VaTxNZvdVmQcam is Alice's node-ID (This format will change s
 Bob can connect to Alice using her node-ID:
 
 ```
-lit-af# con n1ozwFWDbZXKYjqwySv3VaTxNZvdVmQcam@pi2
-entered command: con n1ozwFWDbZXKYjqwySv3VaTxNZvdVmQcam@pi2
-
+lit-af# con ln1pmclh89haeswrw0unf8awuyqeu4t2uell58nea@:2448@pi2
+entered command: con ln1pmclh89haeswrw0unf8awuyqeu4t2uell58nea@:2448@pi2
 connected to peer 1
 lit-af# say 1 Hi Alice!
 entered command: say 1 Hi Alice!
@@ -100,11 +99,10 @@ Bob puts the pubkey@hostname for Alice and connects.  Then he says hi to Alice.
 Before Bob can make a channel, he needs to sweep his coins to make sure they are in his segwit address.
 
 ```
-lit-af# sweep H5qcg9CudN1KyHKx5h1R87tspxmZ4rPSypQ6w 50000000
-entered command: sweep H5qcg9CudN1KyHKx5h1R87tspxmZ4rPSypQ6w 50000000
+lit-af# sweep tb1qrh7xpsmlgrd7lf4vv6yyn87j4n7pdjkra9jrr9 50000000
+entered command: sweep tb1qrh7xpsmlgrd7lf4vv6yyn87j4n7pdjkra9jrr9 50000000
 Swept
-0 acd0bf89ee6902f6c66cd831fe332f6f89eab2d613de4120dc3791df44885bb1
-1 f28aae0860cefadc921a661bf77f5ab80f7a0d7a64c5269093219a99e345dac7
+0 d297da04c43919e683ffc03539ee38e185425e8fa14d1ccae6577fbb35be575a
 ```
 
 ### Step 5: Open a channel
@@ -112,10 +110,10 @@ Swept
 Bob is connected to Alice and wants to open a payment channel. If he has enough (segwit) money and is connected to Alice, he can open a channel.
 
 ```
-lit-af# fund 1 50000000 0
+lit-af# fund 1 1 50000000 0
 ```
 
-This opens a channel with peer 1 (Alice) with a channel capacity of 50,000,000 satoshis (half a coin), and sends 0 satoshis over in the creation process.  Bob starts out with all 50,000,000 satoshis in the channel, so only he can send to Alice.
+This opens a channel with peer 1 (Alice) with a channel capacity of 50,000,000 satoshis (half a coin), and sends 0 satoshis over in the creation process.  Bob starts out with all 50,000,000 satoshis in the channel, so only he can send to Alice.  The second "1" is to specify the cointype, which is 1 for the Bitcoin Testnet3.
 
 ### Step 6: Send micro-payments
 
