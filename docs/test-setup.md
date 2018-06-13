@@ -154,4 +154,4 @@ The nodes are now connected together.
 Now that you have a set up with two LIT nodes, you can continue with some interesting things, we cover in follow-up tutorials:
 
 * Form and use payment channels
-* Offer and settle Discreet Log ContractsYou 
+* [Executing a Discreet Log Contract using LIT-AF] (execute-dlc-litaf.md)
