@@ -1,5 +1,6 @@
 # lit - a lightning node you can run on your own
 ![Lit Logo](litlogo145.png)
+
 [![Coverage Status](https://coveralls.io/repos/github/mit-dci/lit/badge.svg)](https://coveralls.io/github/mit-dci/lit)
 
 Under development, not for use with real money.

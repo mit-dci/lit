@@ -4,12 +4,9 @@ import (
 	"fmt"
 
 	"github.com/adiabat/btcd/wire"
+	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
 )
-
-// minOutput is the minimum output amt, post fee.
-// This (plus fees) is also the minimum channel balance
-const minOutput = 100000
 
 // Grab the coins that are rightfully yours! Plus some more.
 // For right now, spend all outputs from channel close.
@@ -70,7 +67,7 @@ DeltaSig collision handling:
 
 Send a DeltaSig.  Delta < 0.
 Receive a DeltaSig with Delta < 0; need to send a GapSigRev
-COLLISION: Set the collision flag (delta-(1<<30))
+COLLISION: Set the collision flag (delta-(130))
 update amount with increment from received deltaSig
 verify received signature & save to disk, update state number
 *your delta value stays the same*
@@ -149,7 +146,7 @@ func (nd *LitNode) ReSendMsg(qc *Qchan) error {
 }
 
 // PushChannel initiates a state update by sending a DeltaSig
-func (nd LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
+func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	// sanity checks
 	if amt >= 1<<30 {
 		return fmt.Errorf("max send 1G sat (1073741823)")
@@ -194,23 +191,23 @@ func (nd LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	theirNewOutputSize := qc.Value - (qc.State.MyAmt - int64(amt)) - qc.State.Fee
 
 	// check if this push would lower my balance below minBal
-	if myNewOutputSize < minOutput {
+	if myNewOutputSize < consts.MinOutput {
 		qc.ClearToSend <- true
-		return fmt.Errorf("want to push %s but %s available after %s fee and %s minOutput",
+		return fmt.Errorf("want to push %s but %s available after %s fee and %s consts.MinOutput",
 			lnutil.SatoshiColor(int64(amt)),
-			lnutil.SatoshiColor(qc.State.MyAmt - qc.State.Fee - minOutput),
+			lnutil.SatoshiColor(qc.State.MyAmt-qc.State.Fee-consts.MinOutput),
 			lnutil.SatoshiColor(qc.State.Fee),
-			lnutil.SatoshiColor(minOutput))
+			lnutil.SatoshiColor(consts.MinOutput))
 	}
 	// check if this push is sufficient to get them above minBal
-	if theirNewOutputSize < minOutput {
+	if theirNewOutputSize < consts.MinOutput {
 		qc.ClearToSend <- true
 		return fmt.Errorf(
-			"pushing %s insufficient; counterparty bal %s fee %s minOutput %s",
+			"pushing %s insufficient; counterparty bal %s fee %s consts.MinOutput %s",
 			lnutil.SatoshiColor(int64(amt)),
 			lnutil.SatoshiColor(qc.Value-qc.State.MyAmt),
 			lnutil.SatoshiColor(qc.State.Fee),
-			lnutil.SatoshiColor(minOutput))
+			lnutil.SatoshiColor(consts.MinOutput))
 	}
 
 	// if we got here, but channel is not in rest state, try to fix it.
@@ -291,7 +288,7 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 		collision = true
 	}
 
-	fmt.Printf("COLLISION is (%s)\n", collision)
+	fmt.Printf("COLLISION is (%t)\n", collision)
 
 	// load state from disk
 	err := nd.ReloadQchanState(qc)
@@ -349,19 +346,19 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 		return fmt.Errorf("DeltaSigHandler err: delta %d", incomingDelta)
 	}
 
-	// perform minOutput check
+	// perform consts.MinOutput check
 	theirNewOutputSize :=
 		qc.Value - (qc.State.MyAmt + int64(incomingDelta)) - qc.State.Fee
 
 	// check if this push is takes them below minimum output size
-	if theirNewOutputSize < minOutput {
+	if theirNewOutputSize < consts.MinOutput {
 		qc.ClearToSend <- true
 		return fmt.Errorf(
-			"pushing %s reduces them too low; counterparty bal %s fee %s minOutput %s",
+			"pushing %s reduces them too low; counterparty bal %s fee %s consts.MinOutput %s",
 			lnutil.SatoshiColor(int64(incomingDelta)),
 			lnutil.SatoshiColor(qc.Value-qc.State.MyAmt),
 			lnutil.SatoshiColor(qc.State.Fee),
-			lnutil.SatoshiColor(minOutput))
+			lnutil.SatoshiColor(consts.MinOutput))
 	}
 
 	// update to the next state to verify
@@ -540,12 +537,10 @@ func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
 	q.State.StateIdx -= 2
 	q.State.MyAmt = prevAmt
 
-	go func() {
-		err = nd.BuildJusticeSig(q)
-		if err != nil {
-			fmt.Printf("GapSigRevHandler BuildJusticeSig err %s", err.Error())
-		}
-	}()
+	err = nd.BuildJusticeSig(q)
+	if err != nil {
+		fmt.Printf("GapSigRevHandler BuildJusticeSig err %s", err.Error())
+	}
 
 	return nil
 }
@@ -619,12 +614,10 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 	qc.State.StateIdx--
 	qc.State.MyAmt = prevAmt
 
-	go func() {
-		err = nd.BuildJusticeSig(qc)
-		if err != nil {
-			fmt.Printf("SigRevHandler BuildJusticeSig err %s", err.Error())
-		}
-	}()
+	err = nd.BuildJusticeSig(qc)
+	if err != nil {
+		fmt.Printf("SigRevHandler BuildJusticeSig err %s", err.Error())
+	}
 
 	// done updating channel, no new messages expected.  Set clear to send
 	qc.ClearToSend <- true
@@ -692,12 +685,10 @@ func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {
 	// the justice signature
 	qc.State.StateIdx--      // back one state
 	qc.State.MyAmt = prevAmt // use stashed previous state amount
-	go func() {
-		err = nd.BuildJusticeSig(qc)
-		if err != nil {
-			fmt.Printf("RevHandler BuildJusticeSig err %s", err.Error())
-		}
-	}()
+	err = nd.BuildJusticeSig(qc)
+	if err != nil {
+		fmt.Printf("RevHandler BuildJusticeSig err %s", err.Error())
+	}
 
 	// got rev, assert clear to send
 	qc.ClearToSend <- true

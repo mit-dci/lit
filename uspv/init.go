@@ -38,7 +38,7 @@ func (s *SPVCon) Connect(remoteNode string) error {
 				break
 			}
 			// gotta keep trying for those IPs
-			log.Println("DNS seed %s error", seed)
+			log.Printf("DNS seed %s error", seed)
 		}
 
 		if len(seedAdrs) == 0 {

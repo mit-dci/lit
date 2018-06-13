@@ -421,8 +421,8 @@ func (nd *LitNode) SignSettlementDivisions(c *lnutil.DlcContract) ([]lnutil.DlcC
 	kg.Step[3] = c.PeerIdx | 1<<31
 	kg.Step[4] = uint32(c.Idx) | 1<<31
 
-	priv := wal.GetPriv(kg)
-	if priv == nil {
+	priv, err := wal.GetPriv(kg)
+	if err != nil {
 		return nil, fmt.Errorf("Could not get private key for contract %d", c.Idx)
 	}
 
@@ -547,8 +547,8 @@ func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oracleSig [32]
 	kg.Step[3] = c.PeerIdx | 1<<31
 	kg.Step[4] = uint32(c.Idx) | 1<<31
 
-	priv := wal.GetPriv(kg)
-	if priv == nil {
+	priv, err := wal.GetPriv(kg)
+	if err != nil {
 		return [32]byte{}, [32]byte{}, fmt.Errorf("SettleContract Could not get private key for contract %d", c.Idx)
 	}
 
@@ -604,7 +604,8 @@ func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oracleSig [32]
 	txClaim.AddTxOut(wire.NewTxOut(d.ValueOurs-1000, lnutil.DirectWPKHScriptFromPKH(addr))) // todo calc fee - fee is double here because the contract output already had the fee deducted in the settlement TX
 
 	kg.Step[2] = UseContractPayoutBase
-	privSpend := wal.GetPriv(kg)
+	privSpend, _ := wal.GetPriv(kg)
+
 	pubSpend := wal.GetPub(kg)
 	privOracle, pubOracle := btcec.PrivKeyFromBytes(btcec.S256(), oracleSig[:])
 	privContractOutput := lnutil.CombinePrivateKeys(privSpend, privOracle)

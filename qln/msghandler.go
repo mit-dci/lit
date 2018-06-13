@@ -365,8 +365,10 @@ func (nd *LitNode) OPEventHandler(OPEventChan chan lnutil.OutPointEvent) {
 					elkScalar, portxo.KeyGen.PrivKey =
 						portxo.KeyGen.PrivKey, elkScalar
 
-					// TODO make sure this doesn't crash on nil wallet
-					privBase := nd.SubWallet[theQ.Coin()].GetPriv(portxo.KeyGen)
+					privBase, err := nd.SubWallet[theQ.Coin()].GetPriv(portxo.KeyGen)
+					if err != nil {
+						continue // or return?
+					}
 
 					portxo.PrivKey = lnutil.CombinePrivKeyAndSubtract(
 						privBase, elkScalar[:])
@@ -430,7 +432,7 @@ func (nd *LitNode) HandleContractOPEvent(c *lnutil.DlcContract,
 			kg.Step[2] = UseContractPayoutPKH
 			kg.Step[3] = c.PeerIdx | 1<<31
 			kg.Step[4] = uint32(c.Idx) | 1<<31
-			priv := wal.GetPriv(kg)
+			priv, _ := wal.GetPriv(kg)
 
 			// make hash cache
 			hCache := txscript.NewTxSigHashes(txClaim)

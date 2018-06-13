@@ -72,7 +72,7 @@ func (lc *litAfClient) Send(textArgs []string) error {
 	args.DestAddrs = []string{textArgs[0]}
 	args.Amts = []int64{int64(amt)}
 
-	err = lc.rpccon.Call("LitRPC.Send", args, reply)
+	err = lc.Call("LitRPC.Send", args, reply)
 	if err != nil {
 		return err
 	}
@@ -110,7 +110,7 @@ func (lc *litAfClient) Sweep(textArgs []string) error {
 		args.Drop = true
 	}
 
-	err = lc.rpccon.Call("LitRPC.Sweep", args, reply)
+	err = lc.Call("LitRPC.Sweep", args, reply)
 	if err != nil {
 		return err
 	}
@@ -156,7 +156,7 @@ func (lc *litAfClient) Fan(textArgs []string) error {
 	}
 	args.AmtPerOutput = int64(amt)
 
-	err = lc.rpccon.Call("LitRPC.Fanout", args, reply)
+	err = lc.Call("LitRPC.Fanout", args, reply)
 	if err != nil {
 		return err
 	}
@@ -200,12 +200,12 @@ func (lc *litAfClient) Fee(textArgs []string) error {
 	}
 
 	if set {
-		err := lc.rpccon.Call("LitRPC.SetFee", SetArgs, reply)
+		err := lc.Call("LitRPC.SetFee", SetArgs, reply)
 		if err != nil {
 			return err
 		}
 	} else {
-		err := lc.rpccon.Call("LitRPC.GetFee", GetArgs, reply)
+		err := lc.Call("LitRPC.GetFee", GetArgs, reply)
 		if err != nil {
 			return err
 		}
@@ -286,7 +286,7 @@ func (lc *litAfClient) Address(textArgs []string) error {
 	args.NumToMake = numadrs
 
 	fmt.Printf("args: %v\n", args)
-	err := lc.rpccon.Call("LitRPC.Address", args, reply)
+	err := lc.Call("LitRPC.Address", args, reply)
 	if err != nil {
 		return err
 	}

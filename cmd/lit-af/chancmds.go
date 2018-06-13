@@ -25,7 +25,7 @@ var fundCommand = &Command{
 var watchCommand = &Command{
 	Format: fmt.Sprintf("%s%s\n", lnutil.White("watch"),
 		lnutil.ReqColor("channel idx", "watchPeerIdx")),
-	Description: fmt.Sprintf("%s\n%s\n%s%s\n",
+	Description: fmt.Sprintf("%s\n%s\n",
 		"Send channel data to a watcher",
 		"The watcher can defend your channel while you're offline."),
 	ShortDescription: "Send channel watch data to watcher.\n",
@@ -74,7 +74,7 @@ func (lc *litAfClient) History(textArgs []string) error {
 	args := new(litrpc.StateDumpArgs)
 	reply := new(litrpc.StateDumpReply)
 
-	err := lc.rpccon.Call("LitRPC.StateDump", args, reply)
+	err := lc.Call("LitRPC.StateDump", args, reply)
 	if err != nil {
 		return err
 	}
@@ -133,7 +133,7 @@ func (lc *litAfClient) FundChannel(textArgs []string) error {
 	args.Capacity = int64(cCap)
 	args.InitialSend = int64(iSend)
 
-	err = lc.rpccon.Call("LitRPC.FundChannel", args, reply)
+	err = lc.Call("LitRPC.FundChannel", args, reply)
 	if err != nil {
 		return err
 	}
@@ -165,7 +165,7 @@ func (lc *litAfClient) CloseChannel(textArgs []string) error {
 
 	args.ChanIdx = uint32(cIdx)
 
-	err = lc.rpccon.Call("LitRPC.CloseChannel", args, reply)
+	err = lc.Call("LitRPC.CloseChannel", args, reply)
 	if err != nil {
 		return err
 	}
@@ -197,7 +197,7 @@ func (lc *litAfClient) BreakChannel(textArgs []string) error {
 
 	args.ChanIdx = uint32(cIdx)
 
-	err = lc.rpccon.Call("LitRPC.BreakChannel", args, reply)
+	err = lc.Call("LitRPC.BreakChannel", args, reply)
 	if err != nil {
 		return err
 	}
@@ -253,7 +253,7 @@ func (lc *litAfClient) Push(textArgs []string) error {
 	args.Amt = int64(amt)
 
 	for times > 0 {
-		err := lc.rpccon.Call("LitRPC.Push", args, reply)
+		err := lc.Call("LitRPC.Push", args, reply)
 		if err != nil {
 			return err
 		}
@@ -268,7 +268,7 @@ func (lc *litAfClient) Dump(textArgs []string) error {
 	pReply := new(litrpc.DumpReply)
 	pArgs := new(litrpc.NoArgs)
 
-	err := lc.rpccon.Call("LitRPC.DumpPrivs", pArgs, pReply)
+	err := lc.Call("LitRPC.DumpPrivs", pArgs, pReply)
 	if err != nil {
 		return err
 	}
@@ -323,7 +323,7 @@ func (lc *litAfClient) Watch(textArgs []string) error {
 	args.ChanIdx = uint32(cIdx)
 	args.SendToPeer = uint32(peer)
 
-	err = lc.rpccon.Call("LitRPC.Watch", args, reply)
+	err = lc.Call("LitRPC.Watch", args, reply)
 	if err != nil {
 		return err
 	}
