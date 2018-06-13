@@ -39,7 +39,7 @@ type VoutJson struct {
 // some dev activity behind it.
 func (a *APILink) NsightGetAdrTxos() error {
 
-	apitxourl := "https://testnet.blockexplorer.com/api"
+	apitxourl := "https://test-insight.bitpay.com/api"
 	// make a comma-separated list of base58 addresses
 	var adrlist string
 
@@ -100,7 +100,7 @@ func (a *APILink) NsightGetAdrTxos() error {
 }
 
 func (a *APILink) GetOPTxs() error {
-	apitxourl := "https://testnet.blockexplorer.com/api/"
+	apitxourl := "https://test-insight.bitpay.com/api/"
 
 	var oplist []wire.OutPoint
 
@@ -183,7 +183,7 @@ func (a *APILink) GetOPTxs() error {
 
 // GetRawTx is a helper function to get a tx from the insight api
 func GetRawTx(txid string) (*wire.MsgTx, error) {
-	rawTxURL := "https://testnet.blockexplorer.com/api/rawtx/"
+	rawTxURL := "https://test-insight.bitpay.com/api/rawtx/"
 	response, err := http.Get(rawTxURL + txid)
 	if err != nil {
 		return nil, err

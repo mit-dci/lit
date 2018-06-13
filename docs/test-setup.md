@@ -155,3 +155,4 @@ Now that you have a set up with two LIT nodes, you can continue with some intere
 
 * Form and use payment channels
 * [Executing a Discreet Log Contract using LIT-AF] (execute-dlc-litaf.md)
+

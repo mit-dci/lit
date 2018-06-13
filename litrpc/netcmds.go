@@ -112,7 +112,6 @@ func (r *LitRPC) ListConnections(args NoArgs, reply *ListConnectionsReply) error
 
 func (r *LitRPC) GetListeningPorts(args NoArgs, reply *ListeningPortsReply) error {
 	reply.Adr, reply.LisIpPorts = r.Node.GetLisAddressAndPorts()
-
 	return nil
 }
 
@@ -144,6 +143,5 @@ type ChannelGraphReply struct {
 
 func (r *LitRPC) GetChannelMap(args NoArgs, reply *ChannelGraphReply) error {
 	reply.Graph = r.Node.VisualiseGraph()
-
 	return nil
 }

@@ -34,17 +34,23 @@ type config struct { // define a struct for usage with go-flags
 	Rpcport uint16 `short:"p" long:"rpcport" description:"Set RPC port to connect to"`
 	Rpchost string `long:"rpchost" description:"Set RPC host to listen to"`
 
-	Params *coinparam.Params
+	AutoReconnect         bool   `long:"autoReconnect" description:"Attempts to automatically reconnect to known peers periodically."`
+	AutoReconnectInterval int64  `long:"autoReconnectInterval" description:"The interval (in seconds) the reconnect logic should be executed"`
+	AutoListenPort        string `long:"autoListenPort" description:"When auto reconnect enabled, starts listening on this port"`
+	Params                *coinparam.Params
 }
 
 var (
-	defaultLitHomeDirName = os.Getenv("HOME") + "/.lit"
-	defaultTrackerURL     = "http://ni.media.mit.edu:46580"
-	defaultKeyFileName    = "privkey.hex"
-	defaultConfigFilename = "lit.conf"
-	defaultHomeDir        = os.Getenv("HOME")
-	defaultRpcport        = uint16(8001)
-	defaultRpchost        = "localhost"
+	defaultLitHomeDirName        = os.Getenv("HOME") + "/.lit"
+	defaultTrackerURL            = "http://hubris.media.mit.edu:46580"
+	defaultKeyFileName           = "privkey.hex"
+	defaultConfigFilename        = "lit.conf"
+	defaultHomeDir               = os.Getenv("HOME")
+	defaultRpcport               = uint16(8001)
+	defaultRpchost               = "localhost"
+	defaultAutoReconnect         = false
+	defaultAutoListenPort        = ":2448"
+	defaultAutoReconnectInterval = int64(60)
 )
 
 func fileExists(name string) bool {
@@ -96,7 +102,6 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 			return err
 		}
 	}
-
 	// try litecoin testnet4
 	if !lnutil.NopeString(conf.Lt4host) {
 		p := &coinparam.LiteCoinTestNet4Params
@@ -134,10 +139,13 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 func main() {
 
 	conf := config{
-		LitHomeDir: defaultLitHomeDirName,
-		Rpcport:    defaultRpcport,
-		Rpchost:    defaultRpchost,
-		TrackerURL: defaultTrackerURL,
+		LitHomeDir:            defaultLitHomeDirName,
+		Rpcport:               defaultRpcport,
+		Rpchost:               defaultRpchost,
+		TrackerURL:            defaultTrackerURL,
+		AutoReconnect:         defaultAutoReconnect,
+		AutoListenPort:        defaultAutoListenPort,
+		AutoReconnectInterval: defaultAutoReconnectInterval,
 	}
 
 	key := litSetup(&conf)
@@ -161,6 +169,10 @@ func main() {
 
 	go litrpc.RPCListen(rpcl, conf.Rpchost, conf.Rpcport)
 	litbamf.BamfListen(conf.Rpcport, conf.LitHomeDir)
+
+	if conf.AutoReconnect {
+		node.AutoReconnect(conf.AutoListenPort, conf.AutoReconnectInterval)
+	}
 
 	<-rpcl.OffButton
 	fmt.Printf("Got stop request\n")
