@@ -113,7 +113,7 @@ Bob is connected to Alice and wants to open a payment channel. If he has enough 
 lit-af# fund 1 1 50000000 0
 ```
 
-This opens a channel with peer 1 (Alice) with a channel capacity of 50,000,000 satoshis (half a coin), and sends 0 satoshis over in the creation process.  Bob starts out with all 50,000,000 satoshis in the channel, so only he can send to Alice.  The second "1" is to specify the cointype, which is 1 for the Bitcoin Testnet3.
+This opens a channel with peer 1 (Alice) with a channel capacity of 50,000,000 satoshis (half a coin), and sends 0 satoshis over in the creation process.  Bob starts out with all 50,000,000 satoshis in the channel, so only he can send to Alice.  The second "1" is to specify the cointype, which is 1 for Bitcoin Testnet3.
 
 ### Step 6: Send micro-payments
 
