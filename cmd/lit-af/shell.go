@@ -3,11 +3,13 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"strconv"
 
 	"io/ioutil"
 	"net/http"
 
 	"github.com/fatih/color"
+	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/lnutil"
 )
@@ -60,10 +62,12 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		err = lc.Help(args)
 		return parseErr(err, "help")
 	}
+
 	if cmd == "watch" {
 		err = lc.Watch(args)
 		return parseErr(err, "watch")
 	}
+
 	// address a new address and displays it
 	if cmd == "adr" {
 		err = lc.Address(args)
@@ -324,11 +328,21 @@ func printHelp(commands []*Command) {
 	}
 }
 
+func printCointypes() {
+	for k, v := range coinparam.RegisteredNets {
+		fmt.Fprintf(color.Output, "CoinType: %s\n", strconv.Itoa(int(k)))
+		fmt.Fprintf(color.Output, "└────── Name: %s,\tBech32Prefix: %s\n", v.Name, v.Bech32Prefix)
+	}
+}
+
 func (lc *litAfClient) Help(textArgs []string) error {
 	if len(textArgs) == 0 {
-		fmt.Fprintf(color.Output, "commands:\n")
+		fmt.Fprintf(color.Output, lnutil.Header("Commands:\n"))
 		listofCommands := []*Command{helpCommand, sayCommand, lsCommand, addressCommand, sendCommand, fanCommand, sweepCommand, lisCommand, conCommand, dlcCommand, fundCommand, watchCommand, pushCommand, closeCommand, breakCommand, historyCommand, offCommand, exitCommand}
 		printHelp(listofCommands)
+		fmt.Fprintf(color.Output, "\n\n")
+		fmt.Fprintf(color.Output, lnutil.Header("Coins:\n"))
+		printCointypes()
 		return nil
 	}
 
