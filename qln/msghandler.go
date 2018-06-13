@@ -112,7 +112,7 @@ func (nd *LitNode) LNDCReader(peer *RemotePeer) error {
 	}
 
 	for {
-		msg := make([]byte, 65535)
+		msg := make([]byte, 1<<24)
 		//	fmt.Printf("read message from %x\n", l.RemoteLNId)
 		n, err := peer.Con.Read(msg)
 		if err != nil {
