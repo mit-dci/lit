@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"golang.org/x/net/proxy"
@@ -50,6 +51,33 @@ type LNDConn struct {
 // NewConn...
 func NewConn(conn net.Conn) *LNDConn {
 	return &LNDConn{Conn: conn}
+}
+
+func IP4(ipAddress string) bool {
+	parseIp := net.ParseIP(ipAddress)
+	if parseIp.To4() == nil {
+		return false
+	}
+	return true
+}
+
+func parseAdr(netAddress string) (string, string, error) {
+	colonCount := strings.Count(netAddress, ":")
+	var conMode string
+	if IP4(netAddress) {
+		// only ipv4 clears this since ipv6 has colons
+		conMode = "tcp4"
+		return netAddress, conMode, nil
+	} else if colonCount == 5 || colonCount == 6 {
+		// ipv6 without remote port
+		if colonCount == 5 {
+			netAddress = "[" + netAddress + "]" + ":"
+		}
+		conMode = "tcp6"
+		return netAddress, conMode, nil
+	} else {
+		return "", "", fmt.Errorf("Invalid ip")
+	}
 }
 
 // Dial...
