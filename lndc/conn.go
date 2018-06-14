@@ -73,14 +73,12 @@ func (c *LNDConn) Dial(
 			}
 
 			c.Conn, err = d.Dial("tcp", netAddress)
-			if err != nil {
-				return err
-			}
 		} else {
 			c.Conn, err = net.Dial("tcp", netAddress)
-			if err != nil {
-				return err
-			}
+		}
+
+		if err != nil {
+			return err
 		}
 	}
 
