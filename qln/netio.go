@@ -105,7 +105,7 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 
 	// If we couldn't deduce a URL, look it up on the tracker
 	if where == "" {
-		where, err = Lookup(who, nd.TrackerURL)
+		where, _, err = Lookup(who, nd.TrackerURL)
 		if err != nil {
 			return err
 		}
@@ -117,6 +117,7 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 	// Assign remote connection
 	newConn := new(lndc.LNDConn)
 
+	// TODO: handle IPv6 connections
 	err = newConn.Dial(idPriv, where, who)
 	if err != nil {
 		return err
