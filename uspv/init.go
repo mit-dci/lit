@@ -44,15 +44,25 @@ func (s *SPVCon) DialNode(listOfNodes []string) error {
 	var err error
 	for i, ip := range listOfNodes {
 		// try to connect to all nodes in this range
+		var conString string
+		if strings.Contains(ip, ":") {
+			// user has given us a port, take that
+			conString = ip
+		} else {
+			conString = ip + ":" + s.Param.DefaultPort
+		}
 		log.Printf("Attempting connection to node at %s\n",
-			ip+":"+s.Param.DefaultPort)
-		s.con, err = net.Dial("tcp", ip+":"+s.Param.DefaultPort)
-		if err != nil && i != len(listOfNodes)-1 {
-			log.Println(err.Error())
-			continue
-		} else if i == len(listOfNodes)-1 {
-			// all nodes have been exhausted, we move on to the next one, if any.
-			return fmt.Errorf(" Tried to connect to all available node Addresses. Failed")
+			conString)
+		s.con, err = net.Dial("tcp", conString)
+		if err != nil {
+			if i != len(listOfNodes)-1 {
+				log.Println(err.Error())
+				continue
+			} else if i == len(listOfNodes)-1 {
+				log.Println(err)
+				// all nodes have been exhausted, we move on to the next one, if any.
+				return fmt.Errorf(" Tried to connect to all available node Addresses. Failed")
+			}
 		}
 		break
 	}
@@ -146,12 +156,12 @@ func (s *SPVCon) Connect(remoteNode string) error {
 		}
 		listOfNodes = []string{remoteNode}
 	}
-
 	handShakeFailed := false //need to be in this scope to access it here
 	connEstablished := false
 	for len(listOfNodes) != 0 {
 		err = s.DialNode(listOfNodes)
 		if err != nil {
+			log.Println(err)
 			log.Printf("Couldn't dial node %s, Moving on", listOfNodes[0])
 			listOfNodes = listOfNodes[1:]
 			continue
@@ -178,10 +188,14 @@ func (s *SPVCon) Connect(remoteNode string) error {
 		}
 	}
 
+	if !handShakeFailed && !connEstablished {
+		// this case happens when user provided node fails to connect
+		return fmt.Errorf("Couldn't establish connection with node. Exiting.")
+	}
 	if handShakeFailed && !connEstablished {
 		// this case is when the last node fails and we continue, only to exit the
 		// loop and execute below code, which is unnecessary.
-		return fmt.Errorf("Couldn't establish connection with any remote node. Exiting.")
+		return fmt.Errorf("Couldn't establish connection with any remote node after an instance of handshake. Exiting.")
 	}
 	s.inMsgQueue = make(chan wire.Message)
 	go s.incomingMessageHandler()
