@@ -64,15 +64,11 @@ func IP4(ipAddress string) bool {
 func parseAdr(netAddress string) (string, string, error) {
 	colonCount := strings.Count(netAddress, ":")
 	var conMode string
-	if IP4(netAddress) {
-		// only ipv4 clears this since ipv6 has colons
+	if colonCount == 1 && IP4(strings.Split(netAddress, ":")[0]) {
+		// only ipv4 clears this since ipv6 has 6 colons (with port no)
 		conMode = "tcp4"
 		return netAddress, conMode, nil
-	} else if colonCount == 5 || colonCount == 6 {
-		// ipv6 without remote port
-		if colonCount == 5 {
-			netAddress = "[" + netAddress + "]" + ":"
-		}
+	} else if colonCount == 6 {
 		conMode = "tcp6"
 		return netAddress, conMode, nil
 	} else {
