@@ -30,7 +30,6 @@ func (s *SPVCon) parseRemoteNode(remoteNode string) (string, string, error) {
 		}
 		// only ipv4 clears this since ipv6 has colons
 		conMode = "tcp4"
-		log.Println("HERE")
 		return remoteNode, conMode, nil
 	} else if colonCount == 1 && IP4(strings.Split(remoteNode, ":")[0]) {
 		// custom port on ipv4
