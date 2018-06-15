@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/adiabat/btcd/btcec"
+	"golang.org/x/net/proxy"
 )
 
 type announcement struct {
@@ -69,8 +70,21 @@ func Announce(priv *btcec.PrivateKey, litport string, litadr string, trackerURL 
 	return nil
 }
 
-func Lookup(litadr string, trackerURL string) (string, error) {
-	resp, err := http.Get(trackerURL + "/" + litadr)
+func Lookup(litadr string, trackerURL string, proxyURL string) (string, error) {
+	var client http.Client
+
+	if proxyURL != "" {
+		dialer, err := proxy.SOCKS5("tcp", proxyURL, nil, proxy.Direct)
+		if err != nil {
+			return "", err
+		}
+
+		client.Transport = &http.Transport{
+			Dial: dialer.Dial,
+		}
+	}
+
+	resp, err := client.Get(trackerURL + "/" + litadr)
 	if err != nil {
 		return "", err
 	}

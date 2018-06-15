@@ -41,9 +41,12 @@ func (nd *LitNode) TCPListener(
 
 	adr := lnutil.LitAdrFromPubkey(idPub)
 
-	err = Announce(idPriv, lisIpPort, adr, nd.TrackerURL)
-	if err != nil {
-		log.Printf("Announcement error %s", err.Error())
+	// Don't announce on the tracker if we are communicating via SOCKS proxy
+	if nd.ProxyURL == "" {
+		err = Announce(idPriv, lisIpPort, adr, nd.TrackerURL)
+		if err != nil {
+			log.Printf("Announcement error %s", err.Error())
+		}
 	}
 
 	fmt.Printf("Listening on %s\n", listener.Addr().String())
@@ -105,7 +108,7 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 
 	// If we couldn't deduce a URL, look it up on the tracker
 	if where == "" {
-		where, err = Lookup(who, nd.TrackerURL)
+		where, err = Lookup(who, nd.TrackerURL, nd.ProxyURL)
 		if err != nil {
 			return err
 		}
