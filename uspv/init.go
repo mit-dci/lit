@@ -87,7 +87,8 @@ func (s *SPVCon) DialNode(listOfNodes []string) error {
 
 		if s.ProxyURL != "" {
 			log.Printf("Attempting to connect via proxy %s", s.ProxyURL)
-			d, err := proxy.SOCKS5("tcp", s.ProxyURL, nil, proxy.Direct)
+			var d proxy.Dialer
+			d, err = proxy.SOCKS5("tcp", s.ProxyURL, nil, proxy.Direct)
 			if err != nil {
 				return err
 			}
