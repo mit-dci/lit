@@ -97,7 +97,7 @@ func Lookup(litadr string, trackerURL string, proxyURL string) (string, string, 
 	if proxyURL != "" {
 		dialer, err := proxy.SOCKS5("tcp", proxyURL, nil, proxy.Direct)
 		if err != nil {
-			return "", err
+			return "", "", err
 		}
 
 		client.Transport = &http.Transport{
