@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
@@ -46,6 +47,13 @@ type Qchan struct {
 	// exists only in ram, doesn't touch disk
 }
 
+type HTLC struct {
+	Incoming bool
+	Amt      int64
+	RHash    [20]byte
+	Locktime time.Time
+}
+
 // StatComs are State Commitments.
 // all elements are saved to the db.
 type StatCom struct {
@@ -77,6 +85,9 @@ type StatCom struct {
 	// sig should have a sig.
 	// only one sig is ever stored, to prevent broadcasting the wrong tx.
 	// could add a mutex here... maybe will later.
+
+	// Any HTLC associated with this channel state (can be nil)
+	CurrentHTLC *HTLC
 }
 
 // QCloseData is the output resulting from an un-cooperative close
