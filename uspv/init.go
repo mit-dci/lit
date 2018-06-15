@@ -178,7 +178,8 @@ func (s *SPVCon) Connect(remoteNode string) error {
 		// if remoteNode is "yes" but no IP specified, use DNS seed
 		listOfNodes, err = s.GetListOfNodes()
 		if err != nil {
-			log.Fatalf("No hosts to connect to for given cointype. Quitting")
+			log.Println(err)
+			return err
 			// automatically quit if there are no other hosts to connect to.
 		}
 	} else { // else connect to user-specified node
