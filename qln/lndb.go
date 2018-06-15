@@ -132,6 +132,9 @@ type LitNode struct {
 
 	ChannelMap map[[20]byte][]lnutil.LinkMsg
 	AdvTimeout *time.Ticker
+
+	// Contains the URL string to connect to a SOCKS5 proxy, if provided
+	ProxyURL string
 }
 
 type RemotePeer struct {

@@ -18,7 +18,7 @@ import (
 
 // Init starts up a lit node.  Needs priv key, and a path.
 // Does not activate a subwallet; do that after init.
-func NewLitNode(privKey *[32]byte, path string, trackerURL string) (*LitNode, error) {
+func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL string) (*LitNode, error) {
 
 	nd := new(LitNode)
 	nd.LitFolder = path
@@ -49,6 +49,8 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string) (*LitNode, er
 	}
 
 	nd.TrackerURL = trackerURL
+
+	nd.ProxyURL = proxyURL
 
 	nd.InitRouting()
 

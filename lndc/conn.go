@@ -9,6 +9,8 @@ import (
 	"net"
 	"time"
 
+	"golang.org/x/net/proxy"
+
 	"github.com/adiabat/btcd/btcec"
 	"github.com/btcsuite/fastsha256"
 	"github.com/codahale/chacha20poly1305"
@@ -52,7 +54,7 @@ func NewConn(conn net.Conn) *LNDConn {
 
 // Dial...
 func (c *LNDConn) Dial(
-	myId *btcec.PrivateKey, netAddress string, remotePKH string) error {
+	myId *btcec.PrivateKey, netAddress string, remotePKH string, proxyURL string) error {
 
 	var err error
 	if myId == nil {
@@ -64,10 +66,21 @@ func (c *LNDConn) Dial(
 			return fmt.Errorf("connection already established")
 		}
 
-		// First, open the TCP connection itself.
-		c.Conn, err = net.Dial("tcp", netAddress)
-		if err != nil {
-			return err
+		if proxyURL != "" {
+			d, err := proxy.SOCKS5("tcp", proxyURL, nil, proxy.Direct)
+			if err != nil {
+				return err
+			}
+
+			c.Conn, err = d.Dial("tcp", netAddress)
+			if err != nil {
+				return err
+			}
+		} else {
+			c.Conn, err = net.Dial("tcp", netAddress)
+			if err != nil {
+				return err
+			}
 		}
 	}
 

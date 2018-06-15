@@ -43,7 +43,7 @@ func TestConnectionCorrectness(t *testing.T) {
 	// main one. If both errors are nil, then encryption+auth was successful.
 	wg.Add(1)
 	go func() {
-		dialErr = conn.Dial(remotePriv, listener.Addr().String(), myAddress)
+		dialErr = conn.Dial(remotePriv, listener.Addr().String(), myAddress, "")
 		wg.Done()
 	}()
 
