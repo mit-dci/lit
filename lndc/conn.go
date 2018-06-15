@@ -68,7 +68,7 @@ func parseAdr(netAddress string) (string, string, error) {
 		// only ipv4 clears this since ipv6 has 6 colons (with port no)
 		conMode = "tcp4"
 		return netAddress, conMode, nil
-	} else if colonCount == 6 {
+	} else if colonCount >= 5 {
 		conMode = "tcp6"
 		return netAddress, conMode, nil
 	} else {
@@ -96,12 +96,21 @@ func (c *LNDConn) Dial(
 				return err
 			}
 
-			c.Conn, err = d.Dial("tcp", netAddress)
+			netAddress, conMode, err := parseAdr(netAddress)
+			if err != nil {
+				return fmt.Errorf("Invalid ip")
+			}
+			c.Conn, err = d.Dial(conMode, netAddress)
 			if err != nil {
 				return err
 			}
 		} else {
-			c.Conn, err = net.Dial("tcp", netAddress)
+			// First, open the TCP connection itself.
+			netAddress, conMode, err := parseAdr(netAddress)
+			if err != nil {
+				return fmt.Errorf("Invalid ip")
+			}
+			c.Conn, err = net.Dial(conMode, netAddress)
 			if err != nil {
 				return err
 			}

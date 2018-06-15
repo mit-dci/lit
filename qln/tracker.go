@@ -91,13 +91,13 @@ func Announce(priv *btcec.PrivateKey, litport string, litadr string, trackerURL 
 	return nil
 }
 
-func Lookup(litadr string, trackerURL string, proxyURL string) (string, error) {
+func Lookup(litadr string, trackerURL string, proxyURL string) (string, string, error) {
 	var client http.Client
 
 	if proxyURL != "" {
 		dialer, err := proxy.SOCKS5("tcp", proxyURL, nil, proxy.Direct)
 		if err != nil {
-			return "", err
+			return "", "", err
 		}
 
 		client.Transport = &http.Transport{
