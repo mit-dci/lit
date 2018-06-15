@@ -1,6 +1,223 @@
 {
 	"comment": "",
 	"ignore": "test",
-	"package": [],
+	"package": [
+		{
+			"checksumSHA1": "IQl0ZHNKACTfj61fKklTsAsuNU4=",
+			"path": "github.com/adiabat/bech32",
+			"revision": "6289d404861d9a285ab7fb6d646a75ba7fe94575",
+			"revisionTime": "2017-05-05T01:18:16Z"
+		},
+		{
+			"checksumSHA1": "3mC+K25asxWHmLZTIqyKPsZ0Ffs=",
+			"path": "github.com/adiabat/btcd/blockchain",
+			"revision": "09ac5b3e5420679a2e25683f59695fb1d0f58717",
+			"revisionTime": "2017-11-17T23:05:43Z"
+		},
+		{
+			"checksumSHA1": "YX7e0hoIANGkTMYKWunx8GIKYT0=",
+			"path": "github.com/adiabat/btcd/btcec",
+			"revision": "09ac5b3e5420679a2e25683f59695fb1d0f58717",
+			"revisionTime": "2017-11-17T23:05:43Z"
+		},
+		{
+			"checksumSHA1": "I5tgDnFdqRvPpT1LhanJXG4vqAA=",
+			"path": "github.com/adiabat/btcd/chaincfg",
+			"revision": "09ac5b3e5420679a2e25683f59695fb1d0f58717",
+			"revisionTime": "2017-11-17T23:05:43Z"
+		},
+		{
+			"checksumSHA1": "DcV6K5AbrlYhoYaKp7cq7vA5Jr8=",
+			"path": "github.com/adiabat/btcd/chaincfg/chainhash",
+			"revision": "09ac5b3e5420679a2e25683f59695fb1d0f58717",
+			"revisionTime": "2017-11-17T23:05:43Z"
+		},
+		{
+			"checksumSHA1": "LnU3jMqoekzjyf8EgfjcFNXdGgU=",
+			"path": "github.com/adiabat/btcd/database",
+			"revision": "09ac5b3e5420679a2e25683f59695fb1d0f58717",
+			"revisionTime": "2017-11-17T23:05:43Z"
+		},
+		{
+			"checksumSHA1": "8uuEz2nCuj5O8QrpM/jWE4FyPGk=",
+			"path": "github.com/adiabat/btcd/txscript",
+			"revision": "09ac5b3e5420679a2e25683f59695fb1d0f58717",
+			"revisionTime": "2017-11-17T23:05:43Z"
+		},
+		{
+			"checksumSHA1": "TG/60VLJ0KO/TWBECXBBg8KWU6Q=",
+			"path": "github.com/adiabat/btcd/wire",
+			"revision": "09ac5b3e5420679a2e25683f59695fb1d0f58717",
+			"revisionTime": "2017-11-17T23:05:43Z"
+		},
+		{
+			"checksumSHA1": "Y8uFqmS7LWKxthjiqMzn7rLpCRA=",
+			"path": "github.com/adiabat/btcutil",
+			"revision": "85f68caa63c5e78274a758372b8ff1a53824d2cd",
+			"revisionTime": "2017-06-22T19:33:40Z"
+		},
+		{
+			"checksumSHA1": "vziZ30Fscdz9UiM+3zfwNJ6k9Pg=",
+			"path": "github.com/adiabat/btcutil/base58",
+			"revision": "85f68caa63c5e78274a758372b8ff1a53824d2cd",
+			"revisionTime": "2017-06-22T19:33:40Z"
+		},
+		{
+			"checksumSHA1": "oHLLBC5MBxP4SDp6DutbQdatSC8=",
+			"path": "github.com/adiabat/btcutil/bloom",
+			"revision": "85f68caa63c5e78274a758372b8ff1a53824d2cd",
+			"revisionTime": "2017-06-22T19:33:40Z"
+		},
+		{
+			"checksumSHA1": "03pRaqk3Hq0FjhvIBa9JtXLYqOI=",
+			"path": "github.com/adiabat/btcutil/hdkeychain",
+			"revision": "85f68caa63c5e78274a758372b8ff1a53824d2cd",
+			"revisionTime": "2017-06-22T19:33:40Z"
+		},
+		{
+			"checksumSHA1": "lyyRohwfLp/G9ktHBx40CMUcgpc=",
+			"path": "github.com/adiabat/btcutil/txsort",
+			"revision": "85f68caa63c5e78274a758372b8ff1a53824d2cd",
+			"revisionTime": "2017-06-22T19:33:40Z"
+		},
+		{
+			"checksumSHA1": "pELHszuriPJpPA23bFwk6XmA4h8=",
+			"path": "github.com/aead/skein",
+			"revision": "9365ae6e95d294dc113a0b308852f97c916db233",
+			"revisionTime": "2016-07-22T08:48:37Z"
+		},
+		{
+			"checksumSHA1": "TNTDdluUyX5oAB0DDehow194Qbo=",
+			"path": "github.com/aead/skein/threefish",
+			"revision": "9365ae6e95d294dc113a0b308852f97c916db233",
+			"revisionTime": "2016-07-22T08:48:37Z"
+		},
+		{
+			"checksumSHA1": "DWbhmc+pTAKYKQ0z6lKvY0nxLg4=",
+			"path": "github.com/awalterschulze/gographviz",
+			"revision": "da5c847b6fb13f2f76225f0ca9d912f5801d92e7",
+			"revisionTime": "2018-06-07T04:58:12Z"
+		},
+		{
+			"checksumSHA1": "Ok8qwxLi8iVhkEJCiwkAwpHHpQg=",
+			"path": "github.com/awalterschulze/gographviz/ast",
+			"revision": "da5c847b6fb13f2f76225f0ca9d912f5801d92e7",
+			"revisionTime": "2018-06-07T04:58:12Z"
+		},
+		{
+			"checksumSHA1": "LCHqj3/4Kp8QUJuxEfqKuUE+n1c=",
+			"path": "github.com/awalterschulze/gographviz/internal/errors",
+			"revision": "da5c847b6fb13f2f76225f0ca9d912f5801d92e7",
+			"revisionTime": "2018-06-07T04:58:12Z"
+		},
+		{
+			"checksumSHA1": "KXDyRfth+z5VBiBfOjUNDDhR7VE=",
+			"path": "github.com/awalterschulze/gographviz/internal/lexer",
+			"revision": "da5c847b6fb13f2f76225f0ca9d912f5801d92e7",
+			"revisionTime": "2018-06-07T04:58:12Z"
+		},
+		{
+			"checksumSHA1": "Yutt18Ig4n2Lr95d6c91xAv4xhw=",
+			"path": "github.com/awalterschulze/gographviz/internal/parser",
+			"revision": "da5c847b6fb13f2f76225f0ca9d912f5801d92e7",
+			"revisionTime": "2018-06-07T04:58:12Z"
+		},
+		{
+			"checksumSHA1": "+31fviZoNt2fGZVFdqaE96NEa3g=",
+			"path": "github.com/awalterschulze/gographviz/internal/token",
+			"revision": "da5c847b6fb13f2f76225f0ca9d912f5801d92e7",
+			"revisionTime": "2018-06-07T04:58:12Z"
+		},
+		{
+			"checksumSHA1": "P/p+X9Ds7j6VFI6a33CScrw8C0k=",
+			"path": "github.com/bitgoin/lyra2rev2",
+			"revision": "bae9ad2043bb55facb14c4918e909f88a7d3ed84",
+			"revisionTime": "2016-12-12T10:20:46Z"
+		},
+		{
+			"checksumSHA1": "u3eKjo4QH4tysFtQyAtDS354+Z0=",
+			"path": "github.com/bitgoin/lyra2rev2/sha3",
+			"revision": "bae9ad2043bb55facb14c4918e909f88a7d3ed84",
+			"revisionTime": "2016-12-12T10:20:46Z"
+		},
+		{
+			"checksumSHA1": "20Pind5XCrfZL/F0oibWfd9gotA=",
+			"path": "github.com/boltdb/bolt",
+			"revision": "fd01fc79c553a8e99d512a07e8e0c63d4a3ccfc5",
+			"revisionTime": "2018-03-02T18:00:52Z"
+		},
+		{
+			"checksumSHA1": "J6VwqSZwsPkigujNZo4vyYIFPWU=",
+			"path": "github.com/btcsuite/btclog",
+			"revision": "84c8d2346e9fc8c7b947e243b9c24e6df9fd206a",
+			"revisionTime": "2017-06-28T15:40:31Z"
+		},
+		{
+			"checksumSHA1": "xowWqSavv3sZfo4VZDpZTgql1lY=",
+			"path": "github.com/btcsuite/fastsha256",
+			"revision": "637e656429416087660c84436a2a035d69d54e2e",
+			"revisionTime": "2016-08-15T19:38:21Z"
+		},
+		{
+			"checksumSHA1": "nouk3wFgYJ/blFmKqnwp+DKR1pw=",
+			"path": "github.com/btcsuite/golangcrypto/ripemd160",
+			"revision": "53f62d9b43e87a6c56975cf862af7edf33a8d0df",
+			"revisionTime": "2015-03-04T02:55:08Z"
+		},
+		{
+			"checksumSHA1": "QPs3L3mjPoi+a9GJCjW8HhyJczM=",
+			"path": "github.com/codahale/chacha20",
+			"revision": "ec07b4f69a3f70b1dd2a8ad77230deb1ba5d6953",
+			"revisionTime": "2015-11-07T02:50:05Z"
+		},
+		{
+			"checksumSHA1": "CQQgrN4cv9iJ+5xep/uRchevRf8=",
+			"path": "github.com/codahale/chacha20poly1305",
+			"revision": "f8a5c48301822c3d7dd26d78e68ea2968db0ab20",
+			"revisionTime": "2015-11-27T06:40:32Z"
+		},
+		{
+			"checksumSHA1": "Q5YN3JDk0g8zt0gZulGLn+uFC30=",
+			"path": "github.com/dchest/blake256",
+			"revision": "dee3fe6eb0e98dc774a94fc231f85baf7c29d360",
+			"revisionTime": "2015-09-03T10:16:04Z"
+		},
+		{
+			"checksumSHA1": "2qxkfUG/WeyOzcD7vz6PpCaELRA=",
+			"path": "github.com/deedlefake/crypto/groestl256",
+			"revision": "2f50d39c528d83b8c63b3bfb8c834107a1fb6e65",
+			"revisionTime": "2017-09-10T23:37:42Z"
+		},
+		{
+			"checksumSHA1": "HbOJxa+FsQ1TTsF+BkHAvzqqZv4=",
+			"path": "github.com/fatih/color",
+			"revision": "2d684516a8861da43017284349b7e303e809ac21",
+			"revisionTime": "2018-05-16T10:03:07Z"
+		},
+		{
+			"checksumSHA1": "K6exl2ouL7d8cR2i378EzZOdRVI=",
+			"path": "github.com/howeyc/gopass",
+			"revision": "bf9dde6d0d2c004a008c27aaee91170c786f6db8",
+			"revisionTime": "2017-01-09T16:22:49Z"
+		},
+		{
+			"checksumSHA1": "SEnjvwVyfuU2xBaOfXfwPD5MZqk=",
+			"path": "github.com/mattn/go-colorable",
+			"revision": "efa589957cd060542a26d2dd7832fd6a6c6c3ade",
+			"revisionTime": "2018-03-10T13:32:14Z"
+		},
+		{
+			"checksumSHA1": "w5RcOnfv5YDr3j2bd1YydkPiZx4=",
+			"path": "github.com/mattn/go-isatty",
+			"revision": "6ca4dbf54d38eea1a992b3c722a76a5d1c4cb25c",
+			"revisionTime": "2017-11-07T05:05:31Z"
+		},
+		{
+			"checksumSHA1": "OOP1im/L1EBwELWoJDJmXsSGv5A=",
+			"path": "github.com/vertcoin/lyra2re",
+			"revision": "8bfa142041c260a0a4e8c227c1c983a725b86734",
+			"revisionTime": "2017-09-10T03:35:46Z"
+		}
+	],
 	"rootPath": "github.com/mit-dci/lit"
 }
