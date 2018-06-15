@@ -11,6 +11,7 @@ import (
 
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/wire"
+	"golang.org/x/net/proxy"
 )
 
 func IP4(ipAddress string) bool {
@@ -83,7 +84,19 @@ func (s *SPVCon) DialNode(listOfNodes []string) error {
 		conString, conMode, err = s.parseRemoteNode(ip)
 		log.Printf("Attempting connection to node at %s\n",
 			conString)
-		s.con, err = net.Dial(conMode, conString)
+
+		if s.ProxyURL != "" {
+			log.Printf("Attempting to connect via proxy %s", s.ProxyURL)
+			d, err := proxy.SOCKS5("tcp", s.ProxyURL, nil, proxy.Direct)
+			if err != nil {
+				return err
+			}
+
+			s.con, err = d.Dial(conMode, conString)
+		} else {
+			s.con, err = net.Dial(conMode, conString)
+		}
+
 		if err != nil {
 			if i != len(listOfNodes)-1 {
 				log.Println(err.Error())

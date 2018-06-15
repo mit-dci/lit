@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -25,6 +26,8 @@ type config struct { // define a struct for usage with go-flags
 	TrackerURL  string `long:"tracker" description:"LN address tracker URL http|https://host:port"`
 	ConfigFile  string
 	ProxyURL    string `long:"proxy" description:"SOCKS5 proxy to use for communicating with the network"`
+
+	ProxyWallit bool `long:"proxywallet" description:"Use the SOCKS5 proxy specified with proxy with Wallit connections"`
 
 	ReSync  bool `short:"r" long:"reSync" description:"Resync from the given tip."`
 	Tower   bool `long:"tower" description:"Watchtower: Run a watching node"`
@@ -78,8 +81,9 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	// try regtest
 	if !lnutil.NopeString(conf.Reghost) {
 		p := &coinparam.RegressionNetParams
-		log.Printf("reg: %s\n", conf.Reghost)
-		err = node.LinkBaseWallet(key, 120, conf.ReSync, conf.Tower, conf.Reghost, p)
+		fmt.Printf("reg: %s\n", conf.Reghost)
+		err = node.LinkBaseWallet(key, 120, conf.ReSync,
+			conf.Tower, conf.Reghost, conf.ProxyWallit, p)
 		if err != nil {
 			return err
 		}
@@ -89,7 +93,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 		p := &coinparam.TestNet3Params
 		err = node.LinkBaseWallet(
 			key, 1256000, conf.ReSync, conf.Tower,
-			conf.Tn3host, p)
+			conf.Tn3host, conf.ProxyWallit, p)
 		if err != nil {
 			return err
 		}
@@ -97,7 +101,8 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	// try litecoin regtest
 	if !lnutil.NopeString(conf.Litereghost) {
 		p := &coinparam.LiteRegNetParams
-		err = node.LinkBaseWallet(key, 120, conf.ReSync, conf.Tower, conf.Litereghost, p)
+		err = node.LinkBaseWallet(key, 120, conf.ReSync,
+			conf.Tower, conf.Litereghost, conf.ProxyWallit, p)
 		if err != nil {
 			return err
 		}
@@ -107,7 +112,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 		p := &coinparam.LiteCoinTestNet4Params
 		err = node.LinkBaseWallet(
 			key, p.StartHeight, conf.ReSync, conf.Tower,
-			conf.Lt4host, p)
+			conf.Lt4host, conf.ProxyWallit, p)
 		if err != nil {
 			return err
 		}
@@ -117,7 +122,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 		p := &coinparam.VertcoinTestNetParams
 		err = node.LinkBaseWallet(
 			key, 25000, conf.ReSync, conf.Tower,
-			conf.Tvtchost, p)
+			conf.Tvtchost, conf.ProxyWallit, p)
 		if err != nil {
 			return err
 		}
@@ -127,7 +132,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 		p := &coinparam.VertcoinParams
 		err = node.LinkBaseWallet(
 			key, p.StartHeight, conf.ReSync, conf.Tower,
-			conf.Vtchost, p)
+			conf.Vtchost, conf.ProxyWallit, p)
 		if err != nil {
 			return err
 		}

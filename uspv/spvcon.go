@@ -16,8 +16,9 @@ type SPVCon struct {
 
 	// Enhanced SPV modes for users who have outgrown easy mode SPV
 	// but have not yet graduated to full nodes.
-	HardMode bool // hard mode doesn't use filters.
-	Ironman  bool // ironman only gets blocks, never requests txs.
+	HardMode bool   // hard mode doesn't use filters.
+	Ironman  bool   // ironman only gets blocks, never requests txs.
+	ProxyURL string // Optionally the URL of a SOCKS5 proxy to use
 
 	headerMutex       sync.Mutex
 	headerFile        *os.File // file for SPV headers

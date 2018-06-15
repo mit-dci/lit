@@ -89,7 +89,7 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 // LinkBaseWallet activates a wallet and hooks it into the litnode.
 func (nd *LitNode) LinkBaseWallet(
 	privKey *[32]byte, birthHeight int32, resync bool, tower bool,
-	host string, param *coinparam.Params) error {
+	host string, proxy bool, param *coinparam.Params) error {
 
 	rootpriv, err := hdkeychain.NewMaster(privKey[:], param)
 	if err != nil {
@@ -114,10 +114,15 @@ func (nd *LitNode) LinkBaseWallet(
 		nd.MultiWallet = true
 	}
 
+	var proxyURL string
+	if proxy {
+		proxyURL = nd.ProxyURL
+	}
+
 	// if there aren't, Multiwallet will still be false; set new wallit to
 	// be the first & default
 	nd.SubWallet[WallitIdx] = wallit.NewWallit(
-		rootpriv, birthHeight, resync, host, nd.LitFolder, param)
+		rootpriv, birthHeight, resync, host, nd.LitFolder, proxyURL, param)
 
 	// re-register channel addresses
 	qChans, err := nd.GetAllQchans()

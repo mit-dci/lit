@@ -17,6 +17,7 @@ import (
 	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
+	"golang.org/x/net/proxy"
 )
 
 // powless is a couple steps below uspv in that it doesn't check
@@ -73,7 +74,8 @@ ChainHook interface
 
 // APILink is a link to a web API that can tell you about blockchain data.
 type APILink struct {
-	apiUrl string
+	apiUrl   string
+	proxyURL string
 
 	// TrackingAdrs and OPs are slices of addresses and outpoints to watch for.
 	// Using struct{} saves a byte of RAM but is ugly so I'll use bool.
@@ -96,13 +98,28 @@ type APILink struct {
 	// time based polling
 	dirtyChan chan interface{}
 
+	client http.Client
+
 	p *coinparam.Params
 }
 
 // Start starts the APIlink
 func (a *APILink) Start(
-	startHeight int32, host, path string, params *coinparam.Params) (
+	startHeight int32, host, path string, proxyURL string, params *coinparam.Params) (
 	chan lnutil.TxAndHeight, chan int32, error) {
+
+	a.proxyURL = proxyURL
+
+	if proxyURL != "" {
+		dialer, err := proxy.SOCKS5("tcp", proxyURL, nil, proxy.Direct)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		a.client.Transport = &http.Transport{
+			Dial: dialer.Dial,
+		}
+	}
 
 	// later, use params to detect which api to connect to
 	a.p = params
@@ -143,7 +160,7 @@ func (a *APILink) PushTx(tx *wire.MsgTx) error {
 	apiurl := a.apiUrl + "sendRawTransaction"
 
 	response, err :=
-		http.Post(apiurl, "text/plain", bytes.NewBuffer([]byte(txHexString)))
+		a.client.Post(apiurl, "text/plain", bytes.NewBuffer([]byte(txHexString)))
 	if err != nil {
 		return err
 	}
@@ -231,7 +248,7 @@ func (a *APILink) TipRefreshLoop() error {
 		// Fetch the current highest block
 		apiurl := a.apiUrl + "blocks?limit=1"
 
-		response, err := http.Get(apiurl)
+		response, err := a.client.Get(apiurl)
 		if err != nil {
 			return err
 		}
@@ -302,7 +319,7 @@ func (a *APILink) GetVAdrTxos() error {
 	// then grab the tx hex, decode and send up to the wallit
 	for _, url := range urls {
 		log.Printf("Requesting adr %s\n", url)
-		response, err := http.Get(url)
+		response, err := a.client.Get(url)
 		if err != nil {
 			return err
 		}
@@ -382,7 +399,7 @@ func (a *APILink) GetVOPTxs() error {
 		// (if we have 2 outpoints with the same txid we query twice...)
 		opstring := op.String()
 		opstring = strings.Replace(opstring, ";", "/", 1)
-		response, err := http.Get(apitxourl + opstring + "?raw=1")
+		response, err := a.client.Get(apitxourl + opstring + "?raw=1")
 		if err != nil {
 			return err
 		}
@@ -434,7 +451,7 @@ func (a *APILink) GetVOPTxs() error {
 // VGetRawTx is a helper function to get a tx from the indexer
 func (a *APILink) VGetRawTx(txid string) (*wire.MsgTx, error) {
 	rawTxURL := a.apiUrl + "getTransaction/"
-	response, err := http.Get(rawTxURL + txid)
+	response, err := a.client.Get(rawTxURL + txid)
 	if err != nil {
 		return nil, err
 	}
