@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"golang.org/x/net/proxy"
@@ -52,6 +53,29 @@ func NewConn(conn net.Conn) *LNDConn {
 	return &LNDConn{Conn: conn}
 }
 
+func IP4(ipAddress string) bool {
+	parseIp := net.ParseIP(ipAddress)
+	if parseIp.To4() == nil {
+		return false
+	}
+	return true
+}
+
+func parseAdr(netAddress string) (string, string, error) {
+	colonCount := strings.Count(netAddress, ":")
+	var conMode string
+	if colonCount == 1 && IP4(strings.Split(netAddress, ":")[0]) {
+		// only ipv4 clears this since ipv6 has 6 colons (with port no)
+		conMode = "tcp4"
+		return netAddress, conMode, nil
+	} else if colonCount >= 5 {
+		conMode = "tcp6"
+		return netAddress, conMode, nil
+	} else {
+		return "", "", fmt.Errorf("Invalid ip")
+	}
+}
+
 // Dial...
 func (c *LNDConn) Dial(
 	myId *btcec.PrivateKey, netAddress string, remotePKH string, proxyURL string) error {
@@ -72,12 +96,21 @@ func (c *LNDConn) Dial(
 				return err
 			}
 
-			c.Conn, err = d.Dial("tcp", netAddress)
+			netAddress, conMode, err := parseAdr(netAddress)
+			if err != nil {
+				return fmt.Errorf("Invalid ip")
+			}
+			c.Conn, err = d.Dial(conMode, netAddress)
 			if err != nil {
 				return err
 			}
 		} else {
-			c.Conn, err = net.Dial("tcp", netAddress)
+			// First, open the TCP connection itself.
+			netAddress, conMode, err := parseAdr(netAddress)
+			if err != nil {
+				return fmt.Errorf("Invalid ip")
+			}
+			c.Conn, err = net.Dial(conMode, netAddress)
 			if err != nil {
 				return err
 			}
