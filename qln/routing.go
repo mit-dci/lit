@@ -89,7 +89,8 @@ func (nd *LitNode) cleanStaleChannels() {
 
 func (nd *LitNode) advertiseLinks(seq uint32) {
 	nd.RemoteMtx.Lock()
-	defer nd.RemoteMtx.Unlock()
+
+	var msgs []lnutil.LinkMsg
 
 	for _, peer := range nd.RemoteCons {
 		for _, q := range peer.QCs {
@@ -115,15 +116,23 @@ func (nd *LitNode) advertiseLinks(seq uint32) {
 
 				outmsg.PeerIdx = math.MaxUint32
 
-				nd.LinkMsgHandler(outmsg)
+				msgs = append(msgs, outmsg)
 			}
 		}
+	}
+
+	nd.RemoteMtx.Unlock()
+
+	for _, msg := range msgs {
+		nd.LinkMsgHandler(msg)
 	}
 }
 
 func (nd *LitNode) LinkMsgHandler(msg lnutil.LinkMsg) {
 	nd.ChannelMapMtx.Lock()
 	defer nd.ChannelMapMtx.Unlock()
+	nd.RemoteMtx.Lock()
+	defer nd.RemoteMtx.Unlock()
 
 	msg.Timestamp = time.Now().Unix()
 	newChan := true
