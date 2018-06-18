@@ -137,7 +137,7 @@ func main() {
 	//	if err != nil {
 	//		log.Fatal("rpc call error:", err)
 	//	}
-	//	fmt.Printf("Sent bal req, response: txototal %d\n", br.TxoTotal)
+	//	log.Printf("Sent bal req, response: txototal %d\n", br.TxoTotal)
 }
 
 func (lc *litAfClient) Call(serviceMethod string, args interface{}, reply interface{}) error {

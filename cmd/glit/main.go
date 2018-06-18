@@ -254,7 +254,7 @@ func buttonFunc(w *nucular.Window) {
 		if err != nil {
 			adr = err.Error()
 		} else {
-			fmt.Printf("Got new address %s\n", adr)
+			log.Printf("Got new address %s\n", adr)
 		}
 		myAdrBar.Buffer = []rune(adr)
 	}

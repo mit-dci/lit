@@ -27,7 +27,7 @@ func (lu *litUiClient) NewAddress() (string, error) {
 	args.CoinType = cointype
 	args.NumToMake = numadrs
 
-	fmt.Printf("adr cointye: %d num:%d\n", args.CoinType, args.NumToMake)
+	log.Printf("adr cointye: %d num:%d\n", args.CoinType, args.NumToMake)
 	err := lu.rpccon.Call("LitRPC.Address", args, reply)
 	if err != nil {
 		return "", err
@@ -58,7 +58,7 @@ func (lu *litUiClient) Address() (string, error) {
 	args.CoinType = cointype
 	args.NumToMake = numadrs
 
-	fmt.Printf("adr cointye: %d num:%d\n", args.CoinType, args.NumToMake)
+	log.Printf("adr cointye: %d num:%d\n", args.CoinType, args.NumToMake)
 	err := lu.rpccon.Call("LitRPC.Address", args, reply)
 	if err != nil {
 		return "", err

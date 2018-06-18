@@ -2,6 +2,7 @@ package qln
 
 import (
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -194,7 +195,7 @@ func (nd *LitNode) GetPubHostFromPeerIdx(idx uint32) ([33]byte, string) {
 		return nil
 	})
 	if err != nil {
-		fmt.Printf(err.Error())
+		log.Printf(err.Error())
 	}
 	return pub, host
 }
@@ -223,7 +224,7 @@ func (nd *LitNode) GetNicknameFromPeerIdx(idx uint32) string {
 		return nil
 	})
 	if err != nil {
-		fmt.Printf(err.Error())
+		log.Printf(err.Error())
 	}
 	return nickname
 }
@@ -382,7 +383,7 @@ func (nd *LitNode) SaveQChan(q *Qchan) error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("saved %d : %s mapping in db\n", q.Idx(), q.Op.String())
+		log.Printf("saved %d : %s mapping in db\n", q.Idx(), q.Op.String())
 
 		cbk := btx.Bucket(BKTChannel) // go into bucket for all peers
 		if cbk == nil {
@@ -412,7 +413,7 @@ func (nd *LitNode) SaveQChan(q *Qchan) error {
 		// serialize elkrem receiver if it exists
 
 		if q.ElkRcv != nil {
-			fmt.Printf("--- elk rcv exists, saving\n")
+			log.Printf("--- elk rcv exists, saving\n")
 
 			eb, err := q.ElkRcv.ToBytes()
 			if err != nil {
@@ -431,7 +432,7 @@ func (nd *LitNode) SaveQChan(q *Qchan) error {
 			return err
 		}
 		// save state
-		fmt.Printf("writing %d byte state to bucket\n", len(b))
+		log.Printf("writing %d byte state to bucket\n", len(b))
 		return qcBucket.Put(KEYState, b)
 	})
 	if err != nil {
@@ -496,7 +497,7 @@ func (nd *LitNode) RestoreQchanFromBucket(bkt *bolt.Bucket) (*Qchan, error) {
 		return nil, err
 	}
 	if qc.ElkRcv != nil {
-		// fmt.Printf("loaded elkrem receiver at state %d\n", qc.ElkRcv.UpTo())
+		// log.Printf("loaded elkrem receiver at state %d\n", qc.ElkRcv.UpTo())
 	}
 
 	// derive elkrem sender root from HD keychain
@@ -622,7 +623,7 @@ func (nd *LitNode) SaveQchanState(q *Qchan) error {
 			return err
 		}
 		// save state
-		fmt.Printf("writing %d byte state to bucket\n", len(b))
+		log.Printf("writing %d byte state to bucket\n", len(b))
 		return qcBucket.Put(KEYState, b)
 	})
 }
@@ -715,7 +716,7 @@ func (nd *LitNode) GetQchanByIdx(cIdx uint32) (*Qchan, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("got op %x\n", op)
+	log.Printf("got op %x\n", op)
 	qc, err := nd.GetQchan(op)
 	if err != nil {
 		return nil, err

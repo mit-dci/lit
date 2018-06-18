@@ -188,7 +188,7 @@ func (lc *litAfClient) Ls2(textArgs []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("JSON over HTTP response: %s\n", string(b))
+	log.Printf("JSON over HTTP response: %s\n", string(b))
 	return nil
 }
 

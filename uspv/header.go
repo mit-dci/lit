@@ -115,7 +115,7 @@ func FindHeader(r io.ReadSeeker, hdr wire.BlockHeader) (int32, error) {
 		}
 		curhash := cur.BlockHash()
 
-		//		fmt.Printf("try %d %s\n", tries, curhash.String())
+		//		log.Printf("try %d %s\n", tries, curhash.String())
 
 		if hdr.PrevBlock.IsEqual(&curhash) {
 			return int32(offset / 80), nil
