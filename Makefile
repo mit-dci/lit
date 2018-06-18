@@ -32,5 +32,5 @@ test tests: lit
 	build/env.sh go test -v ./...
 ifeq ($(with-python), true)
 	python3 test/test_basic.py -c reg --dumplogs
-	python3 test/test_break.py -c reg --
+	python3 test/test_break.py -c reg --dumplogs
 endif
