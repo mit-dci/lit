@@ -171,11 +171,11 @@ func (s *SPVCon) Handshake(listOfNodes []string) error {
 // list of nodes if the user has specified a YupString. Else, moves on to dial
 // the node to see if its up and establishes a conneciton followed by Handshake()
 // which sends out wire messages, checks for version string to prevent spam, etc.
-var UserProvidedString = false
 func (s *SPVCon) Connect(remoteNode string) error {
 	var err error
 	var listOfNodes []string
 	if lnutil.YupString(remoteNode) {
+		s.randomNodesOK = true
 		// if remoteNode is "yes" but no IP specified, use DNS seed
 		listOfNodes, err = s.GetListOfNodes()
 		if err != nil {
@@ -184,7 +184,6 @@ func (s *SPVCon) Connect(remoteNode string) error {
 			// automatically quit if there are no other hosts to connect to.
 		}
 	} else { // else connect to user-specified node
-		UserProvidedString = true
 		listOfNodes = []string{remoteNode}
 	}
 	handShakeFailed := false //need to be in this scope to access it here
