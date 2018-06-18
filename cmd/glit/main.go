@@ -254,7 +254,7 @@ func buttonFunc(w *nucular.Window) {
 		if err != nil {
 			adr = err.Error()
 		} else {
-			log.Printf("Got new address %s\n", adr)
+			fmt.Printf("Got new address %s\n", adr)
 		}
 		myAdrBar.Buffer = []rune(adr)
 	}
@@ -263,7 +263,7 @@ func buttonFunc(w *nucular.Window) {
 		responseText, err :=
 			lu.Send(string(sendAdrBar.Buffer), string(sendAmtBar.Buffer))
 		if err != nil {
-			log.Printf("send error %s\n", err.Error())
+			fmt.Printf("send error %s\n", err.Error())
 			popupMsg = err.Error()
 			w.Master().PopupOpen(
 				"Send Error", popupFlags,

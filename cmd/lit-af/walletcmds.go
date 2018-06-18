@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"strconv"
 
 	"github.com/fatih/color"
@@ -167,7 +166,7 @@ func (lc *litAfClient) Fee(textArgs []string) error {
 	if len(textArgs) > 0 {
 		feeint, err := strconv.Atoi(textArgs[0])
 		if err != nil {
-			log.Printf("Can't set fee to %s, querying current fee instead\n", textArgs[0])
+			fmt.Printf("Can't set fee to %s, querying current fee instead\n", textArgs[0])
 		} else {
 			set = true
 			SetArgs.Fee = int64(feeint)
@@ -196,7 +195,7 @@ func (lc *litAfClient) Fee(textArgs []string) error {
 
 	}
 
-	log.Printf("Current fee rate %d sat / byte\n", reply.CurrentFee)
+	fmt.Printf("Current fee rate %d sat / byte\n", reply.CurrentFee)
 
 	return nil
 }
@@ -225,7 +224,7 @@ func (lc *litAfClient) SetFee(textArgs []string) error {
 		args.CoinType = uint32(coinint)
 	}
 
-	log.Printf("Current fee rate %d sat / byte\n", reply.CurrentFee)
+	fmt.Printf("Current fee rate %d sat / byte\n", reply.CurrentFee)
 
 	return nil
 }
@@ -268,7 +267,7 @@ func (lc *litAfClient) Address(textArgs []string) error {
 	args.CoinType = cointype
 	args.NumToMake = numadrs
 
-	log.Printf("args: %v\n", args)
+	fmt.Printf("args: %v\n", args)
 	err = lc.Call("LitRPC.Address", args, reply)
 	if err != nil {
 		return err

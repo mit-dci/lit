@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"strconv"
 
 	"io/ioutil"
@@ -189,7 +188,7 @@ func (lc *litAfClient) Ls2(textArgs []string) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("JSON over HTTP response: %s\n", string(b))
+	fmt.Printf("JSON over HTTP response: %s\n", string(b))
 	return nil
 }
 

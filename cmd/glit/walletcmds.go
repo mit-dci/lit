@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"strconv"
 
 	"github.com/mit-dci/lit/litrpc"
@@ -27,7 +26,7 @@ func (lu *litUiClient) NewAddress() (string, error) {
 	args.CoinType = cointype
 	args.NumToMake = numadrs
 
-	log.Printf("adr cointye: %d num:%d\n", args.CoinType, args.NumToMake)
+	fmt.Printf("adr cointye: %d num:%d\n", args.CoinType, args.NumToMake)
 	err := lu.rpccon.Call("LitRPC.Address", args, reply)
 	if err != nil {
 		return "", err
@@ -58,7 +57,7 @@ func (lu *litUiClient) Address() (string, error) {
 	args.CoinType = cointype
 	args.NumToMake = numadrs
 
-	log.Printf("adr cointye: %d num:%d\n", args.CoinType, args.NumToMake)
+	fmt.Printf("adr cointye: %d num:%d\n", args.CoinType, args.NumToMake)
 	err := lu.rpccon.Call("LitRPC.Address", args, reply)
 	if err != nil {
 		return "", err
@@ -78,7 +77,7 @@ func (lu *litUiClient) Send(adr, amtString string) (string, error) {
 		return "", err
 	}
 
-	log.Printf("send %d to address: %s \n", amt, adr)
+	fmt.Printf("send %d to address: %s \n", amt, adr)
 
 	args.DestAddrs = []string{adr}
 	args.Amts = []int64{int64(amt)}
