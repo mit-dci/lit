@@ -104,7 +104,7 @@ class TestBasic(LitTest):
         assert_equal(self.litnodes[0].ChannelList()['result']['Channels'], [])
         assert_equal(self.litnodes[1].ChannelList()['result']['Channels'], [])
 
-        self.litnodes[0].FundChannel(Peer=1, CoinType=self.coins[0]['code'], Capacity=1000000000)
+        self.litnodes[0].FundChannel(Peer=1, CoinType=self.coins[0]['code'], Capacity=1000000000, InitialSend=200000)
         self.confirm_transactions(self.coinnodes[0], self.litnodes[0], 1)
         self.log.info("lit node 0 has funded channel")
 
@@ -124,12 +124,12 @@ class TestBasic(LitTest):
         assert_equal(litnode0_channel['Capacity'], 1000000000)
         assert_equal(litnode0_channel['StateNum'], 0)
         assert not litnode0_channel['Closed']
-        assert_equal(litnode0_channel['MyBalance'], 1000000000)
+        assert_equal(litnode0_channel['MyBalance'], 999800000)
 
         assert_equal(litnode1_channel['Capacity'], 1000000000)
         assert_equal(litnode1_channel['StateNum'], 0)
         assert not litnode1_channel['Closed']
-        assert_equal(litnode1_channel['MyBalance'], 0)
+        assert_equal(litnode1_channel['MyBalance'], 200000)
 
         self.log_channel_balance(self.litnodes[0], 0, self.litnodes[1], 0)
 
@@ -140,8 +140,8 @@ class TestBasic(LitTest):
 
         litnode0_channel = self.litnodes[0].ChannelList()['result']['Channels'][0]
         litnode1_channel = self.litnodes[1].ChannelList()['result']['Channels'][0]
-        assert_equal(litnode0_channel['MyBalance'], 900000000)
-        assert_equal(litnode1_channel['MyBalance'], 100000000)
+        assert_equal(litnode0_channel['MyBalance'], 899800000)
+        assert_equal(litnode1_channel['MyBalance'], 100200000)
 
         self.log_channel_balance(self.litnodes[0], 0, self.litnodes[1], 0)
 
@@ -150,8 +150,8 @@ class TestBasic(LitTest):
 
         litnode0_channel = self.litnodes[0].ChannelList()['result']['Channels'][0]
         litnode1_channel = self.litnodes[1].ChannelList()['result']['Channels'][0]
-        assert_equal(litnode0_channel['MyBalance'], 950000000)
-        assert_equal(litnode1_channel['MyBalance'], 50000000)
+        assert_equal(litnode0_channel['MyBalance'], 949800000)
+        assert_equal(litnode1_channel['MyBalance'], 50200000)
 
         self.log_channel_balance(self.litnodes[0], 0, self.litnodes[1], 0)
         self.log_balances(self.coins[0]['code'])
@@ -162,11 +162,11 @@ class TestBasic(LitTest):
         self.confirm_transactions(self.coinnodes[0], self.litnodes[0], 1)
 
         # Make sure balances are as expected
-        wait_until(lambda: abs(self.litnodes[1].get_balance(self.coins[0]['code'])['TxoTotal'] - 50000000) < self.coins[0]["feerate"] * 2000)
+        wait_until(lambda: abs(self.litnodes[1].get_balance(self.coins[0]['code'])['TxoTotal'] - 50200000) < self.coins[0]["feerate"] * 2000)
         litnode1_balance = self.litnodes[1].get_balance(self.coins[0]['code'])
         assert_equal(litnode1_balance['TxoTotal'], litnode1_balance['MatureWitty'])
         litnode0_balance = self.litnodes[0].get_balance(self.coins[0]['code'])
-        assert abs(self.balance + 950000000 - litnode0_balance['TxoTotal']) < self.coins[0]["feerate"] * 2000
+        assert abs(self.balance + 949800000 - litnode0_balance['TxoTotal']) < self.coins[0]["feerate"] * 2000
         assert_equal(litnode0_balance['TxoTotal'], litnode0_balance['MatureWitty'])
 
         self.log_balances(self.coins[0]['code'])
