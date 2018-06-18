@@ -130,8 +130,9 @@ type LitNode struct {
 	// The URL from which lit attempts to resolve the LN address
 	TrackerURL string
 
-	ChannelMap map[[20]byte][]lnutil.LinkMsg
-	AdvTimeout *time.Ticker
+	ChannelMap    map[[20]byte][]lnutil.LinkMsg
+	ChannelMapMtx sync.Mutex
+	AdvTimeout    *time.Ticker
 
 	// Contains the URL string to connect to a SOCKS5 proxy, if provided
 	ProxyURL string
