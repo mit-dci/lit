@@ -7,6 +7,7 @@ GO ?= latest
 WEBUI_REPO = "https://github.com/josephtchung/webui"
 all: lit test
 
+
 goget:
 	build/env.sh go get ./...
 

@@ -5,10 +5,10 @@ import (
 
 	"github.com/adiabat/btcd/btcec"
 	"github.com/adiabat/btcd/wire"
+	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
-	"github.com/mit-dci/lit/consts"
 )
 
 /*
@@ -126,6 +126,16 @@ func (nd *LitNode) FundChannel(
 	if initSend > ccap {
 		nd.InProg.mtx.Unlock()
 		return 0, fmt.Errorf("Can't send %d in %d capacity channel", initSend, ccap)
+	}
+
+	if initSend < consts.MinOutput {
+		nd.InProg.mtx.Unlock()
+		return 0, fmt.Errorf("Can't send %d as initial send because MinOutput is %d", initSend, consts.MinOutput)
+	}
+
+	if ccap-initSend < consts.MinOutput {
+		nd.InProg.mtx.Unlock()
+		return 0, fmt.Errorf("Can't send %d as initial send because MinOutput is %d and you would only have %d", initSend, consts.MinOutput, ccap-initSend)
 	}
 
 	// TODO - would be convenient if it auto connected to the peer huh
