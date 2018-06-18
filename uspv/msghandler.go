@@ -16,6 +16,8 @@ func (s *SPVCon) incomingMessageHandler() {
 			log.Printf("ReadMessageWithEncodingN error.  Disconnecting from given peer. %s\n", err.Error())
 			if s.randomNodesOK { // if user wants to connect to localhost, let him do so
 				s.Connect("yes") // really any YupString here
+			} else {
+				s.con.Close()
 			}
 			return
 		}
