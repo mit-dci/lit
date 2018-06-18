@@ -14,7 +14,9 @@ func (s *SPVCon) incomingMessageHandler() {
 			wire.BitcoinNet(s.Param.NetMagicBytes), wire.LatestEncoding)
 		if err != nil {
 			log.Printf("ReadMessageWithEncodingN error.  Disconnecting from given peer. %s\n", err.Error())
-			s.Connect("yes") // really any YupString here
+			if !UserProvidedString { // if user wants to connect to localhost, let him do so
+				s.Connect("yes") // really any YupString here
+			}
 			return
 		}
 		s.RBytes += uint64(n)
