@@ -18,8 +18,8 @@ func (s *SPVCon) incomingMessageHandler() {
 				s.Connect("yes") // really any YupString here
 			} else {
 				s.con.Close()
+				return
 			}
-			return
 		}
 		s.RBytes += uint64(n)
 		//		log.Printf("Got %d byte %s message\n", n, xm.Command())
