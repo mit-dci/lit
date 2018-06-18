@@ -6,6 +6,7 @@ GOBIN = $(shell pwd)/build/bin
 GO ?= latest
 
 lit:
-	build/env.sh go get . go build
+	build/env.sh go get .
+	build/env.sh go build
 	@echo "Done building."
 	@echo "Run \"$(GOBIN)/lit\" to launch lit."
