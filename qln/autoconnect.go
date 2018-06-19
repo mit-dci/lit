@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/adiabat/bech32"
+	"github.com/mit-dci/lit/bech32"
 	"github.com/mit-dci/lit/crypto/fastsha256"
 )
 

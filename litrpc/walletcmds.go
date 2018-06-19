@@ -3,7 +3,7 @@ package litrpc
 import (
 	"fmt"
 
-	"github.com/adiabat/bech32"
+	"github.com/mit-dci/lit/bech32"
 	"github.com/adiabat/btcd/wire"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
