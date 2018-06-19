@@ -6,7 +6,7 @@ import (
 	"log"
 
 	"github.com/mit-dci/lit/btcutil/btcd/txscript"
-	"github.com/mit-dci/lit/btcutil/btcd/wire"
+	"github.com/mit-dci/lit/wire"
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"

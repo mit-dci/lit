@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mit-dci/lit/btcutil/btcd/wire"
+	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/btcutil/hdkeychain"
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/coinparam"

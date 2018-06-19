@@ -9,7 +9,7 @@ import (
 	"io"
 
 	"github.com/mit-dci/lit/btcutil/btcd/chaincfg/chainhash"
-	"github.com/mit-dci/lit/btcutil/btcd/wire"
+	"github.com/mit-dci/lit/wire"
 )
 
 // TxIndexUnknown is the value returned for a transaction index that is unknown.

@@ -6,7 +6,7 @@ import (
 	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
 
-	"github.com/mit-dci/lit/btcutil/btcd/wire"
+	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/btcutil/txsort"
 )
 

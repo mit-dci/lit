@@ -7,7 +7,7 @@ package blockchain
 import (
 	"github.com/mit-dci/lit/btcutil/btcd/chaincfg/chainhash"
 	"github.com/mit-dci/lit/btcutil/btcd/database"
-	"github.com/mit-dci/lit/btcutil/btcd/wire"
+	"github.com/mit-dci/lit/wire"
 )
 
 // BlockLocator is used to help locate a specific block.  The algorithm for

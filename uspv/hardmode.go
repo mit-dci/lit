@@ -5,7 +5,7 @@ import (
 	"log"
 
 	"github.com/mit-dci/lit/btcutil/btcd/chaincfg/chainhash"
-	"github.com/mit-dci/lit/btcutil/btcd/wire"
+	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/btcutil/bloom"
 	"github.com/mit-dci/lit/lnutil"
 )

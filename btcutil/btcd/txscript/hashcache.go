@@ -8,7 +8,7 @@ import (
 	"sync"
 
 	"github.com/mit-dci/lit/btcutil/btcd/chaincfg/chainhash"
-	"github.com/mit-dci/lit/btcutil/btcd/wire"
+	"github.com/mit-dci/lit/wire"
 )
 
 // TxSigHashes houses the partial set of sighashes introduced within BIP0143.

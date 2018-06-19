@@ -12,7 +12,7 @@ import (
 	"sort"
 
 	"github.com/mit-dci/lit/btcutil/btcd/chaincfg/chainhash"
-	"github.com/mit-dci/lit/btcutil/btcd/wire"
+	"github.com/mit-dci/lit/wire"
 )
 
 // InPlaceSort modifies the passed transaction inputs and outputs to be sorted

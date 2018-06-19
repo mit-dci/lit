@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/mit-dci/lit/btcutil/btcd/btcec"
-	"github.com/mit-dci/lit/btcutil/btcd/wire"
+	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/btcutil"
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/dlc"

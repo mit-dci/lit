@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/mit-dci/lit/btcutil/btcd/chaincfg/chainhash"
-	"github.com/mit-dci/lit/btcutil/btcd/wire"
+	"github.com/mit-dci/lit/wire"
 )
 
 // Bip16Activation is the timestamp where BIP0016 is valid to use in the

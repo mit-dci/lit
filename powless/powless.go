@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/mit-dci/lit/bech32"
-	"github.com/mit-dci/lit/btcutil/btcd/wire"
+	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
 )

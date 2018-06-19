@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/mit-dci/lit/btcutil/btcd/wire"
+	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/lnutil"
 )
 
