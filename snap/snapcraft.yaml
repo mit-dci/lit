@@ -1,0 +1,26 @@
+name: lit
+version: master
+summary: Lightning Network node software
+description: |
+  Under development, not for use with real money.
+
+grade: devel # must be 'stable' to release into candidate/stable channels
+confinement: strict
+
+apps:
+  lit:
+    command: lit
+    plugs: [network, network-bind]
+  af:
+    command: lit-af
+    plugs: [network, network-bind]
+    aliases: [lit-af]
+
+parts:
+  lit:
+    source: .
+    plugin: go
+    go-importpath: github.com/mit-dci/lit
+    after: [go]
+  go:
+    source-tag: go1.8.3
