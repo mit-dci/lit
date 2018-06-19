@@ -5,7 +5,7 @@ import (
 	"log"
 
 	"github.com/mit-dci/lit/btcutil/btcd/chaincfg/chainhash"
-	"github.com/mit-dci/lit/btcutil/btcd/wire"
+	"github.com/mit-dci/lit/wire"
 )
 
 func MakeMerkleParent(left, right *chainhash.Hash) *chainhash.Hash {

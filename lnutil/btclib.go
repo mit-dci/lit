@@ -7,7 +7,7 @@ import (
 
 	"github.com/mit-dci/lit/btcutil/btcd/blockchain"
 	"github.com/mit-dci/lit/btcutil/btcd/txscript"
-	"github.com/mit-dci/lit/btcutil/btcd/wire"
+	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/crypto/fastsha256"
 )

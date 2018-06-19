@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/mit-dci/lit/btcutil/btcd/btcec"
-	"github.com/mit-dci/lit/btcutil/btcd/wire"
+	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"

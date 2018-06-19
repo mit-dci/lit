@@ -9,7 +9,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/mit-dci/lit/btcutil/btcd/wire"
+	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/lnutil"
 )
 

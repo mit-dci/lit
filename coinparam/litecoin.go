@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/mit-dci/lit/btcutil/btcd/chaincfg/chainhash"
-	"github.com/mit-dci/lit/btcutil/btcd/wire"
+	"github.com/mit-dci/lit/wire"
 
 	"golang.org/x/crypto/scrypt"
 )

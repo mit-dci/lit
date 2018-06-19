@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/mit-dci/lit/btcutil/btcd/txscript"
-	"github.com/mit-dci/lit/btcutil/btcd/wire"
+	"github.com/mit-dci/lit/wire"
 )
 
 // CommitScript is the script for 0.13.1: OP_CHECKSIG turned into OP_CHECSIGVERIFY

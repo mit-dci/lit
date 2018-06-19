@@ -11,7 +11,7 @@ import (
 
 	"github.com/mit-dci/lit/btcutil/btcd/chaincfg/chainhash"
 	"github.com/mit-dci/lit/btcutil/btcd/txscript"
-	"github.com/mit-dci/lit/btcutil/btcd/wire"
+	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/btcutil"
 )
 
