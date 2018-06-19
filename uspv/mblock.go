@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/adiabat/btcd/chaincfg/chainhash"
-	"github.com/adiabat/btcd/wire"
+	"github.com/mit-dci/lit/btcutil/btcd/chaincfg/chainhash"
+	"github.com/mit-dci/lit/btcutil/btcd/wire"
 )
 
 func MakeMerkleParent(left, right *chainhash.Hash) *chainhash.Hash {

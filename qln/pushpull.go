@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/adiabat/btcd/wire"
+	"github.com/mit-dci/lit/btcutil/btcd/wire"
 	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
 )

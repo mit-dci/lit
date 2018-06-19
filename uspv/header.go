@@ -13,9 +13,9 @@ import (
 	"math/big"
 	"os"
 
-	"github.com/adiabat/btcd/blockchain"
+	"github.com/mit-dci/lit/btcutil/btcd/blockchain"
 
-	"github.com/adiabat/btcd/wire"
+	"github.com/mit-dci/lit/btcutil/btcd/wire"
 	"github.com/mit-dci/lit/coinparam"
 )
 
