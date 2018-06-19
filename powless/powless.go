@@ -147,7 +147,7 @@ func (a *APILink) PushTx(tx *wire.MsgTx) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("respo	nse: %s", response.Status)
+	log.Printf("respo	nse: %s", response.Status)
 	_, err = io.Copy(os.Stdout, response.Body)
 
 	return err
@@ -251,7 +251,7 @@ func (a *APILink) TipRefreshLoop() error {
 			a.dirtyChan <- nil
 		}
 
-		fmt.Printf("blockchain tip %v\n", a.tipBlockHash)
+		log.Printf("blockchain tip %v\n", a.tipBlockHash)
 
 		time.Sleep(time.Second * 60)
 	}
@@ -377,7 +377,7 @@ func (a *APILink) GetVOPTxs() error {
 
 	// need to query each txid with a different http request
 	for _, op := range oplist {
-		fmt.Printf("asking for %s\n", op.String())
+		log.Printf("asking for %s\n", op.String())
 		// get full tx info for the outpoint's tx
 		// (if we have 2 outpoints with the same txid we query twice...)
 		opstring := op.String()
@@ -391,7 +391,7 @@ func (a *APILink) GetVOPTxs() error {
 		// parse the response to get the spending txid
 		err = json.NewDecoder(response.Body).Decode(&txr)
 		if err != nil || txr.Error {
-			fmt.Printf("json decode error; op %s not found\n", op.String())
+			log.Printf("json decode error; op %s not found\n", op.String())
 			continue
 		}
 

@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"net"
 	"strings"
 
@@ -109,7 +110,7 @@ func LnAddrFromString(encodedAddr string, param *chaincfg.Params) (*LNAdr, error
 	case idLen > 30 && idLen < 39:
 		addr.Base58Adr, err = btcutil.DecodeAddress(idHost[0], param)
 		if err != nil {
-			fmt.Printf("error from DecodeAddress %s\n", idHost[0])
+			log.Printf("error from DecodeAddress %s\n", idHost[0])
 			return nil, err
 		}
 	default:

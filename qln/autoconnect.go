@@ -2,6 +2,7 @@ package qln
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/adiabat/bech32"
@@ -25,7 +26,7 @@ func (nd *LitNode) AutoReconnect(listenPort string, interval int64) {
 			for {
 				pubKey, _ := nd.GetPubHostFromPeerIdx(i)
 				if pubKey == empty {
-					fmt.Printf("Done, tried %d hosts\n", i-1)
+					log.Printf("Done, tried %d hosts\n", i-1)
 					break
 				}
 
@@ -44,7 +45,7 @@ func (nd *LitNode) AutoReconnect(listenPort string, interval int64) {
 				err := nd.DialPeer(adr)
 
 				if err != nil {
-					fmt.Printf("Could not restore connection to %s: %s\n", adr, err.Error())
+					log.Printf("Could not restore connection to %s: %s\n", adr, err.Error())
 				}
 
 				i++
