@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/adiabat/btcd/wire"
 	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
 )
@@ -83,49 +82,6 @@ Receive Rev for previous state
 
 
 */
-
-// example message struct
-type SigRevMsg struct {
-	Op    wire.OutPoint
-	Delta int32
-	Sig   [64]byte
-}
-
-// example serialization method
-func (m *SigRevMsg) Bytes() []byte {
-	var b []byte
-
-	// DeltaSig is op (36), Delta (4),  sig (64)
-	// total length 104
-
-	opbytes := lnutil.OutPointToBytes(m.Op)
-	b = append(b, opbytes[:]...)
-	b = append(b, lnutil.I32tB(m.Delta)...)
-	b = append(b, m.Sig[:]...)
-
-	return b
-}
-
-// example deserialization method
-func SigRevFromBytes(b []byte) (*SigRevMsg, error) {
-	if len(b) != 104 {
-		return nil, fmt.Errorf("%d bytes, need 104", len(b))
-	}
-
-	m := new(SigRevMsg)
-
-	var opArr [36]byte
-	copy(opArr[:], b[:36])
-	op := lnutil.OutPointFromBytes(opArr)
-	m.Op = *op
-
-	m.Delta = lnutil.BtI32(b[36:40])
-
-	copy(m.Sig[:], b[40:])
-
-	return m, nil
-
-}
 
 // SendNextMsg determines what message needs to be sent next
 // based on the channel state.  It then calls the appropriate function.

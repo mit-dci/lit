@@ -48,10 +48,17 @@ type Qchan struct {
 }
 
 type HTLC struct {
+	portxo.PorTxo
+
+	Idx uint64
+
 	Incoming bool
 	Amt      int64
-	RHash    [20]byte
+	RHash    [32]byte
 	Locktime time.Time
+
+	MyBasePoint    [33]byte
+	TheirBasePoint [33]byte
 }
 
 // StatComs are State Commitments.
@@ -86,8 +93,11 @@ type StatCom struct {
 	// only one sig is ever stored, to prevent broadcasting the wrong tx.
 	// could add a mutex here... maybe will later.
 
-	// Any HTLC associated with this channel state (can be nil)
-	CurrentHTLC *HTLC
+	HTLCIdx    uint64
+	InProgHTLC *HTLC // Current in progress HTLC
+
+	// Any HTLCs associated with this channel state (can be nil)
+	HTLCs []HTLC
 }
 
 // QCloseData is the output resulting from an un-cooperative close

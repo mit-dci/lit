@@ -22,6 +22,9 @@ const (
 	// pays TO)
 	UseContractPayoutPKH = 52 | hdkeychain.HardenedKeyStart
 
+	// key derivation path for HTLC pubkeys
+	UseHTLCBase = 60 | hdkeychain.HardenedKeyStart
+
 	// links Id and channel. replaces UseChannelFund
 	UseIdKey = 111 | hdkeychain.HardenedKeyStart
 
