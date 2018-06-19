@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/mit-dci/lit/bech32"
-	"github.com/adiabat/btcutil/base58"
+	"github.com/mit-dci/lit/btcutil/base58"
 	"github.com/mit-dci/lit/crypto/fastsha256"
 )
 

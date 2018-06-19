@@ -4,7 +4,7 @@ import (
 	"log"
 
 	"github.com/adiabat/btcd/wire"
-	"github.com/adiabat/btcutil/bloom"
+	"github.com/mit-dci/lit/btcutil/bloom"
 	"github.com/mit-dci/lit/lnutil"
 )
 

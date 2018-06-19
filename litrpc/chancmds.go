@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/adiabat/btcutil"
+	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/qln"
 	"github.com/mit-dci/lit/consts"

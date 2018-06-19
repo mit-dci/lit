@@ -72,7 +72,7 @@ func round(f float64) Amount {
 // NewAmount is for specifically for converting BTC to Satoshi.
 // For creating a new Amount with an int64 value which denotes a quantity of Satoshi,
 // do a simple type conversion from type int64 to Amount.
-// See GoDoc for example: http://godoc.org/github.com/adiabat/btcutil#example-Amount
+// See GoDoc for example: http://godoc.org/github.com/mit-dci/lit/btcutil#example-Amount
 func NewAmount(f float64) (Amount, error) {
 	// The amount is only considered invalid if it cannot be represented
 	// as an integer type.  This may happen if f is NaN or +-Infinity.

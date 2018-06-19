@@ -8,7 +8,7 @@ import (
 	"fmt"
 
 	"github.com/adiabat/btcd/txscript"
-	"github.com/adiabat/btcutil"
+	"github.com/mit-dci/lit/btcutil"
 )
 
 const (

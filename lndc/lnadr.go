@@ -10,7 +10,7 @@ import (
 
 	"github.com/adiabat/btcd/btcec"
 	"github.com/adiabat/btcd/chaincfg"
-	"github.com/adiabat/btcutil"
+	"github.com/mit-dci/lit/btcutil"
 )
 
 // lnAddr...
