@@ -9,7 +9,7 @@ import (
 	"github.com/adiabat/btcd/chaincfg/chainhash"
 	"github.com/adiabat/btcd/txscript"
 	"github.com/adiabat/btcd/wire"
-	"github.com/adiabat/btcutil/txsort"
+	"github.com/mit-dci/lit/btcutil/txsort"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/consts"

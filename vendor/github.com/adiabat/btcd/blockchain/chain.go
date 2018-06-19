@@ -17,7 +17,7 @@ import (
 	"github.com/adiabat/btcd/database"
 	"github.com/adiabat/btcd/txscript"
 	"github.com/adiabat/btcd/wire"
-	"github.com/adiabat/btcutil"
+	"github.com/mit-dci/lit/btcutil"
 )
 
 const (

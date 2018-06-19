@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/adiabat/btcd/wire"
-	"github.com/adiabat/btcutil/hdkeychain"
+	"github.com/mit-dci/lit/btcutil/hdkeychain"
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"

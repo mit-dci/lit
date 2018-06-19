@@ -11,7 +11,7 @@ import (
 	"github.com/adiabat/btcd/chaincfg/chainhash"
 	"github.com/adiabat/btcd/database"
 	"github.com/adiabat/btcd/txscript"
-	"github.com/adiabat/btcutil"
+	"github.com/mit-dci/lit/btcutil"
 )
 
 // CheckpointConfirmations is the number of blocks before the end of the current

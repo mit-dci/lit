@@ -9,7 +9,7 @@ import (
 
 	"github.com/adiabat/btcd/chaincfg/chainhash"
 	"github.com/adiabat/btcd/database"
-	"github.com/adiabat/btcutil"
+	"github.com/mit-dci/lit/btcutil"
 )
 
 // BehaviorFlags is a bitmask defining tweaks to the normal behavior when

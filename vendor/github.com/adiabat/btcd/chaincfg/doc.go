@@ -25,7 +25,7 @@
 //          "fmt"
 //          "log"
 //
-//          "github.com/adiabat/btcutil"
+//          "github.com/mit-dci/lit/btcutil"
 //          "github.com/adiabat/btcd/chaincfg"
 //  )
 //

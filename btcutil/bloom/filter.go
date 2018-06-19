@@ -12,7 +12,7 @@ import (
 	"github.com/adiabat/btcd/chaincfg/chainhash"
 	"github.com/adiabat/btcd/txscript"
 	"github.com/adiabat/btcd/wire"
-	"github.com/adiabat/btcutil"
+	"github.com/mit-dci/lit/btcutil"
 )
 
 // ln2Squared is simply the square of the natural log of 2.

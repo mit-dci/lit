@@ -8,7 +8,7 @@ import (
 	"github.com/adiabat/btcd/blockchain"
 	"github.com/adiabat/btcd/txscript"
 	"github.com/adiabat/btcd/wire"
-	"github.com/adiabat/btcutil"
+	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/crypto/fastsha256"
 )
 

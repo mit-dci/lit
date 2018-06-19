@@ -9,7 +9,7 @@ package database
 
 import (
 	"github.com/adiabat/btcd/chaincfg/chainhash"
-	"github.com/adiabat/btcutil"
+	"github.com/mit-dci/lit/btcutil"
 )
 
 // Cursor represents a cursor over key/value pairs and nested buckets of a
