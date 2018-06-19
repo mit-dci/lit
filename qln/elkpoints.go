@@ -3,7 +3,7 @@ package qln
 import (
 	"fmt"
 
-	"github.com/adiabat/btcd/chaincfg/chainhash"
+	"github.com/mit-dci/lit/btcutil/btcd/chaincfg/chainhash"
 	"github.com/mit-dci/lit/lnutil"
 )
 

@@ -3,7 +3,7 @@ package portxo
 import (
 	"fmt"
 
-	"github.com/adiabat/btcd/wire"
+	"github.com/mit-dci/lit/btcutil/btcd/wire"
 )
 
 // ExtractFromTx returns a portxo from a tx and index.

@@ -10,7 +10,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/adiabat/btcd/btcec"
+	"github.com/mit-dci/lit/btcutil/btcd/btcec"
 	"golang.org/x/net/proxy"
 )
 

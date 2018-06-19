@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/adiabat/btcd/chaincfg"
+	"github.com/mit-dci/lit/btcutil/btcd/chaincfg"
 	"github.com/mit-dci/lit/btcutil"
 )
 

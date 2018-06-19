@@ -3,9 +3,9 @@ package qln
 import (
 	"fmt"
 
-	"github.com/adiabat/btcd/btcec"
-	"github.com/adiabat/btcd/txscript"
-	"github.com/adiabat/btcd/wire"
+	"github.com/mit-dci/lit/btcutil/btcd/btcec"
+	"github.com/mit-dci/lit/btcutil/btcd/txscript"
+	"github.com/mit-dci/lit/btcutil/btcd/wire"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/sig64"
 )

@@ -3,8 +3,8 @@ package coinparam
 import (
 	"time"
 
-	"github.com/adiabat/btcd/chaincfg/chainhash"
-	"github.com/adiabat/btcd/wire"
+	"github.com/mit-dci/lit/btcutil/btcd/chaincfg/chainhash"
+	"github.com/mit-dci/lit/btcutil/btcd/wire"
 )
 
 // MainNetParams defines the network parameters for the main Bitcoin network.
