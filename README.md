@@ -121,6 +121,9 @@ One package that implements the chainhook interface is uspv.  Uspv deals with he
 
 (in theory it shouldn't be too hard to write a package that implements the chainhook interface and talks to some block explorer.  Maybe if you ran your own explorer and authed and stuff that'd be OK.)
 
+#### Dependency graph
+
+![Dependency Graph](deps-2018-06-19.png)
 
 ## License
 [MIT](https://github.com/mit-dci/lit/blob/master/LICENSE)
