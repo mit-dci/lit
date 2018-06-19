@@ -2,11 +2,14 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"io"
 	"log"
+	"fmt"
 	"os"
 	"path/filepath"
 
+	UpnP "github.com/NebulousLabs/go-UpnP"
 	"github.com/jessevdk/go-flags"
 	"github.com/mit-dci/lit/lnutil"
 )
@@ -130,5 +133,32 @@ func litSetup(conf *config) *[32]byte {
 		log.Fatal(err)
 	}
 
+	// do UPnP port forwarding
+	// right now we fatal if we aren't able to port forward via upnp
+	// a question though is whether we should continue connceting without
+	// port forwardign
+	if conf.UPnP {
+		// Connect to router
+		var externalIPs []string
+		d, err := UpnP.DiscoverCtx(context.Background())
+		if err != nil {
+			fmt.Printf("Unable to discover router %v\n", err)
+			log.Fatal(err)
+		}
+		// Get external IP
+		ip, err := d.ExternalIP()
+		if err != nil {
+			fmt.Printf("Unable to get external ip %v\n", err)
+			log.Fatal(err)
+		}
+		log.Printf("Your external IP is %s", ip)
+		// Forward peer port
+		err = d.Forward(uint16(conf.Rpcport), "lnd peer port")
+		if err != nil {
+			fmt.Printf("UpnP: Unable to forward pear port ip %v\n", err)
+			log.Fatal(err)
+		}
+		externalIPs = append(externalIPs, ip)
+	}
 	return key
 }
