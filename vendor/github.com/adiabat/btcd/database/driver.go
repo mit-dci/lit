@@ -7,7 +7,7 @@ package database
 import (
 	"fmt"
 
-	"github.com/btcsuite/btclog"
+	"github.com/mit-dci/lit/btclog"
 )
 
 // Driver defines a structure for backend drivers to use when they registered

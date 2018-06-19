@@ -12,7 +12,7 @@ import (
 	"github.com/adiabat/btcd/btcec"
 	"github.com/adiabat/btcd/chaincfg"
 	"github.com/adiabat/btcutil/base58"
-	"github.com/btcsuite/golangcrypto/ripemd160"
+	"github.com/mit-dci/lit/crypto/ripemd160"
 )
 
 var (

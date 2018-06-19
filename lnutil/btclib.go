@@ -9,7 +9,7 @@ import (
 	"github.com/adiabat/btcd/txscript"
 	"github.com/adiabat/btcd/wire"
 	"github.com/adiabat/btcutil"
-	"github.com/btcsuite/fastsha256"
+	"github.com/mit-dci/lit/crypto/fastsha256"
 )
 
 // TxAndHeight is just a tx, and the height at which it was confirmed.

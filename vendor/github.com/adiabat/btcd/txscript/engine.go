@@ -11,7 +11,7 @@ import (
 
 	"github.com/adiabat/btcd/btcec"
 	"github.com/adiabat/btcd/wire"
-	"github.com/btcsuite/fastsha256"
+	"github.com/mit-dci/lit/crypto/fastsha256"
 )
 
 // ScriptFlags is a bitmask defining additional operations or tests that will be

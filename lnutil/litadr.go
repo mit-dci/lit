@@ -5,7 +5,7 @@ import (
 
 	"github.com/adiabat/bech32"
 	"github.com/adiabat/btcutil/base58"
-	"github.com/btcsuite/fastsha256"
+	"github.com/mit-dci/lit/crypto/fastsha256"
 )
 
 // Lit addresses use the bech32 format, but sometimes omit the checksum!

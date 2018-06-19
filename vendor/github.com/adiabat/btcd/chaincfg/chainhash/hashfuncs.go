@@ -5,7 +5,7 @@
 
 package chainhash
 
-import "github.com/btcsuite/fastsha256"
+import "github.com/mit-dci/lit/crypto/fastsha256"
 
 // HashB calculates hash(b) and returns the resulting bytes.
 func HashB(b []byte) []byte {
