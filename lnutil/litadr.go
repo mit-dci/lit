@@ -3,7 +3,7 @@ package lnutil
 import (
 	"fmt"
 
-	"github.com/adiabat/bech32"
+	"github.com/mit-dci/lit/bech32"
 	"github.com/adiabat/btcutil/base58"
 	"github.com/mit-dci/lit/crypto/fastsha256"
 )
