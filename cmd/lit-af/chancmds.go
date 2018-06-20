@@ -52,6 +52,7 @@ var dualFundAcceptCommand = &Command{
 	Format:           fmt.Sprintf("%s\n", lnutil.White("dualfund accept")),
 	Description:      "Accepts the pending dual funding request received from another peer (if any)\n",
 	ShortDescription: "Accepts the pending dual funding request received from another peer (if any)\n",
+}
 
 var watchCommand = &Command{
 	Format: fmt.Sprintf("%s%s\n", lnutil.White("watch"),
@@ -60,7 +61,6 @@ var watchCommand = &Command{
 		"Send channel data to a watcher",
 		"The watcher can defend your channel while you're offline."),
 	ShortDescription: "Send channel watch data to watcher.\n",
-
 }
 
 var pushCommand = &Command{
