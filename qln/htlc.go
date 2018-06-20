@@ -143,20 +143,21 @@ func (nd *LitNode) OfferHTLC(qc *Qchan, amt uint32, RHash [32]byte, locktime tim
 func (nd *LitNode) SendHashSig(q *Qchan) error {
 	q.State.StateIdx++
 	q.State.HTLCIdx++
+
 	q.State.MyAmt -= int64(q.State.InProgHTLC.Amt)
+
 	q.State.ElkPoint = q.State.NextElkPoint
 	q.State.NextElkPoint = q.State.N2ElkPoint
 
 	// make the signature to send over
-	sig, err := nd.SignState(q)
+	commitmentSig, HTLCSigs, err := nd.SignState(q)
 	if err != nil {
 		return err
 	}
 
-	// TODO: modify SignState to make this array
-	var HTLCSigs [][64]byte
+	q.State.NextHTLCBase = q.State.N2HTLCBase
 
-	outMsg := lnutil.NewHashSigMsg(q.Peer(), q.Op, q.State.InProgHTLC.Amt, q.State.InProgHTLC.RHash, sig, HTLCSigs, q.State.InProgHTLC.MyBasePoint, q.State.Data)
+	outMsg := lnutil.NewHashSigMsg(q.Peer(), q.Op, q.State.InProgHTLC.Amt, q.State.InProgHTLC.RHash, commitmentSig, HTLCSigs, q.State.Data)
 
 	log.Printf("Sending HashSig")
 

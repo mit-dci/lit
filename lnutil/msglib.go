@@ -728,25 +728,23 @@ type HashSigMsg struct {
 	PeerIdx  uint32
 	Outpoint wire.OutPoint
 
-	Amt         int64
-	RHash       [32]byte
-	MyBasePoint [33]byte
+	Amt   int64
+	RHash [32]byte
 
 	Data [32]byte
 
 	CommitmentSignature [64]byte
-	// must be at least 36 + 4 + 32 + 33 + 32 + 64 = 202 bytes
+	// must be at least 36 + 4 + 32 + 33 + 32 + 64 = 169 bytes
 	HTLCSigs [][64]byte
 }
 
-func NewHashSigMsg(peerid uint32, OP wire.OutPoint, amt int64, RHash [32]byte, sig [64]byte, HTLCSigs [][64]byte, bp [33]byte, data [32]byte) HashSigMsg {
+func NewHashSigMsg(peerid uint32, OP wire.OutPoint, amt int64, RHash [32]byte, sig [64]byte, HTLCSigs [][64]byte, data [32]byte) HashSigMsg {
 	d := new(HashSigMsg)
 	d.PeerIdx = peerid
 	d.Outpoint = OP
 	d.Amt = amt
 	d.CommitmentSignature = sig
 	d.Data = data
-	d.MyBasePoint = bp
 	d.RHash = RHash
 	d.HTLCSigs = HTLCSigs
 	return *d
@@ -756,8 +754,8 @@ func NewHashSigMsgFromBytes(b []byte, peerid uint32) (HashSigMsg, error) {
 	ds := new(HashSigMsg)
 	ds.PeerIdx = peerid
 
-	if len(b) < 202 {
-		return *ds, fmt.Errorf("got %d byte HashSig, expect at least 202 bytes", len(b))
+	if len(b) < 169 {
+		return *ds, fmt.Errorf("got %d byte HashSig, expect at least 169 bytes", len(b))
 	}
 
 	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
@@ -769,13 +767,12 @@ func NewHashSigMsgFromBytes(b []byte, peerid uint32) (HashSigMsg, error) {
 	// deserialize DeltaSig
 	ds.Amt = BtI64(buf.Next(4))
 	copy(ds.RHash[:], buf.Next(32))
-	copy(ds.MyBasePoint[:], buf.Next(33))
 
 	copy(ds.Data[:], buf.Next(32))
 
 	copy(ds.CommitmentSignature[:], buf.Next(64))
 
-	nHTLCSigs := (buf.Len() - (64 + 32 + 33 + 32 + 4 + 36)) / 64
+	nHTLCSigs := (buf.Len() - (64 + 32 + 32 + 4 + 36)) / 64
 
 	for i := 0; i < nHTLCSigs; i++ {
 		var sig [64]byte
@@ -792,7 +789,6 @@ func (self HashSigMsg) Bytes() []byte {
 	opArr := OutPointToBytes(self.Outpoint)
 	msg = append(msg, opArr[:]...)
 	msg = append(msg, I64tB(self.Amt)...)
-	msg = append(msg, self.MyBasePoint[:]...)
 	msg = append(msg, self.Data[:]...)
 	msg = append(msg, self.CommitmentSignature[:]...)
 	for _, sig := range self.HTLCSigs {

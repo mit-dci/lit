@@ -57,8 +57,8 @@ type HTLC struct {
 	RHash    [32]byte
 	Locktime time.Time
 
-	MyBasePoint    [33]byte
-	TheirBasePoint [33]byte
+	MyHTLCBase    [33]byte
+	TheirHTLCBase [33]byte
 }
 
 // StatComs are State Commitments.
@@ -95,6 +95,13 @@ type StatCom struct {
 
 	HTLCIdx    uint64
 	InProgHTLC *HTLC // Current in progress HTLC
+
+	// Analogous to the ElkPoints above but used for generating their pubkey for the HTLC
+	NextHTLCBase [33]byte
+	N2HTLCBase   [33]byte
+
+	MyNextHTLCBase [33]byte
+	MyN2HTLCBase   [33]byte
 
 	// Any HTLCs associated with this channel state (can be nil)
 	HTLCs []HTLC

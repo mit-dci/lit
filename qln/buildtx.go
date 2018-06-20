@@ -119,7 +119,8 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
 
 	var fancyAmt, pkhAmt, theirAmt int64 // output amounts
 	var revPub, timePub [33]byte         // pubkeys
-	var pkhPub [33]byte                  // the simple output's pub key hash
+
+	var pkhPub [33]byte // the simple output's pub key hash
 
 	fee := s.Fee // fixed fee for now
 
@@ -191,6 +192,65 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
 	outPKH := wire.NewTxOut(pkhAmt, pkhScript)
 
 	fmt.Printf("\tcombined refund %x, pkh %x\n", pkhPub, outPKH.PkScript)
+
+	// Generate new HTLC signatures
+	for _, h := range s.HTLCs {
+		if mine { // Generating OUR tx that WE save
+			curElk, err := q.ElkPoint(false, q.State.StateIdx)
+			if err != nil {
+				return nil, err
+			}
+
+			remotePub := lnutil.CombinePubs(h.TheirHTLCBase, curElk)
+			localPub := lnutil.CombinePubs(h.MyHTLCBase, curElk)
+
+			if h.Incoming { // We're the receiver
+				//HTLCScript := lnutil.ReceiveHTLCScript()
+				
+			} else { // We're the offerer
+				//HTLCScript := lnutil.OfferHTLCScript()
+
+			}
+		} else { // Generating THEIR tx that THEY save
+			remotePub := lnutil.CombinePubs(h.MyHTLCBase, s.ElkPoint)
+			localPub := lnutil.CombinePubs(h.TheirHTLCBase, s.ElkPoint)
+
+			if h.Incoming { // They're the receiver
+
+			} else { // They're the offerer
+
+			}
+		}
+	}
+
+	// There's an HTLC in progress
+	if s.InProgHTLC != nil {
+		// TODO
+		if mine { // Generating OUR tx that WE save
+			curElk, err := q.ElkPoint(false, q.State.StateIdx)
+			if err != nil {
+				return nil, err
+			}
+
+			remotePub := lnutil.CombinePubs(s.NextHTLCBase, curElk)
+			localPub := lnutil.CombinePubs(s.MyNextHTLCBase, curElk)
+
+			if h.Incoming { // We're the receiver
+
+			} else { // We're the offerer
+
+			}
+		} else { // Generating THEIR tx that THEY save
+			remotePub := lnutil.CombinePubs(s.MyNextHTLCBase, s.ElkPoint)
+			localPub := lnutil.CombinePubs(s.NextHTLCBase, s.ElkPoint)
+
+			if h.Incoming { // They're the receiver
+
+			} else { // They're the offerer
+
+			}
+		}
+	}
 
 	// make a new tx
 	tx := wire.NewMsgTx()

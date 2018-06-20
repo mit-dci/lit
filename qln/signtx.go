@@ -147,22 +147,21 @@ func (nd *LitNode) SignClaimTx(claimTx *wire.MsgTx, value int64, pre []byte,
 }
 
 // SignNextState generates your signature for their state.
-func (nd *LitNode) SignState(q *Qchan) ([64]byte, error) {
-
+func (nd *LitNode) SignState(q *Qchan) ([64]byte, [][64]byte, error) {
 	var sig [64]byte
 
 	// make sure channel exists, and wallet is present on node
 	if q == nil {
-		return sig, fmt.Errorf("SignState nil channel")
+		return sig, nil, fmt.Errorf("SignState nil channel")
 	}
 	_, ok := nd.SubWallet[q.Coin()]
 	if !ok {
-		return sig, fmt.Errorf("SignState no wallet for cointype %d", q.Coin())
+		return sig, nil, fmt.Errorf("SignState no wallet for cointype %d", q.Coin())
 	}
 	// build transaction for next state
 	tx, err := q.BuildStateTx(false) // their tx, as I'm signing
 	if err != nil {
-		return sig, err
+		return sig, nil, err
 	}
 
 	// make hash cache for this tx
@@ -171,13 +170,17 @@ func (nd *LitNode) SignState(q *Qchan) ([64]byte, error) {
 	// generate script preimage (ignore key order)
 	pre, _, err := lnutil.FundTxScript(q.MyPub, q.TheirPub)
 	if err != nil {
-		return sig, err
+		return [64]byte{},
+
+			sig, err
 	}
 
 	// get private signing key
 	priv, err := nd.SubWallet[q.Coin()].GetPriv(q.KeyGen)
-		if err != nil {
-		return sig, err
+	if err != nil {
+		return [64]byte{},
+
+			sig, err
 	}
 
 	// generate sig.
@@ -188,7 +191,9 @@ func (nd *LitNode) SignState(q *Qchan) ([64]byte, error) {
 
 	sig, err = sig64.SigCompress(bigSig)
 	if err != nil {
-		return sig, err
+		return [64]byte{},
+
+			sig, err
 	}
 
 	fmt.Printf("____ sig creation for channel (%d,%d):\n", q.Peer(), q.Idx())
@@ -198,7 +203,9 @@ func (nd *LitNode) SignState(q *Qchan) ([64]byte, error) {
 	}
 	fmt.Printf("\tstate %d myamt: %d theiramt: %d\n", q.State.StateIdx, q.State.MyAmt, q.Value-q.State.MyAmt)
 
-	return sig, nil
+	return [64]byte{},
+
+		sig, nil
 }
 
 // VerifySig verifies their signature for your next state.
