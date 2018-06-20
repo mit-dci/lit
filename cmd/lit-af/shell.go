@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"strconv"
+	"strings"
 
 	"io/ioutil"
 	"net/http"
@@ -223,14 +225,42 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		return err
 	}
 	if len(cReply.Channels) > 0 {
-		fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Channels:"))
+		fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Closed Channels:"))
 	}
 
+	sort.Slice(cReply.Channels, func(i, j int) bool {
+		return cReply.Channels[i].Height < cReply.Channels[j].Height
+	})
+
+	var closedChannels []litrpc.ChannelInfo
+	var openChannels []litrpc.ChannelInfo
 	for _, c := range cReply.Channels {
 		if c.Closed {
-			fmt.Fprintf(color.Output, lnutil.Red("Closed  "))
+			closedChannels = append(closedChannels, c)
 		} else {
-			fmt.Fprintf(color.Output, lnutil.Green("Channel "))
+			openChannels = append(openChannels, c)
+		}
+	}
+
+	for _, c := range closedChannels {
+		fmt.Fprintf(color.Output, lnutil.Red("Closed:       "))
+		fmt.Fprintf(
+			color.Output,
+			"%s (peer %d) type %d %s\n\t cap: %s bal: %s h: %d state: %d data: %x pkh: %x\n",
+			lnutil.White(c.CIdx), c.PeerIdx, c.CoinType,
+			lnutil.OutPoint(c.OutPoint),
+			lnutil.SatoshiColor(c.Capacity), lnutil.SatoshiColor(c.MyBalance),
+			c.Height, c.StateNum, c.Data, c.Pkh)
+	}
+
+	for _, c := range openChannels {
+		if c.Height == -1 {
+			c := color.New(color.FgGreen).Add(color.Underline)
+			c.Printf("Unconfirmed:")
+			fmt.Fprintf(color.Output, lnutil.Green("  "))
+			//needed for preventing the underline from extending
+		} else {
+			fmt.Fprintf(color.Output, lnutil.Green("Open:         "))
 		}
 		fmt.Fprintf(
 			color.Output,
@@ -250,7 +280,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	}
 	for i, t := range tReply.Txos {
 		fmt.Fprintf(color.Output, "%d %s h:%d amt:%s %s %s",
-			i, lnutil.OutPoint(t.OutPoint), t.Height,
+			i+1, lnutil.OutPoint(t.OutPoint), t.Height,
 			lnutil.SatoshiColor(t.Amt), t.KeyPath, t.CoinType)
 		if t.Delay != 0 {
 			fmt.Fprintf(color.Output, " delay: %d", t.Delay)
@@ -278,7 +308,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	}
 	fmt.Fprintf(color.Output, lnutil.Header("\tAddresses:\n"))
 	for i, a := range aReply.WitAddresses {
-		fmt.Fprintf(color.Output, "%d %s (%s)\n", i,
+		fmt.Fprintf(color.Output, "%d %s (%s)\n", i+1,
 			lnutil.Address(a), lnutil.Address(aReply.LegacyAddresses[i]))
 	}
 
@@ -331,7 +361,7 @@ func printHelp(commands []*Command) {
 func printCointypes() {
 	for k, v := range coinparam.RegisteredNets {
 		fmt.Fprintf(color.Output, "CoinType: %s\n", strconv.Itoa(int(k)))
-		fmt.Fprintf(color.Output, "└────── Name: %s,\tBech32Prefix: %s\n", v.Name, v.Bech32Prefix)
+		fmt.Fprintf(color.Output, "└────── Name: %s,%sBech32Prefix: %s\n\n", v.Name, strings.Repeat(" ", 13-len(v.Name)), v.Bech32Prefix)
 	}
 }
 
