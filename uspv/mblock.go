@@ -108,7 +108,7 @@ func checkMBlock(m *wire.MsgMerkleBlock) ([]*chainhash.Hash, error) {
 		}
 		// does stack have 3+ items? and are last 2 items filled?
 		if tip > 1 && s[tip-1].h != nil && s[tip].h != nil {
-			//fmt.Printf("nodes %d and %d combine into %d\n",
+			//log.Printf("nodes %d and %d combine into %d\n",
 			//	s[tip-1].p, s[tip].p, s[tip-2].p)
 			// combine two filled nodes into parent node
 			s[tip-2].h = MakeMerkleParent(s[tip-1].h, s[tip].h)

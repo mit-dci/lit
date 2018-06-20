@@ -2,6 +2,7 @@ package qln
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/adiabat/btcd/btcec"
 	"github.com/adiabat/btcd/txscript"
@@ -27,7 +28,10 @@ func (nd *LitNode) SignBreakTx(q *Qchan) (*wire.MsgTx, error) {
 	}
 
 	// get private signing key
-	priv := nd.SubWallet[q.Coin()].GetPriv(q.KeyGen)
+	priv, err := nd.SubWallet[q.Coin()].GetPriv(q.KeyGen)
+	if err != nil {
+		return nil, err
+	}
 	// generate sig.
 	mySig, err := txscript.RawTxInWitnessSignature(
 		tx, hCache, 0, q.Value, pre, txscript.SigHashAll, priv)
@@ -36,7 +40,7 @@ func (nd *LitNode) SignBreakTx(q *Qchan) (*wire.MsgTx, error) {
 	// put the sighash all byte on the end of their signature
 	theirSig = append(theirSig, byte(txscript.SigHashAll))
 
-	fmt.Printf("made mysig: %x theirsig: %x\n", mySig, theirSig)
+	log.Printf("made mysig: %x theirsig: %x\n", mySig, theirSig)
 	// add sigs to the witness stack
 	if swap {
 		tx.TxIn[0].Witness = SpendMultiSigWitStack(pre, theirSig, mySig)
@@ -69,7 +73,10 @@ func (nd *LitNode) SignSimpleClose(q *Qchan, tx *wire.MsgTx) ([64]byte, error) {
 		return sig, err
 	}
 	// get private signing key
-	priv := nd.SubWallet[q.Coin()].GetPriv(q.KeyGen)
+	priv, err := nd.SubWallet[q.Coin()].GetPriv(q.KeyGen)
+	if err != nil {
+		return sig, err
+	}
 	// generate sig
 	mySig, err := txscript.RawTxInWitnessSignature(
 		tx, hCache, 0, q.Value, pre, txscript.SigHashAll, priv)
@@ -79,6 +86,65 @@ func (nd *LitNode) SignSimpleClose(q *Qchan, tx *wire.MsgTx) ([64]byte, error) {
 	// truncate sig (last byte is sighash type, always sighashAll)
 	mySig = mySig[:len(mySig)-1]
 	return sig64.SigCompress(mySig)
+}
+
+// SignSettlementTx signs the given settlement tx based on the passed contract
+// using the passed private key. Tx is modified in place.
+func (nd *LitNode) SignSettlementTx(c *lnutil.DlcContract, tx *wire.MsgTx,
+	priv *btcec.PrivateKey) ([64]byte, error) {
+
+	var sig [64]byte
+	// make hash cache
+	hCache := txscript.NewTxSigHashes(tx)
+
+	// generate script preimage for signing (ignore key order)
+	pre, _, err := lnutil.FundTxScript(c.OurFundMultisigPub,
+		c.TheirFundMultisigPub)
+
+	if err != nil {
+		return sig, err
+	}
+	// generate sig
+	mySig, err := txscript.RawTxInWitnessSignature(
+		tx, hCache, 0, c.TheirFundingAmount+c.OurFundingAmount,
+		pre, txscript.SigHashAll, priv)
+
+	if err != nil {
+		return sig, err
+	}
+	// truncate sig (last byte is sighash type, always sighashAll)
+	mySig = mySig[:len(mySig)-1]
+	return sig64.SigCompress(mySig)
+}
+
+// SignClaimTx signs the given claim tx based on the passed preimage and value
+// using the passed private key. Tx is modified in place. timeout=false means
+// it's a regular claim, timeout=true means we're claiming an output that has
+// expired (for instance if someone) published the wrong settlement TX, we can
+// claim this output back to our wallet after the timelock expired.
+func (nd *LitNode) SignClaimTx(claimTx *wire.MsgTx, value int64, pre []byte,
+	priv *btcec.PrivateKey, timeout bool) error {
+
+	// make hash cache
+	hCache := txscript.NewTxSigHashes(claimTx)
+
+	// generate sig
+	mySig, err := txscript.RawTxInWitnessSignature(
+		claimTx, hCache, 0, value, pre, txscript.SigHashAll, priv)
+	if err != nil {
+		return err
+	}
+
+	witStash := make([][]byte, 3)
+	witStash[0] = mySig
+	if timeout {
+		witStash[1] = nil
+	} else {
+		witStash[1] = []byte{0x01}
+	}
+	witStash[2] = pre
+	claimTx.TxIn[0].Witness = witStash
+	return nil
 }
 
 // SignNextState generates your signature for their state.
@@ -110,7 +176,10 @@ func (nd *LitNode) SignState(q *Qchan) ([64]byte, error) {
 	}
 
 	// get private signing key
-	priv := nd.SubWallet[q.Coin()].GetPriv(q.KeyGen)
+	priv, err := nd.SubWallet[q.Coin()].GetPriv(q.KeyGen)
+	if err != nil {
+		return sig, err
+	}
 
 	// generate sig.
 	bigSig, err := txscript.RawTxInWitnessSignature(
@@ -123,12 +192,12 @@ func (nd *LitNode) SignState(q *Qchan) ([64]byte, error) {
 		return sig, err
 	}
 
-	fmt.Printf("____ sig creation for channel (%d,%d):\n", q.Peer(), q.Idx())
-	fmt.Printf("\tinput %s\n", tx.TxIn[0].PreviousOutPoint.String())
+	log.Printf("____ sig creation for channel (%d,%d):\n", q.Peer(), q.Idx())
+	log.Printf("\tinput %s\n", tx.TxIn[0].PreviousOutPoint.String())
 	for i, txout := range tx.TxOut {
-		fmt.Printf("\toutput %d: %x %d\n", i, txout.PkScript, txout.Value)
+		log.Printf("\toutput %d: %x %d\n", i, txout.PkScript, txout.Value)
 	}
-	fmt.Printf("\tstate %d myamt: %d theiramt: %d\n", q.State.StateIdx, q.State.MyAmt, q.Value-q.State.MyAmt)
+	log.Printf("\tstate %d myamt: %d theiramt: %d\n", q.State.StateIdx, q.State.MyAmt, q.Value-q.State.MyAmt)
 
 	return sig, nil
 }
@@ -172,13 +241,13 @@ func (q *Qchan) VerifySig(sig [64]byte) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("____ sig verification for channel (%d,%d):\n", q.Peer(), q.Idx())
-	fmt.Printf("\tinput %s\n", tx.TxIn[0].PreviousOutPoint.String())
+	log.Printf("____ sig verification for channel (%d,%d):\n", q.Peer(), q.Idx())
+	log.Printf("\tinput %s\n", tx.TxIn[0].PreviousOutPoint.String())
 	for i, txout := range tx.TxOut {
-		fmt.Printf("\toutput %d: %x %d\n", i, txout.PkScript, txout.Value)
+		log.Printf("\toutput %d: %x %d\n", i, txout.PkScript, txout.Value)
 	}
-	fmt.Printf("\tstate %d myamt: %d theiramt: %d\n", q.State.StateIdx, q.State.MyAmt, q.Value-q.State.MyAmt)
-	fmt.Printf("\tsig: %x\n", sig)
+	log.Printf("\tstate %d myamt: %d theiramt: %d\n", q.State.StateIdx, q.State.MyAmt, q.Value-q.State.MyAmt)
+	log.Printf("\tsig: %x\n", sig)
 
 	worked := pSig.Verify(hash, theirPubKey)
 	if !worked {

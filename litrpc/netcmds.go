@@ -2,6 +2,7 @@ package litrpc
 
 import (
 	"fmt"
+	"log"
 	"strconv"
 
 	"github.com/mit-dci/lit/lnutil"
@@ -53,7 +54,7 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
 		if host != "" {
 			connectAdr += "@" + host
 		}
-		fmt.Printf("try string %s\n", connectAdr)
+		log.Printf("try string %s\n", connectAdr)
 
 	} else {
 		// use string as is, try to convert to ln address
@@ -112,7 +113,6 @@ func (r *LitRPC) ListConnections(args NoArgs, reply *ListConnectionsReply) error
 
 func (r *LitRPC) GetListeningPorts(args NoArgs, reply *ListeningPortsReply) error {
 	reply.Adr, reply.LisIpPorts = r.Node.GetLisAddressAndPorts()
-
 	return nil
 }
 
@@ -144,6 +144,5 @@ type ChannelGraphReply struct {
 
 func (r *LitRPC) GetChannelMap(args NoArgs, reply *ChannelGraphReply) error {
 	reply.Graph = r.Node.VisualiseGraph()
-
 	return nil
 }

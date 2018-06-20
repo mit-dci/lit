@@ -10,7 +10,7 @@ import (
 func (lc *litAfClient) completePeers(line string) []string {
 	names := make([]string, 0)
 	pReply := new(litrpc.ListConnectionsReply)
-	err := lc.rpccon.Call("LitRPC.ListConnections", nil, pReply)
+	err := lc.Call("LitRPC.ListConnections", nil, pReply)
 	if err != nil {
 		return names
 	}
@@ -28,11 +28,11 @@ func (lc *litAfClient) completeClosedPeers(line string) []string {
 	connectedpeers := make([]string, 0)
 	pReply := new(litrpc.ListConnectionsReply)
 	cReply := new(litrpc.ChannelListReply)
-	err := lc.rpccon.Call("LitRPC.ListConnections", nil, pReply)
+	err := lc.Call("LitRPC.ListConnections", nil, pReply)
 	if err != nil {
 		return channelpeers
 	}
-	err = lc.rpccon.Call("LitRPC.ChannelList", nil, cReply)
+	err = lc.Call("LitRPC.ChannelList", nil, cReply)
 	if err != nil {
 		return channelpeers
 	}
@@ -61,7 +61,7 @@ func (lc *litAfClient) completeClosedPeers(line string) []string {
 func (lc *litAfClient) completeChannelIdx(line string) []string {
 	names := make([]string, 0)
 	cReply := new(litrpc.ChannelListReply)
-	err := lc.rpccon.Call("LitRPC.ChannelList", nil, cReply)
+	err := lc.Call("LitRPC.ChannelList", nil, cReply)
 	if err != nil {
 		return names
 	}

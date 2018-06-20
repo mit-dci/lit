@@ -2,9 +2,11 @@ package litrpc
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/adiabat/bech32"
 	"github.com/adiabat/btcd/wire"
+	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 )
@@ -163,8 +165,8 @@ func (r *LitRPC) Send(args SendArgs, reply *TxidsReply) error {
 
 	txOuts := make([]*wire.TxOut, nOutputs)
 	for i, s := range args.DestAddrs {
-		if args.Amts[i] < 10000 {
-			return fmt.Errorf("Amt %d less than min 10000", args.Amts[i])
+		if args.Amts[i] < consts.MinSendAmt {
+			return fmt.Errorf("Amt %d less than minimum send amount %d", args.Amts[i], consts.MinSendAmt)
 		}
 
 		outScript, err := AdrStringToOutscript(s)
@@ -212,7 +214,7 @@ func (r *LitRPC) Sweep(args SweepArgs, reply *TxidsReply) error {
 		return err
 	}
 
-	fmt.Printf("numtx: %d\n", args.NumTx)
+	log.Printf("numtx: %d\n", args.NumTx)
 	if args.NumTx < 1 {
 		return fmt.Errorf("can't send %d txs", args.NumTx)
 	}

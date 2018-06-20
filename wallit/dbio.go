@@ -13,6 +13,7 @@ import (
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
+	"github.com/mit-dci/lit/consts"
 )
 
 // const strings for db usage
@@ -86,7 +87,7 @@ func (w *Wallit) AdrDump() ([][20]byte, error) {
 		return nil, err
 	}
 
-	if last > 1<<20 {
+	if last > consts.MaxKeys {
 		return nil, fmt.Errorf("Got %d keys stored, expect something reasonable", last)
 	}
 
@@ -244,7 +245,7 @@ func (w *Wallit) GetAllUtxos() ([]*portxo.PorTxo, error) {
 
 			// 0 len v means it's a watch-only utxo, not spendable
 			if len(v) == 0 {
-				// fmt.Printf("not nil, 0 len slice\n")
+				// log.Printf("not nil, 0 len slice\n")
 				return nil
 			}
 
@@ -443,8 +444,8 @@ func (w *Wallit) IngestMany(txs []*wire.MsgTx, height int32) (uint32, error) {
 	// spendTxIdx tells which tx (in the txs slice) the utxo loss came from
 	spentTxIdx := make([]uint32, 0, len(txs))
 
-	if len(txs) < 1 || len(txs) > 1000000 {
-		return 0, fmt.Errorf("tried to ingest %d txs, expect 1 to 1M", len(txs))
+	if len(txs) < 1 || len(txs) > consts.MaxTxLen {
+		return 0, fmt.Errorf("tried to ingest %d txs, expect 1 to %d", len(txs), consts.MaxTxLen)
 	}
 
 	// initial in-ram work on all txs.
@@ -481,7 +482,7 @@ func (w *Wallit) IngestMany(txs []*wire.MsgTx, height int32) (uint32, error) {
 				keygenBytes := adrb.Get(lnutil.KeyHashFromPkScript(out.PkScript))
 				if keygenBytes != nil {
 					// address matches something we're watching, cool.
-					// fmt.Printf("txout script:%x matched kg: %x\n", out.PkScript, keygenBytes)
+					// log.Printf("txout script:%x matched kg: %x\n", out.PkScript, keygenBytes)
 
 					// build new portxo
 					txob, err := NewPorTxoBytesFromKGBytes(
@@ -536,7 +537,7 @@ func (w *Wallit) IngestMany(txs []*wire.MsgTx, height int32) (uint32, error) {
 				if len(v) == 0 && cap(w.OPEventChan) != 0 {
 					// confirmation of unknown / watch only outpoint, send up to ln
 					// confirmation match detected; return OP event with nil tx
-					// fmt.Printf("|||| zomg match  ")
+					// log.Printf("|||| zomg match  ")
 					hitTxs[i] = true // flag to save tx in db
 
 					var opArr [36]byte
@@ -559,7 +560,7 @@ func (w *Wallit) IngestMany(txs []*wire.MsgTx, height int32) (uint32, error) {
 		for i, curOP := range spentOPs {
 			v := dufb.Get(curOP[:])
 			if v != nil && len(v) == 0 && cap(w.OPEventChan) != 0 {
-				// fmt.Printf("|||watch only here zomg\n")
+				// log.Printf("|||watch only here zomg\n")
 				hitTxs[spentTxIdx[i]] = true // just save everything
 				op := lnutil.OutPointFromBytes(curOP)
 				// build new outpoint event

@@ -149,7 +149,7 @@ func (w *WatchTower) NewChannel(m lnutil.WatchDescMsg) error {
 		// save truncated descriptor for static info (drop elk0)
 		wdBytes := m.Bytes()
 		if len(wdBytes) < 96 {
-			return fmt.Errorf("watchdescriptor %d bytes, expect 96")
+			return fmt.Errorf("watchdescriptor %d bytes, expect 96", len(wdBytes))
 		}
 		chanBucket.Put(KEYStatic, wdBytes[:96])
 		log.Printf("saved new channel to pkh %x\n", m.DestPKHScript)
@@ -197,7 +197,7 @@ func (w *WatchTower) UpdateChannel(m lnutil.WatchStateMsg) error {
 		if err != nil {
 			return err
 		}
-		// fmt.Printf("added elkrem %x at index %d OK\n", cm.Elk[:], elkr.UpTo())
+		// log.Printf("added elkrem %x at index %d OK\n", cm.Elk[:], elkr.UpTo())
 
 		// get state number, after elk insertion.  also convert to 8 bytes.
 		stateNumBytes := lnutil.U64tB(elkr.UpTo())

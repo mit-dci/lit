@@ -38,7 +38,7 @@ func (w *WatchTower) BuildJusticeTx(
 		txid := badTx.TxHash()
 		idxSigBytes := txidbkt.Get(txid[:16])
 		if idxSigBytes == nil {
-			return fmt.Errorf("couldn't get txid %x")
+			return fmt.Errorf("couldn't get txid %x", idxSigBytes)
 		}
 		iSig, err = IdxSigFromBytes(idxSigBytes)
 		if err != nil {

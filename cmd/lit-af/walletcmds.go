@@ -42,19 +42,14 @@ var sweepCommand = &Command{
 
 // Send sends coins somewhere
 func (lc *litAfClient) Send(textArgs []string) error {
-	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Fprintf(color.Output, sendCommand.Format)
-		fmt.Fprintf(color.Output, sendCommand.Description)
-		return nil
+	err := CheckHelpCommand(sendCommand, textArgs, 2)
+	if err != nil {
+		return err
 	}
 
 	args := new(litrpc.SendArgs)
 	reply := new(litrpc.TxidsReply)
 
-	// need args, fail
-	if len(textArgs) < 2 {
-		return fmt.Errorf(sendCommand.Description)
-	}
 	/*
 		adr, err := btcutil.DecodeAddress(args[0], lc.Param)
 		if err != nil {
@@ -72,7 +67,7 @@ func (lc *litAfClient) Send(textArgs []string) error {
 	args.DestAddrs = []string{textArgs[0]}
 	args.Amts = []int64{int64(amt)}
 
-	err = lc.rpccon.Call("LitRPC.Send", args, reply)
+	err = lc.Call("LitRPC.Send", args, reply)
 	if err != nil {
 		return err
 	}
@@ -85,20 +80,13 @@ func (lc *litAfClient) Send(textArgs []string) error {
 
 // Sweep moves utxos with many 1-in-1-out txs
 func (lc *litAfClient) Sweep(textArgs []string) error {
-	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Fprintf(color.Output, sweepCommand.Format)
-		fmt.Fprintf(color.Output, sweepCommand.Description)
-		return nil
+	err := CheckHelpCommand(sweepCommand, textArgs, 2)
+	if err != nil {
+		return err
 	}
 
 	args := new(litrpc.SweepArgs)
 	reply := new(litrpc.TxidsReply)
-
-	var err error
-
-	if len(textArgs) < 2 {
-		return fmt.Errorf(sweepCommand.Format)
-	}
 
 	args.DestAdr = textArgs[0]
 	numTxs, err := strconv.Atoi(textArgs[1])
@@ -110,7 +98,7 @@ func (lc *litAfClient) Sweep(textArgs []string) error {
 		args.Drop = true
 	}
 
-	err = lc.rpccon.Call("LitRPC.Sweep", args, reply)
+	err = lc.Call("LitRPC.Sweep", args, reply)
 	if err != nil {
 		return err
 	}
@@ -130,18 +118,13 @@ func (lc *litAfClient) Sweep(textArgs []string) error {
 //}
 
 func (lc *litAfClient) Fan(textArgs []string) error {
-	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Fprintf(color.Output, fanCommand.Format)
-		fmt.Fprintf(color.Output, fanCommand.Description)
-		return nil
+	err := CheckHelpCommand(fanCommand, textArgs, 3)
+	if err != nil {
+		return err
 	}
 
 	args := new(litrpc.FanArgs)
 	reply := new(litrpc.TxidsReply)
-	if len(textArgs) < 3 {
-		return fmt.Errorf(fanCommand.Format)
-	}
-	var err error
 	args.DestAdr = textArgs[0]
 
 	outputs, err := strconv.Atoi(textArgs[1])
@@ -156,7 +139,7 @@ func (lc *litAfClient) Fan(textArgs []string) error {
 	}
 	args.AmtPerOutput = int64(amt)
 
-	err = lc.rpccon.Call("LitRPC.Fanout", args, reply)
+	err = lc.Call("LitRPC.Fanout", args, reply)
 	if err != nil {
 		return err
 	}
@@ -200,12 +183,12 @@ func (lc *litAfClient) Fee(textArgs []string) error {
 	}
 
 	if set {
-		err := lc.rpccon.Call("LitRPC.SetFee", SetArgs, reply)
+		err := lc.Call("LitRPC.SetFee", SetArgs, reply)
 		if err != nil {
 			return err
 		}
 	} else {
-		err := lc.rpccon.Call("LitRPC.GetFee", GetArgs, reply)
+		err := lc.Call("LitRPC.GetFee", GetArgs, reply)
 		if err != nil {
 			return err
 		}
@@ -248,10 +231,9 @@ func (lc *litAfClient) SetFee(textArgs []string) error {
 
 // Address makes new addresses
 func (lc *litAfClient) Address(textArgs []string) error {
-	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Fprintf(color.Output, addressCommand.Format)
-		fmt.Fprintf(color.Output, addressCommand.Description)
-		return nil
+	err := CheckHelpCommand(addressCommand, textArgs, 0)
+	if err != nil {
+		return err
 	}
 
 	var cointype, numadrs uint32
@@ -286,7 +268,7 @@ func (lc *litAfClient) Address(textArgs []string) error {
 	args.NumToMake = numadrs
 
 	fmt.Printf("args: %v\n", args)
-	err := lc.rpccon.Call("LitRPC.Address", args, reply)
+	err = lc.Call("LitRPC.Address", args, reply)
 	if err != nil {
 		return err
 	}

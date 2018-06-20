@@ -1,15 +1,14 @@
 package qln
 
 import (
+	"errors"
 	"fmt"
+	"log"
 
 	"github.com/adiabat/btcd/wire"
+	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
 )
-
-// minOutput is the minimum output amt, post fee.
-// This (plus fees) is also the minimum channel balance
-const minOutput = 100000
 
 // Grab the coins that are rightfully yours! Plus some more.
 // For right now, spend all outputs from channel close.
@@ -70,7 +69,7 @@ DeltaSig collision handling:
 
 Send a DeltaSig.  Delta < 0.
 Receive a DeltaSig with Delta < 0; need to send a GapSigRev
-COLLISION: Set the collision flag (delta-(1<<30))
+COLLISION: Set the collision flag (delta-(130))
 update amount with increment from received deltaSig
 verify received signature & save to disk, update state number
 *your delta value stays the same*
@@ -134,13 +133,13 @@ func (nd *LitNode) ReSendMsg(qc *Qchan) error {
 
 	// DeltaSig
 	if qc.State.Delta < 0 {
-		fmt.Printf("Sending previously sent DeltaSig\n")
+		log.Printf("Sending previously sent DeltaSig\n")
 		return nd.SendDeltaSig(qc)
 	}
 
 	// SigRev
 	if qc.State.Delta > 0 {
-		fmt.Printf("Sending previously sent SigRev\n")
+		log.Printf("Sending previously sent SigRev\n")
 		return nd.SendSigRev(qc)
 	}
 
@@ -149,7 +148,7 @@ func (nd *LitNode) ReSendMsg(qc *Qchan) error {
 }
 
 // PushChannel initiates a state update by sending a DeltaSig
-func (nd LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
+func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	// sanity checks
 	if amt >= 1<<30 {
 		return fmt.Errorf("max send 1G sat (1073741823)")
@@ -158,14 +157,17 @@ func (nd LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 		return fmt.Errorf("have to send non-zero amount")
 	}
 
-	// see if channel is busy, error if so, lock if not
+	// see if channel is busy
 	// lock this channel
-
-	select {
-	case <-qc.ClearToSend:
-	// keep going
-	default:
-		return fmt.Errorf("Channel %d busy", qc.Idx())
+	cts := false
+	for !cts {
+		qc.ChanMtx.Lock()
+		select {
+		case <-qc.ClearToSend:
+			cts = true
+		default:
+			qc.ChanMtx.Unlock()
+		}
 	}
 	// ClearToSend is now empty
 
@@ -173,6 +175,7 @@ func (nd LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	err := nd.ReloadQchanState(qc)
 	if err != nil {
 		// don't clear to send here; something is wrong with the channel
+		qc.ChanMtx.Unlock()
 		return err
 	}
 
@@ -180,11 +183,13 @@ func (nd LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	wal, ok := nd.SubWallet[qc.Coin()]
 	if !ok {
 		qc.ClearToSend <- true
+		qc.ChanMtx.Unlock()
 		return fmt.Errorf("Not connected to coin type %d\n", qc.Coin())
 	}
 
 	if !wal.Params().TestCoin && qc.Height < 100 {
 		qc.ClearToSend <- true
+		qc.ChanMtx.Unlock()
 		return fmt.Errorf(
 			"height %d; must wait min 1 conf for non-test coin\n", qc.Height)
 	}
@@ -194,23 +199,25 @@ func (nd LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	theirNewOutputSize := qc.Value - (qc.State.MyAmt - int64(amt)) - qc.State.Fee
 
 	// check if this push would lower my balance below minBal
-	if myNewOutputSize < minOutput {
+	if myNewOutputSize < consts.MinOutput {
 		qc.ClearToSend <- true
-		return fmt.Errorf("want to push %s but %s available after %s fee and %s minOutput",
+		qc.ChanMtx.Unlock()
+		return fmt.Errorf("want to push %s but %s available after %s fee and %s consts.MinOutput",
 			lnutil.SatoshiColor(int64(amt)),
-			lnutil.SatoshiColor(qc.State.MyAmt - qc.State.Fee - minOutput),
+			lnutil.SatoshiColor(qc.State.MyAmt-qc.State.Fee-consts.MinOutput),
 			lnutil.SatoshiColor(qc.State.Fee),
-			lnutil.SatoshiColor(minOutput))
+			lnutil.SatoshiColor(consts.MinOutput))
 	}
 	// check if this push is sufficient to get them above minBal
-	if theirNewOutputSize < minOutput {
+	if theirNewOutputSize < consts.MinOutput {
 		qc.ClearToSend <- true
+		qc.ChanMtx.Unlock()
 		return fmt.Errorf(
-			"pushing %s insufficient; counterparty bal %s fee %s minOutput %s",
+			"pushing %s insufficient; counterparty bal %s fee %s consts.MinOutput %s",
 			lnutil.SatoshiColor(int64(amt)),
 			lnutil.SatoshiColor(qc.Value-qc.State.MyAmt),
 			lnutil.SatoshiColor(qc.State.Fee),
-			lnutil.SatoshiColor(minOutput))
+			lnutil.SatoshiColor(consts.MinOutput))
 	}
 
 	// if we got here, but channel is not in rest state, try to fix it.
@@ -218,36 +225,62 @@ func (nd LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 		err = nd.ReSendMsg(qc)
 		if err != nil {
 			qc.ClearToSend <- true
+			qc.ChanMtx.Unlock()
 			return err
 		}
-		qc.ClearToSend <- true
+		qc.ChanMtx.Unlock()
 		return fmt.Errorf("Didn't send.  Recovered though, so try again!")
 	}
 
 	qc.State.Data = data
-	fmt.Printf("Sending message %x", data)
+	log.Printf("Sending message %x", data)
 
 	qc.State.Delta = int32(-amt)
+
+	if qc.State.Delta == 0 {
+		qc.ChanMtx.Unlock()
+		return errors.New("PushChannel: Delta cannot be zero")
+	}
+
 	// save to db with ONLY delta changed
 	err = nd.SaveQchanState(qc)
 	if err != nil {
 		// don't clear to send here; something is wrong with the channel
+		qc.ChanMtx.Unlock()
 		return err
 	}
 	// move unlock to here so that delta is saved before
 
+	log.Printf("PushChannel: Sending DeltaSig")
+
 	err = nd.SendDeltaSig(qc)
 	if err != nil {
+		qc.ChanMtx.Unlock()
 		// don't clear; something is wrong with the network
 		return err
 	}
 
-	fmt.Printf("got pre CTS... \n")
+	log.Printf("PushChannel: Done: sent DeltaSig")
+
+	log.Printf("got pre CTS... \n")
 	// block until clear to send is full again
-	<-qc.ClearToSend
-	fmt.Printf("got post CTS... \n")
+	qc.ChanMtx.Unlock()
+
+	cts = false
+	for !cts {
+		qc.ChanMtx.Lock()
+		select {
+		case <-qc.ClearToSend:
+			cts = true
+		default:
+			qc.ChanMtx.Unlock()
+		}
+	}
+
+	log.Printf("got post CTS... \n")
 	// since we cleared with that statement, fill it again before returning
 	qc.ClearToSend <- true
+	qc.ChanMtx.Unlock()
 
 	return nil
 }
@@ -267,7 +300,14 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 		return err
 	}
 
+	if q.State.Delta == 0 {
+		return errors.New("Delta cannot be zero")
+	}
+
 	outMsg := lnutil.NewDeltaSigMsg(q.Peer(), q.Op, -q.State.Delta, sig, q.State.Data)
+
+	log.Printf("Sending DeltaSig: %v", outMsg)
+
 	nd.OmniOut <- outMsg
 
 	return nil
@@ -277,6 +317,7 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 // or a GapSigRev (if there's a collision)
 // Leaves the channel either expecting a Rev (normally) or a GapSigRev (collision)
 func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
+	log.Printf("Got DeltaSig: %v", msg)
 
 	var collision bool
 	//incomingDelta := uint32(math.Abs(float64(msg.Delta))) //int32 (may be negative, but should not be)
@@ -291,7 +332,7 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 		collision = true
 	}
 
-	fmt.Printf("COLLISION is (%s)\n", collision)
+	log.Printf("COLLISION is (%t)\n", collision)
 
 	// load state from disk
 	err := nd.ReloadQchanState(qc)
@@ -314,7 +355,7 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 		// incoming delta saved as collision value,
 		// existing (negative) delta value retained.
 		qc.State.Collision = int32(incomingDelta)
-		fmt.Printf("delta sig COLLISION (%d)\n", qc.State.Collision)
+		log.Printf("delta sig COLLISION (%d)\n", qc.State.Collision)
 	}
 
 	// detect if channel is already locked, and lock if not
@@ -332,7 +373,7 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 	//	}
 
 	if qc.State.Delta > 0 {
-		fmt.Printf(
+		log.Printf(
 			"DeltaSigHandler err: chan %d delta %d, expect rev, send empty rev",
 			qc.Idx(), qc.State.Delta)
 
@@ -349,19 +390,19 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 		return fmt.Errorf("DeltaSigHandler err: delta %d", incomingDelta)
 	}
 
-	// perform minOutput check
+	// perform consts.MinOutput check
 	theirNewOutputSize :=
 		qc.Value - (qc.State.MyAmt + int64(incomingDelta)) - qc.State.Fee
 
 	// check if this push is takes them below minimum output size
-	if theirNewOutputSize < minOutput {
+	if theirNewOutputSize < consts.MinOutput {
 		qc.ClearToSend <- true
 		return fmt.Errorf(
-			"pushing %s reduces them too low; counterparty bal %s fee %s minOutput %s",
+			"pushing %s reduces them too low; counterparty bal %s fee %s consts.MinOutput %s",
 			lnutil.SatoshiColor(int64(incomingDelta)),
 			lnutil.SatoshiColor(qc.Value-qc.State.MyAmt),
 			lnutil.SatoshiColor(qc.State.Fee),
-			lnutil.SatoshiColor(minOutput))
+			lnutil.SatoshiColor(consts.MinOutput))
 	}
 
 	// update to the next state to verify
@@ -369,7 +410,7 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 	// regardless of collision, raise amt
 	qc.State.MyAmt += int64(incomingDelta)
 
-	fmt.Printf("Got message %x", msg.Data)
+	log.Printf("Got message %x", msg.Data)
 	qc.State.Data = msg.Data
 
 	// verify sig for the next state. only save if this works
@@ -441,6 +482,8 @@ func (nd *LitNode) SendGapSigRev(q *Qchan) error {
 
 	outMsg := lnutil.NewGapSigRev(q.KeyGen.Step[3]&0x7fffffff, q.Op, sig, *elk, n2ElkPoint)
 
+	log.Printf("Sending GapSigRev: %v", outMsg)
+
 	nd.OmniOut <- outMsg
 
 	return nil
@@ -475,6 +518,8 @@ func (nd *LitNode) SendSigRev(q *Qchan) error {
 
 	outMsg := lnutil.NewSigRev(q.KeyGen.Step[3]&0x7fffffff, q.Op, sig, *elk, n2ElkPoint)
 
+	log.Printf("Sending SigRev: %v", outMsg)
+
 	nd.OmniOut <- outMsg
 	return nil
 }
@@ -482,6 +527,7 @@ func (nd *LitNode) SendSigRev(q *Qchan) error {
 // GapSigRevHandler takes in a GapSigRev, responds with a Rev, and
 // leaves the channel in a state expecting a Rev.
 func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
+	log.Printf("Got GapSigRev: %v", msg)
 
 	// load qchan & state from DB
 	err := nd.ReloadQchanState(q)
@@ -540,12 +586,10 @@ func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
 	q.State.StateIdx -= 2
 	q.State.MyAmt = prevAmt
 
-	go func() {
-		err = nd.BuildJusticeSig(q)
-		if err != nil {
-			fmt.Printf("GapSigRevHandler BuildJusticeSig err %s", err.Error())
-		}
-	}()
+	err = nd.BuildJusticeSig(q)
+	if err != nil {
+		log.Printf("GapSigRevHandler BuildJusticeSig err %s", err.Error())
+	}
 
 	return nil
 }
@@ -553,6 +597,7 @@ func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
 // SIGREVHandler takes in a SIGREV and responds with a REV (if everything goes OK)
 // Leaves the channel in a clear / rest state.
 func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
+	log.Printf("Got SigRev: %v", msg)
 
 	// load qchan & state from DB
 	err := nd.ReloadQchanState(qc)
@@ -606,7 +651,7 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 		return fmt.Errorf("SIGREVHandler err %s", err.Error())
 	}
 
-	fmt.Printf("SIGREV OK, state %d, will send REV\n", qc.State.StateIdx)
+	log.Printf("SIGREV OK, state %d, will send REV\n", qc.State.StateIdx)
 	err = nd.SendREV(qc)
 	if err != nil {
 		return fmt.Errorf("SIGREVHandler err %s", err.Error())
@@ -619,12 +664,10 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 	qc.State.StateIdx--
 	qc.State.MyAmt = prevAmt
 
-	go func() {
-		err = nd.BuildJusticeSig(qc)
-		if err != nil {
-			fmt.Printf("SigRevHandler BuildJusticeSig err %s", err.Error())
-		}
-	}()
+	err = nd.BuildJusticeSig(qc)
+	if err != nil {
+		log.Printf("SigRevHandler BuildJusticeSig err %s", err.Error())
+	}
 
 	// done updating channel, no new messages expected.  Set clear to send
 	qc.ClearToSend <- true
@@ -647,6 +690,8 @@ func (nd *LitNode) SendREV(q *Qchan) error {
 
 	outMsg := lnutil.NewRevMsg(q.Peer(), q.Op, *elk, n2ElkPoint)
 
+	log.Printf("Sending Rev: %v", outMsg)
+
 	nd.OmniOut <- outMsg
 
 	return err
@@ -656,6 +701,7 @@ func (nd *LitNode) SendREV(q *Qchan) error {
 // final message in the state update process and there is no response.
 // Leaves the channel in a clear / rest state.
 func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {
+	log.Printf("Got Rev: %v", msg)
 
 	// load qchan & state from DB
 	err := nd.ReloadQchanState(qc)
@@ -669,14 +715,14 @@ func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {
 	}
 	// maybe this is an unexpected rev, asking us for a rev repeat
 	if qc.State.Delta < 0 {
-		fmt.Printf("got Rev, expected SigRev.  Re-sending last REV.\n")
+		log.Printf("got Rev, expected SigRev.  Re-sending last REV.\n")
 		return nd.SendREV(qc)
 	}
 
 	// verify elkrem
 	err = qc.AdvanceElkrem(&msg.Elk, msg.N2ElkPoint)
 	if err != nil {
-		fmt.Printf(" ! non-recoverable error, need to close the channel here.\n")
+		log.Printf(" ! non-recoverable error, need to close the channel here.\n")
 		return fmt.Errorf("REVHandler err %s", err.Error())
 	}
 	prevAmt := qc.State.MyAmt - int64(qc.State.Delta)
@@ -692,16 +738,14 @@ func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {
 	// the justice signature
 	qc.State.StateIdx--      // back one state
 	qc.State.MyAmt = prevAmt // use stashed previous state amount
-	go func() {
-		err = nd.BuildJusticeSig(qc)
-		if err != nil {
-			fmt.Printf("RevHandler BuildJusticeSig err %s", err.Error())
-		}
-	}()
+	err = nd.BuildJusticeSig(qc)
+	if err != nil {
+		log.Printf("RevHandler BuildJusticeSig err %s", err.Error())
+	}
 
 	// got rev, assert clear to send
 	qc.ClearToSend <- true
 
-	fmt.Printf("REV OK, state %d all clear.\n", qc.State.StateIdx)
+	log.Printf("REV OK, state %d all clear.\n", qc.State.StateIdx)
 	return nil
 }

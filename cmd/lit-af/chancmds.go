@@ -52,6 +52,15 @@ var dualFundAcceptCommand = &Command{
 	Format:           fmt.Sprintf("%s\n", lnutil.White("dualfund accept")),
 	Description:      "Accepts the pending dual funding request received from another peer (if any)\n",
 	ShortDescription: "Accepts the pending dual funding request received from another peer (if any)\n",
+
+var watchCommand = &Command{
+	Format: fmt.Sprintf("%s%s\n", lnutil.White("watch"),
+		lnutil.ReqColor("channel idx", "watchPeerIdx")),
+	Description: fmt.Sprintf("%s\n%s\n",
+		"Send channel data to a watcher",
+		"The watcher can defend your channel while you're offline."),
+	ShortDescription: "Send channel watch data to watcher.\n",
+
 }
 
 var pushCommand = &Command{
@@ -97,7 +106,7 @@ func (lc *litAfClient) History(textArgs []string) error {
 	args := new(litrpc.StateDumpArgs)
 	reply := new(litrpc.StateDumpReply)
 
-	err := lc.rpccon.Call("LitRPC.StateDump", args, reply)
+	err := lc.Call("LitRPC.StateDump", args, reply)
 	if err != nil {
 		return err
 	}
@@ -109,19 +118,25 @@ func (lc *litAfClient) History(textArgs []string) error {
 	return nil
 }
 
-func (lc *litAfClient) FundChannel(textArgs []string) error {
+func CheckHelpCommand(command *Command, textArgs []string, expectedLength int) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Fprintf(color.Output, fundCommand.Format)
-		fmt.Fprintf(color.Output, fundCommand.Description)
-		return nil
+		fmt.Fprintf(color.Output, command.Format)
+		fmt.Fprintf(color.Output, command.Description)
 	}
+	if len(textArgs) < expectedLength {
+		// if number of args are less than expected, return
+		return fmt.Errorf(command.Format)
+	}
+	return nil
+}
 
+func (lc *litAfClient) FundChannel(textArgs []string) error {
+	err := CheckHelpCommand(fundCommand, textArgs, 4)
+	if err != nil {
+		return err
+	}
 	args := new(litrpc.FundArgs)
 	reply := new(litrpc.StatusReply)
-
-	if len(textArgs) < 4 {
-		return fmt.Errorf(fundCommand.Format)
-	}
 
 	peer, err := strconv.Atoi(textArgs[0])
 	if err != nil {
@@ -156,7 +171,7 @@ func (lc *litAfClient) FundChannel(textArgs []string) error {
 	args.Capacity = int64(cCap)
 	args.InitialSend = int64(iSend)
 
-	err = lc.rpccon.Call("LitRPC.FundChannel", args, reply)
+	err = lc.Call("LitRPC.FundChannel", args, reply)
 	if err != nil {
 		return err
 	}
@@ -263,19 +278,13 @@ func (lc *litAfClient) DualFundAccept(textArgs []string) error {
 
 // Request close of a channel.  Need to pass in peer, channel index
 func (lc *litAfClient) CloseChannel(textArgs []string) error {
-	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Fprintf(color.Output, closeCommand.Format)
-		fmt.Fprintf(color.Output, closeCommand.Description)
-		return nil
+	err := CheckHelpCommand(closeCommand, textArgs, 1)
+	if err != nil {
+		return err
 	}
 
 	args := new(litrpc.ChanArgs)
 	reply := new(litrpc.StatusReply)
-
-	// need args, fail
-	if len(textArgs) < 1 {
-		return fmt.Errorf("need args: close chanIdx")
-	}
 
 	cIdx, err := strconv.Atoi(textArgs[0])
 	if err != nil {
@@ -284,7 +293,7 @@ func (lc *litAfClient) CloseChannel(textArgs []string) error {
 
 	args.ChanIdx = uint32(cIdx)
 
-	err = lc.rpccon.Call("LitRPC.CloseChannel", args, reply)
+	err = lc.Call("LitRPC.CloseChannel", args, reply)
 	if err != nil {
 		return err
 	}
@@ -295,19 +304,13 @@ func (lc *litAfClient) CloseChannel(textArgs []string) error {
 
 // Almost exactly the same as CloseChannel.  Maybe make "break" a bool...?
 func (lc *litAfClient) BreakChannel(textArgs []string) error {
-	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Fprintf(color.Output, breakCommand.Format)
-		fmt.Fprintf(color.Output, breakCommand.Description)
-		return nil
+	err := CheckHelpCommand(breakCommand, textArgs, 1)
+	if err != nil {
+		return err
 	}
 
 	args := new(litrpc.ChanArgs)
 	reply := new(litrpc.StatusReply)
-
-	// need args, fail
-	if len(textArgs) < 1 {
-		return fmt.Errorf("need args: break chanIdx")
-	}
 
 	cIdx, err := strconv.Atoi(textArgs[0])
 	if err != nil {
@@ -316,7 +319,7 @@ func (lc *litAfClient) BreakChannel(textArgs []string) error {
 
 	args.ChanIdx = uint32(cIdx)
 
-	err = lc.rpccon.Call("LitRPC.BreakChannel", args, reply)
+	err = lc.Call("LitRPC.BreakChannel", args, reply)
 	if err != nil {
 		return err
 	}
@@ -327,18 +330,13 @@ func (lc *litAfClient) BreakChannel(textArgs []string) error {
 
 // Push is the shell command which calls PushChannel
 func (lc *litAfClient) Push(textArgs []string) error {
-	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Fprintf(color.Output, pushCommand.Format)
-		fmt.Fprintf(color.Output, pushCommand.Description)
-		return nil
+	err := CheckHelpCommand(pushCommand, textArgs, 2)
+	if err != nil {
+		return err
 	}
 
 	args := new(litrpc.PushArgs)
 	reply := new(litrpc.PushReply)
-
-	if len(textArgs) < 2 {
-		return fmt.Errorf("need args: push chanIdx amt (times) (data)")
-	}
 
 	// this stuff is all the same as in cclose, should put into a function...
 	cIdx, err := strconv.Atoi(textArgs[0])
@@ -372,7 +370,7 @@ func (lc *litAfClient) Push(textArgs []string) error {
 	args.Amt = int64(amt)
 
 	for times > 0 {
-		err := lc.rpccon.Call("LitRPC.Push", args, reply)
+		err := lc.Call("LitRPC.Push", args, reply)
 		if err != nil {
 			return err
 		}
@@ -387,7 +385,7 @@ func (lc *litAfClient) Dump(textArgs []string) error {
 	pReply := new(litrpc.DumpReply)
 	pArgs := new(litrpc.NoArgs)
 
-	err := lc.rpccon.Call("LitRPC.DumpPrivs", pArgs, pReply)
+	err := lc.Call("LitRPC.DumpPrivs", pArgs, pReply)
 	if err != nil {
 		return err
 	}
@@ -411,6 +409,39 @@ func (lc *litAfClient) Dump(textArgs []string) error {
 		fmt.Fprintf(color.Output, "\n\tprivkey: %s", lnutil.Red(t.WIF))
 		fmt.Fprintf(color.Output, "\n")
 	}
+
+	return nil
+}
+
+func (lc *litAfClient) Watch(textArgs []string) error {
+	err := CheckHelpCommand(watchCommand, textArgs, 2)
+	if err != nil {
+		return err
+	}
+
+	args := new(litrpc.WatchArgs)
+	reply := new(litrpc.WatchReply)
+
+	cIdx, err := strconv.Atoi(textArgs[0])
+	if err != nil {
+		return err
+	}
+
+	peer, err := strconv.Atoi(textArgs[1])
+	if err != nil {
+		return err
+	}
+
+	args.ChanIdx = uint32(cIdx)
+	args.SendToPeer = uint32(peer)
+
+	err = lc.Call("LitRPC.Watch", args, reply)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(color.Output, "Send channel %d data to peer %d\n",
+		args.ChanIdx, args.SendToPeer)
 
 	return nil
 }

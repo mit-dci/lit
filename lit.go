@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"time"
@@ -25,6 +24,7 @@ type config struct { // define a struct for usage with go-flags
 	LitHomeDir  string `long:"dir" description:"Specify Home Directory of lit as an absolute path."`
 	TrackerURL  string `long:"tracker" description:"LN address tracker URL http|https://host:port"`
 	ConfigFile  string
+	ProxyURL    string `long:"proxy" description:"SOCKS5 proxy to use for communicating with the network"`
 
 	ReSync  bool `short:"r" long:"reSync" description:"Resync from the given tip."`
 	Tower   bool `long:"tower" description:"Watchtower: Run a watching node"`
@@ -32,17 +32,25 @@ type config struct { // define a struct for usage with go-flags
 	Verbose bool `short:"v" long:"verbose" description:"Set verbosity to true."`
 
 	Rpcport uint16 `short:"p" long:"rpcport" description:"Set RPC port to connect to"`
+	Rpchost string `long:"rpchost" description:"Set RPC host to listen to"`
 
-	Params *coinparam.Params
+	AutoReconnect         bool   `long:"autoReconnect" description:"Attempts to automatically reconnect to known peers periodically."`
+	AutoReconnectInterval int64  `long:"autoReconnectInterval" description:"The interval (in seconds) the reconnect logic should be executed"`
+	AutoListenPort        string `long:"autoListenPort" description:"When auto reconnect enabled, starts listening on this port"`
+	Params                *coinparam.Params
 }
 
 var (
-	defaultLitHomeDirName = os.Getenv("HOME") + "/.lit"
-	defaultTrackerURL     = "http://ni.media.mit.edu:46580"
-	defaultKeyFileName    = "privkey.hex"
-	defaultConfigFilename = "lit.conf"
-	defaultHomeDir        = os.Getenv("HOME")
-	defaultRpcport        = uint16(8001)
+	defaultLitHomeDirName        = os.Getenv("HOME") + "/.lit"
+	defaultTrackerURL            = "http://hubris.media.mit.edu:46580"
+	defaultKeyFileName           = "privkey.hex"
+	defaultConfigFilename        = "lit.conf"
+	defaultHomeDir               = os.Getenv("HOME")
+	defaultRpcport               = uint16(8001)
+	defaultRpchost               = "localhost"
+	defaultAutoReconnect         = false
+	defaultAutoListenPort        = ":2448"
+	defaultAutoReconnectInterval = int64(60)
 )
 
 func fileExists(name string) bool {
@@ -70,7 +78,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	// try regtest
 	if !lnutil.NopeString(conf.Reghost) {
 		p := &coinparam.RegressionNetParams
-		fmt.Printf("reg: %s\n", conf.Reghost)
+		log.Printf("reg: %s\n", conf.Reghost)
 		err = node.LinkBaseWallet(key, 120, conf.ReSync, conf.Tower, conf.Reghost, p)
 		if err != nil {
 			return err
@@ -94,7 +102,6 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 			return err
 		}
 	}
-
 	// try litecoin testnet4
 	if !lnutil.NopeString(conf.Lt4host) {
 		p := &coinparam.LiteCoinTestNet4Params
@@ -132,16 +139,20 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 func main() {
 
 	conf := config{
-		LitHomeDir: defaultLitHomeDirName,
-		Rpcport:    defaultRpcport,
-		TrackerURL: defaultTrackerURL,
+		LitHomeDir:            defaultLitHomeDirName,
+		Rpcport:               defaultRpcport,
+		Rpchost:               defaultRpchost,
+		TrackerURL:            defaultTrackerURL,
+		AutoReconnect:         defaultAutoReconnect,
+		AutoListenPort:        defaultAutoListenPort,
+		AutoReconnectInterval: defaultAutoReconnectInterval,
 	}
 
 	key := litSetup(&conf)
 
 	// Setup LN node.  Activate Tower if in hard mode.
-	// give node and below file pathof lit home directoy
-	node, err := qln.NewLitNode(key, conf.LitHomeDir, conf.TrackerURL)
+	// give node and below file pathof lit home directory
+	node, err := qln.NewLitNode(key, conf.LitHomeDir, conf.TrackerURL, conf.ProxyURL)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -156,11 +167,15 @@ func main() {
 	rpcl.Node = node
 	rpcl.OffButton = make(chan bool, 1)
 
-	go litrpc.RPCListen(rpcl, conf.Rpcport)
+	go litrpc.RPCListen(rpcl, conf.Rpchost, conf.Rpcport)
 	litbamf.BamfListen(conf.Rpcport, conf.LitHomeDir)
 
+	if conf.AutoReconnect {
+		node.AutoReconnect(conf.AutoListenPort, conf.AutoReconnectInterval)
+	}
+
 	<-rpcl.OffButton
-	fmt.Printf("Got stop request\n")
+	log.Printf("Got stop request\n")
 	time.Sleep(time.Second)
 
 	return

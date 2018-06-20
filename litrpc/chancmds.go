@@ -7,6 +7,7 @@ import (
 	"github.com/adiabat/btcutil"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/qln"
+	"github.com/mit-dci/lit/consts"
 )
 
 type ChannelInfo struct {
@@ -82,7 +83,7 @@ func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
 	if args.InitialSend < 0 || args.Capacity < 0 {
 		return fmt.Errorf("Can't have negative send or capacity")
 	}
-	if args.Capacity < 1000000 { // limit for now
+	if args.Capacity < consts.MinChanCapacity { // limit for now
 		return fmt.Errorf("Min channel capacity 1M sat")
 	}
 	if args.InitialSend > args.Capacity {
@@ -108,9 +109,9 @@ func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
 
 	spendable := allPorTxos.SumWitness(nowHeight)
 
-	if args.Capacity > spendable-50000 {
+	if args.Capacity > spendable-consts.SafeFee {
 		return fmt.Errorf("Wanted %d but %d available for channel creation",
-			args.Capacity, spendable-50000)
+			args.Capacity, spendable-consts.SafeFee)
 	}
 
 	idx, err := r.Node.FundChannel(
@@ -280,13 +281,12 @@ type PushReply struct {
 // Will change to .. tries to send, but may not complete.
 
 func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
-
-	if args.Amt > 100000000 || args.Amt < 1 {
+	if args.Amt > consts.MaxChanCapacity || args.Amt < 1 {
 		return fmt.Errorf(
 			"can't push %d max is 1 coin (100000000), min is 1", args.Amt)
 	}
 
-	fmt.Printf("push %d to chan %d with data %x\n", args.Amt, args.ChanIdx, args.Data)
+	log.Printf("push %d to chan %d with data %x\n", args.Amt, args.ChanIdx, args.Data)
 
 	// load the whole channel from disk just to see who the peer is
 	// (pretty inefficient)
@@ -316,7 +316,7 @@ func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 			dummyqc.Peer(), dummyqc.Idx())
 	}
 
-	fmt.Printf("channel %s\n", qc.Op.String())
+	log.Printf("channel %s\n", qc.Op.String())
 
 	if qc.CloseData.Closed {
 		return fmt.Errorf("Channel %d already closed by tx %s",
@@ -411,7 +411,10 @@ func (r *LitRPC) DumpPrivs(args NoArgs, reply *DumpReply) error {
 		thisTxo.Witty = true
 		thisTxo.PairKey = fmt.Sprintf("%x", qc.TheirPub)
 
-		priv := wal.GetPriv(qc.KeyGen)
+		priv, err := wal.GetPriv(qc.KeyGen)
+		if err != nil {
+			return err
+		}
 		wif := btcutil.WIF{priv, true, wal.Params().PrivateKeyID}
 		thisTxo.WIF = wif.String()
 
@@ -438,7 +441,10 @@ func (r *LitRPC) DumpPrivs(args NoArgs, reply *DumpReply) error {
 				theseTxos[i].Delay = u.Height + int32(u.Seq) - syncHeight
 			}
 			theseTxos[i].Witty = u.Mode&portxo.FlagTxoWitness != 0
-			priv := wal.GetPriv(u.KeyGen)
+			priv, err := wal.GetPriv(u.KeyGen)
+			if err != nil {
+				return err
+			}
 			wif := btcutil.WIF{priv, true, wal.Params().PrivateKeyID}
 
 			theseTxos[i].WIF = wif.String()

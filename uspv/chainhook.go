@@ -27,7 +27,7 @@ type ChainHook interface {
 	// Start turns on the ChainHook.  Later on, pass more parameters here.
 	// Also gets the txChan where txs come in from the ChainHook to the wallit.
 	// The TxChannel should never give txs that the wallit doesn't care about.  In the
-	// case of bloom fitlers, false positives should be handled and stopped at the
+	// case of bloom filters, false positives should be handled and stopped at the
 	// ChainHook layer; wallit should not have to handle ingesting irrelevant txs.
 	// You get back an error and 2 channels: one for txs with height attached, and
 	// one with block heights.  Subject to change; maybe this is redundant.
@@ -116,6 +116,7 @@ func (s *SPVCon) Start(
 	err = s.Connect(host)
 	if err != nil {
 		log.Printf("Can't connect to host %s\n", host)
+		log.Println(err)
 		return nil, nil, err
 	}
 

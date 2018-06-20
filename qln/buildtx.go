@@ -2,7 +2,9 @@ package qln
 
 import (
 	"fmt"
+	"log"
 
+	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
 
 	"github.com/adiabat/btcd/wire"
@@ -27,7 +29,7 @@ func GetStateIdxFromTx(tx *wire.MsgTx, x uint64) uint64 {
 	}
 	// check that indicating high bytes are correct.  If not, return 0
 	if tx.TxIn[0].Sequence>>24 != 0xff || tx.LockTime>>24 != 0x21 {
-		//		fmt.Printf("sequence byte %x, locktime byte %x\n",
+		//		log.Printf("sequence byte %x, locktime byte %x\n",
 		//			tx.TxIn[0].Sequence>>24, tx.LockTime>>24 != 0x21)
 		return 0
 	}
@@ -85,10 +87,10 @@ func (q *Qchan) SimpleCloseTx() (*wire.MsgTx, error) {
 	theirOutput := wire.NewTxOut(theirAmt, theirScript)
 
 	// check output amounts (should never fail)
-	if myAmt < minOutput {
+	if myAmt < consts.MinOutput {
 		return nil, fmt.Errorf("SimpleCloseTx: my output amt %d too low", myAmt)
 	}
-	if theirAmt < minOutput {
+	if theirAmt < consts.MinOutput {
 		return nil, fmt.Errorf("SimpleCloseTx: their output amt %d too low", myAmt)
 	}
 
@@ -148,7 +150,7 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
 		}
 	} else { // build THEIR tx (to sign)
 		// Their tx that they store.  I get funds PKH.  SH is theirs eventually.
-		fmt.Printf("using elkpoint %x\n", s.ElkPoint)
+		log.Printf("using elkpoint %x\n", s.ElkPoint)
 		// SH pubkeys are our base points plus the received elk point
 		revPub = lnutil.CombinePubs(q.MyHAKDBase, s.ElkPoint)
 		timePub = lnutil.AddPubsEZ(q.TheirHAKDBase, s.ElkPoint)
@@ -166,10 +168,10 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
 
 	// check amounts.  Nonzero amounts below the minOutput is an error.
 	// Shouldn't happen and means some checks in push/pull went wrong.
-	if fancyAmt != 0 && fancyAmt < minOutput {
+	if fancyAmt != 0 && fancyAmt < consts.MinOutput {
 		return nil, fmt.Errorf("SH amt %d too low", fancyAmt)
 	}
-	if pkhAmt != 0 && pkhAmt < minOutput {
+	if pkhAmt != 0 && pkhAmt < consts.MinOutput {
 		return nil, fmt.Errorf("PKH amt %d too low", pkhAmt)
 	}
 
@@ -177,19 +179,19 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
 	fancyScript := lnutil.CommitScript(revPub, timePub, q.Delay)
 	pkhScript := lnutil.DirectWPKHScript(pkhPub) // p2wpkh-ify
 
-	fmt.Printf("> made SH script, state %d\n", s.StateIdx)
-	fmt.Printf("\t revPub %x timeout pub %x \n", revPub, timePub)
-	fmt.Printf("\t script %x ", fancyScript)
+	log.Printf("> made SH script, state %d\n", s.StateIdx)
+	log.Printf("\t revPub %x timeout pub %x \n", revPub, timePub)
+	log.Printf("\t script %x ", fancyScript)
 
 	fancyScript = lnutil.P2WSHify(fancyScript) // p2wsh-ify
 
-	fmt.Printf("\t scripthash %x\n", fancyScript)
+	log.Printf("\t scripthash %x\n", fancyScript)
 
 	// create txouts by assigning amounts
 	outFancy := wire.NewTxOut(fancyAmt, fancyScript)
 	outPKH := wire.NewTxOut(pkhAmt, pkhScript)
 
-	fmt.Printf("\tcombined refund %x, pkh %x\n", pkhPub, outPKH.PkScript)
+	log.Printf("\tcombined refund %x, pkh %x\n", pkhPub, outPKH.PkScript)
 
 	// make a new tx
 	tx := wire.NewMsgTx()

@@ -6,15 +6,18 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
 
 	"github.com/adiabat/btcd/btcec"
+	"golang.org/x/net/proxy"
 )
 
 type announcement struct {
-	url  string
+	ipv4 string
+	ipv6 string
 	addr string
 	sig  string
 	pbk  string
@@ -23,13 +26,14 @@ type announcement struct {
 type nodeinfo struct {
 	Success bool
 	Node    struct {
-		Url  string
+		IPv4 string
+		IPv6 string
 		Addr string
 	}
 }
 
 func Announce(priv *btcec.PrivateKey, litport string, litadr string, trackerURL string) error {
-	resp, err := http.Get("http://myexternalip.com/raw")
+	resp, err := http.Get("https://ipv4.myexternalip.com/raw")
 	if err != nil {
 		return err
 	}
@@ -38,9 +42,25 @@ func Announce(priv *btcec.PrivateKey, litport string, litadr string, trackerURL 
 	buf := new(bytes.Buffer)
 	buf.ReadFrom(resp.Body)
 
-	liturl := strings.TrimSpace(buf.String()) + litport
+	liturlIPv4 := strings.TrimSpace(buf.String()) + litport
 
-	urlBytes := []byte(liturl)
+	var liturlIPv6 string
+
+	/* TODO: Find a better way to get this information. Their
+	 * SSL cert doesn't work for IPv6.
+	 */
+	resp, err = http.Get("http://ipv6.myexternalip.com/raw")
+	if err != nil {
+		log.Printf("%v", err)
+	} else {
+		defer resp.Body.Close()
+
+		buf = new(bytes.Buffer)
+		buf.ReadFrom(resp.Body)
+		liturlIPv6 = strings.TrimSpace(buf.String()) + litport
+	}
+
+	urlBytes := []byte(liturlIPv4 + liturlIPv6)
 
 	urlHash := sha256.Sum256(urlBytes)
 
@@ -51,13 +71,15 @@ func Announce(priv *btcec.PrivateKey, litport string, litadr string, trackerURL 
 
 	var ann announcement
 
-	ann.url = liturl
+	ann.ipv4 = liturlIPv4
+	ann.ipv6 = liturlIPv6
 	ann.addr = litadr
 	ann.sig = hex.EncodeToString(urlSig.Serialize())
 	ann.pbk = hex.EncodeToString(priv.PubKey().SerializeCompressed())
 
 	_, err = http.PostForm(trackerURL+"/announce",
-		url.Values{"url": {ann.url},
+		url.Values{"ipv4": {ann.ipv4},
+			"ipv6": {ann.ipv6},
 			"addr": {ann.addr},
 			"sig":  {ann.sig},
 			"pbk":  {ann.pbk}})
@@ -69,10 +91,23 @@ func Announce(priv *btcec.PrivateKey, litport string, litadr string, trackerURL 
 	return nil
 }
 
-func Lookup(litadr string, trackerURL string) (string, error) {
-	resp, err := http.Get(trackerURL + "/" + litadr)
+func Lookup(litadr string, trackerURL string, proxyURL string) (string, string, error) {
+	var client http.Client
+
+	if proxyURL != "" {
+		dialer, err := proxy.SOCKS5("tcp", proxyURL, nil, proxy.Direct)
+		if err != nil {
+			return "", "", err
+		}
+
+		client.Transport = &http.Transport{
+			Dial: dialer.Dial,
+		}
+	}
+
+	resp, err := client.Get(trackerURL + "/" + litadr)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	defer resp.Body.Close()
 
@@ -80,12 +115,12 @@ func Lookup(litadr string, trackerURL string) (string, error) {
 	var node nodeinfo
 	err = decoder.Decode(&node)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	if !node.Success {
-		return "", errors.New("Node not found")
+		return "", "", errors.New("Node not found")
 	}
 
-	return node.Node.Url, nil
+	return node.Node.IPv4, node.Node.IPv6, nil
 }

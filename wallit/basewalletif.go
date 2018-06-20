@@ -1,6 +1,7 @@
 package wallit
 
 import (
+	"fmt"
 	"log"
 	"sort"
 
@@ -34,8 +35,12 @@ type UWallet interface {
 
 // --- implementation of BaseWallet interface ----
 
-func (w *Wallit) GetPriv(k portxo.KeyGen) *btcec.PrivateKey {
-	return w.PathPrivkey(k)
+func (w *Wallit) GetPriv(k portxo.KeyGen) (*btcec.PrivateKey, error) {
+	if w.PathPrivkey(k) != nil {
+		return w.PathPrivkey(k), nil
+	} else {
+		return nil, fmt.Errorf("Nil Wallet Error")
+	}
 }
 
 func (w *Wallit) GetPub(k portxo.KeyGen) *btcec.PublicKey {
