@@ -223,7 +223,7 @@ func (nd *LitNode) SignState(q *Qchan) ([64]byte, [][64]byte, error) {
 			return sig, nil, err
 		}
 
-		// Find the tx we need to verify. (this would all be much easier if we
+		// Find the tx we need to sign. (this would all be much easier if we
 		// didn't use BIP69)
 		var spendTx *wire.MsgTx
 		var which int
@@ -315,7 +315,7 @@ func (q *Qchan) VerifySigs(sig [64]byte, HTLCSigs [][64]byte) error {
 			q.Idx(), q.State.StateIdx)
 	}
 
-	// TODO: Verify HTLC-success/failure signatures
+	// Verify HTLC-success/failure signatures
 
 	if len(HTLCSigs) != len(spendHTLCTxs) {
 		return fmt.Errorf("Wrong number of signatures provided for HTLCs in channel. Got %d expected %d.",
