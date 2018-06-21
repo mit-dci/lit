@@ -47,8 +47,6 @@ type Qchan struct {
 }
 
 type HTLC struct {
-	portxo.PorTxo
-
 	Idx uint32
 
 	Incoming bool
@@ -60,6 +58,8 @@ type HTLC struct {
 	TheirHTLCBase [33]byte
 
 	KeyGen portxo.KeyGen
+
+	Sig [64]byte
 }
 
 // StatComs are State Commitments.

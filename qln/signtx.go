@@ -198,8 +198,7 @@ func (nd *LitNode) SignState(q *Qchan) ([64]byte, [][64]byte, error) {
 	}
 	fmt.Printf("\tstate %d myamt: %d theiramt: %d\n", q.State.StateIdx, q.State.MyAmt, q.Value-q.State.MyAmt)
 
-	// TODO: generate signatures for HTLC-success/failure transactions
-
+	// Generate signatures for HTLC-success/failure transactions
 	spendHTLCSigs := map[int][64]byte{}
 
 	for idx, h := range HTLCTxOuts {
@@ -213,12 +212,18 @@ func (nd *LitNode) SignState(q *Qchan) ([64]byte, [][64]byte, error) {
 			}
 		}
 
-		HTLCPriv, err := nd.SubWallet[q.Coin()].GetPriv(q.State.HTLCs[idx].KeyGen)
+		var HTLCPriv *btcec.PrivateKey
+		if idx >= len(q.State.HTLCs) {
+			HTLCPriv, err = nd.SubWallet[q.Coin()].GetPriv(q.State.InProgHTLC.KeyGen)
+		} else {
+			HTLCPriv, err = nd.SubWallet[q.Coin()].GetPriv(q.State.HTLCs[idx].KeyGen)
+		}
+
 		if err != nil {
 			return sig, nil, err
 		}
 
-		// Find the tx we need to sign. (this would all be much easier if we
+		// Find the tx we need to verify. (this would all be much easier if we
 		// didn't use BIP69)
 		var spendTx *wire.MsgTx
 		var which int
@@ -262,11 +267,11 @@ func (nd *LitNode) SignState(q *Qchan) ([64]byte, [][64]byte, error) {
 // do bool, error or just error?  Bad sig is an error I guess.
 // for verifying signature, always use theirHAKDpub, so generate & populate within
 // this function.
-func (q *Qchan) VerifySig(sig [64]byte) error {
+func (q *Qchan) VerifySigs(sig [64]byte, HTLCSigs [][64]byte) error {
 
 	bigSig := sig64.SigDecompress(sig)
 	// my tx when I'm verifying.
-	tx, err := q.BuildStateTx(true)
+	commitmentTx, spendHTLCTxs, HTLCTxOuts, err := q.BuildStateTxs(true)
 	if err != nil {
 		return err
 	}
@@ -277,7 +282,7 @@ func (q *Qchan) VerifySig(sig [64]byte) error {
 		return err
 	}
 
-	hCache := txscript.NewTxSigHashes(tx)
+	hCache := txscript.NewTxSigHashes(commitmentTx)
 
 	parsed, err := txscript.ParseScript(pre)
 	if err != nil {
@@ -285,7 +290,7 @@ func (q *Qchan) VerifySig(sig [64]byte) error {
 	}
 	// always sighash all
 	hash := txscript.CalcWitnessSignatureHash(
-		parsed, hCache, txscript.SigHashAll, tx, 0, q.Value)
+		parsed, hCache, txscript.SigHashAll, commitmentTx, 0, q.Value)
 
 	// sig is pre-truncated; last byte for sighashtype is always sighashAll
 	pSig, err := btcec.ParseDERSignature(bigSig, btcec.S256())
@@ -297,8 +302,8 @@ func (q *Qchan) VerifySig(sig [64]byte) error {
 		return err
 	}
 	fmt.Printf("____ sig verification for channel (%d,%d):\n", q.Peer(), q.Idx())
-	fmt.Printf("\tinput %s\n", tx.TxIn[0].PreviousOutPoint.String())
-	for i, txout := range tx.TxOut {
+	fmt.Printf("\tinput %s\n", commitmentTx.TxIn[0].PreviousOutPoint.String())
+	for i, txout := range commitmentTx.TxOut {
 		fmt.Printf("\toutput %d: %x %d\n", i, txout.PkScript, txout.Value)
 	}
 	fmt.Printf("\tstate %d myamt: %d theiramt: %d\n", q.State.StateIdx, q.State.MyAmt, q.Value-q.State.MyAmt)
@@ -310,8 +315,91 @@ func (q *Qchan) VerifySig(sig [64]byte) error {
 			q.Idx(), q.State.StateIdx)
 	}
 
+	// TODO: Verify HTLC-success/failure signatures
+
+	if len(HTLCSigs) != len(spendHTLCTxs) {
+		return fmt.Errorf("Wrong number of signatures provided for HTLCs in channel. Got %d expected %d.",
+			len(HTLCSigs), len(spendHTLCTxs))
+	}
+
+	// Map HTLC index to signature index
+	sigIndex := map[uint32]uint32{}
+
+	for idx, h := range HTLCTxOuts {
+		// Find out which vout this HTLC is in the commitment tx since BIP69
+		// potentially reordered them
+		var where uint32
+		for i, o := range commitmentTx.TxOut {
+			if bytes.Compare(o.PkScript, h.PkScript) == 0 {
+				where = uint32(i)
+				break
+			}
+		}
+
+		// Find the tx we need to verify. (this would all be much easier if we
+		// didn't use BIP69)
+		var spendTx *wire.MsgTx
+		var which int
+		for i, t := range spendHTLCTxs {
+			if t.TxIn[0].PreviousOutPoint.Index == where {
+				spendTx = t
+				which = i
+				sigIndex[idx] = which
+				break
+			}
+		}
+
+		hc := txscript.NewTxSigHashes(spendTx)
+
+		HTLCparsed, err := txscript.ParseScript(h.PkScript)
+		if err != nil {
+			return err
+		}
+		// always sighash all
+		spendHTLCHash := txscript.CalcWitnessSignatureHash(
+			HTLCparsed, hc, txscript.SigHashAll, spendTx, 0, h.Value)
+
+		// sig is pre-truncated; last byte for sighashtype is always sighashAll
+		HTLCSig, err := btcec.ParseDERSignature(sig64.SigDecompress(HTLCSigs[which]), btcec.S256())
+		if err != nil {
+			return err
+		}
+
+		curElk, err := q.ElkPoint(false, q.State.StateIdx)
+		if err != nil {
+			return err
+		}
+
+		var theirHTLCPub [33]byte
+		if idx >= len(q.State.HTLCs) {
+			theirHTLCPub = lnutil.CombinePubs(q.State.InProgHTLC.TheirHTLCBase, curElk)
+		} else {
+			theirHTLCPub = lnutil.CombinePubs(q.State.HTLCs[idx].TheirHTLCBase, curElk)
+		}
+
+		theirHTLCPubKey, err := btcec.ParsePubKey(theirHTLCPub[:], btcec.S256())
+		if err != nil {
+			return err
+		}
+
+		sigValid := HTLCSig.Verify(spendHTLCHash, theirHTLCPubKey)
+		if !sigValid {
+			return fmt.Errorf("Invalid signature HTLC on chan %d state %d HTLC %d",
+				q.Idx(), q.State.StateIdx, idx)
+		}
+	}
+
 	// copy signature, overwriting old signature.
 	q.State.sig = sig
+
+	// copy HTLC-success/failure signatures
+	for i, s := range sigIndex {
+		if i >= len(q.State.HTLCs) {
+			q.State.InProgHTLC.Sig = HTLCSigs[s]
+		} else {
+			q.State.HTLCs[i] = HTLCSigs[s]
+		}
+	}
 
 	return nil
 }
