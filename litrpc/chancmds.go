@@ -165,7 +165,7 @@ func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 			"can't push %d max is 1 coin (100000000), min is 1", args.Amt)
 	}
 
-	fmt.Printf("push %d to chan %d with data %x\n", args.Amt, args.ChanIdx, args.Data)
+	log.Printf("push %d to chan %d with data %x\n", args.Amt, args.ChanIdx, args.Data)
 
 	// load the whole channel from disk just to see who the peer is
 	// (pretty inefficient)
@@ -195,7 +195,7 @@ func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 			dummyqc.Peer(), dummyqc.Idx())
 	}
 
-	fmt.Printf("channel %s\n", qc.Op.String())
+	log.Printf("channel %s\n", qc.Op.String())
 
 	if qc.CloseData.Closed {
 		return fmt.Errorf("Channel %d already closed by tx %s",

@@ -116,6 +116,7 @@ func (s *SPVCon) Start(
 	err = s.Connect(host)
 	if err != nil {
 		log.Printf("Can't connect to host %s\n", host)
+		log.Println(err)
 		return nil, nil, err
 	}
 

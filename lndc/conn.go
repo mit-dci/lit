@@ -6,7 +6,9 @@ import (
 	"crypto/hmac"
 	"encoding/binary"
 	"fmt"
+	"log"
 	"net"
+	"strings"
 	"time"
 
 	"golang.org/x/net/proxy"
@@ -52,6 +54,29 @@ func NewConn(conn net.Conn) *LNDConn {
 	return &LNDConn{Conn: conn}
 }
 
+func IP4(ipAddress string) bool {
+	parseIp := net.ParseIP(ipAddress)
+	if parseIp.To4() == nil {
+		return false
+	}
+	return true
+}
+
+func parseAdr(netAddress string) (string, string, error) {
+	colonCount := strings.Count(netAddress, ":")
+	var conMode string
+	if colonCount == 1 && IP4(strings.Split(netAddress, ":")[0]) {
+		// only ipv4 clears this since ipv6 has 6 colons (with port no)
+		conMode = "tcp4"
+		return netAddress, conMode, nil
+	} else if colonCount >= 5 {
+		conMode = "tcp6"
+		return netAddress, conMode, nil
+	} else {
+		return "", "", fmt.Errorf("Invalid ip")
+	}
+}
+
 // Dial...
 func (c *LNDConn) Dial(
 	myId *btcec.PrivateKey, netAddress string, remotePKH string, proxyURL string) error {
@@ -72,12 +97,21 @@ func (c *LNDConn) Dial(
 				return err
 			}
 
-			c.Conn, err = d.Dial("tcp", netAddress)
+			netAddress, conMode, err := parseAdr(netAddress)
+			if err != nil {
+				return fmt.Errorf("Invalid ip")
+			}
+			c.Conn, err = d.Dial(conMode, netAddress)
 			if err != nil {
 				return err
 			}
 		} else {
-			c.Conn, err = net.Dial("tcp", netAddress)
+			// First, open the TCP connection itself.
+			netAddress, conMode, err := parseAdr(netAddress)
+			if err != nil {
+				return fmt.Errorf("Invalid ip")
+			}
+			c.Conn, err = net.Dial(conMode, netAddress)
 			if err != nil {
 				return err
 			}
@@ -136,7 +170,7 @@ func (c *LNDConn) Dial(
 	}
 
 	// display private key for debug only
-	fmt.Printf("made session key %x\n", sessionKey)
+	log.Printf("made session key %x\n", sessionKey)
 
 	c.myNonceInt = 1 << 63
 	c.remoteNonceInt = 0
@@ -236,7 +270,7 @@ func (c *LNDConn) authPKH(
 		return err
 	}
 	idDH := fastsha256.Sum256(btcec.GenerateSharedSecret(myId, theirPub))
-	fmt.Printf("made idDH %x\n", idDH)
+	log.Printf("made idDH %x\n", idDH)
 	theirDHproof := fastsha256.Sum256(append(localEphPubBytes, idDH[:]...))
 
 	// Verify that their DH proof matches the one we just generated.
@@ -281,14 +315,14 @@ func (c *LNDConn) Read(b []byte) (n int, err error) {
 		var nonceBuf [8]byte
 		binary.BigEndian.PutUint64(nonceBuf[:], c.remoteNonceInt)
 
-		//		fmt.Printf("decrypt %d byte from %x nonce %d\n",
+		//		log.Printf("decrypt %d byte from %x nonce %d\n",
 		//			len(ctext), c.RemoteLNId, c.remoteNonceInt)
 
 		c.remoteNonceInt++ // increment remote nonce, no matter what...
 
 		msg, err := c.chachaStream.Open(nil, nonceBuf[:], ctext, nil)
 		if err != nil {
-			fmt.Printf("decrypt %d byte ciphertext failed\n", len(ctext))
+			log.Printf("decrypt %d byte ciphertext failed\n", len(ctext))
 			return 0, err
 		}
 
@@ -308,7 +342,7 @@ func (c *LNDConn) Write(b []byte) (n int, err error) {
 	if b == nil {
 		return 0, fmt.Errorf("write to %x nil", c.RemotePub.SerializeCompressed())
 	}
-	//	fmt.Printf("Encrypt %d byte plaintext to %x nonce %d\n",
+	//	log.Printf("Encrypt %d byte plaintext to %x nonce %d\n",
 	//		len(b), c.RemoteLNId, c.myNonceInt)
 
 	// first encrypt message with shared key

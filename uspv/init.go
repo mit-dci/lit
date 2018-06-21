@@ -13,6 +13,40 @@ import (
 	"github.com/mit-dci/lit/lnutil"
 )
 
+func IP4(ipAddress string) bool {
+	parseIp := net.ParseIP(ipAddress)
+	if parseIp.To4() == nil {
+		return false
+	}
+	return true
+}
+
+func (s *SPVCon) parseRemoteNode(remoteNode string) (string, string, error) {
+	colonCount := strings.Count(remoteNode, ":")
+	var conMode string
+	if colonCount == 0 {
+		if IP4(remoteNode) || remoteNode == "localhost" { // need this to connect to locahost
+			remoteNode = remoteNode + ":" + s.Param.DefaultPort
+		}
+		// only ipv4 clears this since ipv6 has colons
+		conMode = "tcp4"
+		return remoteNode, conMode, nil
+	} else if colonCount == 1 && IP4(strings.Split(remoteNode, ":")[0]) {
+		// custom port on ipv4
+		return remoteNode, "tcp4", nil
+	} else if colonCount >= 5 {
+		// ipv6 without remote port
+		// assume users don't give ports with ipv6 nodes
+		if !strings.Contains(remoteNode, "[") && !strings.Contains(remoteNode, "]") {
+			remoteNode = "[" + remoteNode + "]" + ":" + s.Param.DefaultPort
+		}
+		conMode = "tcp6"
+		return remoteNode, conMode, nil
+	} else {
+		return "", "", fmt.Errorf("Invalid ip")
+	}
+}
+
 // GetListOfNodes contacts all DNSSeeds for the coin specified and then contacts
 // each one of them in order to receive a list of ips and then returns a combined
 // list
@@ -44,16 +78,12 @@ func (s *SPVCon) DialNode(listOfNodes []string) error {
 	var err error
 	for i, ip := range listOfNodes {
 		// try to connect to all nodes in this range
-		var conString string
-		if strings.Contains(ip, ":") {
-			// user has given us a port, take that
-			conString = ip
-		} else {
-			conString = ip + ":" + s.Param.DefaultPort
-		}
+		var conString, conMode string
+		// need to check whether conString is ipv4 or ipv6
+		conString, conMode, err = s.parseRemoteNode(ip)
 		log.Printf("Attempting connection to node at %s\n",
 			conString)
-		s.con, err = net.Dial("tcp", conString)
+		s.con, err = net.Dial(conMode, conString)
 		if err != nil {
 			if i != len(listOfNodes)-1 {
 				log.Println(err.Error())
@@ -145,15 +175,15 @@ func (s *SPVCon) Connect(remoteNode string) error {
 	var err error
 	var listOfNodes []string
 	if lnutil.YupString(remoteNode) {
+		s.randomNodesOK = true
 		// if remoteNode is "yes" but no IP specified, use DNS seed
 		listOfNodes, err = s.GetListOfNodes()
 		if err != nil {
+			log.Println(err)
 			return err
+			// automatically quit if there are no other hosts to connect to.
 		}
 	} else { // else connect to user-specified node
-		if !strings.Contains(remoteNode, ":") {
-			remoteNode = remoteNode + ":" + s.Param.DefaultPort
-		}
 		listOfNodes = []string{remoteNode}
 	}
 	handShakeFailed := false //need to be in this scope to access it here

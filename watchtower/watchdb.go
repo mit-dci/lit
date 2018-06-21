@@ -197,7 +197,7 @@ func (w *WatchTower) UpdateChannel(m lnutil.WatchStateMsg) error {
 		if err != nil {
 			return err
 		}
-		// fmt.Printf("added elkrem %x at index %d OK\n", cm.Elk[:], elkr.UpTo())
+		// log.Printf("added elkrem %x at index %d OK\n", cm.Elk[:], elkr.UpTo())
 
 		// get state number, after elk insertion.  also convert to 8 bytes.
 		stateNumBytes := lnutil.U64tB(elkr.UpTo())
