@@ -13,7 +13,9 @@ import (
 
 // SignBreak signs YOUR tx, which you already have a sig for
 func (nd *LitNode) SignBreakTx(q *Qchan) (*wire.MsgTx, error) {
-	tx, err := q.BuildStateTx(true)
+	// TODO: we probably have to do something with the HTLCs here
+
+	tx, _, _, err := q.BuildStateTxs(true)
 	if err != nil {
 		return nil, err
 	}
@@ -344,7 +346,7 @@ func (q *Qchan) VerifySigs(sig [64]byte, HTLCSigs [][64]byte) error {
 			if t.TxIn[0].PreviousOutPoint.Index == where {
 				spendTx = t
 				which = i
-				sigIndex[idx] = which
+				sigIndex[uint32(idx)] = uint32(which)
 				break
 			}
 		}
@@ -394,10 +396,10 @@ func (q *Qchan) VerifySigs(sig [64]byte, HTLCSigs [][64]byte) error {
 
 	// copy HTLC-success/failure signatures
 	for i, s := range sigIndex {
-		if i >= len(q.State.HTLCs) {
+		if int(i) >= len(q.State.HTLCs) {
 			q.State.InProgHTLC.Sig = HTLCSigs[s]
 		} else {
-			q.State.HTLCs[i] = HTLCSigs[s]
+			q.State.HTLCs[i].Sig = HTLCSigs[s]
 		}
 	}
 

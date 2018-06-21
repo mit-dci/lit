@@ -251,7 +251,9 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 	// N2Elk is now invalid
 
 	// make the signature to send over
-	sig, err := nd.SignState(q)
+
+	// TODO: There are extra signatures required now
+	sig, _, err := nd.SignState(q)
 	if err != nil {
 		return err
 	}
@@ -370,7 +372,9 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 	qc.State.Data = msg.Data
 
 	// verify sig for the next state. only save if this works
-	err = qc.VerifySig(msg.Signature)
+
+	// TODO: There are more signatures required
+	err = qc.VerifySigs(msg.Signature, nil)
 	if err != nil {
 		return fmt.Errorf("DeltaSigHandler err %s", err.Error())
 	}
@@ -427,7 +431,9 @@ func (nd *LitNode) SendGapSigRev(q *Qchan) error {
 	q.State.MyAmt += int64(q.State.Delta)
 
 	// sign state n+1
-	sig, err := nd.SignState(q)
+
+	// TODO: send the sigs
+	sig, _, err := nd.SignState(q)
 	if err != nil {
 		return err
 	}
@@ -461,7 +467,8 @@ func (nd *LitNode) SendSigRev(q *Qchan) error {
 	// q.State.NextElkPoint = q.State.N2ElkPoint // not needed
 	// n2elk invalid here
 
-	sig, err := nd.SignState(q)
+	// TODO: send the sigs
+	sig, _, err := nd.SignState(q)
 	if err != nil {
 		return err
 	}
@@ -521,7 +528,9 @@ func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
 	q.State.StateIdx++
 
 	// verify the sig
-	err = q.VerifySig(msg.Signature)
+
+	// TODO: More sigs here that before
+	err = q.VerifySigs(msg.Signature, nil)
 	if err != nil {
 		return fmt.Errorf("GapSigRevHandler err %s", err.Error())
 	}
@@ -586,7 +595,9 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 
 	// first verify sig.
 	// (if elkrem ingest fails later, at least we close out with a bit more money)
-	err = qc.VerifySig(msg.Signature)
+
+	// TODO: more sigs here than before
+	err = qc.VerifySigs(msg.Signature, nil)
 	if err != nil {
 		return fmt.Errorf("SIGREVHandler err %s", err.Error())
 	}

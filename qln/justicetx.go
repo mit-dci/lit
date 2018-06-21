@@ -106,8 +106,10 @@ func (nd *LitNode) BuildJusticeSig(q *Qchan) error {
 	script := lnutil.CommitScript(badRevokePub, badTimeoutPub, q.Delay)
 	scriptHashOutScript := lnutil.P2WSHify(script)
 
+	// TODO: we have to build justics txs for each of the HTLCs too
+
 	// build the bad tx (redundant as we just build most of it...
-	badTx, err := q.BuildStateTx(false)
+	badTx, _, _, err := q.BuildStateTxs(false)
 
 	var badAmt int64
 	badIdx := uint32(len(badTx.TxOut) + 1)

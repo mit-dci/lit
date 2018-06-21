@@ -451,7 +451,7 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 		return
 	}
 
-	sig, err := nd.SignState(qc)
+	sig, _, err := nd.SignState(qc)
 	if err != nil {
 		fmt.Printf("QChanDescHandler SignState err %s", err.Error())
 		return
@@ -491,7 +491,7 @@ func (nd *LitNode) QChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePeer) {
 	qc.State.NextElkPoint = msg.ElkOne
 	qc.State.N2ElkPoint = msg.ElkTwo
 
-	err = qc.VerifySig(sig)
+	err = qc.VerifySigs(sig, nil)
 	if err != nil {
 		fmt.Printf("QChanAckHandler VerifySig err %s", err.Error())
 		return
@@ -507,7 +507,7 @@ func (nd *LitNode) QChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePeer) {
 	// Make sure everything works & is saved, then clear InProg.
 
 	// sign their com tx to send
-	sig, err = nd.SignState(qc)
+	sig, _, err = nd.SignState(qc)
 	if err != nil {
 		fmt.Printf("QChanAckHandler SignState err %s", err.Error())
 		return
@@ -576,7 +576,7 @@ func (nd *LitNode) SigProofHandler(msg lnutil.SigProofMsg, peer *RemotePeer) {
 		return
 	}
 
-	err = qc.VerifySig(msg.Signature)
+	err = qc.VerifySigs(msg.Signature, nil)
 	if err != nil {
 		fmt.Printf("SigProofHandler err %s", err.Error())
 		return
