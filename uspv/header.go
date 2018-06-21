@@ -12,6 +12,7 @@ import (
 	"log"
 	"math/big"
 	"os"
+	"strings"
 
 	"github.com/adiabat/btcd/blockchain"
 
@@ -43,7 +44,7 @@ func moreWork(a, b []*wire.BlockHeader, p *coinparam.Params) bool {
 		log.Println(hash)
 		log.Println(a[i].PrevBlock.IsEqual(&hash))
 		log.Println(b[i].PrevBlock.IsEqual(&hash))
-		if a[i].PrevBlock.IsEqual(&hash) && b[i].PrevBlock.IsEqual(&hash){
+		if a[i].PrevBlock.IsEqual(&hash) && b[i].PrevBlock.IsEqual(&hash) {
 			isMoreWork = true
 			pos = i
 			break
@@ -282,11 +283,15 @@ func CheckHeaderChain(
 		// find where it points to
 
 		attachHeight, err = FindHeader(r, *inHeaders[0])
-		if err != nil {
+		if err != nil && !(attachHeight == -1 && strings.Contains(p.Name, "lite")) {
+			log.Println(attachHeight)
 			return 0, fmt.Errorf(
 				"CheckHeaderChain: header message doesn't attach to tip or anywhere.")
 		}
 
+		if (attachHeight) == -1 && strings.Contains(p.Name, "lite") { // if we're syncing from scratch for ltc
+			attachHeight = 1 // hacky, but works
+		}
 		// adjust attachHeight by adding the startheight
 		attachHeight += p.StartHeight
 

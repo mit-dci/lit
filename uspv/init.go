@@ -143,8 +143,9 @@ func (s *SPVCon) Handshake(listOfNodes []string) error {
 		return fmt.Errorf("Remote node version: %x too old, disconnecting.", mv.ProtocolVersion)
 	}
 
-	if !(strings.Contains(mv.UserAgent, "Satoshi") || strings.Contains(mv.UserAgent, "btcd")) && (len(listOfNodes) != 0) {
+	if s.Param.Name == "testnet3" && !(strings.Contains(mv.UserAgent, "Satoshi") || strings.Contains(mv.UserAgent, "btcd")) && (len(listOfNodes) != 0) {
 		// TODO: improve this filtering criterion
+		// param name matching to prevent ltc nodes from not connecting
 		return fmt.Errorf("Couldn't connect to this node. Returning!")
 	}
 
