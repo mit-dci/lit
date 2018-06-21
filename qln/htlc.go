@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/mit-dci/lit/portxo"
+
 	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
 )
 
-func (nd *LitNode) OfferHTLC(qc *Qchan, amt uint32, RHash [32]byte, locktime int64, data [32]byte) error {
+func (nd *LitNode) OfferHTLC(qc *Qchan, amt uint32, RHash [32]byte, locktime uint32, data [32]byte) error {
 	if amt >= 1<<30 {
 		return fmt.Errorf("max send 1G sat (1073741823)")
 	}
@@ -102,6 +104,17 @@ func (nd *LitNode) OfferHTLC(qc *Qchan, amt uint32, RHash [32]byte, locktime int
 	qc.State.InProgHTLC.Amt = int64(amt)
 	qc.State.InProgHTLC.RHash = RHash
 	qc.State.InProgHTLC.Locktime = locktime
+	qc.State.InProgHTLC.TheirHTLCBase = qc.State.NextHTLCBase
+
+	keyGen := portxo.KeyGen{}
+	keyGen.Depth = 5
+	keyGen.Step[0] = 44 | 1<<31
+	keyGen.Step[1] = qc.Coin() | 1<<31
+	keyGen.Step[2] = UseHTLCBase
+	keyGen.Step[3] = qc.State.HTLCIdx | 1<<31
+	keyGen.Step[4] = qc.Idx() | 1<<31
+
+	qc.State.InProgHTLC.MyHTLCBase, _ = nd.GetUsePub(keyGen, UseHTLCBase)
 
 	// save to db with ONLY InProgHTLC changed
 	err = nd.SaveQchanState(qc)

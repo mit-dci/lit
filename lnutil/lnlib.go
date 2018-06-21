@@ -82,7 +82,7 @@ func FundTxOut(pubA, pubB [33]byte, amt int64) (*wire.TxOut, error) {
 	return wire.NewTxOut(amt, scriptBytes), nil
 }
 
-func ReceiveHTLCScript(revPKH [20]byte, remotePub [33]byte, RHash [32]byte, localPub [33]byte, locktime int64) []byte {
+func ReceiveHTLCScript(revPKH [20]byte, remotePub [33]byte, RHash [32]byte, localPub [33]byte, locktime uint32) []byte {
 	b := txscript.NewScriptBuilder()
 
 	b.AddOp(txscript.OP_DUP)
@@ -108,7 +108,7 @@ func ReceiveHTLCScript(revPKH [20]byte, remotePub [33]byte, RHash [32]byte, loca
 	b.AddOp(txscript.OP_CHECKMULTISIG)
 	b.AddOp(txscript.OP_ELSE)
 	b.AddOp(txscript.OP_DROP)
-	b.AddInt64(locktime)
+	b.AddInt64(int64(locktime))
 	b.AddOp(txscript.OP_CHECKLOCKTIMEVERIFY)
 	b.AddOp(txscript.OP_DROP)
 	b.AddOp(txscript.OP_CHECKSIG)

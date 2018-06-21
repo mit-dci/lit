@@ -49,12 +49,12 @@ type Qchan struct {
 type HTLC struct {
 	portxo.PorTxo
 
-	Idx uint64
+	Idx uint32
 
 	Incoming bool
 	Amt      int64
 	RHash    [32]byte
-	Locktime int64
+	Locktime uint32
 
 	MyHTLCBase    [33]byte
 	TheirHTLCBase [33]byte
@@ -92,7 +92,7 @@ type StatCom struct {
 	// only one sig is ever stored, to prevent broadcasting the wrong tx.
 	// could add a mutex here... maybe will later.
 
-	HTLCIdx    uint64
+	HTLCIdx    uint32
 	InProgHTLC *HTLC // Current in progress HTLC
 
 	// Analogous to the ElkPoints above but used for generating their pubkey for the HTLC

@@ -296,9 +296,16 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, []*wire.MsgTx, error) {
 	// sort outputs
 	txsort.InPlaceSort(tx)
 
-	// TODO: build HTLC spending transactions
+	txHash := tx.TxHash()
 
-	for _, h := range HTLCTxOuts {
+	HTLCSpends := map[int]*wire.MsgTx{}
+
+	for j, h := range HTLCTxOuts {
+		amt := h.Value - fee
+		if amt < consts.MinOutput {
+			return nil, nil, fmt.Errorf("HTLC amt %d too low", amt)
+		}
+
 		// But now they're sorted how do I know which outpoint to spend?
 		// We can iterate over our HTLC list, then compare pkScripts to find
 		// the right one
@@ -313,10 +320,54 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, []*wire.MsgTx, error) {
 
 		spendHTLCScript := lnutil.CommitScript(revPub, timePub, q.Delay)
 
-		
+		HTLCSpend := wire.NewMsgTx()
+
+		HTLCOp := wire.NewOutPoint(&txHash, uint32(idx))
+
+		in := wire.NewTxIn(HTLCOp, nil, nil)
+		in.Sequence = 0
+
+		HTLCSpend.AddTxIn(in)
+		HTLCSpend.AddTxOut(wire.NewTxOut(amt, lnutil.P2WSHify(spendHTLCScript)))
+
+		HTLCSpend.Version = 2
+
+		/*
+			!incoming & mine: my TX that they sign (HTLC-timeout)
+			!incoming & !mine: their TX that I sign (HTLC-success)
+			incoming & mine: my TX that they sign (HTLC-success)
+			incoming & !mine: their TX that I sign (HTLC-timeout)
+		*/
+
+		var success bool
+		var lt uint32
+
+		if j >= len(s.HTLCs) {
+			success = s.InProgHTLC.Incoming == mine
+			lt = s.InProgHTLC.Locktime
+		} else {
+			success = s.HTLCs[j].Incoming == mine
+			lt = s.HTLCs[j].Locktime
+		}
+
+		if success {
+			// HTLC-success
+			HTLCSpend.LockTime = 0
+		} else {
+			// HTLC-failure
+			HTLCSpend.LockTime = lt
+		}
+
+		HTLCSpends[idx] = HTLCSpend
 	}
 
-	return tx, nil, nil
+	var HTLCSpendsArr []*wire.MsgTx
+
+	for i := 0; i < len(HTLCSpends); i++ {
+		HTLCSpendsArr = append(HTLCSpendsArr, HTLCSpends[i])
+	}
+
+	return tx, HTLCSpendsArr, nil
 }
 
 // the scriptsig to put on a P2SH input.  Sigs need to be in order!
