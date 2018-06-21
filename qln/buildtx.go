@@ -107,17 +107,17 @@ func (q *Qchan) SimpleCloseTx() (*wire.MsgTx, error) {
 	return tx, nil
 }
 
-// BuildStateTx constructs and returns a state commitment tx and a list of HTLC
+// BuildStateTxs constructs and returns a state commitment tx and a list of HTLC
 // success/failure txs.  As simple as I can make it.
 // This func just makes the tx with data from State in ram, and HAKD key arg
-func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, []*wire.MsgTx, error) {
+func (q *Qchan) BuildStateTxs(mine bool) (*wire.MsgTx, []*wire.MsgTx, []*wire.TxOut, error) {
 	if q == nil {
-		return nil, nil, fmt.Errorf("BuildStateTx: nil chan")
+		return nil, nil, nil, fmt.Errorf("BuildStateTx: nil chan")
 	}
 	// sanity checks
 	s := q.State // use it a lot, make shorthand variable
 	if s == nil {
-		return nil, nil, fmt.Errorf("channel (%d,%d) has no state", q.KeyGen.Step[3], q.KeyGen.Step[4])
+		return nil, nil, nil, fmt.Errorf("channel (%d,%d) has no state", q.KeyGen.Step[3], q.KeyGen.Step[4])
 	}
 
 	var fancyAmt, pkhAmt, theirAmt int64 // output amounts
@@ -146,7 +146,7 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, []*wire.MsgTx, error) {
 		// Create latest elkrem point (the one I create)
 		curElk, err := q.ElkPoint(false, q.State.StateIdx)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		revPub = lnutil.CombinePubs(q.TheirHAKDBase, curElk)
 		timePub = lnutil.AddPubsEZ(q.MyHAKDBase, curElk)
@@ -181,10 +181,10 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, []*wire.MsgTx, error) {
 	// check amounts.  Nonzero amounts below the minOutput is an error.
 	// Shouldn't happen and means some checks in push/pull went wrong.
 	if fancyAmt != 0 && fancyAmt < consts.MinOutput {
-		return nil, nil, fmt.Errorf("SH amt %d too low", fancyAmt)
+		return nil, nil, nil, fmt.Errorf("SH amt %d too low", fancyAmt)
 	}
 	if pkhAmt != 0 && pkhAmt < consts.MinOutput {
-		return nil, nil, fmt.Errorf("PKH amt %d too low", pkhAmt)
+		return nil, nil, nil, fmt.Errorf("PKH amt %d too low", pkhAmt)
 	}
 
 	// now that everything is chosen, build fancy script and pkh script
@@ -253,7 +253,7 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, []*wire.MsgTx, error) {
 	for _, h := range s.HTLCs {
 		HTLCOut, err := genHTLCOut(h)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		HTLCTxOuts = append(HTLCTxOuts, HTLCOut)
 	}
@@ -262,7 +262,7 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, []*wire.MsgTx, error) {
 	if s.InProgHTLC != nil {
 		HTLCOut, err := genHTLCOut(*s.InProgHTLC)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		HTLCTxOuts = append(HTLCTxOuts, HTLCOut)
 	}
@@ -283,7 +283,7 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, []*wire.MsgTx, error) {
 	}
 
 	if len(tx.TxOut) < 1 {
-		return nil, nil, fmt.Errorf("No outputs, all below minOutput")
+		return nil, nil, nil, fmt.Errorf("No outputs, all below minOutput")
 	}
 
 	// add unsigned txin
@@ -303,7 +303,7 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, []*wire.MsgTx, error) {
 	for j, h := range HTLCTxOuts {
 		amt := h.Value - fee
 		if amt < consts.MinOutput {
-			return nil, nil, fmt.Errorf("HTLC amt %d too low", amt)
+			return nil, nil, nil, fmt.Errorf("HTLC amt %d too low", amt)
 		}
 
 		// But now they're sorted how do I know which outpoint to spend?
@@ -363,11 +363,13 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, []*wire.MsgTx, error) {
 
 	var HTLCSpendsArr []*wire.MsgTx
 
-	for i := 0; i < len(HTLCSpends); i++ {
-		HTLCSpendsArr = append(HTLCSpendsArr, HTLCSpends[i])
+	for i := 0; i < len(HTLCSpends)+2; i++ {
+		if s, ok := HTLCSpends[i]; ok {
+			HTLCSpendsArr = append(HTLCSpendsArr, s)
+		}
 	}
 
-	return tx, HTLCSpendsArr, nil
+	return tx, HTLCSpendsArr, HTLCTxOuts, nil
 }
 
 // the scriptsig to put on a P2SH input.  Sigs need to be in order!

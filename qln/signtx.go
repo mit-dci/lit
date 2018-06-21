@@ -1,6 +1,7 @@
 package qln
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/adiabat/btcd/btcec"
@@ -159,53 +160,101 @@ func (nd *LitNode) SignState(q *Qchan) ([64]byte, [][64]byte, error) {
 		return sig, nil, fmt.Errorf("SignState no wallet for cointype %d", q.Coin())
 	}
 	// build transaction for next state
-	tx, err := q.BuildStateTx(false) // their tx, as I'm signing
+	commitmentTx, spendHTLCTxs, HTLCTxOuts, err := q.BuildStateTxs(false) // their tx, as I'm signing
 	if err != nil {
 		return sig, nil, err
 	}
 
 	// make hash cache for this tx
-	hCache := txscript.NewTxSigHashes(tx)
+	hCache := txscript.NewTxSigHashes(commitmentTx)
 
 	// generate script preimage (ignore key order)
 	pre, _, err := lnutil.FundTxScript(q.MyPub, q.TheirPub)
 	if err != nil {
-		return [64]byte{},
-
-			sig, err
+		return sig, nil, err
 	}
 
 	// get private signing key
 	priv, err := nd.SubWallet[q.Coin()].GetPriv(q.KeyGen)
 	if err != nil {
-		return [64]byte{},
-
-			sig, err
+		return sig, nil, err
 	}
 
 	// generate sig.
 	bigSig, err := txscript.RawTxInWitnessSignature(
-		tx, hCache, 0, q.Value, pre, txscript.SigHashAll, priv)
+		commitmentTx, hCache, 0, q.Value, pre, txscript.SigHashAll, priv)
 	// truncate sig (last byte is sighash type, always sighashAll)
 	bigSig = bigSig[:len(bigSig)-1]
 
 	sig, err = sig64.SigCompress(bigSig)
 	if err != nil {
-		return [64]byte{},
-
-			sig, err
+		return sig, nil, err
 	}
 
 	fmt.Printf("____ sig creation for channel (%d,%d):\n", q.Peer(), q.Idx())
-	fmt.Printf("\tinput %s\n", tx.TxIn[0].PreviousOutPoint.String())
-	for i, txout := range tx.TxOut {
+	fmt.Printf("\tinput %s\n", commitmentTx.TxIn[0].PreviousOutPoint.String())
+	for i, txout := range commitmentTx.TxOut {
 		fmt.Printf("\toutput %d: %x %d\n", i, txout.PkScript, txout.Value)
 	}
 	fmt.Printf("\tstate %d myamt: %d theiramt: %d\n", q.State.StateIdx, q.State.MyAmt, q.Value-q.State.MyAmt)
 
-	return [64]byte{},
+	// TODO: generate signatures for HTLC-success/failure transactions
 
-		sig, nil
+	spendHTLCSigs := map[int][64]byte{}
+
+	for idx, h := range HTLCTxOuts {
+		// Find out which vout this HTLC is in the commitment tx since BIP69
+		// potentially reordered them
+		var where uint32
+		for i, o := range commitmentTx.TxOut {
+			if bytes.Compare(o.PkScript, h.PkScript) == 0 {
+				where = uint32(i)
+				break
+			}
+		}
+
+		HTLCPriv, err := nd.SubWallet[q.Coin()].GetPriv(q.State.HTLCs[idx].KeyGen)
+		if err != nil {
+			return sig, nil, err
+		}
+
+		// Find the tx we need to sign. (this would all be much easier if we
+		// didn't use BIP69)
+		var spendTx *wire.MsgTx
+		var which int
+		for i, t := range spendHTLCTxs {
+			if t.TxIn[0].PreviousOutPoint.Index == where {
+				spendTx = t
+				which = i
+				break
+			}
+		}
+
+		hc := txscript.NewTxSigHashes(spendTx)
+
+		HTLCSig, err := txscript.RawTxInWitnessSignature(spendTx, hc, 0, h.Value, h.PkScript, txscript.SigHashAll, HTLCPriv)
+		if err != nil {
+			return sig, nil, err
+		}
+
+		HTLCSig = HTLCSig[:len(HTLCSig)-1]
+		s, err := sig64.SigCompress(HTLCSig)
+		if err != nil {
+			return sig, nil, err
+		}
+
+		spendHTLCSigs[which] = s
+	}
+
+	// Get the sigs in the same order as the HTLCs in the tx
+	var spendHTLCSigsArr [][64]byte
+	for i := 0; i < len(spendHTLCSigs)+2; i++ {
+		if s, ok := spendHTLCSigs[i]; ok {
+			spendHTLCSigsArr = append(spendHTLCSigsArr, s)
+		}
+	}
+
+	return sig, spendHTLCSigsArr, err
 }
 
 // VerifySig verifies their signature for your next state.

@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/mit-dci/lit/portxo"
-
 	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
 )
@@ -106,15 +104,15 @@ func (nd *LitNode) OfferHTLC(qc *Qchan, amt uint32, RHash [32]byte, locktime uin
 	qc.State.InProgHTLC.Locktime = locktime
 	qc.State.InProgHTLC.TheirHTLCBase = qc.State.NextHTLCBase
 
-	keyGen := portxo.KeyGen{}
-	keyGen.Depth = 5
-	keyGen.Step[0] = 44 | 1<<31
-	keyGen.Step[1] = qc.Coin() | 1<<31
-	keyGen.Step[2] = UseHTLCBase
-	keyGen.Step[3] = qc.State.HTLCIdx | 1<<31
-	keyGen.Step[4] = qc.Idx() | 1<<31
+	qc.State.InProgHTLC.KeyGen.Depth = 5
+	qc.State.InProgHTLC.KeyGen.Step[0] = 44 | 1<<31
+	qc.State.InProgHTLC.KeyGen.Step[1] = qc.Coin() | 1<<31
+	qc.State.InProgHTLC.KeyGen.Step[2] = UseHTLCBase
+	qc.State.InProgHTLC.KeyGen.Step[3] = qc.State.HTLCIdx | 1<<31
+	qc.State.InProgHTLC.KeyGen.Step[4] = qc.Idx() | 1<<31
 
-	qc.State.InProgHTLC.MyHTLCBase, _ = nd.GetUsePub(keyGen, UseHTLCBase)
+	qc.State.InProgHTLC.MyHTLCBase, _ = nd.GetUsePub(qc.State.InProgHTLC.KeyGen,
+		UseHTLCBase)
 
 	// save to db with ONLY InProgHTLC changed
 	err = nd.SaveQchanState(qc)

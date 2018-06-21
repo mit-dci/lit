@@ -58,6 +58,8 @@ type HTLC struct {
 
 	MyHTLCBase    [33]byte
 	TheirHTLCBase [33]byte
+
+	KeyGen portxo.KeyGen
 }
 
 // StatComs are State Commitments.
