@@ -3,13 +3,12 @@ package qln
 import (
 	"fmt"
 	"log"
-	"time"
 
 	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
 )
 
-func (nd *LitNode) OfferHTLC(qc *Qchan, amt uint32, RHash [32]byte, locktime time.Time, data [32]byte) error {
+func (nd *LitNode) OfferHTLC(qc *Qchan, amt uint32, RHash [32]byte, locktime int64, data [32]byte) error {
 	if amt >= 1<<30 {
 		return fmt.Errorf("max send 1G sat (1073741823)")
 	}
@@ -56,6 +55,10 @@ func (nd *LitNode) OfferHTLC(qc *Qchan, amt uint32, RHash [32]byte, locktime tim
 
 	myNewOutputSize := qc.State.MyAmt - qc.State.Fee - int64(amt)
 	theirNewOutputSize := qc.Value - myNewOutputSize - int64(amt)
+
+	for _, h := range qc.State.HTLCs {
+		theirNewOutputSize -= h.Amt
+	}
 
 	// check if this push would lower my balance below minBal
 	if myNewOutputSize < consts.MinOutput {

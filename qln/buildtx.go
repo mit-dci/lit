@@ -1,12 +1,14 @@
 package qln
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
 
 	"github.com/adiabat/btcd/wire"
+	"github.com/adiabat/btcutil"
 	"github.com/adiabat/btcutil/txsort"
 )
 
@@ -105,26 +107,36 @@ func (q *Qchan) SimpleCloseTx() (*wire.MsgTx, error) {
 	return tx, nil
 }
 
-// BuildStateTx constructs and returns a state tx.  As simple as I can make it.
+// BuildStateTx constructs and returns a state commitment tx and a list of HTLC
+// success/failure txs.  As simple as I can make it.
 // This func just makes the tx with data from State in ram, and HAKD key arg
-func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
+func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, []*wire.MsgTx, error) {
 	if q == nil {
-		return nil, fmt.Errorf("BuildStateTx: nil chan")
+		return nil, nil, fmt.Errorf("BuildStateTx: nil chan")
 	}
 	// sanity checks
 	s := q.State // use it a lot, make shorthand variable
 	if s == nil {
-		return nil, fmt.Errorf("channel (%d,%d) has no state", q.KeyGen.Step[3], q.KeyGen.Step[4])
+		return nil, nil, fmt.Errorf("channel (%d,%d) has no state", q.KeyGen.Step[3], q.KeyGen.Step[4])
 	}
 
 	var fancyAmt, pkhAmt, theirAmt int64 // output amounts
 	var revPub, timePub [33]byte         // pubkeys
+	var pkhPub [33]byte                  // the simple output's pub key hash
 
-	var pkhPub [33]byte // the simple output's pub key hash
+	var revPKH [20]byte
 
 	fee := s.Fee // fixed fee for now
 
 	theirAmt = q.Value - s.MyAmt
+
+	if s.InProgHTLC != nil {
+		theirAmt -= s.InProgHTLC.Amt
+	}
+
+	for _, h := range s.HTLCs {
+		theirAmt -= h.Amt
+	}
 
 	// the PKH clear refund also has elkrem points added to mask the PKH.
 	// this changes the txouts at each state to blind sorcerer better.
@@ -134,7 +146,7 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
 		// Create latest elkrem point (the one I create)
 		curElk, err := q.ElkPoint(false, q.State.StateIdx)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		revPub = lnutil.CombinePubs(q.TheirHAKDBase, curElk)
 		timePub = lnutil.AddPubsEZ(q.MyHAKDBase, curElk)
@@ -169,10 +181,10 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
 	// check amounts.  Nonzero amounts below the minOutput is an error.
 	// Shouldn't happen and means some checks in push/pull went wrong.
 	if fancyAmt != 0 && fancyAmt < consts.MinOutput {
-		return nil, fmt.Errorf("SH amt %d too low", fancyAmt)
+		return nil, nil, fmt.Errorf("SH amt %d too low", fancyAmt)
 	}
 	if pkhAmt != 0 && pkhAmt < consts.MinOutput {
-		return nil, fmt.Errorf("PKH amt %d too low", pkhAmt)
+		return nil, nil, fmt.Errorf("PKH amt %d too low", pkhAmt)
 	}
 
 	// now that everything is chosen, build fancy script and pkh script
@@ -193,63 +205,66 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
 
 	fmt.Printf("\tcombined refund %x, pkh %x\n", pkhPub, outPKH.PkScript)
 
-	// Generate new HTLC signatures
-	for _, h := range s.HTLCs {
+	var HTLCTxOuts []*wire.TxOut
+
+	revPKHSlice := btcutil.Hash160(revPub[:])
+	copy(revPKH[:], revPKHSlice[:20])
+
+	genHTLCOut := func(h HTLC) (*wire.TxOut, error) {
+		var remotePub, localPub [33]byte
+
 		if mine { // Generating OUR tx that WE save
 			curElk, err := q.ElkPoint(false, q.State.StateIdx)
 			if err != nil {
 				return nil, err
 			}
 
-			remotePub := lnutil.CombinePubs(h.TheirHTLCBase, curElk)
-			localPub := lnutil.CombinePubs(h.MyHTLCBase, curElk)
-
-			if h.Incoming { // We're the receiver
-				//HTLCScript := lnutil.ReceiveHTLCScript()
-				
-			} else { // We're the offerer
-				//HTLCScript := lnutil.OfferHTLCScript()
-
-			}
+			remotePub = lnutil.CombinePubs(h.TheirHTLCBase, curElk)
+			localPub = lnutil.CombinePubs(h.MyHTLCBase, curElk)
 		} else { // Generating THEIR tx that THEY save
-			remotePub := lnutil.CombinePubs(h.MyHTLCBase, s.ElkPoint)
-			localPub := lnutil.CombinePubs(h.TheirHTLCBase, s.ElkPoint)
-
-			if h.Incoming { // They're the receiver
-
-			} else { // They're the offerer
-
-			}
+			remotePub = lnutil.CombinePubs(h.MyHTLCBase, s.ElkPoint)
+			localPub = lnutil.CombinePubs(h.TheirHTLCBase, s.ElkPoint)
 		}
+
+		var HTLCScript []byte
+
+		/*
+			incoming && mine = Receive
+			incoming && !mine = Offer
+			!incoming && mine = Offer
+			!incoming && !mine = Receive
+		*/
+		if h.Incoming != mine {
+			HTLCScript = lnutil.OfferHTLCScript(revPKH,
+				remotePub, h.RHash, localPub)
+		} else {
+			HTLCScript = lnutil.ReceiveHTLCScript(revPKH,
+				remotePub, h.RHash, localPub, h.Locktime)
+		}
+
+		witScript := lnutil.P2WSHify(HTLCScript)
+
+		HTLCOut := wire.NewTxOut(h.Amt, witScript)
+
+		return HTLCOut, nil
+	}
+
+	// Generate new HTLC signatures
+	for _, h := range s.HTLCs {
+		HTLCOut, err := genHTLCOut(h)
+		if err != nil {
+			return nil, nil, err
+		}
+		HTLCTxOuts = append(HTLCTxOuts, HTLCOut)
 	}
 
 	// There's an HTLC in progress
 	if s.InProgHTLC != nil {
-		// TODO
-		if mine { // Generating OUR tx that WE save
-			curElk, err := q.ElkPoint(false, q.State.StateIdx)
-			if err != nil {
-				return nil, err
-			}
-
-			remotePub := lnutil.CombinePubs(s.NextHTLCBase, curElk)
-			localPub := lnutil.CombinePubs(s.MyNextHTLCBase, curElk)
-
-			if h.Incoming { // We're the receiver
-
-			} else { // We're the offerer
-
-			}
-		} else { // Generating THEIR tx that THEY save
-			remotePub := lnutil.CombinePubs(s.MyNextHTLCBase, s.ElkPoint)
-			localPub := lnutil.CombinePubs(s.NextHTLCBase, s.ElkPoint)
-
-			if h.Incoming { // They're the receiver
-
-			} else { // They're the offerer
-
-			}
+		HTLCOut, err := genHTLCOut(*s.InProgHTLC)
+		if err != nil {
+			return nil, nil, err
 		}
+		HTLCTxOuts = append(HTLCTxOuts, HTLCOut)
 	}
 
 	// make a new tx
@@ -262,8 +277,13 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
 		tx.AddTxOut(outPKH)
 	}
 
+	// Add HTLC outputs
+	for _, out := range HTLCTxOuts {
+		tx.AddTxOut(out)
+	}
+
 	if len(tx.TxOut) < 1 {
-		return nil, fmt.Errorf("No outputs, all below minOutput")
+		return nil, nil, fmt.Errorf("No outputs, all below minOutput")
 	}
 
 	// add unsigned txin
@@ -275,7 +295,28 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
 
 	// sort outputs
 	txsort.InPlaceSort(tx)
-	return tx, nil
+
+	// TODO: build HTLC spending transactions
+
+	for _, h := range HTLCTxOuts {
+		// But now they're sorted how do I know which outpoint to spend?
+		// We can iterate over our HTLC list, then compare pkScripts to find
+		// the right one
+		// Which index is this HTLC output in the tx?
+		var idx int
+		for i, out := range tx.TxOut {
+			if bytes.Compare(out.PkScript, h.PkScript) == 0 {
+				idx = i
+				break
+			}
+		}
+
+		spendHTLCScript := lnutil.CommitScript(revPub, timePub, q.Delay)
+
+		
+	}
+
+	return tx, nil, nil
 }
 
 // the scriptsig to put on a P2SH input.  Sigs need to be in order!

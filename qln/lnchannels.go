@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
@@ -55,7 +54,7 @@ type HTLC struct {
 	Incoming bool
 	Amt      int64
 	RHash    [32]byte
-	Locktime time.Time
+	Locktime int64
 
 	MyHTLCBase    [33]byte
 	TheirHTLCBase [33]byte
