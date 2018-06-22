@@ -158,7 +158,7 @@ func (s *StatCom) ToBytes() ([]byte, error) {
 	}
 
 	for _, h := range s.HTLCs {
-		HTLCBytes, err = h.Bytes()
+		HTLCBytes, err := h.Bytes()
 		if err != nil {
 			return nil, err
 		}
