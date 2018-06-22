@@ -119,16 +119,16 @@ func (s *StatCom) ToBytes() ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-	}
 
-	HTLCBytes, err := s.InProgHTLC.Bytes()
-	if err != nil {
-		return nil, err
-	}
+		HTLCBytes, err := s.InProgHTLC.Bytes()
+		if err != nil {
+			return nil, err
+		}
 
-	_, err = buf.Write(HTLCBytes)
-	if err != nil {
-		return nil, err
+		_, err = buf.Write(HTLCBytes)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	_, err = buf.Write(s.NextHTLCBase[:])
