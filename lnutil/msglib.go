@@ -231,21 +231,27 @@ type PointRespMsg struct {
 	ChannelPub [33]byte
 	RefundPub  [33]byte
 	HAKDbase   [33]byte
+
+	NextHTLCBase [33]byte
+	N2HTLCBase   [33]byte
 }
 
-func NewPointRespMsg(peerid uint32, chanpub [33]byte, refundpub [33]byte, HAKD [33]byte) PointRespMsg {
+func NewPointRespMsg(peerid uint32, chanpub [33]byte, refundpub [33]byte,
+	HAKD [33]byte, nextHTLCBase [33]byte, N2HTLCBase [33]byte) PointRespMsg {
 	pr := new(PointRespMsg)
 	pr.PeerIdx = peerid
 	pr.ChannelPub = chanpub
 	pr.RefundPub = refundpub
 	pr.HAKDbase = HAKD
+	pr.NextHTLCBase = nextHTLCBase
+	pr.N2HTLCBase = N2HTLCBase
 	return *pr
 }
 
 func NewPointRespMsgFromBytes(b []byte, peerid uint32) (PointRespMsg, error) {
 	pm := new(PointRespMsg)
 
-	if len(b) < 100 {
+	if len(b) < 166 {
 		return *pm, fmt.Errorf("PointResp err: msg %d bytes, expect 100\n", len(b))
 	}
 
@@ -254,6 +260,8 @@ func NewPointRespMsgFromBytes(b []byte, peerid uint32) (PointRespMsg, error) {
 	copy(pm.ChannelPub[:], buf.Next(33))
 	copy(pm.RefundPub[:], buf.Next(33))
 	copy(pm.HAKDbase[:], buf.Next(33))
+	copy(pm.NextHTLCBase[:], buf.Next(33))
+	copy(pm.N2HTLCBase[:], buf.Next(33))
 
 	return *pm, nil
 }
@@ -278,6 +286,9 @@ type ChanDescMsg struct {
 	RefundPub [33]byte
 	HAKDbase  [33]byte
 
+	NextHTLCBase [33]byte
+	N2HTLCBase   [33]byte
+
 	CoinType    uint32
 	Capacity    int64
 	InitPayment int64
@@ -291,7 +302,7 @@ type ChanDescMsg struct {
 
 func NewChanDescMsg(
 	peerid uint32, OP wire.OutPoint,
-	pubkey, refund, hakd [33]byte,
+	pubkey, refund, hakd [33]byte, nextHTLCBase [33]byte, N2HTLCBase [33]byte,
 	cointype uint32,
 	capacity int64, payment int64,
 	ELKZero, ELKOne, ELKTwo [33]byte, data [32]byte) ChanDescMsg {
@@ -302,6 +313,8 @@ func NewChanDescMsg(
 	cd.PubKey = pubkey
 	cd.RefundPub = refund
 	cd.HAKDbase = hakd
+	cd.NextHTLCBase = nextHTLCBase
+	cd.N2HTLCBase = N2HTLCBase
 	cd.CoinType = cointype
 	cd.Capacity = capacity
 	cd.InitPayment = payment
@@ -327,6 +340,8 @@ func NewChanDescMsgFromBytes(b []byte, peerid uint32) (ChanDescMsg, error) {
 	copy(cm.PubKey[:], buf.Next(33))
 	copy(cm.RefundPub[:], buf.Next(33))
 	copy(cm.HAKDbase[:], buf.Next(33))
+	copy(cm.NextHTLCBase[:], buf.Next(33))
+	copy(cm.N2HTLCBase[:], buf.Next(33))
 	cm.CoinType = BtU32(buf.Next(4))
 	cm.Capacity = BtI64(buf.Next(8))
 	cm.InitPayment = BtI64(buf.Next(8))
@@ -350,6 +365,8 @@ func (self ChanDescMsg) Bytes() []byte {
 	msg = append(msg, self.PubKey[:]...)
 	msg = append(msg, self.RefundPub[:]...)
 	msg = append(msg, self.HAKDbase[:]...)
+	msg = append(msg, self.NextHTLCBase[:]...)
+	msg = append(msg, self.N2HTLCBase[:]...)
 	msg = append(msg, coinTypeBin[:]...)
 	msg = append(msg, capBin[:]...)
 	msg = append(msg, initBin[:]...)
