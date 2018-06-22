@@ -18,7 +18,7 @@ var sayCommand = &Command{
 
 var lisCommand = &Command{
 	Format:           fmt.Sprintf("%s%s\n", lnutil.White("lis"), lnutil.OptColor("port")),
-	Description:      fmt.Sprintf("Start listening for incoming connections. The port number, if omitted, defaults to 9735.\n"),
+	Description:      fmt.Sprintf("Start listening for incoming connections. The port number, if omitted, defaults to 2448.\n"),
 	ShortDescription: "Start listening for incoming connections.\n",
 }
 
@@ -27,7 +27,7 @@ var conCommand = &Command{
 	Description: fmt.Sprintf("%s\n%s\n%s\n",
 		"Make a connection to another host by connecting to their pubkeyhash",
 		"(printed when listening using the lis command), on the given host.",
-		"A port may be provided; if omitted, 9735 is used."),
+		"A port may be provided; if omitted, 2448 is used."),
 	ShortDescription: "Make a connection to another host by connecting to their pubkeyhash\n",
 }
 
@@ -88,7 +88,7 @@ func (lc *litAfClient) Lis(textArgs []string) error {
 	args := new(litrpc.ListenArgs)
 	reply := new(litrpc.ListeningPortsReply)
 
-	args.Port = ":9735"
+	args.Port = ":2448"
 	if len(textArgs) > 0 {
 		if strings.Contains(textArgs[0], ":") {
 			args.Port = textArgs[0]
