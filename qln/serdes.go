@@ -22,7 +22,6 @@ bytes   desc   ends at
 1	Collision
 64	Sig
 
-
 note that sigs are truncated and don't have the sighash type byte at the end.
 
 their rev hash can be derived from the elkrem sender
@@ -270,4 +269,94 @@ func QCloseFromBytes(b []byte) (QCloseData, error) {
 	c.CloseHeight = lnutil.BtI32(b[32:36])
 
 	return c, nil
+}
+
+func (h *HTLC) Bytes() ([]byte, error) {
+	var buf bytes.Buffer
+	var err error
+
+	err = binary.Write(&buf, binary.BigEndian, h.Idx)
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Write(&buf, binary.BigEndian, h.Incoming)
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Write(&buf, binary.BigEndian, h.Amt)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = buf.Write(h.RHash[:])
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Write(&buf, binary.BigEndian, h.Locktime)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = buf.Write(h.MyHTLCBase[:])
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = buf.Write(h.TheirHTLCBase[:])
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = buf.Write(h.KeyGen.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = buf.Write(h.Sig[:])
+	if err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
+func HTLCFromBytes(b []byte) (HTLC, error) {
+	var h HTLC
+
+	buf := bytes.NewBuffer(b)
+	err := binary.Read(buf, binary.BigEndian, &h.Idx)
+	if err != nil {
+		return h, err
+	}
+
+	err = binary.Read(buf, binary.BigEndian, &h.Incoming)
+	if err != nil {
+		return h, err
+	}
+
+	err = binary.Read(buf, binary.BigEndian, &h.Amt)
+	if err != nil {
+		return h, err
+	}
+
+	copy(h.RHash[:], buf.Next(32))
+
+	err = binary.Read(buf, binary.BigEndian, &h.Locktime)
+	if err != nil {
+		return h, err
+	}
+
+	copy(h.MyHTLCBase[:], buf.Next(33))
+	copy(h.TheirHTLCBase[:], buf.Next(33))
+
+	var keyGenBytes [53]byte
+	copy(keyGenBytes[:], buf.Next(53))
+	h.KeyGen = portxo.KeyGenFromBytes(keyGenBytes)
+
+	copy(h.Sig[:], buf.Next(64))
+
+	return h, nil
 }
