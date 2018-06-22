@@ -68,7 +68,7 @@ func (nd *LitNode) TCPListener(
 				continue
 			}
 			log.Printf("Incoming connection from %x on %s\n",
-				newConn.RemotePub.SerializeCompressed(), newConn.RemoteAddr().String())
+				newConn.RemotePub().SerializeCompressed(), newConn.RemoteAddr().String())
 
 			// don't save host/port for incoming connections
 			peerIdx, err := nd.GetPeerIdx(newConn.RemotePub(), "")
@@ -103,7 +103,7 @@ func (nd *LitNode) TCPListener(
 func splitAdrString(adr string) (string, string) {
 
 	if !strings.ContainsRune(adr, ':') && strings.ContainsRune(adr, '@') {
-		adr += ":9735"
+		adr += ":2448"
 	}
 
 	idHost := strings.Split(adr, "@")
