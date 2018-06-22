@@ -21,6 +21,20 @@ bytes   desc   ends at
 33	N2ElkPoint
 1	Collision
 64	Sig
+32  Data
+
+4   HTLCIdx
+1   InProgHTLC?
+(232 InProgHTLC)
+
+33   NextHTLCBase
+33   N2HTLCBase
+33   MyNextHTLCBase
+33   MyN2HTLCBase
+
+4    nHTLCs
+(n*232 HTLC)
+
 
 note that sigs are truncated and don't have the sighash type byte at the end.
 
@@ -95,6 +109,66 @@ func (s *StatCom) ToBytes() ([]byte, error) {
 		return nil, err
 	}
 
+	err = binary.Write(&buf, binary.BigEndian, s.HTLCIdx)
+	if err != nil {
+		return nil, err
+	}
+
+	if s.InProgHTLC != nil {
+		err = binary.Write(&buf, binary.BigEndian, true)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	HTLCBytes, err := s.InProgHTLC.Bytes()
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = buf.Write(HTLCBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = buf.Write(s.NextHTLCBase[:])
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = buf.Write(s.N2HTLCBase[:])
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = buf.Write(s.MyNextHTLCBase[:])
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = buf.Write(s.MyN2HTLCBase[:])
+	if err != nil {
+		return nil, err
+	}
+
+	nHTLCs := uint32(len(s.HTLCs))
+	err = binary.Write(&buf, binary.BigEndian, nHTLCs)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, h := range s.HTLCs {
+		HTLCBytes, err = h.Bytes()
+		if err != nil {
+			return nil, err
+		}
+
+		_, err = buf.Write(HTLCBytes)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return buf.Bytes(), nil
 }
 
@@ -149,6 +223,52 @@ func StatComFromBytes(b []byte) (*StatCom, error) {
 
 	// copy data
 	copy(s.Data[:], buf.Next(32))
+
+	err = binary.Read(buf, binary.BigEndian, &s.HTLCIdx)
+	if err != nil {
+		return nil, err
+	}
+
+	var inProg bool
+	err = binary.Read(buf, binary.BigEndian, &inProg)
+	if err != nil {
+		return nil, err
+	}
+
+	if inProg {
+		var HTLCBytes []byte
+		copy(HTLCBytes, buf.Next(232))
+
+		h, err := HTLCFromBytes(HTLCBytes)
+		if err != nil {
+			return nil, err
+		}
+
+		s.InProgHTLC = &h
+	}
+
+	copy(s.NextHTLCBase[:], buf.Next(33))
+	copy(s.N2HTLCBase[:], buf.Next(33))
+	copy(s.MyNextHTLCBase[:], buf.Next(33))
+	copy(s.N2HTLCBase[:], buf.Next(33))
+
+	var nHTLCs uint32
+	err = binary.Read(buf, binary.BigEndian, &nHTLCs)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := uint32(0); i < nHTLCs; i++ {
+		var HTLCBytes []byte
+		copy(HTLCBytes, buf.Next(232))
+
+		h, err := HTLCFromBytes(HTLCBytes)
+		if err != nil {
+			return nil, err
+		}
+
+		s.HTLCs = append(s.HTLCs, h)
+	}
 
 	return &s, nil
 }
@@ -271,6 +391,9 @@ func QCloseFromBytes(b []byte) (QCloseData, error) {
 	return c, nil
 }
 
+// Bytes turns an HTLC into a slice of
+// 4 + 1 + 8 + 32 + 4 + 33 + 33 + 53 + 64
+// = 232 bytes
 func (h *HTLC) Bytes() ([]byte, error) {
 	var buf bytes.Buffer
 	var err error
