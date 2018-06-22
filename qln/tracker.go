@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"golang.org/x/net/proxy"
@@ -33,7 +34,12 @@ type nodeinfo struct {
 }
 
 func Announce(priv *btcec.PrivateKey, litport string, litadr string, trackerURL string) error {
-	resp, err := http.Get("https://ipv4.myexternalip.com/raw")
+	timeout := time.Duration(10 * time.Second)
+	client := http.Client{
+		Timeout: timeout, //sometimes timeouts, so its better to have a timeout
+	}
+	resp, err := client.Get("http://ipv4.myexternalip.com/raw")
+
 	if err != nil {
 		return err
 	}
@@ -49,7 +55,7 @@ func Announce(priv *btcec.PrivateKey, litport string, litadr string, trackerURL 
 	/* TODO: Find a better way to get this information. Their
 	 * SSL cert doesn't work for IPv6.
 	 */
-	resp, err = http.Get("http://ipv6.myexternalip.com/raw")
+	resp, err = client.Get("http://ipv6.myexternalip.com/raw")
 	if err != nil {
 		log.Printf("%v", err)
 	} else {
