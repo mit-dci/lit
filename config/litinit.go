@@ -2,15 +2,19 @@ package config
 
 import (
 	"bufio"
+	"errors"
 	"io"
 	"log"
+	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/jessevdk/go-flags"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/qln"
+	"github.com/mit-dci/lit/tor"
 )
 
 // createDefaultConfigFile creates a config file  -- only call this if the
@@ -91,6 +95,26 @@ func LitSetup(conf *Config) *[32]byte {
 		_, ok := err.(*os.PathError)
 		if !ok {
 			log.Fatal(err)
+		}
+	}
+
+	preconf.Tor.V2PrivateKeyPath = filepath.Join(preconf.LitHomeDir, DefaultTorV2PrivateKeyFilename)
+
+	if preconf.Tor.V2 && preconf.Tor.V3 {
+		log.Fatal(errors.New("either tor.v2 or tor.v3 can be set, " +
+			"but not both"))
+	}
+
+	// Set up the network-related functions that will be used throughout
+	// the daemon. We use the standard Go "net" package functions by
+	// default. If we should be proxying all traffic through Tor, then
+	// we'll use the Tor proxy specific functions in order to avoid leaking
+	// our real information.
+	if preconf.Tor.Active {
+		preconf.Net = &tor.ProxyNet{
+			SOCKS:           preconf.Tor.SOCKS,
+			DNS:             preconf.Tor.DNS,
+			StreamIsolation: preconf.Tor.StreamIsolation,
 		}
 	}
 	// Parse command line options again to ensure they take precedence.
@@ -201,4 +225,37 @@ func LinkWallets(node *qln.LitNode, key *[32]byte, conf *Config) error {
 
 	}
 	return nil
+}
+
+// normalizeAddresses returns a new slice with all the passed addresses
+// normalized with the given default port and all duplicates removed.
+func normalizeAddresses(addrs []string, defaultPort string) []string {
+	result := make([]string, 0, len(addrs))
+	seen := map[string]struct{}{}
+	for _, addr := range addrs {
+		addr = normalizeAddress(addr, defaultPort)
+		if _, ok := seen[addr]; !ok {
+			result = append(result, addr)
+			seen[addr] = struct{}{}
+		}
+	}
+	return result
+}
+
+// normalizeAddress normalizes an address by either setting a missing host to
+// localhost or missing port to the default port.
+func normalizeAddress(addr, defaultPort string) string {
+	if _, _, err := net.SplitHostPort(addr); err != nil {
+		// If the address is an integer, then we assume it is *only* a
+		// port and default to binding to that port on localhost.
+		if _, err := strconv.Atoi(addr); err == nil {
+			return net.JoinHostPort("localhost", addr)
+		}
+
+		// Otherwise, the address only contains the host so we'll use
+		// the default port.
+		return net.JoinHostPort(addr, defaultPort)
+	}
+
+	return addr
 }
