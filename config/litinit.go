@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"bufio"
@@ -8,14 +8,16 @@ import (
 	"path/filepath"
 
 	"github.com/jessevdk/go-flags"
+	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/qln"
 )
 
 // createDefaultConfigFile creates a config file  -- only call this if the
 // config file isn't already there
 func createDefaultConfigFile(destinationPath string) error {
 
-	dest, err := os.OpenFile(filepath.Join(destinationPath, defaultConfigFilename),
+	dest, err := os.OpenFile(filepath.Join(destinationPath, DefaultConfigFilename),
 		os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
@@ -36,7 +38,7 @@ func createDefaultConfigFile(destinationPath string) error {
 // configuration variables, reading in key data, reading and creating files if
 // they're not yet there.  It takes in a config, and returns a key.
 // (maybe add the key to the config?
-func litSetup(conf *config) *[32]byte {
+func LitSetup(conf *Config) *[32]byte {
 	// Pre-parse the command line options to see if an alternative config
 	// file or the version flag was specified.  Any errors aside from the
 	// help message error can be ignored here since they will be caught by
@@ -45,14 +47,14 @@ func litSetup(conf *config) *[32]byte {
 	//	usageMessage := fmt.Sprintf("Use %s -h to show usage", "./lit")
 
 	preconf := *conf
-	preParser := newConfigParser(&preconf, flags.HelpFlag)
+	preParser := NewConfigParser(&preconf, flags.HelpFlag)
 	_, err := preParser.ParseArgs(os.Args)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// Load config from file and parse
-	parser := newConfigParser(conf, flags.Default)
+	parser := NewConfigParser(conf, flags.Default)
 
 	// create home directory
 	_, err = os.Stat(preconf.LitHomeDir)
@@ -100,7 +102,6 @@ func litSetup(conf *config) *[32]byte {
 	logFilePath := filepath.Join(conf.LitHomeDir, "lit.log")
 
 	logfile, err := os.OpenFile(logFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	// TODO ... what's this do?
 	defer logfile.Close()
 
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
@@ -122,7 +123,7 @@ func litSetup(conf *config) *[32]byte {
 	// Right now though, they all get the *same* key.  For lit as a single binary
 	// now, all using the same key makes sense; could split up later.
 
-	keyFilePath := filepath.Join(conf.LitHomeDir, defaultKeyFileName)
+	keyFilePath := filepath.Join(conf.LitHomeDir, DefaultKeyFileName)
 
 	// read key file (generate if not found)
 	key, err := lnutil.ReadKeyFile(keyFilePath)
@@ -131,4 +132,73 @@ func litSetup(conf *config) *[32]byte {
 	}
 
 	return key
+}
+
+func LinkWallets(node *qln.LitNode, key *[32]byte, conf *Config) error {
+	// for now, wallets are linked to the litnode on startup, and
+	// can't appear / disappear while it's running.  Later
+	// could support dynamically adding / removing wallets
+
+	// order matters; the first registered wallet becomes the default
+
+	var err error
+	// try regtest
+	if !lnutil.NopeString(conf.Reghost) {
+		p := &coinparam.RegressionNetParams
+		log.Printf("reg: %s\n", conf.Reghost)
+		err = node.LinkBaseWallet(key, 120, conf.ReSync, conf.Tower, conf.Reghost, p)
+		if err != nil {
+			return err
+		}
+	}
+	// try testnet3
+	if !lnutil.NopeString(conf.Tn3host) {
+		p := &coinparam.TestNet3Params
+		err = node.LinkBaseWallet(
+			key, 1256000, conf.ReSync, conf.Tower,
+			conf.Tn3host, p)
+		if err != nil {
+			return err
+		}
+	}
+	// try litecoin regtest
+	if !lnutil.NopeString(conf.Litereghost) {
+		p := &coinparam.LiteRegNetParams
+		err = node.LinkBaseWallet(key, 120, conf.ReSync, conf.Tower, conf.Litereghost, p)
+		if err != nil {
+			return err
+		}
+	}
+	// try litecoin testnet4
+	if !lnutil.NopeString(conf.Lt4host) {
+		p := &coinparam.LiteCoinTestNet4Params
+		err = node.LinkBaseWallet(
+			key, p.StartHeight, conf.ReSync, conf.Tower,
+			conf.Lt4host, p)
+		if err != nil {
+			return err
+		}
+	}
+	// try vertcoin testnet
+	if !lnutil.NopeString(conf.Tvtchost) {
+		p := &coinparam.VertcoinTestNetParams
+		err = node.LinkBaseWallet(
+			key, 25000, conf.ReSync, conf.Tower,
+			conf.Tvtchost, p)
+		if err != nil {
+			return err
+		}
+	}
+	// try vertcoin mainnet
+	if !lnutil.NopeString(conf.Vtchost) {
+		p := &coinparam.VertcoinParams
+		err = node.LinkBaseWallet(
+			key, p.StartHeight, conf.ReSync, conf.Tower,
+			conf.Vtchost, p)
+		if err != nil {
+			return err
+		}
+
+	}
+	return nil
 }
