@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/textproto"
 	"os"
 	"strings"
@@ -192,7 +193,7 @@ func (c *Controller) authenticate() error {
 	// We're interested in retrieving the SERVERHASH and SERVERNONCE
 	// parameters, so we'll parse our reply to do so.
 	replyParams := parseTorReply(reply)
-
+	log.Printf("Reply from tor client: %s\n", reply)
 	// Once retrieved, we'll ensure these values are of proper length when
 	// decoded.
 	serverHash, ok := replyParams["SERVERHASH"]

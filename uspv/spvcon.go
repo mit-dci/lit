@@ -9,11 +9,13 @@ import (
 	"github.com/adiabat/btcd/wire"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
+	litconfig"github.com/mit-dci/lit/config"
 )
 
 type SPVCon struct {
 	con net.Conn // the (probably tcp) connection to the node
 
+	Conf *litconfig.Config
 	// Enhanced SPV modes for users who have outgrown easy mode SPV
 	// but have not yet graduated to full nodes.
 	HardMode bool // hard mode doesn't use filters.

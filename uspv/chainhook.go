@@ -8,6 +8,7 @@ import (
 	"github.com/adiabat/btcd/wire"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
+	litconfig "github.com/mit-dci/lit/config"
 )
 
 // ChainHook is an interface which provides access to a blockchain for the
@@ -34,7 +35,7 @@ type ChainHook interface {
 
 	// Note that for reorgs, the height chan just sends a lower height than you
 	// already have, and that means "reorg back!"
-	Start(height int32, host, path string, params *coinparam.Params) (
+	Start(height int32, host, path string, config *litconfig.Config, params *coinparam.Params) (
 		chan lnutil.TxAndHeight, chan int32, error)
 
 	// The Register functions send information to the ChainHook about what txs to
@@ -85,7 +86,7 @@ type ChainHook interface {
 // --- implementation of ChainHook interface ----
 
 func (s *SPVCon) Start(
-	startHeight int32, host, path string, params *coinparam.Params) (
+	startHeight int32, host, path string, config *litconfig.Config, params *coinparam.Params) (
 	chan lnutil.TxAndHeight, chan int32, error) {
 
 	// These can be set before calling Start()
@@ -93,7 +94,7 @@ func (s *SPVCon) Start(
 	s.Ironman = false
 
 	s.Param = params
-
+	s.Conf = config
 	s.TrackingAdrs = make(map[[20]byte]bool)
 	s.TrackingOPs = make(map[wire.OutPoint]bool)
 

@@ -55,8 +55,8 @@ func (s *SPVCon) GetListOfNodes() ([]string, error) {
 	log.Printf("Attempting to retrieve peers to connect to based on DNS Seed\n")
 
 	for _, seed := range s.Param.DNSSeeds {
-		temp, err := net.LookupHost(seed)
-		// need this temp in order to capture the error from net.LookupHost
+		temp, err := s.Conf.Net.LookupHost(seed)
+		// need this temp in order to capture the error from s.Conf.Net.LookupHost
 		// also need this to report the number of IPs we get from a seed
 		if err != nil {
 			log.Printf("Have difficulty trying to conenct to %s. Going to the next seed", seed)
@@ -83,7 +83,7 @@ func (s *SPVCon) DialNode(listOfNodes []string) error {
 		conString, conMode, err = s.parseRemoteNode(ip)
 		log.Printf("Attempting connection to node at %s\n",
 			conString)
-		s.con, err = net.Dial(conMode, conString)
+			s.con, err = s.Conf.Net.Dial(conMode, conString)
 		if err != nil {
 			if i != len(listOfNodes)-1 {
 				log.Println(err.Error())

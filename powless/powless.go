@@ -17,6 +17,7 @@ import (
 	"github.com/adiabat/btcd/wire"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
+	litconfig "github.com/mit-dci/lit/config"
 )
 
 // powless is a couple steps below uspv in that it doesn't check
@@ -101,7 +102,7 @@ type APILink struct {
 
 // Start starts the APIlink
 func (a *APILink) Start(
-	startHeight int32, host, path string, params *coinparam.Params) (
+	startHeight int32, host, path string, config *litconfig.Config, params *coinparam.Params) (
 	chan lnutil.TxAndHeight, chan int32, error) {
 
 	// later, use params to detect which api to connect to

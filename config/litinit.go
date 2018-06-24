@@ -11,9 +11,7 @@ import (
 	"strconv"
 
 	"github.com/jessevdk/go-flags"
-	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
-	"github.com/mit-dci/lit/qln"
 	"github.com/mit-dci/lit/tor"
 )
 
@@ -98,23 +96,18 @@ func LitSetup(conf *Config) *[32]byte {
 		}
 	}
 
-	preconf.Tor.V2PrivateKeyPath = filepath.Join(preconf.LitHomeDir, DefaultTorV2PrivateKeyFilename)
+	conf.Tor.V2PrivateKeyPath = filepath.Join(conf.LitHomeDir, DefaultTorV2PrivateKeyFilename)
 
-	if preconf.Tor.V2 && preconf.Tor.V3 {
+	if conf.Tor.V2 && conf.Tor.V3 {
 		log.Fatal(errors.New("either tor.v2 or tor.v3 can be set, " +
 			"but not both"))
 	}
 
-	// Set up the network-related functions that will be used throughout
-	// the daemon. We use the standard Go "net" package functions by
-	// default. If we should be proxying all traffic through Tor, then
-	// we'll use the Tor proxy specific functions in order to avoid leaking
-	// our real information.
-	if preconf.Tor.Active {
-		preconf.Net = &tor.ProxyNet{
-			SOCKS:           preconf.Tor.SOCKS,
-			DNS:             preconf.Tor.DNS,
-			StreamIsolation: preconf.Tor.StreamIsolation,
+	if conf.Tor.Active {
+		conf.Net = &tor.ProxyNet{
+			SOCKS:           conf.Tor.SOCKS,
+			DNS:             conf.Tor.DNS,
+			StreamIsolation: conf.Tor.StreamIsolation,
 		}
 	}
 	// Parse command line options again to ensure they take precedence.
@@ -156,75 +149,6 @@ func LitSetup(conf *Config) *[32]byte {
 	}
 
 	return key
-}
-
-func LinkWallets(node *qln.LitNode, key *[32]byte, conf *Config) error {
-	// for now, wallets are linked to the litnode on startup, and
-	// can't appear / disappear while it's running.  Later
-	// could support dynamically adding / removing wallets
-
-	// order matters; the first registered wallet becomes the default
-
-	var err error
-	// try regtest
-	if !lnutil.NopeString(conf.Reghost) {
-		p := &coinparam.RegressionNetParams
-		log.Printf("reg: %s\n", conf.Reghost)
-		err = node.LinkBaseWallet(key, 120, conf.ReSync, conf.Tower, conf.Reghost, p)
-		if err != nil {
-			return err
-		}
-	}
-	// try testnet3
-	if !lnutil.NopeString(conf.Tn3host) {
-		p := &coinparam.TestNet3Params
-		err = node.LinkBaseWallet(
-			key, 1256000, conf.ReSync, conf.Tower,
-			conf.Tn3host, p)
-		if err != nil {
-			return err
-		}
-	}
-	// try litecoin regtest
-	if !lnutil.NopeString(conf.Litereghost) {
-		p := &coinparam.LiteRegNetParams
-		err = node.LinkBaseWallet(key, 120, conf.ReSync, conf.Tower, conf.Litereghost, p)
-		if err != nil {
-			return err
-		}
-	}
-	// try litecoin testnet4
-	if !lnutil.NopeString(conf.Lt4host) {
-		p := &coinparam.LiteCoinTestNet4Params
-		err = node.LinkBaseWallet(
-			key, p.StartHeight, conf.ReSync, conf.Tower,
-			conf.Lt4host, p)
-		if err != nil {
-			return err
-		}
-	}
-	// try vertcoin testnet
-	if !lnutil.NopeString(conf.Tvtchost) {
-		p := &coinparam.VertcoinTestNetParams
-		err = node.LinkBaseWallet(
-			key, 25000, conf.ReSync, conf.Tower,
-			conf.Tvtchost, p)
-		if err != nil {
-			return err
-		}
-	}
-	// try vertcoin mainnet
-	if !lnutil.NopeString(conf.Vtchost) {
-		p := &coinparam.VertcoinParams
-		err = node.LinkBaseWallet(
-			key, p.StartHeight, conf.ReSync, conf.Tower,
-			conf.Vtchost, p)
-		if err != nil {
-			return err
-		}
-
-	}
-	return nil
 }
 
 // normalizeAddresses returns a new slice with all the passed addresses

@@ -13,11 +13,12 @@ import (
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/powless"
 	"github.com/mit-dci/lit/uspv"
+	litconfig "github.com/mit-dci/lit/config"
 )
 
 func NewWallit(
 	rootkey *hdkeychain.ExtendedKey, birthHeight int32, resync bool,
-	spvhost, path string, p *coinparam.Params) *Wallit {
+	spvhost, path string, p *coinparam.Params, config *litconfig.Config) *Wallit {
 
 	var w Wallit
 	w.rootPrivKey = rootkey
@@ -64,7 +65,7 @@ func NewWallit(
 	}
 
 	log.Printf("DB height %d\n", height)
-	incomingTx, incomingBlockheight, err := w.Hook.Start(height, spvhost, wallitpath, p)
+	incomingTx, incomingBlockheight, err := w.Hook.Start(height, spvhost, wallitpath, config, p)
 	if err != nil {
 		log.Printf("NewWallit Hook.Start crash  %s ", err.Error())
 	}
