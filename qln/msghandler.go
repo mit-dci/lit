@@ -3,6 +3,7 @@ package qln
 import (
 	"bytes"
 	"fmt"
+	"log"
 
 	"github.com/adiabat/btcd/txscript"
 	"github.com/adiabat/btcd/wire"
@@ -12,6 +13,7 @@ import (
 
 // handles stuff that comes in over the wire.  Not user-initiated.
 func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) error {
+	log.Printf("Message from %d type %x", msg.Peer(), msg.MsgType())
 	switch msg.MsgType() & 0xf0 {
 	case 0x00: // TEXT MESSAGE.  SIMPLE
 		chat, ok := msg.(lnutil.ChatMsg)
@@ -129,6 +131,7 @@ func (nd *LitNode) LNDCReader(peer *RemotePeer) error {
 		var routedMsg lnutil.LitMsg
 		routedMsg, err = lnutil.LitMsgFromBytes(msg, peer.Idx)
 		if err != nil {
+			log.Printf("Error decoding LitMsg: %s", err.Error())
 			return err
 		}
 

@@ -239,7 +239,6 @@ func (nd *LitNode) PointReqHandler(msg lnutil.PointReqMsg) {
 	outMsg := lnutil.NewPointRespMsg(msg.Peer(), myChanPub, myRefundPub, myHAKDbase,
 		myNextHTLCBase, myN2HTLCBase)
 	nd.OmniOut <- outMsg
-	outMsg.Bytes()
 
 	return
 }
@@ -247,6 +246,7 @@ func (nd *LitNode) PointReqHandler(msg lnutil.PointReqMsg) {
 // FUNDER
 // PointRespHandler takes in a point response, and returns a channel description
 func (nd *LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
+	log.Printf("Got PointResponse")
 
 	nd.InProg.mtx.Lock()
 	defer nd.InProg.mtx.Unlock()
