@@ -172,11 +172,11 @@ func (s *StatCom) ToBytes() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// StatComFromBytes turns 192 bytes into a StatCom
+// StatComFromBytes turns at least 357 bytes into a StatCom
 func StatComFromBytes(b []byte) (*StatCom, error) {
 	var s StatCom
-	if len(b) < 235 || len(b) > 235 {
-		return nil, fmt.Errorf("StatComFromBytes got %d bytes, expect 203",
+	if len(b) < 357 {
+		return nil, fmt.Errorf("StatComFromBytes got %d bytes, expect at least 357",
 			len(b))
 	}
 	buf := bytes.NewBuffer(b)
