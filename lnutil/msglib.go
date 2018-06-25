@@ -828,14 +828,14 @@ func NewHashSigMsgFromBytes(b []byte, peerid uint32) (HashSigMsg, error) {
 	ds.Outpoint = *OutPointFromBytes(op)
 
 	// deserialize DeltaSig
-	ds.Amt = BtI64(buf.Next(4))
+	ds.Amt = BtI64(buf.Next(8))
 	copy(ds.RHash[:], buf.Next(32))
 
 	copy(ds.Data[:], buf.Next(32))
 
 	copy(ds.CommitmentSignature[:], buf.Next(64))
 
-	nHTLCSigs := (buf.Len() - (64 + 32 + 32 + 4 + 36)) / 64
+	nHTLCSigs := (buf.Len() - (64 + 32 + 32 + 8 + 36)) / 64
 
 	for i := 0; i < nHTLCSigs; i++ {
 		var sig [64]byte
