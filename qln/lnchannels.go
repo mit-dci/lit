@@ -46,6 +46,7 @@ type Qchan struct {
 	// exists only in ram, doesn't touch disk
 }
 
+// 4 + 1 + 8 + 32 + 4 + 33 + 33 + 1 + 5 + 32 + 64 = 217 bytes
 type HTLC struct {
 	Idx uint32
 
