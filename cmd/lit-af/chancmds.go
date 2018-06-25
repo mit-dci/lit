@@ -64,6 +64,14 @@ var historyCommand = &Command{
 	ShortDescription: "Show all the metadata for justice txs.\n",
 }
 
+var addHTLCCommand = &Command{
+	Format: fmt.Sprintf("%s%s%s\n", lnutil.White("add"), lnutil.ReqColor("channel idx", "amount", "RHash"), lnutil.OptColor("data")),
+	Description: fmt.Sprintf("%s\n%s\n",
+		"Add an HTLC of the given amount (in satoshis) to the given channel.",
+		"Optionally, the push operation can be associated with a 32 byte value hex encoded."),
+	ShortDescription: "Add HTLC of the given amount (in satoshis) to the given channel.\n",
+}
+
 func (lc *litAfClient) History(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
 		fmt.Fprintf(color.Output, historyCommand.Format)
@@ -314,6 +322,54 @@ func (lc *litAfClient) Watch(textArgs []string) error {
 
 	fmt.Fprintf(color.Output, "Send channel %d data to peer %d\n",
 		args.ChanIdx, args.SendToPeer)
+
+	return nil
+}
+
+// Add is the shell command which calls AddHTLC
+func (lc *litAfClient) AddHTLC(textArgs []string) error {
+	err := CheckHelpCommand(addHTLCCommand, textArgs, 3)
+	if err != nil {
+		return err
+	}
+
+	args := new(litrpc.AddHTLCArgs)
+	reply := new(litrpc.AddHTLCReply)
+
+	// this stuff is all the same as in cclose, should put into a function...
+	cIdx, err := strconv.Atoi(textArgs[0])
+	if err != nil {
+		return err
+	}
+	amt, err := strconv.Atoi(textArgs[1])
+	if err != nil {
+		return err
+	}
+
+	RHash, err := hex.DecodeString(textArgs[2])
+	if err != nil {
+		return err
+	}
+	copy(args.RHash[:], RHash[:])
+
+	if len(textArgs) > 3 {
+		data, err := hex.DecodeString(textArgs[3])
+		if err != nil {
+			// Wasn't valid hex, copy directly and truncate
+			copy(args.Data[:], textArgs[3])
+		} else {
+			copy(args.Data[:], data[:])
+		}
+	}
+
+	args.ChanIdx = uint32(cIdx)
+	args.Amt = int64(amt)
+
+	err = lc.Call("LitRPC.AddHTLC", args, reply)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(color.Output, "Added HTLC %s at state %s idx %s\n", lnutil.SatoshiColor(int64(amt)), lnutil.White(reply.StateIndex), lnutil.White(reply.HTLCIndex))
 
 	return nil
 }
