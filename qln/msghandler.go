@@ -257,6 +257,10 @@ func (nd *LitNode) PushPullHandler(routedMsg lnutil.LitMsg, q *Qchan) error {
 		fmt.Printf("Got REV from %x\n", routedMsg.Peer())
 		return nd.RevHandler(message, q)
 
+	case lnutil.HashSigMsg: // Offer HTLC
+		log.Printf("Got HashSig from %d", routedMsg.Peer())
+		return nd.HashSigHandler(message, q)
+
 	default:
 		return fmt.Errorf("Unknown message type %x", routedMsg.MsgType())
 

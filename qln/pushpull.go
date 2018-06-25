@@ -576,7 +576,7 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 			qc.Idx(), qc.State.Delta)
 	}
 
-	if qc.State.Delta == 0 {
+	if qc.State.Delta == 0 && qc.State.InProgHTLC == nil {
 		// re-send last rev; they probably didn't get it
 		return nd.SendREV(qc)
 	}
@@ -592,6 +592,10 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 	qc.State.StateIdx++
 	qc.State.MyAmt += int64(qc.State.Delta)
 	qc.State.Delta = 0
+
+	if qc.State.InProgHTLC != nil {
+		qc.State.HTLCIdx++
+	}
 
 	// first verify sig.
 	// (if elkrem ingest fails later, at least we close out with a bit more money)
@@ -611,6 +615,11 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 	// if the elkrem failed but sig didn't... we should update the DB to reflect
 	// that and try to close with the incremented amount, why not.
 	// TODO Implement that later though.
+
+	if qc.State.InProgHTLC != nil {
+		qc.State.HTLCs = append(qc.State.HTLCs, *qc.State.InProgHTLC)
+		qc.State.InProgHTLC = nil
+	}
 
 	// all verified; Save finished state to DB, puller is pretty much done.
 	err = nd.SaveQchanState(qc)
@@ -694,6 +703,11 @@ func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {
 	}
 	prevAmt := qc.State.MyAmt - int64(qc.State.Delta)
 	qc.State.Delta = 0
+
+	if qc.State.InProgHTLC != nil {
+		qc.State.HTLCs = append(qc.State.HTLCs, *qc.State.InProgHTLC)
+		qc.State.InProgHTLC = nil
+	}
 
 	// save to DB (new elkrem & point, delta zeroed)
 	err = nd.SaveQchanState(qc)

@@ -30,6 +30,9 @@ const (
 	MSGID_SIGREV    = 0x31 // pulling funds; signing new state and revoking old
 	MSGID_GAPSIGREV = 0x32 // resolving collision
 	MSGID_REV       = 0x33 // pushing funds; revoking previous channel state
+		
+	// HTLC messages
+	MSGID_HASHSIG = 0x34 // Like a deltasig but offers an HTLC
 
 	//not implemented
 	MSGID_FWDMSG     = 0x40
@@ -45,9 +48,6 @@ const (
 
 	//Routing messages
 	MSGID_LINK_DESC = 0x70 // Describes a new channel for routing
-
-	// HTLC messages
-	MSGID_HASHSIG = 0x75 // Like a deltasig but offers an HTLC
 
 	//Discreet log contracts messages
 	MSGID_DLC_OFFER               = 0x90 // Offer a contract

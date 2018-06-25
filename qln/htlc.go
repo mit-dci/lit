@@ -179,3 +179,138 @@ func (nd *LitNode) SendHashSig(q *Qchan) error {
 
 	return nil
 }
+
+func (nd *LitNode) HashSigHandler(msg lnutil.HashSigMsg, qc *Qchan) error {
+	log.Printf("Got HashSig: %v", msg)
+
+	var collision bool
+
+	// we should be clear to send when we get a hashSig
+	select {
+	case <-qc.ClearToSend:
+	// keep going, normal
+	default:
+		// collision
+		collision = true
+	}
+
+	fmt.Printf("COLLISION is (%t)\n", collision)
+
+	// load state from disk
+	err := nd.ReloadQchanState(qc)
+	if err != nil {
+		return fmt.Errorf("HashSigHandler ReloadQchan err %s", err.Error())
+	}
+
+	// TODO we should send a response that the channel is closed.
+	// or offer to double spend with a cooperative close?
+	// or update the remote node on closed channel status when connecting
+	// TODO should disallow 'break' command when connected to the other node
+	// or merge 'break' and 'close' UI so that it breaks when it can't
+	// connect, and closes when it can.
+	if qc.CloseData.Closed {
+		return fmt.Errorf("HashSigHandler err: %d, %d is closed.",
+			qc.Peer(), qc.Idx())
+	}
+
+	if collision {
+		// TODO: handle collisions
+	}
+
+	if qc.State.Delta > 0 {
+		fmt.Printf(
+			"DeltaSigHandler err: chan %d delta %d, expect rev, send empty rev",
+			qc.Idx(), qc.State.Delta)
+
+		return nd.SendREV(qc)
+	}
+
+	if !collision {
+		// TODO: handle non-collision
+	}
+
+	// they have to actually send you money
+	if msg.Amt < consts.MinOutput {
+		return fmt.Errorf("HashSigHandler err: HTLC amount %d less than minOutput", msg.Amt)
+	}
+
+	// perform consts.MinOutput check
+	myNewOutputSize := qc.State.MyAmt - qc.State.Fee
+	theirNewOutputSize := qc.Value - myNewOutputSize - int64(msg.Amt)
+
+	for _, h := range qc.State.HTLCs {
+		theirNewOutputSize -= h.Amt
+	}
+
+	// check if this push is takes them below minimum output size
+	if theirNewOutputSize < consts.MinOutput {
+		qc.ClearToSend <- true
+		return fmt.Errorf(
+			"pushing %s reduces them too low; counterparty bal %s fee %s consts.MinOutput %s",
+			lnutil.SatoshiColor(int64(msg.Amt)),
+			lnutil.SatoshiColor(qc.Value-qc.State.MyAmt),
+			lnutil.SatoshiColor(qc.State.Fee),
+			lnutil.SatoshiColor(consts.MinOutput))
+	}
+
+	// update to the next state to verify
+	qc.State.StateIdx++
+
+	qc.State.InProgHTLC = new(HTLC)
+	qc.State.InProgHTLC.Idx = qc.State.HTLCIdx
+	qc.State.InProgHTLC.Incoming = true
+	qc.State.InProgHTLC.Amt = int64(msg.Amt)
+	qc.State.InProgHTLC.RHash = msg.RHash
+
+	// TODO: make this customisable?
+	qc.State.InProgHTLC.Locktime = consts.DefaultLockTime
+	qc.State.InProgHTLC.TheirHTLCBase = qc.State.NextHTLCBase
+
+	qc.State.InProgHTLC.KeyGen.Depth = 5
+	qc.State.InProgHTLC.KeyGen.Step[0] = 44 | 1<<31
+	qc.State.InProgHTLC.KeyGen.Step[1] = qc.Coin() | 1<<31
+	qc.State.InProgHTLC.KeyGen.Step[2] = UseHTLCBase
+	qc.State.InProgHTLC.KeyGen.Step[3] = qc.State.HTLCIdx | 1<<31
+	qc.State.InProgHTLC.KeyGen.Step[4] = qc.Idx() | 1<<31
+
+	qc.State.InProgHTLC.MyHTLCBase, _ = nd.GetUsePub(qc.State.InProgHTLC.KeyGen,
+		UseHTLCBase)
+
+	qc.State.InProgHTLC.TheirHTLCBase = qc.State.NextHTLCBase
+
+	fmt.Printf("Got message %x", msg.Data)
+	qc.State.Data = msg.Data
+
+	qc.State.HTLCIdx++
+
+	// verify sig for the next state. only save if this works
+
+	// TODO: There are more signatures required
+	err = qc.VerifySigs(msg.CommitmentSignature, msg.HTLCSigs)
+	if err != nil {
+		return fmt.Errorf("HashSigHandler err %s", err.Error())
+	}
+
+	// (seems odd, but everything so far we still do in case of collision, so
+	// only check here.  If it's a collision, set, save, send gapSigRev
+
+	// save channel with new state, new sig, and positive delta set
+	// and maybe collision; still haven't checked
+	err = nd.SaveQchanState(qc)
+	if err != nil {
+		return fmt.Errorf("HashSigHandler SaveQchanState err %s", err.Error())
+	}
+
+	if qc.State.Collision != 0 {
+		err = nd.SendGapSigRev(qc)
+		if err != nil {
+			return fmt.Errorf("HashSigHandler SendGapSigRev err %s", err.Error())
+		}
+	} else { // saved to db, now proceed to create & sign their tx
+		err = nd.SendSigRev(qc)
+		if err != nil {
+			return fmt.Errorf("HashSigHandler SendSigRev err %s", err.Error())
+		}
+	}
+	return nil
+}
