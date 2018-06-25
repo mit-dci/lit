@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"log"
 
 	"github.com/adiabat/btcd/chaincfg/chainhash"
 	"github.com/mit-dci/lit/lnutil"
@@ -241,11 +240,8 @@ func StatComFromBytes(b []byte) (*StatCom, error) {
 		return nil, err
 	}
 
-	log.Printf("Got here %b", inProg)
-
 	if inProg {
 		var HTLCBytes []byte
-		log.Printf("Got here")
 		copy(HTLCBytes, buf.Next(232))
 
 		h, err := HTLCFromBytes(HTLCBytes)
@@ -256,14 +252,10 @@ func StatComFromBytes(b []byte) (*StatCom, error) {
 		s.InProgHTLC = &h
 	}
 
-	log.Printf("Got here")
-
 	copy(s.NextHTLCBase[:], buf.Next(33))
 	copy(s.N2HTLCBase[:], buf.Next(33))
 	copy(s.MyNextHTLCBase[:], buf.Next(33))
 	copy(s.MyN2HTLCBase[:], buf.Next(33))
-
-	log.Printf("Got here")
 
 	var nHTLCs uint32
 	err = binary.Read(buf, binary.BigEndian, &nHTLCs)
