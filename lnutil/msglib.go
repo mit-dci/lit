@@ -108,7 +108,7 @@ func LitMsgFromBytes(b []byte, peerid uint32) (LitMsg, error) {
 	case MSGID_REV:
 		return NewRevMsgFromBytes(b, peerid)
 	case MSGID_HASHSIG:
-		return NewDeltaSigMsgFromBytes(b, peerid)
+		return NewHashSigMsgFromBytes(b, peerid)
 
 	/*
 		case MSGID_FWDMSG:
