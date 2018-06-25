@@ -30,7 +30,7 @@ const (
 	MSGID_SIGREV    = 0x31 // pulling funds; signing new state and revoking old
 	MSGID_GAPSIGREV = 0x32 // resolving collision
 	MSGID_REV       = 0x33 // pushing funds; revoking previous channel state
-		
+
 	// HTLC messages
 	MSGID_HASHSIG = 0x34 // Like a deltasig but offers an HTLC
 
@@ -107,6 +107,8 @@ func LitMsgFromBytes(b []byte, peerid uint32) (LitMsg, error) {
 		return NewGapSigRevFromBytes(b, peerid)
 	case MSGID_REV:
 		return NewRevMsgFromBytes(b, peerid)
+	case MSGID_HASHSIG:
+		return NewDeltaSigMsgFromBytes(b, peerid)
 
 	/*
 		case MSGID_FWDMSG:
