@@ -2,6 +2,7 @@ package qln
 
 import (
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -458,10 +459,12 @@ func (nd *LitNode) RestoreQchanFromBucket(bkt *bolt.Bucket) (*Qchan, error) {
 	// load the serialized channel base description
 	qc, err := QchanFromBytes(bkt.Get(KEYutxo))
 	if err != nil {
+		log.Printf("Error decoding Qchan: %s", err.Error())
 		return nil, err
 	}
 	qc.CloseData, err = QCloseFromBytes(bkt.Get(KEYqclose))
 	if err != nil {
+		log.Printf("Error decoding QClose: %s", err.Error())
 		return nil, err
 	}
 
@@ -485,6 +488,7 @@ func (nd *LitNode) RestoreQchanFromBucket(bkt *bolt.Bucket) (*Qchan, error) {
 	if stBytes != nil {
 		qc.State, err = StatComFromBytes(stBytes)
 		if err != nil {
+			log.Printf("Error loading StatCom: %s", err.Error())
 			return nil, err
 		}
 	}
