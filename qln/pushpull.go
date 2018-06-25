@@ -253,7 +253,7 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 	// make the signature to send over
 
 	// TODO: There are extra signatures required now
-	sig, _, err := nd.SignState(q)
+	sig, HTLCSigs, err := nd.SignState(q)
 	if err != nil {
 		return err
 	}
@@ -262,7 +262,7 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 		return errors.New("Delta cannot be zero")
 	}
 
-	outMsg := lnutil.NewDeltaSigMsg(q.Peer(), q.Op, -q.State.Delta, sig, q.State.Data)
+	outMsg := lnutil.NewDeltaSigMsg(q.Peer(), q.Op, -q.State.Delta, sig, HTLCSigs, q.State.Data)
 
 	log.Printf("Sending DeltaSig: %v", outMsg)
 
@@ -374,7 +374,7 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 	// verify sig for the next state. only save if this works
 
 	// TODO: There are more signatures required
-	err = qc.VerifySigs(msg.Signature, nil)
+	err = qc.VerifySigs(msg.Signature, msg.HTLCSigs)
 	if err != nil {
 		return fmt.Errorf("DeltaSigHandler err %s", err.Error())
 	}
@@ -433,7 +433,7 @@ func (nd *LitNode) SendGapSigRev(q *Qchan) error {
 	// sign state n+1
 
 	// TODO: send the sigs
-	sig, _, err := nd.SignState(q)
+	sig, HTLCSigs, err := nd.SignState(q)
 	if err != nil {
 		return err
 	}
@@ -442,7 +442,7 @@ func (nd *LitNode) SendGapSigRev(q *Qchan) error {
 	// GapSigRev is op (36), sig (64), ElkHash (32), NextElkPoint (33)
 	// total length 165
 
-	outMsg := lnutil.NewGapSigRev(q.KeyGen.Step[3]&0x7fffffff, q.Op, sig, *elk, n2ElkPoint)
+	outMsg := lnutil.NewGapSigRev(q.KeyGen.Step[3]&0x7fffffff, q.Op, sig, *elk, n2ElkPoint, HTLCSigs)
 
 	log.Printf("Sending GapSigRev: %v", outMsg)
 
@@ -468,7 +468,7 @@ func (nd *LitNode) SendSigRev(q *Qchan) error {
 	// n2elk invalid here
 
 	// TODO: send the sigs
-	sig, _, err := nd.SignState(q)
+	sig, HTLCSigs, err := nd.SignState(q)
 	if err != nil {
 		return err
 	}
@@ -479,7 +479,7 @@ func (nd *LitNode) SendSigRev(q *Qchan) error {
 		return err
 	}
 
-	outMsg := lnutil.NewSigRev(q.KeyGen.Step[3]&0x7fffffff, q.Op, sig, *elk, n2ElkPoint)
+	outMsg := lnutil.NewSigRev(q.KeyGen.Step[3]&0x7fffffff, q.Op, sig, *elk, n2ElkPoint, HTLCSigs)
 
 	log.Printf("Sending SigRev: %v", outMsg)
 
@@ -530,7 +530,7 @@ func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
 	// verify the sig
 
 	// TODO: More sigs here that before
-	err = q.VerifySigs(msg.Signature, nil)
+	err = q.VerifySigs(msg.Signature, msg.HTLCSigs)
 	if err != nil {
 		return fmt.Errorf("GapSigRevHandler err %s", err.Error())
 	}
@@ -597,7 +597,7 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 	// (if elkrem ingest fails later, at least we close out with a bit more money)
 
 	// TODO: more sigs here than before
-	err = qc.VerifySigs(msg.Signature, nil)
+	err = qc.VerifySigs(msg.Signature, msg.HTLCSigs)
 	if err != nil {
 		return fmt.Errorf("SIGREVHandler err %s", err.Error())
 	}
