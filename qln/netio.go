@@ -179,6 +179,7 @@ func (nd *LitNode) OutMessager() {
 type PeerInfo struct {
 	PeerNumber uint32
 	RemoteHost string
+	LitAdr 	   string
 	Nickname   string
 }
 
@@ -186,9 +187,11 @@ func (nd *LitNode) GetConnectedPeerList() []PeerInfo {
 	var peers []PeerInfo
 	for k, v := range nd.RemoteCons {
 		var newPeer PeerInfo
+		var pubArr,_ = nd.GetPubHostFromPeerIdx(k)
 		newPeer.PeerNumber = k
 		newPeer.RemoteHost = v.Con.RemoteAddr().String()
 		newPeer.Nickname = v.Nickname
+		newPeer.LitAdr = lnutil.LitAdrFromPubkey(pubArr)
 		peers = append(peers, newPeer)
 	}
 	return peers
