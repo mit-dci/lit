@@ -249,13 +249,13 @@ func NewPointRespMsg(peerid uint32, chanpub [33]byte, refundpub [33]byte,
 }
 
 // NewPointRespMsgFromBytes takes a byte slice and a peerid and constructs a
-// PointRespMsg object from the bytes. Expects at least 4 + 33 + 33 + 33 +
-// 33 + 33 = 169.
+// PointRespMsg object from the bytes. Expects at least 1 + 33 + 33 + 33 +
+// 33 + 33 = 166.
 func NewPointRespMsgFromBytes(b []byte, peerid uint32) (PointRespMsg, error) {
 	pm := new(PointRespMsg)
 
-	if len(b) < 169 {
-		return *pm, fmt.Errorf("PointResp err: msg %d bytes, expect 169\n", len(b))
+	if len(b) < 166 {
+		return *pm, fmt.Errorf("PointResp err: msg %d bytes, expect 166\n", len(b))
 	}
 
 	pm.PeerIdx = peerid
