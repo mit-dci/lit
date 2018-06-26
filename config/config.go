@@ -49,6 +49,7 @@ const (
 	DefaultRpchost               = "localhost"
 	DefaultAutoReconnect         = false
 	DefaultAutoListenPort        = ":2448"
+	DefaultPeerPort              = 2448
 	DefaultAutoReconnectInterval = int64(60)
 	// tor config
 	DefaultTorSOCKSPort            = 9050

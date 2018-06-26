@@ -19,11 +19,11 @@ import (
 
 // Init starts up a lit node.  Needs priv key, and a path.
 // Does not activate a subwallet; do that after init.
-func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL string) (*LitNode, error) {
+func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL string, conf *litconfig.Config) (*LitNode, error) {
 
 	nd := new(LitNode)
 	nd.LitFolder = path
-
+	nd.Conf = conf
 	litdbpath := filepath.Join(nd.LitFolder, "ln.db")
 	err := nd.OpenDB(litdbpath)
 	if err != nil {

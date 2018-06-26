@@ -7,6 +7,7 @@ import (
 
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/qln"
+	litconfig"github.com/mit-dci/lit/config"
 )
 
 // ------------------------- listen
@@ -37,10 +38,10 @@ func (r *LitRPC) Listen(args ListenArgs, reply *ListeningPortsReply) error {
 // ------------------------- connect
 type ConnectArgs struct {
 	LNAddr string
+	Config litconfig.Config
 }
 
 func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
-
 	// first, see if the peer to connect to is referenced by peer index.
 	var connectAdr string
 	// check if a peer number was supplied instead of a pubkeyhash
@@ -61,7 +62,7 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
 		connectAdr = args.LNAddr
 	}
 
-	err = r.Node.DialPeer(connectAdr)
+	err = r.Node.DialPeer(connectAdr, args.Config)
 	if err != nil {
 		return err
 	}

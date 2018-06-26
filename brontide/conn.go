@@ -7,8 +7,10 @@ import (
 	"math"
 	"net"
 	"time"
+	"log"
 
 	"github.com/adiabat/btcd/btcec"
+	litconfig "github.com/mit-dci/lit/config"
 )
 
 // Conn is an implementation of net.Conn which enforces an authenticated key
@@ -33,11 +35,14 @@ var _ net.Conn = (*Conn)(nil)
 // public key. In the case of a handshake failure, the connection is closed and
 // a non-nil error is returned.
 func Dial(localPriv *btcec.PrivateKey, ipAddr string, remotePKH string,
-	dialer func(string, string) (net.Conn, error)) (*Conn, error) {
+	dialer func(string, string) (net.Conn, error), config litconfig.Config) (*Conn, error) {
 	var conn net.Conn
 	var err error
-	conn, err = dialer("tcp", ipAddr)
+	// connecting to a node via tor works.
+	log.Println("COOL")
+	conn, err = config.Net.Dial("tcp", ipAddr) // connect via tor if possible
 	if err != nil {
+		log.Println("NOOB")
 		return nil, err
 	}
 

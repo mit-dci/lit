@@ -15,6 +15,7 @@ import (
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/watchtower"
+	litconfig"github.com/mit-dci/lit/config"
 )
 
 /*
@@ -134,6 +135,7 @@ type LitNode struct {
 
 	// Contains the URL string to connect to a SOCKS5 proxy, if provided
 	ProxyURL string
+	Conf *litconfig.Config
 }
 
 type RemotePeer struct {

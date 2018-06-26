@@ -391,6 +391,7 @@ func (c *Controller) AddOnionV2(privateKeyFilename string,
 			portParam += fmt.Sprintf("Port=%d,%d ", virtPort,
 				targPort)
 		}
+		log.Println("VIRT PORT", virtPort, targPorts)
 	}
 
 	cmd := fmt.Sprintf("ADD_ONION %s %s", keyParam, portParam)
@@ -444,6 +445,6 @@ func (c *Controller) AddOnionV2(privateKeyFilename string,
 		}
 		addrs = append(addrs, addr)
 	}
-
+	log.Println("ADDR ON!!!")
 	return addrs, nil
 }

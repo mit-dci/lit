@@ -82,33 +82,6 @@ func LinkWallets(node *qln.LitNode, key *[32]byte, conf *litconfig.Config) error
 	return nil
 }
 
-
-// initTorController initiliazes the Tor controller backed by lit and
-// automatically sets up a v2 onion service in order to listen for inbound
-// connections over Tor.
-func initTorController(torController *tor.Controller, conf litconfig.Config) error {
-	if err := torController.Start(); err != nil {
-		log.Println("ERRORRS HERE")
-		return err
-	}
-	defaultPeerPort := 2448
-	listenPorts := make(map[int]struct{})
-	listenPorts[2448] = struct{}{}
-
-	// Once the port mapping has been set, we can go ahead and automatically
-	// create our onion service. The service's private key will be saved to
-	// disk in order to regain access to this service when restarting lit.
-	virtToTargPorts := tor.VirtToTargPorts{defaultPeerPort: listenPorts}
-	onionServiceAddr, err := torController.AddOnionV2( //onionServiceAddrs
-		conf.Tor.V2PrivateKeyPath, virtToTargPorts,
-	)
-	if err != nil {
-		return err
-	}
-	log.Println("Listening on onion address:", onionServiceAddr)
-	return nil
-}
-
 func main() {
 
 	conf := litconfig.Config{
@@ -130,18 +103,9 @@ func main() {
 
 	key := litconfig.LitSetup(&conf)
 
-	var torController *tor.Controller
-
-	if conf.Tor.Active && conf.Tor.V2 {
-		torController = tor.NewController(conf.Tor.Control) //main controller?
-		if err := initTorController(torController, conf); err != nil {
-			log.Fatal(err)
-		}
-	}
-
 	// Setup LN node.  Activate Tower if in hard mode.
 	// give node and below file pathof lit home directory
-	node, err := qln.NewLitNode(key, conf.LitHomeDir, conf.TrackerURL, conf.ProxyURL)
+	node, err := qln.NewLitNode(key, conf.LitHomeDir, conf.TrackerURL, conf.ProxyURL, &conf)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -151,7 +115,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	rpcl := new(litrpc.LitRPC)
 	rpcl.Node = node
 	rpcl.OffButton = make(chan bool, 1)
@@ -160,7 +123,7 @@ func main() {
 	litbamf.BamfListen(conf.Rpcport, conf.LitHomeDir)
 
 	if conf.AutoReconnect {
-		node.AutoReconnect(conf.AutoListenPort, conf.AutoReconnectInterval)
+		node.AutoReconnect(conf.AutoListenPort, conf.AutoReconnectInterval, conf)
 	}
 
 	<-rpcl.OffButton

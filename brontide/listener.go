@@ -3,10 +3,13 @@ package brontide
 import (
 	"errors"
 	"io"
+	"log"
 	"net"
 	"time"
 
 	"github.com/adiabat/btcd/btcec"
+	tor"github.com/mit-dci/lit/tor"
+	litconfig "github.com/mit-dci/lit/config"
 )
 
 // defaultHandshakes is the maximum number of handshakes that can be done in
@@ -20,12 +23,42 @@ const defaultHandshakes = 1000
 // connection.
 type Listener struct {
 	localStatic *btcec.PrivateKey
-
-	tcp *net.TCPListener
+	conf        *litconfig.Config
+	tcp         *net.TCPListener
 
 	handshakeSema chan struct{}
 	conns         chan maybeConn
 	quit          chan struct{}
+}
+
+// initTorController initiliazes the Tor controller backed by lit and
+// automatically sets up a v2 onion service in order to listen for inbound
+// connections over Tor.
+func initTorController(torController *tor.Controller, conf *litconfig.Config) error {
+	if err := torController.Start(); err != nil {
+		log.Println("ERRORRS HERE")
+		return err
+	}
+	defaultPeerPort := 9051
+	listenPorts := make(map[int]struct{})
+	listenPorts[9051] = struct{}{}
+
+	// Once the port mapping has been set, we can go ahead and automatically
+	// create our onion service. The service's private key will be saved to
+	// disk in order to regain access to this service when restarting lit.
+	virtToTargPorts := tor.VirtToTargPorts{defaultPeerPort: listenPorts}
+	onionServiceAddr, err := torController.AddOnionV2( //onionServiceAddrs
+		conf.Tor.V2PrivateKeyPath, virtToTargPorts,
+	)
+	if err != nil {
+		return err
+	}
+		//l, err := net.ListenTCP("tcp", "rskkr2vi6rd63mxr.onion:2448")
+		//if err != nil {
+		//	return nil, err
+		//}
+	log.Println("Listening on onion address:", onionServiceAddr)
+	return nil
 }
 
 // A compile-time assertion to ensure that Conn meets the net.Listener interface.
@@ -33,14 +66,24 @@ var _ net.Listener = (*Listener)(nil)
 
 // NewListener returns a new net.Listener which enforces the Brontide scheme
 // during both initial connection establishment and data transfer.
-func NewListener(localStatic *btcec.PrivateKey, listenAddr string) (*Listener,
-	error) {
+func NewListener(localStatic *btcec.PrivateKey, listenAddr string,
+	config *litconfig.Config) (*Listener, error) {
+
+
+	if config.Tor.Active && config.Tor.V2 {
+		//log.Println("CFG TORC", config.Tor.Control)
+		torController := tor.NewController("localhost:9051") //main controller?
+		if err := initTorController(torController, config); err != nil {
+			log.Fatal(err)
+		}
+	}
 	addr, err := net.ResolveTCPAddr("tcp", listenAddr)
 	if err != nil {
+		log.Printf("ERRHERE", err, listenAddr)
 		return nil, err
 	}
-
-	l, err := net.ListenTCP("tcp", addr)
+	// log.Println("ADDRESS", addr)
+	l, err := net.ListenTCP("tcp",addr)
 	if err != nil {
 		return nil, err
 	}
@@ -48,6 +91,7 @@ func NewListener(localStatic *btcec.PrivateKey, listenAddr string) (*Listener,
 	brontideListener := &Listener{
 		localStatic:   localStatic,
 		tcp:           l,
+		conf:          config,
 		handshakeSema: make(chan struct{}, defaultHandshakes),
 		conns:         make(chan maybeConn),
 		quit:          make(chan struct{}),

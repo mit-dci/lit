@@ -7,12 +7,13 @@ import (
 
 	"github.com/adiabat/bech32"
 	"github.com/btcsuite/fastsha256"
+	litconfig"github.com/mit-dci/lit/config"
 )
 
 // AutoReconnect will start listening for incoming connections
 // and attempt to automatically reconnect to all
 // previously known peers.
-func (nd *LitNode) AutoReconnect(listenPort string, interval int64) {
+func (nd *LitNode) AutoReconnect(listenPort string, interval int64, config litconfig.Config) {
 	// Listen myself after a timeout
 	nd.TCPListener(listenPort)
 
@@ -42,7 +43,7 @@ func (nd *LitNode) AutoReconnect(listenPort string, interval int64) {
 				idHash := fastsha256.Sum256(pubKey[:])
 				adr := bech32.Encode("ln", idHash[:20])
 
-				err := nd.DialPeer(adr)
+				err := nd.DialPeer(adr, config)
 
 				if err != nil {
 					log.Printf("Could not restore connection to %s: %s\n", adr, err.Error())
