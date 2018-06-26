@@ -5,8 +5,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/adiabat/bech32"
-	"github.com/btcsuite/fastsha256"
+	"github.com/mit-dci/lit/bech32"
+	"github.com/mit-dci/lit/crypto/fastsha256"
 )
 
 // AutoReconnect will start listening for incoming connections
