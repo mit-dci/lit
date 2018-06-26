@@ -173,7 +173,7 @@ func (nd *LitNode) SendHashSig(q *Qchan) error {
 
 	outMsg := lnutil.NewHashSigMsg(q.Peer(), q.Op, q.State.InProgHTLC.Amt, q.State.InProgHTLC.RHash, commitmentSig, HTLCSigs, q.State.Data)
 
-	log.Printf("Sending HashSig")
+	log.Printf("Sending HashSig with %d HTLC sigs", len(HTLCSigs))
 
 	nd.OmniOut <- outMsg
 

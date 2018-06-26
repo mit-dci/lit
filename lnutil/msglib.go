@@ -576,7 +576,7 @@ func NewDeltaSigMsgFromBytes(b []byte, peerid uint32) (DeltaSigMsg, error) {
 	copy(ds.Signature[:], buf.Next(64))
 	copy(ds.Data[:], buf.Next(32))
 
-	nHTLCs := (buf.Len() - 136) / 64
+	nHTLCs := buf.Len() / 64
 	for i := 0; i < nHTLCs; i++ {
 		var HTLCSig [64]byte
 		copy(HTLCSig[:], buf.Next(64))
@@ -642,7 +642,7 @@ func NewSigRevFromBytes(b []byte, peerid uint32) (SigRevMsg, error) {
 	sr.Elk = *elk
 	copy(sr.N2ElkPoint[:], buf.Next(33))
 
-	nHTLCs := (buf.Len() - 165) / 64
+	nHTLCs := buf.Len() / 64
 	for i := 0; i < nHTLCs; i++ {
 		var HTLCSig [64]byte
 		copy(HTLCSig[:], buf.Next(64))
@@ -708,7 +708,7 @@ func NewGapSigRevFromBytes(b []byte, peerId uint32) (GapSigRevMsg, error) {
 	gs.Elk = *elk
 	copy(gs.N2ElkPoint[:], buf.Next(33))
 
-	nHTLCs := (buf.Len() - 165) / 64
+	nHTLCs := buf.Len() / 64
 	for i := 0; i < nHTLCs; i++ {
 		var HTLCSig [64]byte
 		copy(HTLCSig[:], buf.Next(64))
@@ -835,7 +835,7 @@ func NewHashSigMsgFromBytes(b []byte, peerid uint32) (HashSigMsg, error) {
 
 	copy(ds.CommitmentSignature[:], buf.Next(64))
 
-	nHTLCSigs := (buf.Len() - (64 + 32 + 32 + 8 + 36)) / 64
+	nHTLCSigs := buf.Len() / 64
 
 	for i := 0; i < nHTLCSigs; i++ {
 		var sig [64]byte
