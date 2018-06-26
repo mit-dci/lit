@@ -204,6 +204,12 @@ func (nd *LitNode) SignState(q *Qchan) ([64]byte, [][64]byte, error) {
 	// Generate signatures for HTLC-success/failure transactions
 	spendHTLCSigs := map[int][64]byte{}
 
+	curElk, err := q.ElkSnd.AtIndex(q.State.StateIdx)
+	if err != nil {
+		return sig, nil, err
+	}
+	elkScalar := lnutil.ElkScalar(curElk)
+
 	for idx, h := range HTLCTxOuts {
 		// Find out which vout this HTLC is in the commitment tx since BIP69
 		// potentially reordered them
@@ -215,16 +221,18 @@ func (nd *LitNode) SignState(q *Qchan) ([64]byte, [][64]byte, error) {
 			}
 		}
 
-		var HTLCPriv *btcec.PrivateKey
+		var HTLCPrivBase *btcec.PrivateKey
 		if idx >= len(q.State.HTLCs) {
-			HTLCPriv, err = nd.SubWallet[q.Coin()].GetPriv(q.State.InProgHTLC.KeyGen)
+			HTLCPrivBase, err = nd.SubWallet[q.Coin()].GetPriv(q.State.InProgHTLC.KeyGen)
 		} else {
-			HTLCPriv, err = nd.SubWallet[q.Coin()].GetPriv(q.State.HTLCs[idx].KeyGen)
+			HTLCPrivBase, err = nd.SubWallet[q.Coin()].GetPriv(q.State.HTLCs[idx].KeyGen)
 		}
 
 		if err != nil {
 			return sig, nil, err
 		}
+
+		HTLCPriv := lnutil.CombinePrivKeyWithBytes(HTLCPrivBase, elkScalar[:])
 
 		// Find the tx we need to sign. (this would all be much easier if we
 		// didn't use BIP69)
@@ -378,7 +386,7 @@ func (q *Qchan) VerifySigs(sig [64]byte, HTLCSigs [][64]byte) error {
 			return err
 		}
 
-		curElk, err := q.ElkPoint(false, q.State.StateIdx)
+		curElk, err := q.ElkPoint(true, q.State.StateIdx)
 		if err != nil {
 			return err
 		}
