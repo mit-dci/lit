@@ -3,8 +3,8 @@ package lnutil
 import (
 	"testing"
 
-	"github.com/mit-dci/lit/btcutil/btcd/btcec"
-	"github.com/mit-dci/lit/btcutil/btcd/chaincfg/chainhash"
+	"github.com/mit-dci/lit/btcutil/btcec"
+	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 )
 
 var (

@@ -3,7 +3,7 @@ package elkrem
 import (
 	"testing"
 
-	"github.com/mit-dci/lit/btcutil/btcd/chaincfg/chainhash"
+	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 )
 
 // TestElkremBig tries 10K hashes
