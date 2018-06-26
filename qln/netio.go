@@ -187,7 +187,8 @@ func (nd *LitNode) GetConnectedPeerList() []PeerInfo {
 	var peers []PeerInfo
 	for k, v := range nd.RemoteCons {
 		var newPeer PeerInfo
-		var pubArr,_ = nd.GetPubHostFromPeerIdx(k)
+		var pubArr [33]byte
+		copy(pubArr[:], v.Con.RemotePub.SerializeCompressed())
 		newPeer.PeerNumber = k
 		newPeer.RemoteHost = v.Con.RemoteAddr().String()
 		newPeer.Nickname = v.Nickname
