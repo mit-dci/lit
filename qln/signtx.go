@@ -210,6 +210,10 @@ func (nd *LitNode) SignState(q *Qchan) ([64]byte, [][64]byte, error) {
 	}
 	elkScalar := lnutil.ElkScalar(curElk)
 
+	ep := lnutil.ElkPointFromHash(curElk)
+
+	log.Printf("Using elkpoint %x to sign HTLC txs", ep)
+
 	for idx, h := range HTLCTxOuts {
 		// Find out which vout this HTLC is in the commitment tx since BIP69
 		// potentially reordered them
@@ -345,6 +349,8 @@ func (q *Qchan) VerifySigs(sig [64]byte, HTLCSigs [][64]byte) error {
 
 	// Map HTLC index to signature index
 	sigIndex := map[uint32]uint32{}
+
+	log.Printf("Using elkpoint %x to verify HTLC txs", q.State.ElkPoint)
 
 	for idx, h := range HTLCTxOuts {
 		// Find out which vout this HTLC is in the commitment tx since BIP69
