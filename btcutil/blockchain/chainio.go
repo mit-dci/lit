@@ -11,10 +11,10 @@ import (
 	"math/big"
 	"sort"
 
+	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/btcutil/database"
 	"github.com/mit-dci/lit/wire"
-	"github.com/mit-dci/lit/btcutil"
 )
 
 var (
@@ -1132,7 +1132,6 @@ func (b *BlockChain) initChainState() error {
 		if serializedData == nil {
 			return nil
 		}
-		log.Tracef("Serialized chain state: %x", serializedData)
 		state, err := deserializeBestChainState(serializedData)
 		if err != nil {
 			return err

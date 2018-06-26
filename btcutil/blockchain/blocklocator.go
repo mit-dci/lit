@@ -133,8 +133,6 @@ func (b *BlockChain) blockLocatorFromHash(hash *chainhash.Hash) BlockLocator {
 				// This shouldn't happen and it's ok to ignore
 				// block locators, so just continue to the next
 				// one.
-				log.Warnf("Lookup of known valid height failed %v",
-					blockHeight)
 				continue
 			}
 			locator = append(locator, h)

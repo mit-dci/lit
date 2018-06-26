@@ -8,11 +8,10 @@ import (
 	"fmt"
 	"math"
 	"runtime"
-	"time"
 
+	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/txscript"
 	"github.com/mit-dci/lit/wire"
-	"github.com/mit-dci/lit/btcutil"
 )
 
 // txValidateItem holds a transaction along with which input to validate.
@@ -298,13 +297,11 @@ func checkBlockScripts(block *btcutil.Block, utxoView *UtxoViewpoint,
 
 	// Validate all of the inputs.
 	validator := newTxValidator(utxoView, scriptFlags, sigCache, hashCache)
-	start := time.Now()
+	//start := time.Now()
 	if err := validator.Validate(txValItems); err != nil {
 		return err
 	}
-	elapsed := time.Since(start)
-
-	log.Tracef("block %v took %v to verify", block.Hash(), elapsed)
+	//elapsed := time.Since(start)
 
 	// If the HashCache is present, once we have validated the block, we no
 	// longer need the cached hashes for these transactions, so we purge
