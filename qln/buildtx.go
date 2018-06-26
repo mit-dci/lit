@@ -132,11 +132,15 @@ func (q *Qchan) BuildStateTxs(mine bool) (*wire.MsgTx, []*wire.MsgTx, []*wire.Tx
 	theirAmt = q.Value - s.MyAmt
 
 	if s.InProgHTLC != nil {
-		theirAmt -= s.InProgHTLC.Amt
+		if s.InProgHTLC.Incoming {
+			theirAmt -= s.InProgHTLC.Amt
+		}
 	}
 
 	for _, h := range s.HTLCs {
-		theirAmt -= h.Amt
+		if h.Incoming {
+			theirAmt -= h.Amt
+		}
 	}
 
 	// the PKH clear refund also has elkrem points added to mask the PKH.
