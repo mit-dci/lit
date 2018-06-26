@@ -132,13 +132,13 @@ func (q *Qchan) BuildStateTxs(mine bool) (*wire.MsgTx, []*wire.MsgTx, []*wire.Tx
 	theirAmt = q.Value - s.MyAmt
 
 	if s.InProgHTLC != nil {
-		if s.InProgHTLC.Incoming {
+		if s.InProgHTLC.Incoming == mine {
 			theirAmt -= s.InProgHTLC.Amt
 		}
 	}
 
 	for _, h := range s.HTLCs {
-		if h.Incoming {
+		if h.Incoming == mine {
 			theirAmt -= h.Amt
 		}
 	}
