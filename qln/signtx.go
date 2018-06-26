@@ -204,7 +204,7 @@ func (nd *LitNode) SignState(q *Qchan) ([64]byte, [][64]byte, error) {
 	// Generate signatures for HTLC-success/failure transactions
 	spendHTLCSigs := map[int][64]byte{}
 
-	curElk, err := q.ElkSnd.AtIndex(q.State.StateIdx)
+	curElk, err := q.ElkSnd.AtIndex(q.State.StateIdx - 1)
 	if err != nil {
 		return sig, nil, err
 	}
@@ -386,7 +386,7 @@ func (q *Qchan) VerifySigs(sig [64]byte, HTLCSigs [][64]byte) error {
 			return err
 		}
 
-		curElk, err := q.ElkPoint(true, q.State.StateIdx)
+		curElk, err := q.ElkPoint(true, q.State.StateIdx-1)
 		if err != nil {
 			return err
 		}
