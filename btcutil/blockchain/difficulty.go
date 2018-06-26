@@ -207,7 +207,6 @@ func (b *BlockChain) findPrevTestNetDifficulty(startNode *blockNode) (uint32, er
 		var err error
 		iterNode, err = b.getPrevNodeFromNode(iterNode)
 		if err != nil {
-			log.Errorf("getPrevNodeFromNode: %v", err)
 			return 0, err
 		}
 	}
@@ -308,18 +307,11 @@ func (b *BlockChain) calcNextRequiredDifficulty(lastNode *blockNode, newBlockTim
 		newTarget.Set(b.chainParams.PowLimit)
 	}
 
-	// Log new target difficulty and return it.  The new target logging is
+	// (Don't) log new target difficulty and return it.  The new target logging is
 	// intentionally converting the bits back to a number instead of using
 	// newTarget since conversion to the compact representation loses
 	// precision.
 	newTargetBits := BigToCompact(newTarget)
-	log.Debugf("Difficulty retarget at block height %d", lastNode.height+1)
-	log.Debugf("Old target %08x (%064x)", lastNode.bits, oldTarget)
-	log.Debugf("New target %08x (%064x)", newTargetBits, CompactToBig(newTargetBits))
-	log.Debugf("Actual timespan %v, adjusted timespan %v, target timespan %v",
-		time.Duration(actualTimespan), time.Duration(adjustedTimespan),
-		b.chainParams.TargetTimespan)
-
 	return newTargetBits, nil
 }
 

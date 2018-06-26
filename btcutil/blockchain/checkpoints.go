@@ -7,11 +7,11 @@ package blockchain
 import (
 	"fmt"
 
+	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/chaincfg"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/btcutil/database"
 	"github.com/mit-dci/lit/btcutil/txscript"
-	"github.com/mit-dci/lit/btcutil"
 )
 
 // CheckpointConfirmations is the number of blocks before the end of the current
@@ -100,8 +100,6 @@ func (b *BlockChain) verifyCheckpoint(height int32, hash *chainhash.Hash) bool {
 		return false
 	}
 
-	log.Infof("Verified checkpoint at height %d/block %s", checkpoint.Height,
-		checkpoint.Hash)
 	return true
 }
 

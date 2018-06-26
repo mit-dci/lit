@@ -133,9 +133,7 @@ func (m *medianTime) AddTimeSample(sourceID string, timeVal time.Time) {
 	copy(sortedOffsets, m.offsets)
 	sort.Sort(int64Sorter(sortedOffsets))
 
-	offsetDuration := time.Duration(offsetSecs) * time.Second
-	log.Debugf("Added time sample of %v (total: %v)", offsetDuration,
-		numOffsets)
+	//offsetDuration := time.Duration(offsetSecs) * time.Second
 
 	// NOTE: The following code intentionally has a bug to mirror the
 	// buggy behavior in Bitcoin Core since the median time is used in the
@@ -172,25 +170,18 @@ func (m *medianTime) AddTimeSample(sourceID string, timeVal time.Time) {
 
 			// Find if any time samples have a time that is close
 			// to the local time.
-			var remoteHasCloseTime bool
+			//var remoteHasCloseTime bool
 			for _, offset := range sortedOffsets {
 				if math.Abs(float64(offset)) < similarTimeSecs {
-					remoteHasCloseTime = true
+					//remoteHasCloseTime = true
 					break
 				}
 			}
 
-			// Warn if none of the time samples are close.
-			if !remoteHasCloseTime {
-				log.Warnf("Please check your date and time " +
-					"are correct!  btcd will not work " +
-					"properly with an invalid time")
-			}
 		}
 	}
 
-	medianDuration := time.Duration(m.offsetSecs) * time.Second
-	log.Debugf("New time offset: %v", medianDuration)
+	//medianDuration := time.Duration(m.offsetSecs) * time.Second
 }
 
 // Offset returns the number of seconds to adjust the local clock based upon the

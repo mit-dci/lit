@@ -11,11 +11,11 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/chaincfg"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/btcutil/txscript"
 	"github.com/mit-dci/lit/wire"
-	"github.com/mit-dci/lit/btcutil"
 )
 
 const (
@@ -667,7 +667,6 @@ func (b *BlockChain) checkBlockHeaderContext(header *wire.BlockHeader, prevNode 
 		// median time of the last several blocks (medianTimeBlocks).
 		medianTime, err := b.calcPastMedianTime(prevNode)
 		if err != nil {
-			log.Errorf("calcPastMedianTime: %v", err)
 			return err
 		}
 		if !header.Timestamp.After(medianTime) {
@@ -1126,7 +1125,6 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	// that are needed to remain in memory.
 	prevNode, err := b.getPrevNodeFromNode(node)
 	if err != nil {
-		log.Errorf("getPrevNodeFromNode: %v", err)
 		return err
 	}
 

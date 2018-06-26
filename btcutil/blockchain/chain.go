@@ -12,12 +12,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/chaincfg"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/btcutil/database"
 	"github.com/mit-dci/lit/btcutil/txscript"
 	"github.com/mit-dci/lit/wire"
-	"github.com/mit-dci/lit/btcutil"
 )
 
 const (
@@ -660,7 +660,6 @@ func (b *BlockChain) calcPastMedianTime(startNode *blockNode) (time.Time, error)
 		var err error
 		iterNode, err = b.getPrevNodeFromNode(iterNode)
 		if err != nil {
-			log.Errorf("getPrevNodeFromNode: %v", err)
 			return time.Time{}, err
 		}
 	}
@@ -1191,19 +1190,6 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 		delete(b.blockCache, *n.hash)
 	}
 
-	// Log the point where the chain forked.
-	firstAttachNode := attachNodes.Front().Value.(*blockNode)
-	forkNode, err := b.getPrevNodeFromNode(firstAttachNode)
-	if err == nil {
-		log.Infof("REORGANIZE: Chain forks at %v", forkNode.hash)
-	}
-
-	// Log the old and new best chain heads.
-	firstDetachNode := detachNodes.Front().Value.(*blockNode)
-	lastAttachNode := attachNodes.Back().Value.(*blockNode)
-	log.Infof("REORGANIZE: Old best chain head was %v", firstDetachNode.hash)
-	log.Infof("REORGANIZE: New best chain head is %v", lastAttachNode.hash)
-
 	return nil
 }
 
@@ -1220,8 +1206,8 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List, flags 
 //  - BFFastAdd: Avoids several expensive transaction validation operations.
 //    This is useful when using checkpoints.
 //  - BFDryRun: Prevents the block from being connected and avoids modifying the
-//    state of the memory chain index.  Also, any log messages related to
-//    modifying the state are avoided.
+//    state of the memory chain index.  Also, any (don't) log messages related
+//    to modifying the state are avoided.
 //
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, flags BehaviorFlags) (bool, error) {
@@ -1277,18 +1263,11 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 
 		return true, nil
 	}
-	if fastAdd {
-		log.Warnf("fastAdd set in the side chain case? %v\n",
-			block.Hash())
-	}
 
 	// We're extending (or creating) a side chain which may or may not
 	// become the main chain, but in either case we need the block stored
 	// for future processing, so add the block to the side chain holding
 	// cache.
-	if !dryRun {
-		log.Debugf("Adding block %v to side chain cache", node.hash)
-	}
 	b.blockCache[*node.hash] = block
 	b.index[*node.hash] = node
 
@@ -1325,17 +1304,6 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 			}
 		}
 
-		// Log information about how the block is forking the chain.
-		if fork.hash.IsEqual(node.parent.hash) {
-			log.Infof("FORK: Block %v forks the chain at height %d"+
-				"/block %v, but does not cause a reorganize",
-				node.hash, fork.height, fork.hash)
-		} else {
-			log.Infof("EXTEND FORK: Block %v extends a side chain "+
-				"which forks the chain at height %d/block %v",
-				node.hash, fork.height, fork.hash)
-		}
-
 		return false, nil
 	}
 
@@ -1349,10 +1317,6 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 	detachNodes, attachNodes := b.getReorganizeNodes(node)
 
 	// Reorganize the chain.
-	if !dryRun {
-		log.Infof("REORGANIZE: Block %v is causing a reorganize.",
-			node.hash)
-	}
 	err := b.reorganizeChain(detachNodes, attachNodes, flags)
 	if err != nil {
 		return false, err
@@ -1537,10 +1501,6 @@ func New(config *Config) (*BlockChain, error) {
 			return nil, err
 		}
 	}
-
-	log.Infof("Chain state (height %d, hash %v, totaltx %d, work %v)",
-		b.bestNode.height, b.bestNode.hash, b.stateSnapshot.TotalTxns,
-		b.bestNode.workSum)
 
 	return &b, nil
 }
