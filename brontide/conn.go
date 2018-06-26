@@ -8,7 +8,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/adiabat/btcd/btcec"
+	"github.com/mit-dci/lit/btcutil/btcd/btcec"
 )
 
 // Conn is an implementation of net.Conn which enforces an authenticated key

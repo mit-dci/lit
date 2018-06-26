@@ -6,7 +6,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/adiabat/btcd/btcec"
+	"github.com/mit-dci/lit/btcutil/btcd/btcec"
 )
 
 // defaultHandshakes is the maximum number of handshakes that can be done in

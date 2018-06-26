@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/adiabat/btcd/btcec"
+	"github.com/mit-dci/lit/btcutil/btcd/btcec"
 )
 
 type maybeNetConn struct {
