@@ -1,4 +1,5 @@
 # lit - a lightning node you can run on your own
+
 ![Lit Logo](litlogo145.png)
 
 [![Build Status](http://hubris.media.mit.edu:8080/job/lit-PR/badge/icon)](http://hubris.media.mit.edu:8080/job/lit-PR/)
@@ -8,10 +9,15 @@ Under development, not for use with real money.
 ## Setup
 
 ### Prerequisites
+
 - [Git](https://git-scm.com/)
 - [Go](https://golang.org/doc/install)
 
-### Installing
+- [Go](https://golang.org/doc/install)
+
+- (Optional, Windows) a [Cygwin](https://cygwin.com/install.html) environment might make things easier for you.
+
+### Downloading
 
 1. Clone this repo with `git clone https://github.com/mit-dci/lit` or do `go get github.com/mit-dci/lit`
 
@@ -19,9 +25,59 @@ Under development, not for use with real money.
 
 3. Run `make lit` to build lit and `make test` to run the tests. `make test with-python=true` will include the python tests (requires `bitcoind`). Alternatively, you can run `go build` to build lit if you're building inside your GOPATH.
 
+### Installing
+
+1. Set your Go variables to match your installed paths are set correctly:
+- `.../go/bin` (your install location) is in `$PATH` (Windows: Add the install location into your `PATH` System Variable)
+- `$GOPATH` is set the location of where you want lit (and other projects) to be
+-  optional: If you want to have packages download in a separate location than your installation add `$GOROOT` set to another location
+
+2. Download the lit project with `go get github.com/mit-dci/lit`
+
 4. Run `./lit --tn3 1` to start lit
 
 The words `yup, yes, y, true, 1, ok, enable, on` can be used to specify that lit automatically connect to a set of populated seeds. It can also be replaced by the ip of the remote node you wish to connect to.
+
+### Building
+
+1. Go to the location of your lit installation with your defined gopath variable (`$GOPATH` on Linux and `%GOPATH%` Windows) to the lit location
+
+```
+cd [gopath]/src/github.com/mit-dci/lit
+```
+
+2. If you try to build now with `go build` you will receive several errors such as
+
+```
+cannot find package "golang.org/x/crypto/nacl/secretbox"
+...
+cannot find package "golang.org/x/crypto/scrypt"
+...
+cannot find package [packageName]
+...
+```
+
+3. In order to download all missing packages, do `go get ./...` or `go get .`
+
+4. Go back to location of the lit folder if you are not already there ([Step 1](#building)) and try to rebuild the project.
+
+5. You may now want to build `lit-af`, the text based client which controls the lit node using
+
+```
+cd cmd/lit-af
+go build
+```
+
+6. To run lit use:
+
+(Note: Windows users can take off ./ but may need to change lit to lit.exe in the second line.)
+
+```
+cd GOPATH/src/github.com/mit-dci/lit
+./lit --tn3 true
+```
+
+The words `true`, `yes`, `1` can be used to specify that lit automatically connect to a set of populated seeds. It can also be replaced by the ip of the remote node you wish to connect to.
 
 ## Using Lightning
 
@@ -88,4 +144,5 @@ One package that implements the chainhook interface is uspv.  Uspv deals with he
 ![Dependency Graph](deps-2018-06-19.png)
 
 ## License
+
 [MIT](https://github.com/mit-dci/lit/blob/master/LICENSE)
