@@ -141,7 +141,7 @@ One package that implements the chainhook interface is uspv.  Uspv deals with he
 
 #### Dependency graph
 
-![Dependency Graph](deps-2018-06-19.png)
+![Dependency Graph](docs/deps.png)
 
 ## License
 
