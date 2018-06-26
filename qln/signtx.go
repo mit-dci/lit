@@ -204,7 +204,7 @@ func (nd *LitNode) SignState(q *Qchan) ([64]byte, [][64]byte, error) {
 	// Generate signatures for HTLC-success/failure transactions
 	spendHTLCSigs := map[int][64]byte{}
 
-	curElk, err := q.ElkSnd.AtIndex(q.State.StateIdx - 1)
+	curElk, err := q.ElkSnd.AtIndex(q.State.StateIdx)
 	if err != nil {
 		return sig, nil, err
 	}
@@ -386,16 +386,11 @@ func (q *Qchan) VerifySigs(sig [64]byte, HTLCSigs [][64]byte) error {
 			return err
 		}
 
-		curElk, err := q.ElkPoint(true, q.State.StateIdx-1)
-		if err != nil {
-			return err
-		}
-
 		var theirHTLCPub [33]byte
 		if idx >= len(q.State.HTLCs) {
-			theirHTLCPub = lnutil.CombinePubs(q.State.InProgHTLC.TheirHTLCBase, curElk)
+			theirHTLCPub = lnutil.CombinePubs(q.State.InProgHTLC.TheirHTLCBase, q.State.ElkPoint)
 		} else {
-			theirHTLCPub = lnutil.CombinePubs(q.State.HTLCs[idx].TheirHTLCBase, curElk)
+			theirHTLCPub = lnutil.CombinePubs(q.State.HTLCs[idx].TheirHTLCBase, q.State.ElkPoint)
 		}
 
 		theirHTLCPubKey, err := btcec.ParsePubKey(theirHTLCPub[:], btcec.S256())
