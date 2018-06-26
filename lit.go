@@ -123,7 +123,8 @@ func main() {
 	litbamf.BamfListen(conf.Rpcport, conf.LitHomeDir)
 
 	if conf.AutoReconnect {
-		node.AutoReconnect(conf.AutoListenPort, conf.AutoReconnectInterval, conf)
+		net := &tor.ClearNet{} //changethis
+		node.AutoReconnect(conf.AutoListenPort, conf.AutoReconnectInterval, net)
 	}
 
 	<-rpcl.OffButton

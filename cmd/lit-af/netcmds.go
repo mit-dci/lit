@@ -10,7 +10,7 @@ import (
 	litconfig "github.com/mit-dci/lit/config"
 	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/lnutil"
-	tor "github.com/mit-dci/lit/tor"
+	//"github.com/mit-dci/lit/tor"
 )
 
 var sayCommand = &Command{
@@ -128,46 +128,18 @@ func (lc *litAfClient) Connect(textArgs []string) error {
 	}
 
 	args.LNAddr = textArgs[0]
-	//args.config *litconfig.Config
-	//conf.Net = &tor.ProxyNet{
-	//	SOCKS:           conf.Tor.SOCKS,
-	//	DNS:             conf.Tor.DNS,
-	//	StreamIsolation: conf.Tor.StreamIsolation,
-	//}
-
-	// args.Config.Net = &tor.ProxyNet{
-	// 	"localhost:9051",
-	// 	"soa.nodes.lightning.directory",
-	// 	false,
-	// }
-	config1 := litconfig.Config{
-		LitHomeDir:            litconfig.DefaultLitHomeDirName,
-		Rpcport:               litconfig.DefaultRpcport,
-		Rpchost:               litconfig.DefaultRpchost,
-		TrackerURL:            litconfig.DefaultTrackerURL,
-		AutoReconnect:         litconfig.DefaultAutoReconnect,
-		AutoListenPort:        litconfig.DefaultAutoListenPort,
-		AutoReconnectInterval: litconfig.DefaultAutoReconnectInterval,
-		Tor: &litconfig.TorConfig{
-			SOCKS:            litconfig.DefaultTorSOCKS,
-			DNS:              litconfig.DefaultTorDNS,
-			Control:          litconfig.DefaultTorControl,
-			V2PrivateKeyPath: litconfig.DefaultTorV2PrivateKeyPath,
-		},
-		Net: &tor.ClearNet{},
+	log.Println("TEXTARGS", textArgs)
+	if len(textArgs) == 3 {
+		args.Tor = &litconfig.TorConfig{
+			SOCKS: "localhost:9050",
+			DNS:   "soa.nodes.lightning.directory",
+		}
+		log.Println("TOR SOCKS", args.Tor.SOCKS)
 	}
-	config1.Net = &tor.ProxyNet{
-		"localhost:9050",
-		"soa.nodes.lightning.directory:53",
-		false,
-	}
-
-	args.Config = config1
-	log.Println("CONFIG", args.Config.Net)
-	log.Println("ARGS", args)
+	//args.Net = &tor.ClearNet{}
 	err := lc.Call("LitRPC.Connect", args, reply)
 	if err != nil {
-		log.Println("ERRORS HERE",err)
+		log.Println("ERRORS HERE", err)
 		return err
 	}
 

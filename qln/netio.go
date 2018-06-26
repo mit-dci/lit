@@ -4,13 +4,14 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
-	"net"
+	//"net"
 	"strings"
 
 	"github.com/adiabat/btcd/btcec"
 	"github.com/mit-dci/lit/brontide"
 	"github.com/mit-dci/lit/lnutil"
-	litconfig"github.com/mit-dci/lit/config"
+	//litconfig"github.com/mit-dci/lit/config"
+	"github.com/mit-dci/lit/tor"
 )
 
 // Gets the list of ports where LitNode is listening for incoming connections,
@@ -117,7 +118,7 @@ func splitAdrString(adr string) (string, string) {
 }
 
 // DialPeer makes an outgoing connection to another node.
-func (nd *LitNode) DialPeer(connectAdr string, config litconfig.Config) error {
+func (nd *LitNode) DialPeer(connectAdr string, net tor.Net) error {
 	var err error
 
 	// parse address and get pkh / host / port
@@ -135,7 +136,7 @@ func (nd *LitNode) DialPeer(connectAdr string, config litconfig.Config) error {
 	idPriv := nd.IdKey()
 
 	// Assign remote connection
-	newConn, err := brontide.Dial(idPriv, where, who, net.Dial, config)
+	newConn, err := brontide.Dial(idPriv, where, who, net)
 	if err != nil {
 		return err
 	}

@@ -8,6 +8,7 @@ import (
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/qln"
 	litconfig"github.com/mit-dci/lit/config"
+	"github.com/mit-dci/lit/tor"
 )
 
 // ------------------------- listen
@@ -38,7 +39,8 @@ func (r *LitRPC) Listen(args ListenArgs, reply *ListeningPortsReply) error {
 // ------------------------- connect
 type ConnectArgs struct {
 	LNAddr string
-	Config litconfig.Config
+	Tor *litconfig.TorConfig
+	Net tor.Net
 }
 
 func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
@@ -61,8 +63,17 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
 		// use string as is, try to convert to ln address
 		connectAdr = args.LNAddr
 	}
-
-	err = r.Node.DialPeer(connectAdr, args.Config)
+	if args.Tor != nil {
+		log.Println("Connecting via tor")
+		err = r.Node.DialPeer(connectAdr, &tor.ProxyNet{
+			SOCKS:           "localhost:9050",
+			DNS:             "soa.nodes.lightning.directory",
+			StreamIsolation: false,
+		})
+	} else {
+		log.Println("Connecting via clearnet")
+		err = r.Node.DialPeer(connectAdr, &tor.ClearNet{})
+	}
 	if err != nil {
 		return err
 	}
