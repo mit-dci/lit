@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/adiabat/btcd/btcec"
-	"github.com/adiabat/btcd/wire"
-	"github.com/adiabat/btcutil"
+	"github.com/mit-dci/lit/btcutil/btcd/btcec"
+	"github.com/mit-dci/lit/wire"
+	"github.com/mit-dci/lit/btcutil"
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/elkrem"

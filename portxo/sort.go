@@ -3,7 +3,7 @@ package portxo
 import (
 	"bytes"
 
-	"github.com/adiabat/btcd/chaincfg/chainhash"
+	"github.com/mit-dci/lit/btcutil/btcd/chaincfg/chainhash"
 )
 
 // txoSliceByBip69 is a sortable txo slice - same algo as txsort / BIP69

@@ -3,8 +3,8 @@ package wallit
 import (
 	"log"
 
-	"github.com/adiabat/btcd/btcec"
-	"github.com/adiabat/btcutil"
+	"github.com/mit-dci/lit/btcutil/btcd/btcec"
+	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/portxo"
 )
 

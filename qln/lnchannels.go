@@ -10,8 +10,8 @@ import (
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 
-	"github.com/adiabat/btcd/btcec"
-	"github.com/adiabat/btcd/chaincfg/chainhash"
+	"github.com/mit-dci/lit/btcutil/btcd/btcec"
+	"github.com/mit-dci/lit/btcutil/btcd/chaincfg/chainhash"
 )
 
 // Uhh, quick channel.  For now.  Once you get greater spire it upgrades to
