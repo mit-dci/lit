@@ -350,7 +350,7 @@ func (q *Qchan) VerifySigs(sig [64]byte, HTLCSigs [][64]byte) error {
 	// Map HTLC index to signature index
 	sigIndex := map[uint32]uint32{}
 
-	log.Printf("Using elkpoint %x to verify HTLC txs", q.State.ElkPoint)
+	log.Printf("Using elkpoint %x to verify HTLC txs", q.State.NextElkPoint)
 
 	for idx, h := range HTLCTxOuts {
 		// Find out which vout this HTLC is in the commitment tx since BIP69
@@ -394,9 +394,9 @@ func (q *Qchan) VerifySigs(sig [64]byte, HTLCSigs [][64]byte) error {
 
 		var theirHTLCPub [33]byte
 		if idx >= len(q.State.HTLCs) {
-			theirHTLCPub = lnutil.CombinePubs(q.State.InProgHTLC.TheirHTLCBase, q.State.ElkPoint)
+			theirHTLCPub = lnutil.CombinePubs(q.State.InProgHTLC.TheirHTLCBase, q.State.NextElkPoint)
 		} else {
-			theirHTLCPub = lnutil.CombinePubs(q.State.HTLCs[idx].TheirHTLCBase, q.State.ElkPoint)
+			theirHTLCPub = lnutil.CombinePubs(q.State.HTLCs[idx].TheirHTLCBase, q.State.NextElkPoint)
 		}
 
 		theirHTLCPubKey, err := btcec.ParsePubKey(theirHTLCPub[:], btcec.S256())
