@@ -13,7 +13,7 @@ import (
 
 	"golang.org/x/net/proxy"
 
-	"github.com/mit-dci/lit/btcutil/btcd/btcec"
+	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/crypto/fastsha256"
 	"github.com/codahale/chacha20poly1305"
 	"github.com/mit-dci/lit/lnutil"

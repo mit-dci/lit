@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/mit-dci/lit/btcutil/btcd/btcec"
+	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/lnutil"
 )
 
