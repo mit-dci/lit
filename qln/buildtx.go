@@ -3,6 +3,7 @@ package qln
 import (
 	"bytes"
 	"fmt"
+	"log"
 
 	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
@@ -241,6 +242,9 @@ func (q *Qchan) BuildStateTxs(mine bool) (*wire.MsgTx, []*wire.MsgTx, []*wire.Tx
 			HTLCScript = lnutil.ReceiveHTLCScript(revPKH,
 				remotePub, h.RHash, localPub, h.Locktime)
 		}
+
+		log.Printf("HTLC %d, script: %x, myBase: %x, theirBase: %x, Incoming: %t, Amt: %d, RHash: %x",
+			h.Idx, HTLCScript, h.MyHTLCBase, h.TheirHTLCBase, h.Incoming, h.Amt, h.RHash)
 
 		witScript := lnutil.P2WSHify(HTLCScript)
 
