@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/adiabat/btcd/btcec"
+	"github.com/mit-dci/lit/btcutil/btcd/btcec"
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
 )
@@ -49,8 +49,8 @@ func (nd *LitNode) TCPListener(
 		}
 	}
 
-	fmt.Printf("Listening on %s\n", listener.Addr().String())
-	fmt.Printf("Listening with ln address: %s \n", adr)
+	log.Printf("Listening on %s\n", listener.Addr().String())
+	log.Printf("Listening with ln address: %s \n", adr)
 
 	go func() {
 		for {
@@ -61,10 +61,10 @@ func (nd *LitNode) TCPListener(
 			}
 			newConn, ok := netConn.(*lndc.LNDConn)
 			if !ok {
-				fmt.Printf("Got something that wasn't a LNDC")
+				log.Printf("Got something that wasn't a LNDC")
 				continue
 			}
-			fmt.Printf("Incoming connection from %x on %s\n",
+			log.Printf("Incoming connection from %x on %s\n",
 				newConn.RemotePub.SerializeCompressed(), newConn.RemoteAddr().String())
 
 			// don't save host/port for incoming connections
@@ -158,7 +158,7 @@ func (nd *LitNode) OutMessager() {
 	for {
 		msg := <-nd.OmniOut
 		if !nd.ConnectedToPeer(msg.Peer()) {
-			fmt.Printf("message type %x to peer %d but not connected\n",
+			log.Printf("message type %x to peer %d but not connected\n",
 				msg.MsgType(), msg.Peer())
 			continue
 		}
@@ -168,9 +168,9 @@ func (nd *LitNode) OutMessager() {
 		nd.RemoteMtx.Lock()   // not sure this is needed...
 		n, err := nd.RemoteCons[msg.Peer()].Con.Write(rawmsg)
 		if err != nil {
-			fmt.Printf("error writing to peer %d: %s\n", msg.Peer(), err.Error())
+			log.Printf("error writing to peer %d: %s\n", msg.Peer(), err.Error())
 		} else {
-			fmt.Printf("type %x %d bytes to peer %d\n", msg.MsgType(), n, msg.Peer())
+			log.Printf("type %x %d bytes to peer %d\n", msg.MsgType(), n, msg.Peer())
 		}
 		nd.RemoteMtx.Unlock()
 	}

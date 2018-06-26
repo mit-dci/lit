@@ -13,11 +13,69 @@ import (
 	"math/big"
 	"os"
 
-	"github.com/adiabat/btcd/blockchain"
+	"github.com/mit-dci/lit/btcutil/btcd/blockchain"
 
-	"github.com/adiabat/btcd/wire"
+	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/coinparam"
 )
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+func moreWork(a, b []*wire.BlockHeader, p *coinparam.Params) bool {
+	var isMoreWork bool = false
+	if len(a) == 0 || len(b) == 0 {
+		return false
+	}
+	//if checkProofOfWork(*a[0], p) == checkProofOfWork(*b[0], p) {
+	// log.Println(string(&a[0].MerkleRoot) == string(&b[0].MerkleRoot))
+
+	// if (&a[0].MerkleRoot).IsEqual(&b[0].MerkleRoot) { this always returns false,
+	// so we use the String() method to convert them, thing stole half an hour..
+	var pos int = 0 //can safely assume this thanks to the first check
+	for i := min(len(a), len(b)) - 1; i >= 1; i-- {
+		log.Println(i)
+		hash := a[i-1].BlockHash()
+		log.Println("HASH")
+		log.Println(hash)
+		log.Println(a[i].PrevBlock.IsEqual(&hash))
+		log.Println(b[i].PrevBlock.IsEqual(&hash))
+		if a[i].PrevBlock.IsEqual(&hash) && b[i].PrevBlock.IsEqual(&hash){
+			isMoreWork = true
+			pos = i
+			break
+		}
+	}
+	if !isMoreWork {
+		return isMoreWork
+	} else {
+		var a1, b1 []*wire.BlockHeader
+		a1 = a[pos:]
+		b1 = b[pos:]
+		// log.Println ("Watch here")
+		// log.Println(len(a1))
+		// log.Println(len(b1))
+		work_a := big.NewInt(0) // since raw declarations don't work, lets set it to 0
+		work_b := big.NewInt(0) // since raw declarations don't work, lets set it to 0
+		for i := 0; i < len(a1); i++ {
+			work_a.Add(blockchain.CalcWork(a1[0].Bits), work_a)
+		}
+		for i := 0; i < len(b1); i++ {
+			//log.Println(i)
+			work_b.Add(blockchain.CalcWork(b1[i].Bits), work_b)
+		}
+		log.Println("Work done by alt chains A and B are: ")
+		log.Println(work_a, work_b)
+		// due to cmp's stquirks in big, we can't return directly
+		if work_a.Cmp(work_b) > 0 { // if chain A does more work than B return true
+			return isMoreWork // true
+		}
+		return !isMoreWork // false
+	}
+}
 
 // checkProofOfWork verifies the header hashes into something
 // lower than specified by the 4-byte bits field.
@@ -115,7 +173,7 @@ func FindHeader(r io.ReadSeeker, hdr wire.BlockHeader) (int32, error) {
 		}
 		curhash := cur.BlockHash()
 
-		//		fmt.Printf("try %d %s\n", tries, curhash.String())
+		//		log.Printf("try %d %s\n", tries, curhash.String())
 
 		if hdr.PrevBlock.IsEqual(&curhash) {
 			return int32(offset / 80), nil
@@ -238,7 +296,19 @@ func CheckHeaderChain(
 		// TODO check for more work here instead of length.  This is wrong...
 		// if we've been given insufficient headers, don't reorg, but
 		// ask for more headers.
-		if attachHeight+int32(len(inHeaders)) < height {
+
+		// Check between two chains with attachHeight+int32(len(inHeaders)) and height
+		// lengths, then Compare the work associated with them.
+		// 1. check whether they really are from the same chain i.e. start from the same Header
+		// 2. Find the most recent common Block
+		// 3. Calculate work on both chains from that block
+		// 4. Return true or false based on which one is better.
+		// the two arrays are chain+inHeaders+attachHeight and the height chain itself
+		// 2,3,4 -? fn
+
+		if moreWork(inHeaders, oldHeaders, p) {
+			// pretty sure this won't work without testing
+			// if attachHeight+int32(len(inHeaders)) < height {
 			return -1, fmt.Errorf(
 				"reorg message up to height %d, but have up to %d",
 				attachHeight+int32(len(inHeaders)), height-1)

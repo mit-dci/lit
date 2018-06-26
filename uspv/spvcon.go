@@ -5,8 +5,8 @@ import (
 	"os"
 	"sync"
 
-	"github.com/adiabat/btcd/chaincfg/chainhash"
-	"github.com/adiabat/btcd/wire"
+	"github.com/mit-dci/lit/btcutil/btcd/chaincfg/chainhash"
+	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
 )
@@ -76,4 +76,5 @@ type SPVCon struct {
 	// waitState is a channel that is empty while in the header and block
 	// sync modes, but when in the idle state has a "true" in it.
 	inWaitState chan bool
+	randomNodesOK bool
 }

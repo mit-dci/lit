@@ -9,7 +9,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/adiabat/btcd/wire"
+	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/lnutil"
 )
 
@@ -30,7 +30,6 @@ func (s *SPVCon) parseRemoteNode(remoteNode string) (string, string, error) {
 		}
 		// only ipv4 clears this since ipv6 has colons
 		conMode = "tcp4"
-		log.Println("HERE")
 		return remoteNode, conMode, nil
 	} else if colonCount == 1 && IP4(strings.Split(remoteNode, ":")[0]) {
 		// custom port on ipv4
@@ -176,10 +175,13 @@ func (s *SPVCon) Connect(remoteNode string) error {
 	var err error
 	var listOfNodes []string
 	if lnutil.YupString(remoteNode) {
+		s.randomNodesOK = true
 		// if remoteNode is "yes" but no IP specified, use DNS seed
 		listOfNodes, err = s.GetListOfNodes()
 		if err != nil {
+			log.Println(err)
 			return err
+			// automatically quit if there are no other hosts to connect to.
 		}
 	} else { // else connect to user-specified node
 		listOfNodes = []string{remoteNode}

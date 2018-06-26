@@ -3,7 +3,7 @@ package lnutil
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
+	"log"
 )
 
 // I shouldn't even have to write these...
@@ -25,7 +25,7 @@ func U32tB(i uint32) []byte {
 // 4 byte slice to uint32.  Returns ffffffff if something doesn't work.
 func BtU32(b []byte) uint32 {
 	if len(b) != 4 {
-		fmt.Printf("Got %x to BtU32 (%d bytes)\n", b, len(b))
+		log.Printf("Got %x to BtU32 (%d bytes)\n", b, len(b))
 		return 0xffffffff
 	}
 	var i uint32
@@ -37,7 +37,7 @@ func BtU32(b []byte) uint32 {
 // 4 byte slice to int32.  Returns 7fffffff if something doesn't work.
 func BtI32(b []byte) int32 {
 	if len(b) != 4 {
-		fmt.Printf("Got %x to BtI32 (%d bytes)\n", b, len(b))
+		log.Printf("Got %x to BtI32 (%d bytes)\n", b, len(b))
 		return 0x7fffffff
 	}
 	var i int32
@@ -63,7 +63,7 @@ func I64tB(i int64) []byte {
 // 8 bytes to int64 (bitcoin amounts).  returns 7fff... if it doesn't work.
 func BtI64(b []byte) int64 {
 	if len(b) != 8 {
-		fmt.Printf("Got %x to BtI64 (%d bytes)\n", b, len(b))
+		log.Printf("Got %x to BtI64 (%d bytes)\n", b, len(b))
 		return 0x7fffffffffffffff
 	}
 	var i int64
@@ -75,7 +75,7 @@ func BtI64(b []byte) int64 {
 // 8 bytes to uint64.  returns ffff. if it doesn't work.
 func BtU64(b []byte) uint64 {
 	if len(b) != 8 {
-		fmt.Printf("Got %x to BtU64 (%d bytes)\n", b, len(b))
+		log.Printf("Got %x to BtU64 (%d bytes)\n", b, len(b))
 		return 0xffffffffffffffff
 	}
 	var i uint64
