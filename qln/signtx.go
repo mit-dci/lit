@@ -3,6 +3,7 @@ package qln
 import (
 	"bytes"
 	"fmt"
+	"log"
 
 	"github.com/adiabat/btcd/btcec"
 	"github.com/adiabat/btcd/txscript"
@@ -239,6 +240,16 @@ func (nd *LitNode) SignState(q *Qchan) ([64]byte, [][64]byte, error) {
 
 		hc := txscript.NewTxSigHashes(spendTx)
 
+		HTLCparsed, err := txscript.ParseScript(h.PkScript)
+		if err != nil {
+			return sig, nil, err
+		}
+
+		spendHTLCHash := txscript.CalcWitnessSignatureHash(
+			HTLCparsed, hc, txscript.SigHashAll, spendTx, 0, h.Value)
+
+		log.Printf("Signing HTLC hash: %x, with pubkey: %x", spendHTLCHash, HTLCPriv.PubKey().SerializeCompressed())
+
 		HTLCSig, err := txscript.RawTxInWitnessSignature(spendTx, hc, 0, h.Value, h.PkScript, txscript.SigHashAll, HTLCPriv)
 		if err != nil {
 			return sig, nil, err
@@ -383,6 +394,8 @@ func (q *Qchan) VerifySigs(sig [64]byte, HTLCSigs [][64]byte) error {
 		if err != nil {
 			return err
 		}
+
+		log.Printf("Verifying HTLC hash: %x, with pubkey: %x", spendHTLCHash, theirHTLCPub)
 
 		sigValid := HTLCSig.Verify(spendHTLCHash, theirHTLCPubKey)
 		if !sigValid {
