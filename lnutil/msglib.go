@@ -852,6 +852,7 @@ func (self HashSigMsg) Bytes() []byte {
 	opArr := OutPointToBytes(self.Outpoint)
 	msg = append(msg, opArr[:]...)
 	msg = append(msg, I64tB(self.Amt)...)
+	msg = append(msg, self.RHash[:]...)
 	msg = append(msg, self.Data[:]...)
 	msg = append(msg, self.CommitmentSignature[:]...)
 	for _, sig := range self.HTLCSigs {
