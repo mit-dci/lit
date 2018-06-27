@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/adiabat/btcd/txscript"
-	"github.com/adiabat/btcd/wire"
+	"github.com/mit-dci/lit/btcutil/btcd/txscript"
+	"github.com/mit-dci/lit/wire"
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/sig64"

@@ -8,10 +8,10 @@ import (
 	"log"
 	"math/big"
 
-	"github.com/adiabat/btcd/btcec"
-	"github.com/adiabat/btcd/chaincfg/chainhash"
+	"github.com/mit-dci/lit/btcutil/btcd/btcec"
+	"github.com/mit-dci/lit/btcutil/btcd/chaincfg/chainhash"
 
-	"github.com/adiabat/btcd/wire"
+	"github.com/mit-dci/lit/wire"
 )
 
 // DlcContractStatus is an enumeration containing the various statuses a

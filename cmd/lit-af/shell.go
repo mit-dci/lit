@@ -235,8 +235,8 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	if len(pReply.Connections) > 0 {
 		fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Peers:"))
 		for _, peer := range pReply.Connections {
-			fmt.Fprintf(color.Output, "%s %s\n",
-				lnutil.White(peer.PeerNumber), peer.RemoteHost)
+			fmt.Fprintf(color.Output, "%s %s (%s)\n",
+				lnutil.White(peer.PeerNumber), peer.RemoteHost, peer.LitAdr)
 		}
 	}
 
