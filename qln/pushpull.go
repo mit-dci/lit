@@ -739,8 +739,16 @@ func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {
 		return fmt.Errorf("REVHandler err %s", err.Error())
 	}
 
+	var clearing bool
+	for _, h := range qc.State.HTLCs {
+		if h.Clearing {
+			clearing = true
+			break
+		}
+	}
+
 	// check if there's nothing for them to revoke
-	if qc.State.Delta == 0 && qc.State.InProgHTLC == nil {
+	if qc.State.Delta == 0 && qc.State.InProgHTLC == nil && !clearing {
 		return fmt.Errorf("got REV, expected deltaSig, ignoring.")
 	}
 	// maybe this is an unexpected rev, asking us for a rev repeat
