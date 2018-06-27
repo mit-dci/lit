@@ -263,8 +263,7 @@ func StatComFromBytes(b []byte) (*StatCom, error) {
 	}
 
 	for i := uint32(0); i < nHTLCs; i++ {
-		var HTLCBytes []byte
-		copy(HTLCBytes, buf.Next(232))
+		HTLCBytes := buf.Next(232)
 
 		h, err := HTLCFromBytes(HTLCBytes)
 		if err != nil {
