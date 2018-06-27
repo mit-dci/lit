@@ -158,7 +158,6 @@ func (nd *LitNode) OfferHTLC(qc *Qchan, amt uint32, RHash [32]byte, locktime uin
 
 func (nd *LitNode) SendHashSig(q *Qchan) error {
 	q.State.StateIdx++
-	q.State.HTLCIdx++
 
 	q.State.MyAmt -= int64(q.State.InProgHTLC.Amt)
 
@@ -278,12 +277,8 @@ func (nd *LitNode) HashSigHandler(msg lnutil.HashSigMsg, qc *Qchan) error {
 	qc.State.InProgHTLC.MyHTLCBase, _ = nd.GetUsePub(qc.State.InProgHTLC.KeyGen,
 		UseHTLCBase)
 
-	qc.State.InProgHTLC.TheirHTLCBase = qc.State.NextHTLCBase
-
 	fmt.Printf("Got message %x", msg.Data)
 	qc.State.Data = msg.Data
-
-	qc.State.HTLCIdx++
 
 	// verify sig for the next state. only save if this works
 

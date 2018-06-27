@@ -7,6 +7,7 @@ import (
 
 	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/portxo"
 )
 
 // Grab the coins that are rightfully yours! Plus some more.
@@ -485,7 +486,25 @@ func (nd *LitNode) SendSigRev(q *Qchan) error {
 		return err
 	}
 
-	outMsg := lnutil.NewSigRev(q.KeyGen.Step[3]&0x7fffffff, q.Op, sig, *elk, n2ElkPoint, HTLCSigs)
+	if q.State.InProgHTLC != nil {
+		var kg portxo.KeyGen
+		kg.Depth = 5
+		kg.Step[0] = 44 | 1<<31
+		kg.Step[1] = q.Coin() | 1<<31
+		kg.Step[2] = UseHTLCBase
+		kg.Step[3] = q.State.HTLCIdx + 2 | 1<<31
+		kg.Step[4] = q.Idx() | 1<<31
+
+		q.State.MyNextHTLCBase = q.State.MyN2HTLCBase
+
+		q.State.MyN2HTLCBase, err = nd.GetUsePub(kg,
+			UseHTLCBase)
+		if err != nil {
+			return err
+		}
+	}
+
+	outMsg := lnutil.NewSigRev(q.KeyGen.Step[3]&0x7fffffff, q.Op, sig, *elk, n2ElkPoint, HTLCSigs, q.State.MyN2HTLCBase)
 
 	log.Printf("Sending SigRev: %v", outMsg)
 
@@ -600,7 +619,6 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 	qc.State.Delta = 0
 
 	if qc.State.InProgHTLC != nil {
-		qc.State.HTLCIdx++
 		qc.State.MyAmt -= qc.State.InProgHTLC.Amt
 	}
 
@@ -626,6 +644,9 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 	if qc.State.InProgHTLC != nil {
 		qc.State.HTLCs = append(qc.State.HTLCs, *qc.State.InProgHTLC)
 		qc.State.InProgHTLC = nil
+		qc.State.NextHTLCBase = qc.State.N2HTLCBase
+		qc.State.N2HTLCBase = msg.N2HTLCBase
+		qc.State.HTLCIdx++
 	}
 
 	// all verified; Save finished state to DB, puller is pretty much done.
@@ -671,7 +692,25 @@ func (nd *LitNode) SendREV(q *Qchan) error {
 		return err
 	}
 
-	outMsg := lnutil.NewRevMsg(q.Peer(), q.Op, *elk, n2ElkPoint)
+	if q.State.InProgHTLC != nil {
+		var kg portxo.KeyGen
+		kg.Depth = 5
+		kg.Step[0] = 44 | 1<<31
+		kg.Step[1] = q.Coin() | 1<<31
+		kg.Step[2] = UseHTLCBase
+		kg.Step[3] = q.State.HTLCIdx + 2 | 1<<31
+		kg.Step[4] = q.Idx() | 1<<31
+
+		q.State.MyNextHTLCBase = q.State.MyN2HTLCBase
+
+		q.State.MyN2HTLCBase, err = nd.GetUsePub(kg,
+			UseHTLCBase)
+		if err != nil {
+			return err
+		}
+	}
+
+	outMsg := lnutil.NewRevMsg(q.Peer(), q.Op, *elk, n2ElkPoint, q.State.MyN2HTLCBase)
 
 	log.Printf("Sending Rev: %v", outMsg)
 
@@ -714,6 +753,9 @@ func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {
 	if qc.State.InProgHTLC != nil {
 		qc.State.HTLCs = append(qc.State.HTLCs, *qc.State.InProgHTLC)
 		qc.State.InProgHTLC = nil
+		qc.State.NextHTLCBase = qc.State.N2HTLCBase
+		qc.State.N2HTLCBase = msg.N2HTLCBase
+		qc.State.HTLCIdx++
 	}
 
 	// save to DB (new elkrem & point, delta zeroed)

@@ -611,9 +611,11 @@ type SigRevMsg struct {
 	Elk        chainhash.Hash
 	N2ElkPoint [33]byte
 	HTLCSigs   [][64]byte
+	N2HTLCBase [33]byte
 }
 
-func NewSigRev(peerid uint32, OP wire.OutPoint, SIG [64]byte, ELK chainhash.Hash, N2ELK [33]byte, HTLCSigs [][64]byte) SigRevMsg {
+func NewSigRev(peerid uint32, OP wire.OutPoint, SIG [64]byte, ELK chainhash.Hash,
+	N2ELK [33]byte, HTLCSigs [][64]byte, N2HTLCBase [33]byte) SigRevMsg {
 	s := new(SigRevMsg)
 	s.PeerIdx = peerid
 	s.Outpoint = OP
@@ -621,6 +623,7 @@ func NewSigRev(peerid uint32, OP wire.OutPoint, SIG [64]byte, ELK chainhash.Hash
 	s.Elk = ELK
 	s.N2ElkPoint = N2ELK
 	s.HTLCSigs = HTLCSigs
+	s.N2HTLCBase = N2HTLCBase
 	return *s
 }
 
@@ -642,12 +645,14 @@ func NewSigRevFromBytes(b []byte, peerid uint32) (SigRevMsg, error) {
 	sr.Elk = *elk
 	copy(sr.N2ElkPoint[:], buf.Next(33))
 
-	nHTLCs := buf.Len() / 64
+	nHTLCs := (buf.Len() - 33) / 64
 	for i := 0; i < nHTLCs; i++ {
 		var HTLCSig [64]byte
 		copy(HTLCSig[:], buf.Next(64))
 		sr.HTLCSigs = append(sr.HTLCSigs, HTLCSig)
 	}
+
+	copy(sr.N2HTLCBase[:], buf.Next(33))
 
 	return *sr, nil
 }
@@ -663,6 +668,7 @@ func (self SigRevMsg) Bytes() []byte {
 	for _, sig := range self.HTLCSigs {
 		msg = append(msg, sig[:]...)
 	}
+	msg = append(msg, self.N2HTLCBase[:]...)
 	return msg
 }
 
@@ -741,14 +747,16 @@ type RevMsg struct {
 	Outpoint   wire.OutPoint
 	Elk        chainhash.Hash
 	N2ElkPoint [33]byte
+	N2HTLCBase [33]byte
 }
 
-func NewRevMsg(peerid uint32, OP wire.OutPoint, ELK chainhash.Hash, N2ELK [33]byte) RevMsg {
+func NewRevMsg(peerid uint32, OP wire.OutPoint, ELK chainhash.Hash, N2ELK [33]byte, N2HTLCBase [33]byte) RevMsg {
 	r := new(RevMsg)
 	r.PeerIdx = peerid
 	r.Outpoint = OP
 	r.Elk = ELK
 	r.N2ElkPoint = N2ELK
+	r.N2HTLCBase = N2HTLCBase
 	return *r
 }
 
@@ -768,6 +776,7 @@ func NewRevMsgFromBytes(b []byte, peerId uint32) (RevMsg, error) {
 	elk, _ := chainhash.NewHash(buf.Next(32))
 	rv.Elk = *elk
 	copy(rv.N2ElkPoint[:], buf.Next(33))
+	copy(rv.N2HTLCBase[:], buf.Next(33))
 	return *rv, nil
 }
 
@@ -778,6 +787,7 @@ func (self RevMsg) Bytes() []byte {
 	msg = append(msg, opArr[:]...)
 	msg = append(msg, self.Elk[:]...)
 	msg = append(msg, self.N2ElkPoint[:]...)
+	msg = append(msg, self.N2HTLCBase[:]...)
 	return msg
 }
 
