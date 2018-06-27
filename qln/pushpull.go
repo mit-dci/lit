@@ -150,9 +150,15 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 			"height %d; must wait min 1 conf for non-test coin\n", qc.Height)
 	}
 
+	value := qc.Value
+
+	for _, h := range qc.State.HTLCs {
+		value -= h.Amt
+	}
+
 	// perform minOutput checks after reload
 	myNewOutputSize := (qc.State.MyAmt - int64(amt)) - qc.State.Fee
-	theirNewOutputSize := qc.Value - (qc.State.MyAmt - int64(amt)) - qc.State.Fee
+	theirNewOutputSize := value - (qc.State.MyAmt - int64(amt)) - qc.State.Fee
 
 	// check if this push would lower my balance below minBal
 	if myNewOutputSize < consts.MinOutput {
@@ -595,6 +601,7 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 
 	if qc.State.InProgHTLC != nil {
 		qc.State.HTLCIdx++
+		qc.State.MyAmt -= qc.State.InProgHTLC.Amt
 	}
 
 	// first verify sig.

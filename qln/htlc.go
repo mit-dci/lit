@@ -53,12 +53,14 @@ func (nd *LitNode) OfferHTLC(qc *Qchan, amt uint32, RHash [32]byte, locktime uin
 			"height %d; must wait min 1 conf for non-test coin\n", qc.Height)
 	}
 
-	myNewOutputSize := qc.State.MyAmt - qc.State.Fee - int64(amt)
-	theirNewOutputSize := qc.Value - myNewOutputSize - int64(amt)
+	value := qc.Value
 
 	for _, h := range qc.State.HTLCs {
-		theirNewOutputSize -= h.Amt
+		value -= h.Amt
 	}
+
+	myNewOutputSize := qc.State.MyAmt - qc.State.Fee - int64(amt)
+	theirNewOutputSize := value - myNewOutputSize - int64(amt)
 
 	// check if this push would lower my balance below minBal
 	if myNewOutputSize < consts.MinOutput {

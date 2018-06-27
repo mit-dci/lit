@@ -129,19 +129,25 @@ func (q *Qchan) BuildStateTxs(mine bool) (*wire.MsgTx, []*wire.MsgTx, []*wire.Tx
 
 	fee := s.Fee // fixed fee for now
 
-	theirAmt = q.Value - s.MyAmt
+	value := q.Value
 
 	if s.InProgHTLC != nil {
-		if s.InProgHTLC.Incoming == mine {
-			theirAmt -= s.InProgHTLC.Amt
-		}
+		value -= s.InProgHTLC.Amt
 	}
 
 	for _, h := range s.HTLCs {
-		if h.Incoming == mine {
-			theirAmt -= h.Amt
-		}
+		value -= h.Amt
 	}
+
+	theirAmt = value - s.MyAmt
+
+	log.Printf("Value: %d, MyAmt: %d, TheirAmt: %d", value, s.MyAmt, theirAmt)
+
+	/*
+		Incoming & mine = "they" are paying
+		Incoming & !mine = "I" am paying
+
+	*/
 
 	// the PKH clear refund also has elkrem points added to mask the PKH.
 	// this changes the txouts at each state to blind sorcerer better.
