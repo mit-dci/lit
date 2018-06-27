@@ -181,29 +181,19 @@ func (lc *litAfClient) FundChannel(textArgs []string) error {
 }
 
 func (lc *litAfClient) DualFund(textArgs []string) error {
-	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Fprintf(color.Output, dualFundCommand.Format)
-		fmt.Fprintf(color.Output, dualFundCommand.Description)
-		return nil
-	} else {
-		return fmt.Errorf(dualFundCommand.Format)
-	}
+	err := CheckHelpCommand(dualFundCommand, textArgs, 2)
+	return err
 }
 
 // Mutually fund a channel
 func (lc *litAfClient) DualFundChannel(textArgs []string) error {
-	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Fprintf(color.Output, dualFundStartCommand.Format)
-		fmt.Fprintf(color.Output, dualFundStartCommand.Description)
-		return nil
+	err := CheckHelpCommand(dualFundStartCommand, textArgs, 4)
+	if err != nil {
+		return err
 	}
 
 	args := new(litrpc.DualFundArgs)
 	reply := new(litrpc.StatusReply)
-
-	if len(textArgs) < 4 {
-		return fmt.Errorf(dualFundStartCommand.Format)
-	}
 
 	peer, err := strconv.Atoi(textArgs[0])
 	if err != nil {
@@ -240,15 +230,14 @@ func (lc *litAfClient) DualFundChannel(textArgs []string) error {
 
 // Decline mutual funding of a channel
 func (lc *litAfClient) DualFundDecline(textArgs []string) error {
-	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Fprintf(color.Output, dualFundDeclineCommand.Format)
-		fmt.Fprintf(color.Output, dualFundDeclineCommand.Description)
-		return nil
+	err := CheckHelpCommand(dualFundDeclineCommand, textArgs, 0)
+	if err != nil {
+		return err
 	}
 
 	reply := new(litrpc.StatusReply)
 
-	err := lc.rpccon.Call("LitRPC.DualFundDecline", nil, reply)
+	err = lc.rpccon.Call("LitRPC.DualFundDecline", nil, reply)
 	if err != nil {
 		return err
 	}
@@ -259,15 +248,14 @@ func (lc *litAfClient) DualFundDecline(textArgs []string) error {
 
 // Accept mutual funding of a channel
 func (lc *litAfClient) DualFundAccept(textArgs []string) error {
-	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Fprintf(color.Output, dualFundAcceptCommand.Format)
-		fmt.Fprintf(color.Output, dualFundAcceptCommand.Description)
-		return nil
+	err := CheckHelpCommand(dualFundAcceptCommand, textArgs, 0)
+	if err != nil {
+		return err
 	}
 
 	reply := new(litrpc.StatusReply)
 
-	err := lc.rpccon.Call("LitRPC.DualFundAccept", nil, reply)
+	err = lc.rpccon.Call("LitRPC.DualFundAccept", nil, reply)
 	if err != nil {
 		return err
 	}
