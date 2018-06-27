@@ -72,6 +72,15 @@ var addHTLCCommand = &Command{
 	ShortDescription: "Add HTLC of the given amount (in satoshis) to the given channel.\n",
 }
 
+var clearHTLCCommand = &Command{
+	Format: fmt.Sprintf("%s%s%s\n", lnutil.White("clear"), lnutil.ReqColor("channel idx", "HTLC idx", "R"), lnutil.OptColor("data")),
+	Description: fmt.Sprintf("%s\n%s\n%s\n",
+		"Clear an HTLC of the given index from the given channel.",
+		"Optionally, the push operation can be associated with a 32 byte value hex encoded.",
+		"Set R to zero to timeout the HTLC"),
+	ShortDescription: "Clear HTLC of the given index from the given channel.\n",
+}
+
 func (lc *litAfClient) History(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
 		fmt.Fprintf(color.Output, historyCommand.Format)
@@ -370,6 +379,54 @@ func (lc *litAfClient) AddHTLC(textArgs []string) error {
 		return err
 	}
 	fmt.Fprintf(color.Output, "Added HTLC %s at state %s idx %s\n", lnutil.SatoshiColor(int64(amt)), lnutil.White(reply.StateIndex), lnutil.White(reply.HTLCIndex))
+
+	return nil
+}
+
+// Clear is the shell command which calls ClearHTLC
+func (lc *litAfClient) ClearHTLC(textArgs []string) error {
+	err := CheckHelpCommand(clearHTLCCommand, textArgs, 3)
+	if err != nil {
+		return err
+	}
+
+	args := new(litrpc.ClearHTLCArgs)
+	reply := new(litrpc.ClearHTLCReply)
+
+	// this stuff is all the same as in cclose, should put into a function...
+	cIdx, err := strconv.Atoi(textArgs[0])
+	if err != nil {
+		return err
+	}
+	HTLCIdx, err := strconv.Atoi(textArgs[1])
+	if err != nil {
+		return err
+	}
+
+	R, err := hex.DecodeString(textArgs[2])
+	if err != nil {
+		return err
+	}
+	copy(args.R[:], R[:])
+
+	if len(textArgs) > 3 {
+		data, err := hex.DecodeString(textArgs[3])
+		if err != nil {
+			// Wasn't valid hex, copy directly and truncate
+			copy(args.Data[:], textArgs[3])
+		} else {
+			copy(args.Data[:], data[:])
+		}
+	}
+
+	args.ChanIdx = uint32(cIdx)
+	args.HTLCIdx = uint32(HTLCIdx)
+
+	err = lc.Call("LitRPC.ClearHTLC", args, reply)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(color.Output, "Cleared HTLC %s at state %s\n", lnutil.White(HTLCIdx), lnutil.White(reply.StateIndex))
 
 	return nil
 }

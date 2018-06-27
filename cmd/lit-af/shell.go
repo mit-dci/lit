@@ -112,6 +112,11 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		return parseErr(err, "add")
 	}
 
+	if cmd == "clear" {
+		err = lc.ClearHTLC(args)
+		return parseErr(err, "clear")
+	}
+
 	if cmd == "con" { // connect to lnd host
 		err = lc.Connect(args)
 		return parseErr(err, "con")
@@ -343,7 +348,7 @@ func printCointypes() {
 func (lc *litAfClient) Help(textArgs []string) error {
 	if len(textArgs) == 0 {
 		fmt.Fprintf(color.Output, lnutil.Header("Commands:\n"))
-		listofCommands := []*Command{helpCommand, sayCommand, lsCommand, addressCommand, sendCommand, fanCommand, sweepCommand, lisCommand, conCommand, dlcCommand, fundCommand, watchCommand, pushCommand, closeCommand, breakCommand, addHTLCCommand, historyCommand, offCommand, exitCommand}
+		listofCommands := []*Command{helpCommand, sayCommand, lsCommand, addressCommand, sendCommand, fanCommand, sweepCommand, lisCommand, conCommand, dlcCommand, fundCommand, watchCommand, pushCommand, closeCommand, breakCommand, addHTLCCommand, clearHTLCCommand, historyCommand, offCommand, exitCommand}
 		printHelp(listofCommands)
 		fmt.Fprintf(color.Output, "\n\n")
 		fmt.Fprintf(color.Output, lnutil.Header("Coins:\n"))

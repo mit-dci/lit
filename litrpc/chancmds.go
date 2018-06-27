@@ -400,6 +400,67 @@ func (r *LitRPC) AddHTLC(args AddHTLCArgs, reply *AddHTLCReply) error {
 	}
 
 	reply.StateIndex = qc.State.StateIdx
-	reply.HTLCIndex = qc.State.HTLCIdx
+	reply.HTLCIndex = qc.State.HTLCIdx - 1
+	return nil
+}
+
+type ClearHTLCArgs struct {
+	ChanIdx uint32
+	HTLCIdx uint32
+	R       [16]byte
+	Data    [32]byte
+}
+type ClearHTLCReply struct {
+	StateIndex uint64
+}
+
+func (r *LitRPC) ClearHTLC(args ClearHTLCArgs, reply *ClearHTLCReply) error {
+	fmt.Printf("clear HTLC %d from chan %d with data %x and preimage %x\n", args.HTLCIdx, args.ChanIdx, args.Data, args.R)
+
+	// load the whole channel from disk just to see who the peer is
+	// (pretty inefficient)
+	dummyqc, err := r.Node.GetQchanByIdx(args.ChanIdx)
+	if err != nil {
+		return err
+	}
+	// see if channel is closed and error early
+	if dummyqc.CloseData.Closed {
+		return fmt.Errorf("Can't clear; channel %d closed", args.ChanIdx)
+	}
+
+	// but we want to reference the qc that's already in ram
+	// first see if we're connected to that peer
+
+	// map read, need mutex...?
+	r.Node.RemoteMtx.Lock()
+	peer, ok := r.Node.RemoteCons[dummyqc.Peer()]
+	r.Node.RemoteMtx.Unlock()
+	if !ok {
+		return fmt.Errorf("not connected to peer %d for channel %d",
+			dummyqc.Peer(), dummyqc.Idx())
+	}
+	qc, ok := peer.QCs[dummyqc.Idx()]
+	if !ok {
+		return fmt.Errorf("peer %d doesn't have channel %d",
+			dummyqc.Peer(), dummyqc.Idx())
+	}
+
+	fmt.Printf("channel %s\n", qc.Op.String())
+
+	if qc.CloseData.Closed {
+		return fmt.Errorf("Channel %d already closed by tx %s",
+			args.ChanIdx, qc.CloseData.CloseTxid.String())
+	}
+
+	// TODO this is a bad place to put it -- litRPC should be a thin layer
+	// to the Node.Func() calls.  For now though, set the height here...
+	qc.Height = dummyqc.Height
+
+	err = r.Node.ClearHTLC(qc, args.R, args.HTLCIdx, args.Data)
+	if err != nil {
+		return err
+	}
+
+	reply.StateIndex = qc.State.StateIdx
 	return nil
 }

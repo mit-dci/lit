@@ -330,7 +330,7 @@ func (nd *LitNode) HashSigHandler(msg lnutil.HashSigMsg, qc *Qchan) error {
 	return nil
 }
 
-func (nd *LitNode) ClearHTLC(qc *Qchan, R [16]byte, HTLCIdx uint32) error {
+func (nd *LitNode) ClearHTLC(qc *Qchan, R [16]byte, HTLCIdx uint32, data [32]byte) error {
 	// see if channel is busy
 	// lock this channel
 	cts := false
@@ -406,6 +406,7 @@ func (nd *LitNode) ClearHTLC(qc *Qchan, R [16]byte, HTLCIdx uint32) error {
 
 	qc.State.HTLCs[HTLCIdx].Clearing = true
 	qc.State.HTLCs[HTLCIdx].R = R
+	qc.State.Data = data
 
 	// save to db with ONLY Clearing & R changed
 	err = nd.SaveQchanState(qc)
