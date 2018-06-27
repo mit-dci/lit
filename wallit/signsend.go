@@ -15,7 +15,7 @@ import (
 	"github.com/mit-dci/lit/wire"
 )
 
-// Build a tx, kindof like with SendCoins, but don't sign or broadcast.
+// Builds a tx, kindof like with SendCoins, but don't sign or broadcast.
 // Segwit inputs only.  Freeze the utxos used so the tx can be signed and broadcast
 // later.  Use only segwit utxos.  Return the txid, and indexes of where the txouts
 // in the argument slice ended up in the final tx.
