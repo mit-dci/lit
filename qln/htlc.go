@@ -6,6 +6,7 @@ import (
 
 	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/portxo"
 )
 
 func (nd *LitNode) OfferHTLC(qc *Qchan, amt uint32, RHash [32]byte, locktime uint32, data [32]byte) error {
@@ -290,6 +291,22 @@ func (nd *LitNode) HashSigHandler(msg lnutil.HashSigMsg, qc *Qchan) error {
 
 	// (seems odd, but everything so far we still do in case of collision, so
 	// only check here.  If it's a collision, set, save, send gapSigRev
+
+	var kg portxo.KeyGen
+	kg.Depth = 5
+	kg.Step[0] = 44 | 1<<31
+	kg.Step[1] = qc.Coin() | 1<<31
+	kg.Step[2] = UseHTLCBase
+	kg.Step[3] = qc.State.HTLCIdx + 2 | 1<<31
+	kg.Step[4] = qc.Idx() | 1<<31
+
+	qc.State.MyNextHTLCBase = qc.State.MyN2HTLCBase
+
+	qc.State.MyN2HTLCBase, err = nd.GetUsePub(kg,
+		UseHTLCBase)
+	if err != nil {
+		return err
+	}
 
 	// save channel with new state, new sig, and positive delta set
 	// and maybe collision; still haven't checked

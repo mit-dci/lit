@@ -486,24 +486,6 @@ func (nd *LitNode) SendSigRev(q *Qchan) error {
 		return err
 	}
 
-	if q.State.InProgHTLC != nil {
-		var kg portxo.KeyGen
-		kg.Depth = 5
-		kg.Step[0] = 44 | 1<<31
-		kg.Step[1] = q.Coin() | 1<<31
-		kg.Step[2] = UseHTLCBase
-		kg.Step[3] = q.State.HTLCIdx + 2 | 1<<31
-		kg.Step[4] = q.Idx() | 1<<31
-
-		q.State.MyNextHTLCBase = q.State.MyN2HTLCBase
-
-		q.State.MyN2HTLCBase, err = nd.GetUsePub(kg,
-			UseHTLCBase)
-		if err != nil {
-			return err
-		}
-	}
-
 	outMsg := lnutil.NewSigRev(q.KeyGen.Step[3]&0x7fffffff, q.Op, sig, *elk, n2ElkPoint, HTLCSigs, q.State.MyN2HTLCBase)
 
 	log.Printf("Sending SigRev: %v", outMsg)
@@ -646,6 +628,23 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 		qc.State.InProgHTLC = nil
 		qc.State.NextHTLCBase = qc.State.N2HTLCBase
 		qc.State.N2HTLCBase = msg.N2HTLCBase
+
+		var kg portxo.KeyGen
+		kg.Depth = 5
+		kg.Step[0] = 44 | 1<<31
+		kg.Step[1] = qc.Coin() | 1<<31
+		kg.Step[2] = UseHTLCBase
+		kg.Step[3] = qc.State.HTLCIdx + 2 | 1<<31
+		kg.Step[4] = qc.Idx() | 1<<31
+
+		qc.State.MyNextHTLCBase = qc.State.MyN2HTLCBase
+
+		qc.State.MyN2HTLCBase, err = nd.GetUsePub(kg,
+			UseHTLCBase)
+		if err != nil {
+			return err
+		}
+
 		qc.State.HTLCIdx++
 	}
 
@@ -690,24 +689,6 @@ func (nd *LitNode) SendREV(q *Qchan) error {
 	n2ElkPoint, err := q.N2ElkPointForThem()
 	if err != nil {
 		return err
-	}
-
-	if q.State.InProgHTLC != nil {
-		var kg portxo.KeyGen
-		kg.Depth = 5
-		kg.Step[0] = 44 | 1<<31
-		kg.Step[1] = q.Coin() | 1<<31
-		kg.Step[2] = UseHTLCBase
-		kg.Step[3] = q.State.HTLCIdx + 2 | 1<<31
-		kg.Step[4] = q.Idx() | 1<<31
-
-		q.State.MyNextHTLCBase = q.State.MyN2HTLCBase
-
-		q.State.MyN2HTLCBase, err = nd.GetUsePub(kg,
-			UseHTLCBase)
-		if err != nil {
-			return err
-		}
 	}
 
 	outMsg := lnutil.NewRevMsg(q.Peer(), q.Op, *elk, n2ElkPoint, q.State.MyN2HTLCBase)
@@ -756,6 +737,7 @@ func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {
 		qc.State.NextHTLCBase = qc.State.N2HTLCBase
 		qc.State.N2HTLCBase = msg.N2HTLCBase
 		qc.State.HTLCIdx++
+		log.Printf("Setting N2HTLCBase %x", qc.State.N2HTLCBase)
 	}
 
 	// save to DB (new elkrem & point, delta zeroed)
