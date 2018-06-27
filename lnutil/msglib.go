@@ -32,7 +32,8 @@ const (
 	MSGID_REV       = 0x33 // pushing funds; revoking previous channel state
 
 	// HTLC messages
-	MSGID_HASHSIG = 0x34 // Like a deltasig but offers an HTLC
+	MSGID_HASHSIG     = 0x34 // Like a deltasig but offers an HTLC
+	MSGID_PREIMAGESIG = 0x35 // Like a hashsig but clears an HTLC
 
 	//not implemented
 	MSGID_FWDMSG     = 0x40
@@ -109,6 +110,8 @@ func LitMsgFromBytes(b []byte, peerid uint32) (LitMsg, error) {
 		return NewRevMsgFromBytes(b, peerid)
 	case MSGID_HASHSIG:
 		return NewHashSigMsgFromBytes(b, peerid)
+	case MSGID_PREIMAGESIG:
+		return NewPreimageSigMsgFromBytes(b, peerid)
 
 	/*
 		case MSGID_FWDMSG:
@@ -873,6 +876,86 @@ func (self HashSigMsg) Bytes() []byte {
 
 func (self HashSigMsg) Peer() uint32   { return self.PeerIdx }
 func (self HashSigMsg) MsgType() uint8 { return MSGID_HASHSIG }
+
+//----------
+
+//message for clearing an HTLC
+type PreimageSigMsg struct {
+	PeerIdx  uint32
+	Outpoint wire.OutPoint
+
+	Idx uint32
+	R   [16]byte
+
+	Data [32]byte
+
+	CommitmentSignature [64]byte
+	// must be at least 36 + 4 + 16 + 32 + 64 = 152 bytes
+	HTLCSigs [][64]byte
+}
+
+func NewPreimageSigMsg(peerid uint32, OP wire.OutPoint, Idx uint32, R [16]byte, sig [64]byte, HTLCSigs [][64]byte, data [32]byte) PreimageSigMsg {
+	d := new(PreimageSigMsg)
+	d.PeerIdx = peerid
+	d.Outpoint = OP
+	d.CommitmentSignature = sig
+	d.Data = data
+	d.R = R
+	d.Idx = Idx
+	d.HTLCSigs = HTLCSigs
+	return *d
+}
+
+func NewPreimageSigMsgFromBytes(b []byte, peerid uint32) (PreimageSigMsg, error) {
+	ps := new(PreimageSigMsg)
+	ps.PeerIdx = peerid
+
+	if len(b) < 152 {
+		return *ps, fmt.Errorf("got %d byte PreimageSig, expect at least 152 bytes", len(b))
+	}
+
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
+
+	var op [36]byte
+	copy(op[:], buf.Next(36))
+	ps.Outpoint = *OutPointFromBytes(op)
+
+	ps.Idx = BtU32(buf.Next(4))
+
+	copy(ps.R[:], buf.Next(16))
+
+	copy(ps.Data[:], buf.Next(32))
+
+	copy(ps.CommitmentSignature[:], buf.Next(64))
+
+	nHTLCSigs := buf.Len() / 64
+
+	for i := 0; i < nHTLCSigs; i++ {
+		var sig [64]byte
+		copy(sig[:], buf.Next(64))
+		ps.HTLCSigs = append(ps.HTLCSigs, sig)
+	}
+
+	return *ps, nil
+}
+
+func (self PreimageSigMsg) Bytes() []byte {
+	var msg []byte
+	msg = append(msg, self.MsgType())
+	opArr := OutPointToBytes(self.Outpoint)
+	msg = append(msg, opArr[:]...)
+	msg = append(msg, U32tB(self.Idx)...)
+	msg = append(msg, self.R[:]...)
+	msg = append(msg, self.Data[:]...)
+	msg = append(msg, self.CommitmentSignature[:]...)
+	for _, sig := range self.HTLCSigs {
+		msg = append(msg, sig[:]...)
+	}
+	return msg
+}
+
+func (self PreimageSigMsg) Peer() uint32   { return self.PeerIdx }
+func (self PreimageSigMsg) MsgType() uint8 { return MSGID_PREIMAGESIG }
 
 //----------
 

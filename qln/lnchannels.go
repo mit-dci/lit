@@ -61,6 +61,10 @@ type HTLC struct {
 	KeyGen portxo.KeyGen
 
 	Sig [64]byte
+
+	R        [16]byte
+	Clearing bool
+	Cleared  bool
 }
 
 // StatComs are State Commitments.

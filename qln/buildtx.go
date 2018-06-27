@@ -136,18 +136,14 @@ func (q *Qchan) BuildStateTxs(mine bool) (*wire.MsgTx, []*wire.MsgTx, []*wire.Tx
 	}
 
 	for _, h := range s.HTLCs {
-		value -= h.Amt
+		if !h.Cleared && !h.Clearing {
+			value -= h.Amt
+		}
 	}
 
 	theirAmt = value - s.MyAmt
 
 	log.Printf("Value: %d, MyAmt: %d, TheirAmt: %d", value, s.MyAmt, theirAmt)
-
-	/*
-		Incoming & mine = "they" are paying
-		Incoming & !mine = "I" am paying
-
-	*/
 
 	// the PKH clear refund also has elkrem points added to mask the PKH.
 	// this changes the txouts at each state to blind sorcerer better.
@@ -265,11 +261,13 @@ func (q *Qchan) BuildStateTxs(mine bool) (*wire.MsgTx, []*wire.MsgTx, []*wire.Tx
 
 	// Generate new HTLC signatures
 	for _, h := range s.HTLCs {
-		HTLCOut, err := genHTLCOut(h)
-		if err != nil {
-			return nil, nil, nil, err
+		if !h.Clearing && !h.Cleared {
+			HTLCOut, err := genHTLCOut(h)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+			HTLCTxOuts = append(HTLCTxOuts, HTLCOut)
 		}
-		HTLCTxOuts = append(HTLCTxOuts, HTLCOut)
 	}
 
 	// There's an HTLC in progress

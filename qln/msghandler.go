@@ -261,6 +261,10 @@ func (nd *LitNode) PushPullHandler(routedMsg lnutil.LitMsg, q *Qchan) error {
 		log.Printf("Got HashSig from %d", routedMsg.Peer())
 		return nd.HashSigHandler(message, q)
 
+	case lnutil.PreimageSigMsg: // Clear HTLC
+		log.Printf("Got PreimageSig from %d", routedMsg.Peer())
+		return nd.PreimageSigHandler(message, q)
+
 	default:
 		return fmt.Errorf("Unknown message type %x", routedMsg.MsgType())
 

@@ -604,6 +604,27 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 		qc.State.MyAmt -= qc.State.InProgHTLC.Amt
 	}
 
+	for _, h := range qc.State.HTLCs {
+		if h.Clearing && !h.Cleared {
+			/*
+				Incoming:
+					Timeout:
+						They get money
+					Success:
+						We get money
+				!Incoming:
+					Timeout:
+						We get money
+					Success:
+						They get money
+			*/
+
+			if (h.Incoming && h.R != [16]byte{}) || (!h.Incoming && h.R == [16]byte{}) {
+				qc.State.MyAmt += h.Amt
+			}
+		}
+	}
+
 	// first verify sig.
 	// (if elkrem ingest fails later, at least we close out with a bit more money)
 
@@ -646,6 +667,12 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 		}
 
 		qc.State.HTLCIdx++
+	}
+
+	for idx, h := range qc.State.HTLCs {
+		if h.Clearing && !h.Cleared {
+			qc.State.HTLCs[idx].Cleared = true
+		}
 	}
 
 	// all verified; Save finished state to DB, puller is pretty much done.
@@ -738,6 +765,12 @@ func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {
 		qc.State.N2HTLCBase = msg.N2HTLCBase
 		qc.State.HTLCIdx++
 		log.Printf("Setting N2HTLCBase %x", qc.State.N2HTLCBase)
+	}
+
+	for idx, h := range qc.State.HTLCs {
+		if h.Clearing && !h.Cleared {
+			qc.State.HTLCs[idx].Cleared = true
+		}
 	}
 
 	// save to DB (new elkrem & point, delta zeroed)
