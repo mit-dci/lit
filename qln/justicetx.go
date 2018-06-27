@@ -110,6 +110,9 @@ func (nd *LitNode) BuildJusticeSig(q *Qchan) error {
 
 	// build the bad tx (redundant as we just build most of it...
 	badTx, _, _, err := q.BuildStateTxs(false)
+	if err != nil {
+		return err
+	}
 
 	var badAmt int64
 	badIdx := uint32(len(badTx.TxOut) + 1)
