@@ -583,7 +583,15 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 			qc.Idx(), qc.State.Delta)
 	}
 
-	if qc.State.Delta == 0 && qc.State.InProgHTLC == nil {
+	var clearing bool
+	for _, h := range qc.State.HTLCs {
+		if h.Clearing {
+			clearing = true
+			break
+		}
+	}
+
+	if qc.State.Delta == 0 && qc.State.InProgHTLC == nil && !clearing {
 		// re-send last rev; they probably didn't get it
 		return nd.SendREV(qc)
 	}
