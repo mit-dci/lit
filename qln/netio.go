@@ -40,7 +40,7 @@ func (nd *LitNode) TCPListener(
 	if err != nil {
 		return "", err
 	}
-
+	log.Println("NETIO.go", listener.Addr())
 	var idPub [33]byte
 	copy(idPub[:], idPriv.PubKey().SerializeCompressed())
 
@@ -66,7 +66,7 @@ func (nd *LitNode) TCPListener(
 			}
 			newConn, ok := netConn.(*brontide.Conn)
 			if !ok {
-				log.Printf("Got something that wasn't a LNDC")
+				log.Printf("Got something that wasn't brontide.Conn")
 				continue
 			}
 			log.Printf("Incoming connection from %x on %s\n",
@@ -128,6 +128,7 @@ func (nd *LitNode) DialPeer(connectAdr string, net tor.Net) error {
 	if where == "" {
 		where, _, err = Lookup(who, nd.TrackerURL, nd.ProxyURL)
 		if err != nil {
+			log.Println("NO TRACKER, COOL")
 			return err
 		}
 	}

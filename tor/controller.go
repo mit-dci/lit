@@ -376,6 +376,7 @@ func (c *Controller) AddOnionV2(privateKeyFilename string,
 	// Now, we'll determine the different virtual ports on which this onion
 	// service will be accessed by.
 	var portParam string
+	log.Println("VIRTUAL PORTS", virtToTargPorts)
 	for virtPort, targPorts := range virtToTargPorts {
 		// If the virtual port doesn't map to any target ports, we'll
 		// use the virtual port as the target port.
@@ -388,6 +389,7 @@ func (c *Controller) AddOnionV2(privateKeyFilename string,
 		// Otherwise, we'll create a mapping from the virtual port to
 		// each target port.
 		for targPort := range targPorts {
+			log.Println("TARGET PORTS", targPort)
 			portParam += fmt.Sprintf("Port=%d,%d ", virtPort,
 				targPort)
 		}
@@ -439,6 +441,7 @@ func (c *Controller) AddOnionV2(privateKeyFilename string,
 	onionService := serviceID + ".onion"
 	addrs := make([]*OnionAddr, 0, len(virtToTargPorts))
 	for virtPort := range virtToTargPorts {
+		log.Println("TAIL END", virtPort)
 		addr := &OnionAddr{
 			OnionService: onionService,
 			Port:         virtPort,

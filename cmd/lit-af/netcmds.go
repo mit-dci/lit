@@ -128,13 +128,12 @@ func (lc *litAfClient) Connect(textArgs []string) error {
 	}
 
 	args.LNAddr = textArgs[0]
-	log.Println("TEXTARGS", textArgs)
-	if len(textArgs) == 3 {
+	if len(textArgs) == 3 && textArgs[1] == "tor" && textArgs[2] == "true" {
 		args.Tor = &litconfig.TorConfig{
 			SOCKS: "localhost:9050",
 			DNS:   "soa.nodes.lightning.directory",
 		}
-		log.Println("TOR SOCKS", args.Tor.SOCKS)
+		log.Println("Tor connecting via", args.Tor.SOCKS)
 	}
 	//args.Net = &tor.ClearNet{}
 	err := lc.Call("LitRPC.Connect", args, reply)

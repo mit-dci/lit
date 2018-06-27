@@ -49,11 +49,14 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
 	// check if a peer number was supplied instead of a pubkeyhash
 	peerIdxint, err := strconv.Atoi(args.LNAddr)
 	// number will mean no error
+	//if args.Tor != nil {
+
 	if err == nil {
 		// get peer from address book
 		pubArr, host := r.Node.GetPubHostFromPeerIdx(uint32(peerIdxint))
 
 		connectAdr = lnutil.LitAdrFromPubkey(pubArr)
+		log.Println("CHECK THIS OUT", connectAdr)
 		if host != "" {
 			connectAdr += "@" + host
 		}
@@ -63,6 +66,8 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
 		// use string as is, try to convert to ln address
 		connectAdr = args.LNAddr
 	}
+	//}
+	log.Println("CHECK THIS OUT", connectAdr)
 	if args.Tor != nil {
 		log.Println("Connecting via tor")
 		err = r.Node.DialPeer(connectAdr, &tor.ProxyNet{
