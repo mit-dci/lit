@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
-	"strings"
 
 	"io/ioutil"
 	"net/http"
@@ -225,7 +224,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		return err
 	}
 	if len(cReply.Channels) > 0 {
-		fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Closed Channels:"))
+		fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Channels:"))
 	}
 
 	sort.Slice(cReply.Channels, func(i, j int) bool {
@@ -361,7 +360,7 @@ func printHelp(commands []*Command) {
 func printCointypes() {
 	for k, v := range coinparam.RegisteredNets {
 		fmt.Fprintf(color.Output, "CoinType: %s\n", strconv.Itoa(int(k)))
-		fmt.Fprintf(color.Output, "└────── Name: %s,%sBech32Prefix: %s\n\n", v.Name, strings.Repeat(" ", 13-len(v.Name)), v.Bech32Prefix)
+		fmt.Fprintf(color.Output, "└────── Name: %-13sBech32Prefix: %s\n\n", v.Name + ",", v.Bech32Prefix)
 	}
 }
 
