@@ -112,7 +112,15 @@ When starting lit, the following command line arguments are available. The follo
 
 | Folder Name  | Details                                                                                                                                  |
 |:-------------|:-----------------------------------------------------------------------------------------------------------------------------------------|
+| `bech32`     | Util for the Bech32 spec                                                                                                                 |
+| `btcutil`    | Misc bitcoin-specific libraries                                                                                                          |
+| `build`      | Tools used for building Lit                                                                                                              |
 | `cmd`        | Has some rpc client code to interact with the lit node.  Not much there yet                                                              |
+| `coinparam`  | Information and other constants for identifying currencies                                                                               |
+| `consts`     | Global constants                                                                                                                         |
+| `crypto`     | Small utility cryptographic libraries                                                                                                    |
+| `dlc`        | Discreet Log Contracts!                                                                                                                  |
+| `docs`       | Other walkthroughs for doing things in Lit, also misc pictures                                                                           |
 | `elkrem`     | A hash-tree for storing `log(n)` items instead of n                                                                                      |
 | `litbamf`    | Lightning Network Browser Actuated Multi-Functionality -- web gui for lit                                                                |
 | `litrpc`     | Websocket based RPC connection                                                                                                           |
@@ -122,10 +130,12 @@ When starting lit, the following command line arguments are available. The follo
 | `powless`    | Introduces a web API chainhook in addition to the uspv one                                                                               |
 | `qln`        | A quick channel implementation with databases.  Doesn't do multihop yet.                                                                 |
 | `sig64`      | Library to make signatures 64 bytes instead of 71 or 72 or something                                                                     |
+| `snap`       | Snapcraft metadata                                                                                                                       |
 | `test`       | Integration tests                                                                                                                        |
 | `uspv`       | Deals with the network layer, sending network messages and filtering what to hand over to `wallit`                                       |
 | `wallit`     | Deals with storing and retrieving utxos, creating and signing transactions                                                               |
 | `watchtower` | Unlinkable outsourcing of channel monitoring                                                                                             |
+| `wire`       | Tools for working with binary data structures in Bitcoin                                                                                 |
 
 ### Hierarchy of packages
 
