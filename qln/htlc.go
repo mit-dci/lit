@@ -373,16 +373,22 @@ func (nd *LitNode) ClearHTLC(qc *Qchan, R [16]byte, HTLCIdx uint32, data [32]byt
 	}
 
 	if int(HTLCIdx) >= len(qc.State.HTLCs) {
+		qc.ClearToSend <- true
+		qc.ChanMtx.Unlock()
 		return fmt.Errorf("HTLC idx %d out of range", HTLCIdx)
 	}
 
 	if qc.State.HTLCs[HTLCIdx].Cleared {
+		qc.ClearToSend <- true
+		qc.ChanMtx.Unlock()
 		return fmt.Errorf("HTLC %d already cleared", HTLCIdx)
 	}
 
 	var timeout bool
 	if R == [16]byte{} {
 		if int32(qc.State.HTLCs[HTLCIdx].Locktime) > wal.CurrentHeight() {
+			qc.ClearToSend <- true
+			qc.ChanMtx.Unlock()
 			return fmt.Errorf("Cannot timeout HTLC because locktime %d has not expired. Height: %d", qc.State.HTLCs[HTLCIdx].Locktime, wal.CurrentHeight())
 		}
 
@@ -392,6 +398,8 @@ func (nd *LitNode) ClearHTLC(qc *Qchan, R [16]byte, HTLCIdx uint32, data [32]byt
 	if !timeout {
 		RHash := fastsha256.Sum256(R[:])
 		if qc.State.HTLCs[HTLCIdx].RHash != RHash {
+			qc.ClearToSend <- true
+			qc.ChanMtx.Unlock()
 			return fmt.Errorf("Preimage does not hash to expected value. Expected %x got %x", qc.State.HTLCs[HTLCIdx].RHash, RHash)
 		}
 	}
