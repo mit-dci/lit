@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=1200px, shrink-to-fit=yes">
+    <meta name="description" content="Lit Docs{{if .Command}} - {{.Command.Name}}{{end}}">
+
+    <title>{{if .Command}}{{.Command.Name}} - {{end}}Lit Docs</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.1.1/css/bootstrap.css" />
+  </head>
+  <style>
+  .card-body {
+    font-size:80%;
+    padding-top: 0.5em;
+  }
+  pre {
+    word-break: break-word;
+    white-space: pre-wrap;
+  }
+  </style>
+
+  <body>
+
+
+    <nav class="navbar  navbar-dark bg-dark ">
+      <a class="navbar-brand" href="index.html">Lit Node Docs</a>
+    </nav>
+
+    <main role="main" class="container-fluid" style="margin-top: 1pc;">
+
+      <div class="row">
+        <div class="col-7 col-lg-8 col-xl-9">
+          <h1>{{if .Command}}{{.Command.Name}} - {{end}}Lit Docs</h1>
+          {{if .Description}}
+            <pre>{{.Description}}</pre>
+            <hr>
+          {{end}}
+          <p>
+          This is an exhaustive resource containing the docs for lit, the Lightning Network implementation of the MIT Media Lab.
+          </p>
+          <p>
+          It was inspired by <a href="https://bitcoin-rpc.github.io/">BitcoinRPC</a>, developed by <a href="https://twitter.com/karel_3d">karel-3d</a>.
+          </p>
+          <p>
+          Made by the <a href="http://github.com/mit-dci/lit/">lit</a> team. License: MIT
+          </p>
+        </div>
+        <div class="col-5 col-lg-3 col-xl-3">
+          {{range .Groups}}
+            <div class="card">
+              <div class="card-header">
+                {{.Name}}
+              </div>
+              <div class="card-body">
+                {{range .Commands}}
+                  <a href="{{.Name}}.html">{{.Name}}</a>
+                  <br>
+                {{end}}
+              </div>
+            </div>
+            <br>
+          {{end}}
+        </div>
+      </div>
+    </main> <!-- /container -->
+  </body>
+</html>
