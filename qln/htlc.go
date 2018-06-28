@@ -378,7 +378,7 @@ func (nd *LitNode) ClearHTLC(qc *Qchan, R [16]byte, HTLCIdx uint32, data [32]byt
 
 	var timeout bool
 	if R == [16]byte{} {
-		if int32(qc.State.HTLCs[HTLCIdx].Locktime) < wal.CurrentHeight() {
+		if int32(qc.State.HTLCs[HTLCIdx].Locktime) > wal.CurrentHeight() {
 			return fmt.Errorf("Cannot timeout HTLC because locktime %d has not expired. Height: %d", qc.State.HTLCs[HTLCIdx].Locktime, wal.CurrentHeight())
 		}
 
@@ -537,7 +537,7 @@ func (nd *LitNode) PreimageSigHandler(msg lnutil.PreimageSigMsg, qc *Qchan) erro
 
 	var timeout bool
 	if msg.R == [16]byte{} {
-		if int32(qc.State.HTLCs[msg.Idx].Locktime) < wal.CurrentHeight() {
+		if int32(qc.State.HTLCs[msg.Idx].Locktime) > wal.CurrentHeight() {
 			return fmt.Errorf("Cannot timeout HTLC because locktime %d has not expired. Height: %d", qc.State.HTLCs[msg.Idx].Locktime, wal.CurrentHeight())
 		}
 
