@@ -58,7 +58,9 @@ func (nd *LitNode) OfferHTLC(qc *Qchan, amt uint32, RHash [32]byte, locktime uin
 	value := qc.Value
 
 	for _, h := range qc.State.HTLCs {
-		value -= h.Amt
+		if !h.Cleared {
+			value -= h.Amt
+		}
 	}
 
 	myNewOutputSize := qc.State.MyAmt - qc.State.Fee - int64(amt)
