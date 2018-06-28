@@ -9,53 +9,19 @@ Under development, not for use with real money.
 
 ### Prerequisites
 - [Git](https://git-scm.com/)
+- [Go](https://golang.org/doc/install)
 
 ### Installing
 
-1. Start by installing Go
- - [Go Installation](https://golang.org/doc/install)
+1. Clone this repo with `git clone https://github.com/mit-dci/lit` or do `go get github.com/mit-dci/lit`
 
-2. Set your Go variables to match your installed paths are set correctly:
-- `.../go/bin` (your install location) is in `$PATH` (Windows: Add the install location into your `PATH` System Variable)
-- `$GOPATH` is set the location of where you want lit (and other projects) to be
--  optional: If you want to have packages download in a separate location than your installation add `$GOROOT` set to another location (Windows: Add )
+2. `cd` into the `lit` directory (either inside your GOPATH or your cloned directory)
 
-3. Download the lit project with `go get github.com/mit-dci/lit`
+3. Run `make lit` to build lit and `make test` to run the tests. `make test with-python=true` will include the python tests (requires `bitcoind`). Alternatively, you can run `go build` to build lit if you're building inside your GOPATH.
 
-### Building
+4. Run `./lit --tn3 1` to start lit
 
-1. Go to the location of your lit installation with your defined gopath variable (`$GOPATH` on Linux and `%GOPATH%` Windows) to the lit location
-```
-cd [gopath]/src/github.com/mit-dci/lit
-```
-
-2. If you try to build now with `go build` you will receive several errors such as
-```
-cannot find package "golang.org/x/crypto/nacl/secretbox"
-...
-cannot find package "golang.org/x/crypto/scrypt"
-...
-cannot find package [packageName]
-...
-```
-
-3. In order to download all missing packages, do `go get ./...` or `go get .`
-
-4. Go back to location of the lit folder if you are not already there ([Step 1](#building)) and try to rebuild the project.
-
-5. You may now want to build `lit-af`, the text based client which controls the lit node using
-```
-cd cmd/lit-af
-go build
-```
-
-6. To run lit use:
-(Note : Windows users can take off ./ but may need to change lit to lit.exe in the second line.)
-```
-cd GOPATH/src/github.com/mit-dci/lit
-./lit --tn3 true
-```
-The words `true`, `yes`, `1` can be used to specify that lit automatically connect to a set of populated seeds. It can also be replaced by the ip of the remote node you wish to connect to.
+The words `yup, yes, y, true, 1, ok, enable, on` can be used to specify that lit automatically connect to a set of populated seeds. It can also be replaced by the ip of the remote node you wish to connect to.
 
 ## Using Lightning
 
@@ -64,8 +30,6 @@ Great! Now that you are all done setting up lit, you can
 - read about the folders for the code and what does what [here](#folders)
 - head over to the [Walkthrough](./WALKTHROUGH.md) to create some lit nodes or
 - check out how to [Contribute](./CONTRIBUTING.md).
-
-
 
 ## Command line arguments
 
@@ -113,9 +77,7 @@ One instance of lit has one litNode (package qln).
 
 LitNodes manage lndc connections to other litnodes, manage all channels, rpc listener, and the ln.db.  Litnodes then initialize and contol wallits.
 
-
 A litNode can have multiple wallits; each must have different params.  For example, there can be a testnet3 wallit, and a regtest wallit.  Eventually it might make sense to support a root key per wallit, but right now the litNode gives a rootPrivkey to each wallet on startup.  Wallits each have a db file which tracks utxos, addresses, and outpoints to watch for the upper litNode.  Wallits do not directly do any network communication.  Instead, wallits have one or more chainhooks; a chainhook is an interface that talks to the blockchain.
-
 
 One package that implements the chainhook interface is uspv.  Uspv deals with headers, wire messages to fullnodes, filters, and all the other mess that is contemporary SPV.
 
