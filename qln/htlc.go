@@ -55,7 +55,7 @@ func (nd *LitNode) OfferHTLC(qc *Qchan, amt uint32, RHash [32]byte, locktime uin
 			"height %d; must wait min 1 conf for non-test coin\n", qc.Height)
 	}
 
-	myAmt, theirAmt := qc.GetChannelBalances()
+	myAmt, _ := qc.GetChannelBalances()
 	myAmt -= qc.State.Fee + int64(amt)
 
 	// check if this push would lower my balance below minBal
@@ -65,18 +65,6 @@ func (nd *LitNode) OfferHTLC(qc *Qchan, amt uint32, RHash [32]byte, locktime uin
 		return fmt.Errorf("want to push %s but %s available after %s fee and %s consts.MinOutput",
 			lnutil.SatoshiColor(int64(amt)),
 			lnutil.SatoshiColor(qc.State.MyAmt-qc.State.Fee-consts.MinOutput),
-			lnutil.SatoshiColor(qc.State.Fee),
-			lnutil.SatoshiColor(consts.MinOutput))
-	}
-
-	// check if this push is sufficient to get them above minBal
-	if theirAmt < consts.MinOutput {
-		qc.ClearToSend <- true
-		qc.ChanMtx.Unlock()
-		return fmt.Errorf(
-			"pushing %s insufficient; counterparty bal %s fee %s consts.MinOutput %s",
-			lnutil.SatoshiColor(int64(amt)),
-			lnutil.SatoshiColor(qc.Value-qc.State.MyAmt),
 			lnutil.SatoshiColor(qc.State.Fee),
 			lnutil.SatoshiColor(consts.MinOutput))
 	}
@@ -215,14 +203,6 @@ func (nd *LitNode) HashSigHandler(msg lnutil.HashSigMsg, qc *Qchan) error {
 		// TODO: handle collisions
 	}
 
-	if qc.State.Delta > 0 {
-		fmt.Printf(
-			"DeltaSigHandler err: chan %d delta %d, expect rev, send empty rev",
-			qc.Idx(), qc.State.Delta)
-
-		return nd.SendREV(qc)
-	}
-
 	if !collision {
 		// TODO: handle non-collision
 	}
@@ -237,11 +217,10 @@ func (nd *LitNode) HashSigHandler(msg lnutil.HashSigMsg, qc *Qchan) error {
 
 	// check if this push is takes them below minimum output size
 	if theirAmt < consts.MinOutput {
-		qc.ClearToSend <- true
 		return fmt.Errorf(
-			"pushing %s reduces them too low; counterparty bal %s fee %s consts.MinOutput %s",
+			"making HTLC of size %s reduces them too low; counterparty bal %s fee %s consts.MinOutput %s",
 			lnutil.SatoshiColor(int64(msg.Amt)),
-			lnutil.SatoshiColor(qc.Value-qc.State.MyAmt),
+			lnutil.SatoshiColor(theirAmt),
 			lnutil.SatoshiColor(qc.State.Fee),
 			lnutil.SatoshiColor(consts.MinOutput))
 	}
