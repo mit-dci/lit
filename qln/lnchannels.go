@@ -255,3 +255,20 @@ func (nd *LitNode) GetDHSecret(q *Qchan) ([]byte, error) {
 
 	return btcec.GenerateSharedSecret(priv, theirPub), nil
 }
+
+// GetChannelBalances returns myAmt and theirAmt in the channel
+// that aren't locked up in HTLCs in satoshis
+func (q *Qchan) GetChannelBalances() (int64, int64) {
+	value := q.Value
+
+	for _, h := range q.State.HTLCs {
+		if !h.Cleared {
+			value -= h.Amt
+		}
+	}
+
+	myAmt := q.State.MyAmt
+	theirAmt := value - myAmt
+
+	return myAmt, theirAmt
+}

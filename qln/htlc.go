@@ -55,19 +55,11 @@ func (nd *LitNode) OfferHTLC(qc *Qchan, amt uint32, RHash [32]byte, locktime uin
 			"height %d; must wait min 1 conf for non-test coin\n", qc.Height)
 	}
 
-	value := qc.Value
-
-	for _, h := range qc.State.HTLCs {
-		if !h.Cleared {
-			value -= h.Amt
-		}
-	}
-
-	myNewOutputSize := qc.State.MyAmt - qc.State.Fee - int64(amt)
-	theirNewOutputSize := value - myNewOutputSize - int64(amt)
+	myAmt, theirAmt := qc.GetChannelBalances()
+	myAmt -= qc.State.Fee + int64(amt)
 
 	// check if this push would lower my balance below minBal
-	if myNewOutputSize < consts.MinOutput {
+	if myAmt < consts.MinOutput {
 		qc.ClearToSend <- true
 		qc.ChanMtx.Unlock()
 		return fmt.Errorf("want to push %s but %s available after %s fee and %s consts.MinOutput",
@@ -76,8 +68,9 @@ func (nd *LitNode) OfferHTLC(qc *Qchan, amt uint32, RHash [32]byte, locktime uin
 			lnutil.SatoshiColor(qc.State.Fee),
 			lnutil.SatoshiColor(consts.MinOutput))
 	}
+
 	// check if this push is sufficient to get them above minBal
-	if theirNewOutputSize < consts.MinOutput {
+	if theirAmt < consts.MinOutput {
 		qc.ClearToSend <- true
 		qc.ChanMtx.Unlock()
 		return fmt.Errorf(
@@ -239,18 +232,11 @@ func (nd *LitNode) HashSigHandler(msg lnutil.HashSigMsg, qc *Qchan) error {
 		return fmt.Errorf("HashSigHandler err: HTLC amount %d less than minOutput", msg.Amt)
 	}
 
-	// perform consts.MinOutput check
-	myNewOutputSize := qc.State.MyAmt - qc.State.Fee
-	theirNewOutputSize := qc.Value - myNewOutputSize - int64(msg.Amt)
-
-	for _, h := range qc.State.HTLCs {
-		if !h.Cleared {
-			theirNewOutputSize -= h.Amt
-		}
-	}
+	_, theirAmt := qc.GetChannelBalances()
+	theirAmt -= int64(msg.Amt)
 
 	// check if this push is takes them below minimum output size
-	if theirNewOutputSize < consts.MinOutput {
+	if theirAmt < consts.MinOutput {
 		qc.ClearToSend <- true
 		return fmt.Errorf(
 			"pushing %s reduces them too low; counterparty bal %s fee %s consts.MinOutput %s",
