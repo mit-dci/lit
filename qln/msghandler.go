@@ -64,6 +64,9 @@ func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) er
 			nd.LinkMsgHandler(msg.(lnutil.LinkMsg))
 		}
 
+	case 0xA0: // Dual Funding messages
+		return nd.DualFundingHandler(msg, peer)
+
 	case 0x90: // Discreet log contract messages
 		if msg.MsgType() == lnutil.MSGID_DLC_OFFER {
 			nd.DlcOfferHandler(msg.(lnutil.DlcOfferMsg), peer)
@@ -130,6 +133,7 @@ func (nd *LitNode) LNDCReader(peer *RemotePeer) error {
 		var routedMsg lnutil.LitMsg
 		routedMsg, err = lnutil.LitMsgFromBytes(msg, peer.Idx)
 		if err != nil {
+			fmt.Printf("decoding message error with %d: %s\n", peer.Idx, err.Error())
 			return err
 		}
 
@@ -179,6 +183,11 @@ func (nd *LitNode) PopulateQchanMap(peer *RemotePeer) error {
 }
 
 func (nd *LitNode) ChannelHandler(msg lnutil.LitMsg, peer *RemotePeer) error {
+	if nd.InProgDual.PeerIdx != 0 { // a dual funding is in progress
+		nd.DualFundingHandler(msg, peer)
+		return nil
+	}
+
 	switch message := msg.(type) {
 	case lnutil.PointReqMsg: // POINT REQUEST
 		log.Printf("Got point request from %x\n", message.Peer())
@@ -204,6 +213,45 @@ func (nd *LitNode) ChannelHandler(msg lnutil.LitMsg, peer *RemotePeer) error {
 	case lnutil.SigProofMsg: // HERE'S YOUR CHANNEL
 		log.Printf("Got channel proof from %x\n", msg.Peer())
 		nd.SigProofHandler(message, peer)
+		return nil
+
+	default:
+		return fmt.Errorf("Unknown message type %x", msg.MsgType())
+	}
+
+}
+
+func (nd *LitNode) DualFundingHandler(msg lnutil.LitMsg, peer *RemotePeer) error {
+	switch message := msg.(type) {
+	case lnutil.DualFundingReqMsg: // DUAL FUNDING REQUEST
+		fmt.Printf("Got dual funding request from %x\n", message.Peer())
+		nd.DualFundingReqHandler(message)
+		return nil
+
+	case lnutil.DualFundingAcceptMsg: // DUAL FUNDING ACCEPT
+		fmt.Printf("Got dual funding acceptance from %x\n", msg.Peer())
+		nd.DualFundingAcceptHandler(message)
+		return nil
+
+	case lnutil.DualFundingDeclMsg: // DUAL FUNDING DECLINE
+		fmt.Printf("Got dual funding decline from %x\n", msg.Peer())
+		nd.DualFundingDeclHandler(message)
+		return nil
+
+	case lnutil.ChanDescMsg: // CHANNEL DESCRIPTION
+		fmt.Printf("Got (dual funding) channel description from %x\n", msg.Peer())
+		nd.DualFundChanDescHandler(message)
+		return nil
+
+	case lnutil.DualFundingChanAckMsg: // CHANNEL ACKNOWLEDGE
+		fmt.Printf("Got (dual funding) channel acknowledgement from %x\n", msg.Peer())
+
+		nd.DualFundChanAckHandler(message, peer)
+		return nil
+
+	case lnutil.SigProofMsg: // HERE'S YOUR CHANNEL
+		fmt.Printf("Got (dual funding) channel proof from %x\n", msg.Peer())
+		nd.DualFundSigProofHandler(message, peer)
 		return nil
 
 	default:

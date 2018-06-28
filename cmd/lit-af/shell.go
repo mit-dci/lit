@@ -124,6 +124,27 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		return parseErr(err, "fund")
 	}
 
+	// mutually fund and create a new channel
+	if cmd == "dualfund" {
+		if (len(args) > 0 && args[0] == "-h") || len(args) == 0 {
+			err = lc.DualFund(args)
+		} else {
+			if args[0] == "start" {
+				err = lc.DualFundChannel(args[1:])
+			} else if args[0] == "decline" {
+				err = lc.DualFundDecline(args[1:])
+			} else if args[0] == "accept" {
+				err = lc.DualFundAccept(args[1:])
+			} else {
+				fmt.Fprintf(color.Output, "dualfund error - unrecognized subcommand %s\n", args[0])
+			}
+		}
+
+		if err != nil {
+			fmt.Fprintf(color.Output, "dualfund error: %s\n", err)
+		}
+		return nil
+	}
 	// cooperative close of a channel
 	if cmd == "close" {
 		err = lc.CloseChannel(args)
@@ -206,6 +227,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	tReply := new(litrpc.TxoListReply)
 	bReply := new(litrpc.BalanceReply)
 	lReply := new(litrpc.ListeningPortsReply)
+	dfReply := new(litrpc.PendingDualFundReply)
 
 	err := lc.Call("LitRPC.ListConnections", nil, pReply)
 	if err != nil {
@@ -270,7 +292,23 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 			c.Height, c.StateNum, c.Data, c.Pkh)
 	}
 
+	err = lc.Call("LitRPC.PendingDualFund", nil, dfReply)
+	if err != nil {
+		return err
+	}
+	if dfReply.Pending {
+		fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Pending Dual Funding Request:"))
+		fmt.Fprintf(
+			color.Output, "\t%s %d\t%s %d\t%s %s\t%s %s\n\n",
+			lnutil.Header("Peer:"), dfReply.PeerIdx,
+			lnutil.Header("Type:"), dfReply.CoinType,
+			lnutil.Header("Their Amt:"), lnutil.SatoshiColor(dfReply.TheirAmount),
+			lnutil.Header("Req Amt:"), lnutil.SatoshiColor(dfReply.RequestedAmount),
+		)
+	}
+
 	err = lc.Call("LitRPC.TxoList", nil, tReply)
+
 	if err != nil {
 		return err
 	}
@@ -366,12 +404,14 @@ func printCointypes() {
 
 func (lc *litAfClient) Help(textArgs []string) error {
 	if len(textArgs) == 0 {
+
 		fmt.Fprintf(color.Output, lnutil.Header("Commands:\n"))
-		listofCommands := []*Command{helpCommand, sayCommand, lsCommand, addressCommand, sendCommand, fanCommand, sweepCommand, lisCommand, conCommand, dlcCommand, fundCommand, watchCommand, pushCommand, closeCommand, breakCommand, historyCommand, offCommand, exitCommand}
+		listofCommands := []*Command{helpCommand, sayCommand, lsCommand, addressCommand, sendCommand, fanCommand, sweepCommand, lisCommand, conCommand, dlcCommand, fundCommand, dualFundCommand, watchCommand, pushCommand, closeCommand, breakCommand, historyCommand, offCommand, exitCommand}
 		printHelp(listofCommands)
 		fmt.Fprintf(color.Output, "\n\n")
 		fmt.Fprintf(color.Output, lnutil.Header("Coins:\n"))
 		printCointypes()
+
 		return nil
 	}
 
