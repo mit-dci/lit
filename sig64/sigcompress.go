@@ -9,7 +9,7 @@ import "fmt"
 // into 65 bytes, and restore back into the ~71 byte normal length.
 
 func SigCompress(sig []byte) (csig [64]byte, err error) {
-	if len(sig) < 68 || len(sig) > 72 {
+	if len(sig) < 65 || len(sig) > 72 {
 		err = fmt.Errorf("Can't compress; sig length is %d", len(sig))
 		return
 	}
