@@ -55,7 +55,7 @@ func NewWallit(
 	}
 	// get height
 	height := w.CurrentHeight()
-	log.Printf("DB height %d\n", height)
+	log.Printf("DB current height %d\n", height)
 
 	// bring height up to birthheight, or back down in case of resync
 	if height < birthHeight || resync {
@@ -63,7 +63,7 @@ func NewWallit(
 		w.SetDBSyncHeight(height)
 	}
 
-	log.Printf("DB height %d\n", height)
+	log.Printf("DB corrected height %d\n", height)
 	incomingTx, incomingBlockheight, err := w.Hook.Start(height, spvhost, wallitpath, p)
 	if err != nil {
 		log.Printf("NewWallit Hook.Start crash  %s ", err.Error())
