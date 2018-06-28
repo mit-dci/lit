@@ -244,7 +244,9 @@ func (nd *LitNode) HashSigHandler(msg lnutil.HashSigMsg, qc *Qchan) error {
 	theirNewOutputSize := qc.Value - myNewOutputSize - int64(msg.Amt)
 
 	for _, h := range qc.State.HTLCs {
-		theirNewOutputSize -= h.Amt
+		if !h.Cleared {
+			theirNewOutputSize -= h.Amt
+		}
 	}
 
 	// check if this push is takes them below minimum output size
