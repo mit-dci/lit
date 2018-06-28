@@ -87,7 +87,6 @@ func diffBitcoin(
 	maxHeader := len(headers) - 1
 
 	// must include an epoch start header
-	log.Println("maxHeader, epochHeight", maxHeader, epochHeight, epochLength)
 	if epochHeight > maxHeader && maxHeader+10 > epochHeight {
 		// assuming max 10 block reorg, if something more,  you're safer
 		// restarting your node. Also, if you're syncing from scratch and
@@ -141,19 +140,20 @@ func diffBitcoin(
 			tempCur := headers[len(headers)-1]
 			tempHeight := height
 			arrIndex := len(headers) - 1
+			i := 0
 			for tempCur != nil && tempHeight%2016 != 0 &&
 				tempCur.Bits == p.PowLimitBits {
 				arrIndex -= 1
 				tempCur = headers[arrIndex]
 				tempHeight -= 1
+				i ++
 			}
 			// Return the found difficulty or the minimum difficulty if no
 			// appropriate block was found.
-			lastBits := p.PowLimitBits
-			if tempCur != nil && tempCur.Bits > p.PowLimitBits { //weird bug
-				lastBits = tempCur.Bits
+			rightBits = p.PowLimitBits
+			if tempCur != nil && tempCur.Bits!= 0 { //weird bug
+				rightBits = tempCur.Bits
 			}
-			rightBits = lastBits
 			// rightBits = epochStart.Bits // original line
 		}
 	}
