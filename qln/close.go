@@ -40,6 +40,13 @@ func (nd *LitNode) CoopClose(q *Qchan) error {
 			q.KeyGen.Step[3]&0x7fffffff, q.KeyGen.Step[4]&0x7fffffff)
 	}
 
+	for _, h := range q.State.HTLCs {
+		if !h.Cleared {
+			return fmt.Errorf("can't close (%d,%d): there are uncleared HTLCs",
+				q.KeyGen.Step[3]&0x7fffffff, q.KeyGen.Step[4]&0x7fffffff)
+		}
+	}
+
 	tx, err := q.SimpleCloseTx()
 	if err != nil {
 		return err
@@ -91,6 +98,14 @@ func (nd *LitNode) CloseReqHandler(msg lnutil.CloseReqMsg) {
 
 	if nd.SubWallet[q.Coin()] == nil {
 		log.Printf("Not connected to coin type %d\n", q.Coin())
+	}
+
+	for _, h := range q.State.HTLCs {
+		if !h.Cleared {
+			log.Printf("can't close (%d,%d): there are uncleared HTLCs",
+				q.KeyGen.Step[3]&0x7fffffff, q.KeyGen.Step[4]&0x7fffffff)
+			return
+		}
 	}
 
 	// verify their sig?  should do that before signing our side just to be safe
