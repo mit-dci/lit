@@ -3,9 +3,10 @@ package qln
 import (
 	"bytes"
 	"fmt"
+	"log"
 
-	"github.com/adiabat/btcd/txscript"
-	"github.com/adiabat/btcd/wire"
+	"github.com/mit-dci/lit/btcutil/btcd/txscript"
+	"github.com/mit-dci/lit/wire"
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/sig64"
@@ -117,11 +118,11 @@ func (nd *LitNode) BuildJusticeSig(q *Qchan) error {
 	var badAmt int64
 	badIdx := uint32(len(badTx.TxOut) + 1)
 
-	fmt.Printf("made revpub %x timeout pub %x\nscript:%x\nhash %x\n",
+	log.Printf("made revpub %x timeout pub %x\nscript:%x\nhash %x\n",
 		badRevokePub[:], badTimeoutPub[:], script, scriptHashOutScript)
 	// figure out which output to bring justice to
 	for i, out := range badTx.TxOut {
-		fmt.Printf("txout %d pkscript %x\n", i, out.PkScript)
+		log.Printf("txout %d pkscript %x\n", i, out.PkScript)
 		if bytes.Equal(out.PkScript, scriptHashOutScript) {
 			badIdx = uint32(i)
 			badAmt = out.Value
@@ -164,7 +165,7 @@ func (nd *LitNode) BuildJusticeSig(q *Qchan) error {
 	justiceTx.AddTxOut(justiceOut)
 
 	jtxid := justiceTx.TxHash()
-	fmt.Printf("made justice tx %s\n", jtxid.String())
+	log.Printf("made justice tx %s\n", jtxid.String())
 	// get hashcache for signing
 	hCache := txscript.NewTxSigHashes(justiceTx)
 

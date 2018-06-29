@@ -6,15 +6,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/adiabat/btcd/btcec"
-	"github.com/adiabat/btcd/wire"
-	"github.com/adiabat/btcutil"
 	"github.com/boltdb/bolt"
+	"github.com/mit-dci/lit/btcutil"
+	"github.com/mit-dci/lit/btcutil/btcd/btcec"
 	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/watchtower"
+	"github.com/mit-dci/lit/wire"
 )
 
 /*
@@ -119,6 +119,9 @@ type LitNode struct {
 	// (1 at a time for now)
 	InProg *InFlightFund
 
+	// the current channel in process of being dual funded
+	InProgDual *InFlightDualFund
+
 	// Nodes don't have Params; their SubWallets do
 	// Param *chaincfg.Params // network parameters (testnet3, segnet, etc)
 
@@ -169,6 +172,55 @@ func (inff *InFlightFund) Clear() {
 	inff.InitSend = 0
 }
 
+// InFlightDualFund is a dual funding transaction that has not yet been broadcast
+type InFlightDualFund struct {
+	PeerIdx, ChanIdx, CoinType              uint32
+	OurAmount, TheirAmount                  int64
+	OurInputs, TheirInputs                  []lnutil.DualFundingInput
+	OurChangeAddress, TheirChangeAddress    [20]byte
+	OurPub, OurRefundPub, OurHAKDBase       [33]byte
+	TheirPub, TheirRefundPub, TheirHAKDBase [33]byte
+	OurNextHTLCBase, OurN2HTLCBase          [33]byte
+	TheirNextHTLCBase, TheirN2HTLCBase      [33]byte
+	OurSignatures, TheirSignatures          [][60]byte
+	InitiatedByUs                           bool
+	OutPoint                                *wire.OutPoint
+	done                                    chan *DualFundingResult
+	mtx                                     sync.Mutex
+}
+
+type DualFundingResult struct {
+	ChannelId     uint32
+	Error         bool
+	Accepted      bool
+	DeclineReason uint8
+}
+
+func (inff *InFlightDualFund) Clear() {
+	inff.PeerIdx = 0
+	inff.ChanIdx = 0
+	inff.OurAmount = 0
+	inff.TheirAmount = 0
+	inff.OurInputs = nil
+	inff.TheirInputs = nil
+	inff.OurChangeAddress = [20]byte{}
+	inff.TheirChangeAddress = [20]byte{}
+	inff.OurPub = [33]byte{}
+	inff.OurRefundPub = [33]byte{}
+	inff.OurHAKDBase = [33]byte{}
+	inff.TheirPub = [33]byte{}
+	inff.TheirRefundPub = [33]byte{}
+	inff.TheirHAKDBase = [33]byte{}
+	inff.OurNextHTLCBase = [33]byte{}
+	inff.OurN2HTLCBase = [33]byte{}
+	inff.TheirNextHTLCBase = [33]byte{}
+	inff.TheirN2HTLCBase = [33]byte{}
+
+	inff.OurSignatures = nil
+	inff.TheirSignatures = nil
+	inff.InitiatedByUs = false
+}
+
 // GetPubHostFromPeerIdx gets the pubkey and internet host name for a peer
 func (nd *LitNode) GetPubHostFromPeerIdx(idx uint32) ([33]byte, string) {
 	var pub [33]byte
@@ -196,7 +248,7 @@ func (nd *LitNode) GetPubHostFromPeerIdx(idx uint32) ([33]byte, string) {
 		return nil
 	})
 	if err != nil {
-		fmt.Printf(err.Error())
+		log.Printf(err.Error())
 	}
 	return pub, host
 }
@@ -225,7 +277,7 @@ func (nd *LitNode) GetNicknameFromPeerIdx(idx uint32) string {
 		return nil
 	})
 	if err != nil {
-		fmt.Printf(err.Error())
+		log.Printf(err.Error())
 	}
 	return nickname
 }
@@ -384,7 +436,7 @@ func (nd *LitNode) SaveQChan(q *Qchan) error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("saved %d : %s mapping in db\n", q.Idx(), q.Op.String())
+		log.Printf("saved %d : %s mapping in db\n", q.Idx(), q.Op.String())
 
 		cbk := btx.Bucket(BKTChannel) // go into bucket for all peers
 		if cbk == nil {
@@ -414,7 +466,7 @@ func (nd *LitNode) SaveQChan(q *Qchan) error {
 		// serialize elkrem receiver if it exists
 
 		if q.ElkRcv != nil {
-			fmt.Printf("--- elk rcv exists, saving\n")
+			log.Printf("--- elk rcv exists, saving\n")
 
 			eb, err := q.ElkRcv.ToBytes()
 			if err != nil {
@@ -433,7 +485,7 @@ func (nd *LitNode) SaveQChan(q *Qchan) error {
 			return err
 		}
 		// save state
-		fmt.Printf("writing %d byte state to bucket\n", len(b))
+		log.Printf("writing %d byte state to bucket\n", len(b))
 		return qcBucket.Put(KEYState, b)
 	})
 	if err != nil {
@@ -501,7 +553,7 @@ func (nd *LitNode) RestoreQchanFromBucket(bkt *bolt.Bucket) (*Qchan, error) {
 		return nil, err
 	}
 	if qc.ElkRcv != nil {
-		// fmt.Printf("loaded elkrem receiver at state %d\n", qc.ElkRcv.UpTo())
+		// log.Printf("loaded elkrem receiver at state %d\n", qc.ElkRcv.UpTo())
 	}
 
 	// derive elkrem sender root from HD keychain
@@ -627,7 +679,7 @@ func (nd *LitNode) SaveQchanState(q *Qchan) error {
 			return err
 		}
 		// save state
-		fmt.Printf("writing %d byte state to bucket\n", len(b))
+		log.Printf("writing %d byte state to bucket\n", len(b))
 		return qcBucket.Put(KEYState, b)
 	})
 }
@@ -720,7 +772,7 @@ func (nd *LitNode) GetQchanByIdx(cIdx uint32) (*Qchan, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("got op %x\n", op)
+	log.Printf("got op %x\n", op)
 	qc, err := nd.GetQchan(op)
 	if err != nil {
 		return nil, err

@@ -5,12 +5,13 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"net"
 	"strings"
 
-	"github.com/adiabat/btcd/btcec"
-	"github.com/adiabat/btcd/chaincfg"
-	"github.com/adiabat/btcutil"
+	"github.com/mit-dci/lit/btcutil/btcd/btcec"
+	"github.com/mit-dci/lit/btcutil/btcd/chaincfg"
+	"github.com/mit-dci/lit/btcutil"
 )
 
 // lnAddr...
@@ -109,7 +110,7 @@ func LnAddrFromString(encodedAddr string, param *chaincfg.Params) (*LNAdr, error
 	case idLen > 30 && idLen < 39:
 		addr.Base58Adr, err = btcutil.DecodeAddress(idHost[0], param)
 		if err != nil {
-			fmt.Printf("error from DecodeAddress %s\n", idHost[0])
+			log.Printf("error from DecodeAddress %s\n", idHost[0])
 			return nil, err
 		}
 	default:

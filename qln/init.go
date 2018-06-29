@@ -5,8 +5,8 @@ import (
 	"log"
 	"path/filepath"
 
-	"github.com/adiabat/btcutil"
-	"github.com/adiabat/btcutil/hdkeychain"
+	"github.com/mit-dci/lit/btcutil"
+	"github.com/mit-dci/lit/btcutil/hdkeychain"
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/dlc"
@@ -69,6 +69,9 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 
 	nd.InProg = new(InFlightFund)
 	nd.InProg.done = make(chan uint32, 1)
+
+	nd.InProgDual = new(InFlightDualFund)
+	nd.InProgDual.done = make(chan *DualFundingResult, 1)
 
 	nd.RemoteCons = make(map[uint32]*RemotePeer)
 

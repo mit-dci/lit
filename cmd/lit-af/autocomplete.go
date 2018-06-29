@@ -86,6 +86,7 @@ func (lc *litAfClient) NewAutoCompleter() readline.AutoCompleter {
 			readline.PcItem("fan"),
 			readline.PcItem("sweep"),
 			readline.PcItem("fund"),
+			readline.PcItem("dualfund"),
 			readline.PcItem("push"),
 			readline.PcItem("close"),
 			readline.PcItem("break"),

@@ -9,8 +9,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/adiabat/btcd/wire"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/wire"
 )
 
 func IP4(ipAddress string) bool {
@@ -143,7 +143,7 @@ func (s *SPVCon) Handshake(listOfNodes []string) error {
 		return fmt.Errorf("Remote node version: %x too old, disconnecting.", mv.ProtocolVersion)
 	}
 
-	if !(strings.Contains(mv.UserAgent, "Satoshi") || strings.Contains(mv.UserAgent, "btcd")) && (len(listOfNodes) != 0) {
+	if !((strings.Contains(s.Param.Name, "lite") && strings.Contains(mv.UserAgent, "LitecoinCore")) || strings.Contains(mv.UserAgent, "Satoshi") || strings.Contains(mv.UserAgent, "btcd")) && (len(listOfNodes) != 0) {
 		// TODO: improve this filtering criterion
 		return fmt.Errorf("Couldn't connect to this node. Returning!")
 	}
@@ -199,7 +199,7 @@ func (s *SPVCon) Connect(remoteNode string) error {
 		err = s.Handshake(listOfNodes)
 		if err != nil {
 			handShakeFailed = true
-			log.Printf("Handshake with %s failed. Moving on.", listOfNodes[0])
+			log.Printf("Handshake with %s failed. Moving on. Error: %s", listOfNodes[0], err.Error())
 			if len(listOfNodes) == 1 { // when the list is empty, error out
 				return fmt.Errorf("Couldn't establish connection with any remote node. Exiting.")
 			}

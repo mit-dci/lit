@@ -2,12 +2,12 @@ package litrpc
 
 import (
 	"fmt"
-
-	"github.com/adiabat/bech32"
-	"github.com/adiabat/btcd/wire"
+	"log"
+	"github.com/mit-dci/lit/bech32"
+	"github.com/mit-dci/lit/wire"
+	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
-	"github.com/mit-dci/lit/consts"
 )
 
 type TxidsReply struct {
@@ -213,7 +213,7 @@ func (r *LitRPC) Sweep(args SweepArgs, reply *TxidsReply) error {
 		return err
 	}
 
-	fmt.Printf("numtx: %d\n", args.NumTx)
+	log.Printf("numtx: %d\n", args.NumTx)
 	if args.NumTx < 1 {
 		return fmt.Errorf("can't send %d txs", args.NumTx)
 	}

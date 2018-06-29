@@ -1,0 +1,103 @@
+{
+	"comment": "",
+	"ignore": "test",
+	"package": [
+		{
+			"checksumSHA1": "IQl0ZHNKACTfj61fKklTsAsuNU4=",
+			"path": "github.com/adiabat/bech32",
+			"revision": "6289d404861d9a285ab7fb6d646a75ba7fe94575",
+			"revisionTime": "2017-05-05T01:18:16Z"
+		},
+		{
+			"checksumSHA1": "3mC+K25asxWHmLZTIqyKPsZ0Ffs=",
+			"path": "github.com/adiabat/btcd/blockchain",
+			"revision": "09ac5b3e5420679a2e25683f59695fb1d0f58717",
+			"revisionTime": "2017-11-17T23:05:43Z"
+		},
+		{
+			"checksumSHA1": "YX7e0hoIANGkTMYKWunx8GIKYT0=",
+			"path": "github.com/adiabat/btcd/btcec",
+			"revision": "09ac5b3e5420679a2e25683f59695fb1d0f58717",
+			"revisionTime": "2017-11-17T23:05:43Z"
+		},
+		{
+			"checksumSHA1": "I5tgDnFdqRvPpT1LhanJXG4vqAA=",
+			"path": "github.com/adiabat/btcd/chaincfg",
+			"revision": "09ac5b3e5420679a2e25683f59695fb1d0f58717",
+			"revisionTime": "2017-11-17T23:05:43Z"
+		},
+		{
+			"checksumSHA1": "DcV6K5AbrlYhoYaKp7cq7vA5Jr8=",
+			"path": "github.com/adiabat/btcd/chaincfg/chainhash",
+			"revision": "09ac5b3e5420679a2e25683f59695fb1d0f58717",
+			"revisionTime": "2017-11-17T23:05:43Z"
+		},
+		{
+			"checksumSHA1": "LnU3jMqoekzjyf8EgfjcFNXdGgU=",
+			"path": "github.com/adiabat/btcd/database",
+			"revision": "09ac5b3e5420679a2e25683f59695fb1d0f58717",
+			"revisionTime": "2017-11-17T23:05:43Z"
+		},
+		{
+			"checksumSHA1": "8uuEz2nCuj5O8QrpM/jWE4FyPGk=",
+			"path": "github.com/adiabat/btcd/txscript",
+			"revision": "09ac5b3e5420679a2e25683f59695fb1d0f58717",
+			"revisionTime": "2017-11-17T23:05:43Z"
+		},
+		{
+			"checksumSHA1": "TG/60VLJ0KO/TWBECXBBg8KWU6Q=",
+			"path": "github.com/adiabat/btcd/wire",
+			"revision": "09ac5b3e5420679a2e25683f59695fb1d0f58717",
+			"revisionTime": "2017-11-17T23:05:43Z"
+		},
+		{
+			"checksumSHA1": "Y8uFqmS7LWKxthjiqMzn7rLpCRA=",
+			"path": "github.com/adiabat/btcutil",
+			"revision": "85f68caa63c5e78274a758372b8ff1a53824d2cd",
+			"revisionTime": "2017-06-22T19:33:40Z"
+		},
+		{
+			"checksumSHA1": "vziZ30Fscdz9UiM+3zfwNJ6k9Pg=",
+			"path": "github.com/adiabat/btcutil/base58",
+			"revision": "85f68caa63c5e78274a758372b8ff1a53824d2cd",
+			"revisionTime": "2017-06-22T19:33:40Z"
+		},
+		{
+			"checksumSHA1": "oHLLBC5MBxP4SDp6DutbQdatSC8=",
+			"path": "github.com/adiabat/btcutil/bloom",
+			"revision": "85f68caa63c5e78274a758372b8ff1a53824d2cd",
+			"revisionTime": "2017-06-22T19:33:40Z"
+		},
+		{
+			"checksumSHA1": "03pRaqk3Hq0FjhvIBa9JtXLYqOI=",
+			"path": "github.com/adiabat/btcutil/hdkeychain",
+			"revision": "85f68caa63c5e78274a758372b8ff1a53824d2cd",
+			"revisionTime": "2017-06-22T19:33:40Z"
+		},
+		{
+			"checksumSHA1": "lyyRohwfLp/G9ktHBx40CMUcgpc=",
+			"path": "github.com/adiabat/btcutil/txsort",
+			"revision": "85f68caa63c5e78274a758372b8ff1a53824d2cd",
+			"revisionTime": "2017-06-22T19:33:40Z"
+		},
+		{
+			"checksumSHA1": "J6VwqSZwsPkigujNZo4vyYIFPWU=",
+			"path": "github.com/btcsuite/btclog",
+			"revision": "84c8d2346e9fc8c7b947e243b9c24e6df9fd206a",
+			"revisionTime": "2017-06-28T15:40:31Z"
+		},
+		{
+			"checksumSHA1": "xowWqSavv3sZfo4VZDpZTgql1lY=",
+			"path": "github.com/btcsuite/fastsha256",
+			"revision": "637e656429416087660c84436a2a035d69d54e2e",
+			"revisionTime": "2016-08-15T19:38:21Z"
+		},
+		{
+			"checksumSHA1": "nouk3wFgYJ/blFmKqnwp+DKR1pw=",
+			"path": "github.com/btcsuite/golangcrypto/ripemd160",
+			"revision": "53f62d9b43e87a6c56975cf862af7edf33a8d0df",
+			"revisionTime": "2015-03-04T02:55:08Z"
+		}
+	],
+	"rootPath": "github.com/mit-dci/lit"
+}
