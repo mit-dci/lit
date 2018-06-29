@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/adiabat/btcd/btcec"
 	"github.com/adiabat/btcd/chaincfg/chainhash"
 	"github.com/adiabat/btcd/txscript"
 	"github.com/adiabat/btcd/wire"
@@ -118,6 +119,43 @@ func (nd *LitNode) CloseReqHandler(msg lnutil.CloseReqMsg) {
 		return
 	}
 
+	hCache := txscript.NewTxSigHashes(tx)
+
+	pre, _, err := lnutil.FundTxScript(q.MyPub, q.TheirPub)
+	if err != nil {
+		log.Printf("CloseReqHandler Sig err %s", err.Error())
+		return
+	}
+
+	parsed, err := txscript.ParseScript(pre)
+	if err != nil {
+		log.Printf("CloseReqHandler Sig err %s", err.Error())
+		return
+	}
+	// always sighash all
+	hash := txscript.CalcWitnessSignatureHash(
+		parsed, hCache, txscript.SigHashAll, tx, 0, q.Value)
+
+	theirBigSig := sig64.SigDecompress(msg.Signature)
+
+	// sig is pre-truncated; last byte for sighashtype is always sighashAll
+	pSig, err := btcec.ParseDERSignature(theirBigSig, btcec.S256())
+	if err != nil {
+		log.Printf("CloseReqHandler Sig err %s", err.Error())
+		return
+	}
+	theirPubKey, err := btcec.ParsePubKey(q.TheirPub[:], btcec.S256())
+	if err != nil {
+		log.Printf("CloseReqHandler Sig err %s", err.Error())
+		return
+	}
+
+	worked := pSig.Verify(hash, theirPubKey)
+	if !worked {
+		log.Printf("CloseReqHandler Sig err invalid signature on close tx %s", err.Error())
+		return
+	}
+
 	// sign close
 	mySig, err := nd.SignSimpleClose(q, tx)
 	if err != nil {
@@ -126,7 +164,6 @@ func (nd *LitNode) CloseReqHandler(msg lnutil.CloseReqMsg) {
 	}
 
 	myBigSig := sig64.SigDecompress(mySig)
-	theirBigSig := sig64.SigDecompress(msg.Signature)
 
 	// put the sighash all byte on the end of both signatures
 	myBigSig = append(myBigSig, byte(txscript.SigHashAll))
