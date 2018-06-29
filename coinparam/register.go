@@ -6,8 +6,8 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/adiabat/btcd/chaincfg/chainhash"
-	"github.com/adiabat/btcd/wire"
+	"github.com/mit-dci/lit/btcutil/btcd/chaincfg/chainhash"
+	"github.com/mit-dci/lit/wire"
 )
 
 // Params defines a Bitcoin network by its parameters.  These parameters may be
@@ -215,10 +215,10 @@ func mustRegister(params *Params) {
 // parameters based on inputs and work regardless of the network being standard
 // or not.
 func Register(params *Params) error {
-	if _, ok := registeredNets[params.HDCoinType]; ok {
+	if _, ok := RegisteredNets[params.HDCoinType]; ok {
 		return ErrDuplicateNet
 	}
-	registeredNets[params.HDCoinType] = struct{}{}
+	RegisteredNets[params.HDCoinType] = params
 	bech32Prefixes[params.Bech32Prefix] = params.HDCoinType
 	pubKeyHashAddrIDs[params.PubKeyHashAddrID] = struct{}{}
 	scriptHashAddrIDs[params.ScriptHashAddrID] = struct{}{}
@@ -243,7 +243,8 @@ var (
 )
 
 var (
-	registeredNets    = make(map[uint32]struct{})
+	// RegisteredNets is the chains that Lit can support, by indexed cointype ID.
+	RegisteredNets    = make(map[uint32]*Params)
 	bech32Prefixes    = make(map[string]uint32)
 	pubKeyHashAddrIDs = make(map[byte]struct{})
 	scriptHashAddrIDs = make(map[byte]struct{})

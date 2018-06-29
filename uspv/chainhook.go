@@ -4,8 +4,8 @@ import (
 	"log"
 	"path/filepath"
 
-	"github.com/adiabat/btcd/chaincfg/chainhash"
-	"github.com/adiabat/btcd/wire"
+	"github.com/mit-dci/lit/btcutil/btcd/chaincfg/chainhash"
+	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
 )
@@ -116,6 +116,7 @@ func (s *SPVCon) Start(
 	err = s.Connect(host)
 	if err != nil {
 		log.Printf("Can't connect to host %s\n", host)
+		log.Println(err)
 		return nil, nil, err
 	}
 

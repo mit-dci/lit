@@ -3,11 +3,14 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"sort"
+	"strconv"
 
 	"io/ioutil"
 	"net/http"
 
 	"github.com/fatih/color"
+	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/lnutil"
 )
@@ -36,6 +39,13 @@ var offCommand = &Command{
 	ShortDescription: "Shut down the lit node.\n",
 }
 
+func parseErr(err error, str string) error {
+	if err != nil {
+		fmt.Fprintf(color.Output, "%s error: %s\n", str, err)
+	}
+	return nil
+}
+
 // Shellparse parses user input and hands it to command functions if matching
 func (lc *litAfClient) Shellparse(cmdslice []string) error {
 	var err error
@@ -51,51 +61,35 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 	// help gives you really terse help.  Just a list of commands.
 	if cmd == "help" {
 		err = lc.Help(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "help error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "help")
 	}
+
 	if cmd == "watch" {
 		err = lc.Watch(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "watch error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "watch")
 	}
+
 	// address a new address and displays it
 	if cmd == "adr" {
 		err = lc.Address(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "adr error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "adr")
 	}
 
 	// ls shows the current set of utxos, addresses and score
 	if cmd == "ls" {
 		err = lc.Ls(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "ls error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "ls")
 	}
 
 	// send sends coins to the address specified
 	if cmd == "send" {
 		err = lc.Send(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "send error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "send")
 	}
 
 	if cmd == "lis" { // listen for lnd peers
 		err = lc.Lis(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "lis error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "lis")
 	}
 
 	if cmd == "off" { // stop remote node
@@ -105,103 +99,85 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 
 	if cmd == "sweep" { // make lots of 1-in 1-out txs
 		err = lc.Sweep(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "sweep error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "sweep")
 	}
 
 	// push money in a channel away from you
 	if cmd == "push" {
 		err = lc.Push(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "push error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "push")
 	}
 
 	if cmd == "con" { // connect to lnd host
 		err = lc.Connect(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "con error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "con")
 	}
 
 	if cmd == "dlc" { // the root command for Discreet log contracts
 		err = lc.Dlc(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "dlc error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "dlc")
 	}
 
 	// fund and create a new channel
 	if cmd == "fund" {
 		err = lc.FundChannel(args)
+		return parseErr(err, "fund")
+	}
+
+	// mutually fund and create a new channel
+	if cmd == "dualfund" {
+		if (len(args) > 0 && args[0] == "-h") || len(args) == 0 {
+			err = lc.DualFund(args)
+		} else {
+			if args[0] == "start" {
+				err = lc.DualFundChannel(args[1:])
+			} else if args[0] == "decline" {
+				err = lc.DualFundDecline(args[1:])
+			} else if args[0] == "accept" {
+				err = lc.DualFundAccept(args[1:])
+			} else {
+				fmt.Fprintf(color.Output, "dualfund error - unrecognized subcommand %s\n", args[0])
+			}
+		}
+
 		if err != nil {
-			fmt.Fprintf(color.Output, "fund error: %s\n", err)
+			fmt.Fprintf(color.Output, "dualfund error: %s\n", err)
 		}
 		return nil
 	}
-
 	// cooperative close of a channel
 	if cmd == "close" {
 		err = lc.CloseChannel(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "close error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "close")
 	}
 	if cmd == "break" {
 		err = lc.BreakChannel(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "break error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "break")
 	}
 	if cmd == "say" {
 		err = lc.Say(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "say error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "say")
 	}
 
 	if cmd == "fan" { // fan-out tx
 		err = lc.Fan(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "fan error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "fan")
 	}
 	if cmd == "fee" { // get fee rate for a wallet
 		err = lc.Fee(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "fee error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "fee")
 	}
 	if cmd == "dump" { // dump all private keys
 		err = lc.Dump(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "dump error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "dump")
 	}
 	if cmd == "history" { // dump justice tx history
 		err = lc.History(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "history error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "history")
 	}
 	if cmd == "graph" { // dump graphviz for channels
 		err = lc.Graph(args)
-		if err != nil {
-			fmt.Fprintf(color.Output, "graph error: %s\n", err)
-		}
-		return nil
+		return parseErr(err, "grpah")
 	}
 
 	fmt.Fprintf(color.Output, "Command not recognized. type help for command list.\n")
@@ -251,6 +227,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	tReply := new(litrpc.TxoListReply)
 	bReply := new(litrpc.BalanceReply)
 	lReply := new(litrpc.ListeningPortsReply)
+	dfReply := new(litrpc.PendingDualFundReply)
 
 	err := lc.Call("LitRPC.ListConnections", nil, pReply)
 	if err != nil {
@@ -259,8 +236,8 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	if len(pReply.Connections) > 0 {
 		fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Peers:"))
 		for _, peer := range pReply.Connections {
-			fmt.Fprintf(color.Output, "%s %s\n",
-				lnutil.White(peer.PeerNumber), peer.RemoteHost)
+			fmt.Fprintf(color.Output, "%s %s (%s)\n",
+				lnutil.White(peer.PeerNumber), peer.RemoteHost, peer.LitAdr)
 		}
 	}
 
@@ -272,11 +249,39 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Channels:"))
 	}
 
+	sort.Slice(cReply.Channels, func(i, j int) bool {
+		return cReply.Channels[i].Height < cReply.Channels[j].Height
+	})
+
+	var closedChannels []litrpc.ChannelInfo
+	var openChannels []litrpc.ChannelInfo
 	for _, c := range cReply.Channels {
 		if c.Closed {
-			fmt.Fprintf(color.Output, lnutil.Red("Closed  "))
+			closedChannels = append(closedChannels, c)
 		} else {
-			fmt.Fprintf(color.Output, lnutil.Green("Channel "))
+			openChannels = append(openChannels, c)
+		}
+	}
+
+	for _, c := range closedChannels {
+		fmt.Fprintf(color.Output, lnutil.Red("Closed:       "))
+		fmt.Fprintf(
+			color.Output,
+			"%s (peer %d) type %d %s\n\t cap: %s bal: %s h: %d state: %d data: %x pkh: %x\n",
+			lnutil.White(c.CIdx), c.PeerIdx, c.CoinType,
+			lnutil.OutPoint(c.OutPoint),
+			lnutil.SatoshiColor(c.Capacity), lnutil.SatoshiColor(c.MyBalance),
+			c.Height, c.StateNum, c.Data, c.Pkh)
+	}
+
+	for _, c := range openChannels {
+		if c.Height == -1 {
+			c := color.New(color.FgGreen).Add(color.Underline)
+			c.Printf("Unconfirmed:")
+			fmt.Fprintf(color.Output, lnutil.Green("  "))
+			//needed for preventing the underline from extending
+		} else {
+			fmt.Fprintf(color.Output, lnutil.Green("Open:         "))
 		}
 		fmt.Fprintf(
 			color.Output,
@@ -287,7 +292,23 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 			c.Height, c.StateNum, c.Data, c.Pkh)
 	}
 
+	err = lc.Call("LitRPC.PendingDualFund", nil, dfReply)
+	if err != nil {
+		return err
+	}
+	if dfReply.Pending {
+		fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Pending Dual Funding Request:"))
+		fmt.Fprintf(
+			color.Output, "\t%s %d\t%s %d\t%s %s\t%s %s\n\n",
+			lnutil.Header("Peer:"), dfReply.PeerIdx,
+			lnutil.Header("Type:"), dfReply.CoinType,
+			lnutil.Header("Their Amt:"), lnutil.SatoshiColor(dfReply.TheirAmount),
+			lnutil.Header("Req Amt:"), lnutil.SatoshiColor(dfReply.RequestedAmount),
+		)
+	}
+
 	err = lc.Call("LitRPC.TxoList", nil, tReply)
+
 	if err != nil {
 		return err
 	}
@@ -296,7 +317,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	}
 	for i, t := range tReply.Txos {
 		fmt.Fprintf(color.Output, "%d %s h:%d amt:%s %s %s",
-			i, lnutil.OutPoint(t.OutPoint), t.Height,
+			i+1, lnutil.OutPoint(t.OutPoint), t.Height,
 			lnutil.SatoshiColor(t.Amt), t.KeyPath, t.CoinType)
 		if t.Delay != 0 {
 			fmt.Fprintf(color.Output, " delay: %d", t.Delay)
@@ -324,7 +345,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	}
 	fmt.Fprintf(color.Output, lnutil.Header("\tAddresses:\n"))
 	for i, a := range aReply.WitAddresses {
-		fmt.Fprintf(color.Output, "%d %s (%s)\n", i,
+		fmt.Fprintf(color.Output, "%d %s (%s)\n", i+1,
 			lnutil.Address(a), lnutil.Address(aReply.LegacyAddresses[i]))
 	}
 
@@ -368,28 +389,29 @@ func (lc *litAfClient) Stop(textArgs []string) error {
 	return fmt.Errorf("stopped remote lit node")
 }
 
+func printHelp(commands []*Command) {
+	for _, command := range commands {
+		fmt.Fprintf(color.Output, "%s\t%s", command.Format, command.ShortDescription)
+	}
+}
+
+func printCointypes() {
+	for k, v := range coinparam.RegisteredNets {
+		fmt.Fprintf(color.Output, "CoinType: %s\n", strconv.Itoa(int(k)))
+		fmt.Fprintf(color.Output, "└────── Name: %-13sBech32Prefix: %s\n\n", v.Name + ",", v.Bech32Prefix)
+	}
+}
+
 func (lc *litAfClient) Help(textArgs []string) error {
 	if len(textArgs) == 0 {
-		fmt.Fprintf(color.Output, "commands:\n")
-		fmt.Fprintf(color.Output, "%s\t%s", helpCommand.Format, helpCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", sayCommand.Format, sayCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", lsCommand.Format, lsCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", addressCommand.Format, addressCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", sendCommand.Format, sendCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", fanCommand.Format, fanCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", sweepCommand.Format, sweepCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", lisCommand.Format, lisCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", conCommand.Format, conCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", graphCommand.Format, graphCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", dlcCommand.Format, dlcCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", fundCommand.Format, fundCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", watchCommand.Format, watchCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", pushCommand.Format, pushCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", closeCommand.Format, closeCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", breakCommand.Format, breakCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", historyCommand.Format, historyCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", offCommand.Format, offCommand.ShortDescription)
-		fmt.Fprintf(color.Output, "%s\t%s", exitCommand.Format, exitCommand.ShortDescription)
+
+		fmt.Fprintf(color.Output, lnutil.Header("Commands:\n"))
+		listofCommands := []*Command{helpCommand, sayCommand, lsCommand, addressCommand, sendCommand, fanCommand, sweepCommand, lisCommand, conCommand, dlcCommand, fundCommand, dualFundCommand, watchCommand, pushCommand, closeCommand, breakCommand, historyCommand, offCommand, exitCommand}
+		printHelp(listofCommands)
+		fmt.Fprintf(color.Output, "\n\n")
+		fmt.Fprintf(color.Output, lnutil.Header("Coins:\n"))
+		printCointypes()
+
 		return nil
 	}
 

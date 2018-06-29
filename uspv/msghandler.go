@@ -3,8 +3,8 @@ package uspv
 import (
 	"log"
 
-	"github.com/adiabat/btcd/wire"
-	"github.com/adiabat/btcutil/bloom"
+	"github.com/mit-dci/lit/wire"
+	"github.com/mit-dci/lit/btcutil/bloom"
 	"github.com/mit-dci/lit/lnutil"
 )
 
@@ -13,8 +13,13 @@ func (s *SPVCon) incomingMessageHandler() {
 		n, xm, _, err := wire.ReadMessageWithEncodingN(s.con, s.localVersion,
 			wire.BitcoinNet(s.Param.NetMagicBytes), wire.LatestEncoding)
 		if err != nil {
-			log.Printf("ReadMessageWithEncodingN error.  Disconnecting: %s\n", err.Error())
-			return
+			log.Printf("ReadMessageWithEncodingN error.  Disconnecting from given peer. %s\n", err.Error())
+			if s.randomNodesOK { // if user wants to connect to localhost, let him do so
+				s.Connect("yes") // really any YupString here
+			} else {
+				s.con.Close()
+				return
+			}
 		}
 		s.RBytes += uint64(n)
 		//		log.Printf("Got %d byte %s message\n", n, xm.Command())
@@ -179,7 +184,7 @@ func (s *SPVCon) TxHandler(tx *wire.MsgTx) {
 	//	}
 	//	if len(dubs) > 0 {
 	//		for i, dub := range dubs {
-	//			fmt.Printf("dub %d known tx %s and new tx %s are exclusive!!!\n",
+	//			log.Printf("dub %d known tx %s and new tx %s are exclusive!!!\n",
 	//				i, dub.String(), m.TxSha().String())
 	//		}
 	//	}

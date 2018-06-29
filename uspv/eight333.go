@@ -5,9 +5,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/adiabat/btcd/chaincfg/chainhash"
-	"github.com/adiabat/btcd/wire"
-	"github.com/adiabat/btcutil/bloom"
+	"github.com/mit-dci/lit/btcutil/btcd/chaincfg/chainhash"
+	"github.com/mit-dci/lit/wire"
+	"github.com/mit-dci/lit/btcutil/bloom"
 	"github.com/mit-dci/lit/lnutil"
 )
 
@@ -36,7 +36,7 @@ func (s *SPVCon) GimmeFilter() (*bloom.Filter, error) {
 	// note there could be false positives since we're just looking
 	// for the 20 byte PKH without the opcodes.
 	for a160, _ := range s.TrackingAdrs { // add 20-byte pubkeyhash
-		//		fmt.Printf("adding address hash %x\n", a160)
+		//		log.Printf("adding address hash %x\n", a160)
 		f.Add(a160[:])
 	}
 	//	for _, u := range allUtxos {
@@ -79,12 +79,12 @@ func (s *SPVCon) MatchTx(tx *wire.MsgTx) bool {
 		// when we gain utxo, set as gain so we can return a match, but
 		// also go through all gained utxos and register to track them
 
-		//		fmt.Printf("got output key %x ", adr20)
+		//		log.Printf("got output key %x ", adr20)
 		if s.TrackingAdrs[adr20] {
 			gain = true
 			s.TrackingOPs[*op] = true
 		} else {
-			//			fmt.Printf(" no match\n")
+			//			log.Printf(" no match\n")
 		}
 
 		// this outpoint may confirm an outpoint we're watching.  Check that here.

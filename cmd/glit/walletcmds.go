@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"strconv"
 
 	"github.com/mit-dci/lit/litrpc"
@@ -78,7 +77,7 @@ func (lu *litUiClient) Send(adr, amtString string) (string, error) {
 		return "", err
 	}
 
-	log.Printf("send %d to address: %s \n", amt, adr)
+	fmt.Printf("send %d to address: %s \n", amt, adr)
 
 	args.DestAddrs = []string{adr}
 	args.Amts = []int64{int64(amt)}

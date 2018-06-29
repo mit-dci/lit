@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"time"
@@ -25,6 +24,7 @@ type config struct { // define a struct for usage with go-flags
 	LitHomeDir  string `long:"dir" description:"Specify Home Directory of lit as an absolute path."`
 	TrackerURL  string `long:"tracker" description:"LN address tracker URL http|https://host:port"`
 	ConfigFile  string
+	ProxyURL    string `long:"proxy" description:"SOCKS5 proxy to use for communicating with the network"`
 
 	Resync  bool `short:"r" long:"resync" description:"Resync from the given tip. Requires --tip"`
 	Tower   bool `long:"tower" description:"Watchtower: Run a watching node"`
@@ -35,18 +35,24 @@ type config struct { // define a struct for usage with go-flags
 	Tip     int32  `short:"t" long:"tip" description:"Specify tip to begin sync from"`
 	Rpchost string `long:"rpchost" description:"Set RPC host to listen to"`
 
-	Params *coinparam.Params
+	AutoReconnect         bool   `long:"autoReconnect" description:"Attempts to automatically reconnect to known peers periodically."`
+	AutoReconnectInterval int64  `long:"autoReconnectInterval" description:"The interval (in seconds) the reconnect logic should be executed"`
+	AutoListenPort        string `long:"autoListenPort" description:"When auto reconnect enabled, starts listening on this port"`
+	Params                *coinparam.Params
 }
 
 var (
-	defaultLitHomeDirName = os.Getenv("HOME") + "/.lit"
-	defaultTrackerURL     = "http://ni.media.mit.edu:46580"
-	defaultKeyFileName    = "privkey.hex"
-	defaultConfigFilename = "lit.conf"
-	defaultHomeDir        = os.Getenv("HOME")
-	defaultRpcport        = uint16(8001)
-	defaultTip            = int32(-1) // wallit.GetDBSyncHeight()
-	defaultRpchost        = "localhost"
+	defaultLitHomeDirName        = os.Getenv("HOME") + "/.lit"
+	defaultTrackerURL            = "http://hubris.media.mit.edu:46580"
+	defaultKeyFileName           = "privkey.hex"
+	defaultConfigFilename        = "lit.conf"
+	defaultHomeDir               = os.Getenv("HOME")
+	defaultRpcport               = uint16(8001)
+	defaultRpchost               = "localhost"
+	defaultAutoReconnect         = false
+	defaultAutoListenPort        = ":2448"
+	defaultAutoReconnectInterval = int64(60)
+  defaultTip            = int32(-1) // wallit.GetDBSyncHeight()
 )
 
 func fileExists(name string) bool {
@@ -98,7 +104,6 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 			return err
 		}
 	}
-
 	// try litecoin testnet4
 	if !lnutil.NopeString(conf.Lt4host) {
 		p := &coinparam.LiteCoinTestNet4Params
@@ -136,18 +141,21 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 func main() {
 
 	conf := config{
-		LitHomeDir: defaultLitHomeDirName,
-		Rpcport:    defaultRpcport,
-		Rpchost:    defaultRpchost,
-		TrackerURL: defaultTrackerURL,
-		Tip:        defaultTip,
+		LitHomeDir:            defaultLitHomeDirName,
+		Rpcport:               defaultRpcport,
+		Rpchost:               defaultRpchost,
+		TrackerURL:            defaultTrackerURL,
+		AutoReconnect:         defaultAutoReconnect,
+		AutoListenPort:        defaultAutoListenPort,
+		AutoReconnectInterval: defaultAutoReconnectInterval,
+    Tip:        defaultTip,
 	}
 
 	key := litSetup(&conf)
 
 	// Setup LN node.  Activate Tower if in hard mode.
 	// give node and below file pathof lit home directory
-	node, err := qln.NewLitNode(key, conf.LitHomeDir, conf.TrackerURL)
+	node, err := qln.NewLitNode(key, conf.LitHomeDir, conf.TrackerURL, conf.ProxyURL)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -165,8 +173,12 @@ func main() {
 	go litrpc.RPCListen(rpcl, conf.Rpchost, conf.Rpcport)
 	litbamf.BamfListen(conf.Rpcport, conf.LitHomeDir)
 
+	if conf.AutoReconnect {
+		node.AutoReconnect(conf.AutoListenPort, conf.AutoReconnectInterval)
+	}
+
 	<-rpcl.OffButton
-	fmt.Printf("Got stop request\n")
+	log.Printf("Got stop request\n")
 	time.Sleep(time.Second)
 
 	return

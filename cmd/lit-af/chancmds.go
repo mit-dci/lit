@@ -22,6 +22,38 @@ var fundCommand = &Command{
 	ShortDescription: "Establish and fund a new lightning channel with the given peer.\n",
 }
 
+var dualFundCommand = &Command{
+	Format: fmt.Sprintf("%s%s%s\n", lnutil.White("dualfund"),
+		lnutil.ReqColor("subcommand"), lnutil.OptColor("parameters...")),
+	Description: fmt.Sprintf("%s\n%s\n",
+		"Commands for establishing and mutually funding a new lightning channel with the given peer.",
+		"Subcommands: start, accept, decline"),
+
+	ShortDescription: "Commands for dual funding\n",
+}
+
+var dualFundStartCommand = &Command{
+	Format: fmt.Sprintf("%s%s\n", lnutil.White("dualfund start"),
+		lnutil.ReqColor("peer", "coinType", "ourAmount", "theirAmount")),
+	Description: fmt.Sprintf("%s\n%s\n%s\n",
+		"Establish and mutually fund a new lightning channel with the given peer.",
+		"The capacity is the sum of the amounts both peers insert into the channel,",
+		"each party will end up with their funded amount in the channel."),
+	ShortDescription: "Establish and mutually fund a new lightning channel with the given peer.\n",
+}
+
+var dualFundDeclineCommand = &Command{
+	Format:           fmt.Sprintf("%s\n", lnutil.White("dualfund decline")),
+	Description:      "Declines the pending dual funding request received from another peer (if any)\n",
+	ShortDescription: "Declines the pending dual funding request received from another peer (if any)\n",
+}
+
+var dualFundAcceptCommand = &Command{
+	Format:           fmt.Sprintf("%s\n", lnutil.White("dualfund accept")),
+	Description:      "Accepts the pending dual funding request received from another peer (if any)\n",
+	ShortDescription: "Accepts the pending dual funding request received from another peer (if any)\n",
+}
+
 var watchCommand = &Command{
 	Format: fmt.Sprintf("%s%s\n", lnutil.White("watch"),
 		lnutil.ReqColor("channel idx", "watchPeerIdx")),
@@ -86,19 +118,25 @@ func (lc *litAfClient) History(textArgs []string) error {
 	return nil
 }
 
-func (lc *litAfClient) FundChannel(textArgs []string) error {
+func CheckHelpCommand(command *Command, textArgs []string, expectedLength int) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Fprintf(color.Output, fundCommand.Format)
-		fmt.Fprintf(color.Output, fundCommand.Description)
-		return nil
+		fmt.Fprintf(color.Output, command.Format)
+		fmt.Fprintf(color.Output, command.Description)
 	}
+	if len(textArgs) < expectedLength {
+		// if number of args are less than expected, return
+		return fmt.Errorf(command.Format)
+	}
+	return nil
+}
 
+func (lc *litAfClient) FundChannel(textArgs []string) error {
+	err := CheckHelpCommand(fundCommand, textArgs, 4)
+	if err != nil {
+		return err
+	}
 	args := new(litrpc.FundArgs)
 	reply := new(litrpc.StatusReply)
-
-	if len(textArgs) < 4 {
-		return fmt.Errorf(fundCommand.Format)
-	}
 
 	peer, err := strconv.Atoi(textArgs[0])
 	if err != nil {
@@ -142,21 +180,99 @@ func (lc *litAfClient) FundChannel(textArgs []string) error {
 	return nil
 }
 
+func (lc *litAfClient) DualFund(textArgs []string) error {
+	err := CheckHelpCommand(dualFundCommand, textArgs, 2)
+	return err
+}
+
+// Mutually fund a channel
+func (lc *litAfClient) DualFundChannel(textArgs []string) error {
+	err := CheckHelpCommand(dualFundStartCommand, textArgs, 4)
+	if err != nil {
+		return err
+	}
+
+	args := new(litrpc.DualFundArgs)
+	reply := new(litrpc.StatusReply)
+
+	peer, err := strconv.Atoi(textArgs[0])
+	if err != nil {
+		return err
+	}
+	coinType, err := strconv.Atoi(textArgs[1])
+	if err != nil {
+		return err
+	}
+
+	ourAmt, err := strconv.Atoi(textArgs[2])
+	if err != nil {
+		return err
+	}
+
+	theirAmt, err := strconv.Atoi(textArgs[3])
+	if err != nil {
+		return err
+	}
+
+	args.Peer = uint32(peer)
+	args.CoinType = uint32(coinType)
+	args.OurAmount = int64(ourAmt)
+	args.TheirAmount = int64(theirAmt)
+
+	err = lc.rpccon.Call("LitRPC.DualFundChannel", args, reply)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(color.Output, "%s\n", reply.Status)
+	return nil
+}
+
+// Decline mutual funding of a channel
+func (lc *litAfClient) DualFundDecline(textArgs []string) error {
+	err := CheckHelpCommand(dualFundDeclineCommand, textArgs, 0)
+	if err != nil {
+		return err
+	}
+
+	reply := new(litrpc.StatusReply)
+
+	err = lc.rpccon.Call("LitRPC.DualFundDecline", nil, reply)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(color.Output, "%s\n", reply.Status)
+	return nil
+}
+
+// Accept mutual funding of a channel
+func (lc *litAfClient) DualFundAccept(textArgs []string) error {
+	err := CheckHelpCommand(dualFundAcceptCommand, textArgs, 0)
+	if err != nil {
+		return err
+	}
+
+	reply := new(litrpc.StatusReply)
+
+	err = lc.rpccon.Call("LitRPC.DualFundAccept", nil, reply)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(color.Output, "%s\n", reply.Status)
+	return nil
+}
+
 // Request close of a channel.  Need to pass in peer, channel index
 func (lc *litAfClient) CloseChannel(textArgs []string) error {
-	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Fprintf(color.Output, closeCommand.Format)
-		fmt.Fprintf(color.Output, closeCommand.Description)
-		return nil
+	err := CheckHelpCommand(closeCommand, textArgs, 1)
+	if err != nil {
+		return err
 	}
 
 	args := new(litrpc.ChanArgs)
 	reply := new(litrpc.StatusReply)
-
-	// need args, fail
-	if len(textArgs) < 1 {
-		return fmt.Errorf("need args: close chanIdx")
-	}
 
 	cIdx, err := strconv.Atoi(textArgs[0])
 	if err != nil {
@@ -176,19 +292,13 @@ func (lc *litAfClient) CloseChannel(textArgs []string) error {
 
 // Almost exactly the same as CloseChannel.  Maybe make "break" a bool...?
 func (lc *litAfClient) BreakChannel(textArgs []string) error {
-	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Fprintf(color.Output, breakCommand.Format)
-		fmt.Fprintf(color.Output, breakCommand.Description)
-		return nil
+	err := CheckHelpCommand(breakCommand, textArgs, 1)
+	if err != nil {
+		return err
 	}
 
 	args := new(litrpc.ChanArgs)
 	reply := new(litrpc.StatusReply)
-
-	// need args, fail
-	if len(textArgs) < 1 {
-		return fmt.Errorf("need args: break chanIdx")
-	}
 
 	cIdx, err := strconv.Atoi(textArgs[0])
 	if err != nil {
@@ -208,18 +318,13 @@ func (lc *litAfClient) BreakChannel(textArgs []string) error {
 
 // Push is the shell command which calls PushChannel
 func (lc *litAfClient) Push(textArgs []string) error {
-	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Fprintf(color.Output, pushCommand.Format)
-		fmt.Fprintf(color.Output, pushCommand.Description)
-		return nil
+	err := CheckHelpCommand(pushCommand, textArgs, 2)
+	if err != nil {
+		return err
 	}
 
 	args := new(litrpc.PushArgs)
 	reply := new(litrpc.PushReply)
-
-	if len(textArgs) < 2 {
-		return fmt.Errorf("need args: push chanIdx amt (times) (data)")
-	}
 
 	// this stuff is all the same as in cclose, should put into a function...
 	cIdx, err := strconv.Atoi(textArgs[0])
@@ -297,18 +402,13 @@ func (lc *litAfClient) Dump(textArgs []string) error {
 }
 
 func (lc *litAfClient) Watch(textArgs []string) error {
-	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Fprintf(color.Output, watchCommand.Format)
-		fmt.Fprintf(color.Output, watchCommand.Description)
-		return nil
+	err := CheckHelpCommand(watchCommand, textArgs, 2)
+	if err != nil {
+		return err
 	}
 
 	args := new(litrpc.WatchArgs)
 	reply := new(litrpc.WatchReply)
-
-	if len(textArgs) < 2 {
-		return fmt.Errorf("need args: watch chanIdx watchPeer")
-	}
 
 	cIdx, err := strconv.Atoi(textArgs[0])
 	if err != nil {

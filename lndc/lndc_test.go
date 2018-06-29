@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/adiabat/btcd/btcec"
+	"github.com/mit-dci/lit/btcutil/btcd/btcec"
 	"github.com/mit-dci/lit/lnutil"
 )
 
@@ -43,7 +43,7 @@ func TestConnectionCorrectness(t *testing.T) {
 	// main one. If both errors are nil, then encryption+auth was successful.
 	wg.Add(1)
 	go func() {
-		dialErr = conn.Dial(remotePriv, listener.Addr().String(), myAddress)
+		dialErr = conn.Dial(remotePriv, listener.Addr().String(), myAddress, "")
 		wg.Done()
 	}()
 

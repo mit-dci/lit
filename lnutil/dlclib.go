@@ -5,12 +5,13 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"log"
 	"math/big"
 
-	"github.com/adiabat/btcd/btcec"
-	"github.com/adiabat/btcd/chaincfg/chainhash"
+	"github.com/mit-dci/lit/btcutil/btcd/btcec"
+	"github.com/mit-dci/lit/btcutil/btcd/chaincfg/chainhash"
 
-	"github.com/adiabat/btcd/wire"
+	"github.com/mit-dci/lit/wire"
 )
 
 // DlcContractStatus is an enumeration containing the various statuses a
@@ -330,7 +331,7 @@ func PrintTx(tx *wire.MsgTx) {
 	w := bufio.NewWriter(&buf)
 	tx.Serialize(w)
 	w.Flush()
-	fmt.Printf("%x\n", buf.Bytes())
+	log.Printf("%x\n", buf.Bytes())
 }
 
 // DlcOutput returns a Txo for a particular value that pays to

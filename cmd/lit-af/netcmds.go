@@ -66,7 +66,7 @@ func (lc *litAfClient) RequestAsync() {
 		args := new(litrpc.NoArgs)
 		reply := new(litrpc.StatusReply)
 
-		err := lc.Call("LitRPC.GetMessages", args, reply)
+		err := lc.rpccon.Call("LitRPC.GetMessages", args, reply)
 		if err != nil {
 			fmt.Fprintf(color.Output, "RequestAsync error %s\n", lnutil.Red(err.Error()))
 			break
@@ -136,18 +136,13 @@ func (lc *litAfClient) Connect(textArgs []string) error {
 }
 
 func (lc *litAfClient) Say(textArgs []string) error {
-	if len(textArgs) > 0 && textArgs[0] == "-h" {
-		fmt.Fprintf(color.Output, sayCommand.Format)
-		fmt.Fprintf(color.Output, sayCommand.Description)
-		return nil
+	err := CheckHelpCommand(sayCommand, textArgs, 2)
+	if err != nil {
+		return err
 	}
 
 	args := new(litrpc.SayArgs)
 	reply := new(litrpc.StatusReply)
-
-	if len(textArgs) < 2 {
-		return fmt.Errorf(sayCommand.Format)
-	}
 
 	peerIdx, err := strconv.Atoi(textArgs[0])
 	if err != nil {

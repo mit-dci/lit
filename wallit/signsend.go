@@ -6,13 +6,13 @@ import (
 	"log"
 	"sort"
 
-	"github.com/adiabat/btcd/chaincfg/chainhash"
-	"github.com/adiabat/btcd/txscript"
-	"github.com/adiabat/btcd/wire"
-	"github.com/adiabat/btcutil/txsort"
+	"github.com/mit-dci/lit/btcutil/btcd/chaincfg/chainhash"
+	"github.com/mit-dci/lit/btcutil/btcd/txscript"
+	"github.com/mit-dci/lit/btcutil/txsort"
+	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
-	"github.com/mit-dci/lit/consts"
+	"github.com/mit-dci/lit/wire"
 )
 
 // Build a tx, kindof like with SendCoins, but don't sign or broadcast.
