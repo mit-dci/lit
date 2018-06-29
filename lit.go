@@ -81,7 +81,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	if !lnutil.NopeString(conf.Reghost) {
 		p := &coinparam.RegressionNetParams
 		log.Printf("reg: %s\n", conf.Reghost)
-		err = node.LinkBaseWallet(key, conf.Tip, conf.Resync, conf.Tower, conf.Reghost, p)
+		err = node.LinkBaseWallet(key, 120, conf.Resync, conf.Tower, conf.Reghost, p)
 		if err != nil {
 			return err
 		}
