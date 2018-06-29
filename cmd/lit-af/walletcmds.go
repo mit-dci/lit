@@ -42,8 +42,8 @@ var sweepCommand = &Command{
 
 // Send sends coins somewhere
 func (lc *litAfClient) Send(textArgs []string) error {
-	err := CheckHelpCommand(sendCommand, textArgs, 2)
-	if err != nil {
+	err, stopEx := CheckHelpCommand(sendCommand, textArgs, 2)
+	if err != nil || stopEx {
 		return err
 	}
 
@@ -80,8 +80,8 @@ func (lc *litAfClient) Send(textArgs []string) error {
 
 // Sweep moves utxos with many 1-in-1-out txs
 func (lc *litAfClient) Sweep(textArgs []string) error {
-	err := CheckHelpCommand(sweepCommand, textArgs, 2)
-	if err != nil {
+	err, stopEx := CheckHelpCommand(sweepCommand, textArgs, 2)
+	if err != nil || stopEx {
 		return err
 	}
 
@@ -118,8 +118,8 @@ func (lc *litAfClient) Sweep(textArgs []string) error {
 //}
 
 func (lc *litAfClient) Fan(textArgs []string) error {
-	err := CheckHelpCommand(fanCommand, textArgs, 3)
-	if err != nil {
+	err, stopEx := CheckHelpCommand(fanCommand, textArgs, 3)
+	if err != nil || stopEx {
 		return err
 	}
 
@@ -231,8 +231,8 @@ func (lc *litAfClient) SetFee(textArgs []string) error {
 
 // Address makes new addresses
 func (lc *litAfClient) Address(textArgs []string) error {
-	err := CheckHelpCommand(addressCommand, textArgs, 0)
-	if err != nil {
+	err, stopEx := CheckHelpCommand(addressCommand, textArgs, 0)
+	if err != nil || stopEx {
 		return err
 	}
 
