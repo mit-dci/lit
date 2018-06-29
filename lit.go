@@ -52,7 +52,7 @@ var (
 	defaultAutoReconnect         = false
 	defaultAutoListenPort        = ":2448"
 	defaultAutoReconnectInterval = int64(60)
-  defaultTip            = int32(-1) // wallit.GetDBSyncHeight()
+	defaultTip                   = int32(-1) // wallit.GetDBSyncHeight()
 )
 
 func fileExists(name string) bool {
@@ -148,11 +148,10 @@ func main() {
 		AutoReconnect:         defaultAutoReconnect,
 		AutoListenPort:        defaultAutoListenPort,
 		AutoReconnectInterval: defaultAutoReconnectInterval,
-    Tip:        defaultTip,
+		Tip: defaultTip,
 	}
 
 	key := litSetup(&conf)
-
 	// Setup LN node.  Activate Tower if in hard mode.
 	// give node and below file pathof lit home directory
 	node, err := qln.NewLitNode(key, conf.LitHomeDir, conf.TrackerURL, conf.ProxyURL)
