@@ -1,0 +1,40 @@
+{
+  "name": "lit-webui",
+  "version": "0.1.0",
+  "homepage": "./",
+  "author": "The lit developers",
+  "private": true,
+  "dependencies": {
+    "@material-ui/icons": "^1.0.0-beta.43",
+    "ajv": "^6.4.0",
+    "date-fns": "^2.0.0-alpha.7",
+    "material-ui": "^1.0.0-beta.38",
+    "@material-ui/core": "*",
+    "material-ui-icons": "^1.0.0-beta.36",
+    "material-ui-pickers": "^1.0.0-rc.7",
+    "react": "^16.2.0",
+    "react-blockies": "*",
+    "react-copy-to-clipboard": "^5.0.1",
+    "react-dom": "^16.2.0",
+    "react-scripts": "1.1.1",
+    "yarn": "^1.7.0",
+    "electron-log": "^2.2.6",
+    "electron-is-dev": "0.3.0"
+  },
+  "main": "public/electron.js",
+  "scripts": {
+    "start": "react-scripts start",
+    "test": "react-scripts test --env=jsdom",
+    "eject": "react-scripts eject",
+    "react-build": "react-scripts build",
+    "build": "yarn react-build && yarn electron-build",
+    "electron-build": "electron-builder",
+    "electron-dev": "concurrently \"BROWSER=none yarn start\" \"wait-on http://localhost:3000 && electron .\""
+  },
+  "devDependencies": {
+    "concurrently": "^3.6.0",
+    "electron": "^2.0.3",
+    "electron-builder": "^20.18.0",
+    "wait-on": "^2.1.0"
+  }
+}

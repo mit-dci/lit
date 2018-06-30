@@ -7,8 +7,9 @@ testkey.hex
 utxo.db
 watch.db
 setup.sh
-
-
+webui/node_modules
+webui/dist
+webui/build
 *.pyc
 
 #Editor temp files
