@@ -36,7 +36,6 @@ type Listener struct {
 // connections over Tor.
 func initTorController(torController *tor.Controller, conf *litconfig.Config) (string, error) {
 	if err := torController.Start(); err != nil {
-		log.Println("ERRORRS HERE")
 		return "", err
 	}
 	defaultPeerPort := 2448 // port it listens on
@@ -97,7 +96,6 @@ func NewListener(localStatic *btcec.PrivateKey, listenAddr string,
 		conns:         make(chan maybeConn),
 		quit:          make(chan struct{}),
 	}
-	log.Println("LISTENING ON ADDRESS", brontideListener.tcp.Addr())
 	for i := 0; i < defaultHandshakes; i++ {
 		brontideListener.handshakeSema <- struct{}{}
 	}
@@ -272,6 +270,5 @@ func (l *Listener) Close() error {
 //
 // Part of the net.Listener interface.
 func (l *Listener) Addr() net.Addr {
-	log.Println("LOG HTIS", l.tcp.Addr())
 	return l.tcp.Addr()
 }

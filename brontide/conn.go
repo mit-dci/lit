@@ -39,10 +39,8 @@ func Dial(localPriv *btcec.PrivateKey, ipAddr string, remotePKH string,
 	var conn net.Conn
 	var err error
 	// connecting to a node via tor works.
-	log.Println("IPADDR", ipAddr)
 	conn, err = Net.Dial("tcp", ipAddr) // connect via tor if possible
 	if err != nil {
-		log.Println("NOOB")
 		return nil, err
 	}
 

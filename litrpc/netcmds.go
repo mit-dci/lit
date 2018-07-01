@@ -56,7 +56,6 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
 		pubArr, host := r.Node.GetPubHostFromPeerIdx(uint32(peerIdxint))
 
 		connectAdr = lnutil.LitAdrFromPubkey(pubArr)
-		log.Println("CHECK THIS OUT", connectAdr)
 		if host != "" {
 			connectAdr += "@" + host
 		}
@@ -67,7 +66,6 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
 		connectAdr = args.LNAddr
 	}
 	//}
-	log.Println("CHECK THIS OUT", connectAdr)
 	if args.Tor != nil {
 		log.Println("Connecting via tor")
 		err = r.Node.DialPeer(connectAdr, &tor.ProxyNet{
