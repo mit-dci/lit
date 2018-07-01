@@ -6,7 +6,6 @@ import PropTypes from 'prop-types';
 import {withStyles} from 'material-ui/styles';
 import Card, {CardActions, CardContent, CardHeader} from 'material-ui/Card';
 import Button from 'material-ui/Button';
-import './ContractCard.css' // highlight css style (@keyframes can't be done in MUI styles)
 
 const styles = theme => ({
   tool: {

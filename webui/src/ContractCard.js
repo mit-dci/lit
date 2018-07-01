@@ -10,7 +10,6 @@ import ContractOfferDialog from './ContractOfferDialog.js';
 import ContractSettleDialog from './ContractSettleDialog.js';
 import ContractMenu from './ContractMenu.js'
 import Chip from 'material-ui/Chip';
-import './ContractCard.css' // highlight css style (@keyframes can't be done in MUI styles)
 
 const styles = theme => ({
   tool: {
