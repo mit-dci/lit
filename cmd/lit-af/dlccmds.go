@@ -400,7 +400,7 @@ func (lc *litAfClient) DlcListOracles(textArgs []string) error {
 }
 
 func (lc *litAfClient) DlcImportOracle(textArgs []string) error {
-	err, stopEx := CheckHelpCommand(importOracleCommand, textArgs, 2)
+	stopEx, err := CheckHelpCommand(importOracleCommand, textArgs, 2)
 	if err != nil || stopEx {
 		return err
 	}
@@ -422,7 +422,7 @@ func (lc *litAfClient) DlcImportOracle(textArgs []string) error {
 }
 
 func (lc *litAfClient) DlcAddOracle(textArgs []string) error {
-	err, stopEx := CheckHelpCommand(addOracleCommand, textArgs, 2)
+	stopEx, err := CheckHelpCommand(addOracleCommand, textArgs, 2)
 	if err != nil || stopEx {
 		return err
 	}
@@ -556,7 +556,7 @@ func (lc *litAfClient) DlcNewContract(textArgs []string) error {
 }
 
 func (lc *litAfClient) DlcViewContract(textArgs []string) error {
-	err, stopEx := CheckHelpCommand(viewContractCommand, textArgs, 1)
+	stopEx, err := CheckHelpCommand(viewContractCommand, textArgs, 1)
 	if err != nil || stopEx {
 		return err
 	}
@@ -580,7 +580,7 @@ func (lc *litAfClient) DlcViewContract(textArgs []string) error {
 }
 
 func (lc *litAfClient) DlcViewContractPayout(textArgs []string) error {
-	err, stopEx := CheckHelpCommand(viewContractPayoutCommand, textArgs, 4)
+	stopEx, err := CheckHelpCommand(viewContractPayoutCommand, textArgs, 4)
 	if err != nil || stopEx {
 		return err
 	}
@@ -617,7 +617,7 @@ func (lc *litAfClient) DlcViewContractPayout(textArgs []string) error {
 }
 
 func (lc *litAfClient) DlcSetContractOracle(textArgs []string) error {
-	err, stopEx := CheckHelpCommand(setContractOracleCommand, textArgs, 2)
+	stopEx, err := CheckHelpCommand(setContractOracleCommand, textArgs, 2)
 	if err != nil || stopEx {
 		return err
 	}
@@ -647,7 +647,7 @@ func (lc *litAfClient) DlcSetContractOracle(textArgs []string) error {
 }
 
 func (lc *litAfClient) DlcSetContractDatafeed(textArgs []string) error {
-	err, stopEx := CheckHelpCommand(setContractDatafeedCommand, textArgs, 2)
+	stopEx, err := CheckHelpCommand(setContractDatafeedCommand, textArgs, 2)
 	if err != nil || stopEx {
 		return err
 	}
@@ -677,7 +677,7 @@ func (lc *litAfClient) DlcSetContractDatafeed(textArgs []string) error {
 }
 
 func (lc *litAfClient) DlcSetContractRPoint(textArgs []string) error {
-	err, stopEx := CheckHelpCommand(setContractRPointCommand, textArgs, 2)
+	stopEx, err := CheckHelpCommand(setContractRPointCommand, textArgs, 2)
 	if err != nil || stopEx {
 		return err
 	}
@@ -707,7 +707,7 @@ func (lc *litAfClient) DlcSetContractRPoint(textArgs []string) error {
 }
 
 func (lc *litAfClient) DlcSetContractSettlementTime(textArgs []string) error {
-	err, stopEx := CheckHelpCommand(setContractSettlementTimeCommand, textArgs, 2)
+	stopEx, err := CheckHelpCommand(setContractSettlementTimeCommand, textArgs, 2)
 	if err != nil || stopEx {
 		return err
 	}
@@ -737,7 +737,7 @@ func (lc *litAfClient) DlcSetContractSettlementTime(textArgs []string) error {
 }
 
 func (lc *litAfClient) DlcSetContractFunding(textArgs []string) error {
-	err, stopEx := CheckHelpCommand(setContractFundingCommand, textArgs, 3)
+	stopEx, err := CheckHelpCommand(setContractFundingCommand, textArgs, 3)
 	if err != nil || stopEx {
 		return err
 	}
@@ -772,7 +772,7 @@ func (lc *litAfClient) DlcSetContractFunding(textArgs []string) error {
 }
 
 func (lc *litAfClient) DlcSetContractCoinType(textArgs []string) error {
-	err, stopEx := CheckHelpCommand(setContractCoinTypeCommand, textArgs, 2)
+	stopEx, err := CheckHelpCommand(setContractCoinTypeCommand, textArgs, 2)
 	if err != nil || stopEx {
 		return err
 	}
@@ -803,7 +803,7 @@ func (lc *litAfClient) DlcSetContractCoinType(textArgs []string) error {
 }
 
 func (lc *litAfClient) DlcSetContractDivision(textArgs []string) error {
-	err, stopEx := CheckHelpCommand(setContractDivisionCommand, textArgs, 3)
+	stopEx, err := CheckHelpCommand(setContractDivisionCommand, textArgs, 3)
 	if err != nil || stopEx {
 		return err
 	}
@@ -838,7 +838,7 @@ func (lc *litAfClient) DlcSetContractDivision(textArgs []string) error {
 }
 
 func (lc *litAfClient) DlcOfferContract(textArgs []string) error {
-	err, stopEx := CheckHelpCommand(offerContractCommand, textArgs, 2)
+	stopEx, err := CheckHelpCommand(offerContractCommand, textArgs, 2)
 	if err != nil || stopEx {
 		return err
 	}
@@ -869,7 +869,7 @@ func (lc *litAfClient) DlcOfferContract(textArgs []string) error {
 }
 
 func (lc *litAfClient) DlcDeclineContract(textArgs []string) error {
-	err, stopEx := CheckHelpCommand(declineContractCommand, textArgs, 1)
+	stopEx, err := CheckHelpCommand(declineContractCommand, textArgs, 1)
 	if err != nil || stopEx {
 		return err
 	}
@@ -895,7 +895,7 @@ func (lc *litAfClient) DlcDeclineContract(textArgs []string) error {
 }
 
 func (lc *litAfClient) DlcAcceptContract(textArgs []string) error {
-	err, stopEx := CheckHelpCommand(acceptContractCommand, textArgs, 1)
+	stopEx, err := CheckHelpCommand(acceptContractCommand, textArgs, 1)
 	if err != nil || stopEx {
 		return err
 	}
@@ -921,7 +921,7 @@ func (lc *litAfClient) DlcAcceptContract(textArgs []string) error {
 }
 
 func (lc *litAfClient) DlcSettleContract(textArgs []string) error {
-	err, stopEx := CheckHelpCommand(settleContractCommand, textArgs, 3)
+	stopEx, err := CheckHelpCommand(settleContractCommand, textArgs, 3)
 	if err != nil || stopEx {
 		return err
 	}
