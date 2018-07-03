@@ -18,9 +18,9 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/mit-dci/lit/btcutil/btcd/btcec"
-	"github.com/mit-dci/lit/btcutil/btcd/chaincfg"
-	"github.com/mit-dci/lit/btcutil/btcd/chaincfg/chainhash"
+	"github.com/mit-dci/lit/btcutil/btcec"
+	"github.com/mit-dci/lit/btcutil/chaincfg"
+	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/base58"
 	"github.com/mit-dci/lit/coinparam"

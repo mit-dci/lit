@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/mit-dci/lit/btcutil/btcd/chaincfg/chainhash"
-	"github.com/mit-dci/lit/btcutil/btcd/txscript"
+	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
+	"github.com/mit-dci/lit/btcutil/txscript"
 	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/crypto/fastsha256"
 	"github.com/mit-dci/lit/lnutil"

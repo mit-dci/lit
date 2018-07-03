@@ -11,7 +11,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/mit-dci/lit/btcutil/btcd/btcec"
+	"github.com/mit-dci/lit/btcutil/btcec"
 	"golang.org/x/net/proxy"
 )
 

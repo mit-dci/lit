@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/mit-dci/lit/btcutil/btcd/txscript"
+	"github.com/mit-dci/lit/btcutil/txscript"
 	"github.com/mit-dci/lit/wire"
 )
 
