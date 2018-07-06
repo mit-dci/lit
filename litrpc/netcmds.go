@@ -49,8 +49,7 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
 	if err == nil {
 		// get peer from address book
 		pubArr, host := r.Node.GetPubHostFromPeerIdx(uint32(peerIdxint))
-
-		connectAdr = lnutil.LitAdrFromPubkey(pubArr)
+		connectAdr = lnutil.LitFullKeyAdrEncode(pubArr)
 		if host != "" {
 			connectAdr += "@" + host
 		}

@@ -5,7 +5,6 @@ import (
 
 	"github.com/mit-dci/lit/bech32"
 	"github.com/mit-dci/lit/btcutil/base58"
-	"github.com/mit-dci/lit/crypto/fastsha256"
 )
 
 // Lit addresses use the bech32 format, but sometimes omit the checksum!
@@ -62,11 +61,6 @@ func LitFullAdrDecode(in string) ([33]byte, error) {
 	}
 	copy(pub[:], data)
 	return pub, nil
-}
-
-func LitAdrFromPubkey(in [33]byte) string {
-	doubleSha := fastsha256.Sum256(in[:])
-	return bech32.Encode("ln", doubleSha[:20])
 }
 
 // LitAdrOK make sure the address is OK.  Either it has a valid checksum, or

@@ -1,6 +1,7 @@
 package qln
 
 import (
+	//"encoding/hex"
 	"fmt"
 	"log"
 
@@ -18,8 +19,11 @@ func (nd *LitNode) GetLisAddressAndPorts() (
 	var idPub [33]byte
 	copy(idPub[:], idPriv.PubKey().SerializeCompressed())
 
-	lisAdr := lnutil.LitAdrFromPubkey(idPub)
-
+	lisAdr := lnutil.LitFullKeyAdrEncode(idPub)
+	//log.Println("LLOKING FOR?", lnutil.LitFullKeyAdrEncode(idPub))
+	//x, _ := lnutil.LitFullAdrDecode(lnutil.LitFullKeyAdrEncode(idPub))
+	//log.Println("THIS", x==idPub)
+	//ln1gq87z4dm9d6q03vtlvygct29m5y58ttqgk8rg88wdq0fj8mlcnz5dyzzgu
 	nd.RemoteMtx.Lock()
 	ports := nd.LisIpPorts
 	nd.RemoteMtx.Unlock()
@@ -39,7 +43,7 @@ func (nd *LitNode) TCPListener(
 	var idPub [33]byte
 	copy(idPub[:], idPriv.PubKey().SerializeCompressed())
 
-	adr := lnutil.LitAdrFromPubkey(idPub)
+	adr := lnutil.LitFullKeyAdrEncode(idPub)
 
 	// Don't announce on the tracker if we are communicating via SOCKS proxy
 	if nd.ProxyURL == "" {
@@ -210,7 +214,7 @@ func (nd *LitNode) GetConnectedPeerList() []PeerInfo {
 		newPeer.PeerNumber = k
 		newPeer.RemoteHost = v.Con.RemoteAddr().String()
 		newPeer.Nickname = v.Nickname
-		newPeer.LitAdr = lnutil.LitAdrFromPubkey(pubArr)
+		newPeer.LitAdr = lnutil.LitFullKeyAdrEncode(pubArr)
 		peers = append(peers, newPeer)
 	}
 	return peers
