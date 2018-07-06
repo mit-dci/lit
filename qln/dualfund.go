@@ -118,7 +118,7 @@ func (nd *LitNode) DualFundChannel(
 		return nullFundingResult, fmt.Errorf("dual funding requires both parties to commit funds")
 	}
 
-	if theirAmount+ourAmount < 1000000 { // limit for now
+	if theirAmount+ourAmount < consts.MinChanCapacity { // limit for now
 		nd.InProgDual.mtx.Unlock()
 		return nullFundingResult, fmt.Errorf("Min channel capacity 1M sat")
 	}
@@ -136,7 +136,7 @@ func (nd *LitNode) DualFundChannel(
 	}
 
 	// Find UTXOs to use
-	utxos, _, err := wal.PickUtxos(ourAmount, 500, wal.Fee(), true) //TODO Fee calculation
+	utxos, _, err := wal.PickUtxos(ourAmount, consts.DualFundFee , wal.Fee(), true) //TODO Fee calculation
 	if err != nil {
 		return nil, err
 	}
@@ -303,7 +303,7 @@ func (nd *LitNode) DualFundingReqHandler(msg lnutil.DualFundingReqMsg) {
 
 	nowHeight := wal.CurrentHeight()
 	spendable := allPorTxos.SumWitness(nowHeight)
-	if msg.TheirAmount > spendable-50000 {
+	if msg.TheirAmount > spendable-50000 { //have spare coins for justice tx
 		log.Printf("Auto declining dual fund request. Requested %d, but we only have %d for funding\n", msg.TheirAmount, spendable-50000)
 		nd.DualFundDecline(DUALFUND_DECLINE_REASON_INSUFFICIENT_BALANCE)
 		return
@@ -492,15 +492,15 @@ func (nd *LitNode) BuildDualFundingTransaction() (*wire.MsgTx, error) {
 
 	if nd.InProgDual.InitiatedByUs {
 		initiatorChangeAddress = nd.InProgDual.OurChangeAddress
-		initiatorChange = ourInputTotal - nd.InProgDual.OurAmount - 500
+		initiatorChange = ourInputTotal - nd.InProgDual.OurAmount - consts.DualFundFee
 		counterPartyChangeAddress = nd.InProgDual.TheirChangeAddress
-		counterPartyChange = theirInputTotal - nd.InProgDual.TheirAmount - 500
+		counterPartyChange = theirInputTotal - nd.InProgDual.TheirAmount - consts.DualFundFee
 
 	} else {
 		initiatorChangeAddress = nd.InProgDual.TheirChangeAddress
-		initiatorChange = theirInputTotal - nd.InProgDual.TheirAmount - 500
+		initiatorChange = theirInputTotal - nd.InProgDual.TheirAmount - consts.DualFundFee
 		counterPartyChangeAddress = nd.InProgDual.OurChangeAddress
-		counterPartyChange = ourInputTotal - nd.InProgDual.OurAmount - 500
+		counterPartyChange = ourInputTotal - nd.InProgDual.OurAmount - consts.DualFundFee
 	}
 
 	changeScriptInitiator := lnutil.DirectWPKHScriptFromPKH(initiatorChangeAddress)

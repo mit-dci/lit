@@ -11,6 +11,7 @@ import (
 	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/qln"
+	"github.com/mit-dci/lit/consts"
 )
 
 type config struct { // define a struct for usage with go-flags
@@ -80,9 +81,8 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	// try regtest
 	if !lnutil.NopeString(conf.Reghost) {
 		p := &coinparam.RegressionNetParams
-		fmt.Printf("reg: %s\n", conf.Reghost)
-		err = node.LinkBaseWallet(key, 120, conf.ReSync,
-			conf.Tower, conf.Reghost, conf.ChainProxyURL, p)
+		log.Printf("reg: %s\n", conf.Reghost)
+		err = node.LinkBaseWallet(key, BitcoinRegtestBHeight, conf.ReSync, conf.Tower, conf.Reghost, p)
 		if err != nil {
 			return err
 		}
@@ -91,8 +91,8 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	if !lnutil.NopeString(conf.Tn3host) {
 		p := &coinparam.TestNet3Params
 		err = node.LinkBaseWallet(
-			key, 1256000, conf.ReSync, conf.Tower,
-			conf.Tn3host, conf.ChainProxyURL, p)
+			key, BitcoinTestnet3BHeight, conf.ReSync, conf.Tower,
+			conf.Tn3host, p)
 		if err != nil {
 			return err
 		}
@@ -120,8 +120,8 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	if !lnutil.NopeString(conf.Tvtchost) {
 		p := &coinparam.VertcoinTestNetParams
 		err = node.LinkBaseWallet(
-			key, 25000, conf.ReSync, conf.Tower,
-			conf.Tvtchost, conf.ChainProxyURL, p)
+			key, VertcoinTestnetBHeight, conf.ReSync, conf.Tower,
+			conf.Tvtchost, p)
 		if err != nil {
 			return err
 		}
