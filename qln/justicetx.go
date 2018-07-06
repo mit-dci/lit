@@ -10,6 +10,7 @@ import (
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/sig64"
+	consts "github.com/mit-dci/lit/consts"
 )
 
 /*
@@ -85,7 +86,7 @@ func (nd *LitNode) BuildJusticeSig(q *Qchan) error {
 	// in this function, "bad" refers to the hypothetical transaction spending the
 	// com tx.  "justice" is the tx spending the bad tx
 
-	fee := int64(5000) // fixed fee for now
+	fee := consts.JusticeFee
 
 	// first we need the keys in the bad script.  Start by getting the elk-scalar
 	// we should have it at the "current" state number
@@ -315,7 +316,7 @@ func (nd *LitNode) SyncWatch(qc *Qchan, watchPeer uint32) error {
 	// send initial description if we haven't sent anything yet
 	if qc.State.WatchUpTo == 0 {
 		desc := lnutil.NewWatchDescMsg(watchPeer, qc.Coin(),
-			qc.WatchRefundAdr, qc.Delay, 5000, qc.TheirHAKDBase, qc.MyHAKDBase)
+			qc.WatchRefundAdr, qc.Delay, consts.JusticeFee, qc.TheirHAKDBase, qc.MyHAKDBase)
 
 		nd.OmniOut <- desc
 		// after sending description, must send at least states 0 and 1.
