@@ -3,7 +3,7 @@ package elkrem
 import (
 	"fmt"
 
-	"github.com/mit-dci/lit/btcutil/btcd/chaincfg/chainhash"
+	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 )
 
 /* elkrem is a simpler alternative to the 64 dimensional sha-chain.

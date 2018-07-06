@@ -135,21 +135,25 @@ func (lc *litAfClient) History(textArgs []string) error {
 	return nil
 }
 
-func CheckHelpCommand(command *Command, textArgs []string, expectedLength int) error {
+// CheckHelpCommand checks whether the user wants help regarding the command
+// or passed invalid arguments. Also checks for expected length of command
+// and returns and error if the expected length is different.
+func CheckHelpCommand(command *Command, textArgs []string, expectedLength int) (bool, error) {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
 		fmt.Fprintf(color.Output, command.Format)
 		fmt.Fprintf(color.Output, command.Description)
+		return true, nil // stop Execution if the guy just wants help
 	}
 	if len(textArgs) < expectedLength {
 		// if number of args are less than expected, return
-		return fmt.Errorf(command.Format)
+		return true, fmt.Errorf(command.Format) // stop execution in case of err
 	}
-	return nil
+	return false, nil
 }
 
 func (lc *litAfClient) FundChannel(textArgs []string) error {
-	err := CheckHelpCommand(fundCommand, textArgs, 4)
-	if err != nil {
+	stopEx, err := CheckHelpCommand(fundCommand, textArgs, 4)
+	if err != nil || stopEx {
 		return err
 	}
 	args := new(litrpc.FundArgs)
@@ -198,14 +202,17 @@ func (lc *litAfClient) FundChannel(textArgs []string) error {
 }
 
 func (lc *litAfClient) DualFund(textArgs []string) error {
-	err := CheckHelpCommand(dualFundCommand, textArgs, 2)
-	return err
+	stopEx, err := CheckHelpCommand(dualFundCommand, textArgs, 2)
+	if err != nil || stopEx {
+		return err
+	}
+	return nil
 }
 
 // Mutually fund a channel
 func (lc *litAfClient) DualFundChannel(textArgs []string) error {
-	err := CheckHelpCommand(dualFundStartCommand, textArgs, 4)
-	if err != nil {
+	stopEx, err := CheckHelpCommand(dualFundStartCommand, textArgs, 4)
+	if err != nil || stopEx {
 		return err
 	}
 
@@ -247,8 +254,8 @@ func (lc *litAfClient) DualFundChannel(textArgs []string) error {
 
 // Decline mutual funding of a channel
 func (lc *litAfClient) DualFundDecline(textArgs []string) error {
-	err := CheckHelpCommand(dualFundDeclineCommand, textArgs, 0)
-	if err != nil {
+	stopEx, err := CheckHelpCommand(dualFundDeclineCommand, textArgs, 0)
+	if err != nil || stopEx {
 		return err
 	}
 
@@ -265,8 +272,8 @@ func (lc *litAfClient) DualFundDecline(textArgs []string) error {
 
 // Accept mutual funding of a channel
 func (lc *litAfClient) DualFundAccept(textArgs []string) error {
-	err := CheckHelpCommand(dualFundAcceptCommand, textArgs, 0)
-	if err != nil {
+	stopEx, err := CheckHelpCommand(dualFundAcceptCommand, textArgs, 0)
+	if err != nil || stopEx {
 		return err
 	}
 
@@ -283,8 +290,8 @@ func (lc *litAfClient) DualFundAccept(textArgs []string) error {
 
 // Request close of a channel.  Need to pass in peer, channel index
 func (lc *litAfClient) CloseChannel(textArgs []string) error {
-	err := CheckHelpCommand(closeCommand, textArgs, 1)
-	if err != nil {
+	stopEx, err := CheckHelpCommand(closeCommand, textArgs, 1)
+	if err != nil || stopEx {
 		return err
 	}
 
@@ -309,8 +316,8 @@ func (lc *litAfClient) CloseChannel(textArgs []string) error {
 
 // Almost exactly the same as CloseChannel.  Maybe make "break" a bool...?
 func (lc *litAfClient) BreakChannel(textArgs []string) error {
-	err := CheckHelpCommand(breakCommand, textArgs, 1)
-	if err != nil {
+	stopEx, err := CheckHelpCommand(breakCommand, textArgs, 1)
+	if err != nil || stopEx {
 		return err
 	}
 
@@ -335,8 +342,8 @@ func (lc *litAfClient) BreakChannel(textArgs []string) error {
 
 // Push is the shell command which calls PushChannel
 func (lc *litAfClient) Push(textArgs []string) error {
-	err := CheckHelpCommand(pushCommand, textArgs, 2)
-	if err != nil {
+	stopEx, err := CheckHelpCommand(pushCommand, textArgs, 2)
+	if err != nil || stopEx {
 		return err
 	}
 
@@ -419,8 +426,8 @@ func (lc *litAfClient) Dump(textArgs []string) error {
 }
 
 func (lc *litAfClient) Watch(textArgs []string) error {
-	err := CheckHelpCommand(watchCommand, textArgs, 2)
-	if err != nil {
+	stopEx, err := CheckHelpCommand(watchCommand, textArgs, 2)
+	if err != nil || stopEx {
 		return err
 	}
 

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/mit-dci/lit/btcutil/btcd/txscript"
+	"github.com/mit-dci/lit/btcutil/txscript"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/wire"
@@ -366,7 +366,6 @@ func (nd *LitNode) OPEventHandler(OPEventChan chan lnutil.OutPointEvent) {
 					theC = c
 				}
 			}
-
 		}
 
 		if theC != nil {

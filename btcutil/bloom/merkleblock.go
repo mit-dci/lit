@@ -5,8 +5,8 @@
 package bloom
 
 import (
-	"github.com/mit-dci/lit/btcutil/btcd/blockchain"
-	"github.com/mit-dci/lit/btcutil/btcd/chaincfg/chainhash"
+	"github.com/mit-dci/lit/btcutil/blockchain"
+	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/btcutil"
 )

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/mit-dci/lit/btcutil/btcd/chaincfg/chainhash"
+	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/lnutil"
 )
 
