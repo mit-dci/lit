@@ -13,9 +13,9 @@ import (
 
 	"golang.org/x/net/proxy"
 
+	"github.com/codahale/chacha20poly1305"
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/crypto/fastsha256"
-	"github.com/codahale/chacha20poly1305"
 	"github.com/mit-dci/lit/lnutil"
 )
 
@@ -72,9 +72,24 @@ func parseAdr(netAddress string) (string, string, error) {
 	} else if colonCount >= 5 {
 		conMode = "tcp6"
 		return netAddress, conMode, nil
-	} else {
-		return "", "", fmt.Errorf("Invalid ip")
+	} else if colonCount == 1 {
+		// Could be a hostname. Look it up!
+		ips, err := net.LookupIP(strings.Split(netAddress, ":")[0])
+		if err != nil || len(ips) == 0 {
+			return "", "", fmt.Errorf("Invalid ip [%s] and can't look up as hostname", netAddress)
+		}
+		addrParts := strings.Split(netAddress, ":")
+		for _, ip := range ips {
+			if ip.To4() != nil {
+				return fmt.Sprintf("%s:%s", ips[0].String(), addrParts[1]), "tcp4", nil
+			}
+			if ip.To16() != nil {
+				return fmt.Sprintf("%s:%s", ips[0].String(), addrParts[len(addrParts)-1]), "tcp6", nil
+			}
+		}
 	}
+
+	return "", "", fmt.Errorf("Invalid ip")
 }
 
 // Dial...
