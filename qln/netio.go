@@ -5,7 +5,7 @@ import (
 	"log"
 
 	"github.com/mit-dci/lit/btcutil/btcec"
-	"github.com/mit-dci/lit/lndc"
+	"github.com/mit-dci/lit/brontide"
 	"github.com/mit-dci/lit/lnutil"
 )
 
@@ -206,7 +206,7 @@ func (nd *LitNode) GetConnectedPeerList() []PeerInfo {
 	for k, v := range nd.RemoteCons {
 		var newPeer PeerInfo
 		var pubArr [33]byte
-		copy(pubArr[:], v.Con.RemotePub.SerializeCompressed())
+		copy(pubArr[:], v.Con.RemotePub().SerializeCompressed())
 		newPeer.PeerNumber = k
 		newPeer.RemoteHost = v.Con.RemoteAddr().String()
 		newPeer.Nickname = v.Nickname
