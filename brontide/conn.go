@@ -2,10 +2,8 @@ package brontide
 
 import (
 	"bytes"
-	//"encoding/hex"
 	"io"
 	"math"
-	//"log"
 	"net"
 	"time"
 

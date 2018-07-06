@@ -1,7 +1,6 @@
 package qln
 
 import (
-	//"encoding/hex"
 	"fmt"
 	"log"
 
@@ -20,10 +19,6 @@ func (nd *LitNode) GetLisAddressAndPorts() (
 	copy(idPub[:], idPriv.PubKey().SerializeCompressed())
 
 	lisAdr := lnutil.LitFullKeyAdrEncode(idPub)
-	//log.Println("LLOKING FOR?", lnutil.LitFullKeyAdrEncode(idPub))
-	//x, _ := lnutil.LitFullAdrDecode(lnutil.LitFullKeyAdrEncode(idPub))
-	//log.Println("THIS", x==idPub)
-	//ln1gq87z4dm9d6q03vtlvygct29m5y58ttqgk8rg88wdq0fj8mlcnz5dyzzgu
 	nd.RemoteMtx.Lock()
 	ports := nd.LisIpPorts
 	nd.RemoteMtx.Unlock()
