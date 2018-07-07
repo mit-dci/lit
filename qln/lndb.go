@@ -6,15 +6,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mit-dci/lit/btcutil/btcec"
-	"github.com/mit-dci/lit/wire"
-	"github.com/mit-dci/lit/btcutil"
 	"github.com/boltdb/bolt"
+	"github.com/mit-dci/lit/btcutil"
+	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/watchtower"
+	"github.com/mit-dci/lit/wire"
 )
 
 /*

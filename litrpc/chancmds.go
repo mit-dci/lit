@@ -5,9 +5,9 @@ import (
 	"log"
 
 	"github.com/mit-dci/lit/btcutil"
+	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/qln"
-	"github.com/mit-dci/lit/consts"
 )
 
 type ChannelInfo struct {

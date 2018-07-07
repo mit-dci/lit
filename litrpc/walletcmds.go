@@ -2,12 +2,12 @@ package litrpc
 
 import (
 	"fmt"
-	"log"
 	"github.com/mit-dci/lit/bech32"
-	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
+	"github.com/mit-dci/lit/wire"
+	"log"
 )
 
 type TxidsReply struct {

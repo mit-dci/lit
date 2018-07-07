@@ -3,9 +3,9 @@ package uspv
 import (
 	"log"
 
-	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/btcutil/bloom"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/wire"
 )
 
 func (s *SPVCon) incomingMessageHandler() {

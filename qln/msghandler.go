@@ -6,9 +6,9 @@ import (
 	"log"
 
 	"github.com/mit-dci/lit/btcutil/txscript"
-	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
+	"github.com/mit-dci/lit/wire"
 )
 
 // handles stuff that comes in over the wire.  Not user-initiated.

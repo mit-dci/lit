@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/mit-dci/lit/btcutil/txscript"
-	"github.com/mit-dci/lit/wire"
 	"github.com/boltdb/bolt"
+	"github.com/mit-dci/lit/btcutil/txscript"
+	consts "github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/sig64"
-	consts "github.com/mit-dci/lit/consts"
+	"github.com/mit-dci/lit/wire"
 )
 
 /*

@@ -11,8 +11,8 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/wire"
 )
 
 // ARGHGH all fields have to be exported (caps) or the json unmarshaller won't

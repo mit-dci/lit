@@ -4,15 +4,15 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/btcutil/txscript"
-	"github.com/mit-dci/lit/wire"
-	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/txsort"
 	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/sig64"
+	"github.com/mit-dci/lit/wire"
 )
 
 func (nd *LitNode) AddContract() (*lnutil.DlcContract, error) {

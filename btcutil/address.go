@@ -9,9 +9,9 @@ import (
 	"encoding/hex"
 	"errors"
 
+	"github.com/mit-dci/lit/btcutil/base58"
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/btcutil/chaincfg"
-	"github.com/mit-dci/lit/btcutil/base58"
 	"github.com/mit-dci/lit/crypto/ripemd160"
 )
 

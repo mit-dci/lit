@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/mit-dci/lit/btcutil/txscript"
-	"github.com/mit-dci/lit/wire"
 	"github.com/boltdb/bolt"
+	"github.com/mit-dci/lit/btcutil/txscript"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/sig64"
+	"github.com/mit-dci/lit/wire"
 )
 
 // BuildJusticeTx takes the badTx and IdxSig found by IngestTx, and returns a

@@ -6,6 +6,7 @@ import (
 
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/btcutil/txsort"
+	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
@@ -136,7 +137,7 @@ func (nd *LitNode) DualFundChannel(
 	}
 
 	// Find UTXOs to use
-	utxos, _, err := wal.PickUtxos(ourAmount, consts.DualFundFee , wal.Fee(), true) //TODO Fee calculation
+	utxos, _, err := wal.PickUtxos(ourAmount, consts.DualFundFee, wal.Fee(), true) //TODO Fee calculation
 	if err != nil {
 		return nil, err
 	}

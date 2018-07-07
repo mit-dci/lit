@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/mit-dci/lit/bech32"
 	"github.com/awalterschulze/gographviz"
+	"github.com/mit-dci/lit/bech32"
 	"github.com/mit-dci/lit/crypto/fastsha256"
 	"github.com/mit-dci/lit/lnutil"
 )

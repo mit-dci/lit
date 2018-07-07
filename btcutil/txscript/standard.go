@@ -5,8 +5,8 @@
 package txscript
 
 import (
-	"github.com/mit-dci/lit/btcutil/chaincfg"
 	"github.com/mit-dci/lit/btcutil"
+	"github.com/mit-dci/lit/btcutil/chaincfg"
 )
 
 const (

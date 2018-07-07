@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/mit-dci/lit/btcutil/chaincfg"
 	"github.com/mit-dci/lit/btcutil"
+	"github.com/mit-dci/lit/btcutil/chaincfg"
 )
 
 func (u *PorTxo) AddWIF(w btcutil.WIF) error {

@@ -6,14 +6,14 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/boltdb/bolt"
+	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/blockchain"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
-	"github.com/mit-dci/lit/wire"
-	"github.com/mit-dci/lit/btcutil"
-	"github.com/boltdb/bolt"
+	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
-	"github.com/mit-dci/lit/consts"
+	"github.com/mit-dci/lit/wire"
 )
 
 // const strings for db usage

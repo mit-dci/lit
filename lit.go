@@ -6,12 +6,13 @@ import (
 	"os"
 	"time"
 
-	flags "github.com/jessevdk/go-flags"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/qln"
-	"github.com/mit-dci/lit/consts"
+
+	flags "github.com/jessevdk/go-flags"
+	consts "github.com/mit-dci/lit/consts"
 )
 
 type config struct { // define a struct for usage with go-flags
@@ -82,7 +83,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	if !lnutil.NopeString(conf.Reghost) {
 		p := &coinparam.RegressionNetParams
 		log.Printf("reg: %s\n", conf.Reghost)
-		err = node.LinkBaseWallet(key, BitcoinRegtestBHeight, conf.ReSync, conf.Tower, conf.Reghost, p)
+		err = node.LinkBaseWallet(key, consts.BitcoinRegtestBHeight, conf.ReSync, conf.Tower, conf.Reghost, p)
 		if err != nil {
 			return err
 		}
@@ -91,7 +92,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	if !lnutil.NopeString(conf.Tn3host) {
 		p := &coinparam.TestNet3Params
 		err = node.LinkBaseWallet(
-			key, BitcoinTestnet3BHeight, conf.ReSync, conf.Tower,
+			key, consts.BitcoinTestnet3BHeight, conf.ReSync, conf.Tower,
 			conf.Tn3host, p)
 		if err != nil {
 			return err
@@ -120,7 +121,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	if !lnutil.NopeString(conf.Tvtchost) {
 		p := &coinparam.VertcoinTestNetParams
 		err = node.LinkBaseWallet(
-			key, VertcoinTestnetBHeight, conf.ReSync, conf.Tower,
+			key, consts.VertcoinTestnetBHeight, conf.ReSync, conf.Tower,
 			conf.Tvtchost, p)
 		if err != nil {
 			return err
