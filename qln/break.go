@@ -41,7 +41,9 @@ func (nd *LitNode) BreakChannel(q *Qchan) error {
 	}
 
 	// set channel state to closed
+	nd.RemoteMtx.Lock()
 	q.CloseData.Closed = true
+	nd.RemoteMtx.Unlock()
 	q.CloseData.CloseTxid = tx.TxHash()
 
 	err = nd.SaveQchanUtxoData(q)

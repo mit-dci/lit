@@ -49,7 +49,9 @@ func (nd *LitNode) SignBreakTx(q *Qchan) (*wire.MsgTx, error) {
 	}
 
 	// save channel state as closed
+	nd.RemoteMtx.Lock()
 	q.CloseData.Closed = true
+	nd.RemoteMtx.Unlock()
 	q.CloseData.CloseTxid = tx.TxHash()
 	err = nd.SaveQchanUtxoData(q)
 	if err != nil {

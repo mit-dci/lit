@@ -55,7 +55,9 @@ func (nd *LitNode) CoopClose(q *Qchan) error {
 
 	// save channel state as closed.  We know the txid... even though that
 	// txid may not actually happen.
+	nd.RemoteMtx.Lock()
 	q.CloseData.Closed = true
+	nd.RemoteMtx.Unlock()
 	q.CloseData.CloseTxid = tx.TxHash()
 	err = nd.SaveQchanUtxoData(q)
 	if err != nil {
@@ -132,7 +134,9 @@ func (nd *LitNode) CloseReqHandler(msg lnutil.CloseReqMsg) {
 	log.Printf(lnutil.TxToString(tx))
 
 	// save channel state to db as closed.
+	nd.RemoteMtx.Lock()
 	q.CloseData.Closed = true
+	nd.RemoteMtx.Unlock()
 	q.CloseData.CloseTxid = tx.TxHash()
 	err = nd.SaveQchanUtxoData(q)
 	if err != nil {

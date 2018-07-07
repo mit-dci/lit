@@ -168,6 +168,7 @@ func (nd *LitNode) PopulateQchanMap(peer *RemotePeer) error {
 		return err
 	}
 	// initialize map
+	nd.RemoteMtx.Lock()
 	peer.QCs = make(map[uint32]*Qchan)
 	// populate from all channels (inefficient)
 	for i, q := range allQs {
@@ -175,6 +176,7 @@ func (nd *LitNode) PopulateQchanMap(peer *RemotePeer) error {
 			peer.QCs[q.Idx()] = allQs[i]
 		}
 	}
+	nd.RemoteMtx.Unlock()
 	return nil
 }
 
