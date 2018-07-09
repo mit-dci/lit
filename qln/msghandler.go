@@ -379,13 +379,13 @@ func (nd *LitNode) OPEventHandler(OPEventChan chan lnutil.OutPointEvent) {
 		if theQ == nil {
 			// Check if this is a HTLC output we're watching
 			opBytes := lnutil.OutPointToBytes(curOPEvent.Op)
-			hash, incoming, err := nd.GetHTLCOP(opBytes)
+			htlcWatch, err := nd.GetHTLCOP(opBytes)
 			if err != nil {
 				log.Printf("Error Getting HTLC OPHash: %s\n", err.Error())
 			}
 
-			if !(hash == [32]byte{}) {
-				log.Printf("Got OP event for HTLC output %x [Incoming: %t]", opBytes, incoming)
+			if !(htlcWatch.RHash == [32]byte{}) {
+				log.Printf("Got OP event for HTLC output %x [Incoming: %t]", opBytes, htlcWatch.Incoming)
 				continue
 			}
 		}

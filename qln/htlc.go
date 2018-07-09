@@ -574,3 +574,31 @@ func (nd *LitNode) PreimageSigHandler(msg lnutil.PreimageSigMsg, qc *Qchan) erro
 	}
 	return nil
 }
+
+// Claim HTLC will claim an HTLC on-chain output from a broken channel using
+// the given preimage. Returns the TXIDs of the claim transactions
+func (nd *LitNode) ClaimHTLC(R [16]byte) ([][32]byte, error) {
+	txids := make([][32]byte, 0)
+	RHash := fastsha256.Sum256(R[:])
+	ops, err := nd.FindHTLCOPsByHash(RHash)
+	if err != nil {
+		return nil, err
+	}
+	for _, op := range ops {
+		// Outgoing HTLCs should not be claimed using the preimage, but
+		// using the timeout. So only claim incoming ones in this routine
+		if op.Incoming {
+			wal := nd.SubWallet[op.CoinType]
+			addr, err := wal.NewAdr()
+			if err != nil {
+				return nil, err
+			}
+			tx, err := lnutil.ClaimHTLCTx(op.Op, op.Value, R, addr)
+			if err != nil {
+				return nil, err
+			}
+			txids = append(txids, tx.TxHash())
+		}
+	}
+	return txids, nil
+}

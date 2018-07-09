@@ -802,17 +802,18 @@ func (nd *LitNode) ClearHTLCOP(op [36]byte) error {
 	})
 }
 
-func (nd *LitNode) FindHTLCOPsByHash(hash [32]byte) ([][36]byte, error) {
-	outpoints := make([][36]byte, 0)
+func (nd *LitNode) FindHTLCOPsByHash(hash [32]byte) ([]*HTLCOPWatch, error) {
+	outpoints := make([]*HTLCOPWatch, 0)
 	err := nd.LitDB.View(func(btx *bolt.Tx) error {
 		cmp := btx.Bucket(BKTHTLCOPs)
 		c := cmp.Cursor()
 
 		for k, v := c.First(); k != nil; k, v = c.Next() {
-			if bytes.Equal(v[:32], hash[:]) {
-				var outpoint [36]byte
-				copy(outpoint[:], k[:])
-				outpoints = append(outpoints, outpoint)
+			var outPoint [36]byte
+			copy(outPoint[:], k)
+			op := HTLCOPWatchFromBytes(v, outPoint)
+			if bytes.Equal(op.RHash[:], hash[:]) {
+				outpoints = append(outpoints, op)
 			}
 		}
 		return nil
@@ -820,18 +821,16 @@ func (nd *LitNode) FindHTLCOPsByHash(hash [32]byte) ([][36]byte, error) {
 	return outpoints, err
 }
 
-func (nd *LitNode) GetHTLCOP(op [36]byte) ([32]byte, bool, error) {
-	var hash [32]byte
-	var incoming bool
+func (nd *LitNode) GetHTLCOP(op [36]byte) (*HTLCOPWatch, error) {
+	h := new(HTLCOPWatch)
 	err := nd.LitDB.View(func(btx *bolt.Tx) error {
 		cmp := btx.Bucket(BKTHTLCOPs)
-		hashVal := cmp.Get(op[:])
-		if hashVal == nil {
+		val := cmp.Get(op[:])
+		if val == nil {
 			return nil
 		}
-		copy(hash[:], hashVal[:32])
-		incoming = (hashVal[32] == 1)
+		h = HTLCOPWatchFromBytes(val, op)
 		return nil
 	})
-	return hash, incoming, err
+	return h, err
 }
