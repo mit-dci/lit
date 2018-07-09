@@ -1,6 +1,7 @@
 package qln
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"sync"
@@ -778,4 +779,59 @@ func (nd *LitNode) GetQchanByIdx(cIdx uint32) (*Qchan, error) {
 		return nil, err
 	}
 	return qc, nil
+}
+
+func (nd *LitNode) SaveHTLCOP(op [36]byte, hash [32]byte, incoming bool) error {
+	log.Printf("Saving HTLC Outpoint %x with hash %x", op, hash)
+	return nd.LitDB.Update(func(btx *bolt.Tx) error {
+		cbk := btx.Bucket(BKTHTLCOPs)
+		value := [33]byte{} // add incoming as last byte
+		copy(value[:], hash[:])
+		if incoming {
+			value[32] = 1
+		}
+		return cbk.Put(op[:], value[:])
+	})
+}
+
+func (nd *LitNode) ClearHTLCOP(op [36]byte) error {
+	log.Printf("Removing HTLC Outpoint %x", op)
+	return nd.LitDB.Update(func(btx *bolt.Tx) error {
+		cbk := btx.Bucket(BKTHTLCOPs)
+		return cbk.Delete(op[:])
+	})
+}
+
+func (nd *LitNode) FindHTLCOPsByHash(hash [32]byte) ([][36]byte, error) {
+	outpoints := make([][36]byte, 0)
+	err := nd.LitDB.View(func(btx *bolt.Tx) error {
+		cmp := btx.Bucket(BKTHTLCOPs)
+		c := cmp.Cursor()
+
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			if bytes.Equal(v[:32], hash[:]) {
+				var outpoint [36]byte
+				copy(outpoint[:], k[:])
+				outpoints = append(outpoints, outpoint)
+			}
+		}
+		return nil
+	})
+	return outpoints, err
+}
+
+func (nd *LitNode) GetHTLCOP(op [36]byte) ([32]byte, bool, error) {
+	var hash [32]byte
+	var incoming bool
+	err := nd.LitDB.View(func(btx *bolt.Tx) error {
+		cmp := btx.Bucket(BKTHTLCOPs)
+		hashVal := cmp.Get(op[:])
+		if hashVal == nil {
+			return nil
+		}
+		copy(hash[:], hashVal[:32])
+		incoming = (hashVal[32] == 1)
+		return nil
+	})
+	return hash, incoming, err
 }
