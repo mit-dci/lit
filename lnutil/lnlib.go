@@ -152,18 +152,3 @@ func OfferHTLCScript(revPKH [20]byte, remotePub [33]byte, RHash [32]byte, localP
 	s, _ := b.Script()
 	return s
 }
-
-func ClaimHTLCTx(op *wire.OutPoint, value int64, R [16]byte, addr [20]byte) (*wire.MsgTx, error) {
-
-	tx := wire.NewMsgTx()
-	tx.Version = 2
-
-	tx.AddTxIn(wire.NewTxIn(op, nil, nil))
-
-	tx.AddTxOut(wire.NewTxOut(value-500,
-		DirectWPKHScriptFromPKH(addr))) // todo calc fee
-
-	// TODO: Actually provide the preimage as input and sign.
-
-	return tx, nil
-}

@@ -1,7 +1,6 @@
 package qln
 
 import (
-	"bytes"
 	"fmt"
 	"log"
 	"sync"
@@ -779,58 +778,4 @@ func (nd *LitNode) GetQchanByIdx(cIdx uint32) (*Qchan, error) {
 		return nil, err
 	}
 	return qc, nil
-}
-
-func (nd *LitNode) SaveHTLCOP(op [36]byte, hash [32]byte, incoming bool) error {
-	log.Printf("Saving HTLC Outpoint %x with hash %x", op, hash)
-	return nd.LitDB.Update(func(btx *bolt.Tx) error {
-		cbk := btx.Bucket(BKTHTLCOPs)
-		value := [33]byte{} // add incoming as last byte
-		copy(value[:], hash[:])
-		if incoming {
-			value[32] = 1
-		}
-		return cbk.Put(op[:], value[:])
-	})
-}
-
-func (nd *LitNode) ClearHTLCOP(op [36]byte) error {
-	log.Printf("Removing HTLC Outpoint %x", op)
-	return nd.LitDB.Update(func(btx *bolt.Tx) error {
-		cbk := btx.Bucket(BKTHTLCOPs)
-		return cbk.Delete(op[:])
-	})
-}
-
-func (nd *LitNode) FindHTLCOPsByHash(hash [32]byte) ([]*HTLCOPWatch, error) {
-	outpoints := make([]*HTLCOPWatch, 0)
-	err := nd.LitDB.View(func(btx *bolt.Tx) error {
-		cmp := btx.Bucket(BKTHTLCOPs)
-		c := cmp.Cursor()
-
-		for k, v := c.First(); k != nil; k, v = c.Next() {
-			var outPoint [36]byte
-			copy(outPoint[:], k)
-			op := HTLCOPWatchFromBytes(v, outPoint)
-			if bytes.Equal(op.RHash[:], hash[:]) {
-				outpoints = append(outpoints, op)
-			}
-		}
-		return nil
-	})
-	return outpoints, err
-}
-
-func (nd *LitNode) GetHTLCOP(op [36]byte) (*HTLCOPWatch, error) {
-	h := new(HTLCOPWatch)
-	err := nd.LitDB.View(func(btx *bolt.Tx) error {
-		cmp := btx.Bucket(BKTHTLCOPs)
-		val := cmp.Get(op[:])
-		if val == nil {
-			return nil
-		}
-		h = HTLCOPWatchFromBytes(val, op)
-		return nil
-	})
-	return h, err
 }
