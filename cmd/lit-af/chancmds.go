@@ -460,8 +460,9 @@ func (lc *litAfClient) Watch(textArgs []string) error {
 
 // Add is the shell command which calls AddHTLC
 func (lc *litAfClient) AddHTLC(textArgs []string) error {
-	err := CheckHelpCommand(addHTLCCommand, textArgs, 3)
-	if err != nil {
+	stopEx, err := CheckHelpCommand(addHTLCCommand, textArgs, 3)
+
+	if err != nil || stopEx {
 		return err
 	}
 
@@ -508,8 +509,8 @@ func (lc *litAfClient) AddHTLC(textArgs []string) error {
 
 // Clear is the shell command which calls ClearHTLC
 func (lc *litAfClient) ClearHTLC(textArgs []string) error {
-	err := CheckHelpCommand(clearHTLCCommand, textArgs, 3)
-	if err != nil {
+	stopEx, err := CheckHelpCommand(clearHTLCCommand, textArgs, 3)
+	if err != nil || stopEx {
 		return err
 	}
 

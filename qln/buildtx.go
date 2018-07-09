@@ -315,7 +315,7 @@ func (q *Qchan) BuildStateTxs(mine bool) (*wire.MsgTx, []*wire.MsgTx, []*wire.Tx
 	for j, h := range HTLCTxOuts {
 		amt := h.Value - fee
 		if amt < consts.MinOutput {
-			return nil, nil, nil, fmt.Errorf("HTLC amt %d too low", amt)
+			return nil, nil, nil, fmt.Errorf("HTLC amt %d too low (fee is %d)", amt, fee)
 		}
 
 		// But now they're sorted how do I know which outpoint to spend?
