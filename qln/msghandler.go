@@ -376,6 +376,20 @@ func (nd *LitNode) OPEventHandler(OPEventChan chan lnutil.OutPointEvent) {
 			continue
 		}
 
+		if theQ == nil {
+			// Check if this is a HTLC output we're watching
+			opBytes := lnutil.OutPointToBytes(curOPEvent.Op)
+			hash, incoming, err := nd.GetHTLCOP(opBytes)
+			if err != nil {
+				log.Printf("Error Getting HTLC OPHash: %s\n", err.Error())
+			}
+
+			if !(hash == [32]byte{}) {
+				log.Printf("Got OP event for HTLC output %x [Incoming: %t]", opBytes, incoming)
+				continue
+			}
+		}
+
 		// end if no associated channel
 		if theQ == nil {
 			log.Printf("OPEvent %s doesn't match any channel\n",
@@ -434,6 +448,29 @@ func (nd *LitNode) OPEventHandler(OPEventChan chan lnutil.OutPointEvent) {
 				}
 				// make this concurrent to avoid circular locking
 				go nd.SubWallet[theQ.Coin()].ExportUtxo(&portxo)
+			}
+
+			// If theQ has any HTLCs, we should grab the OPs for them
+			// And monitor spending or timeouts
+			for _, h := range theQ.State.HTLCs {
+				txOut1, err := theQ.GenHTLCOut(h, false)
+				if err != nil {
+					log.Printf("Error getting HTLC TXOs: %s", err.Error())
+					return
+				}
+				txOut2, err := theQ.GenHTLCOut(h, true)
+				if err != nil {
+					log.Printf("Error getting HTLC TXOs: %s", err.Error())
+					return
+				}
+				for i, txo := range curOPEvent.Tx.TxOut {
+					if (bytes.Equal(txOut1.PkScript, txo.PkScript) && txOut1.Value == txo.Value) ||
+						(bytes.Equal(txOut2.PkScript, txo.PkScript) && txOut2.Value == txo.Value) {
+						op := wire.OutPoint{Hash: curOPEvent.Tx.TxHash(), Index: uint32(i)}
+						nd.SaveHTLCOP(lnutil.OutPointToBytes(op), h.RHash, h.Incoming)
+						nd.SubWallet[theQ.Coin()].WatchThis(op)
+					}
+				}
 			}
 		}
 	}
