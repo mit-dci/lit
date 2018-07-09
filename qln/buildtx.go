@@ -122,10 +122,15 @@ func (q *Qchan) BuildStateTxs(mine bool) (*wire.MsgTx, []*wire.MsgTx, []*wire.Tx
 	}
 
 	var fancyAmt, pkhAmt, theirAmt int64 // output amounts
-	var revPub, timePub [33]byte         // pubkeys
-	var pkhPub [33]byte                  // the simple output's pub key hash
+
+	revPub, timePub, pkhPub, err := q.GetKeysFromState(mine)
+	if err != nil {
+		return nil, nil, nil, err
+	}
 
 	var revPKH [20]byte
+	revPKHSlice := btcutil.Hash160(revPub[:])
+	copy(revPKH[:], revPKHSlice[:20])
 
 	fee := s.Fee // fixed fee for now
 
@@ -148,18 +153,6 @@ func (q *Qchan) BuildStateTxs(mine bool) (*wire.MsgTx, []*wire.MsgTx, []*wire.Tx
 	// the PKH clear refund also has elkrem points added to mask the PKH.
 	// this changes the txouts at each state to blind sorcerer better.
 	if mine { // build MY tx (to verify) (unless breaking)
-		// My tx that I store.  They get funds unencumbered. SH is mine eventually
-		// SH pubkeys are base points combined with the elk point we give them
-		// Create latest elkrem point (the one I create)
-		curElk, err := q.ElkPoint(false, q.State.StateIdx)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		revPub = lnutil.CombinePubs(q.TheirHAKDBase, curElk)
-		timePub = lnutil.AddPubsEZ(q.MyHAKDBase, curElk)
-
-		pkhPub = q.TheirRefundPub
-
 		// nonzero amts means build the output
 		if theirAmt > 0 {
 			pkhAmt = theirAmt - fee
@@ -168,14 +161,6 @@ func (q *Qchan) BuildStateTxs(mine bool) (*wire.MsgTx, []*wire.MsgTx, []*wire.Tx
 			fancyAmt = s.MyAmt - fee
 		}
 	} else { // build THEIR tx (to sign)
-		// Their tx that they store.  I get funds PKH.  SH is theirs eventually.
-		log.Printf("using elkpoint %x\n", s.ElkPoint)
-		// SH pubkeys are our base points plus the received elk point
-		revPub = lnutil.CombinePubs(q.MyHAKDBase, s.ElkPoint)
-		timePub = lnutil.AddPubsEZ(q.TheirHAKDBase, s.ElkPoint)
-		// PKH output
-		pkhPub = q.MyRefundPub
-
 		// nonzero amts means build the output
 		if theirAmt > 0 {
 			fancyAmt = theirAmt - fee
@@ -214,55 +199,10 @@ func (q *Qchan) BuildStateTxs(mine bool) (*wire.MsgTx, []*wire.MsgTx, []*wire.Tx
 
 	var HTLCTxOuts []*wire.TxOut
 
-	revPKHSlice := btcutil.Hash160(revPub[:])
-	copy(revPKH[:], revPKHSlice[:20])
-
-	genHTLCOut := func(h HTLC) (*wire.TxOut, error) {
-		var remotePub, localPub [33]byte
-
-		if mine { // Generating OUR tx that WE save
-			curElk, err := q.ElkPoint(false, q.State.StateIdx)
-			if err != nil {
-				return nil, err
-			}
-
-			remotePub = lnutil.CombinePubs(h.TheirHTLCBase, curElk)
-			localPub = lnutil.CombinePubs(h.MyHTLCBase, curElk)
-		} else { // Generating THEIR tx that THEY save
-			remotePub = lnutil.CombinePubs(h.MyHTLCBase, s.ElkPoint)
-			localPub = lnutil.CombinePubs(h.TheirHTLCBase, s.ElkPoint)
-		}
-
-		var HTLCScript []byte
-
-		/*
-			incoming && mine = Receive
-			incoming && !mine = Offer
-			!incoming && mine = Offer
-			!incoming && !mine = Receive
-		*/
-		if h.Incoming != mine {
-			HTLCScript = lnutil.OfferHTLCScript(revPKH,
-				remotePub, h.RHash, localPub)
-		} else {
-			HTLCScript = lnutil.ReceiveHTLCScript(revPKH,
-				remotePub, h.RHash, localPub, h.Locktime)
-		}
-
-		log.Printf("HTLC %d, script: %x, myBase: %x, theirBase: %x, Incoming: %t, Amt: %d, RHash: %x",
-			h.Idx, HTLCScript, h.MyHTLCBase, h.TheirHTLCBase, h.Incoming, h.Amt, h.RHash)
-
-		witScript := lnutil.P2WSHify(HTLCScript)
-
-		HTLCOut := wire.NewTxOut(h.Amt, witScript)
-
-		return HTLCOut, nil
-	}
-
 	// Generate new HTLC signatures
 	for _, h := range s.HTLCs {
 		if !h.Clearing && !h.Cleared {
-			HTLCOut, err := genHTLCOut(h)
+			HTLCOut, err := q.GenHTLCOut(h, mine)
 			if err != nil {
 				return nil, nil, nil, err
 			}
@@ -272,7 +212,7 @@ func (q *Qchan) BuildStateTxs(mine bool) (*wire.MsgTx, []*wire.MsgTx, []*wire.Tx
 
 	// There's an HTLC in progress
 	if s.InProgHTLC != nil {
-		HTLCOut, err := genHTLCOut(*s.InProgHTLC)
+		HTLCOut, err := q.GenHTLCOut(*s.InProgHTLC, mine)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -382,6 +322,90 @@ func (q *Qchan) BuildStateTxs(mine bool) (*wire.MsgTx, []*wire.MsgTx, []*wire.Tx
 	}
 
 	return tx, HTLCSpendsArr, HTLCTxOuts, nil
+}
+
+func (q *Qchan) GenHTLCOut(h HTLC, mine bool) (*wire.TxOut, error) {
+	var remotePub, localPub [33]byte
+
+	revPub, _, _, err := q.GetKeysFromState(mine)
+	if err != nil {
+		return nil, err
+	}
+
+	revPKHSlice := btcutil.Hash160(revPub[:])
+	var revPKH [20]byte
+	copy(revPKH[:], revPKHSlice[:20])
+
+	if mine { // Generating OUR tx that WE save
+		curElk, err := q.ElkPoint(false, q.State.StateIdx)
+		if err != nil {
+			return nil, err
+		}
+
+		remotePub = lnutil.CombinePubs(h.TheirHTLCBase, curElk)
+		localPub = lnutil.CombinePubs(h.MyHTLCBase, curElk)
+	} else { // Generating THEIR tx that THEY save
+		remotePub = lnutil.CombinePubs(h.MyHTLCBase, q.State.ElkPoint)
+		localPub = lnutil.CombinePubs(h.TheirHTLCBase, q.State.ElkPoint)
+	}
+
+	var HTLCScript []byte
+
+	/*
+		incoming && mine = Receive
+		incoming && !mine = Offer
+		!incoming && mine = Offer
+		!incoming && !mine = Receive
+	*/
+	if h.Incoming != mine {
+		HTLCScript = lnutil.OfferHTLCScript(revPKH,
+			remotePub, h.RHash, localPub)
+	} else {
+		HTLCScript = lnutil.ReceiveHTLCScript(revPKH,
+			remotePub, h.RHash, localPub, h.Locktime)
+	}
+
+	log.Printf("HTLC %d, script: %x, myBase: %x, theirBase: %x, Incoming: %t, Amt: %d, RHash: %x",
+		h.Idx, HTLCScript, h.MyHTLCBase, h.TheirHTLCBase, h.Incoming, h.Amt, h.RHash)
+
+	witScript := lnutil.P2WSHify(HTLCScript)
+
+	HTLCOut := wire.NewTxOut(h.Amt, witScript)
+
+	return HTLCOut, nil
+}
+
+// GetKeysFromState will inspect the channel state and return the revPub, timePub and pkhPub based on
+// whether we're building our own or the remote transaction.
+func (q *Qchan) GetKeysFromState(mine bool) (revPub, timePub, pkhPub [33]byte, err error) {
+
+	// the PKH clear refund also has elkrem points added to mask the PKH.
+	// this changes the txouts at each state to blind sorcerer better.
+	if mine { // build MY tx (to verify) (unless breaking)
+		var curElk [33]byte
+		// My tx that I store.  They get funds unencumbered. SH is mine eventually
+		// SH pubkeys are base points combined with the elk point we give them
+		// Create latest elkrem point (the one I create)
+		curElk, err = q.ElkPoint(false, q.State.StateIdx)
+		if err != nil {
+			return
+		}
+		revPub = lnutil.CombinePubs(q.TheirHAKDBase, curElk)
+		timePub = lnutil.AddPubsEZ(q.MyHAKDBase, curElk)
+
+		pkhPub = q.TheirRefundPub
+
+	} else { // build THEIR tx (to sign)
+		// Their tx that they store.  I get funds PKH.  SH is theirs eventually.
+		log.Printf("using elkpoint %x\n", q.State.ElkPoint)
+		// SH pubkeys are our base points plus the received elk point
+		revPub = lnutil.CombinePubs(q.MyHAKDBase, q.State.ElkPoint)
+		timePub = lnutil.AddPubsEZ(q.TheirHAKDBase, q.State.ElkPoint)
+		// PKH output
+		pkhPub = q.MyRefundPub
+	}
+
+	return
 }
 
 // the scriptsig to put on a P2SH input.  Sigs need to be in order!

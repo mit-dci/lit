@@ -202,22 +202,39 @@ func (nd *LitNode) CloseReqHandler(msg lnutil.CloseReqMsg) {
 	return
 }
 
-func (q *Qchan) GetHtlcTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
-	if tx == nil {
-		return nil, fmt.Errorf("IngesGetCloseTxostCloseTx: nil tx")
+func (q *Qchan) GetHtlcTxos(tx *wire.MsgTx) ([]*wire.TxOut, error) {
+	htlcOutsInTx := make([]*wire.TxOut, 0)
+	htlcOuts := make([]*wire.TxOut, 0)
+	for _, h := range q.State.HTLCs {
+		txOut, err := q.GenHTLCOut(h, false)
+		if err != nil {
+			return nil, err
+		}
+		htlcOuts = append(htlcOuts, txOut)
+
+		txOut, err = q.GenHTLCOut(h, true)
+		if err != nil {
+			return nil, err
+		}
+		htlcOuts = append(htlcOuts, txOut)
 	}
-	txid := tx.TxHash()
-	// double check -- does this tx actually spend from the channel's outpoint?
-	if !(len(tx.TxIn) == 1 && lnutil.OutPointsEqual(tx.TxIn[0].PreviousOutPoint, q.Op)) {
-		return nil, fmt.Errorf("tx %s doesn't spend channel outpoint %s",
-			txid.String(), q.Op.String())
+
+	for i, out := range tx.TxOut {
+		htlcOut := false
+		for _, hOut := range htlcOuts {
+			if out.Value == hOut.Value && bytes.Equal(out.PkScript, hOut.PkScript) {
+				// This is an HTLC output
+				log.Printf("Found HTLC output at index %d", i)
+				htlcOut = true
+				break
+			}
+		}
+		if htlcOut {
+			htlcOutsInTx = append(htlcOutsInTx, out)
+		}
 	}
 
-	cTxos := make([]portxo.PorTxo, 0)
-
-	//cTxos = append(cTxos, portxo.PorTxo{})
-
-	return cTxos, nil
+	return htlcOutsInTx, nil
 }
 
 // GetCloseTxos takes in a tx and sets the QcloseTXO fields based on the tx.
@@ -239,14 +256,29 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 	cTxos := make([]portxo.PorTxo, 1)
 	myPKHPkSript := lnutil.DirectWPKHScript(q.MyRefundPub)
 
+	htlcOutsInTx, err := q.GetHtlcTxos(tx)
+	if err != nil {
+		return nil, err
+	}
+
 	shIdx = 999 // set high here to detect if there's no SH output
-	// Classify outputs.  Assumes only 1 SH output.  Later recognize HTLC outputs
-	// TODO-HTLC: Recognize HTLC output
+	// Classify outputs. If output is an HTLC, do nothing, since there is a
+	// separate function for that
 	for i, out := range tx.TxOut {
 		if len(out.PkScript) == 34 {
-			shIdx = uint32(i)
-		}
-		if bytes.Equal(myPKHPkSript, out.PkScript) {
+			htlcOut := false
+			for _, txo := range htlcOutsInTx {
+				if bytes.Equal(txo.PkScript, out.PkScript) && txo.Value == out.Value {
+					htlcOut = true
+					break
+				}
+			}
+			// There should be only one other script output other than HTLCs which
+			// is the closing script with timelock
+			if !htlcOut {
+				shIdx = uint32(i)
+			}
+		} else if bytes.Equal(myPKHPkSript, out.PkScript) {
 			pkhIdx = uint32(i)
 			pkhIsMine = true
 		}
