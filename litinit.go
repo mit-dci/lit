@@ -2,16 +2,13 @@ package main
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/jessevdk/go-flags"
 	"github.com/mit-dci/lit/lnutil"
-	nat "github.com/mit-dci/lit/nat"
 )
 
 // createDefaultConfigFile creates a config file  -- only call this if the
@@ -133,39 +130,5 @@ func litSetup(conf *config) *[32]byte {
 		log.Fatal(err)
 	}
 
-	if conf.UPnP && conf.NatPmp {
-		log.Println("Currently both Upnp and NAT-PMP cannot be " +
-			"enabled together, using UPnP")
-	}
-
-	// do UPnP port forwarding
-	// right now we fatal if we aren't able to port forward via upnp
-	// a question though is whether we should continue connceting without
-	// port forwarding if the user has explicitly told us so.
-	if conf.UPnP {
-		err := nat.SetupUpnp(conf.Rpcport)
-		if err != nil {
-			fmt.Printf("Unable to setup Upnp %v\n", err)
-			log.Fatal(err)
-		}
-		log.Println("Forwarded port via UPnP")
-		return key
-		// don't go down further because in case both upnp and natpmp
-		// are specified, we want upnp to take precedence.
-	}
-
-	if conf.NatPmp {
-		discoveryTimeout := time.Duration(10 * time.Second)
-		//log.Println("welcome to natpmp world")
-		_, err := nat.SetupPmp(discoveryTimeout, conf.Rpcport)
-		if err != nil {
-			err := fmt.Errorf("Unable to discover a "+
-				"NAT-PMP enabled device on the local "+
-				"network: %v", err)
-			log.Fatal(err)
-		}
-
-		// no need to return here since there's nothing after this
-	}
 	return key
 }

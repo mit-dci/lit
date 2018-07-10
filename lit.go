@@ -32,8 +32,7 @@ type config struct { // define a struct for usage with go-flags
 	// proxy
 	ProxyURL string `long:"proxy" description:"SOCKS5 proxy to use for communicating with the network"`
 	//UPnP port forwarding and NAT Traversal
-	UPnP bool `long:"upnp" description:"Use UpnP NAT Traversal"`
-	NatPmp bool `long:"natpmp" description:"Toggle Nat Pmp support for auto network discovery"`
+	Nat string `long:"nat" description:"Toggle upnp or pmp NAT Traversal NAT Punching"`
 	//resync and twoer config
 	ReSync bool `short:"r" long:"reSync" description:"Resync from the given tip."`
 	Tower  bool `long:"tower" description:"Watchtower: Run a watching node"`
@@ -163,7 +162,7 @@ func main() {
 
 	// Setup LN node.  Activate Tower if in hard mode.
 	// give node and below file pathof lit home directory
-	node, err := qln.NewLitNode(key, conf.LitHomeDir, conf.TrackerURL, conf.ProxyURL)
+	node, err := qln.NewLitNode(key, conf.LitHomeDir, conf.TrackerURL, conf.ProxyURL, conf.Nat)
 	if err != nil {
 		log.Fatal(err)
 	}
