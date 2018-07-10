@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
-	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/wire"
 )
 
 // ChainHook is an interface which provides access to a blockchain for the

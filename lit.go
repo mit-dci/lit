@@ -15,19 +15,19 @@ import (
 )
 
 type config struct { // define a struct for usage with go-flags
-	Tn3host     string `long:"tn3" description:"Connect to bitcoin testnet3."`
-	Bc2host     string `long:"bc2" description:"bc2 full node."`
-	Lt4host     string `long:"lt4" description:"Connect to litecoin testnet4."`
-	Reghost     string `long:"reg" description:"Connect to bitcoin regtest."`
-	Litereghost string `long:"litereg" description:"Connect to litecoin regtest."`
-	Tvtchost    string `long:"tvtc" description:"Connect to Vertcoin test node."`
-	Vtchost     string `long:"vtc" description:"Connect to Vertcoin."`
-	LitHomeDir  string `long:"dir" description:"Specify Home Directory of lit as an absolute path."`
-	TrackerURL  string `long:"tracker" description:"LN address tracker URL http|https://host:port"`
-	ConfigFile  string
-	ProxyURL    string `long:"proxy" description:"SOCKS5 proxy to use for communicating with the network"`
-
-	ProxyWallit bool `long:"proxywallet" description:"Use the SOCKS5 proxy specified with proxy with Wallit connections"`
+	Tn3host       string `long:"tn3" description:"Connect to bitcoin testnet3."`
+	Bc2host       string `long:"bc2" description:"bc2 full node."`
+	Lt4host       string `long:"lt4" description:"Connect to litecoin testnet4."`
+	Reghost       string `long:"reg" description:"Connect to bitcoin regtest."`
+	Litereghost   string `long:"litereg" description:"Connect to litecoin regtest."`
+	Tvtchost      string `long:"tvtc" description:"Connect to Vertcoin test node."`
+	Vtchost       string `long:"vtc" description:"Connect to Vertcoin."`
+	LitHomeDir    string `long:"dir" description:"Specify Home Directory of lit as an absolute path."`
+	TrackerURL    string `long:"tracker" description:"LN address tracker URL http|https://host:port"`
+	ConfigFile    string
+	ProxyURL      string `long:"proxy" description:"SOCKS5 proxy to use for communicating with the network"`
+	LitProxyURL   string `long:"litproxy" description:"SOCKS5 proxy to use for Lit's network communications. Overridden by the proxy flag."`
+	ChainProxyURL string `long:"chainproxy" description:"SOCKS5 proxy to use for Wallit's network communications. Overridden by the proxy flag."`
 
 	ReSync  bool `short:"r" long:"reSync" description:"Resync from the given tip."`
 	Tower   bool `long:"tower" description:"Watchtower: Run a watching node"`
@@ -83,7 +83,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 		p := &coinparam.RegressionNetParams
 		fmt.Printf("reg: %s\n", conf.Reghost)
 		err = node.LinkBaseWallet(key, 120, conf.ReSync,
-			conf.Tower, conf.Reghost, conf.ProxyWallit, p)
+			conf.Tower, conf.Reghost, conf.ChainProxyURL, p)
 		if err != nil {
 			return err
 		}
@@ -93,7 +93,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 		p := &coinparam.TestNet3Params
 		err = node.LinkBaseWallet(
 			key, 1256000, conf.ReSync, conf.Tower,
-			conf.Tn3host, conf.ProxyWallit, p)
+			conf.Tn3host, conf.ChainProxyURL, p)
 		if err != nil {
 			return err
 		}
@@ -102,7 +102,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	if !lnutil.NopeString(conf.Litereghost) {
 		p := &coinparam.LiteRegNetParams
 		err = node.LinkBaseWallet(key, 120, conf.ReSync,
-			conf.Tower, conf.Litereghost, conf.ProxyWallit, p)
+			conf.Tower, conf.Litereghost, conf.ChainProxyURL, p)
 		if err != nil {
 			return err
 		}
@@ -112,7 +112,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 		p := &coinparam.LiteCoinTestNet4Params
 		err = node.LinkBaseWallet(
 			key, p.StartHeight, conf.ReSync, conf.Tower,
-			conf.Lt4host, conf.ProxyWallit, p)
+			conf.Lt4host, conf.ChainProxyURL, p)
 		if err != nil {
 			return err
 		}
@@ -122,7 +122,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 		p := &coinparam.VertcoinTestNetParams
 		err = node.LinkBaseWallet(
 			key, 25000, conf.ReSync, conf.Tower,
-			conf.Tvtchost, conf.ProxyWallit, p)
+			conf.Tvtchost, conf.ChainProxyURL, p)
 		if err != nil {
 			return err
 		}
@@ -132,7 +132,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 		p := &coinparam.VertcoinParams
 		err = node.LinkBaseWallet(
 			key, p.StartHeight, conf.ReSync, conf.Tower,
-			conf.Vtchost, conf.ProxyWallit, p)
+			conf.Vtchost, conf.ChainProxyURL, p)
 		if err != nil {
 			return err
 		}
@@ -155,9 +155,14 @@ func main() {
 
 	key := litSetup(&conf)
 
+	if conf.ProxyURL != "" {
+		conf.LitProxyURL = conf.ProxyURL
+		conf.ChainProxyURL = conf.ProxyURL
+	}
+
 	// Setup LN node.  Activate Tower if in hard mode.
 	// give node and below file pathof lit home directory
-	node, err := qln.NewLitNode(key, conf.LitHomeDir, conf.TrackerURL, conf.ProxyURL)
+	node, err := qln.NewLitNode(key, conf.LitHomeDir, conf.TrackerURL, conf.LitProxyURL)
 	if err != nil {
 		log.Fatal(err)
 	}
