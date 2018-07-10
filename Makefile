@@ -6,16 +6,18 @@ GOBIN = $(shell pwd)
 GO ?= latest
 WEBUI_REPO = "https://github.com/josephtchung/webui"
 
-all: lit lit-af
+all: lit lit-af test
 
-lit:
+goget:
 	build/env.sh go get -v .
+	build/env.sh go get -v ./cmd/lit-af
+
+lit: goget
 	build/env.sh go build -v
 	@echo "Done building."
 	@echo "Run \"$(GOBIN)/lit\" to launch lit."
 
-lit-af:
-	build/env.sh go get -v ./cmd/lit-af
+lit-af: goget
 	build/env.sh bash -c '(cd cmd/lit-af && go build -v)'
 	@echo "Run \"$(GOBIN)/cmd/lit-af/lit-af\" to launch lit-af."
 
@@ -38,7 +40,7 @@ clean:
 	rm -f cmd/glit/glit
 
 test: lit
-	build/env.sh go test -v ./...
+	build/env.sh ./gotests.sh
 ifeq ($(with-python), true)
 	python3 test/test_basic.py -c reg --dumplogs
 	python3 test/test_break.py -c reg --dumplogs

@@ -27,4 +27,6 @@ cd "$homedir/lit"
 PWD="$homedir/lit"
 
 # Launch the arguments with the configured environment.
-exec "$@"
+if [ ! -z "$1" ]; then
+	exec "$@"
+fi
