@@ -3,15 +3,16 @@ package qln
 import (
 	"fmt"
 	"log"
+	"net/rpc"
 	"sync"
 	"time"
 
 	"github.com/boltdb/bolt"
-	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/elkrem"
+	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/watchtower"
 	"github.com/mit-dci/lit/wire"
@@ -135,6 +136,8 @@ type LitNode struct {
 	ChannelMap    map[[20]byte][]lnutil.LinkMsg
 	ChannelMapMtx sync.Mutex
 	AdvTimeout    *time.Ticker
+
+	LocalRPCCon *rpc.Client
 
 	// Contains the URL string to connect to a SOCKS5 proxy, if provided
 	ProxyURL string

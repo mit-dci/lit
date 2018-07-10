@@ -3,9 +3,13 @@ package main
 import (
 	"fmt"
 	"log"
+	"net/rpc/jsonrpc"
 	"os"
 	"time"
 
+	"golang.org/x/net/websocket"
+
+	flags "github.com/jessevdk/go-flags"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/lnutil"
@@ -39,7 +43,7 @@ type config struct { // define a struct for usage with go-flags
 	ReSync bool `short:"r" long:"reSync" description:"Resync from the given tip."`
 	Tower  bool `long:"tower" description:"Watchtower: Run a watching node"`
 	Hard   bool `short:"t" long:"hard" description:"Flag to set networks."`
-  
+
 	Verbose bool `short:"v" long:"verbose" description:"Set verbosity to true."`
 	// rpc server config
 	Rpcport uint16 `short:"p" long:"rpcport" description:"Set RPC port to connect to"`
@@ -191,6 +195,16 @@ func main() {
 	if conf.AutoReconnect {
 		node.AutoReconnect(conf.AutoListenPort, conf.AutoReconnectInterval)
 	}
+
+	origin := "http://127.0.0.1/"
+	urlString := fmt.Sprintf("ws://%s:%d/ws", conf.Rpchost, conf.Rpcport)
+	wsConn, err := websocket.Dial(urlString, "", origin)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer wsConn.Close()
+
+	node.LocalRPCCon = jsonrpc.NewClient(wsConn)
 
 	<-rpcl.OffButton
 	log.Printf("Got stop request\n")

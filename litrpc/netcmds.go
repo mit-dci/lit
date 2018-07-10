@@ -154,3 +154,33 @@ func (r *LitRPC) GetChannelMap(args NoArgs, reply *ChannelGraphReply) error {
 	reply.Graph = r.Node.VisualiseGraph()
 	return nil
 }
+
+type RCAuthArgs struct {
+	PubKey        [33]byte
+	Authorization *qln.RemoteControlAuthorization
+}
+
+func (r *LitRPC) RemoteControlAuth(args RCAuthArgs, reply *StatusReply) error {
+
+	err := r.Node.SaveRemoteControlAuthorization(args.PubKey, args.Authorization)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type RCSendArgs struct {
+	PeerIdx uint32
+	Msg     []byte
+}
+
+func (r *LitRPC) RemoteControlSend(args RCSendArgs, reply *StatusReply) error {
+	msg, err := lnutil.NewRemoteControlRpcRequestMsgFromBytes(args.Msg, args.PeerIdx)
+	if err != nil {
+		return err
+	}
+
+	r.Node.OmniOut <- msg
+	return nil
+}

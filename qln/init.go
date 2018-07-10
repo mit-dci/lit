@@ -209,6 +209,11 @@ func (nd *LitNode) OpenDB(filename string) error {
 			return err
 		}
 
+		_, err = btx.CreateBucketIfNotExists(BKTRCAuth)
+		if err != nil {
+			return err
+		}
+
 		return nil
 	})
 	if err != nil {
