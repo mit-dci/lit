@@ -14,7 +14,7 @@ Under development, not for use with real money.  Unless you're crazy.
 
 - [Go](https://golang.org/doc/install)
 
-- `make` (UNIX)
+- make
 
 - (Optional, Windows) a [Cygwin](https://cygwin.com/install.html) environment might make things easier for you.
 
@@ -44,20 +44,20 @@ make all
 You can also run the tests with `make test`.  Running `make test with-python=true`
 will include the python tests (requires `bitcoind`) that do some heavier testing.
 
-4. Run `./lit --tn3 1` to start lit
-
-The words `yup, yes, y, true, 1, ok, enable, on` can be used to specify that lit automatically connect to a set of populated seeds. It can also be replaced by the ip of the remote node you wish to connect to.
-
 #### Windows
+
+It's recommended to install Cygwin and follow those setup instructions.  Or just
+download prebuilt binaries.
 
 1. Make sure that your `%GOPATH%` environmental variable is set up correctly.
 
-2. Download dependencies and then build like this:
+2. Download dependencies and then build with something like this:
 
 ```
 go get -v ./...
+cd %GOPATH%\src\github.com\mit-dci\lit
 go build -v .
-go build -v ./cmd/lit-af
+go build -v .\cmd\lit-af
 ```
 
 ### Running
@@ -69,10 +69,14 @@ you this.
 (Note: Windows users can take off `./` but may need to change `lit` to `lit.exe` in the second line.)
 
 ```bash
-./lit --tn3 true
+./lit --tn3=true
 ```
 
-The words `true`, `yes`, `1` can be used to specify that lit automatically connect to a set of populated seeds. It can also be replaced by the ip of the remote node you wish to connect to.
+Run `./lit --tn3=true` to start Lit on the Bitcoin testnet3
+
+The words `yup, yes, y, true, 1, ok, enable, on` can be used to specify that Lit
+automatically connect to a set of populated seeds. It can also be replaced by
+the address of the remote node you wish to connect to.
 
 ## Using Lightning
 
