@@ -4,7 +4,7 @@
 
 [![Build Status](http://hubris.media.mit.edu:8080/job/lit-PR/badge/icon)](http://hubris.media.mit.edu:8080/job/lit-PR/)
 
-Under development, not for use with real money.  Unless you're crazy.
+Under development, not for use with real money.
 
 ## Setup
 
@@ -38,11 +38,11 @@ To build Lit and Lit-AF, just use the following command.  You don't have to have
 a `$GOPATH` set up in any particular way since we handle that for you.
 
 ```bash
-make all
+make # or `make all`
 ```
 
-You can also run the tests with `make test`.  Running `make test with-python=true`
-will include the python tests (requires `bitcoind`) that do some heavier testing.
+This will also run the test suite.  Running `make test with-python=true` will
+include the python tests (requires `bitcoind`) that do some heavier testing.
 
 #### Windows
 
