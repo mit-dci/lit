@@ -4,76 +4,71 @@
 
 [![Build Status](http://hubris.media.mit.edu:8080/job/lit-PR/badge/icon)](http://hubris.media.mit.edu:8080/job/lit-PR/)
 
-Under development, not for use with real money.
+Under development, not for use with real money.  Unless you're crazy.
 
 ## Setup
 
 ### Prerequisites
 
 - [Git](https://git-scm.com/)
-- [Go](https://golang.org/doc/install)
 
 - [Go](https://golang.org/doc/install)
+
+- `make` (UNIX)
 
 - (Optional, Windows) a [Cygwin](https://cygwin.com/install.html) environment might make things easier for you.
 
 ### Downloading
 
-1. Clone this repo with `git clone https://github.com/mit-dci/lit` or do `go get github.com/mit-dci/lit`
+Just use Git to download the repo and then cd into it.
 
-2. `cd` into the `lit` directory (either inside your GOPATH or your cloned directory)
+```bash
+git clone https://github.com/mit-dci/lit
+cd lit
+```
 
-3. Run `make lit` to build lit and `make test` to run the tests. `make test with-python=true` will include the python tests (requires `bitcoind`). Alternatively, you can run `go build` to build lit if you're building inside your GOPATH.
+### Installation
 
-### Installing
+#### Linux, macOS, Cygwin, etc.
 
-1. Set your Go variables to match your installed paths are set correctly:
-- `.../go/bin` (your install location) is in `$PATH` (Windows: Add the install location into your `PATH` System Variable)
-- `$GOPATH` is set the location of where you want lit (and other projects) to be
--  optional: If you want to have packages download in a separate location than your installation add `$GOROOT` set to another location
+Go has its own build process and dependency management, but for Lit it's a
+little more complicated, so we set up a Makefile to do most of the work for you.
 
-2. Download the lit project with `go get github.com/mit-dci/lit`
+To build Lit and Lit-AF, just use the following command.  You don't have to have
+a `$GOPATH` set up in any particular way since we handle that for you.
+
+```bash
+make all
+```
+
+You can also run the tests with `make test`.  Running `make test with-python=true`
+will include the python tests (requires `bitcoind`) that do some heavier testing.
 
 4. Run `./lit --tn3 1` to start lit
 
 The words `yup, yes, y, true, 1, ok, enable, on` can be used to specify that lit automatically connect to a set of populated seeds. It can also be replaced by the ip of the remote node you wish to connect to.
 
-### Building
+#### Windows
 
-1. Go to the location of your lit installation with your defined gopath variable (`$GOPATH` on Linux and `%GOPATH%` Windows) to the lit location
+1. Make sure that your `%GOPATH%` environmental variable is set up correctly.
 
-```
-cd [gopath]/src/github.com/mit-dci/lit
-```
-
-2. If you try to build now with `go build` you will receive several errors such as
+2. Download dependencies and then build like this:
 
 ```
-cannot find package "golang.org/x/crypto/nacl/secretbox"
-...
-cannot find package "golang.org/x/crypto/scrypt"
-...
-cannot find package [packageName]
-...
+go get -v ./...
+go build -v .
+go build -v ./cmd/lit-af
 ```
 
-3. In order to download all missing packages, do `go get ./...` or `go get .`
+### Running
 
-4. Go back to location of the lit folder if you are not already there ([Step 1](#building)) and try to rebuild the project.
+The below command will run Lit on the Bitcoin testnet3.  You probably need to
+have `bitcoind` running on your machine such that Lit can connect to it when do
+you this.
 
-5. You may now want to build `lit-af`, the text based client which controls the lit node using
+(Note: Windows users can take off `./` but may need to change `lit` to `lit.exe` in the second line.)
 
-```
-cd cmd/lit-af
-go build
-```
-
-6. To run lit use:
-
-(Note: Windows users can take off ./ but may need to change lit to lit.exe in the second line.)
-
-```
-cd GOPATH/src/github.com/mit-dci/lit
+```bash
 ./lit --tn3 true
 ```
 
@@ -91,7 +86,7 @@ Great! Now that you are all done setting up lit, you can
 
 When starting lit, the following command line arguments are available. The following commands may also be specified in lit.conf which is automatically generated on startup.
 
-#### connecting to networks:
+#### Connecting to networks
 
 | Arguments                   | Details                                                      | Default Port  |
 | --------------------------- |--------------------------------------------------------------| ------------- |
@@ -99,14 +94,14 @@ When starting lit, the following command line arguments are available. The follo
 | `--reg <nodeHostName>`      | connect to `nodeHostName`, which is a bitcoin regtest node.  | 18444         |
 | `--lt4 <nodeHostName>`      | connect to `nodeHostName`, which is a litecoin testnet4 node.| 19335         |
 
-#### other settings:
+#### Other settings
 
-| Arguments                   | Details                                                      |
-| --------------------------- |--------------------------------------------------------------|
-| `-v` or `--verbose`         | Verbose; log everything to stdout as well as the lit.log file.  Lots of text.|
-| `--dir <folderPath>`        | use `folderPath` as the directory.  By default, saves to `~/.lit/` |
-| `-p` or `--rpcport <portNumber>` | listen for RPC clients on port `portNumber`.  Defaults to `8001`.  Useful when you want to run multiple lit nodes on the same computer (also need the `--dir` option) |
-| `-r` or `--reSync`          | try to re-sync to the blockchain |
+| Arguments                        | Details                                                                                                                                                                |
+| ---------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `-v` or `--verbose`              | Verbose; log everything to stdout as well as the lit.log file.  Lots of text.                                                                                          |
+| `--dir <folderPath>`             | Use `folderPath` as the directory.  By default, saves to `~/.lit/`.                                                                                                    |
+| `-p` or `--rpcport <portNumber>` | Listen for RPC clients on port `portNumber`.  Defaults to `8001`.  Useful when you want to run multiple lit nodes on the same computer (also need the `--dir` option). |
+| `-r` or `--reSync`               | Try to re-sync to the blockchain.                                                                                                                                      |
 
 ## Folders
 
