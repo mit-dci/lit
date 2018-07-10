@@ -36,6 +36,7 @@ var (
 	BKTPeerMap = []byte("pmp") // map of peer index to pubkey
 	BKTChanMap = []byte("cmp") // map of channel index to outpoint
 	BKTWatch   = []byte("wch") // txids & signatures for export to watchtowers
+	BKTRCAuth  = []byte("rca") // Remote control authorization
 
 	KEYIdx      = []byte("idx")  // index for key derivation
 	KEYhost     = []byte("hst")  // hostname where peer lives

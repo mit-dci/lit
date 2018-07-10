@@ -45,7 +45,6 @@ func serveWS(ws *websocket.Conn) {
 func RPCListen(rpcl *LitRPC, host string, port uint16) {
 
 	rpc.Register(rpcl)
-
 	listenString := fmt.Sprintf("%s:%d", host, port)
 
 	http.Handle("/ws", websocket.Handler(serveWS))

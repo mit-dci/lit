@@ -60,6 +60,9 @@ const (
 	MSGID_DUALFUNDINGDECL    = 0xA2 // Declines the funding request
 	MSGID_DUALFUNDINGCHANACK = 0xA3 // Acknowledges channel and sends along signatures for funding
 
+	//Remote control messages
+	MSGID_REMOTE_RPCREQUEST  = 0xB0 // Contains an RPC request from a remote peer
+	MSGID_REMOTE_RPCRESPONSE = 0xB1 // Contains an RPC response to send to a remote peer
 )
 
 //interface that all messages follow, for easy use
@@ -151,6 +154,11 @@ func LitMsgFromBytes(b []byte, peerid uint32) (LitMsg, error) {
 		return NewDlcContractFundingSigsMsgFromBytes(b, peerid)
 	case MSGID_DLC_SIGPROOF:
 		return NewDlcContractSigProofMsgFromBytes(b, peerid)
+
+	case MSGID_REMOTE_RPCREQUEST:
+		return NewRemoteControlRpcRequestMsgFromBytes(b, peerid)
+	case MSGID_REMOTE_RPCRESPONSE:
+		return NewRemoteControlRpcResponseMsgFromBytes(b, peerid)
 
 	default:
 		return nil, fmt.Errorf("Unknown message of type %d ", msgType)
@@ -1721,4 +1729,89 @@ func (msg DlcContractSigProofMsg) Peer() uint32 {
 // MsgType returns the type of this message
 func (msg DlcContractSigProofMsg) MsgType() uint8 {
 	return MSGID_DLC_SIGPROOF
+}
+
+type RemoteControlRpcRequestMsg struct {
+	PeerIdx uint32
+	PubKey  [33]byte
+	Json    []byte
+	Sig     [64]byte
+}
+
+func NewRemoteControlRpcRequestMsgFromBytes(b []byte,
+	peerIdx uint32) (RemoteControlRpcRequestMsg, error) {
+
+	msg := new(RemoteControlRpcRequestMsg)
+	msg.PeerIdx = peerIdx
+
+	buf := bytes.NewBuffer(b[1:])
+	copy(msg.PubKey[:], buf.Next(33))
+	copy(msg.Sig[:], buf.Next(64))
+	jsonLength, _ := wire.ReadVarInt(buf, 0)
+
+	msg.Json = buf.Next(int(jsonLength))
+	return *msg, nil
+}
+
+// Bytes serializes a RemoteControlRpcRequestMsg into a byte array
+func (msg RemoteControlRpcRequestMsg) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.WriteByte(msg.MsgType())
+	buf.Write(msg.PubKey[:])
+	buf.Write(msg.Sig[:])
+	wire.WriteVarInt(&buf, 0, uint64(len(msg.Json)))
+	buf.Write(msg.Json)
+	return buf.Bytes()
+}
+
+// Peer returns the peer index this message was received from/sent to
+func (msg RemoteControlRpcRequestMsg) Peer() uint32 {
+	return msg.PeerIdx
+}
+
+// MsgType returns the type of this message
+func (msg RemoteControlRpcRequestMsg) MsgType() uint8 {
+	return MSGID_REMOTE_RPCREQUEST
+}
+
+type RemoteControlRpcResponseMsg struct {
+	PeerIdx uint32
+	Json    []byte
+}
+
+func NewRemoteControlRpcResponseMsg(peerIdx uint32, json []byte) RemoteControlRpcResponseMsg {
+
+	msg := new(RemoteControlRpcResponseMsg)
+	msg.PeerIdx = peerIdx
+	msg.Json = json
+	return *msg
+}
+
+func NewRemoteControlRpcResponseMsgFromBytes(b []byte,
+	peerIdx uint32) (RemoteControlRpcResponseMsg, error) {
+
+	msg := new(RemoteControlRpcResponseMsg)
+	msg.PeerIdx = peerIdx
+	msg.Json = b[1:]
+	return *msg, nil
+}
+
+// Bytes serializes a RemoteControlRpcRequestMsg into a byte array
+func (msg RemoteControlRpcResponseMsg) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.WriteByte(msg.MsgType())
+	buf.Write(msg.Json)
+	return buf.Bytes()
+}
+
+// Peer returns the peer index this message was received from/sent to
+func (msg RemoteControlRpcResponseMsg) Peer() uint32 {
+	return msg.PeerIdx
+}
+
+// MsgType returns the type of this message
+func (msg RemoteControlRpcResponseMsg) MsgType() uint8 {
+	return MSGID_REMOTE_RPCRESPONSE
 }

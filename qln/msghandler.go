@@ -6,9 +6,9 @@ import (
 	"log"
 
 	"github.com/mit-dci/lit/btcutil/txscript"
-	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
+	"github.com/mit-dci/lit/wire"
 )
 
 // handles stuff that comes in over the wire.  Not user-initiated.
@@ -86,6 +86,14 @@ func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) er
 		}
 		if msg.MsgType() == lnutil.MSGID_DLC_SIGPROOF {
 			nd.DlcSigProofHandler(msg.(lnutil.DlcContractSigProofMsg), peer)
+		}
+
+	case 0xB0: // remote control
+		if msg.MsgType() == lnutil.MSGID_REMOTE_RPCREQUEST {
+			nd.RemoteControlRequestHandler(msg.(lnutil.RemoteControlRpcRequestMsg), peer)
+		}
+		if msg.MsgType() == lnutil.MSGID_REMOTE_RPCRESPONSE {
+			nd.RemoteControlResponseHandler(msg.(lnutil.RemoteControlRpcResponseMsg), peer)
 		}
 	default:
 		return fmt.Errorf("Unknown message id byte %x &f0", msg.MsgType())

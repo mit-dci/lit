@@ -5,9 +5,9 @@ import (
 	"log"
 	"path/filepath"
 
+	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/hdkeychain"
-	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/lnutil"
@@ -186,6 +186,11 @@ func (nd *LitNode) OpenDB(filename string) error {
 		}
 
 		_, err = btx.CreateBucketIfNotExists(BKTWatch)
+		if err != nil {
+			return err
+		}
+
+		_, err = btx.CreateBucketIfNotExists(BKTRCAuth)
 		if err != nil {
 			return err
 		}

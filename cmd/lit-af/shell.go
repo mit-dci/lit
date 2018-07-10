@@ -118,6 +118,17 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		return parseErr(err, "dlc")
 	}
 
+	// remote control
+	if cmd == "rcauth" {
+		err = lc.RemoteControlAuth(args)
+		return parseErr(err, "rcauth")
+	}
+
+	if cmd == "rcsend" {
+		err = lc.RemoteControlSend(args)
+		return parseErr(err, "rcsend")
+	}
+
 	// fund and create a new channel
 	if cmd == "fund" {
 		err = lc.FundChannel(args)
@@ -398,7 +409,7 @@ func printHelp(commands []*Command) {
 func printCointypes() {
 	for k, v := range coinparam.RegisteredNets {
 		fmt.Fprintf(color.Output, "CoinType: %s\n", strconv.Itoa(int(k)))
-		fmt.Fprintf(color.Output, "└────── Name: %-13sBech32Prefix: %s\n\n", v.Name + ",", v.Bech32Prefix)
+		fmt.Fprintf(color.Output, "└────── Name: %-13sBech32Prefix: %s\n\n", v.Name+",", v.Bech32Prefix)
 	}
 }
 
@@ -406,7 +417,7 @@ func (lc *litAfClient) Help(textArgs []string) error {
 	if len(textArgs) == 0 {
 
 		fmt.Fprintf(color.Output, lnutil.Header("Commands:\n"))
-		listofCommands := []*Command{helpCommand, sayCommand, lsCommand, addressCommand, sendCommand, fanCommand, sweepCommand, lisCommand, conCommand, dlcCommand, fundCommand, dualFundCommand, watchCommand, pushCommand, closeCommand, breakCommand, historyCommand, offCommand, exitCommand}
+		listofCommands := []*Command{helpCommand, sayCommand, lsCommand, addressCommand, sendCommand, fanCommand, sweepCommand, lisCommand, conCommand, dlcCommand, fundCommand, dualFundCommand, watchCommand, pushCommand, closeCommand, breakCommand, historyCommand, rcAuthCommand, rcSendCommand, offCommand, exitCommand}
 		printHelp(listofCommands)
 		fmt.Fprintf(color.Output, "\n\n")
 		fmt.Fprintf(color.Output, lnutil.Header("Coins:\n"))
