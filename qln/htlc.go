@@ -740,22 +740,24 @@ func (nd *LitNode) ClaimHTLCTx(q *Qchan, h HTLC) (*wire.MsgTx, error) {
 	lnutil.PrintTx(tx)
 	log.Printf("Signing HTLC script %x - hash: %x, with pubkey: %x", htlcTxo.PkScript, spendHTLCHash, HTLCPriv.PubKey().SerializeCompressed())
 
-	HTLCSig, err := txscript.RawTxInWitnessSignature(tx, hc, 0, htlcTxo.Value, htlcTxo.PkScript, txscript.SigHashAll, HTLCPriv)
+	myBigSig, err := txscript.RawTxInWitnessSignature(tx, hc, 0, htlcTxo.Value, htlcTxo.PkScript, txscript.SigHashAll, HTLCPriv)
 	if err != nil {
 		return nil, err
 	}
 
-	HTLCSig = HTLCSig[:len(HTLCSig)-1]
-	s, err := sig64.SigCompress(HTLCSig)
-	if err != nil {
-		return nil, err
-	}
+	theirBigSig := sig64.SigDecompress(h.Sig)
+	theirBigSig = append(theirBigSig, byte(txscript.SigHashAll))
 
-	tx.TxIn[0].Witness = make([][]byte, 4)
+	tx.TxIn[0].Witness = make([][]byte, 5)
 	tx.TxIn[0].Witness[0] = []byte{0}
-	tx.TxIn[0].Witness[1] = h.Sig[:]
-	tx.TxIn[0].Witness[2] = s[:]
+	tx.TxIn[0].Witness[1] = theirBigSig
+	tx.TxIn[0].Witness[2] = myBigSig
 	tx.TxIn[0].Witness[3] = h.R[:]
+	HTLCScript, err := q.GenHTLCScript(h, mine)
+	if err != nil {
+		return nil, err
+	}
+	tx.TxIn[0].Witness[4] = HTLCScript
 
 	log.Println("Claiming HTLC using transaction:\n\n")
 	lnutil.PrintTx(tx)
