@@ -324,7 +324,7 @@ func (q *Qchan) BuildStateTxs(mine bool) (*wire.MsgTx, []*wire.MsgTx, []*wire.Tx
 	return tx, HTLCSpendsArr, HTLCTxOuts, nil
 }
 
-func (q *Qchan) GenHTLCOut(h HTLC, mine bool) (*wire.TxOut, error) {
+func (q *Qchan) GenHTLCScript(h HTLC, mine bool) ([]byte, error) {
 	var remotePub, localPub [33]byte
 
 	revPub, _, _, err := q.GetKeysFromState(mine)
@@ -367,6 +367,15 @@ func (q *Qchan) GenHTLCOut(h HTLC, mine bool) (*wire.TxOut, error) {
 
 	log.Printf("HTLC %d, script: %x, myBase: %x, theirBase: %x, Incoming: %t, Amt: %d, RHash: %x",
 		h.Idx, HTLCScript, h.MyHTLCBase, h.TheirHTLCBase, h.Incoming, h.Amt, h.RHash)
+
+	return HTLCScript, nil
+}
+
+func (q *Qchan) GenHTLCOut(h HTLC, mine bool) (*wire.TxOut, error) {
+	HTLCScript, err := q.GenHTLCScript(h, mine)
+	if err != nil {
+		return nil, err
+	}
 
 	witScript := lnutil.P2WSHify(HTLCScript)
 
