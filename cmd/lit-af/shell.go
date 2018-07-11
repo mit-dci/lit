@@ -237,10 +237,11 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	}
 
 	if len(textArgs) == 0 {
-		fmt.Printf("pick one: conns, chans, addrs, txos, bals, ports, dualfunds")
+		fmt.Printf("pick one: conns, chans, dualfunds, txos, ports, addrs, bals")
 		return nil
 	}
 
+	// TODO Move these to their respective places?  Perhaps this gets optimized out anyways.
 	pReply := new(litrpc.ListConnectionsReply)
 	cReply := new(litrpc.ChannelListReply)
 	aReply := new(litrpc.AddressReply)
