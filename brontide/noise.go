@@ -398,7 +398,7 @@ const (
 	//
 	// 1 + 33
 	// send ephemeral key  -> e
-	ActOneSize = 34
+	ActOneSize = 50
 
 	// ActTwoSize is the size the packet sent from responder to initiator
 	// in ActTwo. The packet consists of a handshake version, an ephemeral
@@ -417,7 +417,7 @@ const (
 	//
 	// 1 + 33 + 16 + 16
 	// send back  -> s, se, same as XK
-	ActThreeSize = 50 //66 50 for non encrypted? is it cool?
+	ActThreeSize = 66 //66 50 for non encrypted? is it cool?
 )
 
 // GenActOne generates the initial packet (act one) to be sent from initiator
@@ -444,8 +444,11 @@ func (b *Machine) GenActOne() ([ActOneSize]byte, error) {
 	ephemeral := b.localEphemeral.PubKey().SerializeCompressed()
 	b.mixHash(ephemeral)
 
+	authPayload := b.EncryptAndHash([]byte{})
 	actOne[0] = HandshakeVersion
 	copy(actOne[1:34], ephemeral)
+	copy(actOne[34:], authPayload)
+	log.Println("ACT ONE PAYLOAD", len(authPayload), authPayload)
 	log.Println("ACT ONE", actOne)
 	return actOne, nil
 }
@@ -471,15 +474,21 @@ func (b *Machine) RecvActOne(actOne [ActOneSize]byte) error {
 
 	copy(e[:], actOne[1:34])
 	copy(p[:], actOne[34:])
-
+	log.Println("ACT ONE PAYLOAD", len(actOne[34:]), p[:])
+	log.Println("ACT ONE", actOne)
 	// e
 	b.remoteEphemeral, err = btcec.ParsePubKey(e[:], btcec.S256())
 	if err != nil {
 		return err
 	}
 	b.mixHash(b.remoteEphemeral.SerializeCompressed())
-	log.Println("RECV ACT ONE", e[:])
-	return nil
+	// If the initiator doesn't know our static key, then this operation
+	// will fail.
+	_, err = b.DecryptAndHash(p[:])
+	if err == nil {
+		log.Println("Act one completed successfully.")
+	}
+	return err
 }
 
 // GenActTwo generates the second packet (act two) to be sent from the
@@ -501,28 +510,27 @@ func (b *Machine) GenActTwo() ([ActTwoSize]byte, error) {
 	}
 
 	ephemeral := b.localEphemeral.PubKey().SerializeCompressed()
-	log.Println("SERIALIZE", ephemeral)
 	b.mixHash(b.localEphemeral.PubKey().SerializeCompressed())
-
-	pubkey := b.localStatic.PubKey().SerializeCompressed() // s
-	b.mixHash(pubkey)
 
 	// ee
 	ee := ecdh(b.remoteEphemeral, b.localEphemeral)
 	b.mixKey(ee)
 
+ 	// s
+	pubkey := b.localStatic.PubKey().SerializeCompressed()
+	b.mixHash(pubkey)
+
 	// es
 	es := ecdh(b.remoteEphemeral, b.localStatic)
 	b.mixKey(es)
 
+	log.Println("MIXING", ephemeral, ee, pubkey, es)
 	authPayload := b.EncryptAndHash([]byte{})
-
+	log.Println("ACT TWO AUTH PAYLOAD GEN", authPayload)
 	actTwo[0] = HandshakeVersion
 	copy(actTwo[1:34], ephemeral)
 	copy(actTwo[34:67], pubkey)
 	copy(actTwo[67:], authPayload)
-	log.Println("GEN ACT TWO, EPH KEY", ephemeral)
-	log.Println("GEN ACT TWO, PUB KEY", pubkey)
 	// add additional stuff based on what we need
 	return actTwo, nil
 }
@@ -549,6 +557,7 @@ func (b *Machine) RecvActTwo(actTwo [ActTwoSize]byte) error {
 	copy(e[:], actTwo[1:34])
 	copy(pubkey[:], actTwo[34:67])
 	copy(p[:], actTwo[67:])
+	log.Println("DeCRYPT", actTwo[67:])
 
 	// e
 	b.remoteEphemeral, err = btcec.ParsePubKey(e[:], btcec.S256())
@@ -556,6 +565,9 @@ func (b *Machine) RecvActTwo(actTwo [ActTwoSize]byte) error {
 		return err
 	}
 	b.mixHash(b.remoteEphemeral.SerializeCompressed())
+	// ee
+	ee := ecdh(b.remoteEphemeral, b.localEphemeral)
+	b.mixKey(ee)
 
 	// s
 	b.remoteStatic, err = btcec.ParsePubKey(pubkey[:], btcec.S256())
@@ -563,18 +575,14 @@ func (b *Machine) RecvActTwo(actTwo [ActTwoSize]byte) error {
 		return err
 	}
 	b.mixHash(b.remoteStatic.SerializeCompressed())
-	log.Println("REMOTE EPH", b.remoteEphemeral)
-	log.Println("REMOTE STATIC", b.remoteStatic)
-
-	// ee
-	ee := ecdh(b.remoteEphemeral, b.localEphemeral)
-	b.mixKey(ee)
 
 	// es
-	es := ecdh(b.remoteEphemeral, b.localStatic)
+	es := ecdh(b.remoteStatic, b.localEphemeral)
 	b.mixKey(es)
-
-	return nil
+	log.Println("MIXING", b.remoteEphemeral.SerializeCompressed(), ee, b.remoteStatic.SerializeCompressed(), es)
+	_, err = b.DecryptAndHash(p[:])
+	log.Println("ERROR IS", err)
+	return err
 }
 
 // GenActThree creates the final (act three) packet of the handshake. Act three
@@ -590,14 +598,17 @@ func (b *Machine) GenActThree() ([ActThreeSize]byte, error) {
 	ourPubkey := b.localStatic.PubKey().SerializeCompressed()
 	log.Println("GEN ACT THREE, OUR PUB KEY", ourPubkey)
 
-	s := ecdh(b.remoteEphemeral, b.localStatic)
-	b.mixKey(s)
+	ciphertext := b.EncryptAndHash(ourPubkey)
+
+	se := ecdh(b.remoteEphemeral, b.localStatic)
+	b.mixKey(se)
+	log.Println("MIXING ACT3", se)
 
 	authPayload := b.EncryptAndHash([]byte{})
 
 	actThree[0] = HandshakeVersion
-	copy(actThree[1:34], ourPubkey)
-	copy(actThree[34:], authPayload)
+	copy(actThree[1:50], ciphertext)
+	copy(actThree[50:], authPayload)
 
 	// With the final ECDH operation complete, derive the session sending
 	// and receiving keys.
@@ -613,7 +624,7 @@ func (b *Machine) GenActThree() ([ActThreeSize]byte, error) {
 func (b *Machine) RecvActThree(actThree [ActThreeSize]byte) error {
 	var (
 		err error
-		s   [33]byte
+		s   [49]byte
 		p   [16]byte
 	)
 
@@ -625,11 +636,15 @@ func (b *Machine) RecvActThree(actThree [ActThreeSize]byte) error {
 			actThree[:])
 	}
 
-	copy(s[:], actThree[1:34])
-	copy(p[:], actThree[34:])
+	copy(s[:], actThree[1:50])
+	copy(p[:], actThree[50:])
 
 	// s
-	remotePub := s[:]
+	remotePub, err := b.DecryptAndHash(s[:])
+	if err != nil {
+		log.Println("EXPECTED:", err)
+		return err
+	}
 	b.remoteStatic, err = btcec.ParsePubKey(remotePub, btcec.S256())
 	if err != nil {
 		return err
@@ -638,6 +653,12 @@ func (b *Machine) RecvActThree(actThree [ActThreeSize]byte) error {
 	// se
 	se := ecdh(b.remoteStatic, b.localEphemeral)
 	b.mixKey(se)
+	log.Println("MIXING ACT3", se)
+
+	if _, err := b.DecryptAndHash(p[:]); err != nil {
+		log.Println("USUAL CULPRIT:", err)
+		return err
+	}
 
 	// With the final ECDH operation complete, derive the session sending
 	// and receiving keys.

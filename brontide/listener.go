@@ -125,7 +125,6 @@ func (l *Listener) doHandshake(conn net.Conn) {
 		l.rejectConn(err)
 		return
 	}
-	log.Println("COMING HERE, ACT TWO")
 	// Next, progress the handshake processes by sending over our ephemeral
 	// key for the session along with an authenticating tag.
 	actTwo, err := brontideConn.noise.GenActTwo()
