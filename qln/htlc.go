@@ -595,12 +595,17 @@ func (nd *LitNode) ClaimHTLC(R [16]byte) ([][32]byte, error) {
 		// using the timeout. So only claim incoming ones in this routine
 		if h.Incoming {
 			q := channels[i]
-			copy(h.R[:], R[:])
-			tx, err := nd.ClaimHTLCTx(q, h)
-			if err != nil {
-				return nil, err
+			if q.CloseData.Closed {
+				copy(h.R[:], R[:])
+				tx, err := nd.ClaimHTLCTx(q, h)
+				if err != nil {
+					log.Printf("Error claiming HTLC: %s", err.Error())
+					return nil, err
+				}
+				txids = append(txids, tx.TxHash())
+			} else {
+				log.Printf("Ignoring HTLC in channel %d since it's not closed\n", q.Idx())
 			}
-			txids = append(txids, tx.TxHash())
 		}
 	}
 	return txids, nil
@@ -637,7 +642,7 @@ func (nd *LitNode) GetHTLC(op *wire.OutPoint) (HTLC, *Qchan, error) {
 		}
 		for _, h := range q.State.HTLCs {
 			txid := tx.TxHash()
-			_, i, err := GetHTLCOut(q, h, tx)
+			_, i, err := GetHTLCOut(q, h, tx, false)
 			if err != nil {
 				return empty, nil, err
 			}
@@ -650,9 +655,9 @@ func (nd *LitNode) GetHTLC(op *wire.OutPoint) (HTLC, *Qchan, error) {
 	return empty, nil, nil
 }
 
-func GetHTLCOut(q *Qchan, h HTLC, tx *wire.MsgTx) (*wire.TxOut, uint32, error) {
+func GetHTLCOut(q *Qchan, h HTLC, tx *wire.MsgTx, mine bool) (*wire.TxOut, uint32, error) {
 	for i, out := range tx.TxOut {
-		htlcOut, err := q.GenHTLCOut(h, false)
+		htlcOut, err := q.GenHTLCOut(h, mine)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -665,22 +670,37 @@ func GetHTLCOut(q *Qchan, h HTLC, tx *wire.MsgTx) (*wire.TxOut, uint32, error) {
 
 func (nd *LitNode) ClaimHTLCTx(q *Qchan, h HTLC) (*wire.MsgTx, error) {
 	tx := wire.NewMsgTx()
-	stateTx, htlcTxs, _, err := q.BuildStateTxs(false)
-	found := false
-	for i, qh := range q.State.HTLCs {
-		if bytes.Equal(qh.Sig[:], h.Sig[:]) && h.Amt == qh.Amt {
-			tx = htlcTxs[i]
-			found = true
-			break
+	mine := true
+	stateTx, _, _, err := q.BuildStateTxs(mine)
+	if err != nil {
+		return nil, err
+	}
+	revPub, timePub, _, err := q.GetKeysFromState(mine)
+	if err != nil {
+		return nil, err
+	}
+	stateTxID := stateTx.TxHash()
+	log.Printf("My state TXID is %s", stateTxID.String())
+	if !q.CloseData.CloseTxid.IsEqual(&stateTxID) {
+		mine = false
+		stateTx, _, _, err = q.BuildStateTxs(mine)
+		if err != nil {
+			return nil, err
+		}
+		revPub, timePub, _, err = q.GetKeysFromState(mine)
+		if err != nil {
+			return nil, err
+		}
+		stateTxID = stateTx.TxHash()
+		log.Printf("Their state TXID is %s", stateTxID.String())
+
+		if !q.CloseData.CloseTxid.IsEqual(&stateTxID) {
+			return nil, fmt.Errorf("Could not find/regenerate proper close TX")
 		}
 	}
 
-	if !found {
-		return nil, fmt.Errorf("Did not find HTLC in channel state")
-	}
-
 	wal := nd.SubWallet[q.Coin()]
-	htlcTxo, _, err := GetHTLCOut(q, h, stateTx)
+	htlcTxo, i, err := GetHTLCOut(q, h, stateTx, mine)
 
 	curElk, err := q.ElkSnd.AtIndex(q.State.StateIdx)
 	if err != nil {
@@ -695,6 +715,17 @@ func (nd *LitNode) ClaimHTLCTx(q *Qchan, h HTLC) (*wire.MsgTx, error) {
 
 	HTLCPriv := lnutil.CombinePrivKeyWithBytes(HTLCPrivBase, elkScalar[:])
 
+	spendHTLCScript := lnutil.CommitScript(revPub, timePub, q.Delay)
+
+	in := wire.NewTxIn(wire.NewOutPoint(&stateTxID, i), nil, nil)
+	in.Sequence = 0
+
+	tx.AddTxIn(in)
+	tx.AddTxOut(wire.NewTxOut(h.Amt-q.State.Fee, lnutil.P2WSHify(spendHTLCScript)))
+
+	tx.Version = 2
+	tx.LockTime = 0
+
 	hc := txscript.NewTxSigHashes(tx)
 
 	HTLCparsed, err := txscript.ParseScript(htlcTxo.PkScript)
@@ -705,7 +736,9 @@ func (nd *LitNode) ClaimHTLCTx(q *Qchan, h HTLC) (*wire.MsgTx, error) {
 	spendHTLCHash := txscript.CalcWitnessSignatureHash(
 		HTLCparsed, hc, txscript.SigHashAll, tx, 0, htlcTxo.Value)
 
-	log.Printf("Signing HTLC hash: %x, with pubkey: %x", spendHTLCHash, HTLCPriv.PubKey().SerializeCompressed())
+	log.Printf("Signing HTLC Spend TX %s\n", tx.TxHash().String())
+	lnutil.PrintTx(tx)
+	log.Printf("Signing HTLC script %x - hash: %x, with pubkey: %x", htlcTxo.PkScript, spendHTLCHash, HTLCPriv.PubKey().SerializeCompressed())
 
 	HTLCSig, err := txscript.RawTxInWitnessSignature(tx, hc, 0, htlcTxo.Value, htlcTxo.PkScript, txscript.SigHashAll, HTLCPriv)
 	if err != nil {
