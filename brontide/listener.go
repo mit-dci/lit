@@ -3,6 +3,7 @@ package brontide
 import (
 	"errors"
 	"io"
+	"log"
 	"net"
 	"time"
 
@@ -98,9 +99,10 @@ func (l *Listener) doHandshake(conn net.Conn) {
 	default:
 	}
 
+	log.Println("LOCAL STATIC", l.localStatic)
 	brontideConn := &Conn{
 		conn:  conn,
-		noise: NewBrontideMachine(false, l.localStatic, nil),
+		noise: NewBrontideMachine(false, l.localStatic),
 	}
 
 	// We'll ensure that we get ActOne from the remote peer in a timely
@@ -117,12 +119,13 @@ func (l *Listener) doHandshake(conn net.Conn) {
 		l.rejectConn(err)
 		return
 	}
+	log.Println("COMING HERE?")
 	if err := brontideConn.noise.RecvActOne(actOne); err != nil {
 		brontideConn.conn.Close()
 		l.rejectConn(err)
 		return
 	}
-
+	log.Println("COMING HERE, ACT TWO")
 	// Next, progress the handshake processes by sending over our ephemeral
 	// key for the session along with an authenticating tag.
 	actTwo, err := brontideConn.noise.GenActTwo()
@@ -153,10 +156,12 @@ func (l *Listener) doHandshake(conn net.Conn) {
 	// sides have mutually authenticated each other.
 	var actThree [ActThreeSize]byte
 	if _, err := io.ReadFull(conn, actThree[:]); err != nil {
+		log.Println("READ FAILED!!" ,err)
 		brontideConn.conn.Close()
 		l.rejectConn(err)
 		return
 	}
+	log.Println("COMING HERE, ACT THREE")
 	if err := brontideConn.noise.RecvActThree(actThree); err != nil {
 		brontideConn.conn.Close()
 		l.rejectConn(err)

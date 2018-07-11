@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/mit-dci/lit/btcutil/btcec"
-	"github.com/mit-dci/lit/lnutil"
+	//"github.com/mit-dci/lit/lnutil"
 )
 
 // Conn is an implementation of net.Conn which enforces an authenticated key
@@ -41,16 +41,9 @@ func Dial(localPriv *btcec.PrivateKey, ipAddr string, remotePKH string,
 		return nil, err
 	}
 
-	// remotePKH = bech32 encoded address
-	remotePK, err := lnutil.LitFullAdrDecode(remotePKH)
-	// now we have the pubkey, dial via brontide
-	pubKey, err := btcec.ParsePubKey(remotePK[:], btcec.S256())
-	if err != nil {
-		return nil, err
-	}
 	b := &Conn{
 		conn:  conn,
-		noise: NewBrontideMachine(true, localPriv, pubKey),
+		noise: NewBrontideMachine(true, localPriv),
 	}
 
 	// Initiate the handshake by sending the first act to the receiver.
