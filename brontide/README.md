@@ -10,11 +10,10 @@ message encryption/decryption scheme. Additionally, the package exposes a
 which allows the encrypted transport to be seamlessly integrated into a
 codebase.
 
-The secure messaging scheme implemented within this package is described in
-detail in [BOLT #8 of the Lightning Network specifications](https://github.com/lightningnetwork/lightning-rfc/blob/master/08-transport.md).
+The secure messaging scheme implemented within this package uses `NOISE_XX` as the handshake for authenticated key exchange.
 
 This package has intentionally been designed so it can be used as a standalone
 package for any projects needing secure encrypted+authenticated communications
 between network enabled programs.
 
-This package requires additional attribution. Please see [license](LICENSE) for details.
+This package requires additional attribution to that of lit since it is adapted from the original [brontide](https://github.com/lightningnetwork/lnd/tree/master/brontide) package. Please see [license](LICENSE) for details.

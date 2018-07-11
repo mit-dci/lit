@@ -3,7 +3,6 @@ package brontide
 import (
 	"errors"
 	"io"
-	"log"
 	"net"
 	"time"
 
@@ -99,7 +98,6 @@ func (l *Listener) doHandshake(conn net.Conn) {
 	default:
 	}
 
-	log.Println("LOCAL STATIC", l.localStatic)
 	brontideConn := &Conn{
 		conn:  conn,
 		noise: NewBrontideMachine(false, l.localStatic),
@@ -119,7 +117,6 @@ func (l *Listener) doHandshake(conn net.Conn) {
 		l.rejectConn(err)
 		return
 	}
-	log.Println("COMING HERE?")
 	if err := brontideConn.noise.RecvActOne(actOne); err != nil {
 		brontideConn.conn.Close()
 		l.rejectConn(err)
@@ -155,12 +152,10 @@ func (l *Listener) doHandshake(conn net.Conn) {
 	// sides have mutually authenticated each other.
 	var actThree [ActThreeSize]byte
 	if _, err := io.ReadFull(conn, actThree[:]); err != nil {
-		log.Println("READ FAILED!!" ,err)
 		brontideConn.conn.Close()
 		l.rejectConn(err)
 		return
 	}
-	log.Println("COMING HERE, ACT THREE")
 	if err := brontideConn.noise.RecvActThree(actThree); err != nil {
 		brontideConn.conn.Close()
 		l.rejectConn(err)

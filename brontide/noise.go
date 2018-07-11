@@ -4,10 +4,9 @@ import (
 	"crypto/cipher"
 	"crypto/sha256"
 	"encoding/binary"
-	"errors"
 	"fmt"
+	"errors"
 	"io"
-	"log"
 	"math"
 	"time"
 
@@ -40,17 +39,8 @@ const (
 	// waiting for data payloads during the various acts of Brontide. If
 	// the remote party fails to deliver the proper payload within this
 	// time frame, then we'll fail the connection.
-	handshakeReadTimeout = time.Second * 5
+	handshakeReadTimeout = time.Second * 5 // not 10 because of litrpc
 )
-
-var (
-	// ErrMaxMessageLengthExceeded is returned a message to be written to
-	// the cipher session exceeds the maximum allowed message payload.
-	ErrMaxMessageLengthExceeded = errors.New("the generated payload exceeds " +
-		"the max allowed message length of (2^16)-1")
-)
-
-// TODO(roasbeef): free buffer pool?
 
 // ecdh performs an ECDH operation between pub and priv. The returned value is
 // the sha256 of the compressed shared point.
@@ -71,14 +61,10 @@ type cipherState struct {
 	// nonce is the nonce passed into the chacha20-poly1305 instance for
 	// encryption+decryption. The nonce is incremented after each successful
 	// encryption/decryption.
-	//
-	// TODO(roasbeef): this should actually be 96 bit
 	nonce uint64
 
 	// secretKey is the shared symmetric key which will be used to
 	// instantiate the cipher.
-	//
-	// TODO(roasbeef): m-lock??
 	secretKey [32]byte
 
 	// salt is an additional secret which is used during key rotation to
@@ -232,7 +218,6 @@ func (s *symmetricState) mixHash(data []byte) {
 // the AEAD cipher.
 func (s *symmetricState) EncryptAndHash(plaintext []byte) []byte {
 	ciphertext := s.Encrypt(s.handshakeDigest[:], nil, plaintext)
-
 	s.mixHash(ciphertext)
 
 	return ciphertext
@@ -244,10 +229,8 @@ func (s *symmetricState) EncryptAndHash(plaintext []byte) []byte {
 func (s *symmetricState) DecryptAndHash(ciphertext []byte) ([]byte, error) {
 	plaintext, err := s.Decrypt(s.handshakeDigest[:], nil, ciphertext)
 	if err != nil {
-		log.Println("COOL", err)
 		return nil, err
 	}
-
 	s.mixHash(ciphertext)
 
 	return plaintext, nil
@@ -257,10 +240,9 @@ func (s *symmetricState) DecryptAndHash(ciphertext []byte) ([]byte, error) {
 // digest (h) and the chaining key (ck) to protocol name.
 func (s *symmetricState) InitializeSymmetric(protocolName []byte) {
 	var empty [32]byte
-
 	s.handshakeDigest = sha256.Sum256(protocolName)
 	s.chainingKey = s.handshakeDigest
-	s.InitializeKey(empty)
+	s.InitializeKey(empty) // init with empty key
 }
 
 // handshakeState encapsulates the symmetricState and keeps track of all the
@@ -287,8 +269,8 @@ func newHandshakeState(initiator bool, prologue []byte,
 	localStatic *btcec.PrivateKey) handshakeState {
 
 	h := handshakeState{
-		initiator:    initiator,
-		localStatic:  localStatic,
+		initiator:   initiator,
+		localStatic: localStatic,
 	}
 
 	// Set the current chaining key and handshake digest to the hash of the
@@ -312,14 +294,14 @@ func EphemeralGenerator(gen func() (*btcec.PrivateKey, error)) func(*Machine) {
 
 // Machine is a state-machine which implements Brontide: an
 // Authenticated-key Exchange in Three Acts. Brontide is derived from the Noise
-// framework, specifically implementing the Noise_XK handshake. Once the
+// framework, specifically implementing the Noise_XX handshake. Once the
 // initial 3-act handshake has completed all messages are encrypted with a
 // chacha20 AEAD cipher. On the wire, all messages are prefixed with an
 // authenticated+encrypted length field. Additionally, the encrypted+auth'd
 // length prefix is used as the AD when encrypting+decryption messages. This
 // construction provides confidentiality of packet length, avoids introducing
 // a padding-oracle, and binds the encrypted packet length to the packet
-// itself.
+// itself. Noise protocol reference: http://noiseprotocol.org/noise.html
 //
 // The acts proceeds the following order (initiator on the left):
 //  GenActOne()   ->
@@ -329,12 +311,16 @@ func EphemeralGenerator(gen func() (*btcec.PrivateKey, error)) func(*Machine) {
 //  GenActThree() ->
 //                    RecvActThree()
 //
-// This exchange corresponds to the following Noise handshake:
-//   <- s
-//   ...
-//   -> e, es
-//   <- e, ee
-//   -> s, se
+// The protocol has the following steps involved:
+// XX(s, rs):
+//  INITIATOR -> e            RESPONDER
+//  INITIATOR <- e, ee, s, es RESPONDER
+//  INITIATOR -> s, se        RESPONDER
+// s refers to the static key (or public key) belonging to an entity
+// e refers to the ephemeral key
+// e, ee, es refer to a DH exchange between the initiator's key pair and the
+// responder's key pair. The letters e and s hold the same meaning as before.
+
 type Machine struct {
 	sendCipher cipherState
 	recvCipher cipherState
@@ -368,6 +354,8 @@ func NewBrontideMachine(initiator bool, localStatic *btcec.PrivateKey,
 	options ...func(*Machine)) *Machine {
 
 	handshake := newHandshakeState(initiator, []byte("lit"), localStatic)
+	// TODO: if we're sending messages of type XK, set it back to
+	// "lightning" which is what BOLT uses
 
 	m := &Machine{handshakeState: handshake}
 
@@ -376,7 +364,6 @@ func NewBrontideMachine(initiator bool, localStatic *btcec.PrivateKey,
 	m.ephemeralGen = func() (*btcec.PrivateKey, error) {
 		return btcec.NewPrivateKey(btcec.S256())
 	}
-
 	// With the default options established, we'll now process all the
 	// options passed in as parameters.
 	for _, option := range options {
@@ -395,61 +382,54 @@ const (
 	// ActOneSize is the size of the packet sent from initiator to
 	// responder in ActOne. The packet consists of a handshake version, an
 	// ephemeral key in compressed format, and a 16-byte poly1305 tag.
-	//
-	// 1 + 33
-	// send ephemeral key  -> e
+	// -> e
+	// 1 + 33 + 16
 	ActOneSize = 50
 
 	// ActTwoSize is the size the packet sent from responder to initiator
 	// in ActTwo. The packet consists of a handshake version, an ephemeral
-	// key in compressed format and a 16-byte poly1305 tag.
-	//
-	// 1 + 33 + 16
-	// send back  <- e, ee, s, es
+	// key in compressed format, a public key in compressed format
+	// and a 16-byte poly1305 tag.
+	// <- e, ee, s, es
 	// 1 + 33 + 33 + 16
 	ActTwoSize = 83
 
 	// ActThreeSize is the size of the packet sent from initiator to
 	// responder in ActThree. The packet consists of a handshake version,
 	// the initiators static key encrypted with strong forward secrecy and
-	// a 16-byte poly1035
-	// tag.
-	//
+	// a 16-byte poly1035 tag.
+	// -> s, se
 	// 1 + 33 + 16 + 16
-	// send back  -> s, se, same as XK
-	ActThreeSize = 66 //66 50 for non encrypted? is it cool?
+	ActThreeSize = 66
 )
 
 // GenActOne generates the initial packet (act one) to be sent from initiator
-// to responder. During act one the initiator generates a fresh ephemeral key,
-// hashes it into the handshake digest, and performs an ECDH between this key
-// and the responder's static key. Future payloads are encrypted with a key
+// to responder. During act one the initiator generates an ephemeral key and
+// hashes it into the handshake digest. Future payloads are encrypted with a key
 // derived from this result.
-//
-//    -> e, es
-
 // -> e
+
 func (b *Machine) GenActOne() ([ActOneSize]byte, error) {
 	var (
 		err    error
 		actOne [ActOneSize]byte
 	)
 
-	// e
+	// Generate e
 	b.localEphemeral, err = b.ephemeralGen()
 	if err != nil {
 		return actOne, err
 	}
 
-	ephemeral := b.localEphemeral.PubKey().SerializeCompressed()
-	b.mixHash(ephemeral)
+	// Compress e
+	e := b.localEphemeral.PubKey().SerializeCompressed()
+	// Hash it into the handshake digest
+	b.mixHash(e)
 
 	authPayload := b.EncryptAndHash([]byte{})
 	actOne[0] = HandshakeVersion
-	copy(actOne[1:34], ephemeral)
+	copy(actOne[1:34], e)
 	copy(actOne[34:], authPayload)
-	log.Println("ACT ONE PAYLOAD", len(authPayload), authPayload)
-	log.Println("ACT ONE", actOne)
 	return actOne, nil
 }
 
@@ -474,29 +454,21 @@ func (b *Machine) RecvActOne(actOne [ActOneSize]byte) error {
 
 	copy(e[:], actOne[1:34])
 	copy(p[:], actOne[34:])
-	log.Println("ACT ONE PAYLOAD", len(actOne[34:]), p[:])
-	log.Println("ACT ONE", actOne)
+
 	// e
 	b.remoteEphemeral, err = btcec.ParsePubKey(e[:], btcec.S256())
 	if err != nil {
 		return err
 	}
 	b.mixHash(b.remoteEphemeral.SerializeCompressed())
-	// If the initiator doesn't know our static key, then this operation
-	// will fail.
+
 	_, err = b.DecryptAndHash(p[:])
-	if err == nil {
-		log.Println("Act one completed successfully.")
-	}
-	return err
+	return err // nil means Act one completed successfully
 }
 
 // GenActTwo generates the second packet (act two) to be sent from the
-// responder to the initiator. The packet for act two is identify to that of
-// act one, but then results in a different ECDH operation between the
-// initiator's and responder's ephemeral keys.
-//
-//    <- e, ee, s, es
+// responder to the initiator
+// <- e, ee, s, es
 func (b *Machine) GenActTwo() ([ActTwoSize]byte, error) {
 	var (
 		err    error
@@ -509,27 +481,25 @@ func (b *Machine) GenActTwo() ([ActTwoSize]byte, error) {
 		return actTwo, err
 	}
 
-	ephemeral := b.localEphemeral.PubKey().SerializeCompressed()
+	e := b.localEphemeral.PubKey().SerializeCompressed()
 	b.mixHash(b.localEphemeral.PubKey().SerializeCompressed())
 
 	// ee
 	ee := ecdh(b.remoteEphemeral, b.localEphemeral)
 	b.mixKey(ee)
 
- 	// s
-	pubkey := b.localStatic.PubKey().SerializeCompressed()
-	b.mixHash(pubkey)
+	// s
+	s := b.localStatic.PubKey().SerializeCompressed()
+	b.mixHash(s)
 
 	// es
 	es := ecdh(b.remoteEphemeral, b.localStatic)
 	b.mixKey(es)
 
-	log.Println("MIXING", ephemeral, ee, pubkey, es)
 	authPayload := b.EncryptAndHash([]byte{})
-	log.Println("ACT TWO AUTH PAYLOAD GEN", authPayload)
 	actTwo[0] = HandshakeVersion
-	copy(actTwo[1:34], ephemeral)
-	copy(actTwo[34:67], pubkey)
+	copy(actTwo[1:34], e)
+	copy(actTwo[34:67], s)
 	copy(actTwo[67:], authPayload)
 	// add additional stuff based on what we need
 	return actTwo, nil
@@ -542,7 +512,7 @@ func (b *Machine) RecvActTwo(actTwo [ActTwoSize]byte) error {
 	var (
 		err error
 		e   [33]byte
-		pubkey [33]byte
+		s   [33]byte
 		p   [16]byte
 	)
 
@@ -555,9 +525,8 @@ func (b *Machine) RecvActTwo(actTwo [ActTwoSize]byte) error {
 	}
 
 	copy(e[:], actTwo[1:34])
-	copy(pubkey[:], actTwo[34:67])
+	copy(s[:], actTwo[34:67])
 	copy(p[:], actTwo[67:])
-	log.Println("DeCRYPT", actTwo[67:])
 
 	// e
 	b.remoteEphemeral, err = btcec.ParsePubKey(e[:], btcec.S256())
@@ -565,12 +534,13 @@ func (b *Machine) RecvActTwo(actTwo [ActTwoSize]byte) error {
 		return err
 	}
 	b.mixHash(b.remoteEphemeral.SerializeCompressed())
+
 	// ee
 	ee := ecdh(b.remoteEphemeral, b.localEphemeral)
 	b.mixKey(ee)
 
 	// s
-	b.remoteStatic, err = btcec.ParsePubKey(pubkey[:], btcec.S256())
+	b.remoteStatic, err = btcec.ParsePubKey(s[:], btcec.S256())
 	if err != nil {
 		return err
 	}
@@ -579,9 +549,8 @@ func (b *Machine) RecvActTwo(actTwo [ActTwoSize]byte) error {
 	// es
 	es := ecdh(b.remoteStatic, b.localEphemeral)
 	b.mixKey(es)
-	log.Println("MIXING", b.remoteEphemeral.SerializeCompressed(), ee, b.remoteStatic.SerializeCompressed(), es)
+
 	_, err = b.DecryptAndHash(p[:])
-	log.Println("ERROR IS", err)
 	return err
 }
 
@@ -590,30 +559,27 @@ func (b *Machine) RecvActTwo(actTwo [ActTwoSize]byte) error {
 // is to transmit the initiator's public key under strong forward secrecy to
 // the responder. This act also includes the final ECDH operation which yields
 // the final session.
-//
-//    -> s, se
+// -> s, se
 func (b *Machine) GenActThree() ([ActThreeSize]byte, error) {
 	var actThree [ActThreeSize]byte
 
-	ourPubkey := b.localStatic.PubKey().SerializeCompressed()
-	log.Println("GEN ACT THREE, OUR PUB KEY", ourPubkey)
+	// s
+	s := b.localStatic.PubKey().SerializeCompressed()
+	encryptedS := b.EncryptAndHash(s)
 
-	ciphertext := b.EncryptAndHash(ourPubkey)
-
+	//se
 	se := ecdh(b.remoteEphemeral, b.localStatic)
 	b.mixKey(se)
-	log.Println("MIXING ACT3", se)
 
 	authPayload := b.EncryptAndHash([]byte{})
 
 	actThree[0] = HandshakeVersion
-	copy(actThree[1:50], ciphertext)
+	copy(actThree[1:50], encryptedS)
 	copy(actThree[50:], authPayload)
 
 	// With the final ECDH operation complete, derive the session sending
 	// and receiving keys.
 	b.split()
-
 	return actThree, nil
 }
 
@@ -642,28 +608,25 @@ func (b *Machine) RecvActThree(actThree [ActThreeSize]byte) error {
 	// s
 	remotePub, err := b.DecryptAndHash(s[:])
 	if err != nil {
-		log.Println("EXPECTED:", err)
 		return err
 	}
+
 	b.remoteStatic, err = btcec.ParsePubKey(remotePub, btcec.S256())
 	if err != nil {
 		return err
 	}
-	log.Println("RECV ACT THREE, REMOTE STATIC", b.remoteStatic, remotePub)
+
 	// se
 	se := ecdh(b.remoteStatic, b.localEphemeral)
 	b.mixKey(se)
-	log.Println("MIXING ACT3", se)
 
 	if _, err := b.DecryptAndHash(p[:]); err != nil {
-		log.Println("USUAL CULPRIT:", err)
 		return err
 	}
 
 	// With the final ECDH operation complete, derive the session sending
 	// and receiving keys.
 	b.split()
-
 	return nil
 }
 
@@ -712,7 +675,8 @@ func (b *Machine) WriteMessage(w io.Writer, p []byte) error {
 	// payload exceed the largest number encodable within a 16-bit unsigned
 	// integer.
 	if len(p) > math.MaxUint16 {
-		return ErrMaxMessageLengthExceeded
+		return errors.New("the generated payload exceeds " +
+			"the max allowed message length of (2^16)-1")
 	}
 
 	// The full length of the packet is only the packet length, and does
@@ -758,6 +722,5 @@ func (b *Machine) ReadMessage(r io.Reader) ([]byte, error) {
 		return nil, err
 	}
 
-	// TODO(roasbeef): modify to let pass in
 	return b.recvCipher.Decrypt(nil, nil, b.nextCipherText[:pktLen])
 }

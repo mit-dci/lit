@@ -46,7 +46,6 @@ func establishTestConnection() (net.Conn, net.Conn, func(), error) {
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	log.Println("LSIT", listener, pubKey, netAddr)
 	defer listener.Close()
 	// Nos, generate the long-term private keys remote end of the connection
 	// within our test.
@@ -72,7 +71,6 @@ func establishTestConnection() (net.Conn, net.Conn, func(), error) {
 		localConn, err := listener.Accept()
 		localConnChan <- maybeNetConn{localConn, err}
 	}()
-	log.Println("DEOS IT REAC EHRE")
 
 	remote := <-remoteConnChan
 	if remote.err != nil {
@@ -217,37 +215,14 @@ func TestMaxPayloadLength(t *testing.T) {
 	b := Machine{}
 	b.split()
 
-	// Create a payload that's only *slightly* above the maximum allotted
-	// payload length.
-	payloadToReject := make([]byte, math.MaxUint16+1)
-
 	var buf bytes.Buffer
-
-	// A write of the payload generated above to the state machine should
-	// be rejected as it's over the max payload length.
-	err := b.WriteMessage(&buf, payloadToReject)
-	if err != ErrMaxMessageLengthExceeded {
-		t.Fatalf("payload is over the max allowed length, the write " +
-			"should have been rejected")
-	}
-
 	// Generate another payload which should be accepted as a valid
 	// payload.
 	payloadToAccept := make([]byte, math.MaxUint16-1)
-	if err := b.WriteMessage(&buf, payloadToAccept); err != nil {
+	payloadToReject := make([]byte, math.MaxUint16+1)
+	if b.WriteMessage(&buf, payloadToAccept) != nil || b.WriteMessage(&buf, payloadToReject) == nil {
 		t.Fatalf("write for payload was rejected, should have been " +
 			"accepted")
-	}
-
-	// Generate a final payload which is only *slightly* above the max payload length
-	// when the MAC is accounted for.
-	payloadToReject = make([]byte, math.MaxUint16+1)
-
-	// This payload should be rejected.
-	err = b.WriteMessage(&buf, payloadToReject)
-	if err != ErrMaxMessageLengthExceeded {
-		t.Fatalf("payload is over the max allowed length, the write " +
-			"should have been rejected")
 	}
 }
 
@@ -321,7 +296,7 @@ func TestBolt0008TestVectors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to decode hex: %v", err)
 	}
-	responderPriv, responderPub := btcec.PrivKeyFromBytes(btcec.S256(),
+	responderPriv, _ := btcec.PrivKeyFromBytes(btcec.S256(),
 		responderKeyBytes)
 
 	// With the initiator's key data parsed, we'll now define a custom
@@ -353,10 +328,8 @@ func TestBolt0008TestVectors(t *testing.T) {
 
 	// Finally, we'll create both brontide state machines, so we can begin
 	// our test.
-	initiator := NewBrontideMachine(true, initiatorPriv, responderPub,
-		initiatorEphemeral)
-	responder := NewBrontideMachine(false, responderPriv, nil,
-		responderEphemeral)
+	initiator := NewBrontideMachine(true, initiatorPriv, initiatorEphemeral)
+	responder := NewBrontideMachine(false, responderPriv, responderEphemeral)
 
 	// We'll start with the initiator generating the initial payload for
 	// act one. This should consist of exactly 50 bytes. We'll assert that
@@ -367,8 +340,8 @@ func TestBolt0008TestVectors(t *testing.T) {
 		t.Fatalf("unable to generate act one: %v", err)
 	}
 	expectedActOne, err := hex.DecodeString("00036360e856310ce5d294e" +
-		"8be33fc807077dc56ac80d95d9cd4ddbd21325eff73f70df608655115" +
-		"1f58b8afe6c195782c6a")
+		"8be33fc807077dc56ac80d95d9cd4ddbd21325eff73f71432d5611e91" +
+		"ffea67c17e8d5ae0cbb3")
 	if err != nil {
 		t.Fatalf("unable to parse expected act one: %v", err)
 	}
@@ -392,8 +365,9 @@ func TestBolt0008TestVectors(t *testing.T) {
 		t.Fatalf("unable to generate act two: %v", err)
 	}
 	expectedActTwo, err := hex.DecodeString("0002466d7fcae563e5cb09a0" +
-		"d1870bb580344804617879a14949cf22285f1bae3f276e2470b93aac58" +
-		"3c9ef6eafca3f730ae")
+		"d1870bb580344804617879a14949cf22285f1bae3f27028d7500dd4c126" +
+		"85d1f568b4c2b5048e8534b873319f3a8daa612b469132ec7f724fb90ec" +
+		"6cbfad43030deee7f279410b")
 	if err != nil {
 		t.Fatalf("unable to parse expected act two: %v", err)
 	}
@@ -414,9 +388,9 @@ func TestBolt0008TestVectors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to generate act three: %v", err)
 	}
-	expectedActThree, err := hex.DecodeString("00b9e3a702e93e3a9948c2e" +
-		"d6e5fd7590a6e1c3a0344cfc9d5b57357049aa22355361aa02e55a8f" +
-		"c28fef5bd6d71ad0c38228dc68b1c466263b47fdf31e560e139ba")
+	expectedActThree, err := hex.DecodeString("008ac8fc232a47aa6fa5c51" +
+		"b3b72c5824018e9d92f0840a5eada20f3b00d66a0e4c93b4e638aad3" +
+		"6083982b74ae15f25f21aca63afa221bc26ea734ca44e8d01aa7e")
 	if err != nil {
 		t.Fatalf("unable to parse expected act three: %v", err)
 	}
@@ -433,19 +407,19 @@ func TestBolt0008TestVectors(t *testing.T) {
 
 	// As a final assertion, we'll ensure that both sides have derived the
 	// proper symmetric encryption keys.
-	sendingKey, err := hex.DecodeString("969ab31b4d288cedf6218839b27a3e2" +
-		"140827047f2c0f01bf5c04435d43511a9")
+	sendingKey, err := hex.DecodeString("6645a2f8c64cc44d0b95614cbe51c2c9c" +
+	"1bee9945bfee823120b5a0978424bdf")
 	if err != nil {
 		t.Fatalf("unable to parse sending key: %v", err)
 	}
-	recvKey, err := hex.DecodeString("bb9020b8965f4df047e07f955f3c4b884" +
-		"18984aadc5cdb35096b9ea8fa5c3442")
+	recvKey, err := hex.DecodeString("43b4a250b7b71ec303fb28b702b85a634" +
+	"9fd9849662e8de3e5cee770f499e449")
 	if err != nil {
 		t.Fatalf("unable to parse receiving key: %v", err)
 	}
 
-	chainKey, err := hex.DecodeString("919219dbb2920afa8db80f9a51787a840" +
-		"bcf111ed8d588caf9ab4be716e42b01")
+	chainKey, err := hex.DecodeString("7e3044d33f4184f65c836133206576b49" +
+	"a9c1cde623321afdcbb39624af60a99")
 	if err != nil {
 		t.Fatalf("unable to parse chaining key: %v", err)
 	}
@@ -483,18 +457,18 @@ func TestBolt0008TestVectors(t *testing.T) {
 	// The starting point for enc/decr is already guaranteed correct from the
 	// above tests of sendingKey, receivingKey, chainingKey.
 	transportMessageVectors := map[int]string{
-		0: "cf2b30ddf0cf3f80e7c35a6e6730b59fe802473180f396d88a8fb0db8cb" +
-			"cf25d2f214cf9ea1d95",
-		1: "72887022101f0b6753e0c7de21657d35a4cb2a1f5cde2650528bbc8f837" +
-			"d0f0d7ad833b1a256a1",
-		500: "178cb9d7387190fa34db9c2d50027d21793c9bc2d40b1e14dcf30ebeeeb2" +
-			"20f48364f7a4c68bf8",
-		501: "1b186c57d44eb6de4c057c49940d79bb838a145cb528d6e8fd26dbe50a6" +
-			"0ca2c104b56b60e45bd",
-		1000: "4a2f3cc3b5e78ddb83dcb426d9863d9d9a723b0337c89dd0b005d89f8d3" +
-			"c05c52b76b29b740f09",
-		1001: "2ecd8c8a5629d0d02ab457a0fdd0f7b90a192cd46be5ecb6ca570bfc5e2" +
-			"68338b1a16cf4ef2d36",
+		0: "78fcfa42dcbf9f174abaea90dec3a678cc26a15700d8aaf7e5395a187e3" +
+			"a1ab176e7cb1ec33a66",
+		1: "c840d0ba1869e362d609815b68d0adbf6213b14f846cb1369e39352562e" +
+			"58403e782f7ffacefd6",
+		500: "9e3be84dae80d3900f50bd29a265fdf9c6745042e6054c7d84a2a81a4" +
+			"4ddea9108dc3411c07ea8",
+		501: "1ae1c6f783bfada390f7f1edb50ab0c48c0d5effb679610299fdf3b8c" +
+			"1d3c0b14656fa2692ff8e",
+		1000: "0a8cbec4586154871b8bf04f8efa97b183244ed2b269796c319bf0c4" +
+			"78f3cdeeef11e8a86ce9fd",
+		1001: "2a48d153ab9f01328a276c2f132ba67dd6a9b629899787eea2a402159" +
+			"cbb85aa22a4dff2071042",
 	}
 
 	// Payload for every message is the string "hello".
