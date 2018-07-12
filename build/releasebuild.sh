@@ -30,8 +30,14 @@ function gen_arc_name() {
 }
 
 function gen_out_dir_name() {
-	commithash=$(git rev-parse --short HEAD)
-	echo lit-$commithash
+	vermarker=$(git rev-parse --short HEAD)
+
+    gittag=$(git describe --tags HEAD | head -n 1)
+    if [ "$?" == "0" ]; then
+        vermarker=$(echo $gittag)
+    fi
+
+	echo lit-$vermarker
 }
 
 function get_work_dir_path() {
@@ -73,13 +79,19 @@ function compile_and_package() {
 	os=$1
 	arch=$2
 
+    outdirname=$(gen_out_dir_name)
+    arcname=$(gen_arc_name $os $arch)
+
 	run_build_for_platform $os $arch
 
-	outdirname=$(gen_out_dir_name)
-	arcname=$(gen_arc_name $os $arch)
+    # Copy some other files into what the archive's going to copy up.
+    for f in 'README.md LICENSE litlogo145.png'; do
+        cp -r $f $workdir/$outdirname
+    done
 
 	# This is where we actually make the archive of it.
-	pushd $(get_work_dir_path $os $arch)
+    workdir=$(get_work_dir_path $os $arch)
+	pushd $workdir
 	if [ "$os" != "win" ]; then
 		tar -cvzf $arcname $outdirname
 	else
