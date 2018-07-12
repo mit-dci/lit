@@ -6,7 +6,7 @@ pipeline {
     stage('Test lit') {
       steps {
         sh 'rm -rf lit ../lit'
-        sh 'git clone https://github.com/Varunram/lit'
+        sh 'git clone https://github.com/mit-dci/lit'
         sh 'mv lit ../'
         sh 'cd ..'
         sh 'make lit lit-af'
