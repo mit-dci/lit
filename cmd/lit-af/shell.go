@@ -251,42 +251,38 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	dfReply := new(litrpc.PendingDualFundReply)
 
 	cmd := textArgs[0]
-	all := false
+	argDashA := false
 	if cmd == "-a" {
-		all = true
+		argDashA = true
 	}
 
-	if cmd == "conns" || all {
+	if cmd == "conns" || argDashA {
 		err := lc.Call("LitRPC.ListConnections", nil, pReply)
 		if err != nil {
 			return err
 		}
 
-		if all {
-			fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Peers:"))
-		}
-
 		if len(pReply.Connections) > 0 {
+			if argDashA {
+				fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Peers:"))
+			}
 			for _, peer := range pReply.Connections {
 				fmt.Fprintf(color.Output, "%s %s (%s)\n",
 					lnutil.White(peer.PeerNumber), peer.RemoteHost, peer.LitAdr)
 			}
-		} else {
-			fmt.Printf("none\n")
 		}
 	}
 
-	if cmd == "chans" || all {
+	if cmd == "chans" || argDashA {
 		err := lc.Call("LitRPC.ChannelList", nil, cReply)
 		if err != nil {
 			return err
 		}
 
-		if all {
-			fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Channels:"))
-		}
-
 		if len(cReply.Channels) > 0 {
+			if argDashA {
+				fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Channels:"))
+			}
 
 			sort.Slice(cReply.Channels, func(i, j int) bool {
 				return cReply.Channels[i].Height < cReply.Channels[j].Height
@@ -330,23 +326,19 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 					lnutil.SatoshiColor(c.Capacity), lnutil.SatoshiColor(c.MyBalance),
 					c.Height, c.StateNum, c.Data, c.Pkh)
 			}
-		} else {
-			fmt.Printf("none\n")
 		}
-
 	}
 
-	if cmd == "dualfunds" || all {
+	if cmd == "dualfunds" || argDashA {
 		err := lc.Call("LitRPC.PendingDualFund", nil, dfReply)
 		if err != nil {
 			return err
 		}
 
-		if all {
-			fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Pending Dualfunds:"))
-		}
-
 		if dfReply.Pending {
+			if argDashA {
+				fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Pending Dualfunds:"))
+			}
 			fmt.Fprintf(
 				color.Output, "\t%s %d\t%s %d\t%s %s\t%s %s\n\n",
 				lnutil.Header("Peer:"), dfReply.PeerIdx,
@@ -354,24 +346,21 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 				lnutil.Header("Their Amt:"), lnutil.SatoshiColor(dfReply.TheirAmount),
 				lnutil.Header("Req Amt:"), lnutil.SatoshiColor(dfReply.RequestedAmount),
 			)
-		} else {
-			fmt.Printf("none\n")
 		}
 
 	}
 
-	if cmd == "txos" || all {
+	if cmd == "txos" || argDashA {
 		err := lc.Call("LitRPC.TxoList", nil, tReply)
 
 		if err != nil {
 			return err
 		}
 
-		if all {
-			fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Txos:"))
-		}
-
 		if len(tReply.Txos) > 0 {
+			if argDashA {
+				fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Txos:"))
+			}
 			for i, t := range tReply.Txos {
 				fmt.Fprintf(color.Output, "%d %s h:%d amt:%s %s %s",
 					i+1, lnutil.OutPoint(t.OutPoint), t.Height,
@@ -384,62 +373,53 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 				}
 				fmt.Fprintf(color.Output, "\n")
 			}
-		} else {
-			fmt.Printf("none\n")
 		}
 	}
 
-	if cmd == "ports" || all {
+	if cmd == "ports" || argDashA {
 		err := lc.Call("LitRPC.GetListeningPorts", nil, lReply)
 		if err != nil {
 			return err
 		}
 
-		if all {
-			fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Listening Ports:"))
-		}
-
 		if len(lReply.LisIpPorts) > 0 {
+			if argDashA {
+				fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Listening Ports:"))
+			}
 			fmt.Fprintf(color.Output,
 				"Listening for connections on port(s) %v with key %s\n",
 				lnutil.White(lReply.LisIpPorts), lReply.Adr)
-		} else {
-			fmt.Printf("none\n")
 		}
 	}
 
-	if cmd == "addrs" || all {
+	if cmd == "addrs" || argDashA {
 		err := lc.Call("LitRPC.Address", nil, aReply)
 		if err != nil {
 			return err
 		}
 
-		if all {
-			fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Addresses:"))
-		}
-
 		if len(aReply.WitAddresses) > 0 {
+			if argDashA {
+				fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Addresses:"))
+			}
 			for i, a := range aReply.WitAddresses {
 				fmt.Fprintf(color.Output, "%d %s (%s)\n", i+1,
 					lnutil.Address(a), lnutil.Address(aReply.LegacyAddresses[i]))
 			}
-		} else {
-			fmt.Printf("none\n")
 		}
 
 	}
 
-	if cmd == "bals" || all {
+	if cmd == "bals" || argDashA {
 		err := lc.Call("LitRPC.Balance", nil, bReply)
 		if err != nil {
 			return err
 		}
 
-		if all {
-			fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Balances:"))
-		}
-
 		if len(bReply.Balances) > 0 {
+			if argDashA {
+				fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Balances:"))
+			}
 			for _, walBal := range bReply.Balances {
 				fmt.Fprintf(
 					color.Output, "%s %d\t%s %d\t%s %d\t%s %s\t%s %s %s %s\n",
@@ -451,8 +431,6 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 					lnutil.Header("Channel:"), lnutil.SatoshiColor(walBal.ChanTotal),
 				)
 			}
-		} else {
-			fmt.Printf("none\n")
 		}
 	}
 
