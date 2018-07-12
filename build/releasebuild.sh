@@ -32,9 +32,9 @@ function gen_arc_name() {
 function gen_out_dir_name() {
 	vermarker=$(git rev-parse --short HEAD)
 
-    gittag=$(git describe --tags HEAD | head -n 1)
+    gittag=$(git describe --tags --exact-match HEAD 2> /dev/null)
     if [ "$?" == "0" ]; then
-        vermarker=$(echo $gittag)
+        vermarker=$(echo "$gittag" | head -n 1)
     fi
 
 	echo lit-$vermarker
@@ -104,13 +104,26 @@ function compile_and_package() {
 
 }
 
-# Linux
-compile_and_package linux amd64
-compile_and_package linux i386
+if [ -n "$1" ] && [ -n "$2" ]; then
+    compile_and_package $1 $2
+else
 
-# macOS (Darwin)
-compile_and_package darwin amd64
+    if [ -z "$1" ]; then
 
-# Windows
-compile_and_package win amd64
-compile_and_package win i386
+        # Linux
+        compile_and_package linux amd64
+        compile_and_package linux i386
+
+        # macOS (Darwin)
+        compile_and_package darwin amd64
+
+        # Windows
+        compile_and_package win amd64
+        compile_and_package win i386
+
+    else
+        echo "usage: $0 <os> <arch>"
+        exit 1
+    fi
+
+fi

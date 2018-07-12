@@ -10,13 +10,13 @@ Under development, not for use with real money.
 
 ### Prerequisites
 
-- [Git](https://git-scm.com/)
+* [Git](https://git-scm.com/)
 
-- [Go](https://golang.org/doc/install)
+* [Go](https://golang.org/doc/install)
 
-- make
+* make
 
-- (Optional, Windows) a [Cygwin](https://cygwin.com/install.html) environment might make things easier for you.
+* (Optional, Windows) a [Cygwin](https://cygwin.com/install.html) environment might make things easier for you.
 
 ### Downloading
 
@@ -66,7 +66,8 @@ The below command will run Lit on the Bitcoin testnet3.  You probably need to
 have `bitcoind` running on your machine such that Lit can connect to it when do
 you this.
 
-(Note: Windows users can take off `./` but may need to change `lit` to `lit.exe` in the second line.)
+(Note: Windows users can take off `./` but may need to change `lit` to `lit.exe`
+in the second line.)
 
 ```bash
 ./lit --tn3=true
@@ -78,6 +79,24 @@ The words `yup, yes, y, true, 1, ok, enable, on` can be used to specify that Lit
 automatically connect to a set of populated seeds. It can also be replaced by
 the address of the remote node you wish to connect to.
 
+### Packaging
+
+This is a separate thing, but you can make a archive package for distribution by
+using this:
+
+```
+./build/releasebuild.sh <os> <arch>
+```
+
+and it'll be dropped into `build/_releasedir`.  It should support any OS that
+Go and our dependencies support.  Just instead of `windows` use `win` and
+instead of `368` use `i386`.
+
+**ALSO:** You can also package for Linux, macOS, and Windows in both amd64 and
+i386 by just running `make package`.  (Except macOS is only amd64.)
+
+And running `./build/releasebuild.sh clean` will cleanup the dirs it generates.
+
 ## Using Lightning
 
 Great! Now that you are all done setting up lit, you can
@@ -88,7 +107,9 @@ Great! Now that you are all done setting up lit, you can
 
 ## Command line arguments
 
-When starting lit, the following command line arguments are available. The following commands may also be specified in lit.conf which is automatically generated on startup.
+When starting lit, the following command line arguments are available.  The
+following commands may also be specified in `lit.conf` which is automatically
+generated on startup.
 
 #### Connecting to networks
 
