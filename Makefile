@@ -6,6 +6,8 @@ GOBIN = $(shell pwd)
 GO ?= latest
 WEBUI_REPO = "https://github.com/josephtchung/webui"
 
+GO_BUILD_EX_ARGS ?=
+
 all: lit lit-af test
 
 goget:
@@ -13,12 +15,12 @@ goget:
 	build/env.sh go get -v ./cmd/lit-af
 
 lit: goget
-	build/env.sh go build -v
+	build/env.sh go build -v ${GO_BUILD_EX_ARGS} .
 	@echo "Done building."
 	@echo "Run \"$(GOBIN)/lit\" to launch lit."
 
 lit-af: goget
-	build/env.sh bash -c '(cd cmd/lit-af && go build -v)'
+	build/env.sh go build -v ${GO_BUILD_EX_ARGS} ./cmd/lit-af
 	@echo "Run \"$(GOBIN)/cmd/lit-af/lit-af\" to launch lit-af."
 
 glit:
@@ -32,10 +34,17 @@ webui:
 	npm install
 	@echo "Run npm start from $(GOBIN)/webui and navigate to localhost:3000"
 
+package:
+	build/releasebuild.sh clean
+	build/releasebuild.sh
+
 clean:
+	build/env.sh clean
+	build/releasebuild.sh clean
+	go clean .
+	go clean ./cmd/lit-af
 	rm -rf build/_workspace/
 	rm -rf webui/
-	rm -f lit
 	rm -f cmd/lit-af/lit-af
 	rm -f cmd/glit/glit
 
