@@ -339,7 +339,7 @@ func TestBolt0008TestVectors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to generate act one: %v", err)
 	}
-	expectedActOne, err := hex.DecodeString("00036360e856310ce5d294e" +
+	expectedActOne, err := hex.DecodeString("01036360e856310ce5d294e" +
 		"8be33fc807077dc56ac80d95d9cd4ddbd21325eff73f71432d5611e91" +
 		"ffea67c17e8d5ae0cbb3")
 	if err != nil {
@@ -364,7 +364,7 @@ func TestBolt0008TestVectors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to generate act two: %v", err)
 	}
-	expectedActTwo, err := hex.DecodeString("0002466d7fcae563e5cb09a0" +
+	expectedActTwo, err := hex.DecodeString("0102466d7fcae563e5cb09a0" +
 		"d1870bb580344804617879a14949cf22285f1bae3f27028d7500dd4c126" +
 		"85d1f568b4c2b5048e8534b873319f3a8daa612b469132ec7f724fb90ec" +
 		"6cbfad43030deee7f279410b")
@@ -388,7 +388,7 @@ func TestBolt0008TestVectors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to generate act three: %v", err)
 	}
-	expectedActThree, err := hex.DecodeString("008ac8fc232a47aa6fa5c51" +
+	expectedActThree, err := hex.DecodeString("018ac8fc232a47aa6fa5c51" +
 		"b3b72c5824018e9d92f0840a5eada20f3b00d66a0e4c93b4e638aad3" +
 		"6083982b74ae15f25f21aca63afa221bc26ea734ca44e8d01aa7e")
 	if err != nil {
