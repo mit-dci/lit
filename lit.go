@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"time"
@@ -83,7 +82,8 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	if !lnutil.NopeString(conf.Reghost) {
 		p := &coinparam.RegressionNetParams
 		log.Printf("reg: %s\n", conf.Reghost)
-		err = node.LinkBaseWallet(key, consts.BitcoinRegtestBHeight, conf.ReSync, conf.Tower, conf.Reghost, p)
+		err = node.LinkBaseWallet(key, consts.BitcoinRegtestBHeight, conf.ReSync,
+			conf.Tower, conf.Reghost, conf.ChainProxyURL, p)
 		if err != nil {
 			return err
 		}
@@ -93,7 +93,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 		p := &coinparam.TestNet3Params
 		err = node.LinkBaseWallet(
 			key, consts.BitcoinTestnet3BHeight, conf.ReSync, conf.Tower,
-			conf.Tn3host, p)
+			conf.Tn3host, conf.ChainProxyURL, p)
 		if err != nil {
 			return err
 		}
@@ -122,7 +122,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 		p := &coinparam.VertcoinTestNetParams
 		err = node.LinkBaseWallet(
 			key, consts.VertcoinTestnetBHeight, conf.ReSync, conf.Tower,
-			conf.Tvtchost, p)
+			conf.Tvtchost, conf.ChainProxyURL, p)
 		if err != nil {
 			return err
 		}
