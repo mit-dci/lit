@@ -5,9 +5,9 @@ import (
 	"log"
 	"path/filepath"
 
+	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/hdkeychain"
-	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/lnutil"
@@ -89,7 +89,7 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 // LinkBaseWallet activates a wallet and hooks it into the litnode.
 func (nd *LitNode) LinkBaseWallet(
 	privKey *[32]byte, birthHeight int32, resync bool, tower bool,
-	host string, param *coinparam.Params) error {
+	host string, proxy string, param *coinparam.Params) error {
 
 	rootpriv, err := hdkeychain.NewMaster(privKey[:], param)
 	if err != nil {
@@ -117,7 +117,7 @@ func (nd *LitNode) LinkBaseWallet(
 	// if there aren't, Multiwallet will still be false; set new wallit to
 	// be the first & default
 	nd.SubWallet[WallitIdx] = wallit.NewWallit(
-		rootpriv, birthHeight, resync, host, nd.LitFolder, param)
+		rootpriv, birthHeight, resync, host, nd.LitFolder, proxy, param)
 
 	// re-register channel addresses
 	qChans, err := nd.GetAllQchans()
