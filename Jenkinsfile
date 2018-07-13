@@ -28,6 +28,8 @@ pipeline {
     }
   }
   post {
-    archiveArtifacts artifacts: 'build/_releasedir/*', fingerprint: false
+    always {
+      archiveArtifacts artifacts: 'build/_releasedir/*', fingerprint: false
+    }
   }
 }
