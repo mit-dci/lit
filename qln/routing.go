@@ -103,7 +103,7 @@ func (nd *LitNode) advertiseLinks(seq uint32) {
 				copy(idPub[:], nd.IdKey().PubKey().SerializeCompressed())
 
 				var theirIdPub [33]byte
-				copy(theirIdPub[:], peer.Con.RemotePub.SerializeCompressed())
+				copy(theirIdPub[:], peer.Con.RemotePub().SerializeCompressed())
 
 				outHash := fastsha256.Sum256(idPub[:])
 				copy(outmsg.APKH[:], outHash[:20])

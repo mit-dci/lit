@@ -3,6 +3,8 @@ package qln
 import (
 	"fmt"
 	"log"
+	"net"
+	"strings"
 
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/brontide"
@@ -30,7 +32,7 @@ func (nd *LitNode) GetLisAddressAndPorts() (
 func (nd *LitNode) TCPListener(
 	lisIpPort string) (string, error) {
 	idPriv := nd.IdKey()
-	listener, err := lndc.NewListener(nd.IdKey(), lisIpPort)
+	listener, err := brontide.NewListener(nd.IdKey(), lisIpPort)
 	if err != nil {
 		return "", err
 	}
@@ -58,7 +60,7 @@ func (nd *LitNode) TCPListener(
 				log.Printf("Listener error: %s\n", err.Error())
 				continue
 			}
-			newConn, ok := netConn.(*lndc.LNDConn)
+			newConn, ok := netConn.(*brontide.Conn)
 			if !ok {
 				log.Printf("Got something that wasn't a LNDC")
 				continue
@@ -67,7 +69,7 @@ func (nd *LitNode) TCPListener(
 				newConn.RemotePub().SerializeCompressed(), newConn.RemoteAddr().String())
 
 			// don't save host/port for incoming connections
-			peerIdx, err := nd.GetPeerIdx(newConn.RemotePub, "")
+			peerIdx, err := nd.GetPeerIdx(newConn.RemotePub(), "")
 			if err != nil {
 				log.Printf("Listener error: %s\n", err.Error())
 				continue
@@ -116,12 +118,7 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 	var err error
 
 	// parse address and get pkh / host / port
-	who, where := lndc.SplitAdrString(connectAdr)
-
-	// sanity check the "who" pkh string
-	if !lnutil.LitAdrOK(who) {
-		return fmt.Errorf("ln address %s invalid", who)
-	}
+	who, where := splitAdrString(connectAdr)
 
 	// If we couldn't deduce a URL, look it up on the tracker
 	if where == "" {
@@ -135,10 +132,7 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 	idPriv := nd.IdKey()
 
 	// Assign remote connection
-	newConn := new(lndc.LNDConn)
-
-	// TODO: handle IPv6 connections
-	err = newConn.Dial(idPriv, where, who, nd.ProxyURL)
+	newConn, err := brontide.Dial(idPriv, where, who, net.Dial)
 	if err != nil {
 		return err
 	}
@@ -148,7 +142,7 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 
 	// figure out peer index, or assign new one for new peer.  Since
 	// we're connecting out, also specify the hostname&port
-	peerIdx, err := nd.GetPeerIdx(newConn.RemotePub, newConn.RemoteAddr().String())
+	peerIdx, err := nd.GetPeerIdx(newConn.RemotePub(), newConn.RemoteAddr().String())
 	if err != nil {
 		return err
 	}
