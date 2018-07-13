@@ -113,6 +113,7 @@ else
         # Linux
         compile_and_package linux amd64
         compile_and_package linux i386
+	compile_and_package linux arm
 
         # macOS (Darwin)
         compile_and_package darwin amd64
