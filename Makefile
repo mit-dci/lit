@@ -1,12 +1,10 @@
 # For people who don't want to use go's standard settings
 
-.PHONY: lit lit-af glit test tests
+.PHONY: lit lit-af glit test tests webui
 
 GOBIN = $(shell pwd)
 GO ?= latest
-WEBUI_REPO = "https://github.com/josephtchung/webui"
 all: lit test
-
 
 goget:
 	build/env.sh go get ./...
@@ -21,8 +19,8 @@ lit-af: goget
 	@echo "Run \"$(GOBIN)/cmd/lit-af/lit-af\" to launch lit-af."
 
 webui:
-	git clone $(WEBUI_REPO); cd webui ; npm install
-	@echo "Run npm start from $(GOBIN)/webui and navigate to localhost:3000"
+	cd webui ; rm -rf node_modules/ ; npm install ; npm run build ; cd ..
+	@echo "Launch app from ./webui/dist/<your_dist>/litwebui"
 
 test tests: lit
 	build/env.sh go test -v ./...
