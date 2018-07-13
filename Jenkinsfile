@@ -5,6 +5,9 @@ pipeline {
     }
   }
   stages {
+    stage('Checkout') {
+      checkout scm
+    }
     stage('Download Deps') {
       steps {
         sh 'make goget'
@@ -23,8 +26,8 @@ pipeline {
     }
     stage('Integration Tests') {
       steps {
-        sh 'python3 test/test_basic.py -c reg --dumplogs'
-        sh 'python3 test/test_break.py -c reg --dumplogs'
+        sh 'python3 test/test_basic.py -c reg --dumplogs || exit 2'
+        sh 'python3 test/test_break.py -c reg --dumplogs || exit 2'
       }
     }
     stage('Package') {
@@ -36,6 +39,7 @@ pipeline {
   post {
     always {
       archiveArtifacts artifacts: 'build/_releasedir/*', fingerprint: false
+      deleteDir()
     }
   }
 }
