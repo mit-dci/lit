@@ -2,6 +2,7 @@ package coinparam
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"math/big"
 
@@ -56,11 +57,13 @@ func diffBitcoin(
 	ltcmode := p.Name == "litetest4" || p.Name == "litereg" ||
 		p.Name == "litecoin" || p.Name == "vtctest" || p.Name == "vtc"
 
-	if p.Name == "regtest" {
-		return 0x207fffff, nil
-	}
+	//if p.Name == "regtest" {
+	//	log.Println("REKT")
+	//	return 0x207fffff, nil
+	//}
 
 	if len(headers) < 2 {
+		log.Println("Less than 2 headers given to diffBitcoin")
 		return 0, fmt.Errorf(
 			"%d headers given to diffBitcoin, expect >2", len(headers))
 	}
@@ -68,7 +71,14 @@ func diffBitcoin(
 	cur := headers[len(headers)-1]
 
 	// normal, no adjustment; Dn = Dn-1
-	rightBits := prev.Bits
+	var rightBits uint32
+	if prev.Bits != 0 {
+		rightBits = prev.Bits
+	} else {
+		// invalid block, prev bits are zero, return min diff.
+		log.Println("Got blocks with diff 0. Returning error")
+		return 0, fmt.Errorf("Got blocks with diff 0. Returning error")
+	}
 
 	epochLength := int(p.TargetTimespan / p.TargetTimePerBlock)
 	epochStart := new(wire.BlockHeader)
@@ -77,10 +87,15 @@ func diffBitcoin(
 	maxHeader := len(headers) - 1
 
 	// must include an epoch start header
-	if epochHeight > maxHeader {
+	if epochHeight > maxHeader && maxHeader+10 > epochHeight {
+		// assuming max 10 block reorg, if something more,  you're safer
+		// restarting your node. Also, if you're syncing from scratch and
+		// get a reorg in 10 blocks, you're doing soemthign wrong.
+		// TODO: handle case when reorg happens over diff reset.
+		return p.PowLimitBits, nil
+	} else if epochHeight > maxHeader {
 		return 0, fmt.Errorf("diffBitcoin got insufficient headers")
 	}
-
 	epochStart = headers[maxHeader-epochHeight]
 
 	// see if we're on a difficulty adjustment block
@@ -121,26 +136,24 @@ func diffBitcoin(
 			// pindex->nBits == nProofOfWorkLimit)
 
 			// ugh I don't know, and whatever this is testnet.
-			// just go to epoch start even though that's not what the cpp code
-			// seems to say
-
 			// well, lets do what btcd does
 			tempCur := headers[len(headers)-1]
 			tempHeight := height
 			arrIndex := len(headers) - 1
+			i := 0
 			for tempCur != nil && tempHeight%2016 != 0 &&
 				tempCur.Bits == p.PowLimitBits {
 				arrIndex -= 1
 				tempCur = headers[arrIndex]
 				tempHeight -= 1
+				i ++
 			}
 			// Return the found difficulty or the minimum difficulty if no
 			// appropriate block was found.
-			lastBits := p.PowLimitBits
-			if tempCur != nil {
-				lastBits = tempCur.Bits
+			rightBits = p.PowLimitBits
+			if tempCur != nil && tempCur.Bits!= 0 { //weird bug
+				rightBits = tempCur.Bits
 			}
-			rightBits = lastBits
 			// rightBits = epochStart.Bits // original line
 		}
 	}

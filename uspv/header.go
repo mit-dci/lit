@@ -15,8 +15,8 @@ import (
 
 	"github.com/mit-dci/lit/btcutil/blockchain"
 
-	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/coinparam"
+	"github.com/mit-dci/lit/wire"
 )
 
 func min(a, b int) int {
@@ -30,20 +30,12 @@ func moreWork(a, b []*wire.BlockHeader, p *coinparam.Params) bool {
 	if len(a) == 0 || len(b) == 0 {
 		return false
 	}
-	//if checkProofOfWork(*a[0], p) == checkProofOfWork(*b[0], p) {
-	// log.Println(string(&a[0].MerkleRoot) == string(&b[0].MerkleRoot))
-
 	// if (&a[0].MerkleRoot).IsEqual(&b[0].MerkleRoot) { this always returns false,
 	// so we use the String() method to convert them, thing stole half an hour..
 	var pos int = 0 //can safely assume this thanks to the first check
 	for i := min(len(a), len(b)) - 1; i >= 1; i-- {
-		log.Println(i)
 		hash := a[i-1].BlockHash()
-		log.Println("HASH")
-		log.Println(hash)
-		log.Println(a[i].PrevBlock.IsEqual(&hash))
-		log.Println(b[i].PrevBlock.IsEqual(&hash))
-		if a[i].PrevBlock.IsEqual(&hash) && b[i].PrevBlock.IsEqual(&hash){
+		if a[i].PrevBlock.IsEqual(&hash) && b[i].PrevBlock.IsEqual(&hash) {
 			isMoreWork = true
 			pos = i
 			break
@@ -55,21 +47,15 @@ func moreWork(a, b []*wire.BlockHeader, p *coinparam.Params) bool {
 		var a1, b1 []*wire.BlockHeader
 		a1 = a[pos:]
 		b1 = b[pos:]
-		// log.Println ("Watch here")
-		// log.Println(len(a1))
-		// log.Println(len(b1))
 		work_a := big.NewInt(0) // since raw declarations don't work, lets set it to 0
-		work_b := big.NewInt(0) // since raw declarations don't work, lets set it to 0
+		work_b := big.NewInt(0)
 		for i := 0; i < len(a1); i++ {
-			work_a.Add(blockchain.CalcWork(a1[0].Bits), work_a)
+			work_a.Add(blockchain.CalcWork(a1[i].Bits), work_a)
 		}
 		for i := 0; i < len(b1); i++ {
-			//log.Println(i)
 			work_b.Add(blockchain.CalcWork(b1[i].Bits), work_b)
 		}
-		log.Println("Work done by alt chains A and B are: ")
-		log.Println(work_a, work_b)
-		// due to cmp's stquirks in big, we can't return directly
+		log.Println("Work done by alt chains A and B are: ", work_a, work_b)
 		if work_a.Cmp(work_b) > 0 { // if chain A does more work than B return true
 			return isMoreWork // true
 		}
@@ -123,15 +109,16 @@ func (s *SPVCon) GetHeaderAtHeight(h int32) (*wire.BlockHeader, error) {
 	// seek to that header
 	_, err := s.headerFile.Seek(int64(80*h), os.SEEK_SET)
 	if err != nil {
+		log.Println(err)
 		return nil, err
 	}
 
 	hdr := new(wire.BlockHeader)
 	err = hdr.Deserialize(s.headerFile)
 	if err != nil {
+		log.Println(err)
 		return nil, err
 	}
-
 	return hdr, nil
 }
 
@@ -163,12 +150,14 @@ func FindHeader(r io.ReadSeeker, hdr wire.BlockHeader) (int32, error) {
 	for tries := 1; tries < 2200; tries++ {
 		offset, err := r.Seek(int64(-80*tries), os.SEEK_END)
 		if err != nil {
+			log.Println(err)
 			return -1, err
 		}
 
 		//	for blkhash.IsEqual(&target) {
 		err = cur.Deserialize(r)
 		if err != nil {
+			log.Println(err)
 			return -1, err
 		}
 		curhash := cur.BlockHash()
@@ -233,6 +222,7 @@ func CheckHeaderChain(
 	// seek to start of last header
 	pos, err := r.Seek(-80, os.SEEK_END)
 	if err != nil {
+		log.Println(err)
 		return 0, err
 	}
 	log.Printf("header file position: %d\n", pos)
@@ -293,7 +283,6 @@ func CheckHeaderChain(
 		log.Printf("Header %s attaches at height %d\n",
 			inHeaders[0].BlockHash().String(), attachHeight)
 
-		// TODO check for more work here instead of length.  This is wrong...
 		// if we've been given insufficient headers, don't reorg, but
 		// ask for more headers.
 
@@ -330,20 +319,22 @@ func CheckHeaderChain(
 		if height+int32(i) > p.AssumeDiffBefore {
 			// check if there's a valid proof of work.  That whole "Bitcoin" thing.
 			if !checkProofOfWork(*hdr, p, height+int32(i)) {
+				log.Println("header in message has bad proof of work")
 				return 0, fmt.Errorf("header %d in message has bad proof of work", i)
 			}
 			// build slice of "previous" headers
 			prevHeaders = append(prevHeaders, inHeaders[i])
 			rightBits, err := p.DiffCalcFunction(prevHeaders, height+int32(i), p)
 			if err != nil {
-				return 0, fmt.Errorf("Error calculating Block %d %s difficuly. %s",
+				log.Println(err)
+				return 0, fmt.Errorf("Error calculating Block %d %s difficulty. %s",
 					int(height)+i, hdr.BlockHash().String(), err.Error())
 			}
 
 			// vertcoin diff adjustment not yet implemented
 			// TODO - get rid of coin specific workaround
 			if hdr.Bits != rightBits && (p.Name != "vtctest" && p.Name != "vtc") {
-				return 0, fmt.Errorf("Block %d %s incorrect difficuly.  Read %x, expect %x",
+				return 0, fmt.Errorf("Block %d %s incorrect difficulty.  Read %x, expect %x",
 					int(height)+i, hdr.BlockHash().String(), hdr.Bits, rightBits)
 			}
 		}
