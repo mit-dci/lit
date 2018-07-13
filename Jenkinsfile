@@ -23,8 +23,12 @@ pipeline {
     }
     stage('Integration Tests') {
       steps {
-        sh 'python3 test/test_basic.py -c reg --dumplogs'
-        sh 'python3 test/test_break.py -c reg --dumplogs'
+        try {
+          sh 'python3 test/test_basic.py -c reg --dumplogs'
+          sh 'python3 test/test_break.py -c reg --dumplogs'
+        } catch (Exception e) {
+          currentBuild.result = 'UNSTABLE'
+        }
       }
     }
     stage('Package') {
