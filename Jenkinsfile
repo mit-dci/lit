@@ -16,9 +16,15 @@ pipeline {
         sh 'make lit-af'
       }
     }
-    stage('Test') {
+    stage('Unit Tests') {
       steps {
-        sh 'make test with-python=true'
+        sh './gotests.sh'
+      }
+    }
+    stage('Integration Tests') {
+      steps {
+        sh 'python3 test/test_basic.py -c reg --dumplogs'
+        sh 'python3 test/test_break.py -c reg --dumplogs'
       }
     }
     stage('Package') {
