@@ -5,9 +5,9 @@ import (
 	"log"
 
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
-	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/wire"
 
 	"github.com/boltdb/bolt"
 )
@@ -111,6 +111,12 @@ func (w *WatchTower) OpenDB(filepath string) error {
 // Probably need some way to prevent overwrites.
 func (w *WatchTower) NewChannel(m lnutil.WatchDescMsg) error {
 
+	// exit if we didn't enable watchtower.
+	if w.WatchDB == nil {
+		fmt.Println("Node sending info thinking we are a watchtower, when we aren't")
+		return fmt.Errorf("Not a watchtower, can't keep track.")
+	}
+
 	// quick check if we support the cointype
 	_, ok := w.Hooks[m.CoinType]
 	if !ok {
@@ -172,6 +178,11 @@ func (w *WatchTower) NewChannel(m lnutil.WatchDescMsg) error {
 // AddMsg adds a new message describing a penalty tx to the db.
 // optimization would be to add a bunch of messages at once.  Not a huge speedup though.
 func (w *WatchTower) UpdateChannel(m lnutil.WatchStateMsg) error {
+
+	if w.WatchDB == nil {
+		fmt.Println("Node sending info thinking we are a watchtower, when we aren't")
+		return fmt.Errorf("Not a watchtower, can't keep track.")
+	}
 
 	return w.WatchDB.Update(func(btx *bolt.Tx) error {
 
@@ -241,6 +252,11 @@ func (w *WatchTower) UpdateChannel(m lnutil.WatchStateMsg) error {
 
 // TODO implement DeleteChannel.  Would be nice to delete old channels.
 func (w *WatchTower) DeleteChannel(m lnutil.WatchDelMsg) error {
+
+	if w.WatchDB == nil {
+		fmt.Println("Node sending info thinking we are a watchtower, when we aren't")
+		return fmt.Errorf("Not a watchtower, can't keep track.")
+	}
 	return nil
 }
 
