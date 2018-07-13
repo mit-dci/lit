@@ -4,10 +4,10 @@ import (
 	"log"
 	"path/filepath"
 
-	"github.com/adiabat/btcd/chaincfg/chainhash"
-	"github.com/adiabat/btcd/wire"
+	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/wire"
 )
 
 // ChainHook is an interface which provides access to a blockchain for the
@@ -34,7 +34,7 @@ type ChainHook interface {
 
 	// Note that for reorgs, the height chan just sends a lower height than you
 	// already have, and that means "reorg back!"
-	Start(height int32, host, path string, params *coinparam.Params) (
+	Start(height int32, host, path string, proxyURL string, params *coinparam.Params) (
 		chan lnutil.TxAndHeight, chan int32, error)
 
 	// The Register functions send information to the ChainHook about what txs to
@@ -85,12 +85,13 @@ type ChainHook interface {
 // --- implementation of ChainHook interface ----
 
 func (s *SPVCon) Start(
-	startHeight int32, host, path string, params *coinparam.Params) (
+	startHeight int32, host, path string, proxyURL string, params *coinparam.Params) (
 	chan lnutil.TxAndHeight, chan int32, error) {
 
 	// These can be set before calling Start()
 	s.HardMode = true
 	s.Ironman = false
+	s.ProxyURL = proxyURL
 
 	s.Param = params
 

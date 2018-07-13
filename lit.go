@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/mit-dci/lit/coinparam"
-	"github.com/mit-dci/lit/litbamf"
 	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/qln"
@@ -30,14 +29,17 @@ type config struct { // define a struct for usage with go-flags
 	ConfigFile string
 
 	// proxy
-	ProxyURL string `long:"proxy" description:"SOCKS5 proxy to use for communicating with the network"`
+	ProxyURL      string `long:"proxy" description:"SOCKS5 proxy to use for communicating with the network"`
+	LitProxyURL   string `long:"litproxy" description:"SOCKS5 proxy to use for Lit's network communications. Overridden by the proxy flag."`
+	ChainProxyURL string `long:"chainproxy" description:"SOCKS5 proxy to use for Wallit's network communications. Overridden by the proxy flag."`
+
 	//UPnP port forwarding and NAT Traversal
 	Nat string `long:"nat" description:"Toggle upnp or pmp NAT Traversal NAT Punching"`
-	//resync and twoer config
+	//resync and tower config
 	ReSync bool `short:"r" long:"reSync" description:"Resync from the given tip."`
 	Tower  bool `long:"tower" description:"Watchtower: Run a watching node"`
 	Hard   bool `short:"t" long:"hard" description:"Flag to set networks."`
-
+  
 	Verbose bool `short:"v" long:"verbose" description:"Set verbosity to true."`
 	// rpc server config
 	Rpcport uint16 `short:"p" long:"rpcport" description:"Set RPC port to connect to"`
@@ -89,7 +91,8 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	if !lnutil.NopeString(conf.Reghost) {
 		p := &coinparam.RegressionNetParams
 		fmt.Printf("reg: %s\n", conf.Reghost)
-		err = node.LinkBaseWallet(key, 120, conf.ReSync, conf.Tower, conf.Reghost, p)
+		err = node.LinkBaseWallet(key, 120, conf.ReSync,
+			conf.Tower, conf.Reghost, conf.ChainProxyURL, p)
 		if err != nil {
 			return err
 		}
@@ -99,7 +102,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 		p := &coinparam.TestNet3Params
 		err = node.LinkBaseWallet(
 			key, 1256000, conf.ReSync, conf.Tower,
-			conf.Tn3host, p)
+			conf.Tn3host, conf.ChainProxyURL, p)
 		if err != nil {
 			return err
 		}
@@ -107,7 +110,8 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	// try litecoin regtest
 	if !lnutil.NopeString(conf.Litereghost) {
 		p := &coinparam.LiteRegNetParams
-		err = node.LinkBaseWallet(key, 120, conf.ReSync, conf.Tower, conf.Litereghost, p)
+		err = node.LinkBaseWallet(key, 120, conf.ReSync,
+			conf.Tower, conf.Litereghost, conf.ChainProxyURL, p)
 		if err != nil {
 			return err
 		}
@@ -117,7 +121,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 		p := &coinparam.LiteCoinTestNet4Params
 		err = node.LinkBaseWallet(
 			key, p.StartHeight, conf.ReSync, conf.Tower,
-			conf.Lt4host, p)
+			conf.Lt4host, conf.ChainProxyURL, p)
 		if err != nil {
 			return err
 		}
@@ -127,7 +131,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 		p := &coinparam.VertcoinTestNetParams
 		err = node.LinkBaseWallet(
 			key, 25000, conf.ReSync, conf.Tower,
-			conf.Tvtchost, p)
+			conf.Tvtchost, conf.ChainProxyURL, p)
 		if err != nil {
 			return err
 		}
@@ -137,7 +141,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 		p := &coinparam.VertcoinParams
 		err = node.LinkBaseWallet(
 			key, p.StartHeight, conf.ReSync, conf.Tower,
-			conf.Vtchost, p)
+			conf.Vtchost, conf.ChainProxyURL, p)
 		if err != nil {
 			return err
 		}
@@ -160,9 +164,14 @@ func main() {
 
 	key := litSetup(&conf)
 
+	if conf.ProxyURL != "" {
+		conf.LitProxyURL = conf.ProxyURL
+		conf.ChainProxyURL = conf.ProxyURL
+	}
+
 	// Setup LN node.  Activate Tower if in hard mode.
 	// give node and below file pathof lit home directory
-	node, err := qln.NewLitNode(key, conf.LitHomeDir, conf.TrackerURL, conf.ProxyURL, conf.Nat)
+	node, err := qln.NewLitNode(key, conf.LitHomeDir, conf.TrackerURL, conf.LitProxyURL, conf.Nat)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -178,14 +187,13 @@ func main() {
 	rpcl.OffButton = make(chan bool, 1)
 
 	go litrpc.RPCListen(rpcl, conf.Rpchost, conf.Rpcport)
-	litbamf.BamfListen(conf.Rpcport, conf.LitHomeDir)
 
 	if conf.AutoReconnect {
 		node.AutoReconnect(conf.AutoListenPort, conf.AutoReconnectInterval)
 	}
 
 	<-rpcl.OffButton
-	fmt.Printf("Got stop request\n")
+	log.Printf("Got stop request\n")
 	time.Sleep(time.Second)
 
 	return

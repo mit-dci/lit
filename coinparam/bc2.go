@@ -3,8 +3,8 @@ package coinparam
 import (
 	"time"
 
-	"github.com/adiabat/btcd/chaincfg/chainhash"
-	"github.com/adiabat/btcd/wire"
+	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
+	"github.com/mit-dci/lit/wire"
 )
 
 // BC2NetParams are the parameters for the BC2 test network.

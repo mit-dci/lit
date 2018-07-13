@@ -5,9 +5,9 @@ import (
 	"log"
 	"sort"
 
-	"github.com/adiabat/btcd/btcec"
-	"github.com/adiabat/btcd/chaincfg/chainhash"
-	"github.com/adiabat/btcd/wire"
+	"github.com/mit-dci/lit/btcutil/btcec"
+	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
+	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"

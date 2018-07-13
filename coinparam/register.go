@@ -6,8 +6,8 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/adiabat/btcd/chaincfg/chainhash"
-	"github.com/adiabat/btcd/wire"
+	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
+	"github.com/mit-dci/lit/wire"
 )
 
 // Params defines a Bitcoin network by its parameters.  These parameters may be

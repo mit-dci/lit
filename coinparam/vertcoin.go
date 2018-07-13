@@ -3,8 +3,8 @@ package coinparam
 import (
 	"time"
 
-	"github.com/adiabat/btcd/chaincfg/chainhash"
-	"github.com/adiabat/btcd/wire"
+	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
+	"github.com/mit-dci/lit/wire"
 
 	"github.com/bitgoin/lyra2rev2"
 	"github.com/vertcoin/lyra2re"

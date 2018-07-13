@@ -1,10 +1,10 @@
 package wallit
 
 import (
-	"fmt"
+	"log"
 
-	"github.com/adiabat/btcd/btcec"
-	"github.com/adiabat/btcutil"
+	"github.com/mit-dci/lit/btcutil/btcec"
+	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/portxo"
 )
 
@@ -28,7 +28,7 @@ func (w *Wallit) PathPrivkey(kg portxo.KeyGen) *btcec.PrivateKey {
 	}
 	priv, err := kg.DerivePrivateKey(w.rootPrivKey)
 	if err != nil {
-		fmt.Printf("PathPrivkey err %s", err.Error())
+		log.Printf("PathPrivkey err %s", err.Error())
 		return nil
 	}
 	return priv

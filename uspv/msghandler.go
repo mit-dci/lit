@@ -3,8 +3,8 @@ package uspv
 import (
 	"log"
 
-	"github.com/adiabat/btcd/wire"
-	"github.com/adiabat/btcutil/bloom"
+	"github.com/mit-dci/lit/wire"
+	"github.com/mit-dci/lit/btcutil/bloom"
 	"github.com/mit-dci/lit/lnutil"
 )
 
@@ -184,7 +184,7 @@ func (s *SPVCon) TxHandler(tx *wire.MsgTx) {
 	//	}
 	//	if len(dubs) > 0 {
 	//		for i, dub := range dubs {
-	//			fmt.Printf("dub %d known tx %s and new tx %s are exclusive!!!\n",
+	//			log.Printf("dub %d known tx %s and new tx %s are exclusive!!!\n",
 	//				i, dub.String(), m.TxSha().String())
 	//		}
 	//	}

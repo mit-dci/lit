@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/adiabat/btcd/chaincfg/chainhash"
-	"github.com/adiabat/btcd/txscript"
-	"github.com/adiabat/btcd/wire"
-	"github.com/btcsuite/fastsha256"
+	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
+	"github.com/mit-dci/lit/btcutil/txscript"
+	"github.com/mit-dci/lit/wire"
+	"github.com/mit-dci/lit/crypto/fastsha256"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/sig64"
@@ -182,7 +182,7 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 
 	// if pkh is mine, grab it.
 	if pkhIsMine {
-		fmt.Printf("got PKH output from channel close")
+		log.Printf("got PKH output from channel close")
 		var pkhTxo portxo.PorTxo // create new utxo and copy into it
 
 		pkhTxo.Op.Hash = txid
@@ -209,7 +209,7 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 		comNum = GetStateIdxFromTx(tx, q.GetChanHint(true))
 	}
 	if comNum > q.State.StateIdx { // future state, uhoh.  Crash for now.
-		fmt.Printf("indicated state %d but we know up to %d",
+		log.Printf("indicated state %d but we know up to %d",
 			comNum, q.State.StateIdx)
 		return cTxos, nil
 	}
@@ -230,10 +230,10 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 		// script check.  redundant / just in case
 		genSH := fastsha256.Sum256(script)
 		if !bytes.Equal(genSH[:], tx.TxOut[shIdx].PkScript[2:34]) {
-			fmt.Printf("got different observed and generated SH scripts.\n")
-			fmt.Printf("in %s:%d, see %x\n", txid, shIdx, tx.TxOut[shIdx].PkScript)
-			fmt.Printf("generated %x \n", genSH)
-			fmt.Printf("revokable pub %x\ntimeout pub %x\n", revokePub, timeoutPub)
+			log.Printf("got different observed and generated SH scripts.\n")
+			log.Printf("in %s:%d, see %x\n", txid, shIdx, tx.TxOut[shIdx].PkScript)
+			log.Printf("generated %x \n", genSH)
+			log.Printf("revokable pub %x\ntimeout pub %x\n", revokePub, timeoutPub)
 		}
 
 		// create the ScriptHash, timeout portxo.
@@ -284,10 +284,10 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 		// script check
 		wshScript := lnutil.P2WSHify(script)
 		if !bytes.Equal(wshScript[:], tx.TxOut[shIdx].PkScript) {
-			fmt.Printf("got different observed and generated SH scripts.\n")
-			fmt.Printf("in %s:%d, see %x\n", txid, shIdx, tx.TxOut[shIdx].PkScript)
-			fmt.Printf("generated %x \n", wshScript)
-			fmt.Printf("revokable pub %x\ntimeout pub %x\n", revokePub, timeoutPub)
+			log.Printf("got different observed and generated SH scripts.\n")
+			log.Printf("in %s:%d, see %x\n", txid, shIdx, tx.TxOut[shIdx].PkScript)
+			log.Printf("generated %x \n", wshScript)
+			log.Printf("revokable pub %x\ntimeout pub %x\n", revokePub, timeoutPub)
 		}
 
 		// myElkHashR added to HAKD private key

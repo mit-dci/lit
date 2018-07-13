@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/adiabat/btcd/chaincfg/chainhash"
-	"github.com/adiabat/btcd/wire"
+	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/wire"
 
 	"github.com/boltdb/bolt"
 )
@@ -111,6 +111,12 @@ func (w *WatchTower) OpenDB(filepath string) error {
 // Probably need some way to prevent overwrites.
 func (w *WatchTower) NewChannel(m lnutil.WatchDescMsg) error {
 
+	// exit if we didn't enable watchtower.
+	if w.WatchDB == nil {
+		fmt.Println("Node sending info thinking we are a watchtower, when we aren't")
+		return fmt.Errorf("Not a watchtower, can't keep track.")
+	}
+
 	// quick check if we support the cointype
 	_, ok := w.Hooks[m.CoinType]
 	if !ok {
@@ -173,6 +179,11 @@ func (w *WatchTower) NewChannel(m lnutil.WatchDescMsg) error {
 // optimization would be to add a bunch of messages at once.  Not a huge speedup though.
 func (w *WatchTower) UpdateChannel(m lnutil.WatchStateMsg) error {
 
+	if w.WatchDB == nil {
+		fmt.Println("Node sending info thinking we are a watchtower, when we aren't")
+		return fmt.Errorf("Not a watchtower, can't keep track.")
+	}
+
 	return w.WatchDB.Update(func(btx *bolt.Tx) error {
 
 		// first get the channel bucket, update the elkrem and read the idx
@@ -197,7 +208,7 @@ func (w *WatchTower) UpdateChannel(m lnutil.WatchStateMsg) error {
 		if err != nil {
 			return err
 		}
-		// fmt.Printf("added elkrem %x at index %d OK\n", cm.Elk[:], elkr.UpTo())
+		// log.Printf("added elkrem %x at index %d OK\n", cm.Elk[:], elkr.UpTo())
 
 		// get state number, after elk insertion.  also convert to 8 bytes.
 		stateNumBytes := lnutil.U64tB(elkr.UpTo())
@@ -241,6 +252,11 @@ func (w *WatchTower) UpdateChannel(m lnutil.WatchStateMsg) error {
 
 // TODO implement DeleteChannel.  Would be nice to delete old channels.
 func (w *WatchTower) DeleteChannel(m lnutil.WatchDelMsg) error {
+
+	if w.WatchDB == nil {
+		fmt.Println("Node sending info thinking we are a watchtower, when we aren't")
+		return fmt.Errorf("Not a watchtower, can't keep track.")
+	}
 	return nil
 }
 

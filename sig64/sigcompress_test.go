@@ -5,8 +5,10 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/adiabat/btcd/btcec"
-	"github.com/adiabat/btcd/chaincfg/chainhash"
+	"github.com/mit-dci/lit/btcutil/btcec"
+	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
+	"github.com/mit-dci/lit/btcutil/txscript"
+	"github.com/mit-dci/lit/wire"
 )
 
 var (
@@ -67,4 +69,40 @@ func TestHardCoded(t *testing.T) {
 	r3 := SigDecompress(c3)
 	t.Logf("dec1:\n%x\n", r3)
 
+}
+
+// TestShortSignature is short signature case
+func TestShortSignature(t *testing.T) {
+	tx := wire.NewMsgTx()
+	hash, _ := chainhash.NewHashFromStr("000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f")
+	op := wire.NewOutPoint(hash, 0)
+	txin := wire.NewTxIn(op, nil, nil)
+	tx.AddTxIn(txin)
+	pkScript := []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21}
+	txout := wire.NewTxOut(100000000, pkScript)
+	tx.AddTxOut(txout)
+	sigHashes := txscript.NewTxSigHashes(tx)
+	idx := 0
+	subScript := []byte{0x14, 0x98, 0x97, 0xfd, 0x2b, 0x98, 0x0f, 0xec, 0xca, 0xeb, 0x9c, 0x63, 0xc2, 0x74, 0x9b, 0x38, 0x9c, 0x77, 0x2a, 0x9d, 0x75}
+	amt := int64(100001000)
+	hashType := txscript.SigHashAll
+	key, _ := btcec.PrivKeyFromBytes(btcec.S256(), []byte("privatekey"))
+	sign, err := txscript.RawTxInWitnessSignature(tx, sigHashes, idx, amt, subScript, hashType, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sign = sign[:len(sign)-1]
+	t.Logf("sign:%x", sign)
+	csig, err := SigCompress(sign)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("csig:%x", csig)
+	dsig := SigDecompress(csig)
+	t.Logf("dsig:%x", dsig)
+	for i := range dsig {
+		if sign[i] != dsig[i] {
+			t.Fatalf("unmatch SigCompress/SigDecompress:%x/%x", sign, dsig)
+		}
+	}
 }

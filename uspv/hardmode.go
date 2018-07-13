@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"log"
 
-	"github.com/adiabat/btcd/chaincfg/chainhash"
-	"github.com/adiabat/btcd/wire"
-	"github.com/adiabat/btcutil/bloom"
+	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
+	"github.com/mit-dci/lit/wire"
+	"github.com/mit-dci/lit/btcutil/bloom"
 	"github.com/mit-dci/lit/lnutil"
 )
 

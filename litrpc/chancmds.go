@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/adiabat/btcutil"
+	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/qln"
 	"github.com/mit-dci/lit/consts"
@@ -125,6 +125,127 @@ func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
 	return nil
 }
 
+// ------------------------- dual fund
+type DualFundArgs struct {
+	Peer        uint32 // who to make the channel with
+	CoinType    uint32 // what coin to use
+	OurAmount   int64  // what amount we will fund
+	TheirAmount int64  // what amount we request them to fund
+}
+
+func (r *LitRPC) DualFundChannel(args DualFundArgs, reply *StatusReply) error {
+	var err error
+	if r.Node.InProgDual != nil && r.Node.InProgDual.PeerIdx != 0 {
+		return fmt.Errorf("channel with peer %d not done yet", r.Node.InProgDual.PeerIdx)
+	}
+
+	if args.OurAmount <= 0 || args.TheirAmount <= 0 {
+		return fmt.Errorf("Need both our and their amount to be more than zero")
+	}
+	if args.OurAmount+args.TheirAmount < 1000000 { // limit for now
+		return fmt.Errorf("Min channel capacity 1M sat")
+	}
+
+	wal := r.Node.SubWallet[args.CoinType]
+	if wal == nil {
+		return fmt.Errorf("No wallet of cointype %d linked", args.CoinType)
+	}
+
+	nowHeight := wal.CurrentHeight()
+
+	// see if we have enough money before calling the funding function.  Not
+	// strictly required but it's better to fail here instead of after net traffic.
+	// also assume a fee of like 50K sat just to be safe
+	var allPorTxos portxo.TxoSliceByAmt
+	allPorTxos, err = wal.UtxoDump()
+	if err != nil {
+		return err
+	}
+
+	spendable := allPorTxos.SumWitness(nowHeight)
+
+	if args.OurAmount > spendable-50000 {
+		return fmt.Errorf("Our amount to fund is %d but only %d available for channel creation",
+			args.OurAmount, spendable-50000)
+	}
+
+	result, err := r.Node.DualFundChannel(
+		args.Peer, args.CoinType, args.OurAmount, args.TheirAmount)
+	if err != nil {
+
+		return err
+	}
+
+	if !result.Accepted {
+		return fmt.Errorf("Peer declined the funding request for reason %d", result.DeclineReason)
+	}
+
+	reply.Status = fmt.Sprintf("funded channel %d", result.ChannelId)
+
+	return nil
+}
+
+type DualFundDeclineArgs struct {
+	// none
+}
+
+func (r *LitRPC) DualFundDecline(args DualFundDeclineArgs, reply *StatusReply) error {
+	peerIdx := r.Node.InProgDual.PeerIdx
+
+	if peerIdx == 0 || r.Node.InProgDual.InitiatedByUs {
+		return fmt.Errorf("There is no pending request to reject")
+	}
+
+	r.Node.DualFundDecline(0x01)
+
+	reply.Status = fmt.Sprintf("Succesfully declined funding request from peer %d", peerIdx)
+
+	return nil
+}
+
+type DualFundAcceptArgs struct {
+	// none
+}
+
+func (r *LitRPC) DualFundAccept(args DualFundAcceptArgs, reply *StatusReply) error {
+	peerIdx := r.Node.InProgDual.PeerIdx
+
+	if peerIdx == 0 || r.Node.InProgDual.InitiatedByUs {
+		return fmt.Errorf("There is no pending request to reject")
+	}
+
+	r.Node.DualFundAccept()
+
+	reply.Status = fmt.Sprintf("Succesfully accepted funding request from peer %d", peerIdx)
+
+	return nil
+}
+
+type PendingDualFundRequestsArgs struct {
+	// none
+}
+
+type PendingDualFundReply struct {
+	Pending         bool
+	PeerIdx         uint32
+	CoinType        uint32
+	TheirAmount     int64
+	RequestedAmount int64
+}
+
+func (r *LitRPC) PendingDualFund(args PendingDualFundRequestsArgs, reply *PendingDualFundReply) error {
+
+	if r.Node.InProgDual.PeerIdx != 0 && !r.Node.InProgDual.InitiatedByUs {
+		reply.Pending = true
+		reply.TheirAmount = r.Node.InProgDual.TheirAmount
+		reply.RequestedAmount = r.Node.InProgDual.OurAmount
+		reply.PeerIdx = r.Node.InProgDual.PeerIdx
+		reply.CoinType = r.Node.InProgDual.CoinType
+	}
+
+	return nil
+}
+
 // ------------------------- statedump
 type StateDumpArgs struct {
 	// none
@@ -165,7 +286,7 @@ func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 			"can't push %d max is 1 coin (100000000), min is 1", args.Amt)
 	}
 
-	fmt.Printf("push %d to chan %d with data %x\n", args.Amt, args.ChanIdx, args.Data)
+	log.Printf("push %d to chan %d with data %x\n", args.Amt, args.ChanIdx, args.Data)
 
 	// load the whole channel from disk just to see who the peer is
 	// (pretty inefficient)
@@ -195,7 +316,7 @@ func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 			dummyqc.Peer(), dummyqc.Idx())
 	}
 
-	fmt.Printf("channel %s\n", qc.Op.String())
+	log.Printf("channel %s\n", qc.Op.String())
 
 	if qc.CloseData.Closed {
 		return fmt.Errorf("Channel %d already closed by tx %s",

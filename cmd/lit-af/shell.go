@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"strconv"
 
 	"io/ioutil"
@@ -123,6 +124,27 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		return parseErr(err, "fund")
 	}
 
+	// mutually fund and create a new channel
+	if cmd == "dualfund" {
+		if (len(args) > 0 && args[0] == "-h") || len(args) == 0 {
+			err = lc.DualFund(args)
+		} else {
+			if args[0] == "start" {
+				err = lc.DualFundChannel(args[1:])
+			} else if args[0] == "decline" {
+				err = lc.DualFundDecline(args[1:])
+			} else if args[0] == "accept" {
+				err = lc.DualFundAccept(args[1:])
+			} else {
+				fmt.Fprintf(color.Output, "dualfund error - unrecognized subcommand %s\n", args[0])
+			}
+		}
+
+		if err != nil {
+			fmt.Fprintf(color.Output, "dualfund error: %s\n", err)
+		}
+		return nil
+	}
 	// cooperative close of a channel
 	if cmd == "close" {
 		err = lc.CloseChannel(args)
@@ -205,6 +227,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	tReply := new(litrpc.TxoListReply)
 	bReply := new(litrpc.BalanceReply)
 	lReply := new(litrpc.ListeningPortsReply)
+	dfReply := new(litrpc.PendingDualFundReply)
 
 	err := lc.Call("LitRPC.ListConnections", nil, pReply)
 	if err != nil {
@@ -213,8 +236,8 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	if len(pReply.Connections) > 0 {
 		fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Peers:"))
 		for _, peer := range pReply.Connections {
-			fmt.Fprintf(color.Output, "%s %s\n",
-				lnutil.White(peer.PeerNumber), peer.RemoteHost)
+			fmt.Fprintf(color.Output, "%s %s (%s)\n",
+				lnutil.White(peer.PeerNumber), peer.RemoteHost, peer.LitAdr)
 		}
 	}
 
@@ -226,11 +249,39 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Channels:"))
 	}
 
+	sort.Slice(cReply.Channels, func(i, j int) bool {
+		return cReply.Channels[i].Height < cReply.Channels[j].Height
+	})
+
+	var closedChannels []litrpc.ChannelInfo
+	var openChannels []litrpc.ChannelInfo
 	for _, c := range cReply.Channels {
 		if c.Closed {
-			fmt.Fprintf(color.Output, lnutil.Red("Closed  "))
+			closedChannels = append(closedChannels, c)
 		} else {
-			fmt.Fprintf(color.Output, lnutil.Green("Channel "))
+			openChannels = append(openChannels, c)
+		}
+	}
+
+	for _, c := range closedChannels {
+		fmt.Fprintf(color.Output, lnutil.Red("Closed:       "))
+		fmt.Fprintf(
+			color.Output,
+			"%s (peer %d) type %d %s\n\t cap: %s bal: %s h: %d state: %d data: %x pkh: %x\n",
+			lnutil.White(c.CIdx), c.PeerIdx, c.CoinType,
+			lnutil.OutPoint(c.OutPoint),
+			lnutil.SatoshiColor(c.Capacity), lnutil.SatoshiColor(c.MyBalance),
+			c.Height, c.StateNum, c.Data, c.Pkh)
+	}
+
+	for _, c := range openChannels {
+		if c.Height == -1 {
+			c := color.New(color.FgGreen).Add(color.Underline)
+			c.Printf("Unconfirmed:")
+			fmt.Fprintf(color.Output, lnutil.Green("  "))
+			//needed for preventing the underline from extending
+		} else {
+			fmt.Fprintf(color.Output, lnutil.Green("Open:         "))
 		}
 		fmt.Fprintf(
 			color.Output,
@@ -241,7 +292,23 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 			c.Height, c.StateNum, c.Data, c.Pkh)
 	}
 
+	err = lc.Call("LitRPC.PendingDualFund", nil, dfReply)
+	if err != nil {
+		return err
+	}
+	if dfReply.Pending {
+		fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Pending Dual Funding Request:"))
+		fmt.Fprintf(
+			color.Output, "\t%s %d\t%s %d\t%s %s\t%s %s\n\n",
+			lnutil.Header("Peer:"), dfReply.PeerIdx,
+			lnutil.Header("Type:"), dfReply.CoinType,
+			lnutil.Header("Their Amt:"), lnutil.SatoshiColor(dfReply.TheirAmount),
+			lnutil.Header("Req Amt:"), lnutil.SatoshiColor(dfReply.RequestedAmount),
+		)
+	}
+
 	err = lc.Call("LitRPC.TxoList", nil, tReply)
+
 	if err != nil {
 		return err
 	}
@@ -250,7 +317,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	}
 	for i, t := range tReply.Txos {
 		fmt.Fprintf(color.Output, "%d %s h:%d amt:%s %s %s",
-			i, lnutil.OutPoint(t.OutPoint), t.Height,
+			i+1, lnutil.OutPoint(t.OutPoint), t.Height,
 			lnutil.SatoshiColor(t.Amt), t.KeyPath, t.CoinType)
 		if t.Delay != 0 {
 			fmt.Fprintf(color.Output, " delay: %d", t.Delay)
@@ -278,7 +345,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	}
 	fmt.Fprintf(color.Output, lnutil.Header("\tAddresses:\n"))
 	for i, a := range aReply.WitAddresses {
-		fmt.Fprintf(color.Output, "%d %s (%s)\n", i,
+		fmt.Fprintf(color.Output, "%d %s (%s)\n", i+1,
 			lnutil.Address(a), lnutil.Address(aReply.LegacyAddresses[i]))
 	}
 
@@ -331,18 +398,20 @@ func printHelp(commands []*Command) {
 func printCointypes() {
 	for k, v := range coinparam.RegisteredNets {
 		fmt.Fprintf(color.Output, "CoinType: %s\n", strconv.Itoa(int(k)))
-		fmt.Fprintf(color.Output, "└────── Name: %s,\tBech32Prefix: %s\n", v.Name, v.Bech32Prefix)
+		fmt.Fprintf(color.Output, "└────── Name: %-13sBech32Prefix: %s\n\n", v.Name + ",", v.Bech32Prefix)
 	}
 }
 
 func (lc *litAfClient) Help(textArgs []string) error {
 	if len(textArgs) == 0 {
+
 		fmt.Fprintf(color.Output, lnutil.Header("Commands:\n"))
-		listofCommands := []*Command{helpCommand, sayCommand, lsCommand, addressCommand, sendCommand, fanCommand, sweepCommand, lisCommand, conCommand, dlcCommand, fundCommand, watchCommand, pushCommand, closeCommand, breakCommand, historyCommand, offCommand, exitCommand}
+		listofCommands := []*Command{helpCommand, sayCommand, lsCommand, addressCommand, sendCommand, fanCommand, sweepCommand, lisCommand, conCommand, dlcCommand, fundCommand, dualFundCommand, watchCommand, pushCommand, closeCommand, breakCommand, historyCommand, offCommand, exitCommand}
 		printHelp(listofCommands)
 		fmt.Fprintf(color.Output, "\n\n")
 		fmt.Fprintf(color.Output, lnutil.Header("Coins:\n"))
 		printCointypes()
+
 		return nil
 	}
 

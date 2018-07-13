@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/adiabat/btcd/blockchain"
-	"github.com/adiabat/btcd/chaincfg/chainhash"
-	"github.com/adiabat/btcd/wire"
-	"github.com/adiabat/btcutil"
+	"github.com/mit-dci/lit/btcutil/blockchain"
+	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
+	"github.com/mit-dci/lit/wire"
+	"github.com/mit-dci/lit/btcutil"
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
@@ -245,7 +245,7 @@ func (w *Wallit) GetAllUtxos() ([]*portxo.PorTxo, error) {
 
 			// 0 len v means it's a watch-only utxo, not spendable
 			if len(v) == 0 {
-				// fmt.Printf("not nil, 0 len slice\n")
+				// log.Printf("not nil, 0 len slice\n")
 				return nil
 			}
 
@@ -482,7 +482,7 @@ func (w *Wallit) IngestMany(txs []*wire.MsgTx, height int32) (uint32, error) {
 				keygenBytes := adrb.Get(lnutil.KeyHashFromPkScript(out.PkScript))
 				if keygenBytes != nil {
 					// address matches something we're watching, cool.
-					// fmt.Printf("txout script:%x matched kg: %x\n", out.PkScript, keygenBytes)
+					// log.Printf("txout script:%x matched kg: %x\n", out.PkScript, keygenBytes)
 
 					// build new portxo
 					txob, err := NewPorTxoBytesFromKGBytes(
@@ -537,7 +537,7 @@ func (w *Wallit) IngestMany(txs []*wire.MsgTx, height int32) (uint32, error) {
 				if len(v) == 0 && cap(w.OPEventChan) != 0 {
 					// confirmation of unknown / watch only outpoint, send up to ln
 					// confirmation match detected; return OP event with nil tx
-					// fmt.Printf("|||| zomg match  ")
+					// log.Printf("|||| zomg match  ")
 					hitTxs[i] = true // flag to save tx in db
 
 					var opArr [36]byte
@@ -560,7 +560,7 @@ func (w *Wallit) IngestMany(txs []*wire.MsgTx, height int32) (uint32, error) {
 		for i, curOP := range spentOPs {
 			v := dufb.Get(curOP[:])
 			if v != nil && len(v) == 0 && cap(w.OPEventChan) != 0 {
-				// fmt.Printf("|||watch only here zomg\n")
+				// log.Printf("|||watch only here zomg\n")
 				hitTxs[spentTxIdx[i]] = true // just save everything
 				op := lnutil.OutPointFromBytes(curOP)
 				// build new outpoint event

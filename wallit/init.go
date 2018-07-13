@@ -6,18 +6,18 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/adiabat/btcd/wire"
-	"github.com/adiabat/btcutil/hdkeychain"
 	"github.com/boltdb/bolt"
+	"github.com/mit-dci/lit/btcutil/hdkeychain"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/powless"
 	"github.com/mit-dci/lit/uspv"
+	"github.com/mit-dci/lit/wire"
 )
 
 func NewWallit(
 	rootkey *hdkeychain.ExtendedKey, birthHeight int32, resync bool,
-	spvhost, path string, p *coinparam.Params) *Wallit {
+	spvhost, path string, proxyURL string, p *coinparam.Params) *Wallit {
 
 	var w Wallit
 	w.rootPrivKey = rootkey
@@ -55,7 +55,7 @@ func NewWallit(
 	}
 	// get height
 	height := w.CurrentHeight()
-	log.Printf("DB height %d\n", height)
+	log.Printf("DB current height %d\n", height)
 
 	// bring height up to birthheight, or back down in case of resync
 	if height < birthHeight || resync {
@@ -64,7 +64,7 @@ func NewWallit(
 	}
 
 	log.Printf("DB height %d\n", height)
-	incomingTx, incomingBlockheight, err := w.Hook.Start(height, spvhost, wallitpath, p)
+	incomingTx, incomingBlockheight, err := w.Hook.Start(height, spvhost, wallitpath, proxyURL, p)
 	if err != nil {
 		log.Printf("NewWallit Hook.Start crash  %s ", err.Error())
 	}

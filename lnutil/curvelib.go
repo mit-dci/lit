@@ -6,8 +6,8 @@ import (
 	"math/big"
 	"sort"
 
-	"github.com/adiabat/btcd/btcec"
-	"github.com/adiabat/btcd/chaincfg/chainhash"
+	"github.com/mit-dci/lit/btcutil/btcec"
+	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 )
 
 // PrivKeyAddBytes adds bytes to a private key.

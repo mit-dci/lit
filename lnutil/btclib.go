@@ -5,11 +5,11 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/adiabat/btcd/blockchain"
-	"github.com/adiabat/btcd/txscript"
-	"github.com/adiabat/btcd/wire"
-	"github.com/adiabat/btcutil"
-	"github.com/btcsuite/fastsha256"
+	"github.com/mit-dci/lit/btcutil/blockchain"
+	"github.com/mit-dci/lit/btcutil/txscript"
+	"github.com/mit-dci/lit/wire"
+	"github.com/mit-dci/lit/btcutil"
+	"github.com/mit-dci/lit/crypto/fastsha256"
 )
 
 // TxAndHeight is just a tx, and the height at which it was confirmed.
