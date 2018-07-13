@@ -377,7 +377,7 @@ const (
 	// HandshakeVersion is the expected version of the brontide handshake.
 	// Any messages that carry a different version will cause the handshake
 	// to abort immediately.
-	HandshakeVersion = byte(0)
+	HandshakeVersion = byte(1)
 
 	// ActOneSize is the size of the packet sent from initiator to
 	// responder in ActOne. The packet consists of a handshake version, an
