@@ -17,12 +17,8 @@ lit: goget
 	@echo "Run \"$(GOBIN)/lit\" to launch lit."
 
 lit-af: goget
-	cd cmd/lit-af ; go build
+	cd cmd/lit-af ; go get ./... ; go build
 	@echo "Run \"$(GOBIN)/cmd/lit-af/lit-af\" to launch lit-af."
-
-glit: goget
-	cd cmd/glit ; go build
-	@echo "Run \"$(GOBIN)/cmd/glit/glit\" to launch glit."
 
 webui:
 	git clone $(WEBUI_REPO); cd webui ; npm install

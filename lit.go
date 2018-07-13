@@ -7,7 +7,6 @@ import (
 
 	flags "github.com/jessevdk/go-flags"
 	"github.com/mit-dci/lit/coinparam"
-	"github.com/mit-dci/lit/litbamf"
 	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/qln"
@@ -168,7 +167,6 @@ func main() {
 	rpcl.OffButton = make(chan bool, 1)
 
 	go litrpc.RPCListen(rpcl, conf.Rpchost, conf.Rpcport)
-	litbamf.BamfListen(conf.Rpcport, conf.LitHomeDir)
 
 	if conf.AutoReconnect {
 		node.AutoReconnect(conf.AutoListenPort, conf.AutoReconnectInterval)
