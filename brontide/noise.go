@@ -508,18 +508,18 @@ func (b *Machine) GenActTwo() ([ActTwoSize]byte, error) {
 // RecvActTwo processes the second packet (act two) sent from the responder to
 // the initiator. A successful processing of this packet authenticates the
 // initiator to the responder.
-func (b *Machine) RecvActTwo(actTwo [ActTwoSize]byte) error {
+func (b *Machine) RecvActTwo(actTwo [ActTwoSize]byte) ([33]byte, error) {
 	var (
 		err error
 		e   [33]byte
 		s   [33]byte
 		p   [16]byte
 	)
-
+	var empty [33]byte
 	// If the handshake version is unknown, then the handshake fails
 	// immediately.
 	if actTwo[0] != HandshakeVersion {
-		return fmt.Errorf("Act Two: invalid handshake version: %v, "+
+		return empty, fmt.Errorf("Act Two: invalid handshake version: %v, "+
 			"only %v is valid, msg=%x", actTwo[0], HandshakeVersion,
 			actTwo[:])
 	}
@@ -531,7 +531,7 @@ func (b *Machine) RecvActTwo(actTwo [ActTwoSize]byte) error {
 	// e
 	b.remoteEphemeral, err = btcec.ParsePubKey(e[:], btcec.S256())
 	if err != nil {
-		return err
+		return empty, err
 	}
 	b.mixHash(b.remoteEphemeral.SerializeCompressed())
 
@@ -542,7 +542,7 @@ func (b *Machine) RecvActTwo(actTwo [ActTwoSize]byte) error {
 	// s
 	b.remoteStatic, err = btcec.ParsePubKey(s[:], btcec.S256())
 	if err != nil {
-		return err
+		return empty, err
 	}
 	b.mixHash(b.remoteStatic.SerializeCompressed())
 
@@ -551,7 +551,7 @@ func (b *Machine) RecvActTwo(actTwo [ActTwoSize]byte) error {
 	b.mixKey(es)
 
 	_, err = b.DecryptAndHash(p[:])
-	return err
+	return s, err
 }
 
 // GenActThree creates the final (act three) packet of the handshake. Act three

@@ -5,10 +5,12 @@ import (
 	"io"
 	"math"
 	"net"
+	"log"
 	"time"
+	"fmt"
 
 	"github.com/mit-dci/lit/btcutil/btcec"
-	//"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/lnutil"
 )
 
 // Conn is an implementation of net.Conn which enforces an authenticated key
@@ -37,6 +39,7 @@ func Dial(localPriv *btcec.PrivateKey, ipAddr string, remotePKH string,
 	var conn net.Conn
 	var err error
 	conn, err = dialer("tcp", ipAddr)
+	log.Println("ipAddr is", ipAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -71,10 +74,17 @@ func Dial(localPriv *btcec.PrivateKey, ipAddr string, remotePKH string,
 		b.conn.Close()
 		return nil, err
 	}
-	if err := b.noise.RecvActTwo(actTwo); err != nil {
+	s, err := b.noise.RecvActTwo(actTwo)
+	if err != nil {
 		b.conn.Close()
 		return nil, err
 	}
+
+	log.Println("Received pubkey", s)
+	if lnutil.LitAdrFromPubkey(s) != remotePKH {
+		return nil, fmt.Errorf("Remote PKH doesn't match. Quitting!")
+	}
+	log.Printf("Received PKH %s matches", lnutil.LitAdrFromPubkey(s))
 
 	// Finally, complete the handshake by sending over our encrypted static
 	// key and execute the final ECDH operation.
