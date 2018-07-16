@@ -1,0 +1,10 @@
+[package]
+name = "lit-af-rs"
+version = "0.1.0"
+authors = ["Trey Del Bonis <j.delbonis.3@gmail.com>"]
+
+[[bin]]
+name = "rs-af"
+path = "main.rs"
+
+[dependencies]
