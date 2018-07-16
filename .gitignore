@@ -1,4 +1,5 @@
 lit
+lit-af
 cmd/lit-af/lit-af
 cmd/glit/glit
 headers.bin
@@ -7,8 +8,9 @@ testkey.hex
 utxo.db
 watch.db
 setup.sh
-
-
+webui/node_modules
+webui/dist
+webui/build
 *.pyc
 
 #Editor temp files

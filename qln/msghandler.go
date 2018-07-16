@@ -45,10 +45,6 @@ func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) er
 	*/
 
 	case 0x60: //Tower Messages
-		//if !nd.Tower.Accepting {
-		//	return fmt.Errorf("Error: Got tower msg from %x but tower disabled\n",
-		//		msg.Peer())
-		//}
 		if msg.MsgType() == lnutil.MSGID_WATCH_DESC {
 			nd.Tower.NewChannel(msg.(lnutil.WatchDescMsg))
 		}
