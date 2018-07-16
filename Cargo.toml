@@ -1,0 +1,4 @@
+[workspace]
+members = [
+	"cmd/lit-af-rs"
+]
