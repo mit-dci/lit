@@ -1,5 +1,6 @@
 lit
 lit-af
+!cmd/lit-af
 cmd/lit-af/lit-af
 cmd/glit/glit
 headers.bin

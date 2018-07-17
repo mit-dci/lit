@@ -868,14 +868,9 @@ func (lc *litAfClient) DlcOfferContract(textArgs []string) error {
 	return nil
 }
 
-func (lc *litAfClient) DlcDeclineContract(textArgs []string) error {
-	stopEx, err := CheckHelpCommand(declineContractCommand, textArgs, 1)
-	if err != nil || stopEx {
-		return err
-	}
-
-	args := new(litrpc.DeclineContractArgs)
-	reply := new(litrpc.DeclineContractArgs)
+func (lc *litAfClient) dlcContractRespond(textArgs []string, aor bool) error {
+	args := new(litrpc.ContractRespondArgs)
+	reply := new(litrpc.ContractRespondReply)
 
 	cIdx, err := strconv.ParseUint(textArgs[0], 10, 64)
 	if err != nil {
@@ -889,9 +884,22 @@ func (lc *litAfClient) DlcDeclineContract(textArgs []string) error {
 		return err
 	}
 
-	fmt.Fprint(color.Output, "Offer declined succesfully\n")
+	if aor {
+		fmt.Fprint(color.Output, "Offer accepted succesfully\n")
+	} else {
+		fmt.Fprint(color.Output, "Offer declined succesfully\n")
+	}
 
 	return nil
+}
+
+func (lc *litAfClient) DlcDeclineContract(textArgs []string) error {
+	stopEx, err := CheckHelpCommand(declineContractCommand, textArgs, 1)
+	if err != nil || stopEx {
+		return err
+	}
+
+	return lc.dlcContractRespond(textArgs, false)
 }
 
 func (lc *litAfClient) DlcAcceptContract(textArgs []string) error {
@@ -900,24 +908,7 @@ func (lc *litAfClient) DlcAcceptContract(textArgs []string) error {
 		return err
 	}
 
-	args := new(litrpc.AcceptContractArgs)
-	reply := new(litrpc.AcceptContractReply)
-
-	cIdx, err := strconv.ParseUint(textArgs[0], 10, 64)
-	if err != nil {
-		return err
-	}
-
-	args.CIdx = cIdx
-
-	err = lc.Call("LitRPC.AcceptContract", args, reply)
-	if err != nil {
-		return err
-	}
-
-	fmt.Fprint(color.Output, "Offer accepted succesfully\n")
-
-	return nil
+	return lc.dlcContractRespond(textArgs, true)
 }
 
 func (lc *litAfClient) DlcSettleContract(textArgs []string) error {
