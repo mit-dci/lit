@@ -5,9 +5,9 @@ import (
 	"log"
 
 	"github.com/mit-dci/lit/btcutil"
+	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/qln"
-	"github.com/mit-dci/lit/consts"
 )
 
 type ChannelInfo struct {
@@ -74,7 +74,13 @@ type FundArgs struct {
 	Data        [32]byte
 }
 
-func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
+type FundReply struct {
+	Status     string
+	ChanIdx    uint32
+	FundHeight int32
+}
+
+func (r *LitRPC) FundChannel(args FundArgs, reply *FundReply) error {
 	var err error
 	if r.Node.InProg != nil && r.Node.InProg.PeerIdx != 0 {
 		return fmt.Errorf("channel with peer %d not done yet", r.Node.InProg.PeerIdx)
@@ -121,6 +127,8 @@ func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
 	}
 
 	reply.Status = fmt.Sprintf("funded channel %d", idx)
+	reply.ChanIdx = idx
+	reply.FundHeight = nowHeight
 
 	return nil
 }

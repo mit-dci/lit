@@ -140,7 +140,7 @@ func (lc *litAfClient) FundChannel(textArgs []string) error {
 		return err
 	}
 	args := new(litrpc.FundArgs)
-	reply := new(litrpc.StatusReply)
+	reply := new(litrpc.FundReply)
 
 	peer, err := strconv.Atoi(textArgs[0])
 	if err != nil {
@@ -180,7 +180,7 @@ func (lc *litAfClient) FundChannel(textArgs []string) error {
 		return err
 	}
 
-	fmt.Fprintf(color.Output, "%s\n", reply.Status)
+	fmt.Fprintf(color.Output, "funded channel %d (height: %d)\n", reply.ChanIdx, reply.FundHeight)
 	return nil
 }
 
