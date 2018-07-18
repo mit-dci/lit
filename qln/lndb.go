@@ -105,6 +105,7 @@ type LitNode struct {
 	// cointype of the first (possibly only) wallet connected
 	DefaultCoin uint32
 
+	ConnectedCoinTypes map[uint32]bool
 	RemoteCons map[uint32]*RemotePeer
 	RemoteMtx  sync.Mutex
 

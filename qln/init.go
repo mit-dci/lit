@@ -116,9 +116,20 @@ func (nd *LitNode) LinkBaseWallet(
 
 	// if there aren't, Multiwallet will still be false; set new wallit to
 	// be the first & default
-	nd.SubWallet[WallitIdx] = wallit.NewWallit(
+	var cointype int
+	nd.SubWallet[WallitIdx], cointype, err = wallit.NewWallit(
 		rootpriv, birthHeight, resync, host, nd.LitFolder, proxy, param)
 
+	if err != nil {
+		 log.Println(err)
+		 return nil
+	}
+
+	if nd.ConnectedCoinTypes == nil {
+		nd.ConnectedCoinTypes = make(map[uint32]bool)
+		nd.ConnectedCoinTypes[uint32(cointype)] = true
+	}
+	nd.ConnectedCoinTypes[uint32(cointype)] = true
 	// re-register channel addresses
 	qChans, err := nd.GetAllQchans()
 	if err != nil {

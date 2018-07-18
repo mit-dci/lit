@@ -111,6 +111,12 @@ func (nd *LitNode) FundChannel(
 
 	nd.InProg.mtx.Lock()
 	//	defer nd.InProg.mtx.Lock()
+
+	_, ok = nd.ConnectedCoinTypes[cointype] ; if !ok {
+		nd.InProg.mtx.Unlock()
+		return 0, fmt.Errorf("No daemon of type %d connected. Can't fund, only receive", cointype)
+	}
+
 	if nd.InProg.PeerIdx != 0 {
 		nd.InProg.mtx.Unlock()
 		return 0, fmt.Errorf("fund with peer %d not done yet", nd.InProg.PeerIdx)

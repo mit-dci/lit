@@ -1,6 +1,7 @@
 package wallit
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -17,7 +18,7 @@ import (
 
 func NewWallit(
 	rootkey *hdkeychain.ExtendedKey, birthHeight int32, resync bool,
-	spvhost, path string, proxyURL string, p *coinparam.Params) *Wallit {
+	spvhost, path string, proxyURL string, p *coinparam.Params) (*Wallit, int, error) {
 
 	var w Wallit
 	w.rootPrivKey = rootkey
@@ -62,10 +63,11 @@ func NewWallit(
 		height = birthHeight
 		w.SetDBSyncHeight(height)
 	}
-
-	log.Printf("DB height %d\n", height)
+	hookFail := false
+	log.Printf("DB corrected height %d\n", height)
 	incomingTx, incomingBlockheight, err := w.Hook.Start(height, spvhost, wallitpath, proxyURL, p)
 	if err != nil {
+		hookFail = true
 		log.Printf("NewWallit Hook.Start crash  %s ", err.Error())
 	}
 
@@ -107,8 +109,10 @@ func NewWallit(
 
 	// deal with incoming height
 	go w.HeightHandler(incomingBlockheight)
-
-	return &w
+	if !hookFail {
+		return &w, int(p.HDCoinType), nil
+	}
+	return &w, 0, fmt.Errorf("Unsupported coin daemon or coin daemon not running")
 }
 
 // TxHandler is the goroutine that receives & ingests new txs for the wallit.
