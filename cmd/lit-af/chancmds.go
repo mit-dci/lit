@@ -113,6 +113,12 @@ var clearHTLCCommand = &Command{
 	ShortDescription: "Clear HTLC of the given index from the given channel.\n",
 }
 
+var claimHTLCCommand = &Command{
+	Format:           fmt.Sprintf("%s%s\n", lnutil.White("claim"), lnutil.ReqColor("R")),
+	Description:      "Claim any on-chain HTLC that matches the given preimage. Use this to claim an HTLC after the channel is broken.\n",
+	ShortDescription: "Clear HTLC of the given index from the given channel.\n",
+}
+
 func (lc *litAfClient) History(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
 		fmt.Fprintf(color.Output, historyCommand.Format)
@@ -551,6 +557,33 @@ func (lc *litAfClient) ClearHTLC(textArgs []string) error {
 		return err
 	}
 	fmt.Fprintf(color.Output, "Cleared HTLC %s at state %s\n", lnutil.White(HTLCIdx), lnutil.White(reply.StateIndex))
+
+	return nil
+}
+
+// Clear is the shell command which calls ClearHTLC
+func (lc *litAfClient) ClaimHTLC(textArgs []string) error {
+	stopEx, err := CheckHelpCommand(claimHTLCCommand, textArgs, 1)
+	if err != nil || stopEx {
+		return err
+	}
+
+	args := new(litrpc.ClaimHTLCArgs)
+	reply := new(litrpc.TxidsReply)
+
+	R, err := hex.DecodeString(textArgs[0])
+	if err != nil {
+		return err
+	}
+	copy(args.R[:], R[:])
+
+	err = lc.Call("LitRPC.ClaimHTLC", args, reply)
+	if err != nil {
+		return err
+	}
+	for _, txid := range reply.Txids {
+		fmt.Fprintf(color.Output, "Claimed HTLC with txid %s\n", lnutil.White(txid))
+	}
 
 	return nil
 }
