@@ -189,12 +189,11 @@ func (lc *litAfClient) RemoteControlAuth(textArgs []string) error {
 	args := new(litrpc.RCAuthArgs)
 	reply := new(litrpc.StatusReply)
 
-	pubKey, err := hex.DecodeString(textArgs[0])
+	args.PubKey, err = hex.DecodeString(textArgs[0])
 	if err != nil {
 		return fmt.Errorf("Could not decode pubkey: %s", err.Error())
 	}
 
-	copy(args.PubKey[:], pubKey)
 	args.Authorization = new(qln.RemoteControlAuthorization)
 	args.Authorization.Allowed = lnutil.YupString(textArgs[1])
 

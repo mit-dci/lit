@@ -63,6 +63,9 @@ const (
 	//Remote control messages
 	MSGID_REMOTE_RPCREQUEST  = 0xB0 // Contains an RPC request from a remote peer
 	MSGID_REMOTE_RPCRESPONSE = 0xB1 // Contains an RPC response to send to a remote peer
+
+	DIGEST_TYPE_SHA256    = 0x00
+	DIGEST_TYPE_RIPEMD160 = 0x01
 )
 
 //interface that all messages follow, for easy use
@@ -1732,10 +1735,11 @@ func (msg DlcContractSigProofMsg) MsgType() uint8 {
 }
 
 type RemoteControlRpcRequestMsg struct {
-	PeerIdx uint32
-	PubKey  [33]byte
-	Json    []byte
-	Sig     [64]byte
+	PeerIdx    uint32
+	PubKey     [33]byte
+	Json       []byte
+	Sig        [64]byte
+	DigestType uint8
 }
 
 func NewRemoteControlRpcRequestMsgFromBytes(b []byte,
@@ -1747,6 +1751,7 @@ func NewRemoteControlRpcRequestMsgFromBytes(b []byte,
 	buf := bytes.NewBuffer(b[1:])
 	copy(msg.PubKey[:], buf.Next(33))
 	copy(msg.Sig[:], buf.Next(64))
+	binary.Read(buf, binary.BigEndian, &msg.DigestType)
 	jsonLength, _ := wire.ReadVarInt(buf, 0)
 
 	msg.Json = buf.Next(int(jsonLength))
@@ -1760,6 +1765,7 @@ func (msg RemoteControlRpcRequestMsg) Bytes() []byte {
 	buf.WriteByte(msg.MsgType())
 	buf.Write(msg.PubKey[:])
 	buf.Write(msg.Sig[:])
+	binary.Write(&buf, binary.BigEndian, msg.DigestType)
 	wire.WriteVarInt(&buf, 0, uint64(len(msg.Json)))
 	buf.Write(msg.Json)
 	return buf.Bytes()
