@@ -1,10 +1,10 @@
 #[macro_use] extern crate clap;
 
+extern crate reqwest;
+
 extern crate serde;
 #[macro_use] extern crate serde_derive;
 extern crate serde_json;
-
-extern crate websocket;
 
 mod litrpc;
 
@@ -25,7 +25,7 @@ fn main() {
         None => 12345 // FIXME
     };
 
-    let client = litrpc::LitRpcClient::new(addr, port).expect("Could not connect to server.");
+    let _client = litrpc::LitRpcClient::new(addr, port);
 
     println!("addr: {}, port {}", addr, port);
 
