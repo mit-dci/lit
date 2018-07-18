@@ -19,13 +19,13 @@ func (nd *LitNode) AutoReconnect(listenPort string, interval int64) {
 	ticker := time.NewTicker(time.Duration(interval) * time.Second)
 	go func() {
 		for {
-			log.Println("Reconnecting to known peers")
+			//log.Println("Reconnecting to known peers")
 			var empty [33]byte
 			i := uint32(1)
 			for {
 				pubKey, _ := nd.GetPubHostFromPeerIdx(i)
 				if pubKey == empty {
-					log.Printf("Done, tried %d hosts\n", i-1)
+					//log.Printf("Done, tried %d hosts\n", i-1)
 					break
 				}
 

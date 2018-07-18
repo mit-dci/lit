@@ -336,12 +336,16 @@ func (q *Qchan) GenHTLCScript(h HTLC, mine bool) ([]byte, error) {
 	var revPKH [20]byte
 	copy(revPKH[:], revPKHSlice[:20])
 
-	if mine { // Generating OUR tx that WE save
-		curElk, err := q.ElkPoint(false, q.State.StateIdx)
-		if err != nil {
-			return nil, err
-		}
+	curElk, err := q.ElkPoint(false, q.State.StateIdx)
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("Using elkpoint [%x] for HTLC\n", q.State.ElkPoint)
+	log.Printf("Using elkpoint [%x] for HTLC\n", curElk)
 
+	log.Printf("MyHTLCBase: [%x]\n", h.MyHTLCBase)
+	log.Printf("TheirHTLCBase: [%x]\n", h.TheirHTLCBase)
+	if mine { // Generating OUR tx that WE save
 		remotePub = lnutil.CombinePubs(h.TheirHTLCBase, curElk)
 		localPub = lnutil.CombinePubs(h.MyHTLCBase, curElk)
 	} else { // Generating THEIR tx that THEY save
