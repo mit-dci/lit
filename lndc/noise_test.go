@@ -37,7 +37,7 @@ func makeListener() (*Listener, string, string, error) {
 	}
 	var idPub [33]byte
 	copy(idPub[:], localPriv.PubKey().SerializeCompressed())
-	lisAdr := lnutil.LitFullKeyAdrEncode(idPub)
+	lisAdr := lnutil.LitAdrFromPubkey(idPub)
 	return listener, lisAdr, listener.Addr().String(), nil
 }
 
@@ -376,7 +376,7 @@ func TestBolt0008TestVectors(t *testing.T) {
 
 	// Moving the handshake along, we'll also ensure that the initiator
 	// accepts the act two payload.
-	if err := initiator.RecvActTwo(actTwo); err != nil {
+	if _, err := initiator.RecvActTwo(actTwo); err != nil {
 		t.Fatalf("initiator unable to process act two: %v", err)
 	}
 
