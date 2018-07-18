@@ -1,4 +1,4 @@
-package brontide
+package lndc
 
 import (
 	"bytes"
@@ -20,7 +20,7 @@ type maybeNetConn struct {
 }
 
 func makeListener() (*Listener, string, string, error) {
-	// First, generate the long-term private keys for the brontide listener.
+	// First, generate the long-term private keys for the lndc listener.
 	localPriv, err := btcec.NewPrivateKey(btcec.S256())
 	if err != nil {
 		return nil, "", "", err
@@ -141,8 +141,8 @@ func TestConnectionCorrectness(t *testing.T) {
 
 // TestConecurrentHandshakes verifies the listener's ability to not be blocked
 // by other pending handshakes. This is tested by opening multiple tcp
-// connections with the listener, without completing any of the brontide acts.
-// The test passes if real brontide dialer connects while the others are
+// connections with the listener, without completing any of the noise_XX acts.
+// The test passes if real lndc dialer connects while the others are
 // stalled.
 func TestConcurrentHandshakes(t *testing.T) {
 	listener, pubKey, netAddr, err := makeListener()
@@ -154,7 +154,7 @@ func TestConcurrentHandshakes(t *testing.T) {
 	const nblocking = 5
 
 	// Open a handful of tcp connections, that do not complete any steps of
-	// the brontide handshake.
+	// the noise_XX handshake.
 	connChan := make(chan maybeNetConn)
 	for i := 0; i < nblocking; i++ {
 		go func() {
@@ -182,7 +182,7 @@ func TestConcurrentHandshakes(t *testing.T) {
 		}
 	}
 
-	// Now, construct a new private key and use the brontide dialer to
+	// Now, construct a new private key and use the lndc dialer to
 	// connect to the listener.
 	remotePriv, err := btcec.NewPrivateKey(btcec.S256())
 	if err != nil {
@@ -194,7 +194,7 @@ func TestConcurrentHandshakes(t *testing.T) {
 		connChan <- maybeNetConn{remoteConn, err}
 	}()
 
-	// This connection should be accepted without error, as the brontide
+	// This connection should be accepted without error, as the lndc
 	// connection should bypass stalled tcp connections.
 	conn, err := listener.Accept()
 	if err != nil {
@@ -275,8 +275,6 @@ func TestWriteMessageChunking(t *testing.T) {
 	}
 }
 
-// TestBolt0008TestVectors ensures that our implementation of brontide exactly
-// matches the test vectors within the specification.
 func TestBolt0008TestVectors(t *testing.T) {
 	t.Parallel()
 
@@ -328,8 +326,8 @@ func TestBolt0008TestVectors(t *testing.T) {
 
 	// Finally, we'll create both brontide state machines, so we can begin
 	// our test.
-	initiator := NewBrontideMachine(true, initiatorPriv, initiatorEphemeral)
-	responder := NewBrontideMachine(false, responderPriv, responderEphemeral)
+	initiator := NewNoiseMachine(true, initiatorPriv, initiatorEphemeral)
+	responder := NewNoiseMachine(false, responderPriv, responderEphemeral)
 
 	// We'll start with the initiator generating the initial payload for
 	// act one. This should consist of exactly 50 bytes. We'll assert that

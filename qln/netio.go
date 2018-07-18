@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/mit-dci/lit/btcutil/btcec"
-	"github.com/mit-dci/lit/brontide"
+	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
 )
 
@@ -32,7 +32,7 @@ func (nd *LitNode) GetLisAddressAndPorts() (
 func (nd *LitNode) TCPListener(
 	lisIpPort string) (string, error) {
 	idPriv := nd.IdKey()
-	listener, err := brontide.NewListener(nd.IdKey(), lisIpPort)
+	listener, err := lndc.NewListener(nd.IdKey(), lisIpPort)
 	if err != nil {
 		return "", err
 	}
@@ -60,7 +60,7 @@ func (nd *LitNode) TCPListener(
 				log.Printf("Listener error: %s\n", err.Error())
 				continue
 			}
-			newConn, ok := netConn.(*brontide.Conn)
+			newConn, ok := netConn.(*lndc.Conn)
 			if !ok {
 				log.Printf("Got something that wasn't a LNDC")
 				continue
@@ -132,7 +132,7 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 	idPriv := nd.IdKey()
 
 	// Assign remote connection
-	newConn, err := brontide.Dial(idPriv, where, who, net.Dial)
+	newConn, err := lndc.Dial(idPriv, where, who, net.Dial)
 	if err != nil {
 		return err
 	}

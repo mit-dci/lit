@@ -10,7 +10,7 @@ import (
 	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/btcutil"
 	"github.com/boltdb/bolt"
-	"github.com/mit-dci/lit/brontide"
+	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
@@ -142,7 +142,7 @@ type LitNode struct {
 type RemotePeer struct {
 	Idx      uint32 // the peer index
 	Nickname string
-	Con      *brontide.Conn
+	Con      *lndc.Conn
 	QCs      map[uint32]*Qchan   // keep map of all peer's channels in ram
 	OpMap    map[[36]byte]uint32 // quick lookup for channels
 }

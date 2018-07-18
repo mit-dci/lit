@@ -1,4 +1,4 @@
-package brontide
+package lndc
 
 import (
 	"errors"
@@ -31,7 +31,7 @@ type Listener struct {
 // A compile-time assertion to ensure that Conn meets the net.Listener interface.
 var _ net.Listener = (*Listener)(nil)
 
-// NewListener returns a new net.Listener which enforces the Brontide scheme
+// NewListener returns a new net.Listener which enforces the lndc scheme
 // during both initial connection establishment and data transfer.
 func NewListener(localStatic *btcec.PrivateKey, listenAddr string) (*Listener,
 	error) {
@@ -45,7 +45,7 @@ func NewListener(localStatic *btcec.PrivateKey, listenAddr string) (*Listener,
 		return nil, err
 	}
 
-	brontideListener := &Listener{
+	lndcListener := &Listener{
 		localStatic:   localStatic,
 		tcp:           l,
 		handshakeSema: make(chan struct{}, defaultHandshakes),
@@ -54,12 +54,12 @@ func NewListener(localStatic *btcec.PrivateKey, listenAddr string) (*Listener,
 	}
 
 	for i := 0; i < defaultHandshakes; i++ {
-		brontideListener.handshakeSema <- struct{}{}
+		lndcListener.handshakeSema <- struct{}{}
 	}
 
-	go brontideListener.listen()
+	go lndcListener.listen()
 
-	return brontideListener, nil
+	return lndcListener, nil
 }
 
 // listen accepts connection from the underlying tcp conn, then performs
@@ -86,7 +86,7 @@ func (l *Listener) listen() {
 	}
 }
 
-// doHandshake asynchronously performs the brontide handshake, so that it does
+// doHandshake asynchronously performs the lndc handshake, so that it does
 // not block the main accept loop. This prevents peers that delay writing to the
 // connection from block other connection attempts.
 func (l *Listener) doHandshake(conn net.Conn) {
@@ -98,9 +98,9 @@ func (l *Listener) doHandshake(conn net.Conn) {
 	default:
 	}
 
-	brontideConn := &Conn{
+	lndcConn := &Conn{
 		conn:  conn,
-		noise: NewBrontideMachine(false, l.localStatic),
+		noise: NewNoiseMachine(false, l.localStatic),
 	}
 
 	// We'll ensure that we get ActOne from the remote peer in a timely
@@ -113,25 +113,25 @@ func (l *Listener) doHandshake(conn net.Conn) {
 	// this portion will fail with a non-nil error.
 	var actOne [ActOneSize]byte
 	if _, err := io.ReadFull(conn, actOne[:]); err != nil {
-		brontideConn.conn.Close()
+		lndcConn.conn.Close()
 		l.rejectConn(err)
 		return
 	}
-	if err := brontideConn.noise.RecvActOne(actOne); err != nil {
-		brontideConn.conn.Close()
+	if err := lndcConn.noise.RecvActOne(actOne); err != nil {
+		lndcConn.conn.Close()
 		l.rejectConn(err)
 		return
 	}
 	// Next, progress the handshake processes by sending over our ephemeral
 	// key for the session along with an authenticating tag.
-	actTwo, err := brontideConn.noise.GenActTwo()
+	actTwo, err := lndcConn.noise.GenActTwo()
 	if err != nil {
-		brontideConn.conn.Close()
+		lndcConn.conn.Close()
 		l.rejectConn(err)
 		return
 	}
 	if _, err := conn.Write(actTwo[:]); err != nil {
-		brontideConn.conn.Close()
+		lndcConn.conn.Close()
 		l.rejectConn(err)
 		return
 	}
@@ -152,12 +152,12 @@ func (l *Listener) doHandshake(conn net.Conn) {
 	// sides have mutually authenticated each other.
 	var actThree [ActThreeSize]byte
 	if _, err := io.ReadFull(conn, actThree[:]); err != nil {
-		brontideConn.conn.Close()
+		lndcConn.conn.Close()
 		l.rejectConn(err)
 		return
 	}
-	if err := brontideConn.noise.RecvActThree(actThree); err != nil {
-		brontideConn.conn.Close()
+	if err := lndcConn.noise.RecvActThree(actThree); err != nil {
+		lndcConn.conn.Close()
 		l.rejectConn(err)
 		return
 	}
@@ -166,10 +166,10 @@ func (l *Listener) doHandshake(conn net.Conn) {
 	// initial handshake.
 	conn.SetReadDeadline(time.Time{})
 
-	l.acceptConn(brontideConn)
+	l.acceptConn(lndcConn)
 }
 
-// maybeConn holds either a brontide connection or an error returned from the
+// maybeConn holds either a lndc connection or an error returned from the
 // handshake.
 type maybeConn struct {
 	conn *Conn
@@ -193,7 +193,7 @@ func (l *Listener) rejectConn(err error) {
 }
 
 // Accept waits for and returns the next connection to the listener. All
-// incoming connections are authenticated via the three act Brontide
+// incoming connections are authenticated via the three act lndc
 // key-exchange scheme. This function will fail with a non-nil error in the
 // case that either the handshake breaks down, or the remote peer doesn't know
 // our static public key.
@@ -204,7 +204,7 @@ func (l *Listener) Accept() (net.Conn, error) {
 	case result := <-l.conns:
 		return result.conn, result.err
 	case <-l.quit:
-		return nil, errors.New("brontide connection closed")
+		return nil, errors.New("lndc connection closed")
 	}
 }
 

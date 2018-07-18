@@ -1,7 +1,7 @@
-brontide
+lndc
 ==========
 
-The brontide package implements a secure crypto messaging protocol based off of
+The lndc package implements a secure crypto messaging protocol based off of
 the [Noise Protocol Framework](http://noiseprotocol.org/noise.html). The
 package exposes the raw state machine that handles the handshake and subsequent
 message encryption/decryption scheme. Additionally, the package exposes a

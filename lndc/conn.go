@@ -1,4 +1,4 @@
-package brontide
+package lndc
 
 import (
 	"bytes"
@@ -14,8 +14,8 @@ import (
 )
 
 // Conn is an implementation of net.Conn which enforces an authenticated key
-// exchange and message encryption protocol dubbed "Brontide" after initial TCP
-// connection establishment. In the case of a successful handshake, all
+// exchange and message encryption protocol based off the noise_XX protocol
+// In the case of a successful handshake, all
 // messages sent via the .Write() method are encrypted with an AEAD cipher
 // along with an encrypted length-prefix. See the Machine struct for
 // additional details w.r.t to the handshake and encryption scheme.
@@ -46,7 +46,7 @@ func Dial(localPriv *btcec.PrivateKey, ipAddr string, remotePKH string,
 
 	b := &Conn{
 		conn:  conn,
-		noise: NewBrontideMachine(true, localPriv),
+		noise: NewNoiseMachine(true, localPriv),
 	}
 
 	// Initiate the handshake by sending the first act to the receiver.
@@ -106,7 +106,7 @@ func Dial(localPriv *btcec.PrivateKey, ipAddr string, remotePKH string,
 }
 
 // ReadNextMessage uses the connection in a message-oriented instructing it to
-// read the next _full_ message with the brontide stream. This function will
+// read the next _full_ message with the lndc stream. This function will
 // block until the read succeeds.
 func (c *Conn) ReadNextMessage() ([]byte, error) {
 	return c.noise.ReadMessage(c.conn)
@@ -180,7 +180,6 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 //
 // Part of the net.Conn interface.
 func (c *Conn) Close() error {
-	// TODO(roasbeef): reset brontide state?
 	return c.conn.Close()
 }
 
