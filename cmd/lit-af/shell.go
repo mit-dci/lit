@@ -87,6 +87,12 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		return parseErr(err, "send")
 	}
 
+	// pay a lit address either on or off chain
+	if cmd == "pay" {
+		err = lc.Pay(args)
+		return parseErr(err, "pay")
+	}
+
 	if cmd == "lis" { // listen for lnd peers
 		err = lc.Lis(args)
 		return parseErr(err, "lis")
@@ -398,7 +404,7 @@ func printHelp(commands []*Command) {
 func printCointypes() {
 	for k, v := range coinparam.RegisteredNets {
 		fmt.Fprintf(color.Output, "CoinType: %s\n", strconv.Itoa(int(k)))
-		fmt.Fprintf(color.Output, "└────── Name: %-13sBech32Prefix: %s\n\n", v.Name + ",", v.Bech32Prefix)
+		fmt.Fprintf(color.Output, "└────── Name: %-13sBech32Prefix: %s\n\n", v.Name+",", v.Bech32Prefix)
 	}
 }
 

@@ -73,6 +73,8 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 	nd.InProgDual = new(InFlightDualFund)
 	nd.InProgDual.done = make(chan *DualFundingResult, 1)
 
+	nd.InFlightSends = make([]*InFlightSend, 0)
+
 	nd.RemoteCons = make(map[uint32]*RemotePeer)
 
 	nd.SubWallet = make(map[uint32]UWallet)

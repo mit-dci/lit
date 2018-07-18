@@ -3,11 +3,12 @@ package litrpc
 import (
 	"fmt"
 	"log"
+
 	"github.com/mit-dci/lit/bech32"
-	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
+	"github.com/mit-dci/lit/wire"
 )
 
 type TxidsReply struct {
@@ -126,6 +127,49 @@ func (r *LitRPC) TxoList(args *NoArgs, reply *TxoListReply) error {
 		reply.Txos = append(reply.Txos, theseTxos...)
 	}
 	return nil
+}
+
+type PayReply struct {
+	OnChain bool
+}
+
+type PayArgs struct {
+	DestAddr string
+	CoinType uint32
+	Amt      int64
+	Data     [32]byte
+}
+
+func (r *LitRPC) Pay(args PayArgs, reply *PayReply) error {
+
+	// Check if we have a wallet of the requested coin type
+	_, ok := r.Node.SubWallet[args.CoinType]
+	if !ok {
+		return fmt.Errorf("No wallet for coinType [%d]", args.CoinType)
+	}
+
+	// See if we have a channel with the recipient
+	// with enough balance
+	channels, err := r.Node.GetAllQchans()
+	if err != nil {
+		return err
+	}
+
+	for _, c := range channels {
+		if !c.CloseData.Closed {
+			pub, _ := r.Node.GetPubHostFromPeerIdx(c.Peer())
+			adr := lnutil.LitAdrFromPubkey(pub)
+			if c.Coin() == args.CoinType && adr == args.DestAddr && c.State.MyAmt >= args.Amt+consts.MinOutput {
+				// Yeah we can use this channel. Let's push it and return.
+				r.Node.PushChannel(c, uint32(args.Amt), args.Data)
+				reply.OnChain = false
+				return nil
+			}
+		}
+	}
+
+	err = r.Node.OnChainSend(args.DestAddr, args.CoinType, args.Amt, args.Data)
+	return err
 }
 
 // ------------------------- send
