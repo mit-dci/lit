@@ -5,6 +5,7 @@ import (
 	"log"
 	"strconv"
 
+	"github.com/adiabat/btcd/btcec"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/qln"
 )
@@ -156,14 +157,26 @@ func (r *LitRPC) GetChannelMap(args NoArgs, reply *ChannelGraphReply) error {
 }
 
 type RCAuthArgs struct {
-	PubKey        [33]byte
+	PubKey        []byte
 	Authorization *qln.RemoteControlAuthorization
 }
 
 func (r *LitRPC) RemoteControlAuth(args RCAuthArgs, reply *StatusReply) error {
 
-	err := r.Node.SaveRemoteControlAuthorization(args.PubKey, args.Authorization)
+	pub, err := btcec.ParsePubKey(args.PubKey, btcec.S256())
 	if err != nil {
+		log.Printf("Error deserializing pubkey: %s", err.Error())
+		return err
+	}
+	compressedPubKey := pub.SerializeCompressed()
+	var pubKey [33]byte
+	copy(pubKey[:], compressedPubKey[:])
+
+	log.Printf("Authorizing pubkey [%x] [%t]\n", pubKey, args.Authorization)
+
+	err = r.Node.SaveRemoteControlAuthorization(pubKey, args.Authorization)
+	if err != nil {
+		log.Printf("Error saving auth: %s", err.Error())
 		return err
 	}
 
@@ -178,9 +191,10 @@ type RCSendArgs struct {
 func (r *LitRPC) RemoteControlSend(args RCSendArgs, reply *StatusReply) error {
 	msg, err := lnutil.NewRemoteControlRpcRequestMsgFromBytes(args.Msg, args.PeerIdx)
 	if err != nil {
+		log.Printf("Error making message from bytes: %s\n", err.Error())
 		return err
 	}
-
+	log.Printf("Sending RC message to peer [%d]\n", args.PeerIdx)
 	r.Node.OmniOut <- msg
 	return nil
 }

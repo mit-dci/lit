@@ -7,6 +7,7 @@ import (
 	"log"
 
 	"github.com/boltdb/bolt"
+	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/crypto/fastsha256"
 	"github.com/mit-dci/lit/lnutil"
@@ -28,8 +29,17 @@ func (nd *LitNode) RemoteControlRequestHandler(msg lnutil.RemoteControlRpcReques
 		log.Println(err.Error())
 		return err
 	}
+	var digest []byte
+	if msg.DigestType == lnutil.DIGEST_TYPE_SHA256 {
+		hash := fastsha256.Sum256(msg.Json)
+		digest = make([]byte, len(hash))
+		copy(digest[:], hash[:])
+	} else if msg.DigestType == lnutil.DIGEST_TYPE_RIPEMD160 {
+		hash := btcutil.Hash160(msg.Json)
+		digest = make([]byte, len(hash))
+		copy(digest[:], hash[:])
+	}
 
-	hash := fastsha256.Sum256(msg.Json)
 	pub, err := btcec.ParsePubKey(msg.PubKey[:], btcec.S256())
 	if err != nil {
 		log.Printf("Error parsing public key for remote control: %s", err.Error())
@@ -42,7 +52,7 @@ func (nd *LitNode) RemoteControlRequestHandler(msg lnutil.RemoteControlRpcReques
 		return err
 	}
 
-	if !signature.Verify(hash[:], pub) {
+	if !signature.Verify(digest, pub) {
 		err = fmt.Errorf("Signature verification failed in remote control request")
 		log.Println(err.Error())
 		return err
@@ -55,17 +65,20 @@ func (nd *LitNode) RemoteControlRequestHandler(msg lnutil.RemoteControlRpcReques
 		return err
 	}
 
-	var reply interface{}
-	nd.LocalRPCCon.Call("LitRPC."+obj["method"].(string), obj["args"], reply)
+	go func() {
+		var reply interface{}
+		nd.LocalRPCCon.Call("LitRPC."+obj["method"].(string), obj["args"], reply)
 
-	replyJSON, err := json.Marshal(reply)
-	if err != nil {
-		log.Printf("Could not produce reply JSON: %s", err.Error())
-		return err
-	}
+		replyJSON, err := json.Marshal(reply)
+		if err != nil {
+			log.Printf("Could not produce reply JSON: %s", err.Error())
+		}
 
-	response := lnutil.NewRemoteControlRpcResponseMsg(msg.Peer(), replyJSON)
-	nd.OmniOut <- response
+		log.Printf("Reply for remote control: %s\n", replyJSON)
+		/*
+			response := lnutil.NewRemoteControlRpcResponseMsg(msg.Peer(), replyJSON)
+			nd.OmniOut <- response*/
+	}()
 	return nil
 }
 
