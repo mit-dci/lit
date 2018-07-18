@@ -1,7 +1,8 @@
 lit
 lit-af
+!cmd/lit-af
 cmd/lit-af/lit-af
-cmd/glit/glit
+
 headers.bin
 ln.db
 testkey.hex
@@ -13,11 +14,11 @@ webui/dist
 webui/build
 *.pyc
 
-#Editor temp files
+# Editor temp files
 \#*
 .\#*
 
-#Windows Specific
+# Windows Specific
 *.exe
 
 ### Vim ###
