@@ -915,7 +915,7 @@ func (lc *litAfClient) DlcAcceptContract(textArgs []string) error {
 		return err
 	}
 
-	fmt.Fprint(color.Output, "Offer accepted succesfully\n")
+	fmt.Fprintf(color.Output, "Offer acceptance initiated. Use [dlc contract view %d] to see the status.\n", cIdx)
 
 	return nil
 }
@@ -994,8 +994,14 @@ func PrintContract(c *lnutil.DlcContract) {
 		status = "Sent offer, awaiting reply"
 	case lnutil.ContractStatusOfferedToMe:
 		status = "Received offer, awaiting reply"
+	case lnutil.ContractStatusAccepting:
+		status = "Accepting"
 	case lnutil.ContractStatusAccepted:
 		status = "Accepted"
+	case lnutil.ContractStatusAcknowledged:
+		status = "Acknowledged"
+	case lnutil.ContractStatusError:
+		status = "Error"
 	case lnutil.ContractStatusDeclined:
 		status = "Declined"
 	}
