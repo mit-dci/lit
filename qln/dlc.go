@@ -192,10 +192,6 @@ func (nd *LitNode) AcceptDlc(cIdx uint64) error {
 		}
 		copy(c.OurPayoutPKH[:], btcutil.Hash160(ourPayoutPKHKey[:]))
 
-		log.Printf("Our Payout PKH: [%x]", c.OurPayoutPKH)
-		log.Printf("Our Payout base: [%x]", c.OurPayoutBase)
-		log.Printf("Our FundMultisigPub: [%x]", c.OurFundMultisigPub)
-
 		// Now we can sign the division
 		sigs, err := nd.SignSettlementDivisions(c)
 		if err != nil {
@@ -529,11 +525,7 @@ func (nd *LitNode) FundContract(c *lnutil.DlcContract) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("Our change PKH: [%x]", c.OurChangePKH[:])
 
-	for i, fip := range c.OurFundingInputs {
-		log.Printf("Our funding input [%d]: %s (%d)\n", i, fip.Outpoint.String(), fip.Value)
-	}
 	return nil
 }
 
