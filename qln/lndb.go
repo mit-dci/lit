@@ -141,6 +141,7 @@ type LitNode struct {
 
 	// Contains the URL string to connect to a SOCKS5 proxy, if provided
 	ProxyURL string
+	Nat string
 }
 
 type RemotePeer struct {
