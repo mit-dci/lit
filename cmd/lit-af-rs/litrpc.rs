@@ -31,7 +31,7 @@ struct RpcResponse<R> {
 }
 
 #[derive(Clone, Debug, Deserialize)]
-struct RpcError {
+pub struct RpcError {
     code: i64,
     message: String,
     data: String
@@ -44,14 +44,15 @@ pub struct LitRpcClient {
 }
 
 pub enum LitRpcError {
+    RpcError(RpcError),
+    RpcInvalidResponse,
     SerdeJsonError(serde_json::Error),
-    ReqError(reqwest::Error),
-    UnknownError
+    HttpError(reqwest::Error),
 }
 
 impl From<reqwest::Error> for LitRpcError {
     fn from(from: reqwest::Error) -> Self {
-        LitRpcError::ReqError(from)
+        LitRpcError::HttpError(from)
     }
 }
 
@@ -91,8 +92,19 @@ impl LitRpcClient {
             .body(req_body)
             .send()?;
 
-        // Just deserialize.
-        Ok(serde_json::from_str(res_json.text()?.as_ref())?)
+        // Deserialize...
+        let res: RpcResponse<R> = serde_json::from_str(res_json.text()?.as_ref())?;
+        if res.id != req.id {
+            // Ok this makes no sense but we should fail out anyways.
+            return Err(LitRpcError::RpcInvalidResponse)
+        }
+
+        // And then match on the response part thingies to figure out what to do.
+        match (res.result, res.error) {
+            (Some(r), None) => Ok(r),
+            (None, Some(e)) => Err(LitRpcError::RpcError(e)),
+            _ => Err(LitRpcError::RpcInvalidResponse)
+        }
 
     }
 }
