@@ -46,12 +46,14 @@ class TestBasic(LitTest):
     def _ready_litnodes(self):
         """Start two lit nodes and connect them."""
         # Start lit node 0 and open websocket connection
+        self.log.info("Starting Lit Node 1")
         self.add_litnode()
         self.litnodes[0].args.extend([self.coins[0]["wallit_code"], "127.0.0.1"])
         self.litnodes[0].start_node()
         self.litnodes[0].add_rpc_connection("127.0.0.1", "8001")
 
         # Start lit node 1 and open websocket connection
+        self.log.info("Starting Lit Node 2")
         self.add_litnode()
         self.litnodes[1].args.extend(["--rpcport", "8002", self.coins[0]["wallit_code"], "127.0.0.1"])
         self.litnodes[1].start_node()
@@ -69,7 +71,8 @@ class TestBasic(LitTest):
         assert not res['error']
 
         # Check that litnode0 and litnode1 are connected
-        time.sleep(10) #RPC timeout, so this doesn't affect the logic of the program
+        self.log.info("Waiting for nodes to connect to each other")
+        time.sleep(10) #RPC timeout, so this doesn't affect the program flow
         # Wait until both nodes are connected
         assert_equal(len(self.litnodes[1].ListConnections()['result']['Connections']), 1)
         self.log.info("lit nodes connected")
@@ -82,9 +85,8 @@ class TestBasic(LitTest):
         self.coinnodes[0].sendtoaddress(addr["result"]["LegacyAddresses"][0], 12.34)
         self.confirm_transactions(self.coinnodes[0], self.litnodes[0], 1)
 
-        self.log.info("Waiting to receive transaction")
-
         # Wait for transaction to be received by lit node
+        self.log.info("Waiting to receive transaction")
         wait_until(lambda: self.litnodes[0].get_balance(self.coins[0]['code'])['TxoTotal'] - self.balance == 1234000000)
         self.balance = self.litnodes[0].get_balance(self.coins[0]['code'])['TxoTotal']
         self.log.info("Funds received by lit node 0")
@@ -111,6 +113,7 @@ class TestBasic(LitTest):
         self.log.info("lit node 0 has funded channel")
 
         # Wait for channel to open
+        self.log.info("Waiting for channel to open")
         wait_until(lambda: len(self.litnodes[0].ChannelList()['result']['Channels']) > 0)
         assert len(self.litnodes[1].ChannelList()['result']['Channels']) > 0
         self.log.info("Channel open")
@@ -164,6 +167,7 @@ class TestBasic(LitTest):
         self.confirm_transactions(self.coinnodes[0], self.litnodes[0], 1)
 
         # Make sure balances are as expected
+        self.log.info("Make sure balances match")
         wait_until(lambda: abs(self.litnodes[1].get_balance(self.coins[0]['code'])['TxoTotal'] - 50200000) < self.coins[0]["feerate"] * 2000)
         litnode1_balance = self.litnodes[1].get_balance(self.coins[0]['code'])
         assert_equal(litnode1_balance['TxoTotal'], litnode1_balance['MatureWitty'])
