@@ -606,7 +606,8 @@ func (nd *LitNode) ClaimHTLC(R [16]byte) ([][32]byte, error) {
 				}
 				txids = append(txids, tx.TxHash())
 			} else {
-				log.Printf("Ignoring HTLC in channel %d since it's not closed\n", q.Idx())
+				log.Printf("Cleaing HTLC from channel [%d] idx [%d]\n", q.Idx(), h.Idx)
+				nd.ClearHTLC(q, R, h.Idx, [32]byte{})
 			}
 		}
 	}
@@ -711,9 +712,9 @@ func (nd *LitNode) ClaimIncomingHTLCTx(q *Qchan, h HTLC) (*wire.MsgTx, error) {
 
 	HTLCPriv := lnutil.CombinePrivKeyWithBytes(HTLCPrivBase, elkScalar[:])
 	tx := wire.NewMsgTx()
-
+	op := wire.NewOutPoint(&stateTxID, i)
 	if mine {
-		op := wire.NewOutPoint(&stateTxID, i)
+
 		for _, s := range htlcSpends {
 			if lnutil.OutPointsEqual(*op, s.TxIn[0].PreviousOutPoint) {
 				tx = s
@@ -726,7 +727,7 @@ func (nd *LitNode) ClaimIncomingHTLCTx(q *Qchan, h HTLC) (*wire.MsgTx, error) {
 		tx.Version = 2
 		tx.LockTime = 0
 
-		in := wire.NewTxIn(wire.NewOutPoint(&stateTxID, i), nil, nil)
+		in := wire.NewTxIn(op, nil, nil)
 		in.Sequence = 0
 
 		tx.AddTxIn(in)
@@ -779,9 +780,7 @@ func (nd *LitNode) ClaimIncomingHTLCTx(q *Qchan, h HTLC) (*wire.MsgTx, error) {
 
 	}
 
-	log.Println("Claiming HTLC using transaction:\n\n")
-	lnutil.PrintTx(tx)
-
+	wal.StopWatchingThis(*op)
 	wal.DirectSendTx(tx)
 	return tx, nil
 }

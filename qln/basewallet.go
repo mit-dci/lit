@@ -5,11 +5,11 @@ import (
 
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
-	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/uspv"
+	"github.com/mit-dci/lit/wire"
 )
 
 // The UWallet interface are the functions needed to work with the LnNode
@@ -76,6 +76,9 @@ type UWallet interface {
 
 	// WatchThis tells the basewallet to watch an outpoint
 	WatchThis(wire.OutPoint) error
+
+	// StopWatchingThis tells the basewallet to stop watching an outpoint
+	StopWatchingThis(wire.OutPoint) error
 
 	// LetMeKnow opens the chan where OutPointEvent flows from the underlying
 	// wallet up to the LN module.

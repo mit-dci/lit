@@ -383,7 +383,30 @@ func (nd *LitNode) OPEventHandler(OPEventChan chan lnutil.OutPointEvent) {
 				log.Printf("Error Getting HTLC OPHash: %s\n", err.Error())
 			}
 
-			log.Printf("Got OP event for HTLC output %s [Incoming: %t]", curOPEvent.Op.String(), h.Incoming)
+			log.Printf("Got OP event for HTLC output %s [Incoming: %t]\n", curOPEvent.Op.String(), h.Incoming)
+			// Check the witness stack for a preimage
+			for _, txi := range curOPEvent.Tx.TxIn {
+
+				var preimage [16]byte
+				preimageFound := false
+				if len(txi.Witness) == 5 && len(txi.Witness[0]) == 0 && len(txi.Witness[3]) == 16 {
+					// Success transaction from their break TX, multisig. Preimage is fourth on the witness stack.
+					copy(preimage[:], txi.Witness[3])
+					preimageFound = true
+				}
+				if len(txi.Witness) == 3 && len(txi.Witness[1]) == 16 {
+					// Success transaction from their break TX, multisig. Preimage is fourth on the witness stack.
+					copy(preimage[:], txi.Witness[1])
+					preimageFound = true
+				}
+
+				if preimageFound {
+					log.Printf("Found preimage [%x] in this TX, looking for HTLCs i have that are claimable with that\n", preimage)
+					// try claiming it!
+					nd.ClaimHTLC(preimage)
+				}
+			}
+
 			continue
 		}
 
@@ -422,6 +445,7 @@ func (nd *LitNode) OPEventHandler(OPEventChan chan lnutil.OutPointEvent) {
 				log.Printf("GetCloseTxos error: %s", err.Error())
 				continue
 			}
+
 			// if you have seq=1 txos, modify the privkey...
 			// pretty ugly as we need the private key to do that.
 			for _, portxo := range txos {
@@ -445,6 +469,21 @@ func (nd *LitNode) OPEventHandler(OPEventChan chan lnutil.OutPointEvent) {
 				}
 				// make this concurrent to avoid circular locking
 				go nd.SubWallet[theQ.Coin()].ExportUtxo(&portxo)
+			}
+
+			// Fetch the indexes of HTLC outputs, and then register them to be watched
+			// We can monitor this for spends from an HTLC output that contains a preimage
+			// and then use that preimage to claim any HTLCs we have outstanding.
+			_, htlcIdxes, err := theQ.GetHtlcTxos(curOPEvent.Tx)
+			if err != nil {
+				log.Printf("GetHtlcTxos error: %s", err.Error())
+				continue
+			}
+			txHash := curOPEvent.Tx.TxHash()
+			for _, i := range htlcIdxes {
+				op := wire.NewOutPoint(&txHash, i)
+				log.Printf("Watching for spends from [%s] (HTLC)\n", op.String())
+				nd.SubWallet[theQ.Coin()].WatchThis(*op)
 			}
 		}
 	}

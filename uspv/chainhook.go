@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
-	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/wire"
 )
 
 // ChainHook is an interface which provides access to a blockchain for the
@@ -49,6 +49,9 @@ type ChainHook interface {
 
 	// RegisterOutPoint tells the ChainHook about an outpoint of interest.
 	RegisterOutPoint(wire.OutPoint) error
+
+	// UnregisterOutPoint tells the ChainHook about loss of interest in an outpoint.
+	UnregisterOutPoint(wire.OutPoint) error
 
 	// SetHeight sets the height ChainHook needs to look above.
 	// Returns a channel which tells the wallit what height the ChainHook has
@@ -139,6 +142,13 @@ func (s *SPVCon) RegisterAddress(adr160 [20]byte) error {
 func (s *SPVCon) RegisterOutPoint(op wire.OutPoint) error {
 	s.TrackingOPsMtx.Lock()
 	s.TrackingOPs[op] = true
+	s.TrackingOPsMtx.Unlock()
+	return nil
+}
+
+func (s *SPVCon) UnregisterOutPoint(op wire.OutPoint) error {
+	s.TrackingOPsMtx.Lock()
+	delete(s.TrackingOPs, op)
 	s.TrackingOPsMtx.Unlock()
 	return nil
 }

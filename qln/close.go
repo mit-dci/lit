@@ -202,19 +202,20 @@ func (nd *LitNode) CloseReqHandler(msg lnutil.CloseReqMsg) {
 	return
 }
 
-func (q *Qchan) GetHtlcTxos(tx *wire.MsgTx) ([]*wire.TxOut, error) {
+func (q *Qchan) GetHtlcTxos(tx *wire.MsgTx) ([]*wire.TxOut, []uint32, error) {
 	htlcOutsInTx := make([]*wire.TxOut, 0)
+	htlcOutIndexesInTx := make([]uint32, 0)
 	htlcOuts := make([]*wire.TxOut, 0)
 	for _, h := range q.State.HTLCs {
 		txOut, err := q.GenHTLCOut(h, false)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		htlcOuts = append(htlcOuts, txOut)
 
 		txOut, err = q.GenHTLCOut(h, true)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		htlcOuts = append(htlcOuts, txOut)
 	}
@@ -231,10 +232,11 @@ func (q *Qchan) GetHtlcTxos(tx *wire.MsgTx) ([]*wire.TxOut, error) {
 		}
 		if htlcOut {
 			htlcOutsInTx = append(htlcOutsInTx, out)
+			htlcOutIndexesInTx = append(htlcOutIndexesInTx, uint32(i))
 		}
 	}
 
-	return htlcOutsInTx, nil
+	return htlcOutsInTx, htlcOutIndexesInTx, nil
 }
 
 // GetCloseTxos takes in a tx and sets the QcloseTXO fields based on the tx.
@@ -256,7 +258,7 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 	cTxos := make([]portxo.PorTxo, 1)
 	myPKHPkSript := lnutil.DirectWPKHScript(q.MyRefundPub)
 
-	htlcOutsInTx, err := q.GetHtlcTxos(tx)
+	htlcOutsInTx, _, err := q.GetHtlcTxos(tx)
 	if err != nil {
 		return nil, err
 	}
