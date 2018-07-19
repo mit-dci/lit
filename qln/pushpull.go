@@ -641,10 +641,13 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 	// (if elkrem ingest fails later, at least we close out with a bit more money)
 
 	// TODO: more sigs here than before
+	curElk := qc.State.ElkPoint
+	qc.State.ElkPoint = qc.State.NextElkPoint
 	err = qc.VerifySigs(msg.Signature, msg.HTLCSigs)
 	if err != nil {
 		return fmt.Errorf("SIGREVHandler err %s", err.Error())
 	}
+	qc.State.ElkPoint = curElk
 
 	// verify elkrem and save it in ram
 	err = qc.AdvanceElkrem(&msg.Elk, msg.N2ElkPoint)

@@ -118,6 +118,11 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		return parseErr(err, "clear")
 	}
 
+	if cmd == "claim" {
+		err = lc.ClaimHTLC(args)
+		return parseErr(err, "claim")
+	}
+
 	if cmd == "con" { // connect to lnd host
 		err = lc.Connect(args)
 		return parseErr(err, "con")

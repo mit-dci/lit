@@ -471,7 +471,7 @@ type AddHTLCReply struct {
 func (r *LitRPC) AddHTLC(args AddHTLCArgs, reply *AddHTLCReply) error {
 	if args.Amt > consts.MaxChanCapacity || args.Amt < consts.MinOutput {
 		return fmt.Errorf(
-			"can't add HTLC %d max is 1 coin (100000000), min is 1", args.Amt)
+			"can't add HTLC %d max is 1 coin (100000000), min is %d", args.Amt, consts.MinOutput)
 	}
 
 	fmt.Printf("add HTLC %d to chan %d with data %x and RHash %x\n", args.Amt, args.ChanIdx, args.Data, args.RHash)

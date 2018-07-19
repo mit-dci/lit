@@ -1,13 +1,17 @@
 package qln
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 
 	"github.com/btcsuite/fastsha256"
+	"github.com/mit-dci/lit/btcutil/txscript"
 	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
+	"github.com/mit-dci/lit/sig64"
+	"github.com/mit-dci/lit/wire"
 )
 
 func (nd *LitNode) OfferHTLC(qc *Qchan, amt uint32, RHash [32]byte, locktime uint32, data [32]byte) error {
@@ -252,13 +256,15 @@ func (nd *LitNode) HashSigHandler(msg lnutil.HashSigMsg, qc *Qchan) error {
 	qc.State.Data = msg.Data
 
 	// verify sig for the next state. only save if this works
+	curElk := qc.State.ElkPoint
+	qc.State.ElkPoint = qc.State.NextElkPoint
 
 	// TODO: There are more signatures required
 	err = qc.VerifySigs(msg.CommitmentSignature, msg.HTLCSigs)
 	if err != nil {
 		return fmt.Errorf("HashSigHandler err %s", err.Error())
 	}
-
+	qc.State.ElkPoint = curElk
 	// (seems odd, but everything so far we still do in case of collision, so
 	// only check here.  If it's a collision, set, save, send gapSigRev
 
@@ -573,4 +579,208 @@ func (nd *LitNode) PreimageSigHandler(msg lnutil.PreimageSigMsg, qc *Qchan) erro
 		}
 	}
 	return nil
+}
+
+// Claim HTLC will claim an HTLC on-chain output from a broken channel using
+// the given preimage. Returns the TXIDs of the claim transactions
+func (nd *LitNode) ClaimHTLC(R [16]byte) ([][32]byte, error) {
+	txids := make([][32]byte, 0)
+	RHash := fastsha256.Sum256(R[:])
+	htlcs, channels, err := nd.FindHTLCsByHash(RHash)
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("Found [%d] HTLC Outpoints from preimage [%x]\n", len(htlcs), R)
+	for i, h := range htlcs {
+
+		// Outgoing HTLCs should not be claimed using the preimage, but
+		// using the timeout. So only claim incoming ones in this routine
+		if h.Incoming {
+			q := channels[i]
+			if q.CloseData.Closed {
+				copy(h.R[:], R[:])
+				tx, err := nd.ClaimIncomingHTLCTx(q, h)
+				if err != nil {
+					log.Printf("Error claiming HTLC: %s", err.Error())
+					return nil, err
+				}
+				txids = append(txids, tx.TxHash())
+			} else {
+				log.Printf("Cleaing HTLC from channel [%d] idx [%d]\n", q.Idx(), h.Idx)
+				nd.ClearHTLC(q, R, h.Idx, [32]byte{})
+			}
+		}
+	}
+	return txids, nil
+}
+
+func (nd *LitNode) FindHTLCsByHash(hash [32]byte) ([]HTLC, []*Qchan, error) {
+	htlcs := make([]HTLC, 0)
+	channels := make([]*Qchan, 0)
+	qc, err := nd.GetAllQchans()
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, q := range qc {
+		for _, h := range q.State.HTLCs {
+			if bytes.Equal(h.RHash[:], hash[:]) {
+				htlcs = append(htlcs, h)
+				channels = append(channels, q)
+			}
+		}
+	}
+	return htlcs, channels, nil
+}
+
+func (nd *LitNode) GetHTLC(op *wire.OutPoint) (HTLC, *Qchan, error) {
+	var empty HTLC
+	qc, err := nd.GetAllQchans()
+	if err != nil {
+		return empty, nil, err
+	}
+	for _, q := range qc {
+		tx, _, _, err := q.BuildStateTxs(false)
+		if err != nil {
+			return empty, nil, err
+		}
+		for _, h := range q.State.HTLCs {
+			txid := tx.TxHash()
+			_, i, err := GetHTLCOut(q, h, tx, false)
+			if err != nil {
+				return empty, nil, err
+			}
+			hashOp := wire.NewOutPoint(&txid, i)
+			if lnutil.OutPointsEqual(*op, *hashOp) {
+				return h, q, nil
+			}
+		}
+	}
+	return empty, nil, nil
+}
+
+func GetHTLCOut(q *Qchan, h HTLC, tx *wire.MsgTx, mine bool) (*wire.TxOut, uint32, error) {
+	for i, out := range tx.TxOut {
+		htlcOut, err := q.GenHTLCOut(h, mine)
+		if err != nil {
+			return nil, 0, err
+		}
+		if bytes.Compare(out.PkScript, htlcOut.PkScript) == 0 {
+			return out, uint32(i), nil
+		}
+	}
+	return nil, 0, nil
+}
+
+func (nd *LitNode) ClaimIncomingHTLCTx(q *Qchan, h HTLC) (*wire.MsgTx, error) {
+	if !h.Incoming {
+		return nil, fmt.Errorf("Trying to claim an HTLC with incoming=false using ClaimIncomingHTLCTx. Not a good idea.")
+	}
+
+	mine := true
+	stateTx, htlcSpends, _, err := q.BuildStateTxs(mine)
+	if err != nil {
+		return nil, err
+	}
+
+	stateTxID := stateTx.TxHash()
+	if !q.CloseData.CloseTxid.IsEqual(&stateTxID) {
+		mine = false
+		stateTx, htlcSpends, _, err = q.BuildStateTxs(mine)
+		if err != nil {
+			return nil, err
+		}
+
+		stateTxID = stateTx.TxHash()
+
+		if !q.CloseData.CloseTxid.IsEqual(&stateTxID) {
+			return nil, fmt.Errorf("Could not find/regenerate proper close TX")
+		}
+	}
+
+	wal := nd.SubWallet[q.Coin()]
+	htlcTxo, i, err := GetHTLCOut(q, h, stateTx, mine)
+
+	curElk, err := q.ElkSnd.AtIndex(q.State.StateIdx)
+	if err != nil {
+		return nil, err
+	}
+	elkScalar := lnutil.ElkScalar(curElk)
+	HTLCPrivBase, err := wal.GetPriv(h.KeyGen)
+	if err != nil {
+		return nil, err
+	}
+
+	HTLCPriv := lnutil.CombinePrivKeyWithBytes(HTLCPrivBase, elkScalar[:])
+	tx := wire.NewMsgTx()
+	op := wire.NewOutPoint(&stateTxID, i)
+	if mine {
+
+		for _, s := range htlcSpends {
+			if lnutil.OutPointsEqual(*op, s.TxIn[0].PreviousOutPoint) {
+				tx = s
+				break
+			}
+		}
+	} else {
+		// Claim back to my wallet, i only need my sig & preimage
+
+		tx.Version = 2
+		tx.LockTime = 0
+
+		in := wire.NewTxIn(op, nil, nil)
+		in.Sequence = 0
+
+		tx.AddTxIn(in)
+
+		pkh, err := wal.NewAdr()
+		if err != nil {
+			return nil, err
+		}
+		tx.AddTxOut(wire.NewTxOut(h.Amt-q.State.Fee, lnutil.DirectWPKHScriptFromPKH(pkh)))
+	}
+
+	hc := txscript.NewTxSigHashes(tx)
+
+	HTLCScript, err := q.GenHTLCScript(h, mine)
+	if err != nil {
+		return nil, err
+	}
+
+	HTLCparsed, err := txscript.ParseScript(HTLCScript)
+	if err != nil {
+		return nil, err
+	}
+
+	spendHTLCHash := txscript.CalcWitnessSignatureHash(
+		HTLCparsed, hc, txscript.SigHashAll, tx, 0, htlcTxo.Value)
+
+	log.Printf("Signing HTLC Hash [%x] with key [%x]\n", spendHTLCHash, HTLCPriv.PubKey().SerializeCompressed())
+	mySig, err := HTLCPriv.Sign(spendHTLCHash)
+	if err != nil {
+		return nil, err
+	}
+
+	myBigSig := append(mySig.Serialize(), byte(txscript.SigHashAll))
+	if !mine && h.Incoming {
+
+		tx.TxIn[0].Witness = make([][]byte, 3)
+		tx.TxIn[0].Witness[0] = myBigSig
+		tx.TxIn[0].Witness[1] = h.R[:]
+		tx.TxIn[0].Witness[2] = HTLCScript
+	} else if mine && h.Incoming {
+		theirBigSig := sig64.SigDecompress(h.Sig)
+		theirBigSig = append(theirBigSig, byte(txscript.SigHashAll))
+
+		tx.TxIn[0].Witness = make([][]byte, 5)
+		tx.TxIn[0].Witness[0] = nil
+		tx.TxIn[0].Witness[1] = theirBigSig
+		tx.TxIn[0].Witness[2] = myBigSig
+		tx.TxIn[0].Witness[3] = h.R[:]
+		tx.TxIn[0].Witness[4] = HTLCScript
+
+	}
+
+	wal.StopWatchingThis(*op)
+	wal.DirectSendTx(tx)
+	return tx, nil
 }

@@ -2,6 +2,7 @@ package qln
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"log"
 	"sync"
@@ -9,9 +10,10 @@ import (
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
+	"github.com/mit-dci/lit/wire"
 
-	"github.com/mit-dci/lit/btcutil/btcd/btcec"
-	"github.com/mit-dci/lit/btcutil/btcd/chaincfg/chainhash"
+	"github.com/mit-dci/lit/btcutil/btcec"
+	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 )
 
 // Uhh, quick channel.  For now.  Once you get greater spire it upgrades to
@@ -272,4 +274,35 @@ func (q *Qchan) GetChannelBalances() (int64, int64) {
 	theirAmt := value - myAmt
 
 	return myAmt, theirAmt
+}
+
+type HTLCOPWatch struct {
+	Op       *wire.OutPoint
+	Value    int64
+	CoinType uint32
+	Incoming bool
+	RHash    [32]byte
+}
+
+func (h *HTLCOPWatch) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.Write(h.RHash[:])
+	binary.Write(&buf, binary.BigEndian, h.Value)
+	binary.Write(&buf, binary.BigEndian, h.CoinType)
+	binary.Write(&buf, binary.BigEndian, h.Incoming)
+
+	return buf.Bytes()
+}
+
+func HTLCOPWatchFromBytes(b []byte, op [36]byte) *HTLCOPWatch {
+	h := new(HTLCOPWatch)
+	h.Op = lnutil.OutPointFromBytes(op)
+
+	buf := bytes.NewBuffer(b)
+	copy(h.RHash[:], buf.Next(32))
+	binary.Read(buf, binary.BigEndian, &h.Value)
+	binary.Read(buf, binary.BigEndian, &h.CoinType)
+	binary.Read(buf, binary.BigEndian, &h.Incoming)
+	return h
 }

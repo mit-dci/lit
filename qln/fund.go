@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/mit-dci/lit/btcutil/btcd/btcec"
+	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/elkrem"

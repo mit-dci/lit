@@ -6,8 +6,8 @@ import (
 	"log"
 	"sort"
 
-	"github.com/mit-dci/lit/btcutil/btcd/chaincfg/chainhash"
-	"github.com/mit-dci/lit/btcutil/btcd/txscript"
+	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
+	"github.com/mit-dci/lit/btcutil/txscript"
 	"github.com/mit-dci/lit/btcutil/txsort"
 	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
