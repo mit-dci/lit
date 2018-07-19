@@ -1,6 +1,11 @@
 #![allow(unused)]
+#![allow(non_snake_case)]
+
+#![feature(concat_idents)]
 
 use std::net::TcpStream;
+
+use std::fmt;
 
 use reqwest;
 
@@ -108,3 +113,321 @@ impl LitRpcClient {
 
     }
 }
+
+macro_rules! rpc_call {
+    {$fname:ident, $method:ident, { $($ii:ident: $it:ty),* } => $oname:ident { $($oi:ident: $ot:ty),* }} => {
+
+        #[derive(Clone, Deserialize)]
+        #[allow(non_snake_case)]
+        pub struct $oname {
+            $( $oi: $ot ),*
+        }
+
+        impl LitRpcClient {
+
+            #[allow(non_snake_case)]
+            pub fn $fname(&mut self, $($ii: $it),*) -> Result<$oname, LitRpcError> {
+
+                #[derive(Clone, Debug, Serialize)]
+                #[allow(non_snake_case)]
+                struct Params {
+                    $( $ii: $it ),*
+                };
+
+                let arg = Params {
+                    $($ii: $ii),*
+                };
+
+                self.call(concat!("LitRPC.", stringify!($method)), arg)
+            }
+        }
+
+    };
+    {$fname:ident, $method:ident, { $($ii:ident: $it:ty),* } => $oname:ident} => {
+
+        impl LitRpcClient {
+
+            #[allow(non_snake_case)]
+            pub fn $fname(&mut self, $($ii: $it),*) -> Result<$oname, LitRpcError> {
+
+                #[derive(Clone, Debug, Serialize)]
+                #[allow(non_snake_case)]
+                struct Params {
+                    $( $ii: $it ),*
+                };
+
+                let arg = Params {
+                    $($ii: $ii),*
+                };
+
+                self.call(concat!("LitRPC.", stringify!($method)), arg)
+            }
+        }
+
+    };
+}
+
+#[derive(Clone, Deserialize)]
+pub struct StatusReply {
+    Status: String
+}
+
+impl fmt::Debug for StatusReply {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        f.write_str(format!("status: {}", self.Status).as_ref())
+    }
+}
+
+// netcmds
+
+#[derive(Clone, Deserialize)]
+pub struct ListeningPortsReply {
+    LisIpPorts: Vec<String>,
+    Adr: String
+}
+
+rpc_call! {
+    call_lis, Listen,
+    { Port: String } => ListeningPortsReply
+}
+
+rpc_call! {
+    call_connect, Connect,
+    { LNAddr: String } => StatusReply
+}
+
+rpc_call! {
+    call_assign_nickname, AssignNickname,
+    { Peer: u32, Nickname: String } => StatusReply
+}
+
+#[derive(Clone, Deserialize)]
+pub struct ConInfo {
+    PeerNumber: u32,
+    RemoteHost: String
+}
+
+rpc_call! {
+    call_list_connections, ListConnections,
+    {} => ListConnectionsReply { Connections: Vec<ConInfo>, MyPKH: String }
+}
+
+rpc_call! {
+    call_get_listening_ports, GetListeningPorts,
+    {} => ListeningPortsReply
+}
+
+rpc_call! { call_get_messages, GetMessages, {} => StatusReply }
+rpc_call! { call_say, Say, {} => StatusReply }
+rpc_call! { call_stop, Stop, {} => StatusReply }
+
+rpc_call! {
+    call_get_chan_map, GetChannelMap,
+    {} => ChanGraphReply { Graph: String }
+}
+
+// chancmds
+
+#[derive(Clone, Deserialize)]
+pub struct ChanInfo {
+    OutPoint: String,
+    CoinType: u32,
+    Closed: bool,
+    Capacity: i64,
+    MyBalance: i64,
+    Height: i32,
+    StateNum: i64,
+    PeerIdx: u32,
+    CIdx: u32,
+    Data: [u8; 32],
+    Pkh: [u8; 20]
+}
+
+rpc_call! {
+    call_chan_list, ChannelList,
+    { ChanIdx: u32 } => ChanListReply { Channels: Vec<ChanInfo> }
+}
+
+rpc_call! {
+    call_fund, FundChannel,
+    {
+        Peer: u32,
+        CoinType: u32,
+        Capacity: i64,
+        Roundup: i64,
+        InitialSend: i64,
+        Data: [u8; 32]
+    } => StatusReply
+}
+
+rpc_call! {
+    call_dual_fund, DualFundChannel,
+    {
+        Peer: i32,
+        CoinType: i32,
+        OurAmount: i64,
+        TheirAmount: i64
+    } => StatusReply
+}
+
+// TODO DualFundDecline, DualFundAccept, etc.
+
+rpc_call! {
+    call_get_pending_dual_fund, PendingDualFund,
+    {} => PendingDualFundReply {
+        Pending: bool,
+        PeerIdx: u32,
+        CoinType: u32,
+        TheirAmount: i64,
+        RequestedAmount: i64
+    }
+}
+
+/* TODO No auto-Deserialize for [u8; 64], do something about this later.
+#[derive(Clone, Deserialize)]
+pub struct JusticeTx {
+    Sig: [u8; 64],
+    Txid: [u8; 16],
+    Amt: i64,
+    Data: [u8; 32],
+    Pkh: [u8; 20],
+    Idx: u64
+}
+
+rpc_call! {
+    call_get_state_dump, StateDump,
+    {} => StateDumpReply {
+        Txs: Vec<JusticeTx>
+    }
+}
+*/
+
+rpc_call! {
+    call_push, Push,
+    {
+        ChanIdx: u32,
+        Amt: i64,
+        Data: [u8; 32]
+    } => PushReply {
+        StateIdx: u64
+    }
+}
+
+rpc_call! {
+    call_close_chan, CloseChannel,
+    { ChanIdx: u32 } => StatusReply
+}
+
+rpc_call! {
+    call_break_chan, BreakChannel,
+    { ChanIdx: u32 } => StatusReply
+}
+
+#[derive(Clone, Deserialize)]
+pub struct PrivInfo {
+    OutPoint: String,
+    Amt: i64,
+    Height: i32,
+    Delay: i32,
+    CoinType: String,
+    Witty: bool,
+    PairKey: String,
+    WIF: String
+}
+
+rpc_call! {
+    call_dump_privs, DumpPrivs,
+    {} => DumpPrivsReply { Privs: Vec<PrivInfo> }
+}
+
+// walletcmds
+
+#[derive(Clone, Deserialize)]
+pub struct CoinBalInfo {
+    CoinType: u32,
+    SyncHeight: i32,
+    ChanTotal: i64,
+    TxoTotal: i64,
+    MatureWitty: i64,
+    FeeRate: i64
+}
+
+rpc_call! {
+    call_bal, Balance,
+    {} => BalanceReply { Balances: Vec<CoinBalInfo> }
+}
+
+#[derive(Clone, Deserialize)]
+pub struct TxoInfo {
+    OutPoint: String,
+    Amt: i64,
+    Height: i32,
+    Delay: i32,
+    CoinType: String,
+    Witty: bool,
+    KeyPath: String
+}
+
+#[derive(Clone, Deserialize)]
+pub struct TxidsReply {
+    Txids: Vec<String>
+}
+
+rpc_call! {
+    call_get_txo_list, TxoList,
+    {} => TxidsReply
+}
+
+rpc_call! {
+    call_send, Send, // oh no it's already an identifier whoops
+    {
+        DestAddrs: Vec<String>,
+        Amts: Vec<i64>
+    } => TxidsReply
+}
+
+rpc_call! {
+    call_sweep, Sweep,
+    {
+        DestAdr: String,
+        NumTx: u32,
+        Drop: bool // oh no it's an identifier too, whoops!
+    } => TxidsReply
+}
+
+rpc_call! {
+    call_fanout, Fanout,
+    {
+        DestAdr: String,
+        NumOutputs: u32,
+        AmtPerOutput: i64
+    } => TxidsReply
+}
+
+#[derive(Clone, Deserialize)]
+pub struct FeeReply {
+    CurrentFee: i64
+}
+
+rpc_call! {
+    call_set_fee, SetFee,
+    { Fee: i64, CoinType: u32 } => FeeReply
+}
+
+rpc_call! {
+    call_get_fee, GetFee,
+    { CoinType: u32 } => FeeReply
+}
+
+rpc_call! {
+    call_gen_address, Address,
+    {
+        NumToMake: u32,
+        CoinType: u32
+    } => AddressReply {
+        WitAddresses: Vec<String>,
+        LegacyAddresses: Vec<String>
+    }
+}
+
+// TODO make RPC call definitions
