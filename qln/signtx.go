@@ -251,8 +251,18 @@ func (nd *LitNode) SignState(q *Qchan) ([64]byte, [][64]byte, error) {
 		}
 
 		hc := txscript.NewTxSigHashes(spendTx)
+		var HTLCScript []byte
 
-		HTLCparsed, err := txscript.ParseScript(h.PkScript)
+		if idx >= len(q.State.HTLCs) {
+			HTLCScript, err = q.GenHTLCScript(*q.State.InProgHTLC, false)
+		} else {
+			HTLCScript, err = q.GenHTLCScript(q.State.HTLCs[idx], false)
+		}
+		if err != nil {
+			return sig, nil, err
+		}
+
+		HTLCparsed, err := txscript.ParseScript(HTLCScript)
 		if err != nil {
 			return sig, nil, err
 		}
@@ -262,12 +272,12 @@ func (nd *LitNode) SignState(q *Qchan) ([64]byte, [][64]byte, error) {
 
 		log.Printf("Signing HTLC hash: %x, with pubkey: %x", spendHTLCHash, HTLCPriv.PubKey().SerializeCompressed())
 
-		HTLCSig, err := txscript.RawTxInWitnessSignature(spendTx, hc, 0, h.Value, h.PkScript, txscript.SigHashAll, HTLCPriv)
+		mySig, err := HTLCPriv.Sign(spendHTLCHash)
 		if err != nil {
 			return sig, nil, err
 		}
 
-		HTLCSig = HTLCSig[:len(HTLCSig)-1]
+		HTLCSig := mySig.Serialize()
 		s, err := sig64.SigCompress(HTLCSig)
 		if err != nil {
 			return sig, nil, err
@@ -377,8 +387,17 @@ func (q *Qchan) VerifySigs(sig [64]byte, HTLCSigs [][64]byte) error {
 		}
 
 		hc := txscript.NewTxSigHashes(spendTx)
+		var HTLCScript []byte
+		if idx >= len(q.State.HTLCs) {
+			HTLCScript, err = q.GenHTLCScript(*q.State.InProgHTLC, true)
+		} else {
+			HTLCScript, err = q.GenHTLCScript(q.State.HTLCs[idx], true)
+		}
+		if err != nil {
+			return err
+		}
 
-		HTLCparsed, err := txscript.ParseScript(h.PkScript)
+		HTLCparsed, err := txscript.ParseScript(HTLCScript)
 		if err != nil {
 			return err
 		}

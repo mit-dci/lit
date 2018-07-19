@@ -256,13 +256,15 @@ func (nd *LitNode) HashSigHandler(msg lnutil.HashSigMsg, qc *Qchan) error {
 	qc.State.Data = msg.Data
 
 	// verify sig for the next state. only save if this works
+	curElk := qc.State.ElkPoint
+	qc.State.ElkPoint = qc.State.NextElkPoint
 
 	// TODO: There are more signatures required
 	err = qc.VerifySigs(msg.CommitmentSignature, msg.HTLCSigs)
 	if err != nil {
 		return fmt.Errorf("HashSigHandler err %s", err.Error())
 	}
-
+	qc.State.ElkPoint = curElk
 	// (seems odd, but everything so far we still do in case of collision, so
 	// only check here.  If it's a collision, set, save, send gapSigRev
 
@@ -597,7 +599,7 @@ func (nd *LitNode) ClaimHTLC(R [16]byte) ([][32]byte, error) {
 			q := channels[i]
 			if q.CloseData.Closed {
 				copy(h.R[:], R[:])
-				tx, err := nd.ClaimHTLCTx(q, h)
+				tx, err := nd.ClaimIncomingHTLCTx(q, h)
 				if err != nil {
 					log.Printf("Error claiming HTLC: %s", err.Error())
 					return nil, err
@@ -668,31 +670,26 @@ func GetHTLCOut(q *Qchan, h HTLC, tx *wire.MsgTx, mine bool) (*wire.TxOut, uint3
 	return nil, 0, nil
 }
 
-func (nd *LitNode) ClaimHTLCTx(q *Qchan, h HTLC) (*wire.MsgTx, error) {
-	tx := wire.NewMsgTx()
+func (nd *LitNode) ClaimIncomingHTLCTx(q *Qchan, h HTLC) (*wire.MsgTx, error) {
+	if !h.Incoming {
+		return nil, fmt.Errorf("Trying to claim an HTLC with incoming=false using ClaimIncomingHTLCTx. Not a good idea.")
+	}
+
 	mine := true
-	stateTx, _, _, err := q.BuildStateTxs(mine)
+	stateTx, htlcSpends, _, err := q.BuildStateTxs(mine)
 	if err != nil {
 		return nil, err
 	}
-	revPub, timePub, _, err := q.GetKeysFromState(mine)
-	if err != nil {
-		return nil, err
-	}
+
 	stateTxID := stateTx.TxHash()
-	log.Printf("My state TXID is %s", stateTxID.String())
 	if !q.CloseData.CloseTxid.IsEqual(&stateTxID) {
 		mine = false
-		stateTx, _, _, err = q.BuildStateTxs(mine)
+		stateTx, htlcSpends, _, err = q.BuildStateTxs(mine)
 		if err != nil {
 			return nil, err
 		}
-		revPub, timePub, _, err = q.GetKeysFromState(mine)
-		if err != nil {
-			return nil, err
-		}
+
 		stateTxID = stateTx.TxHash()
-		log.Printf("Their state TXID is %s", stateTxID.String())
 
 		if !q.CloseData.CloseTxid.IsEqual(&stateTxID) {
 			return nil, fmt.Errorf("Could not find/regenerate proper close TX")
@@ -707,28 +704,48 @@ func (nd *LitNode) ClaimHTLCTx(q *Qchan, h HTLC) (*wire.MsgTx, error) {
 		return nil, err
 	}
 	elkScalar := lnutil.ElkScalar(curElk)
-
 	HTLCPrivBase, err := wal.GetPriv(h.KeyGen)
 	if err != nil {
 		return nil, err
 	}
 
 	HTLCPriv := lnutil.CombinePrivKeyWithBytes(HTLCPrivBase, elkScalar[:])
+	tx := wire.NewMsgTx()
 
-	spendHTLCScript := lnutil.CommitScript(revPub, timePub, q.Delay)
+	if mine {
+		op := wire.NewOutPoint(&stateTxID, i)
+		for _, s := range htlcSpends {
+			if lnutil.OutPointsEqual(*op, s.TxIn[0].PreviousOutPoint) {
+				tx = s
+				break
+			}
+		}
+	} else {
+		// Claim back to my wallet, i only need my sig & preimage
 
-	in := wire.NewTxIn(wire.NewOutPoint(&stateTxID, i), nil, nil)
-	in.Sequence = 0
+		tx.Version = 2
+		tx.LockTime = 0
 
-	tx.AddTxIn(in)
-	tx.AddTxOut(wire.NewTxOut(h.Amt-q.State.Fee, lnutil.P2WSHify(spendHTLCScript)))
+		in := wire.NewTxIn(wire.NewOutPoint(&stateTxID, i), nil, nil)
+		in.Sequence = 0
 
-	tx.Version = 2
-	tx.LockTime = 0
+		tx.AddTxIn(in)
+
+		pkh, err := wal.NewAdr()
+		if err != nil {
+			return nil, err
+		}
+		tx.AddTxOut(wire.NewTxOut(h.Amt-q.State.Fee, lnutil.DirectWPKHScriptFromPKH(pkh)))
+	}
 
 	hc := txscript.NewTxSigHashes(tx)
 
-	HTLCparsed, err := txscript.ParseScript(htlcTxo.PkScript)
+	HTLCScript, err := q.GenHTLCScript(h, mine)
+	if err != nil {
+		return nil, err
+	}
+
+	HTLCparsed, err := txscript.ParseScript(HTLCScript)
 	if err != nil {
 		return nil, err
 	}
@@ -736,33 +753,35 @@ func (nd *LitNode) ClaimHTLCTx(q *Qchan, h HTLC) (*wire.MsgTx, error) {
 	spendHTLCHash := txscript.CalcWitnessSignatureHash(
 		HTLCparsed, hc, txscript.SigHashAll, tx, 0, htlcTxo.Value)
 
-	log.Printf("Signing HTLC Spend TX %s\n", tx.TxHash().String())
-	lnutil.PrintTx(tx)
-	log.Printf("Signing HTLC script %x - hash: %x, with pubkey: %x", htlcTxo.PkScript, spendHTLCHash, HTLCPriv.PubKey().SerializeCompressed())
-
-	myBigSig, err := txscript.RawTxInWitnessSignature(tx, hc, 0, htlcTxo.Value, htlcTxo.PkScript, txscript.SigHashAll, HTLCPriv)
+	log.Printf("Signing HTLC Hash [%x] with key [%x]\n", spendHTLCHash, HTLCPriv.PubKey().SerializeCompressed())
+	mySig, err := HTLCPriv.Sign(spendHTLCHash)
 	if err != nil {
 		return nil, err
 	}
 
-	theirBigSig := sig64.SigDecompress(h.Sig)
-	theirBigSig = append(theirBigSig, byte(txscript.SigHashAll))
+	myBigSig := append(mySig.Serialize(), byte(txscript.SigHashAll))
+	if !mine && h.Incoming {
 
-	tx.TxIn[0].Witness = make([][]byte, 5)
-	tx.TxIn[0].Witness[0] = []byte{0}
-	tx.TxIn[0].Witness[1] = theirBigSig
-	tx.TxIn[0].Witness[2] = myBigSig
-	tx.TxIn[0].Witness[3] = h.R[:]
-	HTLCScript, err := q.GenHTLCScript(h, mine)
-	if err != nil {
-		return nil, err
+		tx.TxIn[0].Witness = make([][]byte, 3)
+		tx.TxIn[0].Witness[0] = myBigSig
+		tx.TxIn[0].Witness[1] = h.R[:]
+		tx.TxIn[0].Witness[2] = HTLCScript
+	} else if mine && h.Incoming {
+		theirBigSig := sig64.SigDecompress(h.Sig)
+		theirBigSig = append(theirBigSig, byte(txscript.SigHashAll))
+
+		tx.TxIn[0].Witness = make([][]byte, 5)
+		tx.TxIn[0].Witness[0] = nil
+		tx.TxIn[0].Witness[1] = theirBigSig
+		tx.TxIn[0].Witness[2] = myBigSig
+		tx.TxIn[0].Witness[3] = h.R[:]
+		tx.TxIn[0].Witness[4] = HTLCScript
+
 	}
-	tx.TxIn[0].Witness[4] = HTLCScript
 
 	log.Println("Claiming HTLC using transaction:\n\n")
 	lnutil.PrintTx(tx)
 
-	// TODO: Actually provide the preimage as input and sign.
 	wal.DirectSendTx(tx)
 	return tx, nil
 }

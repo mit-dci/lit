@@ -340,16 +340,11 @@ func (q *Qchan) GenHTLCScript(h HTLC, mine bool) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("Using elkpoint [%x] for HTLC\n", q.State.ElkPoint)
-	log.Printf("Using elkpoint [%x] for HTLC\n", curElk)
-
-	log.Printf("MyHTLCBase: [%x]\n", h.MyHTLCBase)
-	log.Printf("TheirHTLCBase: [%x]\n", h.TheirHTLCBase)
 	if mine { // Generating OUR tx that WE save
-		remotePub = lnutil.CombinePubs(h.TheirHTLCBase, curElk)
+		remotePub = lnutil.CombinePubs(h.TheirHTLCBase, q.State.ElkPoint)
 		localPub = lnutil.CombinePubs(h.MyHTLCBase, curElk)
 	} else { // Generating THEIR tx that THEY save
-		remotePub = lnutil.CombinePubs(h.MyHTLCBase, q.State.ElkPoint)
+		remotePub = lnutil.CombinePubs(h.MyHTLCBase, curElk)
 		localPub = lnutil.CombinePubs(h.TheirHTLCBase, q.State.ElkPoint)
 	}
 
