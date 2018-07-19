@@ -20,6 +20,7 @@
 
 from lit_test_framework import LitTest, wait_until
 from utils import assert_equal
+import time
 
 class TestBasic(LitTest):
     def run_test(self):
@@ -68,7 +69,8 @@ class TestBasic(LitTest):
         assert not res['error']
 
         # Check that litnode0 and litnode1 are connected
-        wait_until(lambda: len(self.litnodes[0].ListConnections()['result']['Connections']) == 1)
+        time.sleep(10) #RPC timeout, so this doesn't affect the logic of the program
+        # Wait until both nodes are connected
         assert_equal(len(self.litnodes[1].ListConnections()['result']['Connections']), 1)
         self.log.info("lit nodes connected")
 
