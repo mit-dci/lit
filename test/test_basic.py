@@ -72,8 +72,11 @@ class TestBasic(LitTest):
 
         # Check that litnode0 and litnode1 are connected
         self.log.info("Waiting for nodes to connect to each other")
-        time.sleep(10) #RPC timeout, so this doesn't affect the program flow
+        wait_until(lambda: len(self.litnodes[0].ListConnections()['result']['Connections']) == 1)
+        #self.log.info("Does wait_until actually trigger?")
+        #time.sleep(10) #RPC timeout, so this doesn't affect the program flow
         # Wait until both nodes are connected
+
         assert_equal(len(self.litnodes[1].ListConnections()['result']['Connections']), 1)
         self.log.info("lit nodes connected")
 

@@ -49,7 +49,7 @@ class BCNode():
             if self.process.poll() is not None:
                 raise Exception('%s exited with status %i during initialization' % (self.__class__.bin_name, self.process.returncode))
             try:
-                resp = self.getinfo()
+                resp = self.getnetworkinfo()
                 if resp.json()['error'] and resp.json()['error']['code'] == -28:
                     # RPC is still in warmup. Sleep some more.
                     continue
