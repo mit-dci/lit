@@ -70,7 +70,7 @@ class TestBasic(LitTest):
         res = self.litnodes[1].Connect(LNAddr=self.litnodes[0].lit_address)
         assert not res['error']
 
-        time.sleep(10) #RPC timeout
+        time.sleep(1) #RPC timeout
         # Check that litnode0 and litnode1 are connected
         self.log.info("Waiting for nodes to connect to each other")
         wait_until(lambda: len(self.litnodes[0].ListConnections()['result']['Connections']) == 1)
