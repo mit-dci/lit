@@ -11,11 +11,20 @@ fi
 workspace="$PWD/build/_workspace"
 root="$PWD"
 homedir="$workspace/src/github.com/mit-dci"
+
+# Are we actually doing cleanup?
+if [ "$1" = "clean" ]; then
+    rm -rf $workspace
+    exit
+fi
+
+# Create the homedir
 if [ ! -L "$homedir/lit" ]; then
-    mkdir -p "$homedir"
-    cd "$homedir"
+    mkdir -p $homedir
+    back=$(pwd)
+    cd $homedir
     ln -s ../../../../../. lit
-    cd "$root"
+    cd $back
 fi
 
 # Set up the environment to use the workspace.
@@ -27,4 +36,6 @@ cd "$homedir/lit"
 PWD="$homedir/lit"
 
 # Launch the arguments with the configured environment.
-exec "$@"
+if [ ! -z "$1" ]; then
+	exec "$@"
+fi
