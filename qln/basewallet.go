@@ -84,6 +84,10 @@ type UWallet interface {
 	// wallet up to the LN module.
 	LetMeKnow() chan lnutil.OutPointEvent
 
+	// LetMeKnowHeight opens the chan where the blockheight flows from the underlying
+	// wallet up to the LN module. Used for monitoring HTLC timeouts
+	LetMeKnowHeight() chan lnutil.HeightEvent
+
 	// Ask for network parameters
 	Params() *coinparam.Params
 

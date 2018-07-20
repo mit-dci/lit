@@ -582,7 +582,26 @@ func (nd *LitNode) PreimageSigHandler(msg lnutil.PreimageSigMsg, qc *Qchan) erro
 	return nil
 }
 
-// Claim HTLC will claim an HTLC on-chain output from a broken channel using
+func (nd *LitNode) ClearHTLCState(q *Qchan, h HTLC) error {
+	q.ChanMtx.Lock()
+	err := nd.ReloadQchanState(q)
+	if err != nil {
+		log.Printf("Error reloading qchan state: %s", err.Error())
+		return err
+	}
+	qh := &q.State.HTLCs[h.Idx]
+	qh.Cleared = true
+	err = nd.SaveQchanState(q)
+	if err != nil {
+		log.Printf("Error saving qchan state: %s", err.Error())
+		return err
+	}
+	q.ChanMtx.Unlock()
+
+	return nil
+}
+
+// ClaimHTLC will claim an HTLC on-chain output from a broken channel using
 // the given preimage. Returns the TXIDs of the claim transactions
 func (nd *LitNode) ClaimHTLC(R [16]byte) ([][32]byte, error) {
 	txids := make([][32]byte, 0)
@@ -591,20 +610,20 @@ func (nd *LitNode) ClaimHTLC(R [16]byte) ([][32]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("Found [%d] HTLC Outpoints from preimage [%x]\n", len(htlcs), R)
 	for i, h := range htlcs {
 
 		// Outgoing HTLCs should not be claimed using the preimage, but
 		// using the timeout. So only claim incoming ones in this routine
-		if h.Incoming {
+		if h.Incoming && !h.Cleared {
 			q := channels[i]
 			if q.CloseData.Closed {
 				copy(h.R[:], R[:])
-				tx, err := nd.ClaimIncomingHTLCTx(q, h)
+				tx, err := nd.ClaimHTLCOnChain(q, h)
 				if err != nil {
 					log.Printf("Error claiming HTLC: %s", err.Error())
 					return nil, err
 				}
+				nd.ClearHTLCState(q, h)
 				txids = append(txids, tx.TxHash())
 			} else {
 				log.Printf("Cleaing HTLC from channel [%d] idx [%d]\n", q.Idx(), h.Idx)
@@ -613,6 +632,61 @@ func (nd *LitNode) ClaimHTLC(R [16]byte) ([][32]byte, error) {
 		}
 	}
 	return txids, nil
+}
+
+func (nd *LitNode) ClaimHTLCTimeouts(coinType uint32, height int32) ([][32]byte, error) {
+	txids := make([][32]byte, 0)
+	htlcs, channels, err := nd.FindHTLCsByTimeoutHeight(coinType, height)
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("Found [%d] HTLC Outpoints that have timed out\n", len(htlcs))
+	for i, h := range htlcs {
+		if !h.Incoming { // only for timed out HTLCs!
+			q := channels[i]
+			if q.CloseData.Closed {
+				tx, err := nd.ClaimHTLCOnChain(q, h)
+				if err != nil {
+					log.Printf("Error claiming HTLC: %s", err.Error())
+					return nil, err
+				}
+				nd.ClearHTLCState(q, h)
+				txids = append(txids, tx.TxHash())
+			} else {
+				log.Printf("Timing out HTLC from channel [%d] idx [%d]\n", q.Idx(), h.Idx)
+				nd.ClearHTLC(q, [16]byte{}, h.Idx, [32]byte{})
+			}
+		}
+	}
+	return txids, nil
+}
+
+func (nd *LitNode) FindHTLCsByTimeoutHeight(coinType uint32, height int32) ([]HTLC, []*Qchan, error) {
+	htlcs := make([]HTLC, 0)
+	channels := make([]*Qchan, 0)
+	qc, err := nd.GetAllQchans()
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, q := range qc {
+		err := nd.ReloadQchanState(q)
+		if err != nil {
+			return nil, nil, err
+		}
+		if q.Coin() == coinType {
+			for _, h := range q.State.HTLCs {
+				if !h.Incoming && !h.Cleared {
+					if height >= int32(h.Locktime) {
+						htlcs = append(htlcs, h)
+						channels = append(channels, q)
+					} else {
+						log.Printf("Ignoring HTLC in chan [%d] idx [%d] - expires at block [%d] (now: %d)", q.Idx(), h.Idx, h.Locktime, height)
+					}
+				}
+			}
+		}
+	}
+	return htlcs, channels, nil
 }
 
 func (nd *LitNode) FindHTLCsByHash(hash [32]byte) ([]HTLC, []*Qchan, error) {
@@ -672,15 +746,11 @@ func GetHTLCOut(q *Qchan, h HTLC, tx *wire.MsgTx, mine bool) (*wire.TxOut, uint3
 	return nil, 0, nil
 }
 
-func (nd *LitNode) ClaimIncomingHTLCTx(q *Qchan, h HTLC) (*wire.MsgTx, error) {
-	if !h.Incoming {
-		return nil, fmt.Errorf("Trying to claim an HTLC with incoming=false using ClaimIncomingHTLCTx. Not a good idea.")
-	}
-
+func (q *Qchan) GetCloseTxs() (*wire.MsgTx, []*wire.MsgTx, bool, error) {
 	mine := true
 	stateTx, htlcSpends, _, err := q.BuildStateTxs(mine)
 	if err != nil {
-		return nil, err
+		return nil, nil, false, err
 	}
 
 	stateTxID := stateTx.TxHash()
@@ -688,17 +758,40 @@ func (nd *LitNode) ClaimIncomingHTLCTx(q *Qchan, h HTLC) (*wire.MsgTx, error) {
 		mine = false
 		stateTx, htlcSpends, _, err = q.BuildStateTxs(mine)
 		if err != nil {
-			return nil, err
+			return nil, nil, false, err
 		}
 
 		stateTxID = stateTx.TxHash()
 
 		if !q.CloseData.CloseTxid.IsEqual(&stateTxID) {
-			return nil, fmt.Errorf("Could not find/regenerate proper close TX")
+			return nil, nil, false, fmt.Errorf("Could not find/regenerate proper close TX")
 		}
 	}
+	return stateTx, htlcSpends, mine, nil
+}
 
-	wal := nd.SubWallet[q.Coin()]
+func (nd *LitNode) ClaimHTLCOnChain(q *Qchan, h HTLC) (*wire.MsgTx, error) {
+	wal, ok := nd.SubWallet[q.Coin()]
+	if !ok {
+		return nil, fmt.Errorf("Unable to find wallet for cointype [%d]", q.Coin())
+	}
+
+	if !h.Incoming {
+		unlockHeight := int32(h.Locktime)
+		if wal.CurrentHeight() < unlockHeight {
+			err := fmt.Errorf("Trying to claim timeout before timelock expires - wait until height %d", unlockHeight)
+			log.Println(err.Error())
+			return nil, err
+		}
+
+	}
+
+	stateTx, htlcSpends, mine, err := q.GetCloseTxs()
+	if err != nil {
+		return nil, err
+	}
+	stateTxID := stateTx.TxHash()
+
 	htlcTxo, i, err := GetHTLCOut(q, h, stateTx, mine)
 
 	curElk, err := q.ElkSnd.AtIndex(q.State.StateIdx)
@@ -715,7 +808,6 @@ func (nd *LitNode) ClaimIncomingHTLCTx(q *Qchan, h HTLC) (*wire.MsgTx, error) {
 	tx := wire.NewMsgTx()
 	op := wire.NewOutPoint(&stateTxID, i)
 	if mine {
-
 		for _, s := range htlcSpends {
 			if lnutil.OutPointsEqual(*op, s.TxIn[0].PreviousOutPoint) {
 				tx = s
@@ -723,7 +815,9 @@ func (nd *LitNode) ClaimIncomingHTLCTx(q *Qchan, h HTLC) (*wire.MsgTx, error) {
 			}
 		}
 	} else {
-		// Claim back to my wallet, i only need my sig & preimage
+		// They broke.
+		// Claim back to my wallet, i only need my sig & preimage (for success)
+		// or just my sig when timed out.
 
 		tx.Version = 2
 		tx.LockTime = 0
@@ -739,7 +833,6 @@ func (nd *LitNode) ClaimIncomingHTLCTx(q *Qchan, h HTLC) (*wire.MsgTx, error) {
 		}
 		tx.AddTxOut(wire.NewTxOut(h.Amt-q.State.Fee, lnutil.DirectWPKHScriptFromPKH(pkh)))
 	}
-
 	hc := txscript.NewTxSigHashes(tx)
 
 	HTLCScript, err := q.GenHTLCScript(h, mine)
@@ -762,10 +855,10 @@ func (nd *LitNode) ClaimIncomingHTLCTx(q *Qchan, h HTLC) (*wire.MsgTx, error) {
 	}
 
 	myBigSig := append(mySig.Serialize(), byte(txscript.SigHashAll))
-	if mine {
-		theirBigSig := sig64.SigDecompress(h.Sig)
-		theirBigSig = append(theirBigSig, byte(txscript.SigHashAll))
+	theirBigSig := sig64.SigDecompress(h.Sig)
+	theirBigSig = append(theirBigSig, byte(txscript.SigHashAll))
 
+	if mine && h.Incoming {
 		tx.TxIn[0].Witness = make([][]byte, 5)
 		tx.TxIn[0].Witness[0] = nil
 		tx.TxIn[0].Witness[1] = theirBigSig
@@ -773,11 +866,21 @@ func (nd *LitNode) ClaimIncomingHTLCTx(q *Qchan, h HTLC) (*wire.MsgTx, error) {
 		tx.TxIn[0].Witness[3] = h.R[:]
 		tx.TxIn[0].Witness[4] = HTLCScript
 	} else {
-		tx.TxIn[0].Witness = make([][]byte, 3)
-		tx.TxIn[0].Witness[0] = myBigSig
-		tx.TxIn[0].Witness[1] = h.R[:]
-		tx.TxIn[0].Witness[2] = HTLCScript
+		tx.TxIn[0].Witness = make([][]byte, 2)
+		if h.Incoming {
+			tx.TxIn[0].Witness = make([][]byte, 3)
+			tx.TxIn[0].Witness[1] = h.R[:]
+		}
+		if mine {
+			tx.TxIn[0].Witness[0] = theirBigSig
+		} else {
+			tx.TxIn[0].Witness[0] = myBigSig
+		}
+		tx.TxIn[0].Witness[len(tx.TxIn[0].Witness)-1] = HTLCScript
 	}
+
+	log.Println("Claiming HTLC on-chain. TX:")
+	lnutil.PrintTx(tx)
 
 	wal.StopWatchingThis(*op)
 	wal.DirectSendTx(tx)
@@ -833,8 +936,6 @@ func (nd *LitNode) ClaimIncomingHTLCTx(q *Qchan, h HTLC) (*wire.MsgTx, error) {
 		shTxo.PreSigStack[0] = nil            // and that item is a nil (timeout)
 
 		shTxo.PkScript = script
-
-		log.Printf("Gaining timeout TXO from HTLC Spend: %s", shTxo.String())
 
 		wal.ExportUtxo(&shTxo)
 	}

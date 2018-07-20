@@ -123,8 +123,8 @@ func (nd *LitNode) LinkBaseWallet(
 		rootpriv, birthHeight, resync, host, nd.LitFolder, proxy, param)
 
 	if err != nil {
-		 log.Println(err)
-		 return nil
+		log.Println(err)
+		return nil
 	}
 
 	if nd.ConnectedCoinTypes == nil {
@@ -150,6 +150,7 @@ func (nd *LitNode) LinkBaseWallet(
 	}
 
 	go nd.OPEventHandler(nd.SubWallet[WallitIdx].LetMeKnow())
+	go nd.HeightEventHandler(nd.SubWallet[WallitIdx].LetMeKnowHeight())
 
 	if !nd.MultiWallet {
 		nd.DefaultCoin = param.HDCoinType

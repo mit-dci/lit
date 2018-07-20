@@ -485,6 +485,20 @@ func (nd *LitNode) OPEventHandler(OPEventChan chan lnutil.OutPointEvent) {
 	}
 }
 
+func (nd *LitNode) HeightEventHandler(HeightEventChan chan lnutil.HeightEvent) {
+	for {
+		event := <-HeightEventChan
+		txs, err := nd.ClaimHTLCTimeouts(event.CoinType, event.Height)
+		if err != nil {
+			log.Printf("Error while claiming HTLC timeouts for coin %d at height %d : %s\n", event.CoinType, event.Height, err.Error())
+		} else {
+			for _, tx := range txs {
+				log.Printf("Claimed timeout HTLC using TXID %x\n", tx)
+			}
+		}
+	}
+}
+
 func (nd *LitNode) HandleContractOPEvent(c *lnutil.DlcContract,
 	opEvent *lnutil.OutPointEvent) error {
 

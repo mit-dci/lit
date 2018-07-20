@@ -14,13 +14,13 @@ func CommitScript(RKey, TKey [33]byte, delay uint16) []byte {
 	builder := txscript.NewScriptBuilder()
 
 	// 1 for penalty / revoked, 0 for timeout
-	// 1, so timeout
+	// 1, so revoked
 	builder.AddOp(txscript.OP_IF)
 
 	// Just push revokable key
 	builder.AddData(RKey[:])
 
-	// 0, so revoked
+	// 0, so timeout
 	builder.AddOp(txscript.OP_ELSE)
 
 	// CSV delay
@@ -109,7 +109,7 @@ func ReceiveHTLCScript(revPKH [20]byte, remotePub [33]byte, RHash [32]byte, loca
 	b.AddInt64(2)
 	b.AddOp(txscript.OP_CHECKMULTISIG)
 	b.AddOp(txscript.OP_ELSE)
-	b.AddOp(txscript.OP_DROP)
+	b.AddOp(txscript.OP_SWAP) // GJG: This was OP_DROP but that drops the signature from the stack.
 	b.AddInt64(int64(locktime))
 	b.AddOp(txscript.OP_CHECKLOCKTIMEVERIFY)
 	b.AddOp(txscript.OP_DROP)
