@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/btcsuite/fastsha256"
+	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/btcutil/txscript"
 	"github.com/mit-dci/lit/consts"
+	"github.com/mit-dci/lit/crypto/fastsha256"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/sig64"
@@ -761,13 +762,7 @@ func (nd *LitNode) ClaimIncomingHTLCTx(q *Qchan, h HTLC) (*wire.MsgTx, error) {
 	}
 
 	myBigSig := append(mySig.Serialize(), byte(txscript.SigHashAll))
-	if !mine && h.Incoming {
-
-		tx.TxIn[0].Witness = make([][]byte, 3)
-		tx.TxIn[0].Witness[0] = myBigSig
-		tx.TxIn[0].Witness[1] = h.R[:]
-		tx.TxIn[0].Witness[2] = HTLCScript
-	} else if mine && h.Incoming {
+	if mine {
 		theirBigSig := sig64.SigDecompress(h.Sig)
 		theirBigSig = append(theirBigSig, byte(txscript.SigHashAll))
 
@@ -777,10 +772,72 @@ func (nd *LitNode) ClaimIncomingHTLCTx(q *Qchan, h HTLC) (*wire.MsgTx, error) {
 		tx.TxIn[0].Witness[2] = myBigSig
 		tx.TxIn[0].Witness[3] = h.R[:]
 		tx.TxIn[0].Witness[4] = HTLCScript
-
+	} else {
+		tx.TxIn[0].Witness = make([][]byte, 3)
+		tx.TxIn[0].Witness[0] = myBigSig
+		tx.TxIn[0].Witness[1] = h.R[:]
+		tx.TxIn[0].Witness[2] = HTLCScript
 	}
 
 	wal.StopWatchingThis(*op)
 	wal.DirectSendTx(tx)
+
+	if mine {
+		// TODO: Refactor this into a function shared with close.go's GetCloseTxos
+		// Store the timeout utxo into the wallit
+		comNum := GetStateIdxFromTx(stateTx, q.GetChanHint(true))
+
+		theirElkPoint, err := q.ElkPoint(false, comNum)
+		if err != nil {
+			return nil, err
+		}
+
+		// build script to store in porTxo, make pubkeys
+		timeoutPub := lnutil.AddPubsEZ(q.MyHAKDBase, theirElkPoint)
+		revokePub := lnutil.CombinePubs(q.TheirHAKDBase, theirElkPoint)
+
+		script := lnutil.CommitScript(revokePub, timeoutPub, q.Delay)
+		// script check.  redundant / just in case
+		genSH := fastsha256.Sum256(script)
+		if !bytes.Equal(genSH[:], tx.TxOut[0].PkScript[2:34]) {
+			log.Printf("got different observed and generated SH scripts.\n")
+			log.Printf("in %s:%d, see %x\n", tx.TxHash().String(), 0, tx.TxOut[0].PkScript)
+			log.Printf("generated %x \n", genSH)
+			log.Printf("revokable pub %x\ntimeout pub %x\n", revokePub, timeoutPub)
+			return tx, nil
+		}
+
+		// create the ScriptHash, timeout portxo.
+		var shTxo portxo.PorTxo // create new utxo and copy into it
+		// use txidx's elkrem as it may not be most recent
+		elk, err := q.ElkSnd.AtIndex(comNum)
+		if err != nil {
+			return nil, err
+		}
+		// keypath is the same, except for use
+		shTxo.KeyGen = q.KeyGen
+		shTxo.Op.Hash = tx.TxHash()
+		shTxo.Op.Index = 0
+		shTxo.Height = q.CloseData.CloseHeight
+		shTxo.KeyGen.Step[2] = UseChannelHAKDBase
+
+		elkpoint := lnutil.ElkPointFromHash(elk)
+		addhash := chainhash.DoubleHashH(append(elkpoint[:], q.MyHAKDBase[:]...))
+
+		shTxo.PrivKey = addhash
+
+		shTxo.Mode = portxo.TxoP2WSHComp
+		shTxo.Value = tx.TxOut[0].Value
+		shTxo.Seq = uint32(q.Delay)
+		shTxo.PreSigStack = make([][]byte, 1) // revoke SH has one presig item
+		shTxo.PreSigStack[0] = nil            // and that item is a nil (timeout)
+
+		shTxo.PkScript = script
+
+		log.Printf("Gaining timeout TXO from HTLC Spend: %s", shTxo.String())
+
+		wal.ExportUtxo(&shTxo)
+	}
+
 	return tx, nil
 }
