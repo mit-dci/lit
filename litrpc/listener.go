@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"net/http"
 	"net/rpc"
 	"net/rpc/jsonrpc"
@@ -32,11 +32,11 @@ type LitRPC struct {
 func serveWS(ws *websocket.Conn) {
 	body, err := ioutil.ReadAll(ws.Request().Body)
 	if err != nil {
-		log.Printf("Error reading body: %v", err)
+		log.Errorf("Error reading body: %v", err)
 		return
 	}
 
-	log.Printf(string(body))
+	log.Debug(string(body))
 	ws.Request().Body = ioutil.NopCloser(bytes.NewBuffer(body))
 
 	jsonrpc.ServeConn(ws)

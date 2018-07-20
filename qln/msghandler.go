@@ -3,7 +3,7 @@ package qln
 import (
 	"bytes"
 	"fmt"
-	"log"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/mit-dci/lit/btcutil/txscript"
 	"github.com/mit-dci/lit/wire"
@@ -116,7 +116,7 @@ func (nd *LitNode) LNDCReader(peer *RemotePeer) error {
 		//	log.Printf("read message from %x\n", l.RemoteLNId)
 		n, err := peer.Con.Read(msg)
 		if err != nil {
-			log.Printf("read error with %d: %s\n", peer.Idx, err.Error())
+			log.Errorf("read error with %d: %s\n", peer.Idx, err.Error())
 			nd.RemoteMtx.Lock()
 			delete(nd.RemoteCons, peer.Idx)
 			nd.RemoteMtx.Unlock()
@@ -124,7 +124,7 @@ func (nd *LitNode) LNDCReader(peer *RemotePeer) error {
 		}
 		msg = msg[:n]
 
-		log.Printf("decrypted message is %x\n", msg)
+		log.Infof("decrypted message is %x\n", msg)
 
 		var routedMsg lnutil.LitMsg
 		routedMsg, err = lnutil.LitMsgFromBytes(msg, peer.Idx)
@@ -133,10 +133,10 @@ func (nd *LitNode) LNDCReader(peer *RemotePeer) error {
 			return err
 		}
 
-		log.Printf("peerIdx is %d\n", routedMsg.Peer())
-		log.Printf("routed bytes %x\n", routedMsg.Bytes())
+		log.Debugf("peerIdx is %d\n", routedMsg.Peer())
+		log.Debugf("routed bytes %x\n", routedMsg.Bytes())
 
-		log.Printf("message type %x\n", routedMsg.MsgType())
+		log.Debugf("message type %x\n", routedMsg.MsgType())
 
 		var chanIdx uint32
 		chanIdx = 0
@@ -148,7 +148,7 @@ func (nd *LitNode) LNDCReader(peer *RemotePeer) error {
 			}
 		}
 
-		log.Printf("chanIdx is %x\n", chanIdx)
+		log.Infof("chanIdx is %x\n", chanIdx)
 
 		if chanIdx != 0 {
 			err = nd.PeerHandler(routedMsg, peer.QCs[chanIdx], peer)
@@ -157,7 +157,7 @@ func (nd *LitNode) LNDCReader(peer *RemotePeer) error {
 		}
 
 		if err != nil {
-			log.Printf("PeerHandler error with %d: %s\n", peer.Idx, err.Error())
+			log.Errorf("PeerHandler error with %d: %s\n", peer.Idx, err.Error())
 		}
 	}
 }
@@ -186,28 +186,28 @@ func (nd *LitNode) ChannelHandler(msg lnutil.LitMsg, peer *RemotePeer) error {
 
 	switch message := msg.(type) {
 	case lnutil.PointReqMsg: // POINT REQUEST
-		log.Printf("Got point request from %x\n", message.Peer())
+		log.Infof("Got point request from %x\n", message.Peer())
 		nd.PointReqHandler(message)
 		return nil
 
 	case lnutil.PointRespMsg: // POINT RESPONSE
-		log.Printf("Got point response from %x\n", msg.Peer())
+		log.Infof("Got point response from %x\n", msg.Peer())
 		return nd.PointRespHandler(message)
 
 	case lnutil.ChanDescMsg: // CHANNEL DESCRIPTION
-		log.Printf("Got channel description from %x\n", msg.Peer())
+		log.Infof("Got channel description from %x\n", msg.Peer())
 
 		nd.QChanDescHandler(message)
 		return nil
 
 	case lnutil.ChanAckMsg: // CHANNEL ACKNOWLEDGE
-		log.Printf("Got channel acknowledgement from %x\n", msg.Peer())
+		log.Infof("Got channel acknowledgement from %x\n", msg.Peer())
 
 		nd.QChanAckHandler(message, peer)
 		return nil
 
 	case lnutil.SigProofMsg: // HERE'S YOUR CHANNEL
-		log.Printf("Got channel proof from %x\n", msg.Peer())
+		log.Infof("Got channel proof from %x\n", msg.Peer())
 		nd.SigProofHandler(message, peer)
 		return nil
 
@@ -260,13 +260,13 @@ func (nd *LitNode) CloseHandler(msg lnutil.LitMsg) error {
 	switch message := msg.(type) { // CLOSE REQ
 
 	case lnutil.CloseReqMsg:
-		log.Printf("Got close request from %x\n", msg.Peer())
+		log.Infof("Got close request from %x\n", msg.Peer())
 		nd.CloseReqHandler(message)
 		return nil
 
 	/* - not yet implemented
 	case lnutil.MSGID_CLOSERESP: // CLOSE RESP
-		log.Printf("Got close response from %x\n", from)
+		log.Info("Got close response from %x\n", from)
 		nd.CloseRespHandler(from, msg[1:])
 		continue
 		return nil
@@ -284,19 +284,19 @@ func (nd *LitNode) PushPullHandler(routedMsg lnutil.LitMsg, q *Qchan) error {
 	defer q.ChanMtx.Unlock()
 	switch message := routedMsg.(type) {
 	case lnutil.DeltaSigMsg:
-		log.Printf("Got DELTASIG from %x\n", routedMsg.Peer())
+		log.Infof("Got DELTASIG from %x\n", routedMsg.Peer())
 		return nd.DeltaSigHandler(message, q)
 
 	case lnutil.SigRevMsg: // SIGNATURE AND REVOCATION
-		log.Printf("Got SIGREV from %x\n", routedMsg.Peer())
+		log.Infof("Got SIGREV from %x\n", routedMsg.Peer())
 		return nd.SigRevHandler(message, q)
 
 	case lnutil.GapSigRevMsg: // GAP SIGNATURE AND REVOCATION
-		log.Printf("Got GapSigRev from %x\n", routedMsg.Peer())
+		log.Infof("Got GapSigRev from %x\n", routedMsg.Peer())
 		return nd.GapSigRevHandler(message, q)
 
 	case lnutil.RevMsg: // REVOCATION
-		log.Printf("Got REV from %x\n", routedMsg.Peer())
+		log.Infof("Got REV from %x\n", routedMsg.Peer())
 		return nd.RevHandler(message, q)
 
 	default:
@@ -329,7 +329,7 @@ func (nd *LitNode) OPEventHandler(OPEventChan chan lnutil.OutPointEvent) {
 		// get all channels each time.  This is very inefficient!
 		qcs, err := nd.GetAllQchans()
 		if err != nil {
-			log.Printf("ln db error: %s", err.Error())
+			log.Errorf("ln db error: %s", err.Error())
 			continue
 		}
 		var theQ *Qchan
@@ -345,7 +345,7 @@ func (nd *LitNode) OPEventHandler(OPEventChan chan lnutil.OutPointEvent) {
 			// Check if this is a contract output
 			contracts, err := nd.DlcManager.ListContracts()
 			if err != nil {
-				log.Printf("contract db error: %s\n", err.Error())
+				log.Errorf("contract db error: %s\n", err.Error())
 				continue
 			}
 			for _, c := range contracts {
@@ -359,44 +359,44 @@ func (nd *LitNode) OPEventHandler(OPEventChan chan lnutil.OutPointEvent) {
 		if theC != nil {
 			err := nd.HandleContractOPEvent(theC, &curOPEvent)
 			if err != nil {
-				log.Printf("HandleContractOPEvent error: %s\n", err.Error())
+				log.Errorf("HandleContractOPEvent error: %s\n", err.Error())
 			}
 			continue
 		}
 
 		// end if no associated channel
 		if theQ == nil {
-			log.Printf("OPEvent %s doesn't match any channel\n",
+			log.Errorf("OPEvent %s doesn't match any channel\n",
 				curOPEvent.Op.String())
 			continue
 		}
 
 		// confirmation event
 		if curOPEvent.Tx == nil {
-			log.Printf("OP %s Confirmation event\n", curOPEvent.Op.String())
+			log.Infof("OP %s Confirmation event\n", curOPEvent.Op.String())
 			theQ.Height = curOPEvent.Height
 			err = nd.SaveQchanUtxoData(theQ)
 			if err != nil {
-				log.Printf("SaveQchanUtxoData error: %s", err.Error())
+				log.Errorf("SaveQchanUtxoData error: %s", err.Error())
 				continue
 			}
 			// spend event (note: happens twice!)
 		} else {
-			log.Printf("OP %s Spend event\n", curOPEvent.Op.String())
+			log.Infof("OP %s Spend event\n", curOPEvent.Op.String())
 			// mark channel as closed
 			theQ.CloseData.Closed = true
 			theQ.CloseData.CloseTxid = curOPEvent.Tx.TxHash()
 			theQ.CloseData.CloseHeight = curOPEvent.Height
 			err = nd.SaveQchanUtxoData(theQ)
 			if err != nil {
-				log.Printf("SaveQchanUtxoData error: %s", err.Error())
+				log.Errorf("SaveQchanUtxoData error: %s", err.Error())
 				continue
 			}
 
 			// detect close tx outs.
 			txos, err := theQ.GetCloseTxos(curOPEvent.Tx)
 			if err != nil {
-				log.Printf("GetCloseTxos error: %s", err.Error())
+				log.Errorf("GetCloseTxos error: %s", err.Error())
 				continue
 			}
 			// if you have seq=1 txos, modify the privkey...
@@ -430,7 +430,7 @@ func (nd *LitNode) OPEventHandler(OPEventChan chan lnutil.OutPointEvent) {
 func (nd *LitNode) HandleContractOPEvent(c *lnutil.DlcContract,
 	opEvent *lnutil.OutPointEvent) error {
 
-	log.Printf("Received OPEvent for contract %d!\n", c.Idx)
+	log.Infof("Received OPEvent for contract %d!\n", c.Idx)
 	if opEvent.Tx != nil {
 		wal, ok := nd.SubWallet[c.CoinType]
 		if !ok {
@@ -454,7 +454,7 @@ func (nd *LitNode) HandleContractOPEvent(c *lnutil.DlcContract,
 			c.Status = lnutil.ContractStatusSettling
 			err := nd.DlcManager.SaveContract(c)
 			if err != nil {
-				log.Printf("HandleContractOPEvent SaveContract err %s\n", err.Error())
+				log.Errorf("HandleContractOPEvent SaveContract err %s\n", err.Error())
 				return err
 			}
 

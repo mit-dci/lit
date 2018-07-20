@@ -2,7 +2,7 @@ package qln
 
 import (
 	"fmt"
-	"log"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
@@ -150,7 +150,7 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
 		}
 	} else { // build THEIR tx (to sign)
 		// Their tx that they store.  I get funds PKH.  SH is theirs eventually.
-		log.Printf("using elkpoint %x\n", s.ElkPoint)
+		log.Infof("using elkpoint %x\n", s.ElkPoint)
 		// SH pubkeys are our base points plus the received elk point
 		revPub = lnutil.CombinePubs(q.MyHAKDBase, s.ElkPoint)
 		timePub = lnutil.AddPubsEZ(q.TheirHAKDBase, s.ElkPoint)
@@ -179,19 +179,19 @@ func (q *Qchan) BuildStateTx(mine bool) (*wire.MsgTx, error) {
 	fancyScript := lnutil.CommitScript(revPub, timePub, q.Delay)
 	pkhScript := lnutil.DirectWPKHScript(pkhPub) // p2wpkh-ify
 
-	log.Printf("> made SH script, state %d\n", s.StateIdx)
-	log.Printf("\t revPub %x timeout pub %x \n", revPub, timePub)
-	log.Printf("\t script %x ", fancyScript)
+	log.Infof("> made SH script, state %d\n", s.StateIdx)
+	log.Infof("\t revPub %x timeout pub %x \n", revPub, timePub)
+	log.Infof("\t script %x ", fancyScript)
 
 	fancyScript = lnutil.P2WSHify(fancyScript) // p2wsh-ify
 
-	log.Printf("\t scripthash %x\n", fancyScript)
+	log.Infof("\t scripthash %x\n", fancyScript)
 
 	// create txouts by assigning amounts
 	outFancy := wire.NewTxOut(fancyAmt, fancyScript)
 	outPKH := wire.NewTxOut(pkhAmt, pkhScript)
 
-	log.Printf("\tcombined refund %x, pkh %x\n", pkhPub, outPKH.PkScript)
+	log.Infof("\tcombined refund %x, pkh %x\n", pkhPub, outPKH.PkScript)
 
 	// make a new tx
 	tx := wire.NewMsgTx()

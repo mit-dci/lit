@@ -2,7 +2,7 @@ package uspv
 
 import (
 	"fmt"
-	"log"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/wire"
@@ -11,7 +11,7 @@ import (
 func MakeMerkleParent(left, right *chainhash.Hash) *chainhash.Hash {
 	// dupes can screw things up; CVE-2012-2459. check for them
 	if left != nil && right != nil && left.IsEqual(right) {
-		log.Printf("DUP HASH CRASH")
+		log.Error("DUP HASH CRASH")
 		return nil
 	}
 	// if left child is nil, output nil.  Need this for hard mode.
@@ -55,7 +55,7 @@ func inDeadZone(pos, size uint32) bool {
 	msb := nextPowerOfTwo(size)
 	last := size - 1      // last valid position is 1 less than size
 	if pos > (msb<<1)-2 { // greater than root; not even in the tree
-		log.Printf(" ?? greater than root ")
+		log.Info(" ?? greater than root ")
 		return true
 	}
 	h := msb

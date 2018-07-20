@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io/ioutil"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"os"
 	"strings"
 
@@ -59,9 +59,9 @@ func LoadKeyFromFileArg(filename string, pass []byte) (*[32]byte, error) {
 	}
 
 	if len(enckey) == 32 { // UNencrypted key, length 32
-		log.Printf("WARNING!! Key file not encrypted!!\n")
-		log.Printf("Anyone who can read the key file can take everything!\n")
-		log.Printf("You should start over and use a good passphrase!\n")
+		log.Warn("Key file not encrypted!!\n")
+		log.Warn("Anyone who can read the key file can take everything!\n")
+		log.Warn("You should start over and use a good passphrase!\n")
 		copy(priv32[:], enckey[:])
 		return priv32, nil
 	}
@@ -130,10 +130,10 @@ func SaveKeyToFileArg(filename string, priv32 *[32]byte, pass []byte) error {
 		if err != nil {
 			return err
 		}
-		log.Printf("WARNING!! Key file not encrypted!!\n")
-		log.Printf("Anyone who can read the key file can take everything!\n")
-		log.Printf("You should start over and use a good passphrase!\n")
-		log.Printf("Saved unencrypted key at %s\n", filename)
+		log.Warn("Key file not encrypted!!\n")
+		log.Warn("Anyone who can read the key file can take everything!\n")
+		log.Warn("You should start over and use a good passphrase!\n")
+		log.Warnf("Saved unencrypted key at %s\n", filename)
 		return nil
 	}
 
@@ -173,7 +173,7 @@ func ReadKeyFile(filename string) (*[32]byte, error) {
 	if err != nil {
 		if os.IsNotExist(err) {
 			// no key found, generate and save one
-			log.Printf("No file %s, generating.\n", filename)
+			log.Debugf("No file %s, generating.\n", filename)
 
 			_, err := rand.Read(key32[:])
 			if err != nil {
@@ -186,7 +186,7 @@ func ReadKeyFile(filename string) (*[32]byte, error) {
 			}
 		} else {
 			// unknown error, crash
-			log.Printf("unknown\n")
+			log.Error("unknown\n")
 			return nil, err
 		}
 	}

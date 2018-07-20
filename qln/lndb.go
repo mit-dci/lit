@@ -2,7 +2,7 @@ package qln
 
 import (
 	"fmt"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"sync"
 	"time"
 
@@ -244,7 +244,7 @@ func (nd *LitNode) GetPubHostFromPeerIdx(idx uint32) ([33]byte, string) {
 		return nil
 	})
 	if err != nil {
-		log.Printf(err.Error())
+		log.Error(err.Error())
 	}
 	return pub, host
 }
@@ -273,7 +273,7 @@ func (nd *LitNode) GetNicknameFromPeerIdx(idx uint32) string {
 		return nil
 	})
 	if err != nil {
-		log.Printf(err.Error())
+		log.Error(err.Error())
 	}
 	return nickname
 }
@@ -432,7 +432,7 @@ func (nd *LitNode) SaveQChan(q *Qchan) error {
 		if err != nil {
 			return err
 		}
-		log.Printf("saved %d : %s mapping in db\n", q.Idx(), q.Op.String())
+		log.Debugf("saved %d : %s mapping in db\n", q.Idx(), q.Op.String())
 
 		cbk := btx.Bucket(BKTChannel) // go into bucket for all peers
 		if cbk == nil {
@@ -462,7 +462,7 @@ func (nd *LitNode) SaveQChan(q *Qchan) error {
 		// serialize elkrem receiver if it exists
 
 		if q.ElkRcv != nil {
-			log.Printf("--- elk rcv exists, saving\n")
+			log.Info("--- elk rcv exists, saving\n")
 
 			eb, err := q.ElkRcv.ToBytes()
 			if err != nil {
@@ -481,7 +481,7 @@ func (nd *LitNode) SaveQChan(q *Qchan) error {
 			return err
 		}
 		// save state
-		log.Printf("writing %d byte state to bucket\n", len(b))
+		log.Infof("writing %d byte state to bucket\n", len(b))
 		return qcBucket.Put(KEYState, b)
 	})
 	if err != nil {
@@ -546,7 +546,7 @@ func (nd *LitNode) RestoreQchanFromBucket(bkt *bolt.Bucket) (*Qchan, error) {
 		return nil, err
 	}
 	if qc.ElkRcv != nil {
-		// log.Printf("loaded elkrem receiver at state %d\n", qc.ElkRcv.UpTo())
+		// log.Info("loaded elkrem receiver at state %d\n", qc.ElkRcv.UpTo())
 	}
 
 	// derive elkrem sender root from HD keychain
@@ -672,7 +672,7 @@ func (nd *LitNode) SaveQchanState(q *Qchan) error {
 			return err
 		}
 		// save state
-		log.Printf("writing %d byte state to bucket\n", len(b))
+		log.Infof("writing %d byte state to bucket\n", len(b))
 		return qcBucket.Put(KEYState, b)
 	})
 }
@@ -765,7 +765,7 @@ func (nd *LitNode) GetQchanByIdx(cIdx uint32) (*Qchan, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("got op %x\n", op)
+	log.Infof("got op %x\n", op)
 	qc, err := nd.GetQchan(op)
 	if err != nil {
 		return nil, err

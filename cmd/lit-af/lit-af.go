@@ -4,7 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"net/rpc"
 	"net/rpc/jsonrpc"
 	"os"

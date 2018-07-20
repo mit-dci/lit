@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"time"
 
@@ -10,6 +9,7 @@ import (
 	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/qln"
+	log "github.com/sirupsen/logrus"
 
 	flags "github.com/jessevdk/go-flags"
 )
@@ -39,8 +39,8 @@ type config struct { // define a struct for usage with go-flags
 	ReSync bool `short:"r" long:"reSync" description:"Resync from the given tip."`
 	Tower  bool `long:"tower" description:"Watchtower: Run a watching node"`
 	Hard   bool `short:"t" long:"hard" description:"Flag to set networks."`
-  
-	Verbose bool `short:"v" long:"verbose" description:"Set verbosity to true."`
+
+	LogLevel int `short:"v" long:"verbose" description:"Set verbosity level from 0 to 5 (most to least)"`
 	// rpc server config
 	Rpcport uint16 `short:"p" long:"rpcport" description:"Set RPC port to connect to"`
 	Rpchost string `long:"rpchost" description:"Set RPC host to listen to"`
@@ -164,6 +164,44 @@ func main() {
 
 	key := litSetup(&conf)
 
+	customFormatter := new(log.TextFormatter)
+	customFormatter.TimestampFormat = "2006-01-02 15:04:05.999999999"
+	customFormatter.FullTimestamp = true
+	log.SetFormatter(customFormatter)
+	// Log Levels:
+	// 0: DebugLevel prints Panics, Fatals, Errors, Warnings, Infos and Debugs
+	// 1: InfoLevel  prints Panics, Fatals, Errors, Warnings and Info
+	// 2: WarnLevel  prints Panics, Fatals, Errors and Warnings
+	// 3: ErrorLevel prints Panics, Fatals and Errors
+	// 4: FatalLevel prints Panics, Fatals
+	// 5: PanicLevel prints Panics
+	// Default is level 3
+	// Code for tagging logs:
+	// Debug -> Useful debugging information
+	// Info  -> Something noteworthy happened
+	// Warn  -> You should probably take a look at this
+	// Error -> Something failed but I'm not quitting
+	// Fatal -> Bye
+	log.Println("LOG LEVEL", conf.LogLevel)
+	if conf.LogLevel >= 0 {
+		switch conf.LogLevel {
+		case 0:
+			log.SetLevel(log.DebugLevel)
+		case 1:
+			log.SetLevel(log.InfoLevel)
+		case 2:
+			log.SetLevel(log.WarnLevel)
+		case 3:
+			log.SetLevel(log.ErrorLevel)
+		case 4:
+			log.SetLevel(log.FatalLevel)
+		case 5:
+			log.SetLevel(log.PanicLevel)
+		default:
+			log.Error("Invalid logging param passed, proceeding with defaults")
+		}
+	}
+
 	if conf.ProxyURL != "" {
 		conf.LitProxyURL = conf.ProxyURL
 		conf.ChainProxyURL = conf.ProxyURL
@@ -193,7 +231,7 @@ func main() {
 	}
 
 	<-rpcl.OffButton
-	log.Printf("Got stop request\n")
+	log.Info("Got stop request\n")
 	time.Sleep(time.Second)
 
 	return

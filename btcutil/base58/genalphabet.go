@@ -9,7 +9,7 @@ package main
 import (
 	"bytes"
 	"io"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"os"
 	"strconv"
 )

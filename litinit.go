@@ -3,7 +3,7 @@ package main
 import (
 	"bufio"
 	"io"
-	"log"
+	"log" // keeping this here to prevent name collisions, shouldn't matter much
 	"os"
 	"path/filepath"
 
@@ -105,12 +105,9 @@ func litSetup(conf *config) *[32]byte {
 
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
 
-	if conf.Verbose {
-		logOutput := io.MultiWriter(os.Stdout, logfile)
-		log.SetOutput(logOutput)
-	} else {
-		log.SetOutput(logfile)
-	}
+	logOutput := io.MultiWriter(os.Stdout, logfile)
+	log.SetOutput(logOutput)
+	// log.SetOutput(logFile)
 
 	// Allow node with no linked wallets, for testing.
 	// TODO Should update tests and disallow nodes without wallets later.

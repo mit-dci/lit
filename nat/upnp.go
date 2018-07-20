@@ -3,7 +3,7 @@ package nat
 import (
 	"context"
 	"fmt"
-	"log"
+	log "github.com/sirupsen/logrus"
 
 	UpnP "github.com/NebulousLabs/go-UpnP"
 )
@@ -21,7 +21,7 @@ func SetupUpnp(port uint16) error {
 		fmt.Printf("Unable to get external ip %v\n", err)
 		log.Fatal(err)
 	}
-	log.Printf("Your external IP is %s", ip)
+	log.Infof("Your external IP is %s", ip)
 	// Forward peer port
 	err = deliver.Forward(uint16(port), "lnd peer port")
 	if err != nil {

@@ -1,7 +1,7 @@
 package nat
 
 import (
-	"log"
+	log "github.com/sirupsen/logrus"
 	"fmt"
 	"github.com/jackpal/gateway"
 	natpmp "github.com/jackpal/go-nat-pmp"
@@ -74,7 +74,7 @@ func SetupPmp(timeout time.Duration, port uint16) (*natpmp.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("Your external IP is %s", ip)
+	log.Infof("Your external IP is %s", ip)
 	_, err = pmp.AddPortMapping("tcp", int(port), int(port), 0)
 	if err != nil {
 		return nil, err

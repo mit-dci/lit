@@ -2,7 +2,7 @@ package coinparam
 
 import (
 	"fmt"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"math"
 	"math/big"
 
@@ -63,7 +63,7 @@ func diffBitcoin(
 	//}
 
 	if len(headers) < 2 {
-		log.Println("Less than 2 headers given to diffBitcoin")
+		log.Error("Less than 2 headers given to diffBitcoin")
 		return 0, fmt.Errorf(
 			"%d headers given to diffBitcoin, expect >2", len(headers))
 	}
@@ -76,7 +76,7 @@ func diffBitcoin(
 		rightBits = prev.Bits
 	} else {
 		// invalid block, prev bits are zero, return min diff.
-		log.Println("Got blocks with diff 0. Returning error")
+		log.Error("Got blocks with diff 0. Returning error")
 		return 0, fmt.Errorf("Got blocks with diff 0. Returning error")
 	}
 

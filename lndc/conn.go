@@ -6,7 +6,7 @@ import (
 	"crypto/hmac"
 	"encoding/binary"
 	"fmt"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"net"
 	"strings"
 	"time"
@@ -185,7 +185,7 @@ func (c *LNDConn) Dial(
 	}
 
 	// display private key for debug only
-	log.Printf("made session key %x\n", sessionKey)
+	log.Debugf("made session key %x\n", sessionKey)
 
 	c.myNonceInt = 1 << 63
 	c.remoteNonceInt = 0
@@ -285,7 +285,7 @@ func (c *LNDConn) authPKH(
 		return err
 	}
 	idDH := fastsha256.Sum256(btcec.GenerateSharedSecret(myId, theirPub))
-	log.Printf("made idDH %x\n", idDH)
+	log.Debugf("made idDH %x\n", idDH)
 	theirDHproof := fastsha256.Sum256(append(localEphPubBytes, idDH[:]...))
 
 	// Verify that their DH proof matches the one we just generated.
@@ -337,7 +337,7 @@ func (c *LNDConn) Read(b []byte) (n int, err error) {
 
 		msg, err := c.chachaStream.Open(nil, nonceBuf[:], ctext, nil)
 		if err != nil {
-			log.Printf("decrypt %d byte ciphertext failed\n", len(ctext))
+			log.Errorf("decrypt %d byte ciphertext failed\n", len(ctext))
 			return 0, err
 		}
 

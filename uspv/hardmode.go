@@ -2,7 +2,7 @@ package uspv
 
 import (
 	"bytes"
-	"log"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/wire"
@@ -59,12 +59,12 @@ func BlockOK(blk wire.MsgBlock) bool {
 		// first find ways witMode can be disqualified
 		if len(commitBytes) != 32 {
 			// witness in block but didn't find a wintess commitment; fail
-			log.Printf("block %s has witness but no witcommit",
+			log.Debugf("block %s has witness but no witcommit",
 				blk.BlockHash().String())
 			return false
 		}
 		if len(cb.TxIn) != 1 {
-			log.Printf("block %s coinbase tx has %d txins (must be 1)",
+			log.Debugf("block %s coinbase tx has %d txins (must be 1)",
 				blk.BlockHash().String(), len(cb.TxIn))
 			return false
 		}
@@ -153,7 +153,7 @@ func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
 
 	ok := BlockOK(*m) // check block self-consistency
 	if !ok {
-		log.Printf("block %s not OK!!11\n", m.BlockHash().String())
+		log.Errorf("block %s not OK!!11\n", m.BlockHash().String())
 		return
 	}
 
@@ -162,20 +162,20 @@ func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
 	case hah = <-s.blockQueue: // pop height off mblock queue
 		break
 	default:
-		log.Printf("Unrequested full block")
+		log.Error("Unrequested full block")
 		return
 	}
 
 	newBlockHash := m.Header.BlockHash()
 	if !hah.blockhash.IsEqual(&newBlockHash) {
-		log.Printf("full block out of order error")
+		log.Error("full block out of order error")
 		return
 	}
 
 	// iterate through all txs in the block, looking for matches.
 	for _, tx := range m.Transactions {
 		if s.MatchTx(tx) {
-			log.Printf("found matching tx %s\n", tx.TxHash().String())
+			log.Infof("found matching tx %s\n", tx.TxHash().String())
 			s.TxUpToWallit <- lnutil.TxAndHeight{tx, hah.height}
 		}
 	}
@@ -185,7 +185,7 @@ func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
 	// track our internal height
 	s.syncHeight = hah.height
 
-	log.Printf("ingested full block %s height %d OK\n",
+	log.Infof("ingested full block %s height %d OK\n",
 		m.Header.BlockHash().String(), hah.height)
 
 	if hah.final { // check sync end
@@ -195,7 +195,7 @@ func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
 		// that way you are pretty sure you're synced up.
 		err = s.AskForHeaders()
 		if err != nil {
-			log.Printf("Merkle block error: %s\n", err.Error())
+			log.Errorf("Merkle block error: %s\n", err.Error())
 			return
 		}
 	}

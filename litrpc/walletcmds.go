@@ -2,7 +2,7 @@ package litrpc
 
 import (
 	"fmt"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"github.com/mit-dci/lit/bech32"
 	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/consts"
@@ -213,7 +213,7 @@ func (r *LitRPC) Sweep(args SweepArgs, reply *TxidsReply) error {
 		return err
 	}
 
-	log.Printf("numtx: %d\n", args.NumTx)
+	log.Debugf("numtx: %d\n", args.NumTx)
 	if args.NumTx < 1 {
 		return fmt.Errorf("can't send %d txs", args.NumTx)
 	}

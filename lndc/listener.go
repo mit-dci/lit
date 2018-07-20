@@ -3,7 +3,7 @@ package lndc
 import (
 	"crypto/hmac"
 	"fmt"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"net"
 
 	"github.com/mit-dci/lit/btcutil/btcec"
@@ -103,7 +103,7 @@ func (l *Listener) createCipherConn(lnConn *LNDConn) ([]byte, error) {
 	lnConn.chachaStream, err = chacha20poly1305.New(sessionKey[:])
 
 	// display private key for debug only
-	log.Printf("made session key %x\n", sessionKey)
+	log.Debugf("made session key %x\n", sessionKey)
 
 	lnConn.remoteNonceInt = 1 << 63
 	lnConn.myNonceInt = 0
@@ -122,11 +122,11 @@ func (l *Listener) authenticateConnection(
 	slice := make([]byte, 73)
 	n, err := lnConn.Conn.Read(slice)
 	if err != nil {
-		log.Printf("Read error: %s\n", err.Error())
+		log.Errorf("Read error: %s\n", err.Error())
 		return err
 	}
 
-	log.Printf("read %d bytes\n", n)
+	log.Debugf("read %d bytes\n", n)
 	authmsg := slice[:n]
 	if len(authmsg) != 53 && len(authmsg) != 45 {
 		return fmt.Errorf("got auth message of %d bytes, "+
@@ -160,7 +160,7 @@ func (l *Listener) authenticateConnection(
 	}
 	idDH :=
 		fastsha256.Sum256(btcec.GenerateSharedSecret(l.longTermPriv, theirPub))
-	log.Printf("made idDH %x\n", idDH)
+	log.Debugf("made idDH %x\n", idDH)
 	myDHproof := fastsha256.Sum256(
 		append(lnConn.RemotePub.SerializeCompressed(), idDH[:]...))
 	theirDHproof := fastsha256.Sum256(

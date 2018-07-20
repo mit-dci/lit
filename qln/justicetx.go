@@ -3,7 +3,7 @@ package qln
 import (
 	"bytes"
 	"fmt"
-	"log"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/mit-dci/lit/btcutil/txscript"
 	"github.com/mit-dci/lit/wire"
@@ -113,11 +113,11 @@ func (nd *LitNode) BuildJusticeSig(q *Qchan) error {
 	var badAmt int64
 	badIdx := uint32(len(badTx.TxOut) + 1)
 
-	log.Printf("made revpub %x timeout pub %x\nscript:%x\nhash %x\n",
+	log.Debugf("made revpub %x timeout pub %x\nscript:%x\nhash %x\n",
 		badRevokePub[:], badTimeoutPub[:], script, scriptHashOutScript)
 	// figure out which output to bring justice to
 	for i, out := range badTx.TxOut {
-		log.Printf("txout %d pkscript %x\n", i, out.PkScript)
+		log.Debugf("txout %d pkscript %x\n", i, out.PkScript)
 		if bytes.Equal(out.PkScript, scriptHashOutScript) {
 			badIdx = uint32(i)
 			badAmt = out.Value
@@ -160,7 +160,7 @@ func (nd *LitNode) BuildJusticeSig(q *Qchan) error {
 	justiceTx.AddTxOut(justiceOut)
 
 	jtxid := justiceTx.TxHash()
-	log.Printf("made justice tx %s\n", jtxid.String())
+	log.Debugf("made justice tx %s\n", jtxid.String())
 	// get hashcache for signing
 	hCache := txscript.NewTxSigHashes(justiceTx)
 

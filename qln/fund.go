@@ -2,7 +2,7 @@ package qln
 
 import (
 	"fmt"
-	"log"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/wire"
@@ -184,7 +184,7 @@ func (nd *LitNode) PointReqHandler(msg lnutil.PointReqMsg) {
 
 	/* shouldn't be possible to get this error...
 	if nd.RemoteCon == nil || nd.RemoteCon.RemotePub == nil {
-		log.Printf("Not connected to anyone\n")
+		log.Errorf("Not connected to anyone\n")
 		return
 	}*/
 
@@ -193,13 +193,13 @@ func (nd *LitNode) PointReqHandler(msg lnutil.PointReqMsg) {
 
 	cIdx, err := nd.NextChannelIdx()
 	if err != nil {
-		log.Printf("PointReqHandler err %s", err.Error())
+		log.Errorf("PointReqHandler err %s", err.Error())
 		return
 	}
 
 	_, ok := nd.SubWallet[msg.Cointype]
 	if !ok {
-		log.Printf("PointReqHandler err no wallet for type %d", msg.Cointype)
+		log.Errorf("PointReqHandler err no wallet for type %d", msg.Cointype)
 		return
 	}
 
@@ -215,11 +215,11 @@ func (nd *LitNode) PointReqHandler(msg lnutil.PointReqMsg) {
 	myRefundPub, _ := nd.GetUsePub(kg, UseChannelRefund)
 	myHAKDbase, err := nd.GetUsePub(kg, UseChannelHAKDBase)
 	if err != nil {
-		log.Printf("PointReqHandler err %s", err.Error())
+		log.Errorf("PointReqHandler err %s", err.Error())
 		return
 	}
 
-	log.Printf("Generated channel pubkey %x\n", myChanPub)
+	log.Infof("Generated channel pubkey %x\n", myChanPub)
 
 	outMsg := lnutil.NewPointRespMsg(msg.Peer(), myChanPub, myRefundPub, myHAKDbase)
 	nd.OmniOut <- outMsg
@@ -365,7 +365,7 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 
 	wal, ok := nd.SubWallet[msg.CoinType]
 	if !ok {
-		log.Printf("QChanDescHandler err no wallet for type %d", msg.CoinType)
+		log.Errorf("QChanDescHandler err no wallet for type %d", msg.CoinType)
 		return
 	}
 
@@ -376,7 +376,7 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 
 	cIdx, err := nd.NextChannelIdx()
 	if err != nil {
-		log.Printf("QChanDescHandler err %s", err.Error())
+		log.Errorf("QChanDescHandler err %s", err.Error())
 		return
 	}
 
@@ -405,10 +405,10 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 	//	qc, err := nd.SaveFundTx(
 	//		op, amt, peerArr, theirPub, theirRefundPub, theirHAKDbase)
 	//	if err != nil {
-	//		log.Printf("QChanDescHandler SaveFundTx err %s", err.Error())
+	//		log.Errorf("QChanDescHandler SaveFundTx err %s", err.Error())
 	//		return
 	//	}
-	log.Printf("got multisig output %s amt %d\n", op.String(), amt)
+	log.Infof("got multisig output %s amt %d\n", op.String(), amt)
 
 	// create initial state
 	qc.State = new(StatCom)
@@ -429,38 +429,38 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 	// save new channel to db
 	err = nd.SaveQChan(qc)
 	if err != nil {
-		log.Printf("QChanDescHandler err %s", err.Error())
+		log.Errorf("QChanDescHandler err %s", err.Error())
 		return
 	}
 
 	// load ... the thing I just saved.  why?
 	qc, err = nd.GetQchan(opArr)
 	if err != nil {
-		log.Printf("QChanDescHandler GetQchan err %s", err.Error())
+		log.Errorf("QChanDescHandler GetQchan err %s", err.Error())
 		return
 	}
 
 	// when funding a channel, give them the first *2* elkpoints.
 	theirElkPointZero, err := qc.ElkPoint(false, 0)
 	if err != nil {
-		log.Printf("QChanDescHandler err %s", err.Error())
+		log.Errorf("QChanDescHandler err %s", err.Error())
 		return
 	}
 	theirElkPointOne, err := qc.ElkPoint(false, 1)
 	if err != nil {
-		log.Printf("QChanDescHandler err %s", err.Error())
+		log.Errorf("QChanDescHandler err %s", err.Error())
 		return
 	}
 
 	theirElkPointTwo, err := qc.N2ElkPointForThem()
 	if err != nil {
-		log.Printf("QChanDescHandler err %s", err.Error())
+		log.Errorf("QChanDescHandler err %s", err.Error())
 		return
 	}
 
 	sig, err := nd.SignState(qc)
 	if err != nil {
-		log.Printf("QChanDescHandler SignState err %s", err.Error())
+		log.Errorf("QChanDescHandler SignState err %s", err.Error())
 		return
 	}
 
@@ -485,13 +485,13 @@ func (nd *LitNode) QChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePeer) {
 	// load channel to save their refund address
 	qc, err := nd.GetQchan(opArr)
 	if err != nil {
-		log.Printf("QChanAckHandler GetQchan err %s", err.Error())
+		log.Errorf("QChanAckHandler GetQchan err %s", err.Error())
 		return
 	}
 
 	//	err = qc.IngestElkrem(revElk)
 	//	if err != nil { // this can't happen because it's the first elk... remove?
-	//		log.Printf("QChanAckHandler IngestElkrem err %s", err.Error())
+	//		log.Errorf("QChanAckHandler IngestElkrem err %s", err.Error())
 	//		return
 	//	}
 	qc.State.ElkPoint = msg.ElkZero
@@ -500,14 +500,14 @@ func (nd *LitNode) QChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePeer) {
 
 	err = qc.VerifySig(sig)
 	if err != nil {
-		log.Printf("QChanAckHandler VerifySig err %s", err.Error())
+		log.Errorf("QChanAckHandler VerifySig err %s", err.Error())
 		return
 	}
 
 	// verify worked; Save state 1 to DB
 	err = nd.SaveQchanState(qc)
 	if err != nil {
-		log.Printf("QChanAckHandler SaveQchanState err %s", err.Error())
+		log.Errorf("QChanAckHandler SaveQchanState err %s", err.Error())
 		return
 	}
 
@@ -516,20 +516,20 @@ func (nd *LitNode) QChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePeer) {
 	// sign their com tx to send
 	sig, err = nd.SignState(qc)
 	if err != nil {
-		log.Printf("QChanAckHandler SignState err %s", err.Error())
+		log.Errorf("QChanAckHandler SignState err %s", err.Error())
 		return
 	}
 
 	// OK to fund.
 	err = nd.SubWallet[qc.Coin()].ReallySend(&qc.Op.Hash)
 	if err != nil {
-		log.Printf("QChanAckHandler ReallySend err %s", err.Error())
+		log.Errorf("QChanAckHandler ReallySend err %s", err.Error())
 		return
 	}
 
 	err = nd.SubWallet[qc.Coin()].WatchThis(qc.Op)
 	if err != nil {
-		log.Printf("QChanAckHandler WatchThis err %s", err.Error())
+		log.Errorf("QChanAckHandler WatchThis err %s", err.Error())
 		return
 	}
 
@@ -573,33 +573,33 @@ func (nd *LitNode) SigProofHandler(msg lnutil.SigProofMsg, peer *RemotePeer) {
 
 	qc, err := nd.GetQchan(opArr)
 	if err != nil {
-		log.Printf("SigProofHandler err %s", err.Error())
+		log.Errorf("SigProofHandler err %s", err.Error())
 		return
 	}
 
 	wal, ok := nd.SubWallet[qc.Coin()]
 	if !ok {
-		log.Printf("Not connected to coin type %d\n", qc.Coin())
+		log.Errorf("Not connected to coin type %d\n", qc.Coin())
 		return
 	}
 
 	err = qc.VerifySig(msg.Signature)
 	if err != nil {
-		log.Printf("SigProofHandler err %s", err.Error())
+		log.Errorf("SigProofHandler err %s", err.Error())
 		return
 	}
 
 	// sig OK, save
 	err = nd.SaveQchanState(qc)
 	if err != nil {
-		log.Printf("SigProofHandler err %s", err.Error())
+		log.Errorf("SigProofHandler err %s", err.Error())
 		return
 	}
 
 	err = wal.WatchThis(op)
 
 	if err != nil {
-		log.Printf("SigProofHandler err %s", err.Error())
+		log.Errorf("SigProofHandler err %s", err.Error())
 		return
 	}
 

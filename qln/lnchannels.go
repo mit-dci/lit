@@ -3,7 +3,7 @@ package qln
 import (
 	"bytes"
 	"fmt"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"sync"
 
 	"github.com/mit-dci/lit/elkrem"
@@ -97,30 +97,30 @@ type QCloseData struct {
 // ChannelInfo prints info about a channel.
 func (nd *LitNode) QchanInfo(q *Qchan) error {
 	// display txid instead of outpoint because easier to copy/paste
-	log.Printf("CHANNEL %s h:%d %s cap: %d\n",
+	log.Debugf("CHANNEL %s h:%d %s cap: %d\n",
 		q.Op.String(), q.Height, q.KeyGen.String(), q.Value)
-	log.Printf("\tPUB mine:%x them:%x REFBASE mine:%x them:%x BASE mine:%x them:%x\n",
+	log.Debugf("\tPUB mine:%x them:%x REFBASE mine:%x them:%x BASE mine:%x them:%x\n",
 		q.MyPub[:4], q.TheirPub[:4], q.MyRefundPub[:4], q.TheirRefundPub[:4],
 		q.MyHAKDBase[:4], q.TheirHAKDBase[:4])
 	if q.State == nil || q.ElkRcv == nil {
-		log.Printf("\t no valid state or elkrem\n")
+		log.Debugf("\t no valid state or elkrem\n")
 	} else {
-		log.Printf("\ta %d (them %d) state index %d\n",
+		log.Debugf("\ta %d (them %d) state index %d\n",
 			q.State.MyAmt, q.Value-q.State.MyAmt, q.State.StateIdx)
 
-		log.Printf("\tdelta:%d HAKD:%x elk@ %d\n",
+		log.Debugf("\tdelta:%d HAKD:%x elk@ %d\n",
 			q.State.Delta, q.State.ElkPoint[:4], q.ElkRcv.UpTo())
 		elkp, _ := q.ElkPoint(false, q.State.StateIdx)
 		myRefPub := lnutil.AddPubsEZ(q.MyRefundPub, elkp)
 		theirRefPub := lnutil.AddPubsEZ(q.TheirRefundPub, q.State.ElkPoint)
-		log.Printf("\tMy Refund: %x Their Refund %x\n", myRefPub[:4], theirRefPub[:4])
+		log.Debugf("\tMy Refund: %x Their Refund %x\n", myRefPub[:4], theirRefPub[:4])
 	}
 
 	if !q.CloseData.Closed { // still open, finish here
 		return nil
 	}
 
-	log.Printf("\tCLOSED at height %d by tx: %s\n",
+	log.Infof("\tCLOSED at height %d by tx: %s\n",
 		q.CloseData.CloseHeight, q.CloseData.CloseTxid.String())
 	//	clTx, err := t.GetTx(&q.CloseData.CloseTxid)
 	//	if err != nil {
@@ -132,16 +132,16 @@ func (nd *LitNode) QchanInfo(q *Qchan) error {
 	//	}
 
 	//	if len(ctxos) == 0 {
-	//		log.Printf("\tcooperative close.\n")
+	//		log.Info("\tcooperative close.\n")
 	//		return nil
 	//	}
 
-	//	log.Printf("\tClose resulted in %d spendable txos\n", len(ctxos))
+	//	log.Info("\tClose resulted in %d spendable txos\n", len(ctxos))
 	//	if len(ctxos) == 2 {
-	//		log.Printf("\t\tINVALID CLOSE!!!11\n")
+	//		log.Error("\t\tINVALID CLOSE!!!11\n")
 	//	}
 	//	for i, u := range ctxos {
-	//		log.Printf("\t\t%d) amt: %d spendable: %d\n", i, u.Value, u.Seq)
+	//		log.Info("\t\t%d) amt: %d spendable: %d\n", i, u.Value, u.Seq)
 	//	}
 	return nil
 }

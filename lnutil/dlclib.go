@@ -5,7 +5,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"math/big"
 
 	"github.com/mit-dci/lit/btcutil/btcec"
@@ -331,7 +331,7 @@ func PrintTx(tx *wire.MsgTx) {
 	w := bufio.NewWriter(&buf)
 	tx.Serialize(w)
 	w.Flush()
-	log.Printf("%x\n", buf.Bytes())
+	log.Infof("%x\n", buf.Bytes())
 }
 
 // DlcOutput returns a Txo for a particular value that pays to

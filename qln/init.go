@@ -2,7 +2,7 @@ package qln
 
 import (
 	"fmt"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"path/filepath"
 
 	"github.com/boltdb/bolt"
@@ -19,7 +19,6 @@ import (
 // Init starts up a lit node.  Needs priv key, and a path.
 // Does not activate a subwallet; do that after init.
 func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL string, nat string) (*LitNode, error) {
-
 	nd := new(LitNode)
 	nd.LitFolder = path
 
@@ -123,7 +122,7 @@ func (nd *LitNode) LinkBaseWallet(
 		rootpriv, birthHeight, resync, host, nd.LitFolder, proxy, param)
 
 	if err != nil {
-		 log.Println(err)
+		 log.Error(err)
 		 return nil
 	}
 
@@ -144,7 +143,7 @@ func (nd *LitNode) LinkBaseWallet(
 		copy(pkh[:], pkhSlice)
 		nd.SubWallet[WallitIdx].ExportHook().RegisterAddress(pkh)
 
-		log.Printf("Registering outpoint %v", qChan.PorTxo.Op)
+		log.Infof("Registering outpoint %v", qChan.PorTxo.Op)
 
 		nd.SubWallet[WallitIdx].WatchThis(qChan.PorTxo.Op)
 	}

@@ -23,7 +23,7 @@
 //  import (
 //          "flag"
 //          "fmt"
-//          "log"
+//          log "github.com/sirupsen/logrus"
 //
 //          "github.com/mit-dci/lit/btcutil"
 //          "github.com/mit-dci/lit/btcutil/chaincfg"

@@ -2,7 +2,7 @@ package qln
 
 import (
 	"fmt"
-	"log"
+	log "github.com/sirupsen/logrus"
 )
 
 // ------------------------- break
@@ -21,17 +21,17 @@ func (nd *LitNode) BreakChannel(q *Qchan) error {
 		return fmt.Errorf("Can't break (%d,%d), already closed\n", q.Peer(), q.Idx())
 	}
 
-	log.Printf("breaking (%d,%d)\n", q.Peer(), q.Idx())
+	log.Infof("breaking (%d,%d)\n", q.Peer(), q.Idx())
 	z, err := q.ElkSnd.AtIndex(0)
 	if err != nil {
 		return err
 	}
-	log.Printf("elk send 0: %s\n", z.String())
+	log.Debugf("elk send 0: %s\n", z.String())
 	z, err = q.ElkRcv.AtIndex(0)
 	if err != nil {
 		return err
 	}
-	log.Printf("elk recv 0: %s\n", z.String())
+	log.Debugf("elk recv 0: %s\n", z.String())
 
 	// set delta to 0... needed for break
 	q.State.Delta = 0
