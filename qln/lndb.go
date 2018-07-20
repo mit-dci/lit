@@ -105,8 +105,9 @@ type LitNode struct {
 	// cointype of the first (possibly only) wallet connected
 	DefaultCoin uint32
 
-	RemoteCons map[uint32]*RemotePeer
-	RemoteMtx  sync.Mutex
+	ConnectedCoinTypes map[uint32]bool
+	RemoteCons         map[uint32]*RemotePeer
+	RemoteMtx          sync.Mutex
 
 	// WatchCon is currently just for the watchtower
 	WatchCon *lndc.LNDConn // merge these later
@@ -140,6 +141,7 @@ type LitNode struct {
 
 	// Contains the URL string to connect to a SOCKS5 proxy, if provided
 	ProxyURL string
+	Nat      string
 }
 
 type RemotePeer struct {
@@ -232,7 +234,7 @@ func (nd *LitNode) GetPubHostFromPeerIdx(idx uint32) ([33]byte, string) {
 			return nil
 		}
 		pubBytes := mp.Get(lnutil.U32tB(idx))
-		if pubBytes != nil {
+		if pubBytes != nil && len(pubBytes) > 0 {
 			copy(pub[:], pubBytes)
 		}
 		peerBkt := btx.Bucket(BKTPeers)

@@ -46,10 +46,6 @@ func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) er
 	*/
 
 	case 0x60: //Tower Messages
-		//if !nd.Tower.Accepting {
-		//	return fmt.Errorf("Error: Got tower msg from %x but tower disabled\n",
-		//		msg.Peer())
-		//}
 		if msg.MsgType() == lnutil.MSGID_WATCH_DESC {
 			nd.Tower.NewChannel(msg.(lnutil.WatchDescMsg))
 		}
@@ -484,6 +480,20 @@ func (nd *LitNode) OPEventHandler(OPEventChan chan lnutil.OutPointEvent) {
 				op := wire.NewOutPoint(&txHash, i)
 				log.Printf("Watching for spends from [%s] (HTLC)\n", op.String())
 				nd.SubWallet[theQ.Coin()].WatchThis(*op)
+			}
+		}
+	}
+}
+
+func (nd *LitNode) HeightEventHandler(HeightEventChan chan lnutil.HeightEvent) {
+	for {
+		event := <-HeightEventChan
+		txs, err := nd.ClaimHTLCTimeouts(event.CoinType, event.Height)
+		if err != nil {
+			log.Printf("Error while claiming HTLC timeouts for coin %d at height %d : %s\n", event.CoinType, event.Height, err.Error())
+		} else {
+			for _, tx := range txs {
+				log.Printf("Claimed timeout HTLC using TXID %x\n", tx)
 			}
 		}
 	}

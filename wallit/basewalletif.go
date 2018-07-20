@@ -27,6 +27,7 @@ type UWallet interface {
 	NahDontSend(txid *chainhash.Hash) error
 	WatchThis(wire.OutPoint) error
 	LetMeKnow() chan lnutil.OutPointEvent
+	LetMeKnowHeight() chan lnutil.HeightEvent
 	BlockMonitor() chan *wire.MsgBlock
 
 	Params() *chaincfg.Params
@@ -58,6 +59,11 @@ func (w *Wallit) Params() *coinparam.Params {
 func (w *Wallit) LetMeKnow() chan lnutil.OutPointEvent {
 	w.OPEventChan = make(chan lnutil.OutPointEvent, 1)
 	return w.OPEventChan
+}
+
+func (w *Wallit) LetMeKnowHeight() chan lnutil.HeightEvent {
+	w.HeightEventChan = make(chan lnutil.HeightEvent, 1)
+	return w.HeightEventChan
 }
 
 func (w *Wallit) CurrentHeight() int32 {

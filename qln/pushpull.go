@@ -159,7 +159,7 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	if myAmt < consts.MinOutput {
 		qc.ClearToSend <- true
 		qc.ChanMtx.Unlock()
-		return fmt.Errorf("want to push %s but %s available after %s fee and %s consts.MinOutput",
+		return fmt.Errorf("want to push %s but %s available after %s fee and %s",
 			lnutil.SatoshiColor(int64(amt)),
 			lnutil.SatoshiColor(myAmt),
 			lnutil.SatoshiColor(qc.State.Fee),

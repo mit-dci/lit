@@ -1,23 +1,24 @@
 package wallit
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/mit-dci/lit/wire"
-	"github.com/mit-dci/lit/btcutil/hdkeychain"
 	"github.com/boltdb/bolt"
+	"github.com/mit-dci/lit/btcutil/hdkeychain"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/powless"
 	"github.com/mit-dci/lit/uspv"
+	"github.com/mit-dci/lit/wire"
 )
 
 func NewWallit(
 	rootkey *hdkeychain.ExtendedKey, birthHeight int32, resync bool,
-	spvhost, path string, p *coinparam.Params) *Wallit {
+	spvhost, path string, proxyURL string, p *coinparam.Params) (*Wallit, int, error) {
 
 	var w Wallit
 	w.rootPrivKey = rootkey
@@ -62,10 +63,11 @@ func NewWallit(
 		height = birthHeight
 		w.SetDBSyncHeight(height)
 	}
-
+	hookFail := false
 	log.Printf("DB corrected height %d\n", height)
-	incomingTx, incomingBlockheight, err := w.Hook.Start(height, spvhost, wallitpath, p)
+	incomingTx, incomingBlockheight, err := w.Hook.Start(height, spvhost, wallitpath, proxyURL, p)
 	if err != nil {
+		hookFail = true
 		log.Printf("NewWallit Hook.Start crash  %s ", err.Error())
 	}
 
@@ -107,8 +109,10 @@ func NewWallit(
 
 	// deal with incoming height
 	go w.HeightHandler(incomingBlockheight)
-
-	return &w
+	if !hookFail {
+		return &w, int(p.HDCoinType), nil
+	}
+	return &w, 0, fmt.Errorf("Unsupported coin daemon or coin daemon not running")
 }
 
 // TxHandler is the goroutine that receives & ingests new txs for the wallit.
@@ -132,6 +136,11 @@ func (w *Wallit) HeightHandler(incomingHeight chan int32) {
 			if err != nil {
 				log.Printf("Rollback crash  %s ", err.Error())
 			}
+		}
+
+		if w.HeightEventChan != nil {
+			he := lnutil.HeightEvent{Height: h, CoinType: w.Param.HDCoinType}
+			w.HeightEventChan <- he
 		}
 
 		err := w.SetDBSyncHeight(h)

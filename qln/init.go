@@ -18,7 +18,7 @@ import (
 
 // Init starts up a lit node.  Needs priv key, and a path.
 // Does not activate a subwallet; do that after init.
-func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL string) (*LitNode, error) {
+func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL string, nat string) (*LitNode, error) {
 
 	nd := new(LitNode)
 	nd.LitFolder = path
@@ -51,6 +51,8 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 	nd.TrackerURL = trackerURL
 
 	nd.ProxyURL = proxyURL
+
+	nd.Nat = nat
 
 	nd.InitRouting()
 
@@ -89,7 +91,7 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 // LinkBaseWallet activates a wallet and hooks it into the litnode.
 func (nd *LitNode) LinkBaseWallet(
 	privKey *[32]byte, birthHeight int32, resync bool, tower bool,
-	host string, param *coinparam.Params) error {
+	host string, proxy string, param *coinparam.Params) error {
 
 	rootpriv, err := hdkeychain.NewMaster(privKey[:], param)
 	if err != nil {
@@ -116,9 +118,20 @@ func (nd *LitNode) LinkBaseWallet(
 
 	// if there aren't, Multiwallet will still be false; set new wallit to
 	// be the first & default
-	nd.SubWallet[WallitIdx] = wallit.NewWallit(
-		rootpriv, birthHeight, resync, host, nd.LitFolder, param)
+	var cointype int
+	nd.SubWallet[WallitIdx], cointype, err = wallit.NewWallit(
+		rootpriv, birthHeight, resync, host, nd.LitFolder, proxy, param)
 
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+
+	if nd.ConnectedCoinTypes == nil {
+		nd.ConnectedCoinTypes = make(map[uint32]bool)
+		nd.ConnectedCoinTypes[uint32(cointype)] = true
+	}
+	nd.ConnectedCoinTypes[uint32(cointype)] = true
 	// re-register channel addresses
 	qChans, err := nd.GetAllQchans()
 	if err != nil {
@@ -137,6 +150,7 @@ func (nd *LitNode) LinkBaseWallet(
 	}
 
 	go nd.OPEventHandler(nd.SubWallet[WallitIdx].LetMeKnow())
+	go nd.HeightEventHandler(nd.SubWallet[WallitIdx].LetMeKnowHeight())
 
 	if !nd.MultiWallet {
 		nd.DefaultCoin = param.HDCoinType
