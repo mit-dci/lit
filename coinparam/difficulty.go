@@ -2,7 +2,7 @@ package coinparam
 
 import (
 	"fmt"
-	log "github.com/sirupsen/logrus"
+	log "github.com/mit-dci/lit/logs"
 	"math"
 	"math/big"
 

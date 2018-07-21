@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	log "github.com/sirupsen/logrus"
+	log "github.com/mit-dci/lit/logs"
 	"net/http"
 	"net/rpc"
 	"net/rpc/jsonrpc"

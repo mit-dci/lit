@@ -1,7 +1,7 @@
 package uspv
 
 import (
-	log "github.com/sirupsen/logrus"
+	log "github.com/mit-dci/lit/logs"
 	"path/filepath"
 
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"

@@ -3,7 +3,7 @@ package lndc
 import (
 	"crypto/hmac"
 	"fmt"
-	log "github.com/sirupsen/logrus"
+	log "github.com/mit-dci/lit/logs"
 	"net"
 
 	"github.com/mit-dci/lit/btcutil/btcec"

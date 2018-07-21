@@ -1,7 +1,7 @@
 package nat
 
 import (
-	log "github.com/sirupsen/logrus"
+	log "github.com/mit-dci/lit/logs"
 	"fmt"
 	"github.com/jackpal/gateway"
 	natpmp "github.com/jackpal/go-nat-pmp"

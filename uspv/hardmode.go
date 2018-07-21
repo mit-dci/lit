@@ -2,7 +2,7 @@ package uspv
 
 import (
 	"bytes"
-	log "github.com/sirupsen/logrus"
+	log "github.com/mit-dci/lit/logs"
 
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/wire"

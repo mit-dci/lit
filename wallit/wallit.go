@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	log "github.com/sirupsen/logrus"
+	log "github.com/mit-dci/lit/logs"
 	"sync"
 
 	"github.com/mit-dci/lit/btcutil/blockchain"

@@ -9,7 +9,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	log "github.com/sirupsen/logrus"
+	log "github.com/mit-dci/lit/logs"
 	"math/big"
 	"os"
 

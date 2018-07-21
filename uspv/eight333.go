@@ -2,7 +2,7 @@ package uspv
 
 import (
 	"fmt"
-	log "github.com/sirupsen/logrus"
+	log "github.com/mit-dci/lit/logs"
 	"os"
 
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"

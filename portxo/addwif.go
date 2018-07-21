@@ -3,7 +3,7 @@ package portxo
 import (
 	"bytes"
 	"fmt"
-	log "github.com/sirupsen/logrus"
+	log "github.com/mit-dci/lit/logs"
 
 	"github.com/mit-dci/lit/btcutil/chaincfg"
 	"github.com/mit-dci/lit/btcutil"

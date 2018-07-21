@@ -2,8 +2,9 @@ package main
 
 import (
 	"bufio"
-	"io"
-	"log" // keeping this here to prevent name collisions, shouldn't matter much
+	//"io"
+	log "github.com/mit-dci/lit/logs"
+	. "github.com/mit-dci/lit/logs"
 	"os"
 	"path/filepath"
 
@@ -57,15 +58,15 @@ func litSetup(conf *config) *[32]byte {
 	// create home directory
 	_, err = os.Stat(preconf.LitHomeDir)
 	if err != nil {
-		log.Println("Error while creating a directory")
+		log.Error("Error while creating a directory")
 	}
 	if os.IsNotExist(err) {
 		// first time the guy is running lit, lets set tn3 to true
 		os.Mkdir(preconf.LitHomeDir, 0700)
-		log.Println("Creating a new config file")
+		log.Info("Creating a new config file")
 		err := createDefaultConfigFile(preconf.LitHomeDir) // Source of error
 		if err != nil {
-			log.Printf("Error creating a default config file: %v", preconf.LitHomeDir)
+			log.Fatal("Error creating a default config file: %v", preconf.LitHomeDir)
 			log.Fatal(err)
 		}
 	}
@@ -73,9 +74,9 @@ func litSetup(conf *config) *[32]byte {
 	if _, err := os.Stat(filepath.Join(filepath.Join(preconf.LitHomeDir), "lit.conf")); os.IsNotExist(err) {
 		// if there is no config file found over at the directory, create one
 		if err != nil {
-			log.Println(err)
+			log.Error(err)
 		}
-		log.Println("Creating a new config file")
+		log.Info("Creating a new config file")
 		err := createDefaultConfigFile(filepath.Join(preconf.LitHomeDir)) // Source of error
 		if err != nil {
 			log.Fatal(err)
@@ -100,14 +101,12 @@ func litSetup(conf *config) *[32]byte {
 	logFilePath := filepath.Join(conf.LitHomeDir, "lit.log")
 
 	logfile, err := os.OpenFile(logFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	// TODO ... what's this do?
-	defer logfile.Close()
 
-	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
-
-	logOutput := io.MultiWriter(os.Stdout, logfile)
-	log.SetOutput(logOutput)
-	// log.SetOutput(logFile)
+	if conf.LogLevel >= 0 {
+		SetupLogs(logFilePath)
+	} else {
+		log.SetOutput(logfile)
+	}
 
 	// Allow node with no linked wallets, for testing.
 	// TODO Should update tests and disallow nodes without wallets later.

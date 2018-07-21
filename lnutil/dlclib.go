@@ -5,7 +5,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	log "github.com/sirupsen/logrus"
+	log "github.com/mit-dci/lit/logs"
 	"math/big"
 
 	"github.com/mit-dci/lit/btcutil/btcec"

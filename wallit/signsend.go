@@ -3,7 +3,7 @@ package wallit
 import (
 	"bytes"
 	"fmt"
-	log "github.com/sirupsen/logrus"
+	log "github.com/mit-dci/lit/logs"
 	"sort"
 
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"

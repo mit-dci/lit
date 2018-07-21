@@ -9,7 +9,7 @@ package main
 import (
 	"bytes"
 	"io"
-	log "github.com/sirupsen/logrus"
+	log "github.com/mit-dci/lit/logs"
 	"os"
 	"strconv"
 )

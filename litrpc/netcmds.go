@@ -2,7 +2,7 @@ package litrpc
 
 import (
 	"fmt"
-	log "github.com/sirupsen/logrus"
+	log "github.com/mit-dci/lit/logs"
 	"strconv"
 
 	"github.com/mit-dci/lit/lnutil"

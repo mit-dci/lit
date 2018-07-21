@@ -2,7 +2,7 @@ package wallit
 
 import (
 	"fmt"
-	log "github.com/sirupsen/logrus"
+	log "github.com/mit-dci/lit/logs"
 	"sort"
 
 	"github.com/mit-dci/lit/btcutil/btcec"

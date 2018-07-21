@@ -9,7 +9,7 @@ import (
 	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/qln"
-	log "github.com/sirupsen/logrus"
+	log "github.com/mit-dci/lit/logs"
 
 	flags "github.com/jessevdk/go-flags"
 )
@@ -162,12 +162,8 @@ func main() {
 		AutoReconnectInterval: defaultAutoReconnectInterval,
 	}
 
+	// setup lit config stuff
 	key := litSetup(&conf)
-
-	customFormatter := new(log.TextFormatter)
-	customFormatter.TimestampFormat = "2006-01-02 15:04:05.999999999"
-	customFormatter.FullTimestamp = true
-	log.SetFormatter(customFormatter)
 	// Log Levels:
 	// 0: DebugLevel prints Panics, Fatals, Errors, Warnings, Infos and Debugs
 	// 1: InfoLevel  prints Panics, Fatals, Errors, Warnings and Info
@@ -182,7 +178,6 @@ func main() {
 	// Warn  -> You should probably take a look at this
 	// Error -> Something failed but I'm not quitting
 	// Fatal -> Bye
-	log.Println("LOG LEVEL", conf.LogLevel)
 	if conf.LogLevel >= 0 {
 		switch conf.LogLevel {
 		case 0:
