@@ -2,7 +2,7 @@ package qln
 
 import (
 	"fmt"
-	log "github.com/mit-dci/lit/logs"
+	."github.com/mit-dci/lit/logs"
 
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/lnutil"
@@ -82,7 +82,7 @@ func (q *Qchan) IngestElkrem(elk *chainhash.Hash) error {
 	if err != nil {
 		return err
 	}
-	log.Debugf("ingested hash, receiver now has up to %d\n", q.ElkRcv.UpTo())
+	Log.Debugf("ingested hash, receiver now has up to %d\n", q.ElkRcv.UpTo())
 
 	// if this is state 0, then we have elkrem 0 and we can stop here.
 	// there's nothing to revoke.
@@ -101,7 +101,7 @@ func (q *Qchan) IngestElkrem(elk *chainhash.Hash) error {
 
 	// see if it matches previous elk point
 	if point != q.State.ElkPoint {
-		log.Debugf("elk1: %x\nelk2: %x\nelk3: %x\nngst: %x\n",
+		Log.Debugf("elk1: %x\nelk2: %x\nelk3: %x\nngst: %x\n",
 			q.State.ElkPoint, q.State.NextElkPoint, q.State.N2ElkPoint, point)
 		// didn't match, the whole channel is borked.
 		return fmt.Errorf("hash %x (index %d) fits tree but creates wrong elkpoint!",

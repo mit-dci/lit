@@ -2,7 +2,7 @@ package qln
 
 import (
 	"fmt"
-	log "github.com/mit-dci/lit/logs"
+	."github.com/mit-dci/lit/logs"
 	"time"
 
 	"github.com/mit-dci/lit/bech32"
@@ -26,7 +26,7 @@ func (nd *LitNode) AutoReconnect(listenPort string, interval int64) {
 			for {
 				pubKey, _ := nd.GetPubHostFromPeerIdx(i)
 				if pubKey == empty {
-					log.Errorf("Done, tried %d hosts\n", i-1)
+					Log.Errorf("Done, tried %d hosts\n", i-1)
 					break
 				}
 
@@ -45,7 +45,7 @@ func (nd *LitNode) AutoReconnect(listenPort string, interval int64) {
 				err := nd.DialPeer(adr)
 
 				if err != nil {
-					log.Errorf("Could not restore connection to %s: %s\n", adr, err.Error())
+					Log.Errorf("Could not restore connection to %s: %s\n", adr, err.Error())
 				}
 
 				i++

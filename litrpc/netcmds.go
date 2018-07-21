@@ -2,7 +2,7 @@ package litrpc
 
 import (
 	"fmt"
-	log "github.com/mit-dci/lit/logs"
+	."github.com/mit-dci/lit/logs"
 	"strconv"
 
 	"github.com/mit-dci/lit/lnutil"
@@ -54,7 +54,7 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
 		if host != "" {
 			connectAdr += "@" + host
 		}
-		log.Debugf("try string %s\n", connectAdr)
+		Log.Debugf("try string %s\n", connectAdr)
 
 	} else {
 		// use string as is, try to convert to ln address

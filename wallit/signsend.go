@@ -3,7 +3,7 @@ package wallit
 import (
 	"bytes"
 	"fmt"
-	log "github.com/mit-dci/lit/logs"
+	."github.com/mit-dci/lit/logs"
 	"sort"
 
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
@@ -57,7 +57,7 @@ func (w *Wallit) MaybeSend(txos []*wire.TxOut, ow bool) ([]*wire.OutPoint, error
 		return nil, err
 	}
 
-	log.Infof("MaybeSend has overshoot %d, %d inputs\n", overshoot, len(utxos))
+	Log.Infof("MaybeSend has overshoot %d, %d inputs\n", overshoot, len(utxos))
 
 	// changeOutSize is the extra vsize that a change output would add
 	changeOutFee := 30 * feePerByte
@@ -112,7 +112,7 @@ func (w *Wallit) MaybeSend(txos []*wire.TxOut, ow bool) ([]*wire.OutPoint, error
 // Sign and broadcast a tx previously built with MaybeSend.  This clears the freeze
 // on the utxos but they're not utxos anymore anyway.
 func (w *Wallit) ReallySend(txid *chainhash.Hash) error {
-	log.Debugf("Reallysend %s\n", txid.String())
+	Log.Debugf("Reallysend %s\n", txid.String())
 	// start frozen set access
 	w.FreezeMutex.Lock()
 	defer w.FreezeMutex.Unlock()
@@ -123,7 +123,7 @@ func (w *Wallit) ReallySend(txid *chainhash.Hash) error {
 	}
 	// delete inputs from frozen set (they're gone anyway, but just to clean it up)
 	for _, txin := range frozenTx.Ins {
-		log.Debugf("\t remove %s from frozen outpoints\n", txin.Op.String())
+		Log.Debugf("\t remove %s from frozen outpoints\n", txin.Op.String())
 		delete(w.FreezeSet, txin.Op)
 	}
 
@@ -144,7 +144,7 @@ func (w *Wallit) ReallySend(txid *chainhash.Hash) error {
 // Cancel the hold on a tx previously built with MaybeSend.  Clears freeze on
 // utxos so they can be used somewhere else.
 func (w *Wallit) NahDontSend(txid *chainhash.Hash) error {
-	log.Debugf("Nahdontsend %s\n", txid.String())
+	Log.Debugf("Nahdontsend %s\n", txid.String())
 	// start frozen set access
 	w.FreezeMutex.Lock()
 	defer w.FreezeMutex.Unlock()
@@ -155,7 +155,7 @@ func (w *Wallit) NahDontSend(txid *chainhash.Hash) error {
 	}
 	// go through all its inputs, and remove those outpoints from the frozen set
 	for _, txin := range frozenTx.Ins {
-		log.Debugf("\t remove %s from frozen outpoints\n", txin.Op.String())
+		Log.Debugf("\t remove %s from frozen outpoints\n", txin.Op.String())
 		delete(w.FreezeSet, txin.Op)
 	}
 	return nil
@@ -184,7 +184,7 @@ func (w *Wallit) GrabAll() error {
 	nothin := true
 	for _, u := range utxos {
 		if u.Seq == 1 && u.Height > 0 { // grabbable
-			log.Infof("found %s to grab!\n", u.String())
+			Log.Infof("found %s to grab!\n", u.String())
 			adr160, err := w.NewAdr160()
 			if err != nil {
 				return err
@@ -204,7 +204,7 @@ func (w *Wallit) GrabAll() error {
 		}
 	}
 	if nothin {
-		log.Debug("Nothing to grab\n")
+		Log.Debug("Nothing to grab\n")
 	}
 	return nil
 }
@@ -286,9 +286,9 @@ func (w *Wallit) PickUtxos(
 		allUtxos[1].Value+allUtxos[2].Value > amtWanted+maxFeeGuess &&
 		!(ow && allUtxos[2].Mode&portxo.FlagTxoWitness == 0) &&
 		!(ow && allUtxos[1].Mode&portxo.FlagTxoWitness == 0) {
-		log.Debug("remaining utxo list, in order:\n")
+		Log.Debug("remaining utxo list, in order:\n")
 		for _, u := range allUtxos {
-			log.Debugf("\t h: %d amt: %d\n", u.Height, u.Value)
+			Log.Debugf("\t h: %d amt: %d\n", u.Height, u.Value)
 		}
 		allUtxos = allUtxos[1:]
 	}
@@ -434,7 +434,7 @@ func (w *Wallit) SignMyInputs(tx *wire.MsgTx) error {
 
 		// get key
 		priv := w.PathPrivkey(utxo.KeyGen)
-		log.Infof("signing with privkey pub %x\n", priv.PubKey().SerializeCompressed())
+		Log.Infof("signing with privkey pub %x\n", priv.PubKey().SerializeCompressed())
 
 		if priv == nil {
 			return fmt.Errorf("SignMyInputs: nil privkey")
@@ -529,7 +529,7 @@ func (w *Wallit) BuildAndSign(
 
 	w.SignMyInputs(tx)
 
-	log.Infof("tx: %s", TxToString(tx))
+	Log.Infof("tx: %s", TxToString(tx))
 	return tx, nil
 }
 
@@ -549,6 +549,6 @@ func EstFee(txins []*portxo.PorTxo, outputByteSize, spB int64) int64 {
 		size += txin.EstSize()
 	}
 
-	log.Infof("%d spB, est vsize %d, fee %d\n", spB, size, size*spB)
+	Log.Infof("%d spB, est vsize %d, fee %d\n", spB, size, size*spB)
 	return size * spB
 }

@@ -2,7 +2,7 @@ package qln
 
 import (
 	"fmt"
-	log "github.com/mit-dci/lit/logs"
+	."github.com/mit-dci/lit/logs"
 	"path/filepath"
 
 	"github.com/boltdb/bolt"
@@ -59,7 +59,7 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 
 	nd.Tower = new(watchtower.WatchTower)
 
-	// Create a new manager for the discreet log contracts
+	// Create a new manager for the discreet .contracts
 	nd.DlcManager, err = dlc.NewManager(filepath.Join(nd.LitFolder, "dlc.db"))
 	if err != nil {
 		return nil, err
@@ -122,7 +122,7 @@ func (nd *LitNode) LinkBaseWallet(
 		rootpriv, birthHeight, resync, host, nd.LitFolder, proxy, param)
 
 	if err != nil {
-		 log.Error(err)
+		 Log.Error(err)
 		 return nil
 	}
 
@@ -143,7 +143,7 @@ func (nd *LitNode) LinkBaseWallet(
 		copy(pkh[:], pkhSlice)
 		nd.SubWallet[WallitIdx].ExportHook().RegisterAddress(pkh)
 
-		log.Infof("Registering outpoint %v", qChan.PorTxo.Op)
+		Log.Infof("Registering outpoint %v", qChan.PorTxo.Op)
 
 		nd.SubWallet[WallitIdx].WatchThis(qChan.PorTxo.Op)
 	}

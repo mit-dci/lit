@@ -2,7 +2,7 @@ package qln
 
 import (
 	"fmt"
-	log "github.com/mit-dci/lit/logs"
+	."github.com/mit-dci/lit/logs"
 	"sync"
 	"time"
 
@@ -93,7 +93,7 @@ type LitNode struct {
 	// all nodes have a watchtower.  but could have a tower without a node
 	Tower watchtower.Watcher
 
-	// discreet log contract manager
+	// discreet .contract manager
 	DlcManager *dlc.DlcManager
 
 	// BaseWallet is the underlying wallet which keeps track of utxos, secrets,
@@ -244,7 +244,7 @@ func (nd *LitNode) GetPubHostFromPeerIdx(idx uint32) ([33]byte, string) {
 		return nil
 	})
 	if err != nil {
-		log.Error(err.Error())
+		Log.Error(err.Error())
 	}
 	return pub, host
 }
@@ -273,7 +273,7 @@ func (nd *LitNode) GetNicknameFromPeerIdx(idx uint32) string {
 		return nil
 	})
 	if err != nil {
-		log.Error(err.Error())
+		Log.Error(err.Error())
 	}
 	return nickname
 }
@@ -432,7 +432,7 @@ func (nd *LitNode) SaveQChan(q *Qchan) error {
 		if err != nil {
 			return err
 		}
-		log.Debugf("saved %d : %s mapping in db\n", q.Idx(), q.Op.String())
+		Log.Debugf("saved %d : %s mapping in db\n", q.Idx(), q.Op.String())
 
 		cbk := btx.Bucket(BKTChannel) // go into bucket for all peers
 		if cbk == nil {
@@ -462,7 +462,7 @@ func (nd *LitNode) SaveQChan(q *Qchan) error {
 		// serialize elkrem receiver if it exists
 
 		if q.ElkRcv != nil {
-			log.Info("--- elk rcv exists, saving\n")
+			Log.Info("--- elk rcv exists, saving\n")
 
 			eb, err := q.ElkRcv.ToBytes()
 			if err != nil {
@@ -481,7 +481,7 @@ func (nd *LitNode) SaveQChan(q *Qchan) error {
 			return err
 		}
 		// save state
-		log.Infof("writing %d byte state to bucket\n", len(b))
+		Log.Infof("writing %d byte state to bucket\n", len(b))
 		return qcBucket.Put(KEYState, b)
 	})
 	if err != nil {
@@ -546,7 +546,7 @@ func (nd *LitNode) RestoreQchanFromBucket(bkt *bolt.Bucket) (*Qchan, error) {
 		return nil, err
 	}
 	if qc.ElkRcv != nil {
-		// log.Info("loaded elkrem receiver at state %d\n", qc.ElkRcv.UpTo())
+		// Log.Info("loaded elkrem receiver at state %d\n", qc.ElkRcv.UpTo())
 	}
 
 	// derive elkrem sender root from HD keychain
@@ -672,7 +672,7 @@ func (nd *LitNode) SaveQchanState(q *Qchan) error {
 			return err
 		}
 		// save state
-		log.Infof("writing %d byte state to bucket\n", len(b))
+		Log.Infof("writing %d byte state to bucket\n", len(b))
 		return qcBucket.Put(KEYState, b)
 	})
 }
@@ -765,7 +765,7 @@ func (nd *LitNode) GetQchanByIdx(cIdx uint32) (*Qchan, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Infof("got op %x\n", op)
+	Log.Infof("got op %x\n", op)
 	qc, err := nd.GetQchan(op)
 	if err != nil {
 		return nil, err

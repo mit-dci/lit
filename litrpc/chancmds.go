@@ -2,7 +2,7 @@ package litrpc
 
 import (
 	"fmt"
-	log "github.com/mit-dci/lit/logs"
+	."github.com/mit-dci/lit/logs"
 
 	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/portxo"
@@ -286,7 +286,7 @@ func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 			"can't push %d max is 1 coin (100000000), min is 1", args.Amt)
 	}
 
-	log.Debugf("push %d to chan %d with data %x\n", args.Amt, args.ChanIdx, args.Data)
+	Log.Debugf("push %d to chan %d with data %x\n", args.Amt, args.ChanIdx, args.Data)
 
 	// load the whole channel from disk just to see who the peer is
 	// (pretty inefficient)
@@ -316,7 +316,7 @@ func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 			dummyqc.Peer(), dummyqc.Idx())
 	}
 
-	log.Infof("channel %s\n", qc.Op.String())
+	Log.Infof("channel %s\n", qc.Op.String())
 
 	if qc.CloseData.Closed {
 		return fmt.Errorf("Channel %d already closed by tx %s",
@@ -397,7 +397,7 @@ func (r *LitRPC) DumpPrivs(args NoArgs, reply *DumpReply) error {
 	for _, qc := range qcs {
 		wal, ok := r.Node.SubWallet[qc.Coin()]
 		if !ok {
-			log.Errorf(
+			Log.Errorf(
 				"Channel %s error - coin %d not connected; can't show keys",
 				qc.Op.String(), qc.Coin())
 			continue

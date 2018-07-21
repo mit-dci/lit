@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	. "github.com/mit-dci/lit/logs"
+	."github.com/mit-dci/lit/logs"
 	"net"
 	"os"
 	"strings"

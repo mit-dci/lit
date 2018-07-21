@@ -4,7 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	log "github.com/mit-dci/lit/logs"
+	."github.com/mit-dci/lit/logs"
 	"net/rpc"
 	"net/rpc/jsonrpc"
 	"os"
@@ -84,7 +84,7 @@ func main() {
 	/*
 		client, err := net.Dial("tcp", dialString)
 		if err != nil {
-			log.Fatal("dialing:", err)
+			Log.Fatal("dialing:", err)
 		}
 		defer client.Close()
 	*/
@@ -95,7 +95,7 @@ func main() {
 	//	url := "ws://127.0.0.1:8000/ws"
 	wsConn, err := websocket.Dial(urlString, "", origin)
 	if err != nil {
-		log.Fatal(err)
+		Log.Fatal(err)
 	}
 	defer wsConn.Close()
 
@@ -107,7 +107,7 @@ func main() {
 		AutoComplete: lc.NewAutoCompleter(),
 	})
 	if err != nil {
-		log.Fatal(err)
+		Log.Fatal(err)
 	}
 	defer rl.Close()
 	go lc.RequestAsync()
@@ -129,13 +129,13 @@ func main() {
 
 		err = lc.Shellparse(cmdslice)
 		if err != nil { // only error should be user exit
-			log.Fatal(err)
+			Log.Fatal(err)
 		}
 	}
 
 	//	err = c.Call("LitRPC.Bal", nil, &br)
 	//	if err != nil {
-	//		log.Fatal("rpc call error:", err)
+	//		Log.Fatal("rpc call error:", err)
 	//	}
 	//	fmt.Printf("Sent bal req, response: txototal %d\n", br.TxoTotal)
 }

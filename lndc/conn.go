@@ -6,7 +6,7 @@ import (
 	"crypto/hmac"
 	"encoding/binary"
 	"fmt"
-	log "github.com/mit-dci/lit/logs"
+	."github.com/mit-dci/lit/logs"
 	"net"
 	"strings"
 	"time"
@@ -185,7 +185,7 @@ func (c *LNDConn) Dial(
 	}
 
 	// display private key for debug only
-	log.Debugf("made session key %x\n", sessionKey)
+	Log.Debugf("made session key %x\n", sessionKey)
 
 	c.myNonceInt = 1 << 63
 	c.remoteNonceInt = 0
@@ -285,7 +285,7 @@ func (c *LNDConn) authPKH(
 		return err
 	}
 	idDH := fastsha256.Sum256(btcec.GenerateSharedSecret(myId, theirPub))
-	log.Debugf("made idDH %x\n", idDH)
+	Log.Debugf("made idDH %x\n", idDH)
 	theirDHproof := fastsha256.Sum256(append(localEphPubBytes, idDH[:]...))
 
 	// Verify that their DH proof matches the one we just generated.
@@ -330,14 +330,14 @@ func (c *LNDConn) Read(b []byte) (n int, err error) {
 		var nonceBuf [8]byte
 		binary.BigEndian.PutUint64(nonceBuf[:], c.remoteNonceInt)
 
-		//		log.Printf("decrypt %d byte from %x nonce %d\n",
+		//		Log.Printf("decrypt %d byte from %x nonce %d\n",
 		//			len(ctext), c.RemoteLNId, c.remoteNonceInt)
 
 		c.remoteNonceInt++ // increment remote nonce, no matter what...
 
 		msg, err := c.chachaStream.Open(nil, nonceBuf[:], ctext, nil)
 		if err != nil {
-			log.Errorf("decrypt %d byte ciphertext failed\n", len(ctext))
+			Log.Errorf("decrypt %d byte ciphertext failed\n", len(ctext))
 			return 0, err
 		}
 
@@ -357,7 +357,7 @@ func (c *LNDConn) Write(b []byte) (n int, err error) {
 	if b == nil {
 		return 0, fmt.Errorf("write to %x nil", c.RemotePub.SerializeCompressed())
 	}
-	//	log.Printf("Encrypt %d byte plaintext to %x nonce %d\n",
+	//	Log.Printf("Encrypt %d byte plaintext to %x nonce %d\n",
 	//		len(b), c.RemoteLNId, c.myNonceInt)
 
 	// first encrypt message with shared key

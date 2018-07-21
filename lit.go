@@ -9,7 +9,7 @@ import (
 	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/qln"
-	log "github.com/mit-dci/lit/logs"
+	."github.com/mit-dci/lit/logs"
 
 	flags "github.com/jessevdk/go-flags"
 )
@@ -164,39 +164,6 @@ func main() {
 
 	// setup lit config stuff
 	key := litSetup(&conf)
-	// Log Levels:
-	// 0: DebugLevel prints Panics, Fatals, Errors, Warnings, Infos and Debugs
-	// 1: InfoLevel  prints Panics, Fatals, Errors, Warnings and Info
-	// 2: WarnLevel  prints Panics, Fatals, Errors and Warnings
-	// 3: ErrorLevel prints Panics, Fatals and Errors
-	// 4: FatalLevel prints Panics, Fatals
-	// 5: PanicLevel prints Panics
-	// Default is level 3
-	// Code for tagging logs:
-	// Debug -> Useful debugging information
-	// Info  -> Something noteworthy happened
-	// Warn  -> You should probably take a look at this
-	// Error -> Something failed but I'm not quitting
-	// Fatal -> Bye
-	if conf.LogLevel >= 0 {
-		switch conf.LogLevel {
-		case 0:
-			log.SetLevel(log.DebugLevel)
-		case 1:
-			log.SetLevel(log.InfoLevel)
-		case 2:
-			log.SetLevel(log.WarnLevel)
-		case 3:
-			log.SetLevel(log.ErrorLevel)
-		case 4:
-			log.SetLevel(log.FatalLevel)
-		case 5:
-			log.SetLevel(log.PanicLevel)
-		default:
-			log.Error("Invalid logging param passed, proceeding with defaults")
-		}
-	}
-
 	if conf.ProxyURL != "" {
 		conf.LitProxyURL = conf.ProxyURL
 		conf.ChainProxyURL = conf.ProxyURL
@@ -206,13 +173,13 @@ func main() {
 	// give node and below file pathof lit home directory
 	node, err := qln.NewLitNode(key, conf.LitHomeDir, conf.TrackerURL, conf.LitProxyURL, conf.Nat)
 	if err != nil {
-		log.Fatal(err)
+		Log.Fatal(err)
 	}
 
 	// node is up; link wallets based on args
 	err = linkWallets(node, key, &conf)
 	if err != nil {
-		log.Fatal(err)
+		Log.Fatal(err)
 	}
 
 	rpcl := new(litrpc.LitRPC)
@@ -226,7 +193,7 @@ func main() {
 	}
 
 	<-rpcl.OffButton
-	log.Info("Got stop request\n")
+	Log.Info("Got stop request\n")
 	time.Sleep(time.Second)
 
 	return

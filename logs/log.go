@@ -1,13 +1,30 @@
 package logs
 
 import (
+  "fmt"
   logrus "github.com/sirupsen/logrus"
   "github.com/rifflock/lfshook"
 )
 var Log *logrus.Logger
 
-func SetupLogs(logFilePath string) error {
+func SetupLogs(logFilePath string, logLevel int) error {
 
+  switch logLevel {
+  case 0:
+    logrus.SetLevel(logrus.DebugLevel)
+  case 1:
+    logrus.SetLevel(logrus.InfoLevel)
+  case 2:
+    logrus.SetLevel(logrus.WarnLevel)
+  case 3:
+    logrus.SetLevel(logrus.ErrorLevel)
+  case 4:
+    logrus.SetLevel(logrus.FatalLevel)
+  case 5:
+    logrus.SetLevel(logrus.PanicLevel)
+  default:
+    return fmt.Errorf("Invalid logging param passed, proceeding with defaults")
+  }
 
   pathMap := lfshook.PathMap{
   	logrus.InfoLevel:  logFilePath,
@@ -19,10 +36,13 @@ func SetupLogs(logFilePath string) error {
   formatter.FullTimestamp = true
 
   logrus.SetFormatter(formatter) // for normal logs, wont be saevd to logfile
+  logrus.Info("THIS IS BS")
   Log = logrus.New()
   Log.Hooks.Add(lfshook.NewHook(
   	pathMap,
-  	&logrus.TextFormatter{},
+  	&logrus.JSONFormatter{},
   ))
+  Log.Info("THIS IS SHIT ")
+  logrus.Error("WTF IS THIS")
   return nil
 }

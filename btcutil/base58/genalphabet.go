@@ -9,7 +9,7 @@ package main
 import (
 	"bytes"
 	"io"
-	log "github.com/mit-dci/lit/logs"
+	."github.com/mit-dci/lit/logs"
 	"os"
 	"strconv"
 )
@@ -45,14 +45,14 @@ var b58 = [256]byte{`)
 func write(w io.Writer, b []byte) {
 	_, err := w.Write(b)
 	if err != nil {
-		log.Fatal(err)
+		Log.Fatal(err)
 	}
 }
 
 func main() {
 	fi, err := os.Create("alphabet.go")
 	if err != nil {
-		log.Fatal(err)
+		Log.Fatal(err)
 	}
 	defer fi.Close()
 

@@ -1,7 +1,7 @@
 package uspv
 
 import (
-	log "github.com/mit-dci/lit/logs"
+	."github.com/mit-dci/lit/logs"
 	"path/filepath"
 
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
@@ -116,13 +116,13 @@ func (s *SPVCon) Start(
 
 	err = s.Connect(host)
 	if err != nil {
-		log.Errorf("Can't connect to host %s\n", host)
+		Log.Errorf("Can't connect to host %s\n", host)
 		return nil, nil, err
 	}
 
 	err = s.AskForHeaders()
 	if err != nil {
-		log.Error("AskForHeaders error\n")
+		Log.Error("AskForHeaders error\n")
 		return nil, nil, err
 	}
 

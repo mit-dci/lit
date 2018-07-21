@@ -1,7 +1,7 @@
 package wallit
 
 import (
-	log "github.com/mit-dci/lit/logs"
+	."github.com/mit-dci/lit/logs"
 
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/btcutil"
@@ -28,7 +28,7 @@ func (w *Wallit) PathPrivkey(kg portxo.KeyGen) *btcec.PrivateKey {
 	}
 	priv, err := kg.DerivePrivateKey(w.rootPrivKey)
 	if err != nil {
-		log.Errorf("PathPrivkey err %s", err.Error())
+		Log.Errorf("PathPrivkey err %s", err.Error())
 		return nil
 	}
 	return priv
