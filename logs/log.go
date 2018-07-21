@@ -10,17 +10,17 @@ var Log *logrus.Logger
 func SetupLogs(logFilePath string, logLevel int) error {
 
   switch logLevel {
-  case 0:
-    logrus.SetLevel(logrus.DebugLevel)
-  case 1:
-    logrus.SetLevel(logrus.InfoLevel)
-  case 2:
-    logrus.SetLevel(logrus.WarnLevel)
-  case 3:
-    logrus.SetLevel(logrus.ErrorLevel)
-  case 4:
-    logrus.SetLevel(logrus.FatalLevel)
   case 5:
+    logrus.SetLevel(logrus.DebugLevel)
+  case 4:
+    logrus.SetLevel(logrus.InfoLevel)
+  case 3:
+    logrus.SetLevel(logrus.WarnLevel)
+  case 2:
+    logrus.SetLevel(logrus.ErrorLevel)
+  case 1:
+    logrus.SetLevel(logrus.FatalLevel)
+  case 0:
     logrus.SetLevel(logrus.PanicLevel)
   default:
     return fmt.Errorf("Invalid logging param passed, proceeding with defaults")
