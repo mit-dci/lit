@@ -383,12 +383,14 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 	qc.State.Data = msg.Data
 
 	// verify sig for the next state. only save if this works
-
+	stashElk := qc.State.ElkPoint
+	qc.State.ElkPoint = qc.State.NextElkPoint
 	// TODO: There are more signatures required
 	err = qc.VerifySigs(msg.Signature, msg.HTLCSigs)
 	if err != nil {
 		return fmt.Errorf("DeltaSigHandler err %s", err.Error())
 	}
+	qc.State.ElkPoint = stashElk
 
 	// (seems odd, but everything so far we still do in case of collision, so
 	// only check here.  If it's a collision, set, save, send gapSigRev
@@ -702,6 +704,17 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 		return fmt.Errorf("SIGREVHandler err %s", err.Error())
 	}
 
+	/*
+		Re-enable this if you want to print out the break TX for old states.
+		You can use this to debug justice. Don't enable in production since these
+		things can screw someone up if someone else maliciously grabs their log file
+
+		err = nd.PrintBreakTxForDebugging(qc)
+		if err != nil {
+			return fmt.Errorf("SIGREVHandler err %s", err.Error())
+		}
+	*/
+
 	// now that we've saved & sent everything, before ending the function, we
 	// go BACK to create a txid/sig pair for watchtower.  This feels like a kindof
 	// weird way to do it.  Maybe there's a better way.
@@ -801,6 +814,17 @@ func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {
 	if err != nil {
 		return fmt.Errorf("REVHandler err %s", err.Error())
 	}
+
+	/*
+		Re-enable this if you want to print out the break TX for old states.
+		You can use this to debug justice. Don't enable in production since these
+		things can screw someone up if someone else maliciously grabs their log file
+
+		err = nd.PrintBreakTxForDebugging(qc)
+		if err != nil {
+			return fmt.Errorf("SIGREVHandler err %s", err.Error())
+		}
+	*/
 
 	// after saving cleared updated state, go back to previous state and build
 	// the justice signature

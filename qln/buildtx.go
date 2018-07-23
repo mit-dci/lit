@@ -376,8 +376,8 @@ func (q *Qchan) GenHTLCScript(h HTLC, mine bool) ([]byte, error) {
 	return q.GenHTLCScriptWithElkPointsAndRevPub(h, mine, q.State.ElkPoint, curElk, revPub)
 }
 
-func (q *Qchan) GenHTLCOut(h HTLC, mine bool) (*wire.TxOut, error) {
-	HTLCScript, err := q.GenHTLCScript(h, mine)
+func (q *Qchan) GenHTLCOutWithElkPointsAndRevPub(h HTLC, mine bool, theirElkPoint, myElkPoint, revPub [33]byte) (*wire.TxOut, error) {
+	HTLCScript, err := q.GenHTLCScriptWithElkPointsAndRevPub(h, mine, theirElkPoint, myElkPoint, revPub)
 	if err != nil {
 		return nil, err
 	}
@@ -387,6 +387,20 @@ func (q *Qchan) GenHTLCOut(h HTLC, mine bool) (*wire.TxOut, error) {
 	HTLCOut := wire.NewTxOut(h.Amt, witScript)
 
 	return HTLCOut, nil
+}
+
+func (q *Qchan) GenHTLCOut(h HTLC, mine bool) (*wire.TxOut, error) {
+	revPub, _, _, err := q.GetKeysFromState(mine)
+	if err != nil {
+		return nil, err
+	}
+
+	curElk, err := q.ElkPoint(false, q.State.StateIdx)
+	if err != nil {
+		return nil, err
+	}
+
+	return q.GenHTLCOutWithElkPointsAndRevPub(h, mine, q.State.ElkPoint, curElk, revPub)
 }
 
 // GetKeysFromState will inspect the channel state and return the revPub, timePub and pkhPub based on
