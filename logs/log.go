@@ -30,26 +30,21 @@ func SetupTestLogs() {
 func SetupFormatter(logFile *os.File, logLevel int) {
 	formatter := new(logrus.TextFormatter)
 	formatter.TimestampFormat = "2006-01-02 15:04:05.000000"
-	// magic date, please don't change.
+	// magic date, don't change.
 	formatter.FullTimestamp = true
 	logrus.SetFormatter(formatter) // for any "normal" log messages
 
-	if logLevel == 0 {
-		Log = &logrus.Logger{
-			Out:       logFile,
-			Formatter: formatter,
-			Hooks:     make(logrus.LevelHooks),
-			// set Level below
-		}
-	} else {
-		Log = &logrus.Logger{
-			Out:       os.Stderr,
-			Formatter: formatter,
-			Hooks:     make(logrus.LevelHooks),
-			// set Level below
-		}
+	Log = &logrus.Logger{
+		Formatter: formatter,
+		Hooks:     make(logrus.LevelHooks),
+		// set Level below
 	}
 	Log.SetLevel(logrus.DebugLevel)
+	if logLevel == 0 {
+		Log.Out = logFile
+	} else {
+		Log.Out = os.Stderr
+	}
 }
 
 func SetupLogs(logFile *os.File, logFilePath string, logLevel int) error {
