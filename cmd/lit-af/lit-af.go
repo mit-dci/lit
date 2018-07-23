@@ -100,7 +100,6 @@ func main() {
 	defer wsConn.Close()
 
 	lc.rpccon = jsonrpc.NewClient(wsConn)
-
 	rl, err := readline.NewEx(&readline.Config{
 		Prompt:       lnutil.Prompt("lit-af") + lnutil.White("# "),
 		HistoryFile:  filepath.Join(lc.litHomeDir, historyFilename),

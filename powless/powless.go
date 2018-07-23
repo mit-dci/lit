@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	."github.com/mit-dci/lit/logs"
 	"net/http"
 	"os"
 	"strings"
@@ -164,7 +164,7 @@ func (a *APILink) PushTx(tx *wire.MsgTx) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("respo	nse: %s", response.Status)
+	Log.Infof("response: %s", response.Status)
 	_, err = io.Copy(os.Stdout, response.Body)
 
 	return err
@@ -173,12 +173,12 @@ func (a *APILink) PushTx(tx *wire.MsgTx) error {
 // RegisterAddress gets a 20 byte address from the wallit and starts
 // watching for utxos at that address.
 func (a *APILink) RegisterAddress(adr160 [20]byte) error {
-	log.Printf("register %x\n", adr160)
+	Log.Infof("register %x\n", adr160)
 	a.TrackingAdrsMtx.Lock()
 	a.TrackingAdrs[adr160] = true
 	a.TrackingAdrsMtx.Unlock()
 	a.dirtyChan <- nil
-	log.Printf("Register %x complete\n", adr160)
+	Log.Infof("Register %x complete\n", adr160)
 
 	return nil
 }
@@ -186,13 +186,13 @@ func (a *APILink) RegisterAddress(adr160 [20]byte) error {
 // RegisterOutPoint gets an outpoint from the wallit and starts looking
 // for txins that spend it.
 func (a *APILink) RegisterOutPoint(op wire.OutPoint) error {
-	log.Printf("register %s\n", op.String())
+	Log.Infof("register %s\n", op.String())
 	a.TrackingOPsMtx.Lock()
 	a.TrackingOPs[op] = true
 	a.TrackingOPsMtx.Unlock()
 
 	a.dirtyChan <- nil
-	log.Printf("Register %s complete\n", op.String())
+	Log.Infof("Register %s complete\n", op.String())
 	return nil
 }
 
@@ -204,18 +204,18 @@ func (a *APILink) DirtyCheckLoop() {
 
 	for {
 		// wait here until something marks the state as dirty
-		log.Printf("Waiting for dirt...\n")
+		Log.Debug("Waiting for dirt...\n")
 		<-a.dirtyChan
 
-		log.Printf("Dirt detected\n")
+		Log.Debug("Dirt detected\n")
 
 		err := a.GetVAdrTxos()
 		if err != nil {
-			log.Printf(err.Error())
+			Log.Error(err.Error())
 		}
 		err = a.GetVOPTxs()
 		if err != nil {
-			log.Printf(err.Error())
+			Log.Error(err.Error())
 		}
 
 		// probably clean, empty it out to prevent cascades
@@ -268,7 +268,7 @@ func (a *APILink) TipRefreshLoop() error {
 			a.dirtyChan <- nil
 		}
 
-		log.Printf("blockchain tip %v\n", a.tipBlockHash)
+		Log.Infof("blockchain tip %v\n", a.tipBlockHash)
 
 		time.Sleep(time.Second * 60)
 	}
@@ -313,12 +313,12 @@ func (a *APILink) GetVAdrTxos() error {
 	}
 	a.TrackingAdrsMtx.Unlock()
 
-	log.Printf("have %d adr urls to check\n", len(urls))
+	Log.Debugf("have %d adr urls to check\n", len(urls))
 
 	// make an API call for every adr in adrs
 	// then grab the tx hex, decode and send up to the wallit
 	for _, url := range urls {
-		log.Printf("Requesting adr %s\n", url)
+		Log.Debugf("Requesting adr %s\n", url)
 		response, err := a.client.Get(url)
 		if err != nil {
 			return err
@@ -329,7 +329,7 @@ func (a *APILink) GetVAdrTxos() error {
 		//			return err
 		//		}
 
-		//		log.Printf(string(bd))
+		//		Log.Printf(string(bd))
 
 		var txojsons VRawResponse
 
@@ -360,13 +360,13 @@ func (a *APILink) GetVAdrTxos() error {
 			txah.Height = int32(txjson.Height)
 			txah.Tx = tx
 
-			log.Printf("tx %s at height %d", txah.Tx.TxHash().String(), txah.Height)
+			Log.Infof("tx %s at height %d", txah.Tx.TxHash().String(), txah.Height)
 			// send the tx and height back up to the wallit
 			a.TxUpToWallit <- txah
-			log.Printf("sent\n")
+			Log.Info("sent\n")
 		}
 	}
-	log.Printf("GetVAdrTxos complete\n")
+	Log.Debug("GetVAdrTxos complete\n")
 	return nil
 }
 
@@ -394,7 +394,7 @@ func (a *APILink) GetVOPTxs() error {
 
 	// need to query each txid with a different http request
 	for _, op := range oplist {
-		log.Printf("asking for %s\n", op.String())
+		Log.Infof("asking for %s\n", op.String())
 		// get full tx info for the outpoint's tx
 		// (if we have 2 outpoints with the same txid we query twice...)
 		opstring := op.String()
@@ -408,7 +408,7 @@ func (a *APILink) GetVOPTxs() error {
 		// parse the response to get the spending txid
 		err = json.NewDecoder(response.Body).Decode(&txr)
 		if err != nil || txr.Error {
-			log.Printf("json decode error; op %s not found\n", op.String())
+			Log.Errorf("json decode error; op %s not found\n", op.String())
 			continue
 		}
 

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"log"
+	."github.com/mit-dci/lit/logs"
 	"net/http"
 	"net/rpc"
 	"net/rpc/jsonrpc"
@@ -32,11 +32,11 @@ type LitRPC struct {
 func serveWS(ws *websocket.Conn) {
 	body, err := ioutil.ReadAll(ws.Request().Body)
 	if err != nil {
-		log.Printf("Error reading body: %v", err)
+		Log.Errorf("Error reading body: %v", err)
 		return
 	}
 
-	log.Printf(string(body))
+	Log.Debug("External Client Connected:", string(body))
 	ws.Request().Body = ioutil.NopCloser(bytes.NewBuffer(body))
 
 	jsonrpc.ServeConn(ws)
@@ -49,5 +49,5 @@ func RPCListen(rpcl *LitRPC, host string, port uint16) {
 	listenString := fmt.Sprintf("%s:%d", host, port)
 
 	http.Handle("/ws", websocket.Handler(serveWS))
-	log.Fatal(http.ListenAndServe(listenString, nil))
+	Log.Fatal(http.ListenAndServe(listenString, nil))
 }

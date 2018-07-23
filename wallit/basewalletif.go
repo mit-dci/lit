@@ -2,7 +2,7 @@ package wallit
 
 import (
 	"fmt"
-	"log"
+	."github.com/mit-dci/lit/logs"
 	"sort"
 
 	"github.com/mit-dci/lit/btcutil/btcec"
@@ -63,7 +63,7 @@ func (w *Wallit) LetMeKnow() chan lnutil.OutPointEvent {
 func (w *Wallit) CurrentHeight() int32 {
 	h, err := w.GetDBSyncHeight()
 	if err != nil {
-		log.Printf("can't get height from db...")
+		Log.Error("can't get height from db...")
 		return -99
 	}
 	return h
@@ -85,12 +85,12 @@ func (w *Wallit) ExportUtxo(u *portxo.PorTxo) {
 	if u.Value == 0 {
 		err := w.AddPorTxoAdr(u.KeyGen)
 		if err != nil {
-			log.Printf(err.Error())
+			Log.Error(err.Error())
 		}
 	} else {
 		err := w.GainUtxo(*u)
 		if err != nil {
-			log.Printf(err.Error())
+			Log.Error(err.Error())
 		}
 	}
 
@@ -98,7 +98,7 @@ func (w *Wallit) ExportUtxo(u *portxo.PorTxo) {
 	adr160 := w.PathPubHash160(u.KeyGen)
 	err := w.Hook.RegisterAddress(adr160)
 	if err != nil {
-		log.Printf(err.Error())
+		Log.Error(err.Error())
 	}
 }
 

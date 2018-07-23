@@ -2,7 +2,7 @@ package qln
 
 import (
 	"fmt"
-	"log"
+	."github.com/mit-dci/lit/logs"
 
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/btcutil/txscript"
@@ -40,7 +40,7 @@ func (nd *LitNode) SignBreakTx(q *Qchan) (*wire.MsgTx, error) {
 	// put the sighash all byte on the end of their signature
 	theirSig = append(theirSig, byte(txscript.SigHashAll))
 
-	log.Printf("made mysig: %x theirsig: %x\n", mySig, theirSig)
+	Log.Debugf("made mysig: %x theirsig: %x\n", mySig, theirSig)
 	// add sigs to the witness stack
 	if swap {
 		tx.TxIn[0].Witness = SpendMultiSigWitStack(pre, theirSig, mySig)
@@ -192,12 +192,12 @@ func (nd *LitNode) SignState(q *Qchan) ([64]byte, error) {
 		return sig, err
 	}
 
-	log.Printf("____ sig creation for channel (%d,%d):\n", q.Peer(), q.Idx())
-	log.Printf("\tinput %s\n", tx.TxIn[0].PreviousOutPoint.String())
+	Log.Debugf("____ sig creation for channel (%d,%d):\n", q.Peer(), q.Idx())
+	Log.Debugf("\tinput %s\n", tx.TxIn[0].PreviousOutPoint.String())
 	for i, txout := range tx.TxOut {
-		log.Printf("\toutput %d: %x %d\n", i, txout.PkScript, txout.Value)
+		Log.Debugf("\toutput %d: %x %d\n", i, txout.PkScript, txout.Value)
 	}
-	log.Printf("\tstate %d myamt: %d theiramt: %d\n", q.State.StateIdx, q.State.MyAmt, q.Value-q.State.MyAmt)
+	Log.Debugf("\tstate %d myamt: %d theiramt: %d\n", q.State.StateIdx, q.State.MyAmt, q.Value-q.State.MyAmt)
 
 	return sig, nil
 }
@@ -241,13 +241,13 @@ func (q *Qchan) VerifySig(sig [64]byte) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("____ sig verification for channel (%d,%d):\n", q.Peer(), q.Idx())
-	log.Printf("\tinput %s\n", tx.TxIn[0].PreviousOutPoint.String())
+	Log.Debugf("____ sig verification for channel (%d,%d):\n", q.Peer(), q.Idx())
+	Log.Debugf("\tinput %s\n", tx.TxIn[0].PreviousOutPoint.String())
 	for i, txout := range tx.TxOut {
-		log.Printf("\toutput %d: %x %d\n", i, txout.PkScript, txout.Value)
+		Log.Debugf("\toutput %d: %x %d\n", i, txout.PkScript, txout.Value)
 	}
-	log.Printf("\tstate %d myamt: %d theiramt: %d\n", q.State.StateIdx, q.State.MyAmt, q.Value-q.State.MyAmt)
-	log.Printf("\tsig: %x\n", sig)
+	Log.Debugf("\tstate %d myamt: %d theiramt: %d\n", q.State.StateIdx, q.State.MyAmt, q.Value-q.State.MyAmt)
+	Log.Debugf("\tsig: %x\n", sig)
 
 	worked := pSig.Verify(hash, theirPubKey)
 	if !worked {

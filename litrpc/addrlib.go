@@ -1,7 +1,7 @@
 package litrpc
 
 import (
-	"log"
+	."github.com/mit-dci/lit/logs"
 	"strings"
 
 	"github.com/mit-dci/lit/bech32"
@@ -54,7 +54,7 @@ func CoinTypeFromAdr(adr string) uint32 {
 	if err == nil {
 		return ct
 	}
-	log.Printf("cointype from bech32 error: %s\n", err.Error())
+	Log.Errorf("cointype from bech32 error: %s\n", err.Error())
 
 	if len(adr) < 5 {
 		// well that's not even an address

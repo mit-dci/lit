@@ -87,7 +87,7 @@ func TestMoreWork(t *testing.T) {
 	// WOrk of B: 1167945961455
 
 	if moreWork(a, b, p) {
-		log.Println("Test failed!!")
+		log.Fatal("Test failed!!")
 		t.Fatal()
 	} else {
 		log.Println("Test Passed!")

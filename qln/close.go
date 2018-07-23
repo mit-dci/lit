@@ -3,7 +3,7 @@ package qln
 import (
 	"bytes"
 	"fmt"
-	"log"
+	."github.com/mit-dci/lit/logs"
 
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/btcutil/txscript"
@@ -85,12 +85,12 @@ func (nd *LitNode) CloseReqHandler(msg lnutil.CloseReqMsg) {
 	// get channel
 	q, err := nd.GetQchan(opArr)
 	if err != nil {
-		log.Printf("CloseReqHandler GetQchan err %s", err.Error())
+		Log.Errorf("CloseReqHandler GetQchan err %s", err.Error())
 		return
 	}
 
 	if nd.SubWallet[q.Coin()] == nil {
-		log.Printf("Not connected to coin type %d\n", q.Coin())
+		Log.Errorf("Not connected to coin type %d\n", q.Coin())
 	}
 
 	// verify their sig?  should do that before signing our side just to be safe
@@ -99,14 +99,14 @@ func (nd *LitNode) CloseReqHandler(msg lnutil.CloseReqMsg) {
 	// build close tx
 	tx, err := q.SimpleCloseTx()
 	if err != nil {
-		log.Printf("CloseReqHandler SimpleCloseTx err %s", err.Error())
+		Log.Errorf("CloseReqHandler SimpleCloseTx err %s", err.Error())
 		return
 	}
 
 	// sign close
 	mySig, err := nd.SignSimpleClose(q, tx)
 	if err != nil {
-		log.Printf("CloseReqHandler SignSimpleClose err %s", err.Error())
+		Log.Errorf("CloseReqHandler SignSimpleClose err %s", err.Error())
 		return
 	}
 
@@ -119,7 +119,7 @@ func (nd *LitNode) CloseReqHandler(msg lnutil.CloseReqMsg) {
 
 	pre, swap, err := lnutil.FundTxScript(q.MyPub, q.TheirPub)
 	if err != nil {
-		log.Printf("CloseReqHandler FundTxScript err %s", err.Error())
+		Log.Errorf("CloseReqHandler FundTxScript err %s", err.Error())
 		return
 	}
 
@@ -129,21 +129,21 @@ func (nd *LitNode) CloseReqHandler(msg lnutil.CloseReqMsg) {
 	} else {
 		tx.TxIn[0].Witness = SpendMultiSigWitStack(pre, myBigSig, theirBigSig)
 	}
-	log.Printf(lnutil.TxToString(tx))
+	Log.Info(lnutil.TxToString(tx))
 
 	// save channel state to db as closed.
 	q.CloseData.Closed = true
 	q.CloseData.CloseTxid = tx.TxHash()
 	err = nd.SaveQchanUtxoData(q)
 	if err != nil {
-		log.Printf("CloseReqHandler SaveQchanUtxoData err %s", err.Error())
+		Log.Errorf("CloseReqHandler SaveQchanUtxoData err %s", err.Error())
 		return
 	}
 
 	// broadcast
 	err = nd.SubWallet[q.Coin()].PushTx(tx)
 	if err != nil {
-		log.Printf("CloseReqHandler NewOutgoingTx err %s", err.Error())
+		Log.Errorf("CloseReqHandler NewOutgoingTx err %s", err.Error())
 		return
 	}
 
@@ -182,7 +182,7 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 
 	// if pkh is mine, grab it.
 	if pkhIsMine {
-		log.Printf("got PKH output from channel close")
+		Log.Info("got PKH output from channel close")
 		var pkhTxo portxo.PorTxo // create new utxo and copy into it
 
 		pkhTxo.Op.Hash = txid
@@ -209,7 +209,7 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 		comNum = GetStateIdxFromTx(tx, q.GetChanHint(true))
 	}
 	if comNum > q.State.StateIdx { // future state, uhoh.  Crash for now.
-		log.Printf("indicated state %d but we know up to %d",
+		Log.Debugf("indicated state %d but we know up to %d",
 			comNum, q.State.StateIdx)
 		return cTxos, nil
 	}
@@ -230,10 +230,10 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 		// script check.  redundant / just in case
 		genSH := fastsha256.Sum256(script)
 		if !bytes.Equal(genSH[:], tx.TxOut[shIdx].PkScript[2:34]) {
-			log.Printf("got different observed and generated SH scripts.\n")
-			log.Printf("in %s:%d, see %x\n", txid, shIdx, tx.TxOut[shIdx].PkScript)
-			log.Printf("generated %x \n", genSH)
-			log.Printf("revokable pub %x\ntimeout pub %x\n", revokePub, timeoutPub)
+			Log.Info("got different observed and generated SH scripts.\n")
+			Log.Infof("in %s:%d, see %x\n", txid, shIdx, tx.TxOut[shIdx].PkScript)
+			Log.Infof("generated %x \n", genSH)
+			Log.Infof("revokable pub %x\ntimeout pub %x\n", revokePub, timeoutPub)
 		}
 
 		// create the ScriptHash, timeout portxo.
@@ -284,10 +284,10 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 		// script check
 		wshScript := lnutil.P2WSHify(script)
 		if !bytes.Equal(wshScript[:], tx.TxOut[shIdx].PkScript) {
-			log.Printf("got different observed and generated SH scripts.\n")
-			log.Printf("in %s:%d, see %x\n", txid, shIdx, tx.TxOut[shIdx].PkScript)
-			log.Printf("generated %x \n", wshScript)
-			log.Printf("revokable pub %x\ntimeout pub %x\n", revokePub, timeoutPub)
+			Log.Info("got different observed and generated SH scripts.\n")
+			Log.Infof("in %s:%d, see %x\n", txid, shIdx, tx.TxOut[shIdx].PkScript)
+			Log.Infof("generated %x \n", wshScript)
+			Log.Infof("revokable pub %x\ntimeout pub %x\n", revokePub, timeoutPub)
 		}
 
 		// myElkHashR added to HAKD private key

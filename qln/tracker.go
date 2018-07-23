@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"log"
+	."github.com/mit-dci/lit/logs"
 	"net/http"
 	"net/url"
 	"strings"
@@ -51,7 +51,7 @@ func Announce(priv *btcec.PrivateKey, litport string, litadr string, trackerURL 
 	 */
 	resp, err = http.Get("http://ipv6.myexternalip.com/raw")
 	if err != nil {
-		log.Printf("%v", err)
+		Log.Errorf("%v", err)
 	} else {
 		defer resp.Body.Close()
 

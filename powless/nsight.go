@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	."github.com/mit-dci/lit/logs"
 	"net/http"
 	"os"
 
@@ -89,7 +89,7 @@ func (a *APILink) NsightGetAdrTxos() error {
 		txah.Height = int32(adrUtxo.Height)
 		txah.Tx = tx
 
-		log.Printf("tx %s at height %d\n", txah.Tx.TxHash().String(), txah.Height)
+		Log.Infof("tx %s at height %d\n", txah.Tx.TxHash().String(), txah.Height)
 		a.TxUpToWallit <- txah
 
 		// don't know what order we get these in, so update APILink height at the end
@@ -114,7 +114,7 @@ func (a *APILink) GetOPTxs() error {
 
 	// need to query each txid with a different http request
 	for _, op := range oplist {
-		log.Printf("asking for %s\n", op.String())
+		Log.Debugf("asking for %s\n", op.String())
 		// get full tx info for the outpoint's tx
 		// (if we have 2 outpoints with the same txid we query twice...)
 		response, err := http.Get(apitxourl + "tx/" + op.Hash.String())
@@ -126,7 +126,7 @@ func (a *APILink) GetOPTxs() error {
 		// parse the response to get the spending txid
 		err = json.NewDecoder(response.Body).Decode(&txr)
 		if err != nil {
-			log.Printf("json decode error; op %s not found\n", op.String())
+			Log.Errorf("json decode error; op %s not found\n", op.String())
 			continue
 		}
 
@@ -135,7 +135,7 @@ func (a *APILink) GetOPTxs() error {
 			if op.Index == txout.N { // hit; request this outpoint's spend tx
 				// see if it's been spent
 				if txout.SpentTxId == "" {
-					log.Printf("%s has nil spenttxid\n", op.String())
+					Log.Debugf("%s has nil spenttxid\n", op.String())
 					// this outpoint is not yet spent, can't request
 					continue
 				}
@@ -266,12 +266,12 @@ func (a *APILink) PushTxSmartBit(tx *wire.MsgTx) error {
 	// turn into hex
 	txHexString := fmt.Sprintf("{\"hex\": \"%x\"}", b.Bytes())
 
-	log.Printf("tx hex string is %s\n", txHexString)
+	Log.Infof("tx hex string is %s\n", txHexString)
 
 	apiurl := "https://testnet-api.smartbit.com.au/v1/blockchain/pushtx"
 	response, err := http.Post(
 		apiurl, "application/json", bytes.NewBuffer([]byte(txHexString)))
-	log.Printf("respo	nse: %s", response.Status)
+	Log.Infof("response: %s", response.Status)
 	_, err = io.Copy(os.Stdout, response.Body)
 
 	return err

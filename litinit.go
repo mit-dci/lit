@@ -2,7 +2,8 @@ package main
 
 import (
 	"bufio"
-	"io"
+	//"io"
+	. "github.com/mit-dci/lit/logs"
 	"log"
 	"os"
 	"path/filepath"
@@ -65,7 +66,7 @@ func litSetup(conf *config) *[32]byte {
 		log.Println("Creating a new config file")
 		err := createDefaultConfigFile(preconf.LitHomeDir) // Source of error
 		if err != nil {
-			log.Printf("Error creating a default config file: %v", preconf.LitHomeDir)
+			log.Fatalf("Error creating a default config file: %v", preconf.LitHomeDir)
 			log.Fatal(err)
 		}
 	}
@@ -98,24 +99,29 @@ func litSetup(conf *config) *[32]byte {
 	}
 
 	logFilePath := filepath.Join(conf.LitHomeDir, "lit.log")
+	logFile, err := os.OpenFile(logFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 
-	logfile, err := os.OpenFile(logFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	// TODO ... what's this do?
-	defer logfile.Close()
+		// Log Levels:
+		// 0: DebugLevel prints Panics, Fatals, Errors, Warnings, Infos and Debugs
+		// 1: InfoLevel  prints Panics, Fatals, Errors, Warnings and Info
+		// 2: WarnLevel  prints Panics, Fatals, Errors and Warnings
+		// 3: ErrorLevel prints Panics, Fatals and Errors
+		// 4: FatalLevel prints Panics, Fatals
+		// 5: PanicLevel prints Panics
+		// Default is level 3
+		// Code for tagging logs:
+		// Debug -> Useful debugging information
+		// Info  -> Something noteworthy happened
+		// Warn  -> You should probably take a look at this
+		// Error -> Something failed but I'm not quitting
+		// Fatal -> Bye
 
-	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
-
-	if conf.Verbose {
-		logOutput := io.MultiWriter(os.Stdout, logfile)
-		log.SetOutput(logOutput)
-	} else {
-		log.SetOutput(logfile)
-	}
+		SetupLogs(logFile, logFilePath, conf.LogLevel)
 
 	// Allow node with no linked wallets, for testing.
 	// TODO Should update tests and disallow nodes without wallets later.
 	//	if conf.Tn3host == "" && conf.Lt4host == "" && conf.Reghost == "" {
-	//		log.Fatal("error: no network specified; use -tn3, -reg, -lt4")
+	//		Log.Fatal("error: no network specified; use -tn3, -reg, -lt4")
 	//	}
 
 	// Keys: the litNode, and wallits, all get 32 byte keys.
@@ -127,7 +133,7 @@ func litSetup(conf *config) *[32]byte {
 	// read key file (generate if not found)
 	key, err := lnutil.ReadKeyFile(keyFilePath)
 	if err != nil {
-		log.Fatal(err)
+		Log.Fatal(err)
 	}
 
 	return key

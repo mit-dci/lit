@@ -1,14 +1,13 @@
 package main
 
 import (
-	"fmt"
-	"log"
 	"os"
 	"time"
 
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/lnutil"
+	. "github.com/mit-dci/lit/logs"
 	"github.com/mit-dci/lit/qln"
 
 	flags "github.com/jessevdk/go-flags"
@@ -39,8 +38,8 @@ type config struct { // define a struct for usage with go-flags
 	ReSync bool `short:"r" long:"reSync" description:"Resync from the given tip."`
 	Tower  bool `long:"tower" description:"Watchtower: Run a watching node"`
 	Hard   bool `short:"t" long:"hard" description:"Flag to set networks."`
-  
-	Verbose bool `short:"v" long:"verbose" description:"Set verbosity to true."`
+
+	LogLevel int `short:"v" long:"verbose" description:"Set verbosity level from 0 to 5 (most to least)"`
 	// rpc server config
 	Rpcport uint16 `short:"p" long:"rpcport" description:"Set RPC port to connect to"`
 	Rpchost string `long:"rpchost" description:"Set RPC host to listen to"`
@@ -90,7 +89,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	// try regtest
 	if !lnutil.NopeString(conf.Reghost) {
 		p := &coinparam.RegressionNetParams
-		fmt.Printf("reg: %s\n", conf.Reghost)
+		Log.Infof("Connecting to bitcoin regtest on: %s\n", conf.Reghost)
 		err = node.LinkBaseWallet(key, 120, conf.ReSync,
 			conf.Tower, conf.Reghost, conf.ChainProxyURL, p)
 		if err != nil {
@@ -100,6 +99,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	// try testnet3
 	if !lnutil.NopeString(conf.Tn3host) {
 		p := &coinparam.TestNet3Params
+		Log.Infof("Connecting to bitcoin testnet3 on: %s\n", conf.Tn3host)
 		err = node.LinkBaseWallet(
 			key, 1256000, conf.ReSync, conf.Tower,
 			conf.Tn3host, conf.ChainProxyURL, p)
@@ -110,6 +110,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	// try litecoin regtest
 	if !lnutil.NopeString(conf.Litereghost) {
 		p := &coinparam.LiteRegNetParams
+		Log.Infof("Connecting to litecoin regtest on: %s\n", conf.Litereghost)
 		err = node.LinkBaseWallet(key, 120, conf.ReSync,
 			conf.Tower, conf.Litereghost, conf.ChainProxyURL, p)
 		if err != nil {
@@ -119,6 +120,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	// try litecoin testnet4
 	if !lnutil.NopeString(conf.Lt4host) {
 		p := &coinparam.LiteCoinTestNet4Params
+		Log.Infof("Connecting to litecoin testnet4 on: %s\n", conf.Lt4host)
 		err = node.LinkBaseWallet(
 			key, p.StartHeight, conf.ReSync, conf.Tower,
 			conf.Lt4host, conf.ChainProxyURL, p)
@@ -129,6 +131,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	// try vertcoin testnet
 	if !lnutil.NopeString(conf.Tvtchost) {
 		p := &coinparam.VertcoinTestNetParams
+		Log.Infof("Connecting to vertcoin testnet on: %s\n", conf.Tvtchost)
 		err = node.LinkBaseWallet(
 			key, 25000, conf.ReSync, conf.Tower,
 			conf.Tvtchost, conf.ChainProxyURL, p)
@@ -139,6 +142,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	// try vertcoin mainnet
 	if !lnutil.NopeString(conf.Vtchost) {
 		p := &coinparam.VertcoinParams
+		Log.Infof("Connecting to vertcoin mainnet on: %s\n", conf.Vtchost)
 		err = node.LinkBaseWallet(
 			key, p.StartHeight, conf.ReSync, conf.Tower,
 			conf.Vtchost, conf.ChainProxyURL, p)
@@ -162,24 +166,22 @@ func main() {
 		AutoReconnectInterval: defaultAutoReconnectInterval,
 	}
 
+	// setup lit config stuff
 	key := litSetup(&conf)
-
 	if conf.ProxyURL != "" {
 		conf.LitProxyURL = conf.ProxyURL
 		conf.ChainProxyURL = conf.ProxyURL
 	}
-
 	// Setup LN node.  Activate Tower if in hard mode.
 	// give node and below file pathof lit home directory
 	node, err := qln.NewLitNode(key, conf.LitHomeDir, conf.TrackerURL, conf.LitProxyURL, conf.Nat)
 	if err != nil {
-		log.Fatal(err)
+		Log.Fatal(err)
 	}
-
 	// node is up; link wallets based on args
 	err = linkWallets(node, key, &conf)
 	if err != nil {
-		log.Fatal(err)
+		Log.Fatal(err)
 	}
 
 	rpcl := new(litrpc.LitRPC)
@@ -193,7 +195,7 @@ func main() {
 	}
 
 	<-rpcl.OffButton
-	log.Printf("Got stop request\n")
+	Log.Info("Got stop request\n")
 	time.Sleep(time.Second)
 
 	return
