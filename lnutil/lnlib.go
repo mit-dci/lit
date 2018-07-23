@@ -109,7 +109,7 @@ func ReceiveHTLCScript(revPKH [20]byte, remotePub [33]byte, RHash [32]byte, loca
 	b.AddInt64(2)
 	b.AddOp(txscript.OP_CHECKMULTISIG)
 	b.AddOp(txscript.OP_ELSE)
-	b.AddOp(txscript.OP_SWAP) // GJG: This was OP_DROP but that drops the signature from the stack.
+	b.AddOp(txscript.OP_DROP)
 	b.AddInt64(int64(locktime))
 	b.AddOp(txscript.OP_CHECKLOCKTIMEVERIFY)
 	b.AddOp(txscript.OP_DROP)
