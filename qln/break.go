@@ -3,6 +3,8 @@ package qln
 import (
 	"fmt"
 	"log"
+
+	"github.com/mit-dci/lit/lnutil"
 )
 
 // ------------------------- break
@@ -51,4 +53,19 @@ func (nd *LitNode) BreakChannel(q *Qchan) error {
 
 	// broadcast break tx directly
 	return nd.SubWallet[q.Coin()].PushTx(tx)
+}
+
+func (nd *LitNode) PrintBreakTxForDebugging(q *Qchan) error {
+	log.Printf("===== BUILDING Break TX for state [%d]:", q.State.StateIdx)
+	saveDelta := q.State.Delta
+	q.State.Delta = 0
+	tx, err := nd.SignBreakTx(q)
+	q.State.Delta = saveDelta
+	if err != nil {
+		return err
+	}
+	log.Printf("===== DONE BUILDING Break TX for state [%d]:", q.State.StateIdx)
+	log.Printf("Break TX for state [%d]:", q.State.StateIdx)
+	lnutil.PrintTx(tx)
+	return nil
 }

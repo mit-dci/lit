@@ -52,12 +52,14 @@ func (nd *LitNode) SignBreakTx(q *Qchan) (*wire.MsgTx, error) {
 	}
 
 	// save channel state as closed
-	q.CloseData.Closed = true
-	q.CloseData.CloseTxid = tx.TxHash()
-	err = nd.SaveQchanUtxoData(q)
-	if err != nil {
-		return nil, err
-	}
+	// Removed - this is already done in the calling function - and is killing
+	// the ability to just print the TX.
+	// q.CloseData.Closed = true
+	// q.CloseData.CloseTxid = tx.TxHash()
+	// err = nd.SaveQchanUtxoData(q)
+	// if err != nil {
+	//	return nil, err
+	// }
 
 	return tx, nil
 }

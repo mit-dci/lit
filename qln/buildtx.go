@@ -324,28 +324,19 @@ func (q *Qchan) BuildStateTxs(mine bool) (*wire.MsgTx, []*wire.MsgTx, []*wire.Tx
 	return tx, HTLCSpendsArr, HTLCTxOuts, nil
 }
 
-func (q *Qchan) GenHTLCScript(h HTLC, mine bool) ([]byte, error) {
+func (q *Qchan) GenHTLCScriptWithElkPointsAndRevPub(h HTLC, mine bool, theirElkPoint, myElkPoint, revPub [33]byte) ([]byte, error) {
 	var remotePub, localPub [33]byte
-
-	revPub, _, _, err := q.GetKeysFromState(mine)
-	if err != nil {
-		return nil, err
-	}
 
 	revPKHSlice := btcutil.Hash160(revPub[:])
 	var revPKH [20]byte
 	copy(revPKH[:], revPKHSlice[:20])
 
-	curElk, err := q.ElkPoint(false, q.State.StateIdx)
-	if err != nil {
-		return nil, err
-	}
 	if mine { // Generating OUR tx that WE save
-		remotePub = lnutil.CombinePubs(h.TheirHTLCBase, q.State.ElkPoint)
-		localPub = lnutil.CombinePubs(h.MyHTLCBase, curElk)
+		remotePub = lnutil.CombinePubs(h.TheirHTLCBase, theirElkPoint)
+		localPub = lnutil.CombinePubs(h.MyHTLCBase, myElkPoint)
 	} else { // Generating THEIR tx that THEY save
-		remotePub = lnutil.CombinePubs(h.MyHTLCBase, curElk)
-		localPub = lnutil.CombinePubs(h.TheirHTLCBase, q.State.ElkPoint)
+		remotePub = lnutil.CombinePubs(h.MyHTLCBase, myElkPoint)
+		localPub = lnutil.CombinePubs(h.TheirHTLCBase, theirElkPoint)
 	}
 
 	var HTLCScript []byte
@@ -368,10 +359,25 @@ func (q *Qchan) GenHTLCScript(h HTLC, mine bool) ([]byte, error) {
 		h.Idx, HTLCScript, h.MyHTLCBase, h.TheirHTLCBase, h.Incoming, h.Amt, h.RHash)
 
 	return HTLCScript, nil
+
 }
 
-func (q *Qchan) GenHTLCOut(h HTLC, mine bool) (*wire.TxOut, error) {
-	HTLCScript, err := q.GenHTLCScript(h, mine)
+func (q *Qchan) GenHTLCScript(h HTLC, mine bool) ([]byte, error) {
+
+	revPub, _, _, err := q.GetKeysFromState(mine)
+	if err != nil {
+		return nil, err
+	}
+
+	curElk, err := q.ElkPoint(false, q.State.StateIdx)
+	if err != nil {
+		return nil, err
+	}
+	return q.GenHTLCScriptWithElkPointsAndRevPub(h, mine, q.State.ElkPoint, curElk, revPub)
+}
+
+func (q *Qchan) GenHTLCOutWithElkPointsAndRevPub(h HTLC, mine bool, theirElkPoint, myElkPoint, revPub [33]byte) (*wire.TxOut, error) {
+	HTLCScript, err := q.GenHTLCScriptWithElkPointsAndRevPub(h, mine, theirElkPoint, myElkPoint, revPub)
 	if err != nil {
 		return nil, err
 	}
@@ -381,6 +387,20 @@ func (q *Qchan) GenHTLCOut(h HTLC, mine bool) (*wire.TxOut, error) {
 	HTLCOut := wire.NewTxOut(h.Amt, witScript)
 
 	return HTLCOut, nil
+}
+
+func (q *Qchan) GenHTLCOut(h HTLC, mine bool) (*wire.TxOut, error) {
+	revPub, _, _, err := q.GetKeysFromState(mine)
+	if err != nil {
+		return nil, err
+	}
+
+	curElk, err := q.ElkPoint(false, q.State.StateIdx)
+	if err != nil {
+		return nil, err
+	}
+
+	return q.GenHTLCOutWithElkPointsAndRevPub(h, mine, q.State.ElkPoint, curElk, revPub)
 }
 
 // GetKeysFromState will inspect the channel state and return the revPub, timePub and pkhPub based on
