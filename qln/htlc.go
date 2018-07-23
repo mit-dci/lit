@@ -640,21 +640,23 @@ func (nd *LitNode) ClaimHTLCTimeouts(coinType uint32, height int32) ([][32]byte,
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("Found [%d] HTLC Outpoints that have timed out\n", len(htlcs))
-	for i, h := range htlcs {
-		if !h.Incoming { // only for timed out HTLCs!
-			q := channels[i]
-			if q.CloseData.Closed {
-				tx, err := nd.ClaimHTLCOnChain(q, h)
-				if err != nil {
-					log.Printf("Error claiming HTLC: %s", err.Error())
-					return nil, err
+	if len(htlcs) > 0 {
+		log.Printf("Found [%d] HTLC Outpoints that have timed out\n", len(htlcs))
+		for i, h := range htlcs {
+			if !h.Incoming { // only for timed out HTLCs!
+				q := channels[i]
+				if q.CloseData.Closed {
+					tx, err := nd.ClaimHTLCOnChain(q, h)
+					if err != nil {
+						log.Printf("Error claiming HTLC: %s", err.Error())
+						return nil, err
+					}
+					nd.ClearHTLCState(q, h)
+					txids = append(txids, tx.TxHash())
+				} else {
+					log.Printf("Timing out HTLC from channel [%d] idx [%d]\n", q.Idx(), h.Idx)
+					nd.ClearHTLC(q, [16]byte{}, h.Idx, [32]byte{})
 				}
-				nd.ClearHTLCState(q, h)
-				txids = append(txids, tx.TxHash())
-			} else {
-				log.Printf("Timing out HTLC from channel [%d] idx [%d]\n", q.Idx(), h.Idx)
-				nd.ClearHTLC(q, [16]byte{}, h.Idx, [32]byte{})
 			}
 		}
 	}
@@ -940,7 +942,7 @@ func (nd *LitNode) ClaimHTLCOnChain(q *Qchan, h HTLC) (*wire.MsgTx, error) {
 		shTxo.Mode = portxo.TxoP2WSHComp
 		shTxo.Value = tx.TxOut[0].Value
 		shTxo.Seq = uint32(q.Delay)
-		shTxo.PreSigStack = make([][]byte, 1) // revoke SH has one presig item
+		shTxo.PreSigStack = make([][]byte, 1) // timeout has one presig item
 		shTxo.PreSigStack[0] = nil            // and that item is a nil (timeout)
 
 		shTxo.PkScript = script
