@@ -22,24 +22,42 @@ func SetupTestLogs() {
 		Hooks:     make(logrus.LevelHooks),
 		// set Level below
 	}
+	Log.Info("COOL!")
 	logrus.SetFormatter(formatter) // for any "normal" log messages
 	Log.SetLevel(logrus.DebugLevel)
 }
-func SetupLogs(logFilePath string, logLevel int) error {
 
+func SetupFormatter(logFile *os.File, logLevel int) {
 	formatter := new(logrus.TextFormatter)
 	formatter.TimestampFormat = "2006-01-02 15:04:05.000000"
 	// magic date, please don't change.
 	formatter.FullTimestamp = true
-
-	Log = &logrus.Logger{
-		Out:       os.Stderr,
-		Formatter: formatter,
-		Hooks:     make(logrus.LevelHooks),
-		// set Level below
-	}
 	logrus.SetFormatter(formatter) // for any "normal" log messages
 
+	if logLevel == 0 {
+		Log = &logrus.Logger{
+			Out:       logFile,
+			Formatter: formatter,
+			Hooks:     make(logrus.LevelHooks),
+			// set Level below
+		}
+	} else {
+		Log = &logrus.Logger{
+			Out:       os.Stderr,
+			Formatter: formatter,
+			Hooks:     make(logrus.LevelHooks),
+			// set Level below
+		}
+	}
+	Log.SetLevel(logrus.DebugLevel)
+}
+
+func SetupLogs(logFile *os.File, logFilePath string, logLevel int) error {
+
+	SetupFormatter(logFile, logLevel)
+	if logLevel == 0 {
+		return nil
+	}
 	pathMap := lfshook.PathMap{
 		logrus.InfoLevel:  logFilePath,
 		logrus.ErrorLevel: logFilePath,
@@ -60,17 +78,17 @@ func SetupLogs(logFilePath string, logLevel int) error {
 	))
 	Log.SetLevel(logrus.DebugLevel)
 	switch logLevel {
-	case 5:
+	case 6:
 		Log.SetLevel(logrus.DebugLevel)
-	case 4:
+	case 5:
 		Log.SetLevel(logrus.InfoLevel)
-	case 3:
+	case 4:
 		Log.SetLevel(logrus.WarnLevel)
-	case 2:
+	case 3:
 		Log.SetLevel(logrus.ErrorLevel)
-	case 1:
+	case 2:
 		Log.SetLevel(logrus.FatalLevel)
-	case 0:
+	case 1:
 		Log.SetLevel(logrus.PanicLevel)
 	default:
 		return fmt.Errorf("Invalid logging param passed, proceeding with defaults")

@@ -99,10 +99,8 @@ func litSetup(conf *config) *[32]byte {
 	}
 
 	logFilePath := filepath.Join(conf.LitHomeDir, "lit.log")
+	logFile, err := os.OpenFile(logFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 
-	logfile, err := os.OpenFile(logFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-
-	if conf.LogLevel >= 0 {
 		// Log Levels:
 		// 0: DebugLevel prints Panics, Fatals, Errors, Warnings, Infos and Debugs
 		// 1: InfoLevel  prints Panics, Fatals, Errors, Warnings and Info
@@ -118,10 +116,7 @@ func litSetup(conf *config) *[32]byte {
 		// Error -> Something failed but I'm not quitting
 		// Fatal -> Bye
 
-		SetupLogs(logFilePath, conf.LogLevel)
-	} else {
-		Log.SetOutput(logfile)
-	}
+		SetupLogs(logFile, logFilePath, conf.LogLevel)
 
 	// Allow node with no linked wallets, for testing.
 	// TODO Should update tests and disallow nodes without wallets later.
