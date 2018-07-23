@@ -162,7 +162,7 @@ func (nd *LitNode) SendHashSig(q *Qchan) error {
 
 	q.State.NextHTLCBase = q.State.N2HTLCBase
 
-	outMsg := lnutil.NewHashSigMsg(q.Peer(), q.Op, q.State.InProgHTLC.Amt, q.State.InProgHTLC.RHash, commitmentSig, HTLCSigs, q.State.Data)
+	outMsg := lnutil.NewHashSigMsg(q.Peer(), q.Op, q.State.InProgHTLC.Amt, q.State.InProgHTLC.Locktime, q.State.InProgHTLC.RHash, commitmentSig, HTLCSigs, q.State.Data)
 
 	log.Printf("Sending HashSig with %d HTLC sigs", len(HTLCSigs))
 
@@ -240,7 +240,7 @@ func (nd *LitNode) HashSigHandler(msg lnutil.HashSigMsg, qc *Qchan) error {
 	qc.State.InProgHTLC.RHash = msg.RHash
 
 	// TODO: make this customisable?
-	qc.State.InProgHTLC.Locktime = consts.DefaultLockTime
+	qc.State.InProgHTLC.Locktime = msg.Locktime
 	qc.State.InProgHTLC.TheirHTLCBase = qc.State.NextHTLCBase
 
 	qc.State.InProgHTLC.KeyGen.Depth = 5
