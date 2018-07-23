@@ -258,7 +258,7 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 	cTxos := make([]portxo.PorTxo, 1)
 	myPKHPkSript := lnutil.DirectWPKHScript(q.MyRefundPub)
 
-	htlcOutsInTx, _, err := q.GetHtlcTxos(tx)
+	htlcOutsInTx, htlcOutIndexesInTx, err := q.GetHtlcTxos(tx)
 	if err != nil {
 		return nil, err
 	}
@@ -383,6 +383,11 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 			return nil, err
 		}
 
+		theirElkPoint, err := q.ElkPoint(false, comNum)
+		if err != nil {
+			return nil, err
+		}
+
 		timeoutPub := lnutil.AddPubsEZ(q.TheirHAKDBase, myElkPoint)
 		revokePub := lnutil.CombinePubs(q.MyHAKDBase, myElkPoint)
 		script := lnutil.CommitScript(revokePub, timeoutPub, q.Delay)
@@ -422,6 +427,44 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 		shTxo.PreSigStack = make([][]byte, 1) // timeout SH has one presig item
 		shTxo.PreSigStack[0] = []byte{0x01}   // and that item is a 1 (justice)
 		cTxos = append(cTxos, shTxo)
+
+		// Also grab HTLCs. They are mine now too :)
+		for i, txo := range htlcOutsInTx {
+			// script check
+			htlcScript, err := q.GenHTLCScriptWithElkPointsAndRevPub(q.State.HTLCs[i], false, theirElkPoint, myElkPoint, revokePub)
+			if err != nil {
+				return nil, err
+			}
+			wshHTLCScript := lnutil.P2WSHify(htlcScript)
+
+			if !bytes.Equal(wshHTLCScript[:], txo.PkScript) {
+				log.Printf("got different observed and generated HTLC scripts.\n")
+				log.Printf("in %s:%d, see %x\n", txid, htlcOutIndexesInTx[i], txo.PkScript)
+				log.Printf("generated %x \n", wshHTLCScript)
+				log.Printf("revokable pub %x\ntimeout pub %x\n", revokePub, timeoutPub)
+			}
+
+			var htlcTxo portxo.PorTxo // create new utxo and copy into it
+			htlcTxo.KeyGen = q.KeyGen
+			htlcTxo.Op.Hash = txid
+			htlcTxo.Op.Index = htlcOutIndexesInTx[i]
+			htlcTxo.Height = q.CloseData.CloseHeight
+
+			htlcTxo.KeyGen.Step[2] = UseChannelHAKDBase
+
+			htlcTxo.PrivKey = lnutil.ElkScalar(elk)
+
+			// just return the elkScalar and let
+			// something modify it before export due to the seq=1 flag.
+
+			htlcTxo.PkScript = script
+			htlcTxo.Value = txo.Value
+			htlcTxo.Mode = portxo.TxoP2WSHComp
+			htlcTxo.Seq = 1                         // 1 means grab immediately
+			htlcTxo.PreSigStack = make([][]byte, 1) // timeout SH has one presig item
+			htlcTxo.PreSigStack[0] = []byte{0x01}   // and that item is a 1 (justice)
+			cTxos = append(cTxos, htlcTxo)
+		}
 	}
 
 	return cTxos, nil
