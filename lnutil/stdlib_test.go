@@ -3,6 +3,7 @@ package lnutil
 import (
 	"bytes"
 	"testing"
+	. "github.com/mit-dci/lit/logs"
 )
 
 // I32tB
@@ -84,6 +85,7 @@ func TestU32tB(t *testing.T) {
 // If the length of the input is not 4, it returns fixed value.
 // This function tests the length
 func TestLenBInBtU32(t *testing.T) {
+	SetupTestLogs()
 	// if b is nil, it occurs an error
 	// when execution because a type of b is not []byte
 

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	//"io"
 	. "github.com/mit-dci/lit/logs"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -48,7 +49,7 @@ func litSetup(conf *config) *[32]byte {
 	preParser := newConfigParser(&preconf, flags.HelpFlag)
 	_, err := preParser.ParseArgs(os.Args)
 	if err != nil {
-		Log.Fatal(err)
+		log.Fatal(err)
 	}
 
 	// Load config from file and parse
@@ -57,28 +58,28 @@ func litSetup(conf *config) *[32]byte {
 	// create home directory
 	_, err = os.Stat(preconf.LitHomeDir)
 	if err != nil {
-		Log.Error("Error while creating a directory")
+		log.Println("Error while creating a directory")
 	}
 	if os.IsNotExist(err) {
 		// first time the guy is running lit, lets set tn3 to true
 		os.Mkdir(preconf.LitHomeDir, 0700)
-		Log.Info("Creating a new config file")
+		log.Println("Creating a new config file")
 		err := createDefaultConfigFile(preconf.LitHomeDir) // Source of error
 		if err != nil {
-			Log.Fatal("Error creating a default config file: %v", preconf.LitHomeDir)
-			Log.Fatal(err)
+			log.Fatalf("Error creating a default config file: %v", preconf.LitHomeDir)
+			log.Fatal(err)
 		}
 	}
 
 	if _, err := os.Stat(filepath.Join(filepath.Join(preconf.LitHomeDir), "lit.conf")); os.IsNotExist(err) {
 		// if there is no config file found over at the directory, create one
 		if err != nil {
-			Log.Error(err)
+			log.Println(err)
 		}
-		Log.Info("Creating a new config file")
+		log.Println("Creating a new config file")
 		err := createDefaultConfigFile(filepath.Join(preconf.LitHomeDir)) // Source of error
 		if err != nil {
-			Log.Fatal(err)
+			log.Fatal(err)
 		}
 	}
 
@@ -88,13 +89,13 @@ func litSetup(conf *config) *[32]byte {
 	if err != nil {
 		_, ok := err.(*os.PathError)
 		if !ok {
-			Log.Fatal(err)
+			log.Fatal(err)
 		}
 	}
 	// Parse command line options again to ensure they take precedence.
 	_, err = parser.ParseArgs(os.Args) // returns invalid flags
 	if err != nil {
-		Log.Fatal(err)
+		log.Fatal(err)
 	}
 
 	logFilePath := filepath.Join(conf.LitHomeDir, "lit.log")

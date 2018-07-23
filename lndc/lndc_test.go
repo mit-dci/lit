@@ -6,11 +6,13 @@ import (
 	"sync"
 	"testing"
 
+	. "github.com/mit-dci/lit/logs"
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/lnutil"
 )
 
 func TestConnectionCorrectness(t *testing.T) {
+	SetupTestLogs()
 	// First, generate the long-term private keys both ends of the connection
 	// within our test.
 	localPriv, err := btcec.NewPrivateKey(btcec.S256())

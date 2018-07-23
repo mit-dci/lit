@@ -3,12 +3,12 @@ package lndc
 import (
 	"crypto/hmac"
 	"fmt"
-	."github.com/mit-dci/lit/logs"
+	. "github.com/mit-dci/lit/logs"
 	"net"
 
+	"github.com/codahale/chacha20poly1305"
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/crypto/fastsha256"
-	"github.com/codahale/chacha20poly1305"
 )
 
 // Listener...

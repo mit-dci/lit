@@ -9,6 +9,22 @@ import (
 
 var Log *logrus.Logger
 
+func SetupTestLogs() {
+
+	formatter := new(logrus.TextFormatter)
+	formatter.TimestampFormat = "2006-01-02 15:04:05.000000"
+	// magic date, please don't change.
+	formatter.FullTimestamp = true
+
+	Log = &logrus.Logger{
+		Out:       os.Stderr,
+		Formatter: formatter,
+		Hooks:     make(logrus.LevelHooks),
+		// set Level below
+	}
+	logrus.SetFormatter(formatter) // for any "normal" log messages
+	Log.SetLevel(logrus.DebugLevel)
+}
 func SetupLogs(logFilePath string, logLevel int) error {
 
 	formatter := new(logrus.TextFormatter)
