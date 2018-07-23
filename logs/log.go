@@ -22,7 +22,6 @@ func SetupTestLogs() {
 		Hooks:     make(logrus.LevelHooks),
 		// set Level below
 	}
-	Log.Info("COOL!")
 	logrus.SetFormatter(formatter) // for any "normal" log messages
 	Log.SetLevel(logrus.DebugLevel)
 }
