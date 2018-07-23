@@ -495,7 +495,7 @@ func (lc *litAfClient) AddHTLC(textArgs []string) error {
 	}
 	copy(args.RHash[:], RHash[:])
 
-	if len(textArgs) > 3 {
+	if len(textArgs) > 4 {
 		data, err := hex.DecodeString(textArgs[4])
 		if err != nil {
 			// Wasn't valid hex, copy directly and truncate
