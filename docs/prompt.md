@@ -17,9 +17,11 @@ Lets call this a payment prompt (for now)
 The prompt does not encode all the payment details.  Instead it encodes just enough to authenticate the user creating the prompt, and distinguish the unique prompt in the case of multiple concurrent prompts from the same user.
 
 Privacy can be an issue: an attacker can try to spam 
-```ln1d6qejxtdg4y5r3zarva:a
+```
+ln1d6qejxtdg4y5r3zarva:a
 ln1d6qejxtdg4y5r3zarva:b
-ln1d6qejxtdg4y5r3zarva:c```
+ln1d6qejxtdg4y5r3zarva:c
+```
 in the hopes of intercepting a prompt.  Since the prompter doesn't know any information (pubkey / address) of the user paying the invoice, (if they did, they wouldn't need to bother with the prompt), they can respond to the wrong person with the invoice info.  The attacker presumably doesn't pay, but does disrupt the invoicing, and learns about what the prompting node is requesting.  The real solution to this is to have an unguessably long prompt identifier like
 
 ```ln1d6qejxtdg4y5r3zarva:k6zdkfs4nce4xj0g```
