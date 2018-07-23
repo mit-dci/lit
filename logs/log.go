@@ -1,48 +1,64 @@
 package logs
 
 import (
-  "fmt"
-  logrus "github.com/sirupsen/logrus"
-  "github.com/rifflock/lfshook"
+	"fmt"
+	"github.com/rifflock/lfshook"
+	logrus "github.com/sirupsen/logrus"
+	"os"
 )
+
 var Log *logrus.Logger
 
 func SetupLogs(logFilePath string, logLevel int) error {
 
-  switch logLevel {
-  case 5:
-    logrus.SetLevel(logrus.DebugLevel)
-  case 4:
-    logrus.SetLevel(logrus.InfoLevel)
-  case 3:
-    logrus.SetLevel(logrus.WarnLevel)
-  case 2:
-    logrus.SetLevel(logrus.ErrorLevel)
-  case 1:
-    logrus.SetLevel(logrus.FatalLevel)
-  case 0:
-    logrus.SetLevel(logrus.PanicLevel)
-  default:
-    return fmt.Errorf("Invalid logging param passed, proceeding with defaults")
-  }
+	formatter := new(logrus.TextFormatter)
+	formatter.TimestampFormat = "2006-01-02 15:04:05.000000"
+	// magic date, please don't change.
+	formatter.FullTimestamp = true
 
-  pathMap := lfshook.PathMap{
-  	logrus.InfoLevel:  logFilePath,
-  	logrus.ErrorLevel: logFilePath,
-  }
+	Log = &logrus.Logger{
+		Out:       os.Stderr,
+		Formatter: formatter,
+		Hooks:     make(logrus.LevelHooks),
+		// set Level below
+	}
+	logrus.SetFormatter(formatter) // for any "normal" log messages
 
-  formatter := new(logrus.TextFormatter)
-  formatter.TimestampFormat = "2006-01-02 15:04:05.999999"
-  formatter.FullTimestamp = true
+	pathMap := lfshook.PathMap{
+		logrus.InfoLevel:  logFilePath,
+		logrus.ErrorLevel: logFilePath,
+		logrus.WarnLevel:  logFilePath,
+		logrus.DebugLevel: logFilePath,
+		logrus.PanicLevel: logFilePath,
+		logrus.FatalLevel: logFilePath,
+	}
+	// setup a local filesystem hook to write to the logfile
+	// logs will be of the format:
+	// time="2018-07-23 10:47:03.617692" level=warning msg="You should start over and use a good passphrase!\n"
+	Log.Hooks.Add(lfshook.NewHook(
+		pathMap,
+		&logrus.TextFormatter{
+			TimestampFormat: "2006-01-02 15:04:05.999999",
+			FullTimestamp:   true,
+		},
+	))
+	Log.SetLevel(logrus.DebugLevel)
+	switch logLevel {
+	case 5:
+		Log.SetLevel(logrus.DebugLevel)
+	case 4:
+		Log.SetLevel(logrus.InfoLevel)
+	case 3:
+		Log.SetLevel(logrus.WarnLevel)
+	case 2:
+		Log.SetLevel(logrus.ErrorLevel)
+	case 1:
+		Log.SetLevel(logrus.FatalLevel)
+	case 0:
+		Log.SetLevel(logrus.PanicLevel)
+	default:
+		return fmt.Errorf("Invalid logging param passed, proceeding with defaults")
+	}
 
-  logrus.SetFormatter(formatter) // for normal logs, wont be saevd to logfile
-  logrus.Info("THIS IS BS")
-  Log = logrus.New()
-  Log.Hooks.Add(lfshook.NewHook(
-  	pathMap,
-  	&logrus.JSONFormatter{},
-  ))
-  Log.Info("THIS IS SHIT ")
-  logrus.Error("WTF IS THIS")
-  return nil
+	return nil
 }

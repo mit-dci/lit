@@ -36,7 +36,7 @@ func serveWS(ws *websocket.Conn) {
 		return
 	}
 
-	Log.Debug(string(body))
+	Log.Debug("External Client Connected:", string(body))
 	ws.Request().Body = ioutil.NopCloser(bytes.NewBuffer(body))
 
 	jsonrpc.ServeConn(ws)

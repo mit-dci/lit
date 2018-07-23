@@ -4,7 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	."github.com/mit-dci/lit/logs"
+	"log"
 	"net/rpc"
 	"net/rpc/jsonrpc"
 	"os"
@@ -84,7 +84,7 @@ func main() {
 	/*
 		client, err := net.Dial("tcp", dialString)
 		if err != nil {
-			Log.Fatal("dialing:", err)
+			log.Fatal("dialing:", err)
 		}
 		defer client.Close()
 	*/
@@ -95,19 +95,18 @@ func main() {
 	//	url := "ws://127.0.0.1:8000/ws"
 	wsConn, err := websocket.Dial(urlString, "", origin)
 	if err != nil {
-		Log.Fatal(err)
+		log.Fatal(err)
 	}
 	defer wsConn.Close()
 
 	lc.rpccon = jsonrpc.NewClient(wsConn)
-
 	rl, err := readline.NewEx(&readline.Config{
 		Prompt:       lnutil.Prompt("lit-af") + lnutil.White("# "),
 		HistoryFile:  filepath.Join(lc.litHomeDir, historyFilename),
 		AutoComplete: lc.NewAutoCompleter(),
 	})
 	if err != nil {
-		Log.Fatal(err)
+		log.Fatal(err)
 	}
 	defer rl.Close()
 	go lc.RequestAsync()
@@ -129,13 +128,13 @@ func main() {
 
 		err = lc.Shellparse(cmdslice)
 		if err != nil { // only error should be user exit
-			Log.Fatal(err)
+			log.Fatal(err)
 		}
 	}
 
 	//	err = c.Call("LitRPC.Bal", nil, &br)
 	//	if err != nil {
-	//		Log.Fatal("rpc call error:", err)
+	//		log.Fatal("rpc call error:", err)
 	//	}
 	//	fmt.Printf("Sent bal req, response: txototal %d\n", br.TxoTotal)
 }
