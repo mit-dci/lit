@@ -458,10 +458,11 @@ func (r *LitRPC) DumpPrivs(args NoArgs, reply *DumpReply) error {
 
 // ------------------------- HTLCs
 type AddHTLCArgs struct {
-	ChanIdx uint32
-	Amt     int64
-	RHash   [32]byte
-	Data    [32]byte
+	ChanIdx  uint32
+	Amt      int64
+	LockTime uint32
+	RHash    [32]byte
+	Data     [32]byte
 }
 type AddHTLCReply struct {
 	StateIndex uint64
@@ -514,8 +515,10 @@ func (r *LitRPC) AddHTLC(args AddHTLCArgs, reply *AddHTLCReply) error {
 	// TODO this is a bad place to put it -- litRPC should be a thin layer
 	// to the Node.Func() calls.  For now though, set the height here...
 	qc.Height = dummyqc.Height
+	curHeight := uint32(r.Node.SubWallet[qc.Coin()].CurrentHeight())
+	curHeight += args.LockTime
 
-	err = r.Node.OfferHTLC(qc, uint32(args.Amt), args.RHash, consts.DefaultLockTime, args.Data)
+	err = r.Node.OfferHTLC(qc, uint32(args.Amt), args.RHash, curHeight, args.Data)
 	if err != nil {
 		return err
 	}

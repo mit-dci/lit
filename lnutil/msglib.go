@@ -820,8 +820,9 @@ type HashSigMsg struct {
 	PeerIdx  uint32
 	Outpoint wire.OutPoint
 
-	Amt   int64
-	RHash [32]byte
+	Amt      int64
+	Locktime uint32
+	RHash    [32]byte
 
 	Data [32]byte
 
@@ -830,7 +831,7 @@ type HashSigMsg struct {
 	HTLCSigs [][64]byte
 }
 
-func NewHashSigMsg(peerid uint32, OP wire.OutPoint, amt int64, RHash [32]byte, sig [64]byte, HTLCSigs [][64]byte, data [32]byte) HashSigMsg {
+func NewHashSigMsg(peerid uint32, OP wire.OutPoint, amt int64, locktime uint32, RHash [32]byte, sig [64]byte, HTLCSigs [][64]byte, data [32]byte) HashSigMsg {
 	d := new(HashSigMsg)
 	d.PeerIdx = peerid
 	d.Outpoint = OP
@@ -838,6 +839,7 @@ func NewHashSigMsg(peerid uint32, OP wire.OutPoint, amt int64, RHash [32]byte, s
 	d.CommitmentSignature = sig
 	d.Data = data
 	d.RHash = RHash
+	d.Locktime = locktime
 	d.HTLCSigs = HTLCSigs
 	return *d
 }
@@ -858,6 +860,7 @@ func NewHashSigMsgFromBytes(b []byte, peerid uint32) (HashSigMsg, error) {
 
 	// deserialize DeltaSig
 	ds.Amt = BtI64(buf.Next(8))
+	ds.Locktime = BtU32(buf.Next(4))
 	copy(ds.RHash[:], buf.Next(32))
 
 	copy(ds.Data[:], buf.Next(32))
@@ -881,6 +884,7 @@ func (self HashSigMsg) Bytes() []byte {
 	opArr := OutPointToBytes(self.Outpoint)
 	msg = append(msg, opArr[:]...)
 	msg = append(msg, I64tB(self.Amt)...)
+	msg = append(msg, U32tB(self.Locktime)...)
 	msg = append(msg, self.RHash[:]...)
 	msg = append(msg, self.Data[:]...)
 	msg = append(msg, self.CommitmentSignature[:]...)

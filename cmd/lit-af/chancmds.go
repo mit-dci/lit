@@ -97,9 +97,9 @@ var historyCommand = &Command{
 }
 
 var addHTLCCommand = &Command{
-	Format: fmt.Sprintf("%s%s%s\n", lnutil.White("add"), lnutil.ReqColor("channel idx", "amount", "RHash"), lnutil.OptColor("data")),
+	Format: fmt.Sprintf("%s%s%s\n", lnutil.White("add"), lnutil.ReqColor("channel idx", "amount", "locktime", "RHash"), lnutil.OptColor("data")),
 	Description: fmt.Sprintf("%s\n%s\n",
-		"Add an HTLC of the given amount (in satoshis) to the given channel.",
+		"Add an HTLC of the given amount (in satoshis) to the given channel. Locktime specifies the number of blocks the HTLC stays active before timing out",
 		"Optionally, the push operation can be associated with a 32 byte value hex encoded."),
 	ShortDescription: "Add HTLC of the given amount (in satoshis) to the given channel.\n",
 }
@@ -484,18 +484,22 @@ func (lc *litAfClient) AddHTLC(textArgs []string) error {
 	if err != nil {
 		return err
 	}
+	locktime, err := strconv.Atoi(textArgs[2])
+	if err != nil {
+		return err
+	}
 
-	RHash, err := hex.DecodeString(textArgs[2])
+	RHash, err := hex.DecodeString(textArgs[3])
 	if err != nil {
 		return err
 	}
 	copy(args.RHash[:], RHash[:])
 
 	if len(textArgs) > 3 {
-		data, err := hex.DecodeString(textArgs[3])
+		data, err := hex.DecodeString(textArgs[4])
 		if err != nil {
 			// Wasn't valid hex, copy directly and truncate
-			copy(args.Data[:], textArgs[3])
+			copy(args.Data[:], textArgs[4])
 		} else {
 			copy(args.Data[:], data[:])
 		}
@@ -503,6 +507,7 @@ func (lc *litAfClient) AddHTLC(textArgs []string) error {
 
 	args.ChanIdx = uint32(cIdx)
 	args.Amt = int64(amt)
+	args.LockTime = uint32(locktime)
 
 	err = lc.Call("LitRPC.AddHTLC", args, reply)
 	if err != nil {
