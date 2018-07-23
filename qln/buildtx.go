@@ -373,7 +373,7 @@ func (q *Qchan) GenHTLCScript(h HTLC, mine bool) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return q.GenHTLCScriptWithElkPointsAndRevPub(h, mine, curElk, q.State.ElkPoint, revPub)
+	return q.GenHTLCScriptWithElkPointsAndRevPub(h, mine, q.State.ElkPoint, curElk, revPub)
 }
 
 func (q *Qchan) GenHTLCOut(h HTLC, mine bool) (*wire.TxOut, error) {
