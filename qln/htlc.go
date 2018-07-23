@@ -831,6 +831,11 @@ func (nd *LitNode) ClaimHTLCOnChain(q *Qchan, h HTLC) (*wire.MsgTx, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		if !h.Incoming {
+			tx.LockTime = h.Locktime
+		}
+
 		tx.AddTxOut(wire.NewTxOut(h.Amt-q.State.Fee, lnutil.DirectWPKHScriptFromPKH(pkh)))
 	}
 	hc := txscript.NewTxSigHashes(tx)
@@ -858,25 +863,28 @@ func (nd *LitNode) ClaimHTLCOnChain(q *Qchan, h HTLC) (*wire.MsgTx, error) {
 	theirBigSig := sig64.SigDecompress(h.Sig)
 	theirBigSig = append(theirBigSig, byte(txscript.SigHashAll))
 
-	if mine && h.Incoming {
+	if mine {
 		tx.TxIn[0].Witness = make([][]byte, 5)
 		tx.TxIn[0].Witness[0] = nil
 		tx.TxIn[0].Witness[1] = theirBigSig
 		tx.TxIn[0].Witness[2] = myBigSig
-		tx.TxIn[0].Witness[3] = h.R[:]
+		if h.Incoming {
+			tx.TxIn[0].Witness[3] = h.R[:]
+		} else {
+			tx.TxIn[0].Witness[3] = nil
+		}
 		tx.TxIn[0].Witness[4] = HTLCScript
 	} else {
-		tx.TxIn[0].Witness = make([][]byte, 2)
+		tx.TxIn[0].Witness = make([][]byte, 3)
+		tx.TxIn[0].Witness[0] = myBigSig
+
 		if h.Incoming {
-			tx.TxIn[0].Witness = make([][]byte, 3)
 			tx.TxIn[0].Witness[1] = h.R[:]
-		}
-		if mine {
-			tx.TxIn[0].Witness[0] = theirBigSig
 		} else {
-			tx.TxIn[0].Witness[0] = myBigSig
+			tx.TxIn[0].Witness[1] = nil
 		}
-		tx.TxIn[0].Witness[len(tx.TxIn[0].Witness)-1] = HTLCScript
+
+		tx.TxIn[0].Witness[2] = HTLCScript
 	}
 
 	log.Println("Claiming HTLC on-chain. TX:")
