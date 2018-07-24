@@ -372,11 +372,14 @@ func (nd *LitNode) OPEventHandler(OPEventChan chan lnutil.OutPointEvent) {
 			continue
 		}
 
-		if theQ == nil {
+		if theQ == nil && curOPEvent.Tx != nil {
 			// Check if this is a HTLC output we're watching
 			h, _, err := nd.GetHTLC(&curOPEvent.Op)
 			if err != nil {
 				log.Printf("Error Getting HTLC OPHash: %s\n", err.Error())
+			}
+			if h.Idx == 0 && h.Amt == 0 { // empty HTLC, so none found
+				continue
 			}
 
 			log.Printf("Got OP event for HTLC output %s [Incoming: %t]\n", curOPEvent.Op.String(), h.Incoming)
