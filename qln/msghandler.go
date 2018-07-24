@@ -378,6 +378,9 @@ func (nd *LitNode) OPEventHandler(OPEventChan chan lnutil.OutPointEvent) {
 			if err != nil {
 				log.Printf("Error Getting HTLC OPHash: %s\n", err.Error())
 			}
+			if h.Idx == 0 && h.Amt == 0 { // empty HTLC, so none found
+				continue
+			}
 
 			log.Printf("Got OP event for HTLC output %s [Incoming: %t]\n", curOPEvent.Op.String(), h.Incoming)
 			// Check the witness stack for a preimage
