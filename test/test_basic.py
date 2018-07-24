@@ -63,14 +63,21 @@ class TestBasic(LitTest):
         wait_until(lambda: self.litnodes[0].get_height(self.coins[0]['code']) == 500)
         wait_until(lambda: self.litnodes[1].get_height(self.coins[0]['code']) == 500)
 
-        self.log.info("Connect lit nodes")
+        self.log.info("Listen on Node 0")
         res = self.litnodes[0].Listen(Port="127.0.0.1:10001")["result"]
-        self.litnodes[0].lit_address = res["Adr"] + '@' + res["LisIpPorts"][0]
 
+        self.log.info("Try to connect to incorrect pkh")
+        self.litnodes[0].lit_address = "ln1p7lhcxmlfgd5mltv6pc335aulv443tkw49q6er" + '@' + res["LisIpPorts"][0]
+        failingRes = self.litnodes[1].Connect(LNAddr=self.litnodes[0].lit_address)
+        assert failingRes['error']
+
+        self.log.info("Connect to correct pkh")
+        self.litnodes[0].lit_address = res["Adr"] + '@' + res["LisIpPorts"][0]
         res = self.litnodes[1].Connect(LNAddr=self.litnodes[0].lit_address)
         assert not res['error']
 
         time.sleep(1) #RPC timeout
+
         # Check that litnode0 and litnode1 are connected
         self.log.info("Waiting for nodes to connect to each other")
         wait_until(lambda: len(self.litnodes[0].ListConnections()['result']['Connections']) == 1)

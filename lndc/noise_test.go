@@ -41,8 +41,8 @@ func makeListener() (*Listener, string, string, error) {
 	return listener, lisAdr, listener.Addr().String(), nil
 }
 
-func establishTestConnection() (net.Conn, net.Conn, func(), error) {
-	listener, pubKey, netAddr, err := makeListener()
+func establishTestConnection(wrong bool) (net.Conn, net.Conn, func(), error) {
+	listener, pkh, netAddr, err := makeListener()
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -57,9 +57,13 @@ func establishTestConnection() (net.Conn, net.Conn, func(), error) {
 	// Initiate a connection with a separate goroutine, and listen with our
 	// main one. If both errors are nil, then encryption+auth was
 	// successful.
+	if wrong {
+		pkh = "ln1p7lhcxmlfgd5mltv6pc335aulv443tkw49q6er"
+		log.Println("Trying to connect to wrong pk hash:", pkh)
+	}
 	remoteConnChan := make(chan maybeNetConn, 1)
 	go func() {
-		remoteConn, err := Dial(remotePriv, netAddr, pubKey, net.Dial)
+		remoteConn, err := Dial(remotePriv, netAddr, pkh, net.Dial)
 		if err != nil {
 			log.Println(err)
 		}
@@ -74,12 +78,12 @@ func establishTestConnection() (net.Conn, net.Conn, func(), error) {
 
 	remote := <-remoteConnChan
 	if remote.err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, remote.err
 	}
 
 	local := <-localConnChan
 	if local.err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, local.err
 	}
 
 	cleanUp := func() {
@@ -89,11 +93,16 @@ func establishTestConnection() (net.Conn, net.Conn, func(), error) {
 	return local.conn, remote.conn, cleanUp, nil
 }
 
+
 func TestConnectionCorrectness(t *testing.T) {
 	// Create a test connection, grabbing either side of the connection
 	// into local variables. If the initial crypto handshake fails, then
 	// we'll get a non-nil error here.
-	localConn, remoteConn, cleanUp, err := establishTestConnection()
+	_, _, _, err := establishTestConnection(true) // wrong pkh
+	if err == nil {
+		t.Fatalf("Failed to catch bad connection: %v", err)
+	}
+	localConn, remoteConn, cleanUp, err := establishTestConnection(false) // correct pkh
 	if err != nil {
 		t.Fatalf("unable to establish test connection: %v", err)
 	}
@@ -230,7 +239,7 @@ func TestWriteMessageChunking(t *testing.T) {
 	// Create a test connection, grabbing either side of the connection
 	// into local variables. If the initial crypto handshake fails, then
 	// we'll get a non-nil error here.
-	localConn, remoteConn, cleanUp, err := establishTestConnection()
+	localConn, remoteConn, cleanUp, err := establishTestConnection(false)
 	if err != nil {
 		t.Fatalf("unable to establish test connection: %v", err)
 	}
