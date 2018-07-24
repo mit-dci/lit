@@ -372,7 +372,7 @@ func (nd *LitNode) OPEventHandler(OPEventChan chan lnutil.OutPointEvent) {
 			continue
 		}
 
-		if theQ == nil {
+		if theQ == nil && curOPEvent.Tx != nil {
 			// Check if this is a HTLC output we're watching
 			h, _, err := nd.GetHTLC(&curOPEvent.Op)
 			if err != nil {
