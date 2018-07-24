@@ -153,7 +153,7 @@ func parseBlock(blk *wire.MsgBlock) string {
 		}
 
 		// creates all txos up to index indicated
-		s += "+" + wire.OutPoint{tx.TxHash(), uint32(len(tx.TxOut)) - 1}.String()
+		s += "+" + wire.OutPoint{tx.TxHash(), uint32(len(tx.TxOut))}.String()
 
 		for i, out := range tx.TxOut {
 			if IsUnspendable(out) {

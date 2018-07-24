@@ -112,10 +112,10 @@ var TestNet3Params = Params{
 		return chainhash.DoubleHashH(b)
 	},
 	DiffCalcFunction: diffBitcoin,
-	StartHeader: newHeaderFromStr("00000020b39e2c241c3fff2c7bf20bc5c5477dc7cedb" +
-		"2154ccede1944800000000000000b767d1cb09db9e355835b7e94a385a4f82accea85c" +
-		"ac5e6b067096bbd5dcf055fba7415aa313081a91ffefce"),
-	StartHeight:              1255968,
+	//	StartHeader: newHeaderFromStr("00000020b39e2c241c3fff2c7bf20bc5c5477dc7cedb" +
+	//		"2154ccede1944800000000000000b767d1cb09db9e355835b7e94a385a4f82accea85c" +
+	//		"ac5e6b067096bbd5dcf055fba7415aa313081a91ffefce"),
+	//	StartHeight:              1255968,
 	FeePerByte:               80,
 	PowLimit:                 testNet3PowLimit,
 	PowLimitBits:             0x1d00ffff,
