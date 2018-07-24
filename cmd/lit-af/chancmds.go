@@ -140,7 +140,7 @@ func (lc *litAfClient) FundChannel(textArgs []string) error {
 		return err
 	}
 	args := new(litrpc.FundArgs)
-	reply := new(litrpc.StatusReply)
+	reply := new(litrpc.FundReply)
 
 	peer, err := strconv.Atoi(textArgs[0])
 	if err != nil {
@@ -180,7 +180,7 @@ func (lc *litAfClient) FundChannel(textArgs []string) error {
 		return err
 	}
 
-	fmt.Fprintf(color.Output, "%s\n", reply.Status)
+	fmt.Fprintf(color.Output, "funded channel %d (height: %d)\n", reply.ChanIdx, reply.FundHeight)
 	return nil
 }
 
@@ -235,6 +235,18 @@ func (lc *litAfClient) DualFundChannel(textArgs []string) error {
 	return nil
 }
 
+func (lc *litAfClient) dualFundRespond(aor bool) error {
+	reply := new(litrpc.StatusReply)
+	args := new(litrpc.DualFundRespondArgs)
+	args.AcceptOrDecline = aor
+	err := lc.rpccon.Call("LitRPC.DualFundRespond", args, reply)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(color.Output, "%s\n", reply.Status)
+	return nil
+}
+
 // Decline mutual funding of a channel
 func (lc *litAfClient) DualFundDecline(textArgs []string) error {
 	stopEx, err := CheckHelpCommand(dualFundDeclineCommand, textArgs, 0)
@@ -242,15 +254,7 @@ func (lc *litAfClient) DualFundDecline(textArgs []string) error {
 		return err
 	}
 
-	reply := new(litrpc.StatusReply)
-
-	err = lc.rpccon.Call("LitRPC.DualFundDecline", nil, reply)
-	if err != nil {
-		return err
-	}
-
-	fmt.Fprintf(color.Output, "%s\n", reply.Status)
-	return nil
+	return lc.dualFundRespond(false)
 }
 
 // Accept mutual funding of a channel
@@ -260,15 +264,7 @@ func (lc *litAfClient) DualFundAccept(textArgs []string) error {
 		return err
 	}
 
-	reply := new(litrpc.StatusReply)
-
-	err = lc.rpccon.Call("LitRPC.DualFundAccept", nil, reply)
-	if err != nil {
-		return err
-	}
-
-	fmt.Fprintf(color.Output, "%s\n", reply.Status)
-	return nil
+	return lc.dualFundRespond(true)
 }
 
 // Request close of a channel.  Need to pass in peer, channel index

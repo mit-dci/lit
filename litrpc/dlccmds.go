@@ -337,43 +337,26 @@ func (r *LitRPC) OfferContract(args OfferContractArgs,
 	return nil
 }
 
-type DeclineContractArgs struct {
-	CIdx uint64
+type ContractRespondArgs struct {
+	// True for accept, false for decline.
+	AcceptOrDecline bool
+	CIdx            uint64
 }
 
-type DeclineContractReply struct {
+type ContractRespondReply struct {
 	Success bool
 }
 
 // DeclineContract declines an offered contract
-func (r *LitRPC) DeclineContract(args DeclineContractArgs,
-	reply *DeclineContractReply) error {
+func (r *LitRPC) ContractRespond(args ContractRespondArgs, reply *ContractRespondReply) error {
 	var err error
 
-	err = r.Node.DeclineDlc(args.CIdx, 0x01)
-	if err != nil {
-		return err
+	if args.AcceptOrDecline {
+		err = r.Node.AcceptDlc(args.CIdx)
+	} else {
+		err = r.Node.DeclineDlc(args.CIdx, 0x01)
 	}
 
-	reply.Success = true
-	return nil
-}
-
-type AcceptContractArgs struct {
-	CIdx uint64
-}
-
-type AcceptContractReply struct {
-	Success bool
-}
-
-// AcceptContract accepts an offered contract and will initiate a
-// signature-exchange for settlement and then for funding
-func (r *LitRPC) AcceptContract(args AcceptContractArgs,
-	reply *AcceptContractReply) error {
-	var err error
-
-	err = r.Node.AcceptDlc(args.CIdx)
 	if err != nil {
 		return err
 	}

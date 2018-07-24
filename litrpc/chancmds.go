@@ -5,9 +5,9 @@ import (
 	"log"
 
 	"github.com/mit-dci/lit/btcutil"
+	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/qln"
-	"github.com/mit-dci/lit/consts"
 )
 
 type ChannelInfo struct {
@@ -74,7 +74,13 @@ type FundArgs struct {
 	Data        [32]byte
 }
 
-func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
+type FundReply struct {
+	Status     string
+	ChanIdx    uint32
+	FundHeight int32
+}
+
+func (r *LitRPC) FundChannel(args FundArgs, reply *FundReply) error {
 	var err error
 	if r.Node.InProg != nil && r.Node.InProg.PeerIdx != 0 {
 		return fmt.Errorf("channel with peer %d not done yet", r.Node.InProg.PeerIdx)
@@ -121,6 +127,8 @@ func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
 	}
 
 	reply.Status = fmt.Sprintf("funded channel %d", idx)
+	reply.ChanIdx = idx
+	reply.FundHeight = nowHeight
 
 	return nil
 }
@@ -185,38 +193,25 @@ func (r *LitRPC) DualFundChannel(args DualFundArgs, reply *StatusReply) error {
 	return nil
 }
 
-type DualFundDeclineArgs struct {
-	// none
+type DualFundRespondArgs struct {
+	// True for accept, false for decline
+	AcceptOrDecline bool
 }
 
-func (r *LitRPC) DualFundDecline(args DualFundDeclineArgs, reply *StatusReply) error {
+func (r *LitRPC) DualFundRespond(args DualFundRespondArgs, reply *StatusReply) error {
 	peerIdx := r.Node.InProgDual.PeerIdx
 
 	if peerIdx == 0 || r.Node.InProgDual.InitiatedByUs {
 		return fmt.Errorf("There is no pending request to reject")
 	}
 
-	r.Node.DualFundDecline(0x01)
-
-	reply.Status = fmt.Sprintf("Succesfully declined funding request from peer %d", peerIdx)
-
-	return nil
-}
-
-type DualFundAcceptArgs struct {
-	// none
-}
-
-func (r *LitRPC) DualFundAccept(args DualFundAcceptArgs, reply *StatusReply) error {
-	peerIdx := r.Node.InProgDual.PeerIdx
-
-	if peerIdx == 0 || r.Node.InProgDual.InitiatedByUs {
-		return fmt.Errorf("There is no pending request to reject")
+	if args.AcceptOrDecline {
+		r.Node.DualFundAccept()
+		reply.Status = fmt.Sprintf("Succesfully accepted funding request from peer %d", peerIdx)
+	} else {
+		r.Node.DualFundDecline(0x01)
+		reply.Status = fmt.Sprintf("Succesfully declined funding request from peer %d", peerIdx)
 	}
-
-	r.Node.DualFundAccept()
-
-	reply.Status = fmt.Sprintf("Succesfully accepted funding request from peer %d", peerIdx)
 
 	return nil
 }

@@ -45,21 +45,17 @@ Returns:
 
 * `Status (string)`
 
-### DualFundDecline
+### DualFundRespond
 
-Args: *empty object*
+Args:
 
-Returns:
-
-* `Status (string)`
-
-### DualFundAccept
-
-Args: *empty object*
+* `AcceptOrDecline (bool)`
 
 Returns:
 
 * `Status (string)`
+
+True for accept, false for decline.
 
 ### PendingDualFund
 
@@ -254,25 +250,18 @@ Returns:
 
 * `Success (bool)`
 
-### DeclineContract
+### ContractRespond
 
 Args:
 
+* `AcceptOrDecline (bool)`
 * `CIdx (uint64)`
 
 Returns:
 
 * `Success (bool)`
 
-### AcceptContract
-
-Args:
-
-* `CIdx (uint64)`
-
-Returns:
-
-* `Success (bool)`
+True for accept, false for decline.
 
 ### SettleContract
 
