@@ -10,7 +10,7 @@ message encryption/decryption scheme. Additionally, the package exposes a
 which allows the encrypted transport to be seamlessly integrated into a
 codebase.
 
-The secure messaging scheme implemented within this package uses `NOISE_XX` as the handshake for authenticated key exchange.
+The secure messaging scheme implemented within this package uses `NOISE_XX` as the handshake for authenticated key exchange. Please note that this is not the same as [brontide](https://github.com/lightningnetwork/lnd/tree/master/brontide) which uses the `NOISE_XK` protocol for handshakes and `lndc` is not compatible with the same.
 
 This package has intentionally been designed so it can be used as a standalone
 package for any projects needing secure encrypted+authenticated communications
