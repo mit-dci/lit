@@ -24,8 +24,6 @@ struct RpcReqest<P> where P: Serialize {
 
 #[derive(Clone, Debug, Deserialize)]
 struct RpcResponse<R> {
-    jsonrpc: String,
-
     //#[serde(default="Option::None")]
     result: Option<R>,
 
@@ -48,6 +46,7 @@ pub struct LitRpcClient {
     client: reqwest::Client
 }
 
+#[derive(Debug)]
 pub enum LitRpcError {
     RpcError(RpcError),
     RpcInvalidResponse,
@@ -91,14 +90,17 @@ impl LitRpcClient {
 
         // Serialize the request.
         let req_body = serde_json::to_string(&req)?;
+        println!("request: {}", req_body);
 
         // Send it off and get a response.
         let mut res_json = self.client.post(self.url.as_str())
             .body(req_body)
             .send()?;
+        let text = res_json.text()?;
+        println!("reponse: {}", text);
 
         // Deserialize...
-        let res: RpcResponse<R> = serde_json::from_str(res_json.text()?.as_ref())?;
+        let res: RpcResponse<R> = serde_json::from_str(text.as_ref())?;
         if res.id != req.id {
             // Ok this makes no sense but we should fail out anyways.
             return Err(LitRpcError::RpcInvalidResponse)
@@ -120,7 +122,7 @@ macro_rules! rpc_call {
         #[derive(Clone, Deserialize)]
         #[allow(non_snake_case)]
         pub struct $oname {
-            $( $oi: $ot ),*
+            $( pub $oi: $ot ),*
         }
 
         impl LitRpcClient {
@@ -228,19 +230,19 @@ rpc_call! {
 
 // chancmds
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct ChanInfo {
-    OutPoint: String,
-    CoinType: u32,
-    Closed: bool,
-    Capacity: i64,
-    MyBalance: i64,
-    Height: i32,
-    StateNum: i64,
-    PeerIdx: u32,
-    CIdx: u32,
-    Data: [u8; 32],
-    Pkh: [u8; 20]
+    pub OutPoint: String,
+    pub CoinType: u32,
+    pub Closed: bool,
+    pub Capacity: i64,
+    pub MyBalance: i64,
+    pub Height: i32,
+    pub StateNum: i64,
+    pub PeerIdx: u32,
+    pub CIdx: u32,
+    pub Data: [u8; 32],
+    pub Pkh: [u8; 20]
 }
 
 rpc_call! {
@@ -325,14 +327,14 @@ rpc_call! {
 
 #[derive(Clone, Deserialize)]
 pub struct PrivInfo {
-    OutPoint: String,
-    Amt: i64,
-    Height: i32,
-    Delay: i32,
-    CoinType: String,
-    Witty: bool,
-    PairKey: String,
-    WIF: String
+    pub OutPoint: String,
+    pub Amt: i64,
+    pub Height: i32,
+    pub Delay: i32,
+    pub CoinType: String,
+    pub Witty: bool,
+    pub PairKey: String,
+    pub WIF: String
 }
 
 rpc_call! {
@@ -344,12 +346,12 @@ rpc_call! {
 
 #[derive(Clone, Deserialize)]
 pub struct CoinBalInfo {
-    CoinType: u32,
-    SyncHeight: i32,
-    ChanTotal: i64,
-    TxoTotal: i64,
-    MatureWitty: i64,
-    FeeRate: i64
+    pub CoinType: u32,
+    pub SyncHeight: i32,
+    pub ChanTotal: i64,
+    pub TxoTotal: i64,
+    pub MatureWitty: i64,
+    pub FeeRate: i64
 }
 
 rpc_call! {
@@ -357,25 +359,25 @@ rpc_call! {
     {} => BalanceReply { Balances: Vec<CoinBalInfo> }
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct TxoInfo {
-    OutPoint: String,
-    Amt: i64,
-    Height: i32,
-    Delay: i32,
-    CoinType: String,
-    Witty: bool,
-    KeyPath: String
-}
-
-#[derive(Clone, Deserialize)]
-pub struct TxidsReply {
-    Txids: Vec<String>
+    pub OutPoint: String,
+    pub Amt: i64,
+    pub Height: i32,
+    pub Delay: i32,
+    pub CoinType: String,
+    pub Witty: bool,
+    pub KeyPath: String
 }
 
 rpc_call! {
     call_get_txo_list, TxoList,
-    {} => TxidsReply
+    {} => TxoListReply { Txos: Vec<TxoInfo> }
+}
+
+#[derive(Clone, Deserialize)]
+pub struct TxidsReply {
+    pub Txids: Vec<String>
 }
 
 rpc_call! {
@@ -406,7 +408,7 @@ rpc_call! {
 
 #[derive(Clone, Deserialize)]
 pub struct FeeReply {
-    CurrentFee: i64
+    pub CurrentFee: i64
 }
 
 rpc_call! {
