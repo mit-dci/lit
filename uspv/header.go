@@ -26,7 +26,7 @@ func min(a, b int) int {
 	return b
 }
 func moreWork(a, b []*wire.BlockHeader, p *coinparam.Params) bool {
-	var isMoreWork = false
+	isMoreWork := false
 	if len(a) == 0 || len(b) == 0 {
 		return false
 	}

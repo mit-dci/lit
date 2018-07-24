@@ -293,9 +293,9 @@ func (s *SPVCon) openHeaderFile(hfn string) error {
 			// if StartHeader is defined, start with hardcoded height
 			if s.Param.StartHeight != 0 {
 				hdr := s.Param.StartHeader
-				_, err2 := b.Write(hdr[:])
-				if err2 != nil {
-					return err2
+				_, err := b.Write(hdr[:])
+				if err != nil {
+					return err
 				}
 			} else {
 				err = s.Param.GenesisBlock.Header.Serialize(&b)
