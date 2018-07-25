@@ -63,9 +63,10 @@ type HTLC struct {
 
 	Sig [64]byte
 
-	R        [16]byte
-	Clearing bool
-	Cleared  bool
+	R              [16]byte
+	Clearing       bool
+	Cleared        bool
+	ClearedOnChain bool // To keep track of what HTLCs we claimed on-chain
 }
 
 // StatComs are State Commitments.

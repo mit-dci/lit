@@ -582,7 +582,7 @@ func (nd *LitNode) PreimageSigHandler(msg lnutil.PreimageSigMsg, qc *Qchan) erro
 	return nil
 }
 
-func (nd *LitNode) ClearHTLCState(q *Qchan, h HTLC) error {
+func (nd *LitNode) SetHTLCClearedOnChain(q *Qchan, h HTLC) error {
 	q.ChanMtx.Lock()
 	err := nd.ReloadQchanState(q)
 	if err != nil {
@@ -590,7 +590,7 @@ func (nd *LitNode) ClearHTLCState(q *Qchan, h HTLC) error {
 		return err
 	}
 	qh := &q.State.HTLCs[h.Idx]
-	qh.Cleared = true
+	qh.ClearedOnChain = true
 	err = nd.SaveQchanState(q)
 	if err != nil {
 		log.Printf("Error saving qchan state: %s", err.Error())
@@ -623,7 +623,7 @@ func (nd *LitNode) ClaimHTLC(R [16]byte) ([][32]byte, error) {
 					log.Printf("Error claiming HTLC: %s", err.Error())
 					return nil, err
 				}
-				nd.ClearHTLCState(q, h)
+				nd.SetHTLCClearedOnChain(q, h)
 				txids = append(txids, tx.TxHash())
 			} else {
 				log.Printf("Cleaing HTLC from channel [%d] idx [%d]\n", q.Idx(), h.Idx)
@@ -651,7 +651,7 @@ func (nd *LitNode) ClaimHTLCTimeouts(coinType uint32, height int32) ([][32]byte,
 						log.Printf("Error claiming HTLC: %s", err.Error())
 						return nil, err
 					}
-					nd.ClearHTLCState(q, h)
+					nd.SetHTLCClearedOnChain(q, h)
 					txids = append(txids, tx.TxHash())
 				} else {
 					log.Printf("Timing out HTLC from channel [%d] idx [%d]\n", q.Idx(), h.Idx)

@@ -461,6 +461,11 @@ func (h *HTLC) Bytes() ([]byte, error) {
 		return nil, err
 	}
 
+	err = binary.Write(&buf, binary.BigEndian, h.ClearedOnChain)
+	if err != nil {
+		return nil, err
+	}
+
 	return buf.Bytes(), nil
 }
 
@@ -507,6 +512,11 @@ func HTLCFromBytes(b []byte) (HTLC, error) {
 	}
 
 	err = binary.Read(buf, binary.BigEndian, &h.Cleared)
+	if err != nil {
+		return h, err
+	}
+
+	err = binary.Read(buf, binary.BigEndian, &h.ClearedOnChain)
 	if err != nil {
 		return h, err
 	}
