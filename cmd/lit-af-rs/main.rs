@@ -5,6 +5,8 @@ extern crate serde;
 #[macro_use] extern crate serde_derive;
 extern crate serde_json;
 
+use std::panic;
+
 use cursive::Cursive;
 use cursive::direction::*;
 use cursive::event::*;
@@ -32,6 +34,16 @@ fn main() {
     };
 
     println!("addr: {}, port {}", addr, port);
+
+    match panic::catch_unwind(|| run_ui(addr, port)) {
+        Ok(_) => {}, // we're ok
+        Err(_) => run_bsod()
+    }
+
+}
+
+fn run_ui(addr: &str, port: u16) {
+
     let mut client = litrpc::LitRpcClient::new(addr, port);
 
     let mut layout = LinearLayout::new(Orientation::Horizontal);
@@ -50,6 +62,20 @@ fn main() {
     siv.set_theme(load_theme(include_str!("ncurses_theme.toml")).unwrap());
     siv.add_global_callback(Event::Refresh, make_update_ui_callback_with_client(&mut client));
     siv.set_fps(1);
+
+    siv.run()
+
+}
+
+fn run_bsod() {
+
+    let mut siv = Cursive::new();
+
+    let d = Dialog::around(TextView::new("RS-AF has encountered an error and needs to exit."))
+                    .title("Panic")
+                    .button("Exit", |s| s.quit());
+
+    siv.add_layer(d);
     siv.run();
 
 }
