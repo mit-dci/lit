@@ -552,11 +552,14 @@ func (nd *LitNode) PreimageSigHandler(msg lnutil.PreimageSigMsg, qc *Qchan) erro
 
 	// verify sig for the next state. only save if this works
 
+	stashElk := qc.State.ElkPoint
+	qc.State.ElkPoint = qc.State.NextElkPoint
 	// TODO: There are more signatures required
 	err = qc.VerifySigs(msg.CommitmentSignature, msg.HTLCSigs)
 	if err != nil {
 		return fmt.Errorf("PreimageSigHandler err %s", err.Error())
 	}
+	qc.State.ElkPoint = stashElk
 
 	// (seems odd, but everything so far we still do in case of collision, so
 	// only check here.  If it's a collision, set, save, send gapSigRev
