@@ -122,9 +122,9 @@ func (nd *LitNode) OfferHTLC(qc *Qchan, amt uint32, RHash [32]byte, locktime uin
 		return err
 	}
 
-	log.Printf("OfferHTLC: Done: sent HashSig")
+	log.Println("OfferHTLC: Done: sent HashSig")
 
-	log.Printf("got pre CTS...")
+	log.Println("got pre CTS...")
 	qc.ChanMtx.Unlock()
 
 	cts = false
@@ -138,7 +138,7 @@ func (nd *LitNode) OfferHTLC(qc *Qchan, amt uint32, RHash [32]byte, locktime uin
 		}
 	}
 
-	log.Printf("got post CTS...")
+	log.Println("got post CTS...")
 	// since we cleared with that statement, fill it again before returning
 	qc.ClearToSend <- true
 	qc.ChanMtx.Unlock()
@@ -400,7 +400,7 @@ func (nd *LitNode) ClearHTLC(qc *Qchan, R [16]byte, HTLCIdx uint32, data [32]byt
 		return err
 	}
 
-	log.Printf("ClearHTLC: Sending PreimageSig")
+	log.Println("ClearHTLC: Sending PreimageSig")
 
 	err = nd.SendPreimageSig(qc, HTLCIdx)
 	if err != nil {
@@ -408,9 +408,7 @@ func (nd *LitNode) ClearHTLC(qc *Qchan, R [16]byte, HTLCIdx uint32, data [32]byt
 		return err
 	}
 
-	log.Printf("ClearHTLC: Done: sent PreimageSig")
-
-	log.Printf("got pre CTS...")
+	log.Println("got pre CTS...")
 	qc.ChanMtx.Unlock()
 
 	cts = false
@@ -424,7 +422,7 @@ func (nd *LitNode) ClearHTLC(qc *Qchan, R [16]byte, HTLCIdx uint32, data [32]byt
 		}
 	}
 
-	log.Printf("got post CTS...")
+	log.Println("got post CTS...")
 	// since we cleared with that statement, fill it again before returning
 	qc.ClearToSend <- true
 	qc.ChanMtx.Unlock()
@@ -552,11 +550,14 @@ func (nd *LitNode) PreimageSigHandler(msg lnutil.PreimageSigMsg, qc *Qchan) erro
 
 	// verify sig for the next state. only save if this works
 
+	stashElk := qc.State.ElkPoint
+	qc.State.ElkPoint = qc.State.NextElkPoint
 	// TODO: There are more signatures required
 	err = qc.VerifySigs(msg.CommitmentSignature, msg.HTLCSigs)
 	if err != nil {
 		return fmt.Errorf("PreimageSigHandler err %s", err.Error())
 	}
+	qc.State.ElkPoint = stashElk
 
 	// (seems odd, but everything so far we still do in case of collision, so
 	// only check here.  If it's a collision, set, save, send gapSigRev
@@ -582,18 +583,20 @@ func (nd *LitNode) PreimageSigHandler(msg lnutil.PreimageSigMsg, qc *Qchan) erro
 	return nil
 }
 
-func (nd *LitNode) ClearHTLCState(q *Qchan, h HTLC) error {
+func (nd *LitNode) SetHTLCClearedOnChain(q *Qchan, h HTLC) error {
 	q.ChanMtx.Lock()
 	err := nd.ReloadQchanState(q)
 	if err != nil {
 		log.Printf("Error reloading qchan state: %s", err.Error())
+		q.ChanMtx.Unlock()
 		return err
 	}
 	qh := &q.State.HTLCs[h.Idx]
-	qh.Cleared = true
+	qh.ClearedOnChain = true
 	err = nd.SaveQchanState(q)
 	if err != nil {
 		log.Printf("Error saving qchan state: %s", err.Error())
+		q.ChanMtx.Unlock()
 		return err
 	}
 	q.ChanMtx.Unlock()
@@ -623,7 +626,7 @@ func (nd *LitNode) ClaimHTLC(R [16]byte) ([][32]byte, error) {
 					log.Printf("Error claiming HTLC: %s", err.Error())
 					return nil, err
 				}
-				nd.ClearHTLCState(q, h)
+				nd.SetHTLCClearedOnChain(q, h)
 				txids = append(txids, tx.TxHash())
 			} else {
 				log.Printf("Cleaing HTLC from channel [%d] idx [%d]\n", q.Idx(), h.Idx)
@@ -651,11 +654,24 @@ func (nd *LitNode) ClaimHTLCTimeouts(coinType uint32, height int32) ([][32]byte,
 						log.Printf("Error claiming HTLC: %s", err.Error())
 						return nil, err
 					}
-					nd.ClearHTLCState(q, h)
+					nd.SetHTLCClearedOnChain(q, h)
 					txids = append(txids, tx.TxHash())
 				} else {
+					// For off-chain we need to fetch the channel from the node
+					// otherwise we're talking to a different instance of the channel
+					nd.RemoteMtx.Lock()
+					peer, ok := nd.RemoteCons[q.Peer()]
+
+					nd.RemoteMtx.Unlock()
+					if !ok {
+						return nil, fmt.Errorf("Couldn't find peer %d in RemoteCons", q.Peer())
+					}
+					qc, ok := peer.QCs[q.Idx()]
+					if !ok {
+						return nil, fmt.Errorf("Couldn't find channel %d in peer.QCs", q.Idx())
+					}
 					log.Printf("Timing out HTLC from channel [%d] idx [%d]\n", q.Idx(), h.Idx)
-					nd.ClearHTLC(q, [16]byte{}, h.Idx, [32]byte{})
+					nd.ClearHTLC(qc, [16]byte{}, h.Idx, [32]byte{})
 				}
 			}
 		}

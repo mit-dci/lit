@@ -74,7 +74,13 @@ type FundArgs struct {
 	Data        [32]byte
 }
 
-func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
+type FundReply struct {
+	Status     string
+	ChanIdx    uint32
+	FundHeight int32
+}
+
+func (r *LitRPC) FundChannel(args FundArgs, reply *FundReply) error {
 	var err error
 	if r.Node.InProg != nil && r.Node.InProg.PeerIdx != 0 {
 		return fmt.Errorf("channel with peer %d not done yet", r.Node.InProg.PeerIdx)
@@ -121,6 +127,8 @@ func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
 	}
 
 	reply.Status = fmt.Sprintf("funded channel %d", idx)
+	reply.ChanIdx = idx
+	reply.FundHeight = nowHeight
 
 	return nil
 }
@@ -185,38 +193,25 @@ func (r *LitRPC) DualFundChannel(args DualFundArgs, reply *StatusReply) error {
 	return nil
 }
 
-type DualFundDeclineArgs struct {
-	// none
+type DualFundRespondArgs struct {
+	// True for accept, false for decline
+	AcceptOrDecline bool
 }
 
-func (r *LitRPC) DualFundDecline(args DualFundDeclineArgs, reply *StatusReply) error {
+func (r *LitRPC) DualFundRespond(args DualFundRespondArgs, reply *StatusReply) error {
 	peerIdx := r.Node.InProgDual.PeerIdx
 
 	if peerIdx == 0 || r.Node.InProgDual.InitiatedByUs {
 		return fmt.Errorf("There is no pending request to reject")
 	}
 
-	r.Node.DualFundDecline(0x01)
-
-	reply.Status = fmt.Sprintf("Succesfully declined funding request from peer %d", peerIdx)
-
-	return nil
-}
-
-type DualFundAcceptArgs struct {
-	// none
-}
-
-func (r *LitRPC) DualFundAccept(args DualFundAcceptArgs, reply *StatusReply) error {
-	peerIdx := r.Node.InProgDual.PeerIdx
-
-	if peerIdx == 0 || r.Node.InProgDual.InitiatedByUs {
-		return fmt.Errorf("There is no pending request to reject")
+	if args.AcceptOrDecline {
+		r.Node.DualFundAccept()
+		reply.Status = fmt.Sprintf("Succesfully accepted funding request from peer %d", peerIdx)
+	} else {
+		r.Node.DualFundDecline(0x01)
+		reply.Status = fmt.Sprintf("Succesfully declined funding request from peer %d", peerIdx)
 	}
-
-	r.Node.DualFundAccept()
-
-	reply.Status = fmt.Sprintf("Succesfully accepted funding request from peer %d", peerIdx)
 
 	return nil
 }
@@ -475,7 +470,7 @@ func (r *LitRPC) AddHTLC(args AddHTLCArgs, reply *AddHTLCReply) error {
 			"can't add HTLC %d max is 1 coin (100000000), min is %d", args.Amt, consts.MinOutput)
 	}
 
-	fmt.Printf("add HTLC %d to chan %d with data %x and RHash %x\n", args.Amt, args.ChanIdx, args.Data, args.RHash)
+	log.Printf("add HTLC %d to chan %d with data %x and RHash %x\n", args.Amt, args.ChanIdx, args.Data, args.RHash)
 
 	// load the whole channel from disk just to see who the peer is
 	// (pretty inefficient)
@@ -505,7 +500,7 @@ func (r *LitRPC) AddHTLC(args AddHTLCArgs, reply *AddHTLCReply) error {
 			dummyqc.Peer(), dummyqc.Idx())
 	}
 
-	fmt.Printf("channel %s\n", qc.Op.String())
+	log.Printf("channel %s\n", qc.Op.String())
 
 	if qc.CloseData.Closed {
 		return fmt.Errorf("Channel %d already closed by tx %s",
@@ -539,7 +534,7 @@ type ClearHTLCReply struct {
 }
 
 func (r *LitRPC) ClearHTLC(args ClearHTLCArgs, reply *ClearHTLCReply) error {
-	fmt.Printf("clear HTLC %d from chan %d with data %x and preimage %x\n", args.HTLCIdx, args.ChanIdx, args.Data, args.R)
+	log.Printf("clear HTLC %d from chan %d with data %x and preimage %x\n", args.HTLCIdx, args.ChanIdx, args.Data, args.R)
 
 	// load the whole channel from disk just to see who the peer is
 	// (pretty inefficient)
@@ -569,7 +564,7 @@ func (r *LitRPC) ClearHTLC(args ClearHTLCArgs, reply *ClearHTLCReply) error {
 			dummyqc.Peer(), dummyqc.Idx())
 	}
 
-	fmt.Printf("channel %s\n", qc.Op.String())
+	log.Printf("channel %s\n", qc.Op.String())
 
 	if qc.CloseData.Closed {
 		return fmt.Errorf("Channel %d already closed by tx %s",

@@ -241,7 +241,7 @@ func StatComFromBytes(b []byte) (*StatCom, error) {
 	}
 
 	if inProg {
-		HTLCBytes := buf.Next(250)
+		HTLCBytes := buf.Next(251)
 
 		h, err := HTLCFromBytes(HTLCBytes)
 		if err != nil {
@@ -263,7 +263,7 @@ func StatComFromBytes(b []byte) (*StatCom, error) {
 	}
 
 	for i := uint32(0); i < nHTLCs; i++ {
-		HTLCBytes := buf.Next(250)
+		HTLCBytes := buf.Next(251)
 
 		h, err := HTLCFromBytes(HTLCBytes)
 		if err != nil {
@@ -395,8 +395,8 @@ func QCloseFromBytes(b []byte) (QCloseData, error) {
 }
 
 // Bytes turns an HTLC into a slice of
-// 4 + 1 + 8 + 32 + 4 + 33 + 33 + 53 + 64 + 16 + 1 + 1
-// = 250 bytes
+// 4 + 1 + 8 + 32 + 4 + 33 + 33 + 53 + 64 + 16 + 1 + 1 + 1
+// = 251 bytes
 func (h *HTLC) Bytes() ([]byte, error) {
 	var buf bytes.Buffer
 	var err error
@@ -461,6 +461,11 @@ func (h *HTLC) Bytes() ([]byte, error) {
 		return nil, err
 	}
 
+	err = binary.Write(&buf, binary.BigEndian, h.ClearedOnChain)
+	if err != nil {
+		return nil, err
+	}
+
 	return buf.Bytes(), nil
 }
 
@@ -507,6 +512,11 @@ func HTLCFromBytes(b []byte) (HTLC, error) {
 	}
 
 	err = binary.Read(buf, binary.BigEndian, &h.Cleared)
+	if err != nil {
+		return h, err
+	}
+
+	err = binary.Read(buf, binary.BigEndian, &h.ClearedOnChain)
 	if err != nil {
 		return h, err
 	}

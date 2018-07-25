@@ -9,6 +9,14 @@ import (
 	"github.com/mit-dci/lit/qln"
 )
 
+// ------------------------- testlog
+
+func (r *LitRPC) TestLog(arg string, reply *string) error {
+	log.Print(arg)
+	*reply = arg
+	return nil
+}
+
 // ------------------------- listen
 
 type ListenArgs struct {
