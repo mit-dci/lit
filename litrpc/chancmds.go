@@ -475,7 +475,7 @@ func (r *LitRPC) AddHTLC(args AddHTLCArgs, reply *AddHTLCReply) error {
 			"can't add HTLC %d max is 1 coin (100000000), min is %d", args.Amt, consts.MinOutput)
 	}
 
-	fmt.Printf("add HTLC %d to chan %d with data %x and RHash %x\n", args.Amt, args.ChanIdx, args.Data, args.RHash)
+	log.Printf("add HTLC %d to chan %d with data %x and RHash %x\n", args.Amt, args.ChanIdx, args.Data, args.RHash)
 
 	// load the whole channel from disk just to see who the peer is
 	// (pretty inefficient)
@@ -505,7 +505,7 @@ func (r *LitRPC) AddHTLC(args AddHTLCArgs, reply *AddHTLCReply) error {
 			dummyqc.Peer(), dummyqc.Idx())
 	}
 
-	fmt.Printf("channel %s\n", qc.Op.String())
+	log.Printf("channel %s\n", qc.Op.String())
 
 	if qc.CloseData.Closed {
 		return fmt.Errorf("Channel %d already closed by tx %s",
@@ -539,7 +539,7 @@ type ClearHTLCReply struct {
 }
 
 func (r *LitRPC) ClearHTLC(args ClearHTLCArgs, reply *ClearHTLCReply) error {
-	fmt.Printf("clear HTLC %d from chan %d with data %x and preimage %x\n", args.HTLCIdx, args.ChanIdx, args.Data, args.R)
+	log.Printf("clear HTLC %d from chan %d with data %x and preimage %x\n", args.HTLCIdx, args.ChanIdx, args.Data, args.R)
 
 	// load the whole channel from disk just to see who the peer is
 	// (pretty inefficient)
@@ -569,7 +569,7 @@ func (r *LitRPC) ClearHTLC(args ClearHTLCArgs, reply *ClearHTLCReply) error {
 			dummyqc.Peer(), dummyqc.Idx())
 	}
 
-	fmt.Printf("channel %s\n", qc.Op.String())
+	log.Printf("channel %s\n", qc.Op.String())
 
 	if qc.CloseData.Closed {
 		return fmt.Errorf("Channel %d already closed by tx %s",
