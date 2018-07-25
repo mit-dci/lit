@@ -90,14 +90,14 @@ impl LitRpcClient {
 
         // Serialize the request.
         let req_body = serde_json::to_string(&req)?;
-        println!("request: {}", req_body);
+        eprintln!("request: {}", req_body);
 
         // Send it off and get a response.
         let mut res_json = self.client.post(self.url.as_str())
             .body(req_body)
             .send()?;
         let text = res_json.text()?;
-        println!("reponse: {}", text);
+        eprintln!("reponse: {}", text);
 
         // Deserialize...
         let res: RpcResponse<R> = serde_json::from_str(text.as_ref())?;
