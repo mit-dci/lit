@@ -51,7 +51,11 @@ fn run_ui(addr: &str, port: u16) {
 
     let mut c_view = LinearLayout::new(Orientation::Vertical);
     c_view.add_child(TextView::new("Channels"));
-    layout.add_child(IdView::new("chans", Panel::new(c_view)));
+    layout.add_child(
+        BoxView::new(
+            SizeConstraint::Full,
+            SizeConstraint::Full,
+            IdView::new("chans", Panel::new(c_view))));
 
     let mut right_view = LinearLayout::new(Orientation::Vertical);
 
@@ -63,16 +67,6 @@ fn run_ui(addr: &str, port: u16) {
                 SizeConstraint::Full,
                 SizeConstraint::Full,
                 IdView::new("bals", Panel::new(bal_view)))
-            .squishable());
-
-    // Addresses
-    let mut addr_view = LinearLayout::new(Orientation::Vertical);
-    addr_view.add_child(TextView::new("Addrs"));
-    right_view.add_child(
-        BoxView::new(
-                SizeConstraint::Full,
-                SizeConstraint::Full,
-                IdView::new("addrs", Panel::new(addr_view)))
             .squishable());
 
     // Txos
@@ -130,19 +124,24 @@ fn generate_view_for_chan(chan: litrpc::ChanInfo) -> impl View {
 
 }
 
-fn generate_view_for_bal(bal: litrpc::CoinBalInfo) -> impl View {
+fn generate_view_for_bal(bal: &litrpc::CoinBalInfo, addrs: Vec<String>) -> impl View {
 
     let mut data = LinearLayout::new(Orientation::Vertical);
 
     let grand_total = bal.ChanTotal + bal.TxoTotal;
     let bal_str = format!(
-        "  Funds: chans {} + txos {} = total {} sat",
+        "  Funds: chans {} + txos {} = total {} (sat)",
         bal.ChanTotal,
         bal.TxoTotal,
         grand_total);
 
     data.add_child(TextView::new(format!("- Type {} @ height {}", bal.CoinType, bal.SyncHeight)));
     data.add_child(TextView::new(bal_str));
+    addrs.into_iter()
+        .map(|a| format!("  - {}", a))
+        .map(TextView::new)
+        .for_each(|l| data.add_child(l));
+    data.add_child(DummyView);
 
     data
 
@@ -205,19 +204,6 @@ fn make_update_ui_callback_with_client(cl: &mut litrpc::LitRpcClient) -> impl Fn
             Err(err) => panic!("{:?}", err)
         };
 
-        c.call_on_id("bals", |balpan: &mut Panel<LinearLayout>| {
-
-            let mut bal_view = LinearLayout::new(Orientation::Vertical);
-            bal_view.add_child(TextView::new("Balances"));
-            bal_view.add_child(DummyView);
-            bals.into_iter()
-                .map(generate_view_for_bal)
-                .for_each(|e| bal_view.add_child(e));
-
-            *balpan.get_inner_mut() = bal_view;
-
-        });
-
         // Addrs
         let addrs: Vec<(u32, String)> = match clrc.call_get_addresses() {
             Ok(ar) => {
@@ -233,16 +219,21 @@ fn make_update_ui_callback_with_client(cl: &mut litrpc::LitRpcClient) -> impl Fn
             Err(err) => panic!("{:?}", err)
         };
 
-        c.call_on_id("addrs", |addrpan: &mut Panel<LinearLayout>| {
+        c.call_on_id("bals", |balpan: &mut Panel<LinearLayout>| {
 
-            let mut addr_view = LinearLayout::new(Orientation::Vertical);
-            addr_view.add_child(TextView::new("Addresses"));
-            addr_view.add_child(DummyView);
-            addrs.into_iter()
-                .map(|(ct, wa)| TextView::new(format!("- type: {} segwit: {}", ct, wa)))
-                .for_each(|e| addr_view.add_child(e));
+            let mut bal_view = LinearLayout::new(Orientation::Vertical);
+            bal_view.add_child(TextView::new("Balances"));
+            bal_view.add_child(DummyView);
+            bals.into_iter()
+                .map(|b| generate_view_for_bal(
+                    &b,
+                    addrs.clone().into_iter()
+                        .filter(|(t, _)| *t == b.CoinType)
+                        .map(|(_, a)| a)
+                        .collect()))
+                .for_each(|e| bal_view.add_child(e));
 
-            *addrpan.get_inner_mut() = addr_view;
+            *balpan.get_inner_mut() = bal_view;
 
         });
 
