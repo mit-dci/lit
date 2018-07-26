@@ -1,5 +1,5 @@
 [package]
-name = "lit-af-rs"
+name = "rs-af"
 version = "0.1.0"
 authors = ["Trey Del Bonis <j.delbonis.3@gmail.com>"]
 
