@@ -39,7 +39,6 @@ clean:
 	go clean .
 	go clean ./cmd/lit-af
 	rm -rf build/_workspace/
-	rm -rf webui/
 	rm -f cmd/lit-af/lit-af
 	rm -f cmd/glit/glit
 
