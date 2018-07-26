@@ -240,7 +240,6 @@ func (nd *LitNode) GetPubHostFromPeerIdx(idx uint32) ([33]byte, string) {
 			return fmt.Errorf("no peer %x", pubBytes)
 		}
 		host = string(prBkt.Get(KEYhost))
-
 		return nil
 	})
 	if err != nil {
