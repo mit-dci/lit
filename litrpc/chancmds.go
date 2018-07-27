@@ -207,10 +207,10 @@ func (r *LitRPC) DualFundRespond(args DualFundRespondArgs, reply *StatusReply) e
 
 	if args.AcceptOrDecline {
 		r.Node.DualFundAccept()
-		reply.Status = fmt.Sprintf("Succesfully accepted funding request from peer %d", peerIdx)
+		reply.Status = fmt.Sprintf("Successfully accepted funding request from peer %d", peerIdx)
 	} else {
 		r.Node.DualFundDecline(0x01)
-		reply.Status = fmt.Sprintf("Succesfully declined funding request from peer %d", peerIdx)
+		reply.Status = fmt.Sprintf("Successfully declined funding request from peer %d", peerIdx)
 	}
 
 	return nil
