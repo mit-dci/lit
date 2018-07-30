@@ -81,7 +81,6 @@ func diffBitcoin(
 	}
 
 	epochLength := int(p.TargetTimespan / p.TargetTimePerBlock)
-	epochStart := new(wire.BlockHeader)
 
 	epochHeight := int(height) % epochLength
 	maxHeader := len(headers) - 1
@@ -96,7 +95,7 @@ func diffBitcoin(
 	} else if epochHeight > maxHeader {
 		return 0, fmt.Errorf("diffBitcoin got insufficient headers")
 	}
-	epochStart = headers[maxHeader-epochHeight]
+	epochStart := headers[maxHeader-epochHeight]
 
 	// see if we're on a difficulty adjustment block
 	if epochHeight == 0 {
@@ -179,7 +178,6 @@ func calcDiffAdjustKGW(
 	var difficultyAverage, previousDifficultyAverage big.Int
 	var rateAdjustmentRatio, eventHorizonDeviation float64
 	var eventHorizonDeviationFast, eventHorizonDevationSlow float64
-	rateAdjustmentRatio = 1
 
 	currentHeight := height - 1
 

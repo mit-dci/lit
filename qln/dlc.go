@@ -435,7 +435,9 @@ func (nd *LitNode) SignSettlementDivisions(c *lnutil.DlcContract) ([]lnutil.DlcC
 	returnValue := make([]lnutil.DlcContractSettlementSignature, len(c.Division))
 	for i, d := range c.Division {
 		tx, err := lnutil.SettlementTx(c, d, true)
-
+		if err != nil {
+			return nil, err
+		}
 		sig, err := nd.SignSettlementTx(c, tx, priv)
 		if err != nil {
 			return nil, err

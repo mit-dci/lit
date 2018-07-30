@@ -109,7 +109,9 @@ func (nd *LitNode) BuildJusticeSig(q *Qchan) error {
 
 	// build the bad tx (redundant as we just build most of it...
 	badTx, err := q.BuildStateTx(false)
-
+	if err != nil {
+		return err
+	}
 	var badAmt int64
 	badIdx := uint32(len(badTx.TxOut) + 1)
 
@@ -167,6 +169,9 @@ func (nd *LitNode) BuildJusticeSig(q *Qchan) error {
 	// sign with combined key.  Justice txs always have only 1 input, so txin is 0
 	bigSig, err := txscript.RawTxInWitnessSignature(
 		justiceTx, hCache, 0, badAmt, script, txscript.SigHashAll, combinedPrivKey)
+	if err != nil {
+		return err
+	}
 	// truncate sig (last byte is sighash type, always sighashAll)
 	bigSig = bigSig[:len(bigSig)-1]
 
