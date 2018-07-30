@@ -105,7 +105,8 @@ type StatCom struct {
 	InProgHTLC    *HTLC // Current in progress HTLC
 	CollidingHTLC *HTLC // HTLC for when the channel is colliding
 
-	CollidingHTLCDelta bool // True when colliding between a DeltaSig and HashSig/PreImageSig
+	CollidingHashDelta    bool // True when colliding between a DeltaSig and HashSig/PreImageSig
+	CollidingHashPreimage bool // True when colliding between HashSig and PreimageSig
 
 	// Analogous to the ElkPoints above but used for generating their pubkey for the HTLC
 	NextHTLCBase [33]byte

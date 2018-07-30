@@ -319,7 +319,7 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 			// Remove the in prog HTLC for checking signatures,
 			// add it back later to send gapsigrev
 			qc.State.InProgHTLC = nil
-			qc.State.CollidingHTLCDelta = true
+			qc.State.CollidingHashDelta = true
 
 			var kg portxo.KeyGen
 			kg.Depth = 5
@@ -428,7 +428,7 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 		return fmt.Errorf("DeltaSigHandler SaveQchanState err %s", err.Error())
 	}
 
-	if qc.State.Collision != 0 || qc.State.CollidingHTLCDelta {
+	if qc.State.Collision != 0 || qc.State.CollidingHashDelta {
 		err = nd.SendGapSigRev(qc)
 		if err != nil {
 			return fmt.Errorf("DeltaSigHandler SendGapSigRev err %s", err.Error())
@@ -550,10 +550,10 @@ func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
 	}
 
 	// check if we're supposed to get a GapSigRev now. Collision should be set
-	if q.State.Collision == 0 && q.State.CollidingHTLC == nil && !q.State.CollidingHTLCDelta {
+	if q.State.Collision == 0 && q.State.CollidingHTLC == nil && !q.State.CollidingHashPreimage && !q.State.CollidingHashDelta {
 		return fmt.Errorf(
-			"chan %d got GapSigRev but collision = 0, collidingHTLC = nil, delta = %d",
-			q.Idx(), q.State.Delta)
+			"chan %d got GapSigRev but collision = 0, collidingHTLC = nil, q.State.CollidingHashPreimage = %t, q.State.CollidingHashDelta = %t, delta = %d",
+			q.Idx(), q.State.CollidingHashPreimage, q.State.CollidingHashDelta, q.State.Delta)
 	}
 
 	// stash for justice tx
@@ -747,7 +747,7 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 	// that and try to close with the incremented amount, why not.
 	// TODO Implement that later though.
 
-	if qc.State.InProgHTLC != nil || qc.State.CollidingHTLCDelta {
+	if qc.State.InProgHTLC != nil || qc.State.CollidingHashDelta {
 		var kg portxo.KeyGen
 		kg.Depth = 5
 		kg.Step[0] = 44 | 1<<31
@@ -887,7 +887,9 @@ func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {
 		qc.State.N2HTLCBase = msg.N2HTLCBase
 	}
 	// Clear collision state for HashSig-DeltaSig
-	qc.State.CollidingHTLCDelta = false
+	qc.State.CollidingHashDelta = false
+	// Clear collision state for HashSig-PreimageSig
+	qc.State.CollidingHashPreimage = false
 
 	if qc.State.InProgHTLC != nil {
 		qc.State.HTLCs = append(qc.State.HTLCs, *qc.State.InProgHTLC)

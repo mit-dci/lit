@@ -208,15 +208,31 @@ func (nd *LitNode) HashSigHandler(msg lnutil.HashSigMsg, qc *Qchan) error {
 
 	htlcIdx := qc.State.HTLCIdx
 
-	// If we are colliding with another HashSig
+	clearingIdxs := make([]uint32, 0)
+	for _, h := range qc.State.HTLCs {
+		if h.Clearing {
+			clearingIdxs = append(clearingIdxs, h.Idx)
+		}
+	}
+
+	// If we are colliding
 	if collision {
 		if qc.State.InProgHTLC != nil {
+			// HashSig-HashSig collision
 			// Set the Idx to the InProg one first - to allow signature
 			// verification. Correct later
 			htlcIdx = qc.State.InProgHTLC.Idx
+		} else if len(clearingIdxs) > 0 {
+			// HashSig-PreimageSig collision
+			// Remove the clearing state for signature verification and
+			// add back afterwards.
+			for _, idx := range clearingIdxs {
+				qc.State.HTLCs[idx].Clearing = false
+			}
+			qc.State.CollidingHashPreimage = true
 		} else {
 			// We are colliding with DeltaSig
-			qc.State.CollidingHTLCDelta = true
+			qc.State.CollidingHashDelta = true
 		}
 	}
 
@@ -276,6 +292,13 @@ func (nd *LitNode) HashSigHandler(msg lnutil.HashSigMsg, qc *Qchan) error {
 		return fmt.Errorf("HashSigHandler err %s", err.Error())
 	}
 	qc.State.ElkPoint = curElk
+
+	// After verification of signatures, add back the clearing state in case
+	// of HashSig-PreimageSig collisions
+	for _, idx := range clearingIdxs {
+		qc.State.HTLCs[idx].Clearing = true
+	}
+
 	// (seems odd, but everything so far we still do in case of collision, so
 	// only check here.  If it's a collision, set, save, send gapSigRev
 
@@ -333,7 +356,7 @@ func (nd *LitNode) HashSigHandler(msg lnutil.HashSigMsg, qc *Qchan) error {
 		return fmt.Errorf("HashSigHandler SaveQchanState err %s", err.Error())
 	}
 
-	if qc.State.Collision != 0 || qc.State.CollidingHTLC != nil || qc.State.CollidingHTLCDelta {
+	if qc.State.Collision != 0 || qc.State.CollidingHTLC != nil || qc.State.CollidingHashPreimage || qc.State.CollidingHashDelta {
 		err = nd.SendGapSigRev(qc)
 		if err != nil {
 			return fmt.Errorf("HashSigHandler SendGapSigRev err %s", err.Error())
@@ -534,8 +557,26 @@ func (nd *LitNode) PreimageSigHandler(msg lnutil.PreimageSigMsg, qc *Qchan) erro
 			qc.Peer(), qc.Idx())
 	}
 
+	clearing := false
+	for _, h := range qc.State.HTLCs {
+		if h.Clearing {
+			clearing = true
+		}
+	}
+
+	inProgHTLC := qc.State.InProgHTLC
 	if collision {
-		// TODO: handle collisions
+		if inProgHTLC != nil {
+			// PreimageSig-HashSig collision. Temporarily remove inprog HTLC for
+			// verifying the signature, then do a GapSigRev
+			qc.State.InProgHTLC = nil
+			qc.State.CollidingHashPreimage = true
+		} else if clearing {
+			// PreimageSig-PreimageSig collision. Probably we can just send GapSigRev
+			// And we should be OK.
+		} else {
+			// PreimageSig-DeltaSig collision. Figure out later.
+		}
 	}
 
 	if qc.State.Delta > 0 {
@@ -600,6 +641,26 @@ func (nd *LitNode) PreimageSigHandler(msg lnutil.PreimageSigMsg, qc *Qchan) erro
 	}
 	qc.State.ElkPoint = stashElk
 
+	qc.State.InProgHTLC = inProgHTLC
+
+	if qc.State.CollidingHashPreimage {
+		var kg portxo.KeyGen
+		kg.Depth = 5
+		kg.Step[0] = 44 | 1<<31
+		kg.Step[1] = qc.Coin() | 1<<31
+		kg.Step[2] = UseHTLCBase
+		kg.Step[3] = qc.State.HTLCIdx + 2 | 1<<31
+		kg.Step[4] = qc.Idx() | 1<<31
+
+		qc.State.MyNextHTLCBase = qc.State.MyN2HTLCBase
+		qc.State.MyN2HTLCBase, err = nd.GetUsePub(kg,
+			UseHTLCBase)
+
+		if err != nil {
+			return err
+		}
+	}
+
 	// (seems odd, but everything so far we still do in case of collision, so
 	// only check here.  If it's a collision, set, save, send gapSigRev
 
@@ -610,7 +671,7 @@ func (nd *LitNode) PreimageSigHandler(msg lnutil.PreimageSigMsg, qc *Qchan) erro
 		return fmt.Errorf("PreimageSigHandler SaveQchanState err %s", err.Error())
 	}
 
-	if qc.State.Collision != 0 {
+	if qc.State.Collision != 0 || qc.State.CollidingHTLC != nil || qc.State.CollidingHashPreimage || qc.State.CollidingHashDelta {
 		err = nd.SendGapSigRev(qc)
 		if err != nil {
 			return fmt.Errorf("PreimageSigHandler SendGapSigRev err %s", err.Error())
