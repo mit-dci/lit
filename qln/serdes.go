@@ -114,6 +114,26 @@ func (s *StatCom) ToBytes() ([]byte, error) {
 		return nil, err
 	}
 
+	err = binary.Write(&buf, binary.BigEndian, s.CollidingHashDelta)
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Write(&buf, binary.BigEndian, s.CollidingHashPreimage)
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Write(&buf, binary.BigEndian, s.CollidingPreimages)
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Write(&buf, binary.BigEndian, s.CollidingPreimageDelta)
+	if err != nil {
+		return nil, err
+	}
+
 	if s.InProgHTLC != nil {
 		err = binary.Write(&buf, binary.BigEndian, true)
 		if err != nil {
@@ -121,6 +141,28 @@ func (s *StatCom) ToBytes() ([]byte, error) {
 		}
 
 		HTLCBytes, err := s.InProgHTLC.Bytes()
+		if err != nil {
+			return nil, err
+		}
+
+		_, err = buf.Write(HTLCBytes)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		err = binary.Write(&buf, binary.BigEndian, false)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if s.CollidingHTLC != nil {
+		err = binary.Write(&buf, binary.BigEndian, true)
+		if err != nil {
+			return nil, err
+		}
+
+		HTLCBytes, err := s.CollidingHTLC.Bytes()
 		if err != nil {
 			return nil, err
 		}
@@ -234,6 +276,26 @@ func StatComFromBytes(b []byte) (*StatCom, error) {
 		return nil, err
 	}
 
+	err = binary.Read(buf, binary.BigEndian, &s.CollidingHashDelta)
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Read(buf, binary.BigEndian, &s.CollidingHashPreimage)
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Read(buf, binary.BigEndian, &s.CollidingPreimages)
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Read(buf, binary.BigEndian, &s.CollidingPreimageDelta)
+	if err != nil {
+		return nil, err
+	}
+
 	var inProg bool
 	err = binary.Read(buf, binary.BigEndian, &inProg)
 	if err != nil {
@@ -249,6 +311,23 @@ func StatComFromBytes(b []byte) (*StatCom, error) {
 		}
 
 		s.InProgHTLC = &h
+	}
+
+	var collidingHtlc bool
+	err = binary.Read(buf, binary.BigEndian, &collidingHtlc)
+	if err != nil {
+		return nil, err
+	}
+
+	if collidingHtlc {
+		HTLCBytes := buf.Next(251)
+
+		h, err := HTLCFromBytes(HTLCBytes)
+		if err != nil {
+			return nil, err
+		}
+
+		s.CollidingHTLC = &h
 	}
 
 	copy(s.NextHTLCBase[:], buf.Next(33))

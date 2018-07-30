@@ -701,16 +701,18 @@ type GapSigRevMsg struct {
 	Signature  [64]byte
 	Elk        chainhash.Hash
 	N2ElkPoint [33]byte
+	N2HTLCBase [33]byte
 	HTLCSigs   [][64]byte
 }
 
-func NewGapSigRev(peerid uint32, OP wire.OutPoint, SIG [64]byte, ELK chainhash.Hash, N2ELK [33]byte, HTLCSigs [][64]byte) GapSigRevMsg {
+func NewGapSigRev(peerid uint32, OP wire.OutPoint, SIG [64]byte, ELK chainhash.Hash, N2ELK [33]byte, HTLCSigs [][64]byte, N2HTLCBase [33]byte) GapSigRevMsg {
 	g := new(GapSigRevMsg)
 	g.PeerIdx = peerid
 	g.Outpoint = OP
 	g.Signature = SIG
 	g.Elk = ELK
 	g.N2ElkPoint = N2ELK
+	g.N2HTLCBase = N2HTLCBase
 	g.HTLCSigs = HTLCSigs
 	return *g
 }
@@ -732,6 +734,7 @@ func NewGapSigRevFromBytes(b []byte, peerId uint32) (GapSigRevMsg, error) {
 	elk, _ := chainhash.NewHash(buf.Next(32))
 	gs.Elk = *elk
 	copy(gs.N2ElkPoint[:], buf.Next(33))
+	copy(gs.N2HTLCBase[:], buf.Next(33))
 
 	nHTLCs := buf.Len() / 64
 	for i := 0; i < nHTLCs; i++ {
@@ -751,6 +754,7 @@ func (self GapSigRevMsg) Bytes() []byte {
 	msg = append(msg, self.Signature[:]...)
 	msg = append(msg, self.Elk[:]...)
 	msg = append(msg, self.N2ElkPoint[:]...)
+	msg = append(msg, self.N2HTLCBase[:]...)
 	for _, sig := range self.HTLCSigs {
 		msg = append(msg, sig[:]...)
 	}
