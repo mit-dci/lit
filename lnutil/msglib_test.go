@@ -420,6 +420,7 @@ func TestGapSigRevMsg(t *testing.T) {
 	var sig [64]byte
 	var elk [32]byte
 	var n2elk [33]byte
+	var n2htlc [33]byte
 	htlcsigs := make([][64]byte, 1)
 	htlcsigs[0] = [64]byte{}
 
@@ -428,11 +429,12 @@ func TestGapSigRevMsg(t *testing.T) {
 	_, _ = rand.Read(sig[:])
 	_, _ = rand.Read(elk[:])
 	_, _ = rand.Read(n2elk[:])
+	_, _ = rand.Read(n2htlc[:])
 
 	op := *OutPointFromBytes(outPoint)
 	Elk, _ := chainhash.NewHash(elk[:])
 
-	msg := NewGapSigRev(peerid, op, sig, *Elk, n2elk, htlcsigs)
+	msg := NewGapSigRev(peerid, op, sig, *Elk, n2elk, htlcsigs, n2htlc)
 	b := msg.Bytes()
 
 	msg2, err := NewGapSigRevFromBytes(b, peerid)
