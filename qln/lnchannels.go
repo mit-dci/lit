@@ -107,6 +107,7 @@ type StatCom struct {
 
 	CollidingHashDelta    bool // True when colliding between a DeltaSig and HashSig/PreImageSig
 	CollidingHashPreimage bool // True when colliding between HashSig and PreimageSig
+	CollidingPreimages    bool // True when colliding between PreimageSig and PreimageSig
 
 	// Analogous to the ElkPoints above but used for generating their pubkey for the HTLC
 	NextHTLCBase [33]byte
