@@ -754,8 +754,22 @@ func (nd *LitNode) ClaimHTLC(R [16]byte) ([][32]byte, error) {
 				nd.SetHTLCClearedOnChain(q, h)
 				txids = append(txids, tx.TxHash())
 			} else {
+				// For off-chain we need to fetch the channel from the node
+				// otherwise we're talking to a different instance of the channel
+				nd.RemoteMtx.Lock()
+				peer, ok := nd.RemoteCons[q.Peer()]
+
+				nd.RemoteMtx.Unlock()
+				if !ok {
+					return nil, fmt.Errorf("Couldn't find peer %d in RemoteCons", q.Peer())
+				}
+				qc, ok := peer.QCs[q.Idx()]
+				if !ok {
+					return nil, fmt.Errorf("Couldn't find channel %d in peer.QCs", q.Idx())
+				}
+
 				log.Printf("Cleaing HTLC from channel [%d] idx [%d]\n", q.Idx(), h.Idx)
-				nd.ClearHTLC(q, R, h.Idx, [32]byte{})
+				nd.ClearHTLC(qc, R, h.Idx, [32]byte{})
 			}
 		}
 	}
