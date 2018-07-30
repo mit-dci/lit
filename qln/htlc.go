@@ -584,6 +584,7 @@ func (nd *LitNode) PreimageSigHandler(msg lnutil.PreimageSigMsg, qc *Qchan) erro
 			qc.State.CollidingPreimages = true
 		} else {
 			// PreimageSig-DeltaSig collision. Figure out later.
+			qc.State.CollidingPreimageDelta = true
 		}
 	}
 
@@ -682,7 +683,7 @@ func (nd *LitNode) PreimageSigHandler(msg lnutil.PreimageSigMsg, qc *Qchan) erro
 		return fmt.Errorf("PreimageSigHandler SaveQchanState err %s", err.Error())
 	}
 
-	if qc.State.Collision != 0 || qc.State.CollidingHashPreimage || qc.State.CollidingPreimages {
+	if qc.State.Collision != 0 || qc.State.CollidingHashPreimage || qc.State.CollidingPreimages || qc.State.CollidingPreimageDelta {
 		err = nd.SendGapSigRev(qc)
 		if err != nil {
 			return fmt.Errorf("PreimageSigHandler SendGapSigRev err %s", err.Error())

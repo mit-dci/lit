@@ -129,6 +129,11 @@ func (s *StatCom) ToBytes() ([]byte, error) {
 		return nil, err
 	}
 
+	err = binary.Write(&buf, binary.BigEndian, s.CollidingPreimageDelta)
+	if err != nil {
+		return nil, err
+	}
+
 	if s.InProgHTLC != nil {
 		err = binary.Write(&buf, binary.BigEndian, true)
 		if err != nil {
@@ -282,6 +287,11 @@ func StatComFromBytes(b []byte) (*StatCom, error) {
 	}
 
 	err = binary.Read(buf, binary.BigEndian, &s.CollidingPreimages)
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Read(buf, binary.BigEndian, &s.CollidingPreimageDelta)
 	if err != nil {
 		return nil, err
 	}

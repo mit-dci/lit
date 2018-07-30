@@ -311,6 +311,13 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 			qc.Peer(), qc.Idx())
 	}
 
+	clearingIdxs := make([]uint32, 0)
+	for _, h := range qc.State.HTLCs {
+		if h.Clearing {
+			clearingIdxs = append(clearingIdxs, h.Idx)
+		}
+	}
+
 	inProgHTLC := qc.State.InProgHTLC
 
 	if collision {
@@ -332,6 +339,15 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 			qc.State.MyNextHTLCBase = qc.State.MyN2HTLCBase
 			qc.State.MyN2HTLCBase, err = nd.GetUsePub(kg,
 				UseHTLCBase)
+		} else if len(clearingIdxs) > 0 {
+			// Collision between DeltaSig-PreimageSig
+			// Remove the clearing state for signature verification and
+			// add back afterwards.
+			for _, idx := range clearingIdxs {
+				qh := &qc.State.HTLCs[idx]
+				qh.Clearing = false
+			}
+			qc.State.CollidingPreimageDelta = true
 		} else {
 			// Collision between DeltaSig-DeltaSig
 
@@ -417,6 +433,13 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 	}
 	qc.State.ElkPoint = stashElk
 
+	// After verification of signatures, add back the clearing state in case
+	// of PreimageSig-DeltaSig collisions
+	for _, idx := range clearingIdxs {
+		qh := &qc.State.HTLCs[idx]
+		qh.Clearing = true
+	}
+
 	qc.State.InProgHTLC = inProgHTLC
 	// (seems odd, but everything so far we still do in case of collision, so
 	// only check here.  If it's a collision, set, save, send gapSigRev
@@ -428,7 +451,7 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 		return fmt.Errorf("DeltaSigHandler SaveQchanState err %s", err.Error())
 	}
 
-	if qc.State.Collision != 0 || qc.State.CollidingHashDelta {
+	if qc.State.Collision != 0 || qc.State.CollidingHashDelta || qc.State.CollidingPreimageDelta {
 		err = nd.SendGapSigRev(qc)
 		if err != nil {
 			return fmt.Errorf("DeltaSigHandler SendGapSigRev err %s", err.Error())
@@ -550,10 +573,10 @@ func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
 	}
 
 	// check if we're supposed to get a GapSigRev now. Collision should be set
-	if q.State.Collision == 0 && q.State.CollidingHTLC == nil && !q.State.CollidingHashPreimage && !q.State.CollidingHashDelta && !q.State.CollidingPreimages {
+	if q.State.Collision == 0 && q.State.CollidingHTLC == nil && !q.State.CollidingHashPreimage && !q.State.CollidingHashDelta && !q.State.CollidingPreimageDelta && !q.State.CollidingPreimages {
 		return fmt.Errorf(
-			"chan %d got GapSigRev but collision = 0, collidingHTLC = nil, q.State.CollidingHashPreimage = %t, q.State.CollidingHashDelta = %t, qc.State.CollidingPreimages = %t, delta = %d",
-			q.Idx(), q.State.CollidingHashPreimage, q.State.CollidingHashDelta, q.State.CollidingPreimages, q.State.Delta)
+			"chan %d got GapSigRev but collision = 0, collidingHTLC = nil, q.State.CollidingHashPreimage = %t, q.State.CollidingHashDelta = %t, qc.State.CollidingPreimages = %t, qc.State.CollidingPreimageDelta = %t, delta = %d",
+			q.Idx(), q.State.CollidingHashPreimage, q.State.CollidingHashDelta, q.State.CollidingPreimages, q.State.CollidingPreimageDelta, q.State.Delta)
 	}
 
 	// stash for justice tx
@@ -891,6 +914,7 @@ func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {
 	// Clear collision state for HashSig-PreimageSig
 	qc.State.CollidingHashPreimage = false
 	qc.State.CollidingPreimages = false
+	qc.State.CollidingPreimageDelta = false
 
 	if qc.State.InProgHTLC != nil {
 		qc.State.HTLCs = append(qc.State.HTLCs, *qc.State.InProgHTLC)
