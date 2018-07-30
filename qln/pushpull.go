@@ -443,6 +443,18 @@ func (nd *LitNode) SendGapSigRev(q *Qchan) error {
 	// amt is delta (negative) plus current amt (collision already added in)
 	q.State.MyAmt += int64(q.State.Delta)
 
+	if q.State.InProgHTLC != nil {
+		if !q.State.InProgHTLC.Incoming {
+			q.State.MyAmt -= q.State.InProgHTLC.Amt
+		}
+	}
+
+	if q.State.CollidingHTLC != nil {
+		if !q.State.CollidingHTLC.Incoming {
+			q.State.MyAmt -= q.State.CollidingHTLC.Amt
+		}
+	}
+
 	// sign state n+1
 
 	// TODO: send the sigs
@@ -455,7 +467,7 @@ func (nd *LitNode) SendGapSigRev(q *Qchan) error {
 	// GapSigRev is op (36), sig (64), ElkHash (32), NextElkPoint (33)
 	// total length 165
 
-	outMsg := lnutil.NewGapSigRev(q.KeyGen.Step[3]&0x7fffffff, q.Op, sig, *elk, n2ElkPoint, HTLCSigs)
+	outMsg := lnutil.NewGapSigRev(q.KeyGen.Step[3]&0x7fffffff, q.Op, sig, *elk, n2ElkPoint, HTLCSigs, q.State.MyN2HTLCBase)
 
 	log.Printf("Sending GapSigRev: %v", outMsg)
 
@@ -512,9 +524,9 @@ func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
 	}
 
 	// check if we're supposed to get a GapSigRev now. Collision should be set
-	if q.State.Collision == 0 {
+	if q.State.Collision == 0 && q.State.CollidingHTLC == nil {
 		return fmt.Errorf(
-			"chan %d got GapSigRev but collision = 0, delta = %d",
+			"chan %d got GapSigRev but collision = 0, collidingHTLC = nil, delta = %d",
 			q.Idx(), q.State.Delta)
 	}
 
@@ -525,6 +537,18 @@ func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
 	q.State.Delta = q.State.Collision     // now delta is positive
 	q.State.Collision = 0
 
+	if q.State.InProgHTLC != nil {
+		if !q.State.InProgHTLC.Incoming {
+			q.State.MyAmt -= q.State.InProgHTLC.Amt
+		}
+	}
+
+	if q.State.CollidingHTLC != nil {
+		if !q.State.CollidingHTLC.Incoming {
+			q.State.MyAmt -= q.State.CollidingHTLC.Amt
+		}
+	}
+
 	// verify elkrem and save it in ram
 	err = q.AdvanceElkrem(&msg.Elk, msg.N2ElkPoint)
 	if err != nil {
@@ -532,7 +556,7 @@ func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
 		// ! non-recoverable error, need to close the channel here.
 	}
 
-	// go up to n+1 elkpoint for the sig verification
+	// go up to n+2 elkpoint for the sig verification
 	stashElkPoint := q.State.ElkPoint
 	q.State.ElkPoint = q.State.NextElkPoint
 
@@ -549,6 +573,32 @@ func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
 	}
 	// go back to sequential elkpoints
 	q.State.ElkPoint = stashElkPoint
+
+	for idx, h := range q.State.HTLCs {
+		if h.Clearing && !h.Cleared {
+			q.State.HTLCs[idx].Cleared = true
+		}
+	}
+
+	// If we were colliding, advance HTLCBase here.
+	if q.State.CollidingHTLC != nil {
+		q.State.NextHTLCBase = q.State.N2HTLCBase
+		q.State.N2HTLCBase = msg.N2HTLCBase
+
+		var kg portxo.KeyGen
+		kg.Depth = 5
+		kg.Step[0] = 44 | 1<<31
+		kg.Step[1] = q.Coin() | 1<<31
+		kg.Step[2] = UseHTLCBase
+		kg.Step[3] = q.State.HTLCIdx + 3 | 1<<31
+		kg.Step[4] = q.Idx() | 1<<31
+
+		q.State.MyNextHTLCBase = q.State.MyN2HTLCBase
+		q.State.MyN2HTLCBase, err = nd.GetUsePub(kg, UseHTLCBase)
+		if err != nil {
+			return err
+		}
+	}
 
 	err = nd.SaveQchanState(q)
 	if err != nil {
@@ -602,7 +652,7 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 		return nd.SendREV(qc)
 	}
 
-	if qc.State.Collision != 0 {
+	if qc.State.Collision != 0 || qc.State.CollidingHTLC != nil {
 		return fmt.Errorf("chan %d got SigRev, expect GapSigRev delta %d col %d",
 			qc.Idx(), qc.State.Delta, qc.State.Collision)
 	}
@@ -615,7 +665,15 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 	qc.State.Delta = 0
 
 	if qc.State.InProgHTLC != nil {
-		qc.State.MyAmt -= qc.State.InProgHTLC.Amt
+		if !qc.State.InProgHTLC.Incoming {
+			qc.State.MyAmt -= qc.State.InProgHTLC.Amt
+		}
+	}
+
+	if qc.State.CollidingHTLC != nil {
+		if !qc.State.CollidingHTLC.Incoming {
+			qc.State.MyAmt -= qc.State.CollidingHTLC.Amt
+		}
 	}
 
 	for _, h := range qc.State.HTLCs {
@@ -794,13 +852,22 @@ func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {
 	prevAmt := qc.State.MyAmt - int64(qc.State.Delta)
 	qc.State.Delta = 0
 
+	stateN2HTLCBase := qc.State.N2HTLCBase
+
 	if qc.State.InProgHTLC != nil {
 		qc.State.HTLCs = append(qc.State.HTLCs, *qc.State.InProgHTLC)
 		qc.State.InProgHTLC = nil
-		qc.State.NextHTLCBase = qc.State.N2HTLCBase
+		qc.State.NextHTLCBase = stateN2HTLCBase
 		qc.State.N2HTLCBase = msg.N2HTLCBase
 		qc.State.HTLCIdx++
-		log.Printf("Setting N2HTLCBase %x", qc.State.N2HTLCBase)
+	}
+
+	if qc.State.CollidingHTLC != nil {
+		qc.State.HTLCs = append(qc.State.HTLCs, *qc.State.CollidingHTLC)
+		qc.State.CollidingHTLC = nil
+		qc.State.NextHTLCBase = stateN2HTLCBase
+		qc.State.N2HTLCBase = msg.N2HTLCBase
+		qc.State.HTLCIdx++
 	}
 
 	for idx, h := range qc.State.HTLCs {

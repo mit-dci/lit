@@ -170,6 +170,8 @@ func (nd *LitNode) SignState(q *Qchan) ([64]byte, [][64]byte, error) {
 		return sig, nil, err
 	}
 
+	log.Printf("Signing state with Elk [%x] NextElk [%x] N2Elk [%x]\n", q.State.ElkPoint, q.State.NextElkPoint, q.State.N2ElkPoint)
+
 	// make hash cache for this tx
 	hCache := txscript.NewTxSigHashes(commitmentTx)
 
@@ -201,6 +203,7 @@ func (nd *LitNode) SignState(q *Qchan) ([64]byte, [][64]byte, error) {
 	for i, txout := range commitmentTx.TxOut {
 		fmt.Printf("\toutput %d: %x %d\n", i, txout.PkScript, txout.Value)
 	}
+
 	log.Printf("\tstate %d myamt: %d theiramt: %d\n", q.State.StateIdx, q.State.MyAmt, q.Value-q.State.MyAmt)
 
 	// Generate signatures for HTLC-success/failure transactions
@@ -228,8 +231,10 @@ func (nd *LitNode) SignState(q *Qchan) ([64]byte, [][64]byte, error) {
 		}
 
 		var HTLCPrivBase *btcec.PrivateKey
-		if idx >= len(q.State.HTLCs) {
+		if idx == len(q.State.HTLCs) {
 			HTLCPrivBase, err = nd.SubWallet[q.Coin()].GetPriv(q.State.InProgHTLC.KeyGen)
+		} else if idx == len(q.State.HTLCs)+1 {
+			HTLCPrivBase, err = nd.SubWallet[q.Coin()].GetPriv(q.State.CollidingHTLC.KeyGen)
 		} else {
 			HTLCPrivBase, err = nd.SubWallet[q.Coin()].GetPriv(q.State.HTLCs[idx].KeyGen)
 		}
@@ -255,8 +260,10 @@ func (nd *LitNode) SignState(q *Qchan) ([64]byte, [][64]byte, error) {
 		hc := txscript.NewTxSigHashes(spendTx)
 		var HTLCScript []byte
 
-		if idx >= len(q.State.HTLCs) {
+		if idx == len(q.State.HTLCs) {
 			HTLCScript, err = q.GenHTLCScript(*q.State.InProgHTLC, false)
+		} else if idx == len(q.State.HTLCs)+1 {
+			HTLCScript, err = q.GenHTLCScript(*q.State.CollidingHTLC, false)
 		} else {
 			HTLCScript, err = q.GenHTLCScript(q.State.HTLCs[idx], false)
 		}
@@ -312,6 +319,8 @@ func (q *Qchan) VerifySigs(sig [64]byte, HTLCSigs [][64]byte) error {
 	if err != nil {
 		return err
 	}
+
+	log.Printf("Verifying signatures with Elk [%x] NextElk [%x] N2Elk [%x]\n", q.State.ElkPoint, q.State.NextElkPoint, q.State.N2ElkPoint)
 
 	// generate fund output script preimage (ignore key order)
 	pre, _, err := lnutil.FundTxScript(q.MyPub, q.TheirPub)
@@ -390,8 +399,10 @@ func (q *Qchan) VerifySigs(sig [64]byte, HTLCSigs [][64]byte) error {
 
 		hc := txscript.NewTxSigHashes(spendTx)
 		var HTLCScript []byte
-		if idx >= len(q.State.HTLCs) {
+		if idx == len(q.State.HTLCs) {
 			HTLCScript, err = q.GenHTLCScript(*q.State.InProgHTLC, true)
+		} else if idx == len(q.State.HTLCs)+1 {
+			HTLCScript, err = q.GenHTLCScript(*q.State.CollidingHTLC, true)
 		} else {
 			HTLCScript, err = q.GenHTLCScript(q.State.HTLCs[idx], true)
 		}
@@ -414,8 +425,10 @@ func (q *Qchan) VerifySigs(sig [64]byte, HTLCSigs [][64]byte) error {
 		}
 
 		var theirHTLCPub [33]byte
-		if idx >= len(q.State.HTLCs) {
+		if idx == len(q.State.HTLCs) {
 			theirHTLCPub = lnutil.CombinePubs(q.State.InProgHTLC.TheirHTLCBase, q.State.NextElkPoint)
+		} else if idx == len(q.State.HTLCs)+1 {
+			theirHTLCPub = lnutil.CombinePubs(q.State.CollidingHTLC.TheirHTLCBase, q.State.NextElkPoint)
 		} else {
 			theirHTLCPub = lnutil.CombinePubs(q.State.HTLCs[idx].TheirHTLCBase, q.State.NextElkPoint)
 		}
@@ -439,8 +452,10 @@ func (q *Qchan) VerifySigs(sig [64]byte, HTLCSigs [][64]byte) error {
 
 	// copy HTLC-success/failure signatures
 	for i, s := range sigIndex {
-		if int(i) >= len(q.State.HTLCs) {
+		if int(i) == len(q.State.HTLCs) {
 			q.State.InProgHTLC.Sig = HTLCSigs[s]
+		} else if int(i) == len(q.State.HTLCs)+1 {
+			q.State.CollidingHTLC.Sig = HTLCSigs[s]
 		} else {
 			q.State.HTLCs[i].Sig = HTLCSigs[s]
 		}

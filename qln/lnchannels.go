@@ -101,8 +101,9 @@ type StatCom struct {
 	// only one sig is ever stored, to prevent broadcasting the wrong tx.
 	// could add a mutex here... maybe will later.
 
-	HTLCIdx    uint32
-	InProgHTLC *HTLC // Current in progress HTLC
+	HTLCIdx       uint32
+	InProgHTLC    *HTLC // Current in progress HTLC
+	CollidingHTLC *HTLC // HTLC for when the channel is colliding
 
 	// Analogous to the ElkPoints above but used for generating their pubkey for the HTLC
 	NextHTLCBase [33]byte

@@ -204,13 +204,36 @@ func (nd *LitNode) HashSigHandler(msg lnutil.HashSigMsg, qc *Qchan) error {
 			qc.Peer(), qc.Idx())
 	}
 
+	inProgHTLC := qc.State.InProgHTLC
+
+	htlcIdx := qc.State.HTLCIdx
 	if collision {
-		// TODO: handle collisions
+		// Set the Idx to the InProg one first - to allow signature
+		// verification. Correct later
+		htlcIdx = qc.State.InProgHTLC.Idx
 	}
 
-	if !collision {
-		// TODO: handle non-collision
-	}
+	incomingHTLC := new(HTLC)
+	incomingHTLC.Idx = htlcIdx
+	incomingHTLC.Incoming = true
+	incomingHTLC.Amt = int64(msg.Amt)
+	incomingHTLC.RHash = msg.RHash
+	incomingHTLC.Locktime = msg.Locktime
+	incomingHTLC.TheirHTLCBase = qc.State.NextHTLCBase
+
+	incomingHTLC.KeyGen.Depth = 5
+	incomingHTLC.KeyGen.Step[0] = 44 | 1<<31
+	incomingHTLC.KeyGen.Step[1] = qc.Coin() | 1<<31
+	incomingHTLC.KeyGen.Step[2] = UseHTLCBase
+	incomingHTLC.KeyGen.Step[3] = htlcIdx | 1<<31
+	incomingHTLC.KeyGen.Step[4] = qc.Idx() | 1<<31
+
+	incomingHTLC.MyHTLCBase, _ = nd.GetUsePub(incomingHTLC.KeyGen,
+		UseHTLCBase)
+
+	// In order to check the incoming HTLC sigs, put it as the in progress one.
+	// We'll set the record straight later.
+	qc.State.InProgHTLC = incomingHTLC
 
 	// they have to actually send you money
 	if msg.Amt < consts.MinOutput {
@@ -233,26 +256,6 @@ func (nd *LitNode) HashSigHandler(msg lnutil.HashSigMsg, qc *Qchan) error {
 	// update to the next state to verify
 	qc.State.StateIdx++
 
-	qc.State.InProgHTLC = new(HTLC)
-	qc.State.InProgHTLC.Idx = qc.State.HTLCIdx
-	qc.State.InProgHTLC.Incoming = true
-	qc.State.InProgHTLC.Amt = int64(msg.Amt)
-	qc.State.InProgHTLC.RHash = msg.RHash
-
-	// TODO: make this customisable?
-	qc.State.InProgHTLC.Locktime = msg.Locktime
-	qc.State.InProgHTLC.TheirHTLCBase = qc.State.NextHTLCBase
-
-	qc.State.InProgHTLC.KeyGen.Depth = 5
-	qc.State.InProgHTLC.KeyGen.Step[0] = 44 | 1<<31
-	qc.State.InProgHTLC.KeyGen.Step[1] = qc.Coin() | 1<<31
-	qc.State.InProgHTLC.KeyGen.Step[2] = UseHTLCBase
-	qc.State.InProgHTLC.KeyGen.Step[3] = qc.State.HTLCIdx | 1<<31
-	qc.State.InProgHTLC.KeyGen.Step[4] = qc.Idx() | 1<<31
-
-	qc.State.InProgHTLC.MyHTLCBase, _ = nd.GetUsePub(qc.State.InProgHTLC.KeyGen,
-		UseHTLCBase)
-
 	fmt.Printf("Got message %x", msg.Data)
 	qc.State.Data = msg.Data
 
@@ -269,6 +272,39 @@ func (nd *LitNode) HashSigHandler(msg lnutil.HashSigMsg, qc *Qchan) error {
 	// (seems odd, but everything so far we still do in case of collision, so
 	// only check here.  If it's a collision, set, save, send gapSigRev
 
+	// save channel with new state, new sig, and positive delta set
+	// and maybe collision; still haven't checked
+	err = nd.SaveQchanState(qc)
+	if err != nil {
+		return fmt.Errorf("HashSigHandler SaveQchanState err %s", err.Error())
+	}
+
+	// Now determine who is what place in the HTLC structure
+	if collision {
+		curIdx := qc.State.InProgHTLC.Idx
+		nextIdx := qc.State.HTLCIdx + 1
+
+		if bytes.Compare(qc.State.MyNextHTLCBase[:], qc.State.NextHTLCBase[:]) > 0 {
+			qc.State.CollidingHTLC = inProgHTLC
+			qc.State.InProgHTLC = incomingHTLC
+		} else {
+			qc.State.CollidingHTLC = incomingHTLC
+			qc.State.InProgHTLC = inProgHTLC
+		}
+		qc.State.InProgHTLC.Idx = curIdx
+		qc.State.CollidingHTLC.Idx = nextIdx
+		qc.State.CollidingHTLC.TheirHTLCBase = qc.State.N2HTLCBase
+		qc.State.CollidingHTLC.KeyGen.Depth = 5
+		qc.State.CollidingHTLC.KeyGen.Step[0] = 44 | 1<<31
+		qc.State.CollidingHTLC.KeyGen.Step[1] = qc.Coin() | 1<<31
+		qc.State.CollidingHTLC.KeyGen.Step[2] = UseHTLCBase
+		qc.State.CollidingHTLC.KeyGen.Step[3] = qc.State.CollidingHTLC.Idx | 1<<31
+		qc.State.CollidingHTLC.KeyGen.Step[4] = qc.Idx() | 1<<31
+
+		qc.State.CollidingHTLC.MyHTLCBase, _ = nd.GetUsePub(qc.State.CollidingHTLC.KeyGen,
+			UseHTLCBase)
+	}
+
 	var kg portxo.KeyGen
 	kg.Depth = 5
 	kg.Step[0] = 44 | 1<<31
@@ -278,21 +314,18 @@ func (nd *LitNode) HashSigHandler(msg lnutil.HashSigMsg, qc *Qchan) error {
 	kg.Step[4] = qc.Idx() | 1<<31
 
 	qc.State.MyNextHTLCBase = qc.State.MyN2HTLCBase
-
-	qc.State.MyN2HTLCBase, err = nd.GetUsePub(kg,
-		UseHTLCBase)
+	qc.State.MyN2HTLCBase, err = nd.GetUsePub(kg, UseHTLCBase)
 	if err != nil {
 		return err
 	}
 
-	// save channel with new state, new sig, and positive delta set
-	// and maybe collision; still haven't checked
+	// save channel with new HTLCBases
 	err = nd.SaveQchanState(qc)
 	if err != nil {
 		return fmt.Errorf("HashSigHandler SaveQchanState err %s", err.Error())
 	}
 
-	if qc.State.Collision != 0 {
+	if qc.State.Collision != 0 || qc.State.CollidingHTLC != nil {
 		err = nd.SendGapSigRev(qc)
 		if err != nil {
 			return fmt.Errorf("HashSigHandler SendGapSigRev err %s", err.Error())
@@ -809,6 +842,8 @@ func (nd *LitNode) ClaimHTLCOnChain(q *Qchan, h HTLC) (*wire.MsgTx, error) {
 		return nil, err
 	}
 	stateTxID := stateTx.TxHash()
+
+	log.Printf("Close TX ID was: %s\n", stateTxID.String())
 
 	htlcTxo, i, err := GetHTLCOut(q, h, stateTx, mine)
 

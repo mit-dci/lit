@@ -140,6 +140,10 @@ func (q *Qchan) BuildStateTxs(mine bool) (*wire.MsgTx, []*wire.MsgTx, []*wire.Tx
 		value -= s.InProgHTLC.Amt
 	}
 
+	if s.CollidingHTLC != nil {
+		value -= s.CollidingHTLC.Amt
+	}
+
 	for _, h := range s.HTLCs {
 		if !h.Cleared && !h.Clearing {
 			value -= h.Amt
@@ -213,6 +217,15 @@ func (q *Qchan) BuildStateTxs(mine bool) (*wire.MsgTx, []*wire.MsgTx, []*wire.Tx
 	// There's an HTLC in progress
 	if s.InProgHTLC != nil {
 		HTLCOut, err := q.GenHTLCOut(*s.InProgHTLC, mine)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		HTLCTxOuts = append(HTLCTxOuts, HTLCOut)
+	}
+
+	// There's an colliding HTLC in progress
+	if s.CollidingHTLC != nil {
+		HTLCOut, err := q.GenHTLCOut(*s.CollidingHTLC, mine)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -294,9 +307,12 @@ func (q *Qchan) BuildStateTxs(mine bool) (*wire.MsgTx, []*wire.MsgTx, []*wire.Tx
 		var success bool
 		var lt uint32
 
-		if j >= len(s.HTLCs) {
+		if j == len(s.HTLCs) {
 			success = s.InProgHTLC.Incoming == mine
 			lt = s.InProgHTLC.Locktime
+		} else if j == len(s.HTLCs)+1 {
+			success = s.CollidingHTLC.Incoming == mine
+			lt = s.CollidingHTLC.Locktime
 		} else {
 			success = s.HTLCs[j].Incoming == mine
 			lt = s.HTLCs[j].Locktime
