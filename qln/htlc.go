@@ -207,10 +207,17 @@ func (nd *LitNode) HashSigHandler(msg lnutil.HashSigMsg, qc *Qchan) error {
 	inProgHTLC := qc.State.InProgHTLC
 
 	htlcIdx := qc.State.HTLCIdx
+
+	// If we are colliding with another HashSig
 	if collision {
-		// Set the Idx to the InProg one first - to allow signature
-		// verification. Correct later
-		htlcIdx = qc.State.InProgHTLC.Idx
+		if qc.State.InProgHTLC != nil {
+			// Set the Idx to the InProg one first - to allow signature
+			// verification. Correct later
+			htlcIdx = qc.State.InProgHTLC.Idx
+		} else {
+			// We are colliding with DeltaSig
+			qc.State.CollidingHTLCDelta = true
+		}
 	}
 
 	incomingHTLC := new(HTLC)
@@ -279,8 +286,9 @@ func (nd *LitNode) HashSigHandler(msg lnutil.HashSigMsg, qc *Qchan) error {
 		return fmt.Errorf("HashSigHandler SaveQchanState err %s", err.Error())
 	}
 
-	// Now determine who is what place in the HTLC structure
-	if collision {
+	// If we are colliding Hashsig-Hashsig, determine who has what place in the
+	// HTLC structure
+	if collision && inProgHTLC != nil {
 		curIdx := qc.State.InProgHTLC.Idx
 		nextIdx := qc.State.HTLCIdx + 1
 
@@ -325,7 +333,7 @@ func (nd *LitNode) HashSigHandler(msg lnutil.HashSigMsg, qc *Qchan) error {
 		return fmt.Errorf("HashSigHandler SaveQchanState err %s", err.Error())
 	}
 
-	if qc.State.Collision != 0 || qc.State.CollidingHTLC != nil {
+	if qc.State.Collision != 0 || qc.State.CollidingHTLC != nil || qc.State.CollidingHTLCDelta {
 		err = nd.SendGapSigRev(qc)
 		if err != nil {
 			return fmt.Errorf("HashSigHandler SendGapSigRev err %s", err.Error())
@@ -842,8 +850,6 @@ func (nd *LitNode) ClaimHTLCOnChain(q *Qchan, h HTLC) (*wire.MsgTx, error) {
 		return nil, err
 	}
 	stateTxID := stateTx.TxHash()
-
-	log.Printf("Close TX ID was: %s\n", stateTxID.String())
 
 	htlcTxo, i, err := GetHTLCOut(q, h, stateTx, mine)
 

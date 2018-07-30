@@ -1,6 +1,7 @@
 package qln
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"log"
@@ -310,13 +311,36 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 			qc.Peer(), qc.Idx())
 	}
 
-	if collision {
-		// incoming delta saved as collision value,
-		// existing (negative) delta value retained.
-		qc.State.Collision = int32(incomingDelta)
-		log.Printf("delta sig COLLISION (%d)\n", qc.State.Collision)
-	}
+	inProgHTLC := qc.State.InProgHTLC
 
+	if collision {
+		if qc.State.InProgHTLC != nil {
+			// Collision between DeltaSig-HashSig
+			// Remove the in prog HTLC for checking signatures,
+			// add it back later to send gapsigrev
+			qc.State.InProgHTLC = nil
+			qc.State.CollidingHTLCDelta = true
+
+			var kg portxo.KeyGen
+			kg.Depth = 5
+			kg.Step[0] = 44 | 1<<31
+			kg.Step[1] = qc.Coin() | 1<<31
+			kg.Step[2] = UseHTLCBase
+			kg.Step[3] = qc.State.HTLCIdx + 2 | 1<<31
+			kg.Step[4] = qc.Idx() | 1<<31
+
+			qc.State.MyNextHTLCBase = qc.State.MyN2HTLCBase
+			qc.State.MyN2HTLCBase, err = nd.GetUsePub(kg,
+				UseHTLCBase)
+		} else {
+			// Collision between DeltaSig-DeltaSig
+
+			// incoming delta saved as collision value,
+			// existing (negative) delta value retained.
+			qc.State.Collision = int32(incomingDelta)
+			log.Printf("delta sig COLLISION (%d)\n", qc.State.Collision)
+		}
+	}
 	// detect if channel is already locked, and lock if not
 	//	nd.PushClearMutex.Lock()
 	//	if nd.PushClear[qc.Idx()] == nil {
@@ -339,7 +363,8 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 		return nd.SendREV(qc)
 	}
 
-	if !collision {
+	// If we collide with an HTLC operation, we can use the incoming Delta also.
+	if !collision || qc.State.InProgHTLC != nil {
 		// no collision, incoming (positive) delta saved.
 		qc.State.Delta = int32(incomingDelta)
 	}
@@ -392,6 +417,7 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 	}
 	qc.State.ElkPoint = stashElk
 
+	qc.State.InProgHTLC = inProgHTLC
 	// (seems odd, but everything so far we still do in case of collision, so
 	// only check here.  If it's a collision, set, save, send gapSigRev
 
@@ -402,7 +428,7 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 		return fmt.Errorf("DeltaSigHandler SaveQchanState err %s", err.Error())
 	}
 
-	if qc.State.Collision != 0 {
+	if qc.State.Collision != 0 || qc.State.CollidingHTLCDelta {
 		err = nd.SendGapSigRev(qc)
 		if err != nil {
 			return fmt.Errorf("DeltaSigHandler SendGapSigRev err %s", err.Error())
@@ -524,7 +550,7 @@ func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
 	}
 
 	// check if we're supposed to get a GapSigRev now. Collision should be set
-	if q.State.Collision == 0 && q.State.CollidingHTLC == nil {
+	if q.State.Collision == 0 && q.State.CollidingHTLC == nil && !q.State.CollidingHTLCDelta {
 		return fmt.Errorf(
 			"chan %d got GapSigRev but collision = 0, collidingHTLC = nil, delta = %d",
 			q.Idx(), q.State.Delta)
@@ -580,11 +606,13 @@ func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
 		}
 	}
 
-	// If we were colliding, advance HTLCBase here.
-	if q.State.CollidingHTLC != nil {
+	if !bytes.Equal(msg.N2HTLCBase[:], q.State.N2HTLCBase[:]) {
 		q.State.NextHTLCBase = q.State.N2HTLCBase
 		q.State.N2HTLCBase = msg.N2HTLCBase
+	}
 
+	// If we were colliding, advance HTLCBase here.
+	if q.State.CollidingHTLC != nil {
 		var kg portxo.KeyGen
 		kg.Depth = 5
 		kg.Step[0] = 44 | 1<<31
@@ -719,12 +747,7 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 	// that and try to close with the incremented amount, why not.
 	// TODO Implement that later though.
 
-	if qc.State.InProgHTLC != nil {
-		qc.State.HTLCs = append(qc.State.HTLCs, *qc.State.InProgHTLC)
-		qc.State.InProgHTLC = nil
-		qc.State.NextHTLCBase = qc.State.N2HTLCBase
-		qc.State.N2HTLCBase = msg.N2HTLCBase
-
+	if qc.State.InProgHTLC != nil || qc.State.CollidingHTLCDelta {
 		var kg portxo.KeyGen
 		kg.Depth = 5
 		kg.Step[0] = 44 | 1<<31
@@ -734,12 +757,19 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 		kg.Step[4] = qc.Idx() | 1<<31
 
 		qc.State.MyNextHTLCBase = qc.State.MyN2HTLCBase
-
 		qc.State.MyN2HTLCBase, err = nd.GetUsePub(kg,
 			UseHTLCBase)
+
 		if err != nil {
 			return err
 		}
+	}
+
+	if qc.State.InProgHTLC != nil {
+		qc.State.HTLCs = append(qc.State.HTLCs, *qc.State.InProgHTLC)
+		qc.State.InProgHTLC = nil
+		qc.State.NextHTLCBase = qc.State.N2HTLCBase
+		qc.State.N2HTLCBase = msg.N2HTLCBase
 
 		qc.State.HTLCIdx++
 	}
@@ -852,21 +882,22 @@ func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {
 	prevAmt := qc.State.MyAmt - int64(qc.State.Delta)
 	qc.State.Delta = 0
 
-	stateN2HTLCBase := qc.State.N2HTLCBase
+	if !bytes.Equal(msg.N2HTLCBase[:], qc.State.N2HTLCBase[:]) {
+		qc.State.NextHTLCBase = qc.State.N2HTLCBase
+		qc.State.N2HTLCBase = msg.N2HTLCBase
+	}
+	// Clear collision state for HashSig-DeltaSig
+	qc.State.CollidingHTLCDelta = false
 
 	if qc.State.InProgHTLC != nil {
 		qc.State.HTLCs = append(qc.State.HTLCs, *qc.State.InProgHTLC)
 		qc.State.InProgHTLC = nil
-		qc.State.NextHTLCBase = stateN2HTLCBase
-		qc.State.N2HTLCBase = msg.N2HTLCBase
 		qc.State.HTLCIdx++
 	}
 
 	if qc.State.CollidingHTLC != nil {
 		qc.State.HTLCs = append(qc.State.HTLCs, *qc.State.CollidingHTLC)
 		qc.State.CollidingHTLC = nil
-		qc.State.NextHTLCBase = stateN2HTLCBase
-		qc.State.N2HTLCBase = msg.N2HTLCBase
 		qc.State.HTLCIdx++
 	}
 
