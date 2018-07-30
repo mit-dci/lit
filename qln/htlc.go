@@ -618,6 +618,17 @@ func (nd *LitNode) PreimageSigHandler(msg lnutil.PreimageSigMsg, qc *Qchan) erro
 		if qc.State.HTLCs[msg.Idx].RHash != RHash {
 			return fmt.Errorf("Preimage does not hash to expected value. Expected %x got %x", qc.State.HTLCs[msg.Idx].RHash, RHash)
 		}
+
+		go func() {
+			txids, err := nd.ClaimHTLC(msg.R)
+			if err != nil {
+				log.Printf("error claiming HTLCs: %s", err.Error())
+			}
+
+			for _, id := range txids {
+				log.Printf("claimed HTLC with txid: %x", id)
+			}
+		}()
 	}
 
 	// update to the next state to verify
