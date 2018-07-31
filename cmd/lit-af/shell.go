@@ -108,6 +108,21 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		return parseErr(err, "push")
 	}
 
+	if cmd == "add" {
+		err = lc.AddHTLC(args)
+		return parseErr(err, "add")
+	}
+
+	if cmd == "clear" {
+		err = lc.ClearHTLC(args)
+		return parseErr(err, "clear")
+	}
+
+	if cmd == "claim" {
+		err = lc.ClaimHTLC(args)
+		return parseErr(err, "claim")
+	}
+
 	if cmd == "con" { // connect to lnd host
 		err = lc.Connect(args)
 		return parseErr(err, "con")
@@ -275,7 +290,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	}
 
 	for _, c := range openChannels {
-		if c.Height == -1 {
+		if c.Height <= 0 {
 			c := color.New(color.FgGreen).Add(color.Underline)
 			c.Printf("Unconfirmed:")
 			fmt.Fprintf(color.Output, lnutil.Green("  "))
@@ -398,7 +413,7 @@ func printHelp(commands []*Command) {
 func printCointypes() {
 	for k, v := range coinparam.RegisteredNets {
 		fmt.Fprintf(color.Output, "CoinType: %s\n", strconv.Itoa(int(k)))
-		fmt.Fprintf(color.Output, "└────── Name: %-13sBech32Prefix: %s\n\n", v.Name + ",", v.Bech32Prefix)
+		fmt.Fprintf(color.Output, "└────── Name: %-13sBech32Prefix: %s\n\n", v.Name+",", v.Bech32Prefix)
 	}
 }
 
@@ -406,7 +421,7 @@ func (lc *litAfClient) Help(textArgs []string) error {
 	if len(textArgs) == 0 {
 
 		fmt.Fprintf(color.Output, lnutil.Header("Commands:\n"))
-		listofCommands := []*Command{helpCommand, sayCommand, lsCommand, addressCommand, sendCommand, fanCommand, sweepCommand, lisCommand, conCommand, dlcCommand, fundCommand, dualFundCommand, watchCommand, pushCommand, closeCommand, breakCommand, historyCommand, offCommand, exitCommand}
+		listofCommands := []*Command{helpCommand, sayCommand, lsCommand, addressCommand, sendCommand, fanCommand, sweepCommand, lisCommand, conCommand, dlcCommand, fundCommand, dualFundCommand, watchCommand, pushCommand, closeCommand, breakCommand, addHTLCCommand, clearHTLCCommand, historyCommand, offCommand, exitCommand}
 		printHelp(listofCommands)
 		fmt.Fprintf(color.Output, "\n\n")
 		fmt.Fprintf(color.Output, lnutil.Header("Coins:\n"))

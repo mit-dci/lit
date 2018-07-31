@@ -34,12 +34,10 @@ type nodeinfo struct {
 }
 
 func Announce(priv *btcec.PrivateKey, litport string, litadr string, trackerURL string) error {
-	timeout := time.Duration(10 * time.Second)
-	client := http.Client{
-		Timeout: timeout, //sometimes timeouts, so its better to have a timeout
+	client := &http.Client{
+		Timeout: time.Second * 4, // 4+4 to accomodate the 10s RPC timeout
 	}
-	resp, err := client.Get("http://ipv4.myexternalip.com/raw")
-
+	resp, err := client.Get("https://ipv4.myexternalip.com/raw")
 	if err != nil {
 		return err
 	}
@@ -60,16 +58,13 @@ func Announce(priv *btcec.PrivateKey, litport string, litadr string, trackerURL 
 		log.Printf("%v", err)
 	} else {
 		defer resp.Body.Close()
-
 		buf = new(bytes.Buffer)
 		buf.ReadFrom(resp.Body)
 		liturlIPv6 = strings.TrimSpace(buf.String()) + litport
 	}
 
 	urlBytes := []byte(liturlIPv4 + liturlIPv6)
-
 	urlHash := sha256.Sum256(urlBytes)
-
 	urlSig, err := priv.Sign(urlHash[:])
 	if err != nil {
 		return err

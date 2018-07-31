@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/mit-dci/lit/bech32"
 	"github.com/awalterschulze/gographviz"
+	"github.com/mit-dci/lit/bech32"
 	"github.com/mit-dci/lit/crypto/fastsha256"
 	"github.com/mit-dci/lit/lnutil"
 )
@@ -168,7 +168,10 @@ func (nd *LitNode) LinkMsgHandler(msg lnutil.LinkMsg) {
 	for peerIdx, _ := range nd.RemoteCons {
 		if peerIdx != origIdx {
 			msg.PeerIdx = peerIdx
-			nd.OmniOut <- msg
+
+			go func(msg lnutil.LinkMsg) {
+				nd.OmniOut <- msg
+			}(msg)
 		}
 	}
 }

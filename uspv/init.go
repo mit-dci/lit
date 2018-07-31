@@ -183,7 +183,7 @@ func (s *SPVCon) Handshake(listOfNodes []string) error {
 
 // Connect dials out and connects to full nodes. Calls GetListOfNodes to get the
 // list of nodes if the user has specified a YupString. Else, moves on to dial
-// the node to see if its up and establishes a conneciton followed by Handshake()
+// the node to see if its up and establishes a connection followed by Handshake()
 // which sends out wire messages, checks for version string to prevent spam, etc.
 func (s *SPVCon) Connect(remoteNode string) error {
 	var err error
