@@ -28,6 +28,8 @@ const (
 	ContractStatusActive       DlcContractStatus = 6
 	ContractStatusSettling     DlcContractStatus = 7
 	ContractStatusClosed       DlcContractStatus = 8
+	ContractStatusError        DlcContractStatus = 9
+	ContractStatusAccepting    DlcContractStatus = 10
 )
 
 // scalarSize is the size of an encoded big endian scalar.

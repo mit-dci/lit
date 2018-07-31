@@ -14,9 +14,9 @@ import (
 	"time"
 
 	"github.com/mit-dci/lit/bech32"
-	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/wire"
 	"golang.org/x/net/proxy"
 )
 
@@ -193,6 +193,18 @@ func (a *APILink) RegisterOutPoint(op wire.OutPoint) error {
 
 	a.dirtyChan <- nil
 	log.Printf("Register %s complete\n", op.String())
+	return nil
+}
+
+// UnregisterOutPoint stops watching an outpoint for spends.
+func (a *APILink) UnregisterOutPoint(op wire.OutPoint) error {
+	log.Printf("unregister %s\n", op.String())
+	a.TrackingOPsMtx.Lock()
+	delete(a.TrackingOPs, op)
+	a.TrackingOPsMtx.Unlock()
+
+	a.dirtyChan <- nil
+	log.Printf("Unregister %s complete\n", op.String())
 	return nil
 }
 

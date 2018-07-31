@@ -879,13 +879,13 @@ func (lc *litAfClient) dlcContractRespond(textArgs []string, aor bool) error {
 
 	args.CIdx = cIdx
 
-	err = lc.Call("LitRPC.DeclineContract", args, reply)
+	err = lc.Call("LitRPC.ContractRespond", args, reply)
 	if err != nil {
 		return err
 	}
 
 	if aor {
-		fmt.Fprint(color.Output, "Offer accepted successfully\n")
+		fmt.Fprintf(color.Output, "Offer acceptance initiated. Use [dlc contract view %d] to see the status.\n", cIdx)
 	} else {
 		fmt.Fprint(color.Output, "Offer declined successfully\n")
 	}
@@ -985,8 +985,14 @@ func PrintContract(c *lnutil.DlcContract) {
 		status = "Sent offer, awaiting reply"
 	case lnutil.ContractStatusOfferedToMe:
 		status = "Received offer, awaiting reply"
+	case lnutil.ContractStatusAccepting:
+		status = "Accepting"
 	case lnutil.ContractStatusAccepted:
 		status = "Accepted"
+	case lnutil.ContractStatusAcknowledged:
+		status = "Acknowledged"
+	case lnutil.ContractStatusError:
+		status = "Error"
 	case lnutil.ContractStatusDeclined:
 		status = "Declined"
 	}

@@ -6,15 +6,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mit-dci/lit/btcutil/btcec"
-	"github.com/mit-dci/lit/wire"
-	"github.com/mit-dci/lit/btcutil"
 	"github.com/boltdb/bolt"
+	"github.com/mit-dci/lit/btcutil"
+	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/watchtower"
+	"github.com/mit-dci/lit/wire"
 )
 
 /*
@@ -106,8 +106,8 @@ type LitNode struct {
 	DefaultCoin uint32
 
 	ConnectedCoinTypes map[uint32]bool
-	RemoteCons map[uint32]*RemotePeer
-	RemoteMtx  sync.Mutex
+	RemoteCons         map[uint32]*RemotePeer
+	RemoteMtx          sync.Mutex
 
 	// WatchCon is currently just for the watchtower
 	WatchCon *lndc.LNDConn // merge these later
@@ -141,7 +141,7 @@ type LitNode struct {
 
 	// Contains the URL string to connect to a SOCKS5 proxy, if provided
 	ProxyURL string
-	Nat string
+	Nat      string
 }
 
 type RemotePeer struct {
@@ -182,6 +182,8 @@ type InFlightDualFund struct {
 	OurChangeAddress, TheirChangeAddress    [20]byte
 	OurPub, OurRefundPub, OurHAKDBase       [33]byte
 	TheirPub, TheirRefundPub, TheirHAKDBase [33]byte
+	OurNextHTLCBase, OurN2HTLCBase          [33]byte
+	TheirNextHTLCBase, TheirN2HTLCBase      [33]byte
 	OurSignatures, TheirSignatures          [][60]byte
 	InitiatedByUs                           bool
 	OutPoint                                *wire.OutPoint
@@ -211,6 +213,10 @@ func (inff *InFlightDualFund) Clear() {
 	inff.TheirPub = [33]byte{}
 	inff.TheirRefundPub = [33]byte{}
 	inff.TheirHAKDBase = [33]byte{}
+	inff.OurNextHTLCBase = [33]byte{}
+	inff.OurN2HTLCBase = [33]byte{}
+	inff.TheirNextHTLCBase = [33]byte{}
+	inff.TheirN2HTLCBase = [33]byte{}
 
 	inff.OurSignatures = nil
 	inff.TheirSignatures = nil
@@ -228,7 +234,7 @@ func (nd *LitNode) GetPubHostFromPeerIdx(idx uint32) ([33]byte, string) {
 			return nil
 		}
 		pubBytes := mp.Get(lnutil.U32tB(idx))
-		if pubBytes != nil {
+		if pubBytes != nil && len(pubBytes) > 0 {
 			copy(pub[:], pubBytes)
 		}
 		peerBkt := btx.Bucket(BKTPeers)
@@ -507,10 +513,12 @@ func (nd *LitNode) RestoreQchanFromBucket(bkt *bolt.Bucket) (*Qchan, error) {
 	// load the serialized channel base description
 	qc, err := QchanFromBytes(bkt.Get(KEYutxo))
 	if err != nil {
+		log.Printf("Error decoding Qchan: %s", err.Error())
 		return nil, err
 	}
 	qc.CloseData, err = QCloseFromBytes(bkt.Get(KEYqclose))
 	if err != nil {
+		log.Printf("Error decoding QClose: %s", err.Error())
 		return nil, err
 	}
 
@@ -534,6 +542,7 @@ func (nd *LitNode) RestoreQchanFromBucket(bkt *bolt.Bucket) (*Qchan, error) {
 	if stBytes != nil {
 		qc.State, err = StatComFromBytes(stBytes)
 		if err != nil {
+			log.Printf("Error loading StatCom: %s", err.Error())
 			return nil, err
 		}
 	}
