@@ -7,6 +7,7 @@ import (
 
 	"github.com/adiabat/bech32"
 	"github.com/btcsuite/fastsha256"
+	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
 )
 
@@ -70,6 +71,26 @@ func (nd *LitNode) MultihopPaymentAckHandler(msg lnutil.MultihopPaymentAckMsg) e
 			firstHop := mh.Path[1]
 			firstHopIdx, _ := nd.FindPeerIndexByAddress(bech32.Encode("ln", firstHop[:]))
 
+			nd.RemoteMtx.Lock()
+			var qc *Qchan
+			for _, ch := range nd.RemoteCons[firstHopIdx].QCs {
+				// TODO: should specify the exact channel on the route, not just the peer
+				if ch.Coin() == 1 && ch.State.MyAmt-consts.MinOutput > mh.Amt && !ch.CloseData.Closed {
+					qc = ch
+					break
+				}
+			}
+
+			if qc == nil {
+				return fmt.Errorf("could not find suitable channel to route payment")
+			}
+
+			nd.RemoteMtx.Unlock()
+			err := nd.OfferHTLC(qc, uint32(mh.Amt), mh.HHash, 100, [32]byte{})
+			if err != nil {
+				return err
+			}
+
 			var data [32]byte
 			outMsg := lnutil.NewMultihopPaymentSetupMsg(firstHopIdx, mh.Amt, msg.HHash, mh.Path, data)
 			fmt.Printf("Sending multihoppaymentsetup to peer %d\n", firstHopIdx)
@@ -89,6 +110,11 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 			// We already know this. If we have a Preimage, then we're the receiving
 			// end and we should send a settlement message to the
 			// predecessor
+			_, err := nd.ClaimHTLC(mh.PreImage)
+			if err != nil {
+				return err
+			}
+
 			outMsg := lnutil.NewMultihopPaymentSettleMsg(msg.Peer(), mh.PreImage)
 			nd.OmniOut <- outMsg
 			return nil
@@ -114,6 +140,27 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 	}
 
 	sendToIdx, _ := nd.FindPeerIndexByAddress(bech32.Encode("ln", sendToPkh[:]))
+
+	nd.RemoteMtx.Lock()
+	var qc *Qchan
+	for _, ch := range nd.RemoteCons[sendToIdx].QCs {
+		// TODO: should specify the exact channel on the route, not just the peer
+		if ch.Coin() == 1 && ch.State.MyAmt-consts.MinOutput > msg.Amount && !ch.CloseData.Closed {
+			qc = ch
+			break
+		}
+	}
+
+	if qc == nil {
+		return fmt.Errorf("could not find suitable channel to route payment")
+	}
+
+	nd.RemoteMtx.Unlock()
+	err := nd.OfferHTLC(qc, uint32(msg.Amount), msg.HHash, 100, [32]byte{})
+	if err != nil {
+		return err
+	}
+
 	msg.PeerIdx = sendToIdx
 	nd.OmniOut <- msg
 	return nil
