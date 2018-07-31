@@ -114,13 +114,16 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 			// We already know this. If we have a Preimage, then we're the receiving
 			// end and we should send a settlement message to the
 			// predecessor
-			_, err := nd.ClaimHTLC(mh.PreImage)
-			if err != nil {
-				return err
-			}
+			go func() {
+				_, err := nd.ClaimHTLC(mh.PreImage)
+				if err != nil {
+					log.Printf("error claiming HTLC: %s", err.Error())
+				}
 
-			outMsg := lnutil.NewMultihopPaymentSettleMsg(msg.Peer(), mh.PreImage)
-			nd.OmniOut <- outMsg
+				outMsg := lnutil.NewMultihopPaymentSettleMsg(msg.Peer(), mh.PreImage)
+				nd.OmniOut <- outMsg
+			}()
+
 			return nil
 		}
 	}
