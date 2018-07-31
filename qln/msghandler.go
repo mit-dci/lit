@@ -64,6 +64,14 @@ func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) er
 	case 0xA0: // Dual Funding messages
 		return nd.DualFundingHandler(msg, peer)
 
+	case 0xC0: // On-chain payment messages
+		if msg.MsgType() == lnutil.MSGID_ONCHAIN_PAYMENT_REQ {
+			nd.OnChainPaymentRequestMsgHandler(msg.(lnutil.OnChainPaymentRequestMsg), peer)
+		}
+		if msg.MsgType() == lnutil.MSGID_ONCHAIN_PAYMENT_REPLY {
+			nd.OnChainPaymentReplyMsgHandler(msg.(lnutil.OnChainPaymentReplyMsg), peer)
+		}
+
 	case 0x90: // Discreet log contract messages
 		if msg.MsgType() == lnutil.MSGID_DLC_OFFER {
 			nd.DlcOfferHandler(msg.(lnutil.DlcOfferMsg), peer)

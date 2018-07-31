@@ -64,6 +64,8 @@ const (
 	MSGID_DUALFUNDINGDECL    = 0xA2 // Declines the funding request
 	MSGID_DUALFUNDINGCHANACK = 0xA3 // Acknowledges channel and sends along signatures for funding
 
+	MSGID_ONCHAIN_PAYMENT_REQ   = 0xC0 // Requests an on-chain address from the remote node to send money if a channel is unavailable
+	MSGID_ONCHAIN_PAYMENT_REPLY = 0xC1 // Response containing an on-chain address to use
 )
 
 //interface that all messages follow, for easy use
@@ -159,6 +161,11 @@ func LitMsgFromBytes(b []byte, peerid uint32) (LitMsg, error) {
 		return NewDlcContractFundingSigsMsgFromBytes(b, peerid)
 	case MSGID_DLC_SIGPROOF:
 		return NewDlcContractSigProofMsgFromBytes(b, peerid)
+
+	case MSGID_ONCHAIN_PAYMENT_REQ:
+		return NewOnChainPaymentRequestMsgFromBytes(b, peerid)
+	case MSGID_ONCHAIN_PAYMENT_REPLY:
+		return NewOnChainPaymentReplyMsgFromBytes(b, peerid)
 
 	default:
 		return nil, fmt.Errorf("Unknown message of type %d ", msgType)
@@ -1976,4 +1983,119 @@ func (msg DlcContractSigProofMsg) Peer() uint32 {
 // MsgType returns the type of this message
 func (msg DlcContractSigProofMsg) MsgType() uint8 {
 	return MSGID_DLC_SIGPROOF
+}
+
+type OnChainPaymentRequestMsg struct {
+	// The index of the peer we're communicating with
+	PeerIdx uint32
+	// The coin we need an address for
+	CoinType uint32
+	// The data for the payment
+	Data [32]byte
+}
+
+func NewOnChainPaymentRequestMsg(peerIdx, coinType uint32, data [32]byte) OnChainPaymentRequestMsg {
+
+	msg := new(OnChainPaymentRequestMsg)
+	msg.PeerIdx = peerIdx
+	msg.CoinType = coinType
+	msg.Data = data
+	return *msg
+}
+
+func NewOnChainPaymentRequestMsgFromBytes(b []byte,
+	peerIdx uint32) (OnChainPaymentRequestMsg, error) {
+
+	msg := new(OnChainPaymentRequestMsg)
+	msg.PeerIdx = peerIdx
+
+	// TODO
+	if len(b) < 34 {
+		return *msg, fmt.Errorf("OnChainPaymentRequestMsg %d bytes, expect"+
+			" at least 34", len(b))
+	}
+
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
+	coinType, _ := wire.ReadVarInt(buf, 0)
+	msg.CoinType = uint32(coinType)
+	copy(msg.Data[:], buf.Next(32))
+
+	return *msg, nil
+}
+
+// Bytes serializes a OnChainPaymentRequestMsg into a byte array
+func (msg OnChainPaymentRequestMsg) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.WriteByte(msg.MsgType())
+	wire.WriteVarInt(&buf, 0, uint64(msg.CoinType))
+	buf.Write(msg.Data[:])
+	return buf.Bytes()
+}
+
+// Peer returns the peer index this message was received from/sent to
+func (msg OnChainPaymentRequestMsg) Peer() uint32 {
+	return msg.PeerIdx
+}
+
+// MsgType returns the type of this message
+func (msg OnChainPaymentRequestMsg) MsgType() uint8 {
+	return MSGID_ONCHAIN_PAYMENT_REQ
+}
+
+type OnChainPaymentReplyMsg struct {
+	// The index of the peer we're communicating with
+	PeerIdx uint32
+	// The data for the payment
+	Data [32]byte
+	// The address the on-chain funds should go to
+	PKH [20]byte
+}
+
+func NewOnChainPaymentReplyMsg(peerIdx uint32, data [32]byte, pkh [20]byte) OnChainPaymentReplyMsg {
+
+	msg := new(OnChainPaymentReplyMsg)
+	msg.PeerIdx = peerIdx
+	msg.Data = data
+	msg.PKH = pkh
+	return *msg
+}
+
+func NewOnChainPaymentReplyMsgFromBytes(b []byte,
+	peerIdx uint32) (OnChainPaymentReplyMsg, error) {
+
+	msg := new(OnChainPaymentReplyMsg)
+	msg.PeerIdx = peerIdx
+
+	// TODO
+	if len(b) < 53 {
+		return *msg, fmt.Errorf("OnChainPaymentReplyMsg %d bytes, expect"+
+			" at least 34", len(b))
+	}
+
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
+	copy(msg.Data[:], buf.Next(32))
+	copy(msg.PKH[:], buf.Next(20))
+
+	return *msg, nil
+}
+
+// Bytes serializes a OnChainPaymentReplyMsg into a byte array
+func (msg OnChainPaymentReplyMsg) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.WriteByte(msg.MsgType())
+	buf.Write(msg.Data[:])
+	buf.Write(msg.PKH[:])
+	return buf.Bytes()
+}
+
+// Peer returns the peer index this message was received from/sent to
+func (msg OnChainPaymentReplyMsg) Peer() uint32 {
+	return msg.PeerIdx
+}
+
+// MsgType returns the type of this message
+func (msg OnChainPaymentReplyMsg) MsgType() uint8 {
+	return MSGID_ONCHAIN_PAYMENT_REPLY
 }

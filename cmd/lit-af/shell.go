@@ -87,6 +87,12 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		return parseErr(err, "send")
 	}
 
+	// pay a lit address either on or off chain
+	if cmd == "pay" {
+		err = lc.Pay(args)
+		return parseErr(err, "pay")
+	}
+
 	if cmd == "lis" { // listen for lnd peers
 		err = lc.Lis(args)
 		return parseErr(err, "lis")

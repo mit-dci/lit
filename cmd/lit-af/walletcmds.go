@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strconv"
 
@@ -38,6 +39,13 @@ var sweepCommand = &Command{
 	Description: "Move UTXOs with many 1-in-1-out txs.\n",
 	// TODO: Make this more clear.
 	ShortDescription: "Move UTXOs with many 1-in-1-out txs.\n",
+}
+
+var payCommand = &Command{
+	Format: fmt.Sprintf(
+		"%s%s%s\n", lnutil.White("pay"), lnutil.ReqColor("lnaddress", "coinType", "amount"), lnutil.OptColor("data")),
+	Description:      "Pay the given amount of satoshis of the specified cointype to the given LN address.\n",
+	ShortDescription: "Pay the given amount of satoshis of the specified cointype to the given LN address. Will try to use an open channel with the given peer, or otherwise fall back to an on-chain payment.\n",
 }
 
 // Send sends coins somewhere
@@ -277,4 +285,48 @@ func (lc *litAfClient) Address(textArgs []string) error {
 		lnutil.Address(reply.WitAddresses), lnutil.Address(reply.LegacyAddresses))
 	return nil
 
+}
+
+// Send sends coins somewhere
+func (lc *litAfClient) Pay(textArgs []string) error {
+	stopEx, err := CheckHelpCommand(payCommand, textArgs, 2)
+	if err != nil || stopEx {
+		return err
+	}
+
+	args := new(litrpc.PayArgs)
+	reply := new(litrpc.PayReply)
+
+	coin, err := strconv.Atoi(textArgs[1])
+	if err != nil {
+		return err
+	}
+
+	amt, err := strconv.Atoi(textArgs[2])
+	if err != nil {
+		return err
+	}
+
+	args.Amt = int64(amt)
+	args.CoinType = uint32(coin)
+	if len(textArgs) > 3 {
+		data, err := hex.DecodeString(textArgs[3])
+		if err != nil {
+			return err
+		}
+		copy(args.Data[:], data)
+	}
+	args.DestAddr = textArgs[0]
+
+	err = lc.Call("LitRPC.Pay", args, reply)
+	if err != nil {
+		return err
+	}
+
+	if reply.OnChain {
+		fmt.Printf("Initiated an on-chain payment to %s for %d satoshi of coin %d\n", args.DestAddr, args.Amt, args.CoinType)
+	} else {
+		fmt.Printf("Pushed an off-chain payment to %s for %d satoshi of coin %d\n", args.DestAddr, args.Amt, args.CoinType)
+	}
+	return nil
 }

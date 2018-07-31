@@ -123,6 +123,7 @@ type LitNode struct {
 	// the current channel in process of being dual funded
 	InProgDual *InFlightDualFund
 
+	InFlightSends []*InFlightSend
 	// Nodes don't have Params; their SubWallets do
 	// Param *chaincfg.Params // network parameters (testnet3, segnet, etc)
 
@@ -150,6 +151,13 @@ type RemotePeer struct {
 	Con      *lndc.LNDConn
 	QCs      map[uint32]*Qchan   // keep map of all peer's channels in ram
 	OpMap    map[[36]byte]uint32 // quick lookup for channels
+}
+
+// InFlightSend is a send transaction that is waiting for an on-chain address
+type InFlightSend struct {
+	PeerIdx, CoinType uint32
+	Amt               int64
+	Data              [32]byte
 }
 
 // InFlightFund is a funding transaction that has not yet been broadcast
@@ -253,6 +261,21 @@ func (nd *LitNode) GetPubHostFromPeerIdx(idx uint32) ([33]byte, string) {
 		log.Printf(err.Error())
 	}
 	return pub, host
+}
+
+func (nd *LitNode) GetPeerIdxFromAdr(lnAdr string) uint32 {
+	peerIdx := uint32(0)
+	nd.RemoteMtx.Lock()
+	var pubKey [33]byte
+	for _, c := range nd.RemoteCons {
+		copy(pubKey[:], c.Con.RemotePub.SerializeCompressed())
+		adr := lnutil.LitAdrFromPubkey(pubKey)
+		if adr == lnAdr {
+			peerIdx = c.Idx
+		}
+	}
+	nd.RemoteMtx.Unlock()
+	return peerIdx
 }
 
 // GetNicknameFromPeerIdx gets the nickname for a peer
