@@ -3,9 +3,10 @@ package qln
 import (
 	"fmt"
 	"log"
+	"net"
+	"strings"
 	"strconv"
 	"time"
-
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
@@ -22,7 +23,6 @@ func (nd *LitNode) GetLisAddressAndPorts() (
 	copy(idPub[:], idPriv.PubKey().SerializeCompressed())
 
 	lisAdr := lnutil.LitAdrFromPubkey(idPub)
-
 	nd.RemoteMtx.Lock()
 	ports := nd.LisIpPorts
 	nd.RemoteMtx.Unlock()
@@ -93,16 +93,16 @@ func (nd *LitNode) TCPListener(
 				log.Printf("Listener error: %s\n", err.Error())
 				continue
 			}
-			newConn, ok := netConn.(*lndc.LNDConn)
+			newConn, ok := netConn.(*lndc.Conn)
 			if !ok {
 				log.Printf("Got something that wasn't a LNDC")
 				continue
 			}
 			log.Printf("Incoming connection from %x on %s\n",
-				newConn.RemotePub.SerializeCompressed(), newConn.RemoteAddr().String())
+				newConn.RemotePub().SerializeCompressed(), newConn.RemoteAddr().String())
 
 			// don't save host/port for incoming connections
-			peerIdx, err := nd.GetPeerIdx(newConn.RemotePub, "")
+			peerIdx, err := nd.GetPeerIdx(newConn.RemotePub(), "")
 			if err != nil {
 				log.Printf("Listener error: %s\n", err.Error())
 				continue
@@ -128,17 +128,30 @@ func (nd *LitNode) TCPListener(
 	return adr, nil
 }
 
+// ParseAdrString splits a string like
+// "ln1yrvw48uc3atg8e2lzs43mh74m39vl785g4ehem@myhost.co:8191 into a separate
+// pkh part and network part, adding the network part if needed
+func splitAdrString(adr string) (string, string) {
+
+	if !strings.ContainsRune(adr, ':') && strings.ContainsRune(adr, '@') {
+		adr += ":2448"
+	}
+
+	idHost := strings.Split(adr, "@")
+
+	if len(idHost) == 1 {
+		return idHost[0], ""
+	}
+
+	return idHost[0], idHost[1]
+}
+
 // DialPeer makes an outgoing connection to another node.
 func (nd *LitNode) DialPeer(connectAdr string) error {
 	var err error
 
 	// parse address and get pkh / host / port
-	who, where := lndc.SplitAdrString(connectAdr)
-
-	// sanity check the "who" pkh string
-	if !lnutil.LitAdrOK(who) {
-		return fmt.Errorf("ln address %s invalid", who)
-	}
+	who, where := splitAdrString(connectAdr)
 
 	// If we couldn't deduce a URL, look it up on the tracker
 	if where == "" {
@@ -152,10 +165,7 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 	idPriv := nd.IdKey()
 
 	// Assign remote connection
-	newConn := new(lndc.LNDConn)
-
-	// TODO: handle IPv6 connections
-	err = newConn.Dial(idPriv, where, who, nd.ProxyURL)
+	newConn, err := lndc.Dial(idPriv, where, who, net.Dial)
 	if err != nil {
 		return err
 	}
@@ -165,7 +175,7 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 
 	// figure out peer index, or assign new one for new peer.  Since
 	// we're connecting out, also specify the hostname&port
-	peerIdx, err := nd.GetPeerIdx(newConn.RemotePub, newConn.RemoteAddr().String())
+	peerIdx, err := nd.GetPeerIdx(newConn.RemotePub(), newConn.RemoteAddr().String())
 	if err != nil {
 		return err
 	}
@@ -222,7 +232,7 @@ func (nd *LitNode) GetConnectedPeerList() []PeerInfo {
 	for k, v := range nd.RemoteCons {
 		var newPeer PeerInfo
 		var pubArr [33]byte
-		copy(pubArr[:], v.Con.RemotePub.SerializeCompressed())
+		copy(pubArr[:], v.Con.RemotePub().SerializeCompressed())
 		newPeer.PeerNumber = k
 		newPeer.RemoteHost = v.Con.RemoteAddr().String()
 		newPeer.Nickname = v.Nickname

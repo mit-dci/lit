@@ -35,6 +35,7 @@ class TestBreak(TestBasic):
         self.confirm_transactions(self.coinnodes[0], self.litnodes[0], 1)
 
         # Make sure balances are as expected
+        self.log.info("Make sure balances match")
         wait_until(lambda: abs(self.litnodes[1].get_balance(self.coins[0]['code'])['TxoTotal'] - 50200000) < self.coins[0]["feerate"] * 2000)
         litnode1_balance = self.litnodes[1].get_balance(self.coins[0]['code'])
         assert litnode1_balance['TxoTotal'] == litnode1_balance['MatureWitty']

@@ -2,346 +2,134 @@ package lndc
 
 import (
 	"bytes"
-	"crypto/cipher"
-	"crypto/hmac"
-	"encoding/binary"
-	"fmt"
-	"log"
+	"io"
+	"math"
 	"net"
-	"strings"
+	"log"
 	"time"
+	"fmt"
 
-	"golang.org/x/net/proxy"
-
-	"github.com/codahale/chacha20poly1305"
 	"github.com/mit-dci/lit/btcutil/btcec"
-	"github.com/mit-dci/lit/crypto/fastsha256"
 	"github.com/mit-dci/lit/lnutil"
 )
 
-// Conn...
-type LNDConn struct {
-	RemotePub *btcec.PublicKey
+// Conn is an implementation of net.Conn which enforces an authenticated key
+// exchange and message encryption protocol based off the noise_XX protocol
+// In the case of a successful handshake, all
+// messages sent via the .Write() method are encrypted with an AEAD cipher
+// along with an encrypted length-prefix. See the Machine struct for
+// additional details w.r.t to the handshake and encryption scheme.
+type Conn struct {
+	conn net.Conn
 
-	myNonceInt     uint64
-	remoteNonceInt uint64
-
-	// If Authed == false, the remotePub is the EPHEMERAL key.
-	// once authed == true, remotePub is who you're actually talking to.
-	Authed bool
-
-	// chachaStream saves some time as you don't have to init it with
-	// the session key every time.  Make SessionKey redundant; remove later.
-	chachaStream cipher.AEAD
-
-	// ViaPbx specifies whether this is a direct TCP connection or an
-	// encapsulated PBX connection.
-	// If going ViaPbx, Cn isn't used channels are used for Read() and
-	// Write(), which are filled by the PBXhandler.
-	ViaPbx      bool
-	PbxIncoming chan []byte
-	PbxOutgoing chan []byte
-
-	version uint8
+	noise *Machine
 
 	readBuf bytes.Buffer
-
-	Conn net.Conn
 }
 
-// NewConn...
-func NewConn(conn net.Conn) *LNDConn {
-	return &LNDConn{Conn: conn}
-}
+// A compile-time assertion to ensure that Conn meets the net.Conn interface.
+var _ net.Conn = (*Conn)(nil)
 
-func IP4(ipAddress string) bool {
-	parseIp := net.ParseIP(ipAddress)
-	if parseIp.To4() == nil {
-		return false
-	}
-	return true
-}
-
-func parseAdr(netAddress string) (string, string, error) {
-	colonCount := strings.Count(netAddress, ":")
-	var conMode string
-	if colonCount == 1 && IP4(strings.Split(netAddress, ":")[0]) {
-		// only ipv4 clears this since ipv6 has 6 colons (with port no)
-		conMode = "tcp4"
-		return netAddress, conMode, nil
-	} else if colonCount >= 5 {
-		conMode = "tcp6"
-		return netAddress, conMode, nil
-	} else if colonCount == 1 {
-		// Could be a hostname. Look it up!
-		ips, err := net.LookupIP(strings.Split(netAddress, ":")[0])
-		if err != nil || len(ips) == 0 {
-			return "", "", fmt.Errorf("Invalid ip [%s] and can't look up as hostname", netAddress)
-		}
-		addrParts := strings.Split(netAddress, ":")
-		for _, ip := range ips {
-			if ip.To4() != nil {
-				return fmt.Sprintf("%s:%s", ips[0].String(), addrParts[1]), "tcp4", nil
-			}
-			if ip.To16() != nil {
-				return fmt.Sprintf("%s:%s", ips[0].String(), addrParts[len(addrParts)-1]), "tcp6", nil
-			}
-		}
-	}
-
-	return "", "", fmt.Errorf("Invalid ip")
-}
-
-// Dial...
-func (c *LNDConn) Dial(
-	myId *btcec.PrivateKey, netAddress string, remotePKH string, proxyURL string) error {
-
+// Dial attempts to establish an encrypted+authenticated connection with the
+// remote peer located at address which has remotePub as its long-term static
+// public key. In the case of a handshake failure, the connection is closed and
+// a non-nil error is returned.
+func Dial(localPriv *btcec.PrivateKey, ipAddr string, remotePKH string,
+	dialer func(string, string) (net.Conn, error)) (*Conn, error) {
+	var conn net.Conn
 	var err error
-	if myId == nil {
-		return fmt.Errorf("LNDConn Dial: nil myId")
-	}
-
-	if !c.ViaPbx {
-		if c.Conn != nil {
-			return fmt.Errorf("connection already established")
-		}
-
-		if proxyURL != "" {
-			d, err := proxy.SOCKS5("tcp", proxyURL, nil, proxy.Direct)
-			if err != nil {
-				return err
-			}
-
-			netAddress, conMode, err := parseAdr(netAddress)
-			if err != nil {
-				return fmt.Errorf("Invalid ip")
-			}
-			c.Conn, err = d.Dial(conMode, netAddress)
-			if err != nil {
-				return err
-			}
-		} else {
-			// First, open the TCP connection itself.
-			netAddress, conMode, err := parseAdr(netAddress)
-			if err != nil {
-				return fmt.Errorf("Invalid ip")
-			}
-			c.Conn, err = net.Dial(conMode, netAddress)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	// check that remotePKH is ok
-	if !lnutil.LitAdrOK(remotePKH) {
-		return fmt.Errorf("invalid ln address %s", remotePKH)
-	}
-
-	// Calc remote LNId; need this for creating pbx connections just because
-	// LNid is in the struct does not mean it's authed!
-	/*
-		if len(remoteId) == 20 || len(remoteId) == 16 {
-			copy(c.RemoteLNId[:], remoteId[:16])
-		} else {
-			theirAdr := btcutil.Hash160(remoteId)
-			copy(c.RemoteLNId[:], theirAdr[:16])
-		}
-	*/
-
-	// Make up an ephemeral keypair for this session.
-	ourEphemeralPriv, err := btcec.NewPrivateKey(btcec.S256())
+	conn, err = dialer("tcp", ipAddr)
+	log.Println("ipAddr is", ipAddr)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	ourEphPubBytes := ourEphemeralPriv.PubKey().SerializeCompressed()
 
-	// 1. Send my ephemeral pubkey. Can add version bits.
-	_, err = writeClear(c.Conn, ourEphPubBytes)
+	b := &Conn{
+		conn:  conn,
+		noise: NewNoiseMachine(true, localPriv),
+	}
+
+	// Initiate the handshake by sending the first act to the receiver.
+	actOne, err := b.noise.GenActOne()
 	if err != nil {
-		return err
+		b.conn.Close()
+		return nil, err
+	}
+	if _, err := conn.Write(actOne[:]); err != nil {
+		b.conn.Close()
+		return nil, err
 	}
 
-	// Wait for theirs; Read, then deserialize their ephemeral public key.
-	theirEphPubBytes, err := readClear(c.Conn)
+	// We'll ensure that we get ActTwo from the remote peer in a timely
+	// manner. If they don't respond within 1s, then we'll kill the
+	// connection.
+	conn.SetReadDeadline(time.Now().Add(handshakeReadTimeout))
+
+	// If the first act was successful (we know that address is actually
+	// remotePub), then read the second act after which we'll be able to
+	// send our static public key to the remote peer with strong forward
+	// secrecy.
+	var actTwo [ActTwoSize]byte
+	if _, err := io.ReadFull(conn, actTwo[:]); err != nil {
+		b.conn.Close()
+		return nil, err
+	}
+	s, err := b.noise.RecvActTwo(actTwo)
 	if err != nil {
-		return err
+		b.conn.Close()
+		return nil, err
 	}
-	theirEphPub, err := btcec.ParsePubKey(theirEphPubBytes, btcec.S256())
+
+	log.Println("Received pubkey", s)
+	if lnutil.LitAdrFromPubkey(s) != remotePKH {
+		return nil, fmt.Errorf("Remote PKH doesn't match. Quitting!")
+	}
+	log.Printf("Received PKH %s matches", lnutil.LitAdrFromPubkey(s))
+
+	// Finally, complete the handshake by sending over our encrypted static
+	// key and execute the final ECDH operation.
+	actThree, err := b.noise.GenActThree()
 	if err != nil {
-		return err
+		b.conn.Close()
+		return nil, err
+	}
+	if _, err := conn.Write(actThree[:]); err != nil {
+		b.conn.Close()
+		return nil, err
 	}
 
-	// Do diffie with ephemeral pubkeys. Sha256 for good luck.
-	sessionKey := fastsha256.Sum256(
-		btcec.GenerateSharedSecret(ourEphemeralPriv, theirEphPub))
+	// We'll reset the deadline as it's no longer critical beyond the
+	// initial handshake.
+	conn.SetReadDeadline(time.Time{})
 
-	// Now that we've derive the session key, we can initialize the
-	// chacha20poly1305 AEAD instance which will be used for the remainder of
-	// the session.
-	c.chachaStream, err = chacha20poly1305.New(sessionKey[:])
-	if err != nil {
-		return err
-	}
-
-	// display private key for debug only
-	log.Printf("made session key %x\n", sessionKey)
-
-	c.myNonceInt = 1 << 63
-	c.remoteNonceInt = 0
-
-	c.RemotePub = theirEphPub
-	c.Authed = false
-
-	// Session is now open and confidential but not yet authenticated...
-	// So auth!
-
-	return c.authPKH(myId, remotePKH, ourEphPubBytes)
+	return b, nil
 }
 
-// authPubKey...
-/*
-func (c *LNDConn) authPubKey(
-	myId *btcec.PrivateKey, remotePKH string, localEphPubBytes []byte) error {
-	if c.Authed {
-		return fmt.Errorf("%s already authed", c.RemotePub)
-	}
-
-	// Since we already know their public key, we can immediately generate
-	// the DH proof without an additional round-trip.
-	theirPub, err := btcec.ParsePubKey(remotePubBytes, btcec.S256())
-	if err != nil {
-		return err
-	}
-	theirPKH := btcutil.Hash160(remotePubBytes)
-	idDH := fastsha256.Sum256(btcec.GenerateSharedSecret(myId, theirPub))
-	myDHproof := btcutil.Hash160(append(c.RemotePub.SerializeCompressed(), idDH[:]...))
-
-	// Send over the 73 byte authentication message: my pubkey, their
-	// pubkey hash, DH proof.
-	var authMsg [73]byte
-	copy(authMsg[:33], myId.PubKey().SerializeCompressed())
-	copy(authMsg[33:], theirPKH)
-	copy(authMsg[53:], myDHproof)
-	if _, err = c.Conn.Write(authMsg[:]); err != nil {
-		return nil
-	}
-
-	// Await, their response. They should send only the 20-byte DH proof.
-	resp := make([]byte, 20)
-	_, err = c.Conn.Read(resp)
-	if err != nil {
-		return err
-	}
-
-	// Verify that their proof matches our locally computed version.
-	theirDHproof := btcutil.Hash160(append(localEphPubBytes, idDH[:]...))
-	if !hmac.Equal(resp, theirDHproof) {
-		return fmt.Errorf("invalid DH proof %x", theirDHproof)
-	}
-
-	// Proof checks out, auth complete.
-	c.RemotePub = theirPub
-	theirAdr := btcutil.Hash160(theirPub.SerializeCompressed())
-	copy(c.RemoteLNId[:], theirAdr[:16])
-	c.Authed = true
-
-	return nil
-}
-*/
-
-// authPKH...
-func (c *LNDConn) authPKH(
-	myId *btcec.PrivateKey, remotePKH string, localEphPubBytes []byte) error {
-	if c.Authed {
-		return fmt.Errorf("%s already authed", c.RemotePub)
-	}
-
-	theirPKH, err := lnutil.LitAdrBytes(remotePKH)
-	if err != nil {
-		return err
-	}
-
-	// Send: our pubkey, and the remote's pubkey hash.
-	// remote pkh may be 20 or 12 bytes
-	greetingMsg := myId.PubKey().SerializeCompressed()
-	greetingMsg = append(greetingMsg, theirPKH...)
-	if _, err := c.Conn.Write(greetingMsg); err != nil {
-		return err
-	}
-
-	// Wait for their response.
-	// TODO(tadge): add timeout here
-	resp := make([]byte, 65)
-	if _, err := c.Conn.Read(resp); err != nil {
-		return err
-	}
-
-	// read back 65 bytes; 33 for their pubkey, and 32 for their DH proof
-
-	// Parse their long-term public key, and generate the DH proof.
-	theirPub, err := btcec.ParsePubKey(resp[:33], btcec.S256())
-	if err != nil {
-		return err
-	}
-	idDH := fastsha256.Sum256(btcec.GenerateSharedSecret(myId, theirPub))
-	log.Printf("made idDH %x\n", idDH)
-	theirDHproof := fastsha256.Sum256(append(localEphPubBytes, idDH[:]...))
-
-	// Verify that their DH proof matches the one we just generated.
-	// use constant time comparison here
-	if !hmac.Equal(resp[33:], theirDHproof[:]) {
-		return fmt.Errorf("Invalid DH proof %x", theirDHproof)
-	}
-
-	// If their DH proof checks out, then send our own.
-	myDHproof := fastsha256.Sum256(
-		append(c.RemotePub.SerializeCompressed(), idDH[:]...))
-	if _, err = c.Conn.Write(myDHproof[:]); err != nil {
-		return err
-	}
-
-	// Proof sent, auth complete.
-	c.RemotePub = theirPub
-	c.Authed = true
-
-	return nil
+// ReadNextMessage uses the connection in a message-oriented instructing it to
+// read the next _full_ message with the lndc stream. This function will
+// block until the read succeeds.
+func (c *Conn) ReadNextMessage() ([]byte, error) {
+	return c.noise.ReadMessage(c.conn)
 }
 
-// Read reads data from the connection.
-// Read can be made to time out and return an Error with Timeout() == true
-// after a fixed time limit; see SetDeadline and SetReadDeadline.
+// Read reads data from the connection.  Read can be made to time out and
+// return an Error with Timeout() == true after a fixed time limit; see
+// SetDeadline and SetReadDeadline.
+//
 // Part of the net.Conn interface.
-func (c *LNDConn) Read(b []byte) (n int, err error) {
+func (c *Conn) Read(b []byte) (n int, err error) {
 	// In order to reconcile the differences between the record abstraction
-	// of our AEAD connection, and the stream abstraction of TCP, we maintain
-	// an intermediate read buffer. If this buffer becomes depleted, then
-	// we read the next record, and feed it into the buffer. Otherwise, we
-	// read directly from the buffer.
+	// of our AEAD connection, and the stream abstraction of TCP, we
+	// maintain an intermediate read buffer. If this buffer becomes
+	// depleted, then we read the next record, and feed it into the
+	// buffer. Otherwise, we read directly from the buffer.
 	if c.readBuf.Len() == 0 {
-		// The buffer is empty, so read the next cipher text.
-		ctext, err := readClear(c.Conn)
+		plaintext, err := c.noise.ReadMessage(c.conn)
 		if err != nil {
 			return 0, err
 		}
 
-		// Encode the current remote nonce, so we can use it to decrypt
-		// the cipher text.
-		var nonceBuf [8]byte
-		binary.BigEndian.PutUint64(nonceBuf[:], c.remoteNonceInt)
-
-		//		log.Printf("decrypt %d byte from %x nonce %d\n",
-		//			len(ctext), c.RemoteLNId, c.remoteNonceInt)
-
-		c.remoteNonceInt++ // increment remote nonce, no matter what...
-
-		msg, err := c.chachaStream.Open(nil, nonceBuf[:], ctext, nil)
-		if err != nil {
-			log.Printf("decrypt %d byte ciphertext failed\n", len(ctext))
-			return 0, err
-		}
-
-		if _, err := c.readBuf.Write(msg); err != nil {
+		if _, err := c.readBuf.Write(plaintext); err != nil {
 			return 0, err
 		}
 	}
@@ -349,81 +137,98 @@ func (c *LNDConn) Read(b []byte) (n int, err error) {
 	return c.readBuf.Read(b)
 }
 
-// Write writes data to the connection.
-// Write can be made to time out and return an Error with Timeout() == true
-// after a fixed time limit; see SetDeadline and SetWriteDeadline.
+// Write writes data to the connection.  Write can be made to time out and
+// return an Error with Timeout() == true after a fixed time limit; see
+// SetDeadline and SetWriteDeadline.
+//
 // Part of the net.Conn interface.
-func (c *LNDConn) Write(b []byte) (n int, err error) {
-	if b == nil {
-		return 0, fmt.Errorf("write to %x nil", c.RemotePub.SerializeCompressed())
-	}
-	//	log.Printf("Encrypt %d byte plaintext to %x nonce %d\n",
-	//		len(b), c.RemoteLNId, c.myNonceInt)
-
-	// first encrypt message with shared key
-	var nonceBuf [8]byte
-	binary.BigEndian.PutUint64(nonceBuf[:], c.myNonceInt)
-	c.myNonceInt++ // increment mine
-
-	ctext := c.chachaStream.Seal(nil, nonceBuf[:], b, nil)
-	if err != nil {
-		return 0, err
-	}
-	if len(ctext) > maxMsgSize {
-		return 0, fmt.Errorf("Write to %x too long, %d bytes",
-			c.RemotePub.SerializeCompressed(), len(ctext))
+func (c *Conn) Write(b []byte) (n int, err error) {
+	// If the message doesn't require any chunking, then we can go ahead
+	// with a single write.
+	if len(b) <= math.MaxUint16 {
+		return len(b), c.noise.WriteMessage(c.conn, b)
 	}
 
-	// use writeClear to prepend length / destination header
-	return writeClear(c.Conn, ctext)
+	// If we need to split the message into fragments, then we'll write
+	// chunks which maximize usage of the available payload.
+	chunkSize := math.MaxUint16
+
+	bytesToWrite := len(b)
+	bytesWritten := 0
+	for bytesWritten < bytesToWrite {
+		// If we're on the last chunk, then truncate the chunk size as
+		// necessary to avoid an out-of-bounds array memory access.
+		if bytesWritten+chunkSize > len(b) {
+			chunkSize = len(b) - bytesWritten
+		}
+
+		// Slice off the next chunk to be written based on our running
+		// counter and next chunk size.
+		chunk := b[bytesWritten : bytesWritten+chunkSize]
+		if err := c.noise.WriteMessage(c.conn, chunk); err != nil {
+			return bytesWritten, err
+		}
+
+		bytesWritten += len(chunk)
+	}
+
+	return bytesWritten, nil
 }
 
-// Close closes the connection.
-// Any blocked Read or Write operations will be unblocked and return errors.
+// Close closes the connection.  Any blocked Read or Write operations will be
+// unblocked and return errors.
+//
 // Part of the net.Conn interface.
-func (c *LNDConn) Close() error {
-	c.myNonceInt = 0
-	c.remoteNonceInt = 0
-	c.RemotePub = nil
-
-	return c.Conn.Close()
+func (c *Conn) Close() error {
+	return c.conn.Close()
 }
 
 // LocalAddr returns the local network address.
+//
 // Part of the net.Conn interface.
-// If PBX reports address of pbx host.
-func (c *LNDConn) LocalAddr() net.Addr {
-	return c.Conn.LocalAddr()
+func (c *Conn) LocalAddr() net.Addr {
+	return c.conn.LocalAddr()
 }
 
 // RemoteAddr returns the remote network address.
+//
 // Part of the net.Conn interface.
-func (c *LNDConn) RemoteAddr() net.Addr {
-	return c.Conn.RemoteAddr()
+func (c *Conn) RemoteAddr() net.Addr {
+	return c.conn.RemoteAddr()
 }
 
-// SetDeadline sets the read and write deadlines associated
-// with the connection. It is equivalent to calling both
-// SetReadDeadline and SetWriteDeadline.
+// SetDeadline sets the read and write deadlines associated with the
+// connection. It is equivalent to calling both SetReadDeadline and
+// SetWriteDeadline.
+//
 // Part of the net.Conn interface.
-func (c *LNDConn) SetDeadline(t time.Time) error {
-	return c.Conn.SetDeadline(t)
+func (c *Conn) SetDeadline(t time.Time) error {
+	return c.conn.SetDeadline(t)
 }
 
-// SetReadDeadline sets the deadline for future Read calls.
-// A zero value for t means Read will not time out.
+// SetReadDeadline sets the deadline for future Read calls.  A zero value for t
+// means Read will not time out.
+//
 // Part of the net.Conn interface.
-func (c *LNDConn) SetReadDeadline(t time.Time) error {
-	return c.Conn.SetReadDeadline(t)
+func (c *Conn) SetReadDeadline(t time.Time) error {
+	return c.conn.SetReadDeadline(t)
 }
 
-// SetWriteDeadline sets the deadline for future Write calls.
-// Even if write times out, it may return n > 0, indicating that
-// some of the data was successfully written.
-// A zero value for t means Write will not time out.
+// SetWriteDeadline sets the deadline for future Write calls.  Even if write
+// times out, it may return n > 0, indicating that some of the data was
+// successfully written.  A zero value for t means Write will not time out.
+//
 // Part of the net.Conn interface.
-func (c *LNDConn) SetWriteDeadline(t time.Time) error {
-	return c.Conn.SetWriteDeadline(t)
+func (c *Conn) SetWriteDeadline(t time.Time) error {
+	return c.conn.SetWriteDeadline(t)
 }
 
-var _ net.Conn = (*LNDConn)(nil)
+// RemotePub returns the remote peer's static public key.
+func (c *Conn) RemotePub() *btcec.PublicKey {
+	return c.noise.remoteStatic
+}
+
+// LocalPub returns the local peer's static public key.
+func (c *Conn) LocalPub() *btcec.PublicKey {
+	return c.noise.localStatic.PubKey()
+}

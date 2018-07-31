@@ -14,8 +14,10 @@ def wait_until(predicate, *, attempts=float('inf'), timeout=float('inf')):
         timeout = 60
     attempt = 0
     elapsed = 0
+    print("Attempt: ", attempt, "elapsed", elapsed)
 
     while attempt < attempts and elapsed < timeout:
+        print("Attempts: ", attempt, "elapsed", elapsed)
         if predicate():
             return True
         attempt += 1
