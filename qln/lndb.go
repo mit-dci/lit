@@ -139,6 +139,15 @@ type LitNode struct {
 	// Contains the URL string to connect to a SOCKS5 proxy, if provided
 	ProxyURL string
 	Nat      string
+
+	InProgMultihop []*InFlightMultihop
+}
+
+type InFlightMultihop struct {
+	Path     [][20]byte
+	Amt      int64
+	HHash    [32]byte
+	PreImage [16]byte
 }
 
 type RemotePeer struct {

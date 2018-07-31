@@ -2,9 +2,12 @@ package qln
 
 import (
 	"bytes"
+	"fmt"
 	"math"
 	"strconv"
 	"time"
+
+	"container/heap"
 
 	"github.com/awalterschulze/gographviz"
 	"github.com/mit-dci/lit/bech32"
@@ -66,6 +69,85 @@ func (nd *LitNode) VisualiseGraph() string {
 	}
 
 	return "di" + graph.String()
+}
+
+func (nd *LitNode) FindPath(targetPkh [20]byte, coinType uint32, amount int64) ([][20]byte, error) {
+
+	var myIdPkh [20]byte
+	idHash := fastsha256.Sum256(nd.IdKey().PubKey().SerializeCompressed())
+	copy(myIdPkh[:], idHash[:20])
+
+	distance := make(map[[20]byte]nodeWithDist)
+	distance[myIdPkh] = nodeWithDist{
+		Dist: 0,
+		Pkh:  myIdPkh,
+	}
+
+	prev := make(map[[20]byte][20]byte)
+
+	var nodeHeap distanceHeap
+	heap.Push(&nodeHeap, distance[myIdPkh])
+
+	for nodeHeap.Len() != 0 {
+		partialPath := heap.Pop(&nodeHeap).(nodeWithDist)
+		bestNode := partialPath.Pkh
+
+		route := [][20]byte{bestNode}
+		for !bytes.Equal(route[0][:], myIdPkh[:]) {
+			route = append([][20]byte{prev[route[0]]}, route...)
+		}
+
+		fmt.Print("Analyzing route: ")
+		for _, node := range route {
+			fmt.Printf("-> %s", bech32.Encode("ln", node[:]))
+		}
+		fmt.Print("\n")
+
+		if bytes.Equal(bestNode[:], targetPkh[:]) {
+			break
+		}
+
+		fmt.Print("Finding edges for %s...\n", bech32.Encode("ln", bestNode[:]))
+		for _, channel := range nd.ChannelMap[bestNode] {
+			fmt.Printf("Checking %s\n", bech32.Encode("ln", channel.BPKH[:]))
+			capOk := (channel.ACapacity >= amount)
+			isTarget := bytes.Equal(targetPkh[:], channel.BPKH[:])
+			coinTypeMatch := (coinType == channel.CoinType)
+
+			fmt.Printf("Capok: [%t] - isTarget: [%t] - coinTypeMatch [%t]\n", capOk, isTarget, coinTypeMatch)
+
+			if capOk && (!isTarget || (isTarget && coinTypeMatch)) {
+
+				tempDist := partialPath.Dist + 1
+				_, exists := distance[channel.BPKH]
+
+				if !exists || (exists && tempDist < distance[channel.BPKH].Dist) {
+					// We could use this. Explore further
+
+					distance[channel.BPKH] = nodeWithDist{
+						Dist: tempDist,
+						Pkh:  channel.BPKH,
+					}
+
+					prev[channel.BPKH] = bestNode
+
+					fmt.Printf("Pushing %s onto heap\n", bech32.Encode("ln", channel.BPKH[:]))
+
+					heap.Push(&nodeHeap, distance[channel.BPKH])
+				}
+			}
+		}
+	}
+
+	if _, ok := prev[targetPkh]; !ok {
+		return nil, fmt.Errorf("No route to target %x", bech32.Encode("ln", targetPkh[:]))
+	}
+
+	route := [][20]byte{prev[targetPkh], targetPkh}
+	for !bytes.Equal(route[0][:], myIdPkh[:]) {
+		route = append([][20]byte{prev[route[0]]}, route...)
+	}
+	return route, nil
 }
 
 func (nd *LitNode) cleanStaleChannels() {

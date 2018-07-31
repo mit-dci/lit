@@ -583,3 +583,15 @@ func (r *LitRPC) ClearHTLC(args ClearHTLCArgs, reply *ClearHTLCReply) error {
 	reply.StateIndex = qc.State.StateIdx
 	return nil
 }
+
+type PayMultihopArgs struct {
+	DestLNAdr string
+	CoinType  uint32
+	Amt       int64
+}
+
+// PayMultihop tries to find a multi-hop path to send the payment along
+func (r *LitRPC) PayMultihop(args PayMultihopArgs, reply *StatusReply) error {
+	_, err := r.Node.PayMultihop(args.DestLNAdr, args.CoinType, args.Amt)
+	return err
+}

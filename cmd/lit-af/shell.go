@@ -194,6 +194,13 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		err = lc.Graph(args)
 		return parseErr(err, "grpah")
 	}
+	if cmd == "paymultihop" { // pay via multi-hop
+		err = lc.PayMultihop(args)
+		if err != nil {
+			fmt.Fprintf(color.Output, "paymultihop error: %s\n", err)
+		}
+		return nil
+	}
 
 	fmt.Fprintf(color.Output, "Command not recognized. type help for command list.\n")
 	return nil

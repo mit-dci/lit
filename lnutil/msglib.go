@@ -50,6 +50,12 @@ const (
 	//Routing messages
 	MSGID_LINK_DESC = 0x70 // Describes a new channel for routing
 
+	//Multihop payment messages
+	MSGID_PAY_REQ    = 0x75 // Request payment
+	MSGID_PAY_ACK    = 0x76 // Acknowledge payment (share preimage hash)
+	MSGID_PAY_SETUP  = 0x77 // Setup a payment route
+	MSGID_PAY_SETTLE = 0x78 // Settle payment route
+
 	//Discreet log contracts messages
 	MSGID_DLC_OFFER               = 0x90 // Offer a contract
 	MSGID_DLC_ACCEPTOFFER         = 0x91 // Accept the contract
@@ -137,6 +143,15 @@ func LitMsgFromBytes(b []byte, peerid uint32) (LitMsg, error) {
 
 	case MSGID_LINK_DESC:
 		return NewLinkMsgFromBytes(b, peerid)
+
+	case MSGID_PAY_REQ:
+		return NewMultihopPaymentRequestMsgFromBytes(b, peerid)
+	case MSGID_PAY_ACK:
+		return NewMultihopPaymentAckMsgFromBytes(b, peerid)
+	case MSGID_PAY_SETUP:
+		return NewMultihopPaymentSetupMsgFromBytes(b, peerid)
+	case MSGID_PAY_SETTLE:
+		return NewMultihopPaymentSettleMsgFromBytes(b, peerid)
 
 	case MSGID_DUALFUNDINGREQ:
 		return NewDualFundingReqMsgFromBytes(b, peerid)
@@ -1976,4 +1991,208 @@ func (msg DlcContractSigProofMsg) Peer() uint32 {
 // MsgType returns the type of this message
 func (msg DlcContractSigProofMsg) MsgType() uint8 {
 	return MSGID_DLC_SIGPROOF
+}
+
+// MultihopPaymentRequestMsg initiates a new multihop payment. It is sent to
+// the peer that will ultimately receive the payment.
+type MultihopPaymentRequestMsg struct {
+	// The index of the peer we're communicating with
+	PeerIdx uint32
+}
+
+func NewMultihopPaymentRequestMsg(peerIdx uint32) MultihopPaymentRequestMsg {
+	msg := new(MultihopPaymentRequestMsg)
+	msg.PeerIdx = peerIdx
+	return *msg
+}
+
+func NewMultihopPaymentRequestMsgFromBytes(b []byte,
+	peerIdx uint32) (MultihopPaymentRequestMsg, error) {
+
+	msg := new(MultihopPaymentRequestMsg)
+	msg.PeerIdx = peerIdx
+	return *msg, nil
+}
+
+// Bytes serializes a MultihopPaymentRequestMsg into a byte array
+func (msg MultihopPaymentRequestMsg) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.WriteByte(msg.MsgType())
+	return buf.Bytes()
+}
+
+// Peer returns the peer index this message was received from/sent to
+func (msg MultihopPaymentRequestMsg) Peer() uint32 {
+	return msg.PeerIdx
+}
+
+// MsgType returns the type of this message
+func (msg MultihopPaymentRequestMsg) MsgType() uint8 {
+	return MSGID_PAY_REQ
+}
+
+// MultihopPaymentRequestMsg initiates a new multihop payment. It is sent to
+// the peer that will ultimately send the payment.
+type MultihopPaymentAckMsg struct {
+	// The index of the peer we're communicating with
+	PeerIdx uint32
+	// The hash to the preimage we use to clear out the HTLCs
+	HHash [32]byte
+}
+
+func NewMultihopPaymentAckMsg(peerIdx uint32, hHash [32]byte) MultihopPaymentAckMsg {
+	msg := new(MultihopPaymentAckMsg)
+	msg.PeerIdx = peerIdx
+	msg.HHash = hHash
+	return *msg
+}
+
+func NewMultihopPaymentAckMsgFromBytes(b []byte,
+	peerIdx uint32) (MultihopPaymentAckMsg, error) {
+
+	msg := new(MultihopPaymentAckMsg)
+	msg.PeerIdx = peerIdx
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
+	copy(msg.HHash[:], buf.Next(32))
+	return *msg, nil
+}
+
+// Bytes serializes a MultihopPaymentAckMsg into a byte array
+func (msg MultihopPaymentAckMsg) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.WriteByte(msg.MsgType())
+	buf.Write(msg.HHash[:])
+	return buf.Bytes()
+}
+
+// Peer returns the peer index this message was received from/sent to
+func (msg MultihopPaymentAckMsg) Peer() uint32 {
+	return msg.PeerIdx
+}
+
+// MsgType returns the type of this message
+func (msg MultihopPaymentAckMsg) MsgType() uint8 {
+	return MSGID_PAY_ACK
+}
+
+// MultihopPaymentSetupMsg forms a new multihop payment. It is sent to
+// the next-in-line peer, which will forward it to the next hop until
+// the target is reached
+type MultihopPaymentSetupMsg struct {
+	// The index of the peer we're communicating with
+	PeerIdx uint32
+	// The hash to the preimage we use to clear out the HTLCs
+	HHash [32]byte
+	// The PKHs (in order) of the nodes we're using.
+	NodeRoute [][20]byte
+	// Amount in satoshi we're paying
+	Amount int64
+	// Data associated with the payment
+	Data [32]byte
+}
+
+func NewMultihopPaymentSetupMsg(peerIdx uint32, amount int64, hHash [32]byte, nodeRoute [][20]byte, data [32]byte) MultihopPaymentSetupMsg {
+	msg := new(MultihopPaymentSetupMsg)
+	msg.PeerIdx = peerIdx
+	msg.HHash = hHash
+	msg.NodeRoute = nodeRoute
+	msg.Data = data
+	msg.Amount = amount
+	return *msg
+}
+
+func NewMultihopPaymentSetupMsgFromBytes(b []byte,
+	peerIdx uint32) (MultihopPaymentSetupMsg, error) {
+
+	msg := new(MultihopPaymentSetupMsg)
+	msg.PeerIdx = peerIdx
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
+	copy(msg.HHash[:], buf.Next(32))
+
+	hops, _ := wire.ReadVarInt(buf, 0)
+	msg.NodeRoute = make([][20]byte, hops)
+	for i := uint64(0); i < hops; i++ {
+		copy(msg.NodeRoute[i][:], buf.Next(20))
+
+	}
+	amount, _ := wire.ReadVarInt(buf, 0)
+	msg.Amount = int64(amount)
+	copy(msg.Data[:], buf.Next(32))
+	return *msg, nil
+}
+
+// Bytes serializes a MultihopPaymentSetupMsg into a byte array
+func (msg MultihopPaymentSetupMsg) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.WriteByte(msg.MsgType())
+	buf.Write(msg.HHash[:])
+	wire.WriteVarInt(&buf, 0, uint64(len(msg.NodeRoute)))
+	for _, nd := range msg.NodeRoute {
+		buf.Write(nd[:])
+	}
+
+	wire.WriteVarInt(&buf, 0, uint64(msg.Amount))
+	buf.Write(msg.Data[:])
+
+	return buf.Bytes()
+}
+
+// Peer returns the peer index this message was received from/sent to
+func (msg MultihopPaymentSetupMsg) Peer() uint32 {
+	return msg.PeerIdx
+}
+
+// MsgType returns the type of this message
+func (msg MultihopPaymentSetupMsg) MsgType() uint8 {
+	return MSGID_PAY_SETUP
+}
+
+// MultihopPaymentSettleMsg settles a multihop payment. It is sent from
+// the last hop back to the previous one, which will forward it to the previous hop until
+// the source is reached
+type MultihopPaymentSettleMsg struct {
+	// The index of the peer we're communicating with
+	PeerIdx uint32
+	// The preimage to prove the next hop accepted our payment, or that we are the destination
+	PreImage [16]byte
+}
+
+func NewMultihopPaymentSettleMsg(peerIdx uint32, preImage [16]byte) MultihopPaymentSettleMsg {
+	msg := new(MultihopPaymentSettleMsg)
+	msg.PeerIdx = peerIdx
+	msg.PreImage = preImage
+	return *msg
+}
+
+func NewMultihopPaymentSettleMsgFromBytes(b []byte,
+	peerIdx uint32) (MultihopPaymentSettleMsg, error) {
+
+	msg := new(MultihopPaymentSettleMsg)
+	msg.PeerIdx = peerIdx
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
+	copy(msg.PreImage[:], buf.Next(16))
+	return *msg, nil
+}
+
+// Bytes serializes a MultihopPaymentSettleMsg into a byte array
+func (msg MultihopPaymentSettleMsg) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.WriteByte(msg.MsgType())
+	buf.Write(msg.PreImage[:])
+
+	return buf.Bytes()
+}
+
+// Peer returns the peer index this message was received from/sent to
+func (msg MultihopPaymentSettleMsg) Peer() uint32 {
+	return msg.PeerIdx
+}
+
+// MsgType returns the type of this message
+func (msg MultihopPaymentSettleMsg) MsgType() uint8 {
+	return MSGID_PAY_SETTLE
 }

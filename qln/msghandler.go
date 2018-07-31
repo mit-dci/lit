@@ -60,6 +60,18 @@ func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) er
 		if msg.MsgType() == lnutil.MSGID_LINK_DESC {
 			nd.LinkMsgHandler(msg.(lnutil.LinkMsg))
 		}
+		if msg.MsgType() == lnutil.MSGID_PAY_REQ {
+			nd.MultihopPaymentRequestHandler(msg.(lnutil.MultihopPaymentRequestMsg))
+		}
+		if msg.MsgType() == lnutil.MSGID_PAY_ACK {
+			nd.MultihopPaymentAckHandler(msg.(lnutil.MultihopPaymentAckMsg))
+		}
+		if msg.MsgType() == lnutil.MSGID_PAY_SETUP {
+			nd.MultihopPaymentSetupHandler(msg.(lnutil.MultihopPaymentSetupMsg))
+		}
+		if msg.MsgType() == lnutil.MSGID_PAY_SETTLE {
+			nd.MultihopPaymentSettleHandler(msg.(lnutil.MultihopPaymentSettleMsg))
+		}
 
 	case 0xA0: // Dual Funding messages
 		return nd.DualFundingHandler(msg, peer)
