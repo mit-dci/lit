@@ -10,7 +10,6 @@ import (
 	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
-	"github.com/mit-dci/lit/wire"
 )
 
 // Grab the coins that are rightfully yours! Plus some more.
