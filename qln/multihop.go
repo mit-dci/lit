@@ -28,7 +28,7 @@ func (nd *LitNode) PayMultihop(dstLNAdr string, coinType uint32, amount int64) (
 
 	inFlight := new(InFlightMultihop)
 	inFlight.Path = path
-	inFlight.Amount = amount
+	inFlight.Amt = amount
 	nd.InProgMultihop = append(nd.InProgMultihop, inFlight)
 
 	//Connect to the node
