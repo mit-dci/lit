@@ -235,15 +235,38 @@ func (nd *LitNode) DualFundAccept() *DualFundingResult {
 		return nil
 	}
 
+	var keyGen portxo.KeyGen
+	keyGen.Depth = 5
+	keyGen.Step[0] = 44 | 1<<31
+	keyGen.Step[1] = nd.InProgDual.CoinType | 1<<31
+	keyGen.Step[2] = UseHTLCBase
+	keyGen.Step[3] = 0 | 1<<31
+	keyGen.Step[4] = nd.InProgDual.ChanIdx | 1<<31
+
+	MyNextHTLCBase, err := nd.GetUsePub(keyGen, UseHTLCBase)
+	if err != nil {
+		log.Printf("error generating NextHTLCBase %v", err)
+		return nil
+	}
+
+	keyGen.Step[3] = 1 | 1<<31
+	MyN2HTLCBase, err := nd.GetUsePub(keyGen, UseHTLCBase)
+	if err != nil {
+		log.Printf("error generating N2HTLCBase %v", err)
+		return nil
+	}
+
 	nd.InProgDual.mtx.Lock()
 	nd.InProgDual.OurChangeAddress = changeAddr
 	nd.InProgDual.OurInputs = ourInputs
 	nd.InProgDual.OurPub = myChanPub
 	nd.InProgDual.OurRefundPub = myRefundPub
 	nd.InProgDual.OurHAKDBase = myHAKDbase
+	nd.InProgDual.OurNextHTLCBase = MyNextHTLCBase
+	nd.InProgDual.OurN2HTLCBase = MyN2HTLCBase
 	nd.InProgDual.mtx.Unlock()
 
-	outMsg := lnutil.NewDualFundingAcceptMsg(nd.InProgDual.PeerIdx, nd.InProgDual.CoinType, myChanPub, myRefundPub, myHAKDbase, changeAddr, ourInputs)
+	outMsg := lnutil.NewDualFundingAcceptMsg(nd.InProgDual.PeerIdx, nd.InProgDual.CoinType, myChanPub, myRefundPub, myHAKDbase, changeAddr, ourInputs, MyNextHTLCBase, MyN2HTLCBase)
 
 	nd.OmniOut <- outMsg
 
@@ -383,6 +406,22 @@ func (nd *LitNode) DualFundingAcceptHandler(msg lnutil.DualFundingAcceptMsg) {
 		return
 	}
 
+	_, err = btcec.ParsePubKey(msg.OurNextHTLCBase[:], btcec.S256())
+	if err != nil {
+		nd.InProgDual.mtx.Unlock()
+		log.Printf("PubRespHandler NextHTLCBase err %s", err.Error())
+		return
+	}
+	_, err = btcec.ParsePubKey(msg.OurN2HTLCBase[:], btcec.S256())
+	if err != nil {
+		nd.InProgDual.mtx.Unlock()
+		log.Printf("PubRespHandler N2HTLCBase err %s", err.Error())
+		return
+	}
+
+	nd.InProgDual.TheirNextHTLCBase = msg.OurNextHTLCBase
+	nd.InProgDual.TheirN2HTLCBase = msg.OurN2HTLCBase
+
 	// derive elkrem sender root from HD keychain
 	elkRoot, _ := nd.GetElkremRoot(q.KeyGen)
 	q.ElkSnd = elkrem.NewElkremSender(elkRoot)
@@ -402,6 +441,11 @@ func (nd *LitNode) DualFundingAcceptHandler(msg lnutil.DualFundingAcceptMsg) {
 	// based on size
 	q.State.Fee = nd.SubWallet[q.Coin()].Fee() * 1000
 	q.Value = nd.InProgDual.OurAmount + nd.InProgDual.TheirAmount
+
+	q.State.NextHTLCBase = msg.OurNextHTLCBase
+	q.State.N2HTLCBase = msg.OurN2HTLCBase
+	q.State.MyNextHTLCBase = nd.InProgDual.OurNextHTLCBase
+	q.State.MyN2HTLCBase = nd.InProgDual.OurN2HTLCBase
 
 	// save channel to db
 	err = nd.SaveQChan(q)
@@ -429,7 +473,8 @@ func (nd *LitNode) DualFundingAcceptHandler(msg lnutil.DualFundingAcceptMsg) {
 	}
 
 	outMsg := lnutil.NewChanDescMsg(
-		nd.InProgDual.PeerIdx, *nd.InProgDual.OutPoint, q.MyPub, q.MyRefundPub, q.MyHAKDBase,
+		nd.InProgDual.PeerIdx, *nd.InProgDual.OutPoint, q.MyPub, q.MyRefundPub, q.MyHAKDBase, nd.InProgDual.OurNextHTLCBase,
+		nd.InProgDual.OurN2HTLCBase,
 		nd.InProgDual.CoinType, nd.InProgDual.OurAmount+nd.InProgDual.TheirAmount, nd.InProgDual.TheirAmount,
 		elkPointZero, elkPointOne, elkPointTwo, q.State.Data)
 
@@ -558,6 +603,17 @@ func (nd *LitNode) DualFundChanDescHandler(msg lnutil.ChanDescMsg) {
 	qc.MyRefundPub, _ = nd.GetUsePub(qc.KeyGen, UseChannelRefund)
 	qc.MyHAKDBase, _ = nd.GetUsePub(qc.KeyGen, UseChannelHAKDBase)
 
+	_, err = btcec.ParsePubKey(msg.NextHTLCBase[:], btcec.S256())
+	if err != nil {
+		fmt.Errorf("QChanDescHandler NextHTLCBase err %s", err.Error())
+		return
+	}
+	_, err = btcec.ParsePubKey(msg.N2HTLCBase[:], btcec.S256())
+	if err != nil {
+		fmt.Errorf("QChanDescHandler N2HTLCBase err %s", err.Error())
+		return
+	}
+
 	// it should go into the next bucket and get the right key index.
 	// but we can't actually check that.
 	//	qc, err := nd.SaveFundTx(
@@ -583,6 +639,12 @@ func (nd *LitNode) DualFundChanDescHandler(msg lnutil.ChanDescMsg) {
 	qc.State.ElkPoint = msg.ElkZero
 	qc.State.NextElkPoint = msg.ElkOne
 	qc.State.N2ElkPoint = msg.ElkTwo
+
+	qc.State.MyNextHTLCBase = nd.InProgDual.OurNextHTLCBase
+	qc.State.MyN2HTLCBase = nd.InProgDual.OurN2HTLCBase
+
+	qc.State.NextHTLCBase = msg.NextHTLCBase
+	qc.State.N2HTLCBase = msg.N2HTLCBase
 
 	// save new channel to db
 	err = nd.SaveQChan(qc)
@@ -616,7 +678,7 @@ func (nd *LitNode) DualFundChanDescHandler(msg lnutil.ChanDescMsg) {
 		return
 	}
 
-	sig, err := nd.SignState(qc)
+	sig, _, err := nd.SignState(qc)
 	if err != nil {
 		log.Printf("DualFundChanDescHandler SignState err %s", err.Error())
 		return
@@ -665,7 +727,7 @@ func (nd *LitNode) DualFundChanAckHandler(msg lnutil.DualFundingChanAckMsg, peer
 	qc.State.NextElkPoint = msg.ElkOne
 	qc.State.N2ElkPoint = msg.ElkTwo
 
-	err = qc.VerifySig(sig)
+	err = qc.VerifySigs(sig, nil)
 	if err != nil {
 		log.Printf("DualFundChanAckHandler VerifySig err %s", err.Error())
 		return
@@ -681,7 +743,7 @@ func (nd *LitNode) DualFundChanAckHandler(msg lnutil.DualFundingChanAckMsg, peer
 	// Make sure everything works & is saved, then clear InProg.
 
 	// sign their com tx to send
-	sig, err = nd.SignState(qc)
+	sig, _, err = nd.SignState(qc)
 	if err != nil {
 		log.Printf("DualFundChanAckHandler SignState err %s", err.Error())
 		return
@@ -773,7 +835,7 @@ func (nd *LitNode) DualFundSigProofHandler(msg lnutil.SigProofMsg, peer *RemoteP
 		return
 	}
 
-	err = qc.VerifySig(msg.Signature)
+	err = qc.VerifySigs(msg.Signature, nil)
 	if err != nil {
 		log.Printf("DualFundSigProofHandler err %s", err.Error())
 		return

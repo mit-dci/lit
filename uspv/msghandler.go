@@ -59,7 +59,7 @@ func (s *SPVCon) incomingMessageHandler() {
 			s.GetDataHandler(m)
 
 		default:
-			log.Printf("Got unknown message type %s\n", m.Command())
+			log.Printf("Got unknown message type %s\n", xm.Command())
 		}
 	}
 	return

@@ -96,6 +96,29 @@ var historyCommand = &Command{
 	ShortDescription: "Show all the metadata for justice txs.\n",
 }
 
+var addHTLCCommand = &Command{
+	Format: fmt.Sprintf("%s%s%s\n", lnutil.White("add"), lnutil.ReqColor("channel idx", "amount", "locktime", "RHash"), lnutil.OptColor("data")),
+	Description: fmt.Sprintf("%s\n%s\n",
+		"Add an HTLC of the given amount (in satoshis) to the given channel. Locktime specifies the number of blocks the HTLC stays active before timing out",
+		"Optionally, the push operation can be associated with a 32 byte value hex encoded."),
+	ShortDescription: "Add HTLC of the given amount (in satoshis) to the given channel.\n",
+}
+
+var clearHTLCCommand = &Command{
+	Format: fmt.Sprintf("%s%s%s\n", lnutil.White("clear"), lnutil.ReqColor("channel idx", "HTLC idx", "R"), lnutil.OptColor("data")),
+	Description: fmt.Sprintf("%s\n%s\n%s\n",
+		"Clear an HTLC of the given index from the given channel.",
+		"Optionally, the push operation can be associated with a 32 byte value hex encoded.",
+		"Set R to zero to timeout the HTLC"),
+	ShortDescription: "Clear HTLC of the given index from the given channel.\n",
+}
+
+var claimHTLCCommand = &Command{
+	Format:           fmt.Sprintf("%s%s\n", lnutil.White("claim"), lnutil.ReqColor("R")),
+	Description:      "Claim any on-chain HTLC that matches the given preimage. Use this to claim an HTLC after the channel is broken.\n",
+	ShortDescription: "Clear HTLC of the given index from the given channel.\n",
+}
+
 func (lc *litAfClient) History(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
 		fmt.Fprintf(color.Output, historyCommand.Format)
@@ -140,7 +163,7 @@ func (lc *litAfClient) FundChannel(textArgs []string) error {
 		return err
 	}
 	args := new(litrpc.FundArgs)
-	reply := new(litrpc.StatusReply)
+	reply := new(litrpc.FundReply)
 
 	peer, err := strconv.Atoi(textArgs[0])
 	if err != nil {
@@ -180,7 +203,7 @@ func (lc *litAfClient) FundChannel(textArgs []string) error {
 		return err
 	}
 
-	fmt.Fprintf(color.Output, "%s\n", reply.Status)
+	fmt.Fprintf(color.Output, "funded channel %d (height: %d)\n", reply.ChanIdx, reply.FundHeight)
 	return nil
 }
 
@@ -235,6 +258,18 @@ func (lc *litAfClient) DualFundChannel(textArgs []string) error {
 	return nil
 }
 
+func (lc *litAfClient) dualFundRespond(aor bool) error {
+	reply := new(litrpc.StatusReply)
+	args := new(litrpc.DualFundRespondArgs)
+	args.AcceptOrDecline = aor
+	err := lc.rpccon.Call("LitRPC.DualFundRespond", args, reply)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(color.Output, "%s\n", reply.Status)
+	return nil
+}
+
 // Decline mutual funding of a channel
 func (lc *litAfClient) DualFundDecline(textArgs []string) error {
 	stopEx, err := CheckHelpCommand(dualFundDeclineCommand, textArgs, 0)
@@ -242,15 +277,7 @@ func (lc *litAfClient) DualFundDecline(textArgs []string) error {
 		return err
 	}
 
-	reply := new(litrpc.StatusReply)
-
-	err = lc.rpccon.Call("LitRPC.DualFundDecline", nil, reply)
-	if err != nil {
-		return err
-	}
-
-	fmt.Fprintf(color.Output, "%s\n", reply.Status)
-	return nil
+	return lc.dualFundRespond(false)
 }
 
 // Accept mutual funding of a channel
@@ -260,15 +287,7 @@ func (lc *litAfClient) DualFundAccept(textArgs []string) error {
 		return err
 	}
 
-	reply := new(litrpc.StatusReply)
-
-	err = lc.rpccon.Call("LitRPC.DualFundAccept", nil, reply)
-	if err != nil {
-		return err
-	}
-
-	fmt.Fprintf(color.Output, "%s\n", reply.Status)
-	return nil
+	return lc.dualFundRespond(true)
 }
 
 // Request close of a channel.  Need to pass in peer, channel index
@@ -437,6 +456,135 @@ func (lc *litAfClient) Watch(textArgs []string) error {
 
 	fmt.Fprintf(color.Output, "Send channel %d data to peer %d\n",
 		args.ChanIdx, args.SendToPeer)
+
+	return nil
+}
+
+// Add is the shell command which calls AddHTLC
+func (lc *litAfClient) AddHTLC(textArgs []string) error {
+	stopEx, err := CheckHelpCommand(addHTLCCommand, textArgs, 3)
+
+	if err != nil || stopEx {
+		return err
+	}
+
+	args := new(litrpc.AddHTLCArgs)
+	reply := new(litrpc.AddHTLCReply)
+
+	// this stuff is all the same as in cclose, should put into a function...
+	cIdx, err := strconv.Atoi(textArgs[0])
+	if err != nil {
+		return err
+	}
+	amt, err := strconv.Atoi(textArgs[1])
+	if err != nil {
+		return err
+	}
+	locktime, err := strconv.Atoi(textArgs[2])
+	if err != nil {
+		return err
+	}
+
+	RHash, err := hex.DecodeString(textArgs[3])
+	if err != nil {
+		return err
+	}
+	copy(args.RHash[:], RHash[:])
+
+	if len(textArgs) > 4 {
+		data, err := hex.DecodeString(textArgs[4])
+		if err != nil {
+			// Wasn't valid hex, copy directly and truncate
+			copy(args.Data[:], textArgs[4])
+		} else {
+			copy(args.Data[:], data[:])
+		}
+	}
+
+	args.ChanIdx = uint32(cIdx)
+	args.Amt = int64(amt)
+	args.LockTime = uint32(locktime)
+
+	err = lc.Call("LitRPC.AddHTLC", args, reply)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(color.Output, "Added HTLC %s at state %s idx %s\n", lnutil.SatoshiColor(int64(amt)), lnutil.White(reply.StateIndex), lnutil.White(reply.HTLCIndex))
+
+	return nil
+}
+
+// Clear is the shell command which calls ClearHTLC
+func (lc *litAfClient) ClearHTLC(textArgs []string) error {
+	stopEx, err := CheckHelpCommand(clearHTLCCommand, textArgs, 3)
+	if err != nil || stopEx {
+		return err
+	}
+
+	args := new(litrpc.ClearHTLCArgs)
+	reply := new(litrpc.ClearHTLCReply)
+
+	// this stuff is all the same as in cclose, should put into a function...
+	cIdx, err := strconv.Atoi(textArgs[0])
+	if err != nil {
+		return err
+	}
+	HTLCIdx, err := strconv.Atoi(textArgs[1])
+	if err != nil {
+		return err
+	}
+
+	R, err := hex.DecodeString(textArgs[2])
+	if err != nil {
+		return err
+	}
+	copy(args.R[:], R[:])
+
+	if len(textArgs) > 3 {
+		data, err := hex.DecodeString(textArgs[3])
+		if err != nil {
+			// Wasn't valid hex, copy directly and truncate
+			copy(args.Data[:], textArgs[3])
+		} else {
+			copy(args.Data[:], data[:])
+		}
+	}
+
+	args.ChanIdx = uint32(cIdx)
+	args.HTLCIdx = uint32(HTLCIdx)
+
+	err = lc.Call("LitRPC.ClearHTLC", args, reply)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(color.Output, "Cleared HTLC %s at state %s\n", lnutil.White(HTLCIdx), lnutil.White(reply.StateIndex))
+
+	return nil
+}
+
+// Clear is the shell command which calls ClearHTLC
+func (lc *litAfClient) ClaimHTLC(textArgs []string) error {
+	stopEx, err := CheckHelpCommand(claimHTLCCommand, textArgs, 1)
+	if err != nil || stopEx {
+		return err
+	}
+
+	args := new(litrpc.ClaimHTLCArgs)
+	reply := new(litrpc.TxidsReply)
+
+	R, err := hex.DecodeString(textArgs[0])
+	if err != nil {
+		return err
+	}
+	copy(args.R[:], R[:])
+
+	err = lc.Call("LitRPC.ClaimHTLC", args, reply)
+	if err != nil {
+		return err
+	}
+	for _, txid := range reply.Txids {
+		fmt.Fprintf(color.Output, "Claimed HTLC with txid %s\n", lnutil.White(txid))
+	}
 
 	return nil
 }

@@ -11,4 +11,5 @@ const (
 	MinOutput       = 100000           // minOutput is the minimum output amt, post fee. This (plus fees) is also the minimum channel balance
 	MinSendAmt      = 10000            // minimum amount that can be sent through a chan
 	MaxTxLen        = 100000           // maximum number of tx's that can be ingested at once
+	DefaultLockTime = 500
 )

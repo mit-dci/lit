@@ -80,9 +80,13 @@ func TestPointRespMsg(t *testing.T) {
 	channelPub := make([]byte, 33)
 	refundPub := make([]byte, 33)
 	HAKDbase := make([]byte, 33)
+	NHTLCBase := make([]byte, 33)
+	N2HTLCBase := make([]byte, 33)
 	_, _ = rand.Read(channelPub)
 	_, _ = rand.Read(refundPub)
 	_, _ = rand.Read(HAKDbase)
+	_, _ = rand.Read(NHTLCBase)
+	_, _ = rand.Read(N2HTLCBase)
 
 	var cp [33]byte
 	copy(cp[:], channelPub[:])
@@ -90,8 +94,12 @@ func TestPointRespMsg(t *testing.T) {
 	copy(rp[:], refundPub[:])
 	var hb [33]byte
 	copy(hb[:], HAKDbase[:])
+	var nhtb [33]byte
+	copy(nhtb[:], NHTLCBase[:])
+	var n2htb [33]byte
+	copy(n2htb[:], N2HTLCBase[:])
 
-	msg := NewPointRespMsg(peerid, cp, rp, hb)
+	msg := NewPointRespMsg(peerid, cp, rp, hb, nhtb, n2htb)
 	b := msg.Bytes()
 
 	msg2, err := NewPointRespMsgFromBytes(b, peerid)
@@ -127,6 +135,8 @@ func TestChanDescMsg(t *testing.T) {
 	var pubKey [33]byte
 	var refundPub [33]byte
 	var hakd [33]byte
+	var nhtlc [33]byte
+	var n2htlc [33]byte
 	cointype := uint32(rand.Int31())
 	capacity := rand.Int63()
 	payment := rand.Int63()
@@ -138,6 +148,8 @@ func TestChanDescMsg(t *testing.T) {
 	_, _ = rand.Read(pubKey[:])
 	_, _ = rand.Read(refundPub[:])
 	_, _ = rand.Read(hakd[:])
+	_, _ = rand.Read(nhtlc[:])
+	_, _ = rand.Read(n2htlc[:])
 	_, _ = rand.Read(elkZero[:])
 	_, _ = rand.Read(elkOne[:])
 	_, _ = rand.Read(elkTwo[:])
@@ -148,6 +160,7 @@ func TestChanDescMsg(t *testing.T) {
 
 	msg := NewChanDescMsg(peerid, op,
 		pubKey, refundPub, hakd,
+		nhtlc, n2htlc,
 		cointype, capacity, payment, elkZero, elkOne, elkTwo, data)
 	b := msg.Bytes()
 
@@ -311,13 +324,16 @@ func TestDeltaSigMsg(t *testing.T) {
 	var empty [32]byte
 	delta := rand.Int31()
 	var sig [64]byte
+	htlcsigs := make([][64]byte, 1)
+	htlcsigs[0] = [64]byte{}
 
 	_, _ = rand.Read(outPoint[:])
 	_, _ = rand.Read(sig[:])
+	_, _ = rand.Read(htlcsigs[0][:])
 
 	op := *OutPointFromBytes(outPoint)
 
-	msg := NewDeltaSigMsg(peerid, op, delta, sig, empty)
+	msg := NewDeltaSigMsg(peerid, op, delta, sig, htlcsigs, empty)
 	b := msg.Bytes()
 
 	msg2, err := NewDeltaSigMsgFromBytes(b, peerid)
@@ -353,16 +369,22 @@ func TestSigRevMsg(t *testing.T) {
 	var sig [64]byte
 	var elk [32]byte
 	var n2elk [33]byte
+	var n2htlc [33]byte
+
+	htlcsigs := make([][64]byte, 1)
+	htlcsigs[0] = [64]byte{}
 
 	_, _ = rand.Read(outPoint[:])
 	_, _ = rand.Read(sig[:])
 	_, _ = rand.Read(elk[:])
 	_, _ = rand.Read(n2elk[:])
+	_, _ = rand.Read(n2htlc[:])
+	_, _ = rand.Read(htlcsigs[0][:])
 
 	op := *OutPointFromBytes(outPoint)
 	Elk, _ := chainhash.NewHash(elk[:])
 
-	msg := NewSigRev(peerid, op, sig, *Elk, n2elk)
+	msg := NewSigRev(peerid, op, sig, *Elk, n2elk, htlcsigs, n2htlc)
 	b := msg.Bytes()
 
 	msg2, err := NewSigRevFromBytes(b, peerid)
@@ -398,16 +420,21 @@ func TestGapSigRevMsg(t *testing.T) {
 	var sig [64]byte
 	var elk [32]byte
 	var n2elk [33]byte
+	var n2htlc [33]byte
+	htlcsigs := make([][64]byte, 1)
+	htlcsigs[0] = [64]byte{}
 
+	_, _ = rand.Read(htlcsigs[0][:])
 	_, _ = rand.Read(outPoint[:])
 	_, _ = rand.Read(sig[:])
 	_, _ = rand.Read(elk[:])
 	_, _ = rand.Read(n2elk[:])
+	_, _ = rand.Read(n2htlc[:])
 
 	op := *OutPointFromBytes(outPoint)
 	Elk, _ := chainhash.NewHash(elk[:])
 
-	msg := NewGapSigRev(peerid, op, sig, *Elk, n2elk)
+	msg := NewGapSigRev(peerid, op, sig, *Elk, n2elk, htlcsigs, n2htlc)
 	b := msg.Bytes()
 
 	msg2, err := NewGapSigRevFromBytes(b, peerid)
@@ -442,15 +469,17 @@ func TestRevMsg(t *testing.T) {
 	var outPoint [36]byte
 	var elk [32]byte
 	var n2elk [33]byte
+	var n2htlc [33]byte
 
 	_, _ = rand.Read(outPoint[:])
 	_, _ = rand.Read(elk[:])
 	_, _ = rand.Read(n2elk[:])
+	_, _ = rand.Read(n2htlc[:])
 
 	op := *OutPointFromBytes(outPoint)
 	Elk, _ := chainhash.NewHash(elk[:])
 
-	msg := NewRevMsg(peerid, op, *Elk, n2elk)
+	msg := NewRevMsg(peerid, op, *Elk, n2elk, n2htlc)
 	b := msg.Bytes()
 
 	msg2, err := NewRevMsgFromBytes(b, peerid)

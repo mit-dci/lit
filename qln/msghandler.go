@@ -6,13 +6,14 @@ import (
 	"log"
 
 	"github.com/mit-dci/lit/btcutil/txscript"
-	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
+	"github.com/mit-dci/lit/wire"
 )
 
 // handles stuff that comes in over the wire.  Not user-initiated.
 func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) error {
+	log.Printf("Message from %d type %x", msg.Peer(), msg.MsgType())
 	switch msg.MsgType() & 0xf0 {
 	case 0x00: // TEXT MESSAGE.  SIMPLE
 		chat, ok := msg.(lnutil.ChatMsg)
@@ -299,6 +300,14 @@ func (nd *LitNode) PushPullHandler(routedMsg lnutil.LitMsg, q *Qchan) error {
 		log.Printf("Got REV from %x\n", routedMsg.Peer())
 		return nd.RevHandler(message, q)
 
+	case lnutil.HashSigMsg: // Offer HTLC
+		log.Printf("Got HashSig from %d", routedMsg.Peer())
+		return nd.HashSigHandler(message, q)
+
+	case lnutil.PreimageSigMsg: // Clear HTLC
+		log.Printf("Got PreimageSig from %d", routedMsg.Peer())
+		return nd.PreimageSigHandler(message, q)
+
 	default:
 		return fmt.Errorf("Unknown message type %x", routedMsg.MsgType())
 
@@ -353,7 +362,6 @@ func (nd *LitNode) OPEventHandler(OPEventChan chan lnutil.OutPointEvent) {
 					theC = c
 				}
 			}
-
 		}
 
 		if theC != nil {
@@ -361,6 +369,43 @@ func (nd *LitNode) OPEventHandler(OPEventChan chan lnutil.OutPointEvent) {
 			if err != nil {
 				log.Printf("HandleContractOPEvent error: %s\n", err.Error())
 			}
+			continue
+		}
+
+		if theQ == nil && curOPEvent.Tx != nil {
+			// Check if this is a HTLC output we're watching
+			h, _, err := nd.GetHTLC(&curOPEvent.Op)
+			if err != nil {
+				log.Printf("Error Getting HTLC OPHash: %s\n", err.Error())
+			}
+			if h.Idx == 0 && h.Amt == 0 { // empty HTLC, so none found
+				continue
+			}
+
+			log.Printf("Got OP event for HTLC output %s [Incoming: %t]\n", curOPEvent.Op.String(), h.Incoming)
+			// Check the witness stack for a preimage
+			for _, txi := range curOPEvent.Tx.TxIn {
+
+				var preimage [16]byte
+				preimageFound := false
+				if len(txi.Witness) == 5 && len(txi.Witness[0]) == 0 && len(txi.Witness[3]) == 16 {
+					// Success transaction from their break TX, multisig. Preimage is fourth on the witness stack.
+					copy(preimage[:], txi.Witness[3])
+					preimageFound = true
+				}
+				if len(txi.Witness) == 3 && len(txi.Witness[1]) == 16 {
+					// Success transaction from their break TX, multisig. Preimage is fourth on the witness stack.
+					copy(preimage[:], txi.Witness[1])
+					preimageFound = true
+				}
+
+				if preimageFound {
+					log.Printf("Found preimage [%x] in this TX, looking for HTLCs i have that are claimable with that\n", preimage)
+					// try claiming it!
+					nd.ClaimHTLC(preimage)
+				}
+			}
+
 			continue
 		}
 
@@ -399,29 +444,67 @@ func (nd *LitNode) OPEventHandler(OPEventChan chan lnutil.OutPointEvent) {
 				log.Printf("GetCloseTxos error: %s", err.Error())
 				continue
 			}
+
 			// if you have seq=1 txos, modify the privkey...
 			// pretty ugly as we need the private key to do that.
-			for _, portxo := range txos {
-				if portxo.Seq == 1 { // revoked key
+			for _, ptxo := range txos {
+				if ptxo.Seq == 1 { // revoked key
 					// GetCloseTxos returns a porTxo with the elk scalar in the
 					// privkey field.  It isn't just added though; it needs to
 					// be combined with the private key in a way porTxo isn't
 					// aware of, so derive and subtract that here.
 					var elkScalar [32]byte
 					// swap out elkscalar, leaving privkey empty
-					elkScalar, portxo.KeyGen.PrivKey =
-						portxo.KeyGen.PrivKey, elkScalar
+					elkScalar, ptxo.KeyGen.PrivKey =
+						ptxo.KeyGen.PrivKey, elkScalar
 
-					privBase, err := nd.SubWallet[theQ.Coin()].GetPriv(portxo.KeyGen)
+					privBase, err := nd.SubWallet[theQ.Coin()].GetPriv(ptxo.KeyGen)
 					if err != nil {
 						continue // or return?
 					}
 
-					portxo.PrivKey = lnutil.CombinePrivKeyAndSubtract(
+					ptxo.PrivKey = lnutil.CombinePrivKeyAndSubtract(
 						privBase, elkScalar[:])
 				}
 				// make this concurrent to avoid circular locking
-				go nd.SubWallet[theQ.Coin()].ExportUtxo(&portxo)
+				go func(porTxo portxo.PorTxo) {
+					nd.SubWallet[theQ.Coin()].ExportUtxo(&porTxo)
+				}(ptxo)
+			}
+
+			// Fetch the indexes of HTLC outputs, and then register them to be watched
+			// We can monitor this for spends from an HTLC output that contains a preimage
+			// and then use that preimage to claim any HTLCs we have outstanding.
+			_, htlcIdxes, err := theQ.GetHtlcTxos(curOPEvent.Tx, false)
+			if err != nil {
+				log.Printf("GetHtlcTxos error: %s", err.Error())
+				continue
+			}
+			_, htlcOurIdxes, err := theQ.GetHtlcTxos(curOPEvent.Tx, true)
+			if err != nil {
+				log.Printf("GetHtlcTxos error: %s", err.Error())
+				continue
+			}
+			htlcIdxes = append(htlcIdxes, htlcOurIdxes...)
+			txHash := curOPEvent.Tx.TxHash()
+			for _, i := range htlcIdxes {
+				op := wire.NewOutPoint(&txHash, i)
+				log.Printf("Watching for spends from [%s] (HTLC)\n", op.String())
+				nd.SubWallet[theQ.Coin()].WatchThis(*op)
+			}
+		}
+	}
+}
+
+func (nd *LitNode) HeightEventHandler(HeightEventChan chan lnutil.HeightEvent) {
+	for {
+		event := <-HeightEventChan
+		txs, err := nd.ClaimHTLCTimeouts(event.CoinType, event.Height)
+		if err != nil {
+			log.Printf("Error while claiming HTLC timeouts for coin %d at height %d : %s\n", event.CoinType, event.Height, err.Error())
+		} else {
+			for _, tx := range txs {
+				log.Printf("Claimed timeout HTLC using TXID %x\n", tx)
 			}
 		}
 	}

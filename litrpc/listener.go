@@ -3,6 +3,7 @@ package litrpc
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -72,6 +73,33 @@ func WebUIHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(bytes)
 }
 
+// OiOoReadWriter is for One-In-One-Out Reader/Writer and I hope to god that it works.
+type OiOoReadWriter struct {
+	from io.ReadCloser
+	to   io.Writer
+}
+
+func (o OiOoReadWriter) Read(p []byte) (int, error) {
+	return o.from.Read(p)
+}
+
+func (o OiOoReadWriter) Write(p []byte) (int, error) {
+	return o.to.Write(p)
+}
+
+func (o OiOoReadWriter) Close() error {
+	return o.from.Close()
+}
+
+func serveOneoffs(rw http.ResponseWriter, req *http.Request) {
+	o := OiOoReadWriter{
+		from: req.Body,
+		to:   rw,
+	}
+	jsonrpc.ServeConn(o)
+	o.Close()
+}
+
 func RPCListen(rpcl *LitRPC, host string, port uint16) {
 
 	rpc.Register(rpcl)
@@ -81,6 +109,6 @@ func RPCListen(rpcl *LitRPC, host string, port uint16) {
 	http.Handle("/ws", websocket.Handler(serveWS))
 	http.HandleFunc("/static/", WebUIHandler)
 	http.HandleFunc("/", WebUIHandler)
-
+	http.HandleFunc("/oneoff", serveOneoffs)
 	log.Fatal(http.ListenAndServe(listenString, nil))
 }

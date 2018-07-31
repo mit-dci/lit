@@ -31,6 +31,10 @@ const (
 	MSGID_GAPSIGREV = 0x32 // resolving collision
 	MSGID_REV       = 0x33 // pushing funds; revoking previous channel state
 
+	// HTLC messages
+	MSGID_HASHSIG     = 0x34 // Like a deltasig but offers an HTLC
+	MSGID_PREIMAGESIG = 0x35 // Like a hashsig but clears an HTLC
+
 	//not implemented
 	MSGID_FWDMSG     = 0x40
 	MSGID_FWDAUTHREQ = 0x41
@@ -111,6 +115,10 @@ func LitMsgFromBytes(b []byte, peerid uint32) (LitMsg, error) {
 		return NewGapSigRevFromBytes(b, peerid)
 	case MSGID_REV:
 		return NewRevMsgFromBytes(b, peerid)
+	case MSGID_HASHSIG:
+		return NewHashSigMsgFromBytes(b, peerid)
+	case MSGID_PREIMAGESIG:
+		return NewPreimageSigMsgFromBytes(b, peerid)
 
 	/*
 		case MSGID_FWDMSG:
@@ -244,22 +252,31 @@ type PointRespMsg struct {
 	ChannelPub [33]byte
 	RefundPub  [33]byte
 	HAKDbase   [33]byte
+
+	NextHTLCBase [33]byte
+	N2HTLCBase   [33]byte
 }
 
-func NewPointRespMsg(peerid uint32, chanpub [33]byte, refundpub [33]byte, HAKD [33]byte) PointRespMsg {
+func NewPointRespMsg(peerid uint32, chanpub [33]byte, refundpub [33]byte,
+	HAKD [33]byte, nextHTLCBase [33]byte, N2HTLCBase [33]byte) PointRespMsg {
 	pr := new(PointRespMsg)
 	pr.PeerIdx = peerid
 	pr.ChannelPub = chanpub
 	pr.RefundPub = refundpub
 	pr.HAKDbase = HAKD
+	pr.NextHTLCBase = nextHTLCBase
+	pr.N2HTLCBase = N2HTLCBase
 	return *pr
 }
 
+// NewPointRespMsgFromBytes takes a byte slice and a peerid and constructs a
+// PointRespMsg object from the bytes. Expects at least 1 + 33 + 33 + 33 +
+// 33 + 33 = 166.
 func NewPointRespMsgFromBytes(b []byte, peerid uint32) (PointRespMsg, error) {
 	pm := new(PointRespMsg)
 
-	if len(b) < 100 {
-		return *pm, fmt.Errorf("PointResp err: msg %d bytes, expect 100\n", len(b))
+	if len(b) < 166 {
+		return *pm, fmt.Errorf("PointResp err: msg %d bytes, expect 166\n", len(b))
 	}
 
 	pm.PeerIdx = peerid
@@ -267,6 +284,8 @@ func NewPointRespMsgFromBytes(b []byte, peerid uint32) (PointRespMsg, error) {
 	copy(pm.ChannelPub[:], buf.Next(33))
 	copy(pm.RefundPub[:], buf.Next(33))
 	copy(pm.HAKDbase[:], buf.Next(33))
+	copy(pm.NextHTLCBase[:], buf.Next(33))
+	copy(pm.N2HTLCBase[:], buf.Next(33))
 
 	return *pm, nil
 }
@@ -277,6 +296,8 @@ func (self PointRespMsg) Bytes() []byte {
 	msg = append(msg, self.ChannelPub[:]...)
 	msg = append(msg, self.RefundPub[:]...)
 	msg = append(msg, self.HAKDbase[:]...)
+	msg = append(msg, self.NextHTLCBase[:]...)
+	msg = append(msg, self.N2HTLCBase[:]...)
 	return msg
 }
 
@@ -291,6 +312,9 @@ type ChanDescMsg struct {
 	RefundPub [33]byte
 	HAKDbase  [33]byte
 
+	NextHTLCBase [33]byte
+	N2HTLCBase   [33]byte
+
 	CoinType    uint32
 	Capacity    int64
 	InitPayment int64
@@ -304,7 +328,7 @@ type ChanDescMsg struct {
 
 func NewChanDescMsg(
 	peerid uint32, OP wire.OutPoint,
-	pubkey, refund, hakd [33]byte,
+	pubkey, refund, hakd [33]byte, nextHTLCBase [33]byte, N2HTLCBase [33]byte,
 	cointype uint32,
 	capacity int64, payment int64,
 	ELKZero, ELKOne, ELKTwo [33]byte, data [32]byte) ChanDescMsg {
@@ -315,6 +339,8 @@ func NewChanDescMsg(
 	cd.PubKey = pubkey
 	cd.RefundPub = refund
 	cd.HAKDbase = hakd
+	cd.NextHTLCBase = nextHTLCBase
+	cd.N2HTLCBase = N2HTLCBase
 	cd.CoinType = cointype
 	cd.Capacity = capacity
 	cd.InitPayment = payment
@@ -340,6 +366,8 @@ func NewChanDescMsgFromBytes(b []byte, peerid uint32) (ChanDescMsg, error) {
 	copy(cm.PubKey[:], buf.Next(33))
 	copy(cm.RefundPub[:], buf.Next(33))
 	copy(cm.HAKDbase[:], buf.Next(33))
+	copy(cm.NextHTLCBase[:], buf.Next(33))
+	copy(cm.N2HTLCBase[:], buf.Next(33))
 	cm.CoinType = BtU32(buf.Next(4))
 	cm.Capacity = BtI64(buf.Next(8))
 	cm.InitPayment = BtI64(buf.Next(8))
@@ -363,6 +391,8 @@ func (self ChanDescMsg) Bytes() []byte {
 	msg = append(msg, self.PubKey[:]...)
 	msg = append(msg, self.RefundPub[:]...)
 	msg = append(msg, self.HAKDbase[:]...)
+	msg = append(msg, self.NextHTLCBase[:]...)
+	msg = append(msg, self.N2HTLCBase[:]...)
 	msg = append(msg, coinTypeBin[:]...)
 	msg = append(msg, capBin[:]...)
 	msg = append(msg, initBin[:]...)
@@ -532,15 +562,17 @@ type DeltaSigMsg struct {
 	Delta     int32
 	Signature [64]byte
 	Data      [32]byte
+	HTLCSigs  [][64]byte
 }
 
-func NewDeltaSigMsg(peerid uint32, OP wire.OutPoint, DELTA int32, SIG [64]byte, data [32]byte) DeltaSigMsg {
+func NewDeltaSigMsg(peerid uint32, OP wire.OutPoint, DELTA int32, SIG [64]byte, HTLCSigs [][64]byte, data [32]byte) DeltaSigMsg {
 	d := new(DeltaSigMsg)
 	d.PeerIdx = peerid
 	d.Outpoint = OP
 	d.Delta = DELTA
 	d.Signature = SIG
 	d.Data = data
+	d.HTLCSigs = HTLCSigs
 	return *d
 }
 
@@ -562,6 +594,14 @@ func NewDeltaSigMsgFromBytes(b []byte, peerid uint32) (DeltaSigMsg, error) {
 	ds.Delta = BtI32(buf.Next(4))
 	copy(ds.Signature[:], buf.Next(64))
 	copy(ds.Data[:], buf.Next(32))
+
+	nHTLCs := buf.Len() / 64
+	for i := 0; i < nHTLCs; i++ {
+		var HTLCSig [64]byte
+		copy(HTLCSig[:], buf.Next(64))
+		ds.HTLCSigs = append(ds.HTLCSigs, HTLCSig)
+	}
+
 	return *ds, nil
 }
 
@@ -573,6 +613,9 @@ func (self DeltaSigMsg) Bytes() []byte {
 	msg = append(msg, I32tB(self.Delta)...)
 	msg = append(msg, self.Signature[:]...)
 	msg = append(msg, self.Data[:]...)
+	for _, sig := range self.HTLCSigs {
+		msg = append(msg, sig[:]...)
+	}
 	return msg
 }
 
@@ -586,15 +629,20 @@ type SigRevMsg struct {
 	Signature  [64]byte
 	Elk        chainhash.Hash
 	N2ElkPoint [33]byte
+	HTLCSigs   [][64]byte
+	N2HTLCBase [33]byte
 }
 
-func NewSigRev(peerid uint32, OP wire.OutPoint, SIG [64]byte, ELK chainhash.Hash, N2ELK [33]byte) SigRevMsg {
+func NewSigRev(peerid uint32, OP wire.OutPoint, SIG [64]byte, ELK chainhash.Hash,
+	N2ELK [33]byte, HTLCSigs [][64]byte, N2HTLCBase [33]byte) SigRevMsg {
 	s := new(SigRevMsg)
 	s.PeerIdx = peerid
 	s.Outpoint = OP
 	s.Signature = SIG
 	s.Elk = ELK
 	s.N2ElkPoint = N2ELK
+	s.HTLCSigs = HTLCSigs
+	s.N2HTLCBase = N2HTLCBase
 	return *s
 }
 
@@ -615,6 +663,16 @@ func NewSigRevFromBytes(b []byte, peerid uint32) (SigRevMsg, error) {
 	elk, _ := chainhash.NewHash(buf.Next(32))
 	sr.Elk = *elk
 	copy(sr.N2ElkPoint[:], buf.Next(33))
+
+	nHTLCs := (buf.Len() - 33) / 64
+	for i := 0; i < nHTLCs; i++ {
+		var HTLCSig [64]byte
+		copy(HTLCSig[:], buf.Next(64))
+		sr.HTLCSigs = append(sr.HTLCSigs, HTLCSig)
+	}
+
+	copy(sr.N2HTLCBase[:], buf.Next(33))
+
 	return *sr, nil
 }
 
@@ -626,6 +684,10 @@ func (self SigRevMsg) Bytes() []byte {
 	msg = append(msg, self.Signature[:]...)
 	msg = append(msg, self.Elk[:]...)
 	msg = append(msg, self.N2ElkPoint[:]...)
+	for _, sig := range self.HTLCSigs {
+		msg = append(msg, sig[:]...)
+	}
+	msg = append(msg, self.N2HTLCBase[:]...)
 	return msg
 }
 
@@ -639,15 +701,19 @@ type GapSigRevMsg struct {
 	Signature  [64]byte
 	Elk        chainhash.Hash
 	N2ElkPoint [33]byte
+	N2HTLCBase [33]byte
+	HTLCSigs   [][64]byte
 }
 
-func NewGapSigRev(peerid uint32, OP wire.OutPoint, SIG [64]byte, ELK chainhash.Hash, N2ELK [33]byte) GapSigRevMsg {
+func NewGapSigRev(peerid uint32, OP wire.OutPoint, SIG [64]byte, ELK chainhash.Hash, N2ELK [33]byte, HTLCSigs [][64]byte, N2HTLCBase [33]byte) GapSigRevMsg {
 	g := new(GapSigRevMsg)
 	g.PeerIdx = peerid
 	g.Outpoint = OP
 	g.Signature = SIG
 	g.Elk = ELK
 	g.N2ElkPoint = N2ELK
+	g.N2HTLCBase = N2HTLCBase
+	g.HTLCSigs = HTLCSigs
 	return *g
 }
 
@@ -668,6 +734,15 @@ func NewGapSigRevFromBytes(b []byte, peerId uint32) (GapSigRevMsg, error) {
 	elk, _ := chainhash.NewHash(buf.Next(32))
 	gs.Elk = *elk
 	copy(gs.N2ElkPoint[:], buf.Next(33))
+	copy(gs.N2HTLCBase[:], buf.Next(33))
+
+	nHTLCs := buf.Len() / 64
+	for i := 0; i < nHTLCs; i++ {
+		var HTLCSig [64]byte
+		copy(HTLCSig[:], buf.Next(64))
+		gs.HTLCSigs = append(gs.HTLCSigs, HTLCSig)
+	}
+
 	return *gs, nil
 }
 
@@ -679,6 +754,10 @@ func (self GapSigRevMsg) Bytes() []byte {
 	msg = append(msg, self.Signature[:]...)
 	msg = append(msg, self.Elk[:]...)
 	msg = append(msg, self.N2ElkPoint[:]...)
+	msg = append(msg, self.N2HTLCBase[:]...)
+	for _, sig := range self.HTLCSigs {
+		msg = append(msg, sig[:]...)
+	}
 	return msg
 }
 
@@ -691,14 +770,16 @@ type RevMsg struct {
 	Outpoint   wire.OutPoint
 	Elk        chainhash.Hash
 	N2ElkPoint [33]byte
+	N2HTLCBase [33]byte
 }
 
-func NewRevMsg(peerid uint32, OP wire.OutPoint, ELK chainhash.Hash, N2ELK [33]byte) RevMsg {
+func NewRevMsg(peerid uint32, OP wire.OutPoint, ELK chainhash.Hash, N2ELK [33]byte, N2HTLCBase [33]byte) RevMsg {
 	r := new(RevMsg)
 	r.PeerIdx = peerid
 	r.Outpoint = OP
 	r.Elk = ELK
 	r.N2ElkPoint = N2ELK
+	r.N2HTLCBase = N2HTLCBase
 	return *r
 }
 
@@ -718,6 +799,7 @@ func NewRevMsgFromBytes(b []byte, peerId uint32) (RevMsg, error) {
 	elk, _ := chainhash.NewHash(buf.Next(32))
 	rv.Elk = *elk
 	copy(rv.N2ElkPoint[:], buf.Next(33))
+	copy(rv.N2HTLCBase[:], buf.Next(33))
 	return *rv, nil
 }
 
@@ -728,11 +810,176 @@ func (self RevMsg) Bytes() []byte {
 	msg = append(msg, opArr[:]...)
 	msg = append(msg, self.Elk[:]...)
 	msg = append(msg, self.N2ElkPoint[:]...)
+	msg = append(msg, self.N2HTLCBase[:]...)
 	return msg
 }
 
 func (self RevMsg) Peer() uint32   { return self.PeerIdx }
 func (self RevMsg) MsgType() uint8 { return MSGID_REV }
+
+//----------
+
+//message for offering an HTLC
+type HashSigMsg struct {
+	PeerIdx  uint32
+	Outpoint wire.OutPoint
+
+	Amt      int64
+	Locktime uint32
+	RHash    [32]byte
+
+	Data [32]byte
+
+	CommitmentSignature [64]byte
+	// must be at least 36 + 4 + 32 + 33 + 32 + 64 = 169 bytes
+	HTLCSigs [][64]byte
+}
+
+func NewHashSigMsg(peerid uint32, OP wire.OutPoint, amt int64, locktime uint32, RHash [32]byte, sig [64]byte, HTLCSigs [][64]byte, data [32]byte) HashSigMsg {
+	d := new(HashSigMsg)
+	d.PeerIdx = peerid
+	d.Outpoint = OP
+	d.Amt = amt
+	d.CommitmentSignature = sig
+	d.Data = data
+	d.RHash = RHash
+	d.Locktime = locktime
+	d.HTLCSigs = HTLCSigs
+	return *d
+}
+
+func NewHashSigMsgFromBytes(b []byte, peerid uint32) (HashSigMsg, error) {
+	ds := new(HashSigMsg)
+	ds.PeerIdx = peerid
+
+	if len(b) < 169 {
+		return *ds, fmt.Errorf("got %d byte HashSig, expect at least 169 bytes", len(b))
+	}
+
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
+
+	var op [36]byte
+	copy(op[:], buf.Next(36))
+	ds.Outpoint = *OutPointFromBytes(op)
+
+	// deserialize DeltaSig
+	ds.Amt = BtI64(buf.Next(8))
+	ds.Locktime = BtU32(buf.Next(4))
+	copy(ds.RHash[:], buf.Next(32))
+
+	copy(ds.Data[:], buf.Next(32))
+
+	copy(ds.CommitmentSignature[:], buf.Next(64))
+
+	nHTLCSigs := buf.Len() / 64
+
+	for i := 0; i < nHTLCSigs; i++ {
+		var sig [64]byte
+		copy(sig[:], buf.Next(64))
+		ds.HTLCSigs = append(ds.HTLCSigs, sig)
+	}
+
+	return *ds, nil
+}
+
+func (self HashSigMsg) Bytes() []byte {
+	var msg []byte
+	msg = append(msg, self.MsgType())
+	opArr := OutPointToBytes(self.Outpoint)
+	msg = append(msg, opArr[:]...)
+	msg = append(msg, I64tB(self.Amt)...)
+	msg = append(msg, U32tB(self.Locktime)...)
+	msg = append(msg, self.RHash[:]...)
+	msg = append(msg, self.Data[:]...)
+	msg = append(msg, self.CommitmentSignature[:]...)
+	for _, sig := range self.HTLCSigs {
+		msg = append(msg, sig[:]...)
+	}
+	return msg
+}
+
+func (self HashSigMsg) Peer() uint32   { return self.PeerIdx }
+func (self HashSigMsg) MsgType() uint8 { return MSGID_HASHSIG }
+
+//----------
+
+//message for clearing an HTLC
+type PreimageSigMsg struct {
+	PeerIdx  uint32
+	Outpoint wire.OutPoint
+
+	Idx uint32
+	R   [16]byte
+
+	Data [32]byte
+
+	CommitmentSignature [64]byte
+	// must be at least 36 + 4 + 16 + 32 + 64 = 152 bytes
+	HTLCSigs [][64]byte
+}
+
+func NewPreimageSigMsg(peerid uint32, OP wire.OutPoint, Idx uint32, R [16]byte, sig [64]byte, HTLCSigs [][64]byte, data [32]byte) PreimageSigMsg {
+	d := new(PreimageSigMsg)
+	d.PeerIdx = peerid
+	d.Outpoint = OP
+	d.CommitmentSignature = sig
+	d.Data = data
+	d.R = R
+	d.Idx = Idx
+	d.HTLCSigs = HTLCSigs
+	return *d
+}
+
+func NewPreimageSigMsgFromBytes(b []byte, peerid uint32) (PreimageSigMsg, error) {
+	ps := new(PreimageSigMsg)
+	ps.PeerIdx = peerid
+
+	if len(b) < 152 {
+		return *ps, fmt.Errorf("got %d byte PreimageSig, expect at least 152 bytes", len(b))
+	}
+
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
+
+	var op [36]byte
+	copy(op[:], buf.Next(36))
+	ps.Outpoint = *OutPointFromBytes(op)
+
+	ps.Idx = BtU32(buf.Next(4))
+
+	copy(ps.R[:], buf.Next(16))
+
+	copy(ps.Data[:], buf.Next(32))
+
+	copy(ps.CommitmentSignature[:], buf.Next(64))
+
+	nHTLCSigs := buf.Len() / 64
+
+	for i := 0; i < nHTLCSigs; i++ {
+		var sig [64]byte
+		copy(sig[:], buf.Next(64))
+		ps.HTLCSigs = append(ps.HTLCSigs, sig)
+	}
+
+	return *ps, nil
+}
+
+func (self PreimageSigMsg) Bytes() []byte {
+	var msg []byte
+	msg = append(msg, self.MsgType())
+	opArr := OutPointToBytes(self.Outpoint)
+	msg = append(msg, opArr[:]...)
+	msg = append(msg, U32tB(self.Idx)...)
+	msg = append(msg, self.R[:]...)
+	msg = append(msg, self.Data[:]...)
+	msg = append(msg, self.CommitmentSignature[:]...)
+	for _, sig := range self.HTLCSigs {
+		msg = append(msg, sig[:]...)
+	}
+	return msg
+}
+
+func (self PreimageSigMsg) Peer() uint32   { return self.PeerIdx }
+func (self PreimageSigMsg) MsgType() uint8 { return MSGID_PREIMAGESIG }
 
 //----------
 
@@ -1117,11 +1364,13 @@ type DualFundingAcceptMsg struct {
 	OurPub              [33]byte
 	OurRefundPub        [33]byte
 	OurHAKDBase         [33]byte
-	OurChangeAddressPKH [20]byte           // The address we want to receive change for funding
+	OurChangeAddressPKH [20]byte // The address we want to receive change for funding
+	OurNextHTLCBase     [33]byte
+	OurN2HTLCBase       [33]byte
 	OurInputs           []DualFundingInput // The inputs we will use for funding
 }
 
-func NewDualFundingAcceptMsg(peerIdx uint32, coinType uint32, ourPub [33]byte, ourRefundPub [33]byte, ourHAKDBase [33]byte, ourChangeAddress [20]byte, ourInputs []DualFundingInput) DualFundingAcceptMsg {
+func NewDualFundingAcceptMsg(peerIdx uint32, coinType uint32, ourPub [33]byte, ourRefundPub [33]byte, ourHAKDBase [33]byte, ourChangeAddress [20]byte, ourInputs []DualFundingInput, ourNextHTLCBase [33]byte, ourN2HTLCBase [33]byte) DualFundingAcceptMsg {
 	msg := new(DualFundingAcceptMsg)
 	msg.PeerIdx = peerIdx
 	msg.CoinType = coinType
@@ -1130,6 +1379,8 @@ func NewDualFundingAcceptMsg(peerIdx uint32, coinType uint32, ourPub [33]byte, o
 	msg.OurHAKDBase = ourHAKDBase
 	msg.OurChangeAddressPKH = ourChangeAddress
 	msg.OurInputs = ourInputs
+	msg.OurNextHTLCBase = ourNextHTLCBase
+	msg.OurN2HTLCBase = ourN2HTLCBase
 	return *msg
 }
 
@@ -1148,6 +1399,8 @@ func NewDualFundingAcceptMsgFromBytes(b []byte, peerIdx uint32) (DualFundingAcce
 	copy(msg.OurRefundPub[:], buf.Next(33))
 	copy(msg.OurHAKDBase[:], buf.Next(33))
 	copy(msg.OurChangeAddressPKH[:], buf.Next(20))
+	copy(msg.OurNextHTLCBase[:], buf.Next(33))
+	copy(msg.OurN2HTLCBase[:], buf.Next(33))
 
 	var utxoCount uint32
 	_ = binary.Read(buf, binary.BigEndian, &utxoCount)
@@ -1177,6 +1430,8 @@ func (self DualFundingAcceptMsg) Bytes() []byte {
 	buf.Write(self.OurRefundPub[:])
 	buf.Write(self.OurHAKDBase[:])
 	buf.Write(self.OurChangeAddressPKH[:])
+	buf.Write(self.OurNextHTLCBase[:])
+	buf.Write(self.OurN2HTLCBase[:])
 
 	binary.Write(&buf, binary.BigEndian, uint32(len(self.OurInputs)))
 
