@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"fmt"
+	"log"
 
 	"github.com/adiabat/bech32"
 	"github.com/btcsuite/fastsha256"
@@ -27,6 +28,7 @@ func (nd *LitNode) PayMultihop(dstLNAdr string, coinType uint32, amount int64) (
 
 	inFlight := new(InFlightMultihop)
 	inFlight.Path = path
+	inFlight.Amount = amount
 	nd.InProgMultihop = append(nd.InProgMultihop, inFlight)
 
 	//Connect to the node
@@ -46,6 +48,7 @@ func (nd *LitNode) MultihopPaymentRequestHandler(msg lnutil.MultihopPaymentReque
 	fmt.Printf("Received multihop payment request from peer %d\n", msg.Peer())
 	inFlight := new(InFlightMultihop)
 	var pkh [20]byte
+
 	id, _ := nd.GetPubHostFromPeerIdx(msg.Peer())
 	idHash := fastsha256.Sum256(id[:])
 	copy(pkh[:], idHash[:20])
@@ -86,6 +89,7 @@ func (nd *LitNode) MultihopPaymentAckHandler(msg lnutil.MultihopPaymentAckMsg) e
 			}
 
 			nd.RemoteMtx.Unlock()
+			log.Printf("offering HTLC")
 			err := nd.OfferHTLC(qc, uint32(mh.Amt), mh.HHash, 100, [32]byte{})
 			if err != nil {
 				return err
