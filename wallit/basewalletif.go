@@ -7,11 +7,11 @@ import (
 
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
-	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/uspv"
+	"github.com/mit-dci/lit/wire"
 )
 
 /*
@@ -27,6 +27,7 @@ type UWallet interface {
 	NahDontSend(txid *chainhash.Hash) error
 	WatchThis(wire.OutPoint) error
 	LetMeKnow() chan lnutil.OutPointEvent
+	LetMeKnowHeight() chan lnutil.HeightEvent
 	BlockMonitor() chan *wire.MsgBlock
 
 	Params() *chaincfg.Params
@@ -58,6 +59,11 @@ func (w *Wallit) Params() *coinparam.Params {
 func (w *Wallit) LetMeKnow() chan lnutil.OutPointEvent {
 	w.OPEventChan = make(chan lnutil.OutPointEvent, 1)
 	return w.OPEventChan
+}
+
+func (w *Wallit) LetMeKnowHeight() chan lnutil.HeightEvent {
+	w.HeightEventChan = make(chan lnutil.HeightEvent, 1)
+	return w.HeightEventChan
 }
 
 func (w *Wallit) CurrentHeight() int32 {
@@ -114,6 +120,24 @@ func (w *Wallit) WatchThis(op wire.OutPoint) error {
 
 	// then register in the wallit
 	err = w.RegisterWatchOP(op)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// StopWatchingThis removes an outpoint to watch.
+func (w *Wallit) StopWatchingThis(op wire.OutPoint) error {
+
+	// first, tell the chainhook
+	err := w.Hook.RegisterOutPoint(op)
+	if err != nil {
+		return err
+	}
+
+	// then unregister from the wallit
+	err = w.UnregisterWatchOP(op)
 	if err != nil {
 		return err
 	}

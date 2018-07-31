@@ -5,11 +5,11 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/blockchain"
 	"github.com/mit-dci/lit/btcutil/txscript"
-	"github.com/mit-dci/lit/wire"
-	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/crypto/fastsha256"
+	"github.com/mit-dci/lit/wire"
 )
 
 // TxAndHeight is just a tx, and the height at which it was confirmed.
@@ -27,6 +27,13 @@ type OutPointEvent struct {
 	Op     wire.OutPoint // the outpoint being described
 	Height int32         // the height of the event
 	Tx     *wire.MsgTx   // the tx spending the outpoint
+}
+
+// HeightEvent is to inform the LN node of a new blockheight on a particular
+// coin type. Used to detect and enforce HTLC timeouts
+type HeightEvent struct {
+	Height   int32
+	CoinType uint32
 }
 
 // need this because before I was comparing pointers maybe?
