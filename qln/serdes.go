@@ -21,6 +21,19 @@ bytes   desc   ends at
 33	N2ElkPoint
 1	Collision
 64	Sig
+32  Data
+
+4   HTLCIdx
+1   InProgHTLC?
+(250 InProgHTLC)
+
+33   NextHTLCBase
+33   N2HTLCBase
+33   MyNextHTLCBase
+33   MyN2HTLCBase
+
+4    nHTLCs
+(n*250 HTLC)
 
 
 note that sigs are truncated and don't have the sighash type byte at the end.
@@ -96,14 +109,121 @@ func (s *StatCom) ToBytes() ([]byte, error) {
 		return nil, err
 	}
 
+	err = binary.Write(&buf, binary.BigEndian, s.HTLCIdx)
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Write(&buf, binary.BigEndian, s.CollidingHashDelta)
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Write(&buf, binary.BigEndian, s.CollidingHashPreimage)
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Write(&buf, binary.BigEndian, s.CollidingPreimages)
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Write(&buf, binary.BigEndian, s.CollidingPreimageDelta)
+	if err != nil {
+		return nil, err
+	}
+
+	if s.InProgHTLC != nil {
+		err = binary.Write(&buf, binary.BigEndian, true)
+		if err != nil {
+			return nil, err
+		}
+
+		HTLCBytes, err := s.InProgHTLC.Bytes()
+		if err != nil {
+			return nil, err
+		}
+
+		_, err = buf.Write(HTLCBytes)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		err = binary.Write(&buf, binary.BigEndian, false)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if s.CollidingHTLC != nil {
+		err = binary.Write(&buf, binary.BigEndian, true)
+		if err != nil {
+			return nil, err
+		}
+
+		HTLCBytes, err := s.CollidingHTLC.Bytes()
+		if err != nil {
+			return nil, err
+		}
+
+		_, err = buf.Write(HTLCBytes)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		err = binary.Write(&buf, binary.BigEndian, false)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	_, err = buf.Write(s.NextHTLCBase[:])
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = buf.Write(s.N2HTLCBase[:])
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = buf.Write(s.MyNextHTLCBase[:])
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = buf.Write(s.MyN2HTLCBase[:])
+	if err != nil {
+		return nil, err
+	}
+
+	nHTLCs := uint32(len(s.HTLCs))
+	err = binary.Write(&buf, binary.BigEndian, nHTLCs)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, h := range s.HTLCs {
+		HTLCBytes, err := h.Bytes()
+		if err != nil {
+			return nil, err
+		}
+
+		_, err = buf.Write(HTLCBytes)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return buf.Bytes(), nil
 }
 
-// StatComFromBytes turns 192 bytes into a StatCom
+// StatComFromBytes turns at least 357 bytes into a StatCom
 func StatComFromBytes(b []byte) (*StatCom, error) {
 	var s StatCom
-	if len(b) < 235 || len(b) > 235 {
-		return nil, fmt.Errorf("StatComFromBytes got %d bytes, expect 203",
+	if len(b) < 357 {
+		return nil, fmt.Errorf("StatComFromBytes got %d bytes, expect at least 357",
 			len(b))
 	}
 	buf := bytes.NewBuffer(b)
@@ -150,6 +270,87 @@ func StatComFromBytes(b []byte) (*StatCom, error) {
 
 	// copy data
 	copy(s.Data[:], buf.Next(32))
+
+	err = binary.Read(buf, binary.BigEndian, &s.HTLCIdx)
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Read(buf, binary.BigEndian, &s.CollidingHashDelta)
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Read(buf, binary.BigEndian, &s.CollidingHashPreimage)
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Read(buf, binary.BigEndian, &s.CollidingPreimages)
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Read(buf, binary.BigEndian, &s.CollidingPreimageDelta)
+	if err != nil {
+		return nil, err
+	}
+
+	var inProg bool
+	err = binary.Read(buf, binary.BigEndian, &inProg)
+	if err != nil {
+		return nil, err
+	}
+
+	if inProg {
+		HTLCBytes := buf.Next(251)
+
+		h, err := HTLCFromBytes(HTLCBytes)
+		if err != nil {
+			return nil, err
+		}
+
+		s.InProgHTLC = &h
+	}
+
+	var collidingHtlc bool
+	err = binary.Read(buf, binary.BigEndian, &collidingHtlc)
+	if err != nil {
+		return nil, err
+	}
+
+	if collidingHtlc {
+		HTLCBytes := buf.Next(251)
+
+		h, err := HTLCFromBytes(HTLCBytes)
+		if err != nil {
+			return nil, err
+		}
+
+		s.CollidingHTLC = &h
+	}
+
+	copy(s.NextHTLCBase[:], buf.Next(33))
+	copy(s.N2HTLCBase[:], buf.Next(33))
+	copy(s.MyNextHTLCBase[:], buf.Next(33))
+	copy(s.MyN2HTLCBase[:], buf.Next(33))
+
+	var nHTLCs uint32
+	err = binary.Read(buf, binary.BigEndian, &nHTLCs)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := uint32(0); i < nHTLCs; i++ {
+		HTLCBytes := buf.Next(251)
+
+		h, err := HTLCFromBytes(HTLCBytes)
+		if err != nil {
+			return nil, err
+		}
+
+		s.HTLCs = append(s.HTLCs, h)
+	}
 
 	return &s, nil
 }
@@ -270,4 +471,134 @@ func QCloseFromBytes(b []byte) (QCloseData, error) {
 	c.CloseHeight = lnutil.BtI32(b[32:36])
 
 	return c, nil
+}
+
+// Bytes turns an HTLC into a slice of
+// 4 + 1 + 8 + 32 + 4 + 33 + 33 + 53 + 64 + 16 + 1 + 1 + 1
+// = 251 bytes
+func (h *HTLC) Bytes() ([]byte, error) {
+	var buf bytes.Buffer
+	var err error
+
+	err = binary.Write(&buf, binary.BigEndian, h.Idx)
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Write(&buf, binary.BigEndian, h.Incoming)
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Write(&buf, binary.BigEndian, h.Amt)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = buf.Write(h.RHash[:])
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Write(&buf, binary.BigEndian, h.Locktime)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = buf.Write(h.MyHTLCBase[:])
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = buf.Write(h.TheirHTLCBase[:])
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = buf.Write(h.KeyGen.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = buf.Write(h.Sig[:])
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = buf.Write(h.R[:])
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Write(&buf, binary.BigEndian, h.Clearing)
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Write(&buf, binary.BigEndian, h.Cleared)
+	if err != nil {
+		return nil, err
+	}
+
+	err = binary.Write(&buf, binary.BigEndian, h.ClearedOnChain)
+	if err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
+func HTLCFromBytes(b []byte) (HTLC, error) {
+	var h HTLC
+
+	buf := bytes.NewBuffer(b)
+	err := binary.Read(buf, binary.BigEndian, &h.Idx)
+	if err != nil {
+		return h, err
+	}
+
+	err = binary.Read(buf, binary.BigEndian, &h.Incoming)
+	if err != nil {
+		return h, err
+	}
+
+	err = binary.Read(buf, binary.BigEndian, &h.Amt)
+	if err != nil {
+		return h, err
+	}
+
+	copy(h.RHash[:], buf.Next(32))
+
+	err = binary.Read(buf, binary.BigEndian, &h.Locktime)
+	if err != nil {
+		return h, err
+	}
+
+	copy(h.MyHTLCBase[:], buf.Next(33))
+	copy(h.TheirHTLCBase[:], buf.Next(33))
+
+	var keyGenBytes [53]byte
+	copy(keyGenBytes[:], buf.Next(53))
+	h.KeyGen = portxo.KeyGenFromBytes(keyGenBytes)
+
+	copy(h.Sig[:], buf.Next(64))
+
+	copy(h.R[:], buf.Next(16))
+
+	err = binary.Read(buf, binary.BigEndian, &h.Clearing)
+	if err != nil {
+		return h, err
+	}
+
+	err = binary.Read(buf, binary.BigEndian, &h.Cleared)
+	if err != nil {
+		return h, err
+	}
+
+	err = binary.Read(buf, binary.BigEndian, &h.ClearedOnChain)
+	if err != nil {
+		return h, err
+	}
+
+	return h, nil
 }

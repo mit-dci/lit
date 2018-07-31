@@ -138,6 +138,11 @@ func (w *Wallit) HeightHandler(incomingHeight chan int32) {
 			}
 		}
 
+		if w.HeightEventChan != nil {
+			he := lnutil.HeightEvent{Height: h, CoinType: w.Param.HDCoinType}
+			w.HeightEventChan <- he
+		}
+
 		err := w.SetDBSyncHeight(h)
 		if err != nil {
 			log.Printf("HeightHandler crash  %s ", err.Error())

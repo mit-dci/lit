@@ -50,6 +50,9 @@ type ChainHook interface {
 	// RegisterOutPoint tells the ChainHook about an outpoint of interest.
 	RegisterOutPoint(wire.OutPoint) error
 
+	// UnregisterOutPoint tells the ChainHook about loss of interest in an outpoint.
+	UnregisterOutPoint(wire.OutPoint) error
+
 	// SetHeight sets the height ChainHook needs to look above.
 	// Returns a channel which tells the wallit what height the ChainHook has
 	// sync'd up to.  This chan should push int32s *after* the TxAndHeights
@@ -140,6 +143,13 @@ func (s *SPVCon) RegisterAddress(adr160 [20]byte) error {
 func (s *SPVCon) RegisterOutPoint(op wire.OutPoint) error {
 	s.TrackingOPsMtx.Lock()
 	s.TrackingOPs[op] = true
+	s.TrackingOPsMtx.Unlock()
+	return nil
+}
+
+func (s *SPVCon) UnregisterOutPoint(op wire.OutPoint) error {
+	s.TrackingOPsMtx.Lock()
+	delete(s.TrackingOPs, op)
 	s.TrackingOPsMtx.Unlock()
 	return nil
 }

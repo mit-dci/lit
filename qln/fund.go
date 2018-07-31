@@ -221,9 +221,30 @@ func (nd *LitNode) PointReqHandler(msg lnutil.PointReqMsg) {
 
 	log.Printf("Generated channel pubkey %x\n", myChanPub)
 
-	outMsg := lnutil.NewPointRespMsg(msg.Peer(), myChanPub, myRefundPub, myHAKDbase)
+	var keyGen portxo.KeyGen
+	keyGen.Depth = 5
+	keyGen.Step[0] = 44 | 1<<31
+	keyGen.Step[1] = msg.Cointype | 1<<31
+	keyGen.Step[2] = UseHTLCBase
+	keyGen.Step[3] = 0 | 1<<31
+	keyGen.Step[4] = cIdx | 1<<31
+
+	myNextHTLCBase, err := nd.GetUsePub(keyGen, UseHTLCBase)
+	if err != nil {
+		log.Printf("error generating NextHTLCBase %v", err)
+		return
+	}
+
+	keyGen.Step[3] = 1 | 1<<31
+	myN2HTLCBase, err := nd.GetUsePub(keyGen, UseHTLCBase)
+	if err != nil {
+		log.Printf("error generating N2HTLCBase %v", err)
+		return
+	}
+
+	outMsg := lnutil.NewPointRespMsg(msg.Peer(), myChanPub, myRefundPub, myHAKDbase,
+		myNextHTLCBase, myN2HTLCBase)
 	nd.OmniOut <- outMsg
-	outMsg.Bytes()
 
 	return
 }
@@ -231,6 +252,7 @@ func (nd *LitNode) PointReqHandler(msg lnutil.PointReqMsg) {
 // FUNDER
 // PointRespHandler takes in a point response, and returns a channel description
 func (nd *LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
+	log.Printf("Got PointResponse")
 
 	nd.InProg.mtx.Lock()
 	defer nd.InProg.mtx.Unlock()
@@ -323,6 +345,37 @@ func (nd *LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 
 	q.State.Data = nd.InProg.Data
 
+	_, err = btcec.ParsePubKey(msg.NextHTLCBase[:], btcec.S256())
+	if err != nil {
+		return fmt.Errorf("PubRespHandler NextHTLCBase err %s", err.Error())
+	}
+	_, err = btcec.ParsePubKey(msg.N2HTLCBase[:], btcec.S256())
+	if err != nil {
+		return fmt.Errorf("PubRespHandler N2HTLCBase err %s", err.Error())
+	}
+
+	var keyGen portxo.KeyGen
+	keyGen.Depth = 5
+	keyGen.Step[0] = 44 | 1<<31
+	keyGen.Step[1] = nd.InProg.Coin | 1<<31
+	keyGen.Step[2] = UseHTLCBase
+	keyGen.Step[3] = 0 | 1<<31
+	keyGen.Step[4] = nd.InProg.ChanIdx | 1<<31
+
+	q.State.MyNextHTLCBase, err = nd.GetUsePub(keyGen, UseHTLCBase)
+	if err != nil {
+		return fmt.Errorf("error generating NextHTLCBase %v", err)
+	}
+
+	keyGen.Step[3] = 1 | 1<<31
+	q.State.MyN2HTLCBase, err = nd.GetUsePub(keyGen, UseHTLCBase)
+	if err != nil {
+		return fmt.Errorf("error generating N2HTLCBase %v", err)
+	}
+
+	q.State.NextHTLCBase = msg.NextHTLCBase
+	q.State.N2HTLCBase = msg.N2HTLCBase
+
 	// save channel to db
 	err = nd.SaveQChan(q)
 	if err != nil {
@@ -350,6 +403,7 @@ func (nd *LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 
 	outMsg := lnutil.NewChanDescMsg(
 		msg.Peer(), *nd.InProg.op, q.MyPub, q.MyRefundPub, q.MyHAKDBase,
+		q.State.MyNextHTLCBase, q.State.MyN2HTLCBase,
 		nd.InProg.Coin, nd.InProg.Amt, nd.InProg.InitSend,
 		elkPointZero, elkPointOne, elkPointTwo, nd.InProg.Data)
 
@@ -426,6 +480,41 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 	qc.State.NextElkPoint = msg.ElkOne
 	qc.State.N2ElkPoint = msg.ElkTwo
 
+	_, err = btcec.ParsePubKey(msg.NextHTLCBase[:], btcec.S256())
+	if err != nil {
+		fmt.Errorf("QChanDescHandler NextHTLCBase err %s", err.Error())
+		return
+	}
+	_, err = btcec.ParsePubKey(msg.N2HTLCBase[:], btcec.S256())
+	if err != nil {
+		fmt.Errorf("QChanDescHandler N2HTLCBase err %s", err.Error())
+		return
+	}
+
+	var keyGen portxo.KeyGen
+	keyGen.Depth = 5
+	keyGen.Step[0] = 44 | 1<<31
+	keyGen.Step[1] = msg.CoinType | 1<<31
+	keyGen.Step[2] = UseHTLCBase
+	keyGen.Step[3] = 0 | 1<<31
+	keyGen.Step[4] = cIdx | 1<<31
+
+	qc.State.MyNextHTLCBase, err = nd.GetUsePub(keyGen, UseHTLCBase)
+	if err != nil {
+		fmt.Printf("error generating NextHTLCBase %v", err)
+		return
+	}
+
+	keyGen.Step[3] = 1 | 1<<31
+	qc.State.MyN2HTLCBase, err = nd.GetUsePub(keyGen, UseHTLCBase)
+	if err != nil {
+		fmt.Printf("error generating N2HTLCBase %v", err)
+		return
+	}
+
+	qc.State.NextHTLCBase = msg.NextHTLCBase
+	qc.State.N2HTLCBase = msg.N2HTLCBase
+
 	// save new channel to db
 	err = nd.SaveQChan(qc)
 	if err != nil {
@@ -458,7 +547,7 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 		return
 	}
 
-	sig, err := nd.SignState(qc)
+	sig, _, err := nd.SignState(qc)
 	if err != nil {
 		log.Printf("QChanDescHandler SignState err %s", err.Error())
 		return
@@ -498,7 +587,7 @@ func (nd *LitNode) QChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePeer) {
 	qc.State.NextElkPoint = msg.ElkOne
 	qc.State.N2ElkPoint = msg.ElkTwo
 
-	err = qc.VerifySig(sig)
+	err = qc.VerifySigs(sig, nil)
 	if err != nil {
 		log.Printf("QChanAckHandler VerifySig err %s", err.Error())
 		return
@@ -514,7 +603,7 @@ func (nd *LitNode) QChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePeer) {
 	// Make sure everything works & is saved, then clear InProg.
 
 	// sign their com tx to send
-	sig, err = nd.SignState(qc)
+	sig, _, err = nd.SignState(qc)
 	if err != nil {
 		log.Printf("QChanAckHandler SignState err %s", err.Error())
 		return
@@ -583,7 +672,7 @@ func (nd *LitNode) SigProofHandler(msg lnutil.SigProofMsg, peer *RemotePeer) {
 		return
 	}
 
-	err = qc.VerifySig(msg.Signature)
+	err = qc.VerifySigs(msg.Signature, nil)
 	if err != nil {
 		log.Printf("SigProofHandler err %s", err.Error())
 		return

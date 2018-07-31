@@ -1,13 +1,14 @@
 package qln
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"log"
 
-	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/portxo"
 )
 
 // Grab the coins that are rightfully yours! Plus some more.
@@ -84,49 +85,6 @@ Receive Rev for previous state
 
 */
 
-// example message struct
-type SigRevMsg struct {
-	Op    wire.OutPoint
-	Delta int32
-	Sig   [64]byte
-}
-
-// example serialization method
-func (m *SigRevMsg) Bytes() []byte {
-	var b []byte
-
-	// DeltaSig is op (36), Delta (4),  sig (64)
-	// total length 104
-
-	opbytes := lnutil.OutPointToBytes(m.Op)
-	b = append(b, opbytes[:]...)
-	b = append(b, lnutil.I32tB(m.Delta)...)
-	b = append(b, m.Sig[:]...)
-
-	return b
-}
-
-// example deserialization method
-func SigRevFromBytes(b []byte) (*SigRevMsg, error) {
-	if len(b) != 104 {
-		return nil, fmt.Errorf("%d bytes, need 104", len(b))
-	}
-
-	m := new(SigRevMsg)
-
-	var opArr [36]byte
-	copy(opArr[:], b[:36])
-	op := lnutil.OutPointFromBytes(opArr)
-	m.Op = *op
-
-	m.Delta = lnutil.BtI32(b[36:40])
-
-	copy(m.Sig[:], b[40:])
-
-	return m, nil
-
-}
-
 // SendNextMsg determines what message needs to be sent next
 // based on the channel state.  It then calls the appropriate function.
 func (nd *LitNode) ReSendMsg(qc *Qchan) error {
@@ -194,28 +152,28 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 			"height %d; must wait min 1 conf for non-test coin\n", qc.Height)
 	}
 
-	// perform minOutput checks after reload
-	myNewOutputSize := (qc.State.MyAmt - int64(amt)) - qc.State.Fee
-	theirNewOutputSize := qc.Value - (qc.State.MyAmt - int64(amt)) - qc.State.Fee
+	myAmt, theirAmt := qc.GetChannelBalances()
+	myAmt -= qc.State.Fee - int64(amt)
+	theirAmt += int64(amt) - qc.State.Fee
 
 	// check if this push would lower my balance below minBal
-	if myNewOutputSize < consts.MinOutput {
+	if myAmt < consts.MinOutput {
 		qc.ClearToSend <- true
 		qc.ChanMtx.Unlock()
 		return fmt.Errorf("want to push %s but %s available after %s fee and %s",
 			lnutil.SatoshiColor(int64(amt)),
-			lnutil.SatoshiColor(qc.State.MyAmt-qc.State.Fee-consts.MinOutput),
+			lnutil.SatoshiColor(myAmt),
 			lnutil.SatoshiColor(qc.State.Fee),
 			lnutil.SatoshiColor(consts.MinOutput))
 	}
 	// check if this push is sufficient to get them above minBal
-	if theirNewOutputSize < consts.MinOutput {
+	if theirAmt < consts.MinOutput {
 		qc.ClearToSend <- true
 		qc.ChanMtx.Unlock()
 		return fmt.Errorf(
 			"pushing %s insufficient; counterparty bal %s fee %s consts.MinOutput %s",
 			lnutil.SatoshiColor(int64(amt)),
-			lnutil.SatoshiColor(qc.Value-qc.State.MyAmt),
+			lnutil.SatoshiColor(theirAmt),
 			lnutil.SatoshiColor(qc.State.Fee),
 			lnutil.SatoshiColor(consts.MinOutput))
 	}
@@ -295,7 +253,9 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 	// N2Elk is now invalid
 
 	// make the signature to send over
-	sig, err := nd.SignState(q)
+
+	// TODO: There are extra signatures required now
+	sig, HTLCSigs, err := nd.SignState(q)
 	if err != nil {
 		return err
 	}
@@ -304,7 +264,7 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 		return errors.New("Delta cannot be zero")
 	}
 
-	outMsg := lnutil.NewDeltaSigMsg(q.Peer(), q.Op, -q.State.Delta, sig, q.State.Data)
+	outMsg := lnutil.NewDeltaSigMsg(q.Peer(), q.Op, -q.State.Delta, sig, HTLCSigs, q.State.Data)
 
 	log.Printf("Sending DeltaSig: %v", outMsg)
 
@@ -351,13 +311,52 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 			qc.Peer(), qc.Idx())
 	}
 
-	if collision {
-		// incoming delta saved as collision value,
-		// existing (negative) delta value retained.
-		qc.State.Collision = int32(incomingDelta)
-		log.Printf("delta sig COLLISION (%d)\n", qc.State.Collision)
+	clearingIdxs := make([]uint32, 0)
+	for _, h := range qc.State.HTLCs {
+		if h.Clearing {
+			clearingIdxs = append(clearingIdxs, h.Idx)
+		}
 	}
 
+	inProgHTLC := qc.State.InProgHTLC
+
+	if collision {
+		if qc.State.InProgHTLC != nil {
+			// Collision between DeltaSig-HashSig
+			// Remove the in prog HTLC for checking signatures,
+			// add it back later to send gapsigrev
+			qc.State.InProgHTLC = nil
+			qc.State.CollidingHashDelta = true
+
+			var kg portxo.KeyGen
+			kg.Depth = 5
+			kg.Step[0] = 44 | 1<<31
+			kg.Step[1] = qc.Coin() | 1<<31
+			kg.Step[2] = UseHTLCBase
+			kg.Step[3] = qc.State.HTLCIdx + 2 | 1<<31
+			kg.Step[4] = qc.Idx() | 1<<31
+
+			qc.State.MyNextHTLCBase = qc.State.MyN2HTLCBase
+			qc.State.MyN2HTLCBase, err = nd.GetUsePub(kg,
+				UseHTLCBase)
+		} else if len(clearingIdxs) > 0 {
+			// Collision between DeltaSig-PreimageSig
+			// Remove the clearing state for signature verification and
+			// add back afterwards.
+			for _, idx := range clearingIdxs {
+				qh := &qc.State.HTLCs[idx]
+				qh.Clearing = false
+			}
+			qc.State.CollidingPreimageDelta = true
+		} else {
+			// Collision between DeltaSig-DeltaSig
+
+			// incoming delta saved as collision value,
+			// existing (negative) delta value retained.
+			qc.State.Collision = int32(incomingDelta)
+			log.Printf("delta sig COLLISION (%d)\n", qc.State.Collision)
+		}
+	}
 	// detect if channel is already locked, and lock if not
 	//	nd.PushClearMutex.Lock()
 	//	if nd.PushClear[qc.Idx()] == nil {
@@ -380,7 +379,8 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 		return nd.SendREV(qc)
 	}
 
-	if !collision {
+	// If we collide with an HTLC operation, we can use the incoming Delta also.
+	if !collision || qc.State.InProgHTLC != nil {
 		// no collision, incoming (positive) delta saved.
 		qc.State.Delta = int32(incomingDelta)
 	}
@@ -390,17 +390,27 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 		return fmt.Errorf("DeltaSigHandler err: delta %d", incomingDelta)
 	}
 
-	// perform consts.MinOutput check
-	theirNewOutputSize :=
-		qc.Value - (qc.State.MyAmt + int64(incomingDelta)) - qc.State.Fee
+	myAmt, theirAmt := qc.GetChannelBalances()
+	theirAmt -= int64(incomingDelta) + qc.State.Fee
+	myAmt += int64(incomingDelta) - qc.State.Fee
 
 	// check if this push is takes them below minimum output size
-	if theirNewOutputSize < consts.MinOutput {
+	if theirAmt < consts.MinOutput {
 		qc.ClearToSend <- true
 		return fmt.Errorf(
 			"pushing %s reduces them too low; counterparty bal %s fee %s consts.MinOutput %s",
 			lnutil.SatoshiColor(int64(incomingDelta)),
-			lnutil.SatoshiColor(qc.Value-qc.State.MyAmt),
+			lnutil.SatoshiColor(theirAmt),
+			lnutil.SatoshiColor(qc.State.Fee),
+			lnutil.SatoshiColor(consts.MinOutput))
+	}
+
+	// check if this push would lower my balance below minBal
+	if myAmt < consts.MinOutput {
+		qc.ClearToSend <- true
+		return fmt.Errorf("want to push %s but %s available after %s fee and %s consts.MinOutput",
+			lnutil.SatoshiColor(int64(incomingDelta)),
+			lnutil.SatoshiColor(myAmt),
 			lnutil.SatoshiColor(qc.State.Fee),
 			lnutil.SatoshiColor(consts.MinOutput))
 	}
@@ -414,11 +424,23 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 	qc.State.Data = msg.Data
 
 	// verify sig for the next state. only save if this works
-	err = qc.VerifySig(msg.Signature)
+	stashElk := qc.State.ElkPoint
+	qc.State.ElkPoint = qc.State.NextElkPoint
+	// TODO: There are more signatures required
+	err = qc.VerifySigs(msg.Signature, msg.HTLCSigs)
 	if err != nil {
 		return fmt.Errorf("DeltaSigHandler err %s", err.Error())
 	}
+	qc.State.ElkPoint = stashElk
 
+	// After verification of signatures, add back the clearing state in case
+	// of PreimageSig-DeltaSig collisions
+	for _, idx := range clearingIdxs {
+		qh := &qc.State.HTLCs[idx]
+		qh.Clearing = true
+	}
+
+	qc.State.InProgHTLC = inProgHTLC
 	// (seems odd, but everything so far we still do in case of collision, so
 	// only check here.  If it's a collision, set, save, send gapSigRev
 
@@ -429,7 +451,7 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 		return fmt.Errorf("DeltaSigHandler SaveQchanState err %s", err.Error())
 	}
 
-	if qc.State.Collision != 0 {
+	if qc.State.Collision != 0 || qc.State.CollidingHashDelta || qc.State.CollidingPreimageDelta {
 		err = nd.SendGapSigRev(qc)
 		if err != nil {
 			return fmt.Errorf("DeltaSigHandler SendGapSigRev err %s", err.Error())
@@ -470,8 +492,22 @@ func (nd *LitNode) SendGapSigRev(q *Qchan) error {
 	// amt is delta (negative) plus current amt (collision already added in)
 	q.State.MyAmt += int64(q.State.Delta)
 
+	if q.State.InProgHTLC != nil {
+		if !q.State.InProgHTLC.Incoming {
+			q.State.MyAmt -= q.State.InProgHTLC.Amt
+		}
+	}
+
+	if q.State.CollidingHTLC != nil {
+		if !q.State.CollidingHTLC.Incoming {
+			q.State.MyAmt -= q.State.CollidingHTLC.Amt
+		}
+	}
+
 	// sign state n+1
-	sig, err := nd.SignState(q)
+
+	// TODO: send the sigs
+	sig, HTLCSigs, err := nd.SignState(q)
 	if err != nil {
 		return err
 	}
@@ -480,7 +516,7 @@ func (nd *LitNode) SendGapSigRev(q *Qchan) error {
 	// GapSigRev is op (36), sig (64), ElkHash (32), NextElkPoint (33)
 	// total length 165
 
-	outMsg := lnutil.NewGapSigRev(q.KeyGen.Step[3]&0x7fffffff, q.Op, sig, *elk, n2ElkPoint)
+	outMsg := lnutil.NewGapSigRev(q.KeyGen.Step[3]&0x7fffffff, q.Op, sig, *elk, n2ElkPoint, HTLCSigs, q.State.MyN2HTLCBase)
 
 	log.Printf("Sending GapSigRev: %v", outMsg)
 
@@ -505,7 +541,8 @@ func (nd *LitNode) SendSigRev(q *Qchan) error {
 	// q.State.NextElkPoint = q.State.N2ElkPoint // not needed
 	// n2elk invalid here
 
-	sig, err := nd.SignState(q)
+	// TODO: send the sigs
+	sig, HTLCSigs, err := nd.SignState(q)
 	if err != nil {
 		return err
 	}
@@ -516,7 +553,7 @@ func (nd *LitNode) SendSigRev(q *Qchan) error {
 		return err
 	}
 
-	outMsg := lnutil.NewSigRev(q.KeyGen.Step[3]&0x7fffffff, q.Op, sig, *elk, n2ElkPoint)
+	outMsg := lnutil.NewSigRev(q.KeyGen.Step[3]&0x7fffffff, q.Op, sig, *elk, n2ElkPoint, HTLCSigs, q.State.MyN2HTLCBase)
 
 	log.Printf("Sending SigRev: %v", outMsg)
 
@@ -536,10 +573,10 @@ func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
 	}
 
 	// check if we're supposed to get a GapSigRev now. Collision should be set
-	if q.State.Collision == 0 {
+	if q.State.Collision == 0 && q.State.CollidingHTLC == nil && !q.State.CollidingHashPreimage && !q.State.CollidingHashDelta && !q.State.CollidingPreimageDelta && !q.State.CollidingPreimages {
 		return fmt.Errorf(
-			"chan %d got GapSigRev but collision = 0, delta = %d",
-			q.Idx(), q.State.Delta)
+			"chan %d got GapSigRev but collision = 0, collidingHTLC = nil, q.State.CollidingHashPreimage = %t, q.State.CollidingHashDelta = %t, qc.State.CollidingPreimages = %t, qc.State.CollidingPreimageDelta = %t, delta = %d",
+			q.Idx(), q.State.CollidingHashPreimage, q.State.CollidingHashDelta, q.State.CollidingPreimages, q.State.CollidingPreimageDelta, q.State.Delta)
 	}
 
 	// stash for justice tx
@@ -549,6 +586,18 @@ func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
 	q.State.Delta = q.State.Collision     // now delta is positive
 	q.State.Collision = 0
 
+	if q.State.InProgHTLC != nil {
+		if !q.State.InProgHTLC.Incoming {
+			q.State.MyAmt -= q.State.InProgHTLC.Amt
+		}
+	}
+
+	if q.State.CollidingHTLC != nil {
+		if !q.State.CollidingHTLC.Incoming {
+			q.State.MyAmt -= q.State.CollidingHTLC.Amt
+		}
+	}
+
 	// verify elkrem and save it in ram
 	err = q.AdvanceElkrem(&msg.Elk, msg.N2ElkPoint)
 	if err != nil {
@@ -556,7 +605,7 @@ func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
 		// ! non-recoverable error, need to close the channel here.
 	}
 
-	// go up to n+1 elkpoint for the sig verification
+	// go up to n+2 elkpoint for the sig verification
 	stashElkPoint := q.State.ElkPoint
 	q.State.ElkPoint = q.State.NextElkPoint
 
@@ -565,12 +614,42 @@ func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
 	q.State.StateIdx++
 
 	// verify the sig
-	err = q.VerifySig(msg.Signature)
+
+	// TODO: More sigs here that before
+	err = q.VerifySigs(msg.Signature, msg.HTLCSigs)
 	if err != nil {
 		return fmt.Errorf("GapSigRevHandler err %s", err.Error())
 	}
 	// go back to sequential elkpoints
 	q.State.ElkPoint = stashElkPoint
+
+	for idx, h := range q.State.HTLCs {
+		if h.Clearing && !h.Cleared {
+			q.State.HTLCs[idx].Cleared = true
+		}
+	}
+
+	if !bytes.Equal(msg.N2HTLCBase[:], q.State.N2HTLCBase[:]) {
+		q.State.NextHTLCBase = q.State.N2HTLCBase
+		q.State.N2HTLCBase = msg.N2HTLCBase
+	}
+
+	// If we were colliding, advance HTLCBase here.
+	if q.State.CollidingHTLC != nil {
+		var kg portxo.KeyGen
+		kg.Depth = 5
+		kg.Step[0] = 44 | 1<<31
+		kg.Step[1] = q.Coin() | 1<<31
+		kg.Step[2] = UseHTLCBase
+		kg.Step[3] = q.State.HTLCIdx + 3 | 1<<31
+		kg.Step[4] = q.Idx() | 1<<31
+
+		q.State.MyNextHTLCBase = q.State.MyN2HTLCBase
+		q.State.MyN2HTLCBase, err = nd.GetUsePub(kg, UseHTLCBase)
+		if err != nil {
+			return err
+		}
+	}
 
 	err = nd.SaveQchanState(q)
 	if err != nil {
@@ -611,12 +690,20 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 			qc.Idx(), qc.State.Delta)
 	}
 
-	if qc.State.Delta == 0 {
+	var clearing bool
+	for _, h := range qc.State.HTLCs {
+		if h.Clearing {
+			clearing = true
+			break
+		}
+	}
+
+	if qc.State.Delta == 0 && qc.State.InProgHTLC == nil && !clearing {
 		// re-send last rev; they probably didn't get it
 		return nd.SendREV(qc)
 	}
 
-	if qc.State.Collision != 0 {
+	if qc.State.Collision != 0 || qc.State.CollidingHTLC != nil {
 		return fmt.Errorf("chan %d got SigRev, expect GapSigRev delta %d col %d",
 			qc.Idx(), qc.State.Delta, qc.State.Collision)
 	}
@@ -628,12 +715,50 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 	qc.State.MyAmt += int64(qc.State.Delta)
 	qc.State.Delta = 0
 
+	if qc.State.InProgHTLC != nil {
+		if !qc.State.InProgHTLC.Incoming {
+			qc.State.MyAmt -= qc.State.InProgHTLC.Amt
+		}
+	}
+
+	if qc.State.CollidingHTLC != nil {
+		if !qc.State.CollidingHTLC.Incoming {
+			qc.State.MyAmt -= qc.State.CollidingHTLC.Amt
+		}
+	}
+
+	for _, h := range qc.State.HTLCs {
+		if h.Clearing && !h.Cleared {
+			/*
+				Incoming:
+					Timeout:
+						They get money
+					Success:
+						We get money
+				!Incoming:
+					Timeout:
+						We get money
+					Success:
+						They get money
+			*/
+
+			if (h.Incoming && h.R != [16]byte{}) || (!h.Incoming && h.R == [16]byte{}) {
+				qc.State.MyAmt += h.Amt
+			}
+		}
+	}
+
 	// first verify sig.
 	// (if elkrem ingest fails later, at least we close out with a bit more money)
-	err = qc.VerifySig(msg.Signature)
+
+	// TODO: more sigs here than before
+	curElk := qc.State.ElkPoint
+	qc.State.ElkPoint = qc.State.NextElkPoint
+	err = qc.VerifySigs(msg.Signature, msg.HTLCSigs)
 	if err != nil {
 		return fmt.Errorf("SIGREVHandler err %s", err.Error())
 	}
+	qc.State.ElkPoint = curElk
 
 	// verify elkrem and save it in ram
 	err = qc.AdvanceElkrem(&msg.Elk, msg.N2ElkPoint)
@@ -644,6 +769,39 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 	// if the elkrem failed but sig didn't... we should update the DB to reflect
 	// that and try to close with the incremented amount, why not.
 	// TODO Implement that later though.
+
+	if qc.State.InProgHTLC != nil || qc.State.CollidingHashDelta {
+		var kg portxo.KeyGen
+		kg.Depth = 5
+		kg.Step[0] = 44 | 1<<31
+		kg.Step[1] = qc.Coin() | 1<<31
+		kg.Step[2] = UseHTLCBase
+		kg.Step[3] = qc.State.HTLCIdx + 2 | 1<<31
+		kg.Step[4] = qc.Idx() | 1<<31
+
+		qc.State.MyNextHTLCBase = qc.State.MyN2HTLCBase
+		qc.State.MyN2HTLCBase, err = nd.GetUsePub(kg,
+			UseHTLCBase)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	if qc.State.InProgHTLC != nil {
+		qc.State.HTLCs = append(qc.State.HTLCs, *qc.State.InProgHTLC)
+		qc.State.InProgHTLC = nil
+		qc.State.NextHTLCBase = qc.State.N2HTLCBase
+		qc.State.N2HTLCBase = msg.N2HTLCBase
+
+		qc.State.HTLCIdx++
+	}
+
+	for idx, h := range qc.State.HTLCs {
+		if h.Clearing && !h.Cleared {
+			qc.State.HTLCs[idx].Cleared = true
+		}
+	}
 
 	// all verified; Save finished state to DB, puller is pretty much done.
 	err = nd.SaveQchanState(qc)
@@ -656,6 +814,17 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 	if err != nil {
 		return fmt.Errorf("SIGREVHandler err %s", err.Error())
 	}
+
+	/*
+		Re-enable this if you want to print out the break TX for old states.
+		You can use this to debug justice. Don't enable in production since these
+		things can screw someone up if someone else maliciously grabs their log file
+
+		err = nd.PrintBreakTxForDebugging(qc)
+		if err != nil {
+			return fmt.Errorf("SIGREVHandler err %s", err.Error())
+		}
+	*/
 
 	// now that we've saved & sent everything, before ending the function, we
 	// go BACK to create a txid/sig pair for watchtower.  This feels like a kindof
@@ -688,7 +857,7 @@ func (nd *LitNode) SendREV(q *Qchan) error {
 		return err
 	}
 
-	outMsg := lnutil.NewRevMsg(q.Peer(), q.Op, *elk, n2ElkPoint)
+	outMsg := lnutil.NewRevMsg(q.Peer(), q.Op, *elk, n2ElkPoint, q.State.MyN2HTLCBase)
 
 	log.Printf("Sending Rev: %v", outMsg)
 
@@ -709,8 +878,16 @@ func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {
 		return fmt.Errorf("REVHandler err %s", err.Error())
 	}
 
+	var clearing bool
+	for _, h := range qc.State.HTLCs {
+		if h.Clearing {
+			clearing = true
+			break
+		}
+	}
+
 	// check if there's nothing for them to revoke
-	if qc.State.Delta == 0 {
+	if qc.State.Delta == 0 && qc.State.InProgHTLC == nil && !clearing {
 		return fmt.Errorf("got REV, expected deltaSig, ignoring.")
 	}
 	// maybe this is an unexpected rev, asking us for a rev repeat
@@ -728,11 +905,51 @@ func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {
 	prevAmt := qc.State.MyAmt - int64(qc.State.Delta)
 	qc.State.Delta = 0
 
+	if !bytes.Equal(msg.N2HTLCBase[:], qc.State.N2HTLCBase[:]) {
+		qc.State.NextHTLCBase = qc.State.N2HTLCBase
+		qc.State.N2HTLCBase = msg.N2HTLCBase
+	}
+	// Clear collision state for HashSig-DeltaSig
+	qc.State.CollidingHashDelta = false
+	// Clear collision state for HashSig-PreimageSig
+	qc.State.CollidingHashPreimage = false
+	qc.State.CollidingPreimages = false
+	qc.State.CollidingPreimageDelta = false
+
+	if qc.State.InProgHTLC != nil {
+		qc.State.HTLCs = append(qc.State.HTLCs, *qc.State.InProgHTLC)
+		qc.State.InProgHTLC = nil
+		qc.State.HTLCIdx++
+	}
+
+	if qc.State.CollidingHTLC != nil {
+		qc.State.HTLCs = append(qc.State.HTLCs, *qc.State.CollidingHTLC)
+		qc.State.CollidingHTLC = nil
+		qc.State.HTLCIdx++
+	}
+
+	for idx, h := range qc.State.HTLCs {
+		if h.Clearing && !h.Cleared {
+			qc.State.HTLCs[idx].Cleared = true
+		}
+	}
+
 	// save to DB (new elkrem & point, delta zeroed)
 	err = nd.SaveQchanState(qc)
 	if err != nil {
 		return fmt.Errorf("REVHandler err %s", err.Error())
 	}
+
+	/*
+		Re-enable this if you want to print out the break TX for old states.
+		You can use this to debug justice. Don't enable in production since these
+		things can screw someone up if someone else maliciously grabs their log file
+
+		err = nd.PrintBreakTxForDebugging(qc)
+		if err != nil {
+			return fmt.Errorf("SIGREVHandler err %s", err.Error())
+		}
+	*/
 
 	// after saving cleared updated state, go back to previous state and build
 	// the justice signature
