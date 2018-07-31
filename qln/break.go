@@ -19,8 +19,11 @@ func (nd *LitNode) BreakChannel(q *Qchan) error {
 		return err
 	}
 
-	if q.CloseData.Closed && q.CloseData.CloseHeight != 0 {
-		return fmt.Errorf("Can't break (%d,%d), already closed\n", q.Peer(), q.Idx())
+	if q.CloseData.Closed {
+		if q.CloseData.CloseHeight != 0 {
+		return fmt.Errorf("Can't break channel %d with peer %d, already closed\n", q.Idx(), q.Peer())
+		}
+		return fmt.Errorf("Can't break channel %d with peer %d, tx already broadcast, wait for confirmation.\n", q.Idx(),  q.Peer())
 	}
 
 	log.Printf("breaking (%d,%d)\n", q.Peer(), q.Idx())
@@ -42,17 +45,21 @@ func (nd *LitNode) BreakChannel(q *Qchan) error {
 		return err
 	}
 
-	// set channel state to closed
-	q.CloseData.Closed = true
-	q.CloseData.CloseTxid = tx.TxHash()
+	// broadcast break tx
+	err = nd.SubWallet[q.Coin()].PushTx(tx)
+	if err != nil {
+		return fmt.Errorf("Error while transmitting break tx, try again!")
+	}
 
+	// save channel state only after tx is broadcast
 	err = nd.SaveQchanUtxoData(q)
 	if err != nil {
 		return err
 	}
-
-	// broadcast break tx directly
-	return nd.SubWallet[q.Coin()].PushTx(tx)
+	// set channel state to closed
+	q.CloseData.Closed = true
+	q.CloseData.CloseTxid = tx.TxHash()
+	return nil
 }
 
 func (nd *LitNode) PrintBreakTxForDebugging(q *Qchan) error {
