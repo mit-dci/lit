@@ -421,15 +421,24 @@ rpc_call! {
     { CoinType: u32 } => FeeReply
 }
 
+#[derive(Clone, Deserialize)]
+pub struct AddressReply {
+    pub CoinTypes: Vec<u32>,
+    pub WitAddresses: Vec<String>,
+    pub LegacyAddresses: Vec<String>
+}
+
 rpc_call! {
     call_gen_address, Address,
     {
         NumToMake: u32,
         CoinType: u32
-    } => AddressReply {
-        WitAddresses: Vec<String>,
-        LegacyAddresses: Vec<String>
-    }
+    } => AddressReply
+}
+
+rpc_call! {
+    call_get_addresses, GetAddresses,
+    {} => AddressReply
 }
 
 // TODO make RPC call definitions

@@ -5,6 +5,7 @@ extern crate serde;
 #[macro_use] extern crate serde_derive;
 extern crate serde_json;
 
+use std::cmp;
 use std::panic;
 
 use cursive::Cursive;
@@ -44,7 +45,7 @@ fn main() {
 
 fn run_ui(addr: &str, port: u16) {
 
-    let mut client = litrpc::LitRpcClient::new(addr, port);
+    let mut client = Box::new(litrpc::LitRpcClient::new(addr, port));
 
     let mut layout = LinearLayout::new(Orientation::Horizontal);
 
@@ -52,9 +53,39 @@ fn run_ui(addr: &str, port: u16) {
     c_view.add_child(TextView::new("Channels"));
     layout.add_child(IdView::new("chans", Panel::new(c_view)));
 
+    let mut right_view = LinearLayout::new(Orientation::Vertical);
+
+    // Balances
+    let mut bal_view = LinearLayout::new(Orientation::Vertical);
+    bal_view.add_child(TextView::new("Balances"));
+    right_view.add_child(
+        BoxView::new(
+                SizeConstraint::Full,
+                SizeConstraint::Full,
+                IdView::new("bals", Panel::new(bal_view)))
+            .squishable());
+
+    // Addresses
+    let mut addr_view = LinearLayout::new(Orientation::Vertical);
+    addr_view.add_child(TextView::new("Addrs"));
+    right_view.add_child(
+        BoxView::new(
+                SizeConstraint::Full,
+                SizeConstraint::Full,
+                IdView::new("addrs", Panel::new(addr_view)))
+            .squishable());
+
+    // Txos
     let mut txo_view = LinearLayout::new(Orientation::Vertical);
     txo_view.add_child(TextView::new("Txos"));
-    layout.add_child(IdView::new("txos", Panel::new(txo_view)));
+    right_view.add_child(
+        BoxView::new(
+                SizeConstraint::Full,
+                SizeConstraint::Full,
+                IdView::new("txos", Panel::new(txo_view)))
+            .squishable());
+
+    layout.add_child(BoxView::new(SizeConstraint::Full, SizeConstraint::Full, right_view));
 
     let mut siv = Cursive::new();
     siv.add_layer(BoxView::new(SizeConstraint::Full, SizeConstraint::Full, layout));
@@ -99,6 +130,24 @@ fn generate_view_for_chan(chan: litrpc::ChanInfo) -> impl View {
 
 }
 
+fn generate_view_for_bal(bal: litrpc::CoinBalInfo) -> impl View {
+
+    let mut data = LinearLayout::new(Orientation::Vertical);
+
+    let grand_total = bal.ChanTotal + bal.TxoTotal;
+    let bal_str = format!(
+        "  Funds: chans {} + txos {} = total {} sat",
+        bal.ChanTotal,
+        bal.TxoTotal,
+        grand_total);
+
+    data.add_child(TextView::new(format!("- Type {} @ height {}", bal.CoinType, bal.SyncHeight)));
+    data.add_child(TextView::new(bal_str));
+
+    data
+
+}
+
 fn generate_view_for_txo(txo: litrpc::TxoInfo) -> impl View {
 
     let strs = vec![
@@ -113,7 +162,7 @@ fn generate_view_for_txo(txo: litrpc::TxoInfo) -> impl View {
         data.add_child(TextView::new(format!("{}: {}", k, v)));
     }
 
-    let cbox = BoxView::new(SizeConstraint::Full, SizeConstraint::AtLeast(5), data);
+    let cbox = BoxView::new(SizeConstraint::Full, SizeConstraint::Fixed(5), data);
     Panel::new(cbox)
 
 }
@@ -122,27 +171,19 @@ fn make_update_ui_callback_with_client(cl: &mut litrpc::LitRpcClient) -> impl Fn
 
     use std::mem;
 
-    eprintln!("foo");
-
-    let p: *mut litrpc::LitRpcClient = unsafe { mem::transmute(cl) };
+    let clp: *mut litrpc::LitRpcClient = unsafe { mem::transmute(cl) };
 
     move |c: &mut Cursive| {
 
-        eprintln!("bar");
+        let clrc: &mut litrpc::LitRpcClient = unsafe { mem::transmute(clp) };
 
         // Channels.
+        let chans: Vec<litrpc::ChanInfo> = match clrc.call_chan_list(0) {
+            Ok(clr) => clr.Channels,
+            Err(err) => panic!("{:?}", err)
+        };
+
         c.call_on_id("chans", |cpan: &mut Panel<LinearLayout>| {
-
-            eprintln!("baz1");
-
-            let r: &mut litrpc::LitRpcClient = unsafe { mem::transmute(p) };
-
-            eprintln!("baz2");
-
-            let chans: Vec<litrpc::ChanInfo> = match r.call_chan_list(0) {
-                Ok(clr) => clr.Channels,
-                Err(err) => panic!("{:?}", err)
-            };
 
             let mut c_view = LinearLayout::new(Orientation::Vertical);
             c_view.add_child(TextView::new("Channels"));
@@ -152,23 +193,66 @@ fn make_update_ui_callback_with_client(cl: &mut litrpc::LitRpcClient) -> impl Fn
 
             *cpan.get_inner_mut() = c_view;
 
-            eprintln!("baz3");
+        });
+
+        // Bals
+        let bals: Vec<litrpc::CoinBalInfo> = match clrc.call_bal() {
+            Ok(br) => {
+                let mut bals = br.Balances;
+                bals.sort_by(|a, b| cmp::Ord::cmp(&a.CoinType, &b.CoinType));
+                bals
+            },
+            Err(err) => panic!("{:?}", err)
+        };
+
+        c.call_on_id("bals", |balpan: &mut Panel<LinearLayout>| {
+
+            let mut bal_view = LinearLayout::new(Orientation::Vertical);
+            bal_view.add_child(TextView::new("Balances"));
+            bal_view.add_child(DummyView);
+            bals.into_iter()
+                .map(generate_view_for_bal)
+                .for_each(|e| bal_view.add_child(e));
+
+            *balpan.get_inner_mut() = bal_view;
+
+        });
+
+        // Addrs
+        let addrs: Vec<(u32, String)> = match clrc.call_get_addresses() {
+            Ok(ar) => {
+                let mut addrs: Vec<(u32, String)> = ar.CoinTypes.into_iter()
+                    .zip(ar.WitAddresses.into_iter())
+                    .collect();
+                addrs.sort_by(|a, b| match cmp::Ord::cmp(&a.0, &b.0) {
+                    cmp::Ordering::Equal => cmp::Ord::cmp(&a.1, &b.1),
+                    o => o
+                });
+                addrs
+            },
+            Err(err) => panic!("{:?}", err)
+        };
+
+        c.call_on_id("addrs", |addrpan: &mut Panel<LinearLayout>| {
+
+            let mut addr_view = LinearLayout::new(Orientation::Vertical);
+            addr_view.add_child(TextView::new("Addresses"));
+            addr_view.add_child(DummyView);
+            addrs.into_iter()
+                .map(|(ct, wa)| TextView::new(format!("- type: {} segwit: {}", ct, wa)))
+                .for_each(|e| addr_view.add_child(e));
+
+            *addrpan.get_inner_mut() = addr_view;
 
         });
 
         // Txos
+        let txos: Vec<litrpc::TxoInfo> = match clrc.call_get_txo_list() {
+            Ok(txr) => txr.Txos,
+            Err(err) => panic!("{:?}", err)
+        };
+
         c.call_on_id("txos", |txopan: &mut Panel<LinearLayout>| {
-
-            eprintln!("quux1");
-
-            let r: &mut litrpc::LitRpcClient = unsafe { mem::transmute(p) };
-
-            eprintln!("quux2");
-
-            let txos: Vec<litrpc::TxoInfo> = match r.call_get_txo_list() {
-                Ok(txr) => txr.Txos,
-                Err(err) => panic!("{:?}", err)
-            };
 
             let mut txo_view = LinearLayout::new(Orientation::Vertical);
             txo_view.add_child(TextView::new("Txos"));
@@ -177,8 +261,6 @@ fn make_update_ui_callback_with_client(cl: &mut litrpc::LitRpcClient) -> impl Fn
                 .for_each(|e| txo_view.add_child(e));
 
             *txopan.get_inner_mut() = txo_view;
-
-            eprintln!("quux3");
 
         });
 
