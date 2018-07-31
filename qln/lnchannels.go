@@ -47,6 +47,28 @@ type Qchan struct {
 	// exists only in ram, doesn't touch disk
 }
 
+// 4 + 1 + 8 + 32 + 4 + 33 + 33 + 1 + 5 + 32 + 64 = 217 bytes
+type HTLC struct {
+	Idx uint32
+
+	Incoming bool
+	Amt      int64
+	RHash    [32]byte
+	Locktime uint32
+
+	MyHTLCBase    [33]byte
+	TheirHTLCBase [33]byte
+
+	KeyGen portxo.KeyGen
+
+	Sig [64]byte
+
+	R              [16]byte
+	Clearing       bool
+	Cleared        bool
+	ClearedOnChain bool // To keep track of what HTLCs we claimed on-chain
+}
+
 // StatComs are State Commitments.
 // all elements are saved to the db.
 type StatCom struct {
@@ -78,6 +100,25 @@ type StatCom struct {
 	// sig should have a sig.
 	// only one sig is ever stored, to prevent broadcasting the wrong tx.
 	// could add a mutex here... maybe will later.
+
+	HTLCIdx       uint32
+	InProgHTLC    *HTLC // Current in progress HTLC
+	CollidingHTLC *HTLC // HTLC for when the channel is colliding
+
+	CollidingHashDelta     bool // True when colliding between a DeltaSig and HashSig/PreImageSig
+	CollidingHashPreimage  bool // True when colliding between HashSig and PreimageSig
+	CollidingPreimages     bool // True when colliding between PreimageSig and PreimageSig
+	CollidingPreimageDelta bool // True when colliding between a DeltaSig and HashSig/PreImageSig
+
+	// Analogous to the ElkPoints above but used for generating their pubkey for the HTLC
+	NextHTLCBase [33]byte
+	N2HTLCBase   [33]byte
+
+	MyNextHTLCBase [33]byte
+	MyN2HTLCBase   [33]byte
+
+	// Any HTLCs associated with this channel state (can be nil)
+	HTLCs []HTLC
 }
 
 // QCloseData is the output resulting from an un-cooperative close
@@ -221,4 +262,21 @@ func (nd *LitNode) GetDHSecret(q *Qchan) ([]byte, error) {
 	}
 
 	return btcec.GenerateSharedSecret(priv, theirPub), nil
+}
+
+// GetChannelBalances returns myAmt and theirAmt in the channel
+// that aren't locked up in HTLCs in satoshis
+func (q *Qchan) GetChannelBalances() (int64, int64) {
+	value := q.Value
+
+	for _, h := range q.State.HTLCs {
+		if !h.Cleared {
+			value -= h.Amt
+		}
+	}
+
+	myAmt := q.State.MyAmt
+	theirAmt := value - myAmt
+
+	return myAmt, theirAmt
 }

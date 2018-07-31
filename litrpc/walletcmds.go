@@ -3,11 +3,12 @@ package litrpc
 import (
 	"fmt"
 	"log"
+
 	"github.com/mit-dci/lit/bech32"
-	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
+	"github.com/mit-dci/lit/wire"
 )
 
 type TxidsReply struct {
@@ -413,3 +414,21 @@ func (r *LitRPC) Address(args *AddressArgs, reply *AddressReply) error {
 //	}
 //	return base58.CheckEncode(pkHash, netID), nil
 //}
+
+type ClaimHTLCArgs struct {
+	R [16]byte
+}
+
+func (r *LitRPC) ClaimHTLC(args *ClaimHTLCArgs, reply *TxidsReply) error {
+	txids, err := r.Node.ClaimHTLC(args.R)
+	if err != nil {
+		return err
+	}
+
+	reply.Txids = make([]string, 0)
+	for _, txid := range txids {
+		reply.Txids = append(reply.Txids, fmt.Sprintf("%x", txid))
+	}
+
+	return nil
+}

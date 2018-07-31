@@ -3,10 +3,13 @@ package qln
 import (
 	"fmt"
 	"log"
+	"strconv"
+	"time"
 
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
+	nat "github.com/mit-dci/lit/nat"
 )
 
 // Gets the list of ports where LitNode is listening for incoming connections,
@@ -31,6 +34,37 @@ func (nd *LitNode) GetLisAddressAndPorts() (
 func (nd *LitNode) TCPListener(
 	lisIpPort string) (string, error) {
 	idPriv := nd.IdKey()
+
+	// do UPnP / pmp port forwarding
+	// fatal if we aren't able to port forward via upnp
+	if len(nd.Nat) > 0 {
+		listenPort, err := strconv.Atoi(lisIpPort[1:])
+		if err != nil {
+			log.Println("Invalid port number, returning")
+			return "", err
+		}
+		if nd.Nat == "upnp" {
+			log.Println("Port forwarding via UPnP on port", lisIpPort[1:])
+			err := nat.SetupUpnp(uint16(listenPort))
+			if err != nil {
+				fmt.Printf("Unable to setup Upnp %v\n", err)
+				log.Fatal(err) // error out if we can't connect via UPnP
+			}
+			log.Println("Forwarded port via UPnP")
+		} else if nd.Nat == "pmp" {
+			discoveryTimeout := time.Duration(10 * time.Second)
+			log.Println("Port forwarding via NAT Pmp on port", lisIpPort[1:])
+			_, err := nat.SetupPmp(discoveryTimeout, uint16(listenPort))
+			if err != nil {
+				err := fmt.Errorf("Unable to discover a "+
+					"NAT-PMP enabled device on the local "+
+					"network: %v", err)
+				log.Fatal(err) // error out if we can't connect via Pmp
+			} else {
+				log.Println("Invalid NAT punching option")
+			}
+		}
+	}
 	listener, err := lndc.NewListener(nd.IdKey(), lisIpPort)
 	if err != nil {
 		return "", err
