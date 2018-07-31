@@ -242,7 +242,8 @@ pub struct ChanInfo {
     pub PeerIdx: u32,
     pub CIdx: u32,
     pub Data: [u8; 32],
-    pub Pkh: [u8; 20]
+    pub Pkh: [u8; 20],
+    pub LastUpdate: u64
 }
 
 rpc_call! {

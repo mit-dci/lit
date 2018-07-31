@@ -1,3 +1,4 @@
+extern crate chrono;
 #[macro_use] extern crate clap;
 extern crate cursive;
 extern crate reqwest;
@@ -7,6 +8,8 @@ extern crate serde_json;
 
 use std::cmp;
 use std::panic;
+
+use chrono::prelude::*;
 
 use cursive::Cursive;
 use cursive::direction::*;
@@ -107,11 +110,17 @@ fn run_bsod() {
 
 fn generate_view_for_chan(chan: litrpc::ChanInfo) -> impl View {
 
+    let ndt = NaiveDateTime::from_timestamp(
+        (chan.LastUpdate / 1000) as i64,
+        ((chan.LastUpdate % 1000) * 1000) as u32);
+    let dt: DateTime<Utc> = DateTime::from_utc(ndt, chrono::Utc);
+
     let mut data = LinearLayout::new(Orientation::Vertical);
     data.add_child(TextView::new(format!("Channel # {}", chan.CIdx)));
     data.add_child(TextView::new(format!("Outpoint: {}", chan.OutPoint)));
     data.add_child(TextView::new(format!("Peer: {}", chan.PeerIdx)));
     data.add_child(TextView::new(format!("Coin Type: {}", chan.CoinType)));
+    data.add_child(TextView::new(format!("Last Activity: {}", dt.to_rfc3339())));
     data.add_child(DummyView);
 
     data.add_child(TextView::new(format!("Balance: {}/{}", chan.MyBalance, chan.Capacity)));
@@ -149,11 +158,13 @@ fn generate_view_for_bal(bal: &litrpc::CoinBalInfo, addrs: Vec<String>) -> impl 
 
 fn generate_view_for_txo(txo: litrpc::TxoInfo) -> impl View {
 
+    // TODO Make this prettier
     let strs = vec![
         ("Outpoint", txo.OutPoint),
         ("Amount", format!("{}", txo.Amt)),
         ("Height", format!("{}", txo.Height)),
-        ("Coin Type", txo.CoinType)
+        ("Coin Type", txo.CoinType),
+        ("Key Path", txo.KeyPath)
     ];
 
     let mut data = LinearLayout::new(Orientation::Vertical);
@@ -161,7 +172,7 @@ fn generate_view_for_txo(txo: litrpc::TxoInfo) -> impl View {
         data.add_child(TextView::new(format!("{}: {}", k, v)));
     }
 
-    let cbox = BoxView::new(SizeConstraint::Full, SizeConstraint::Fixed(5), data);
+    let cbox = BoxView::new(SizeConstraint::Full, SizeConstraint::Free, data);
     Panel::new(cbox)
 
 }
@@ -178,7 +189,12 @@ fn make_update_ui_callback_with_client(cl: &mut litrpc::LitRpcClient) -> impl Fn
 
         // Channels.
         let chans: Vec<litrpc::ChanInfo> = match clrc.call_chan_list(0) {
-            Ok(clr) => clr.Channels,
+            Ok(clr) => {
+                let mut cls = clr.Channels;
+                // Reversed because we want the newest at the top.
+                cls.sort_by(|a, b| cmp::Ord::cmp(&b.LastUpdate, &a.LastUpdate));
+                cls
+            },
             Err(err) => panic!("{:?}", err)
         };
 
@@ -240,7 +256,10 @@ fn make_update_ui_callback_with_client(cl: &mut litrpc::LitRpcClient) -> impl Fn
         // Txos
         let txos: Vec<litrpc::TxoInfo> = match clrc.call_get_txo_list() {
             Ok(txr) => txr.Txos,
-            Err(err) => panic!("{:?}", err)
+            Err(err) => {
+                eprintln!("error: {:?}", err);
+                Vec::new()
+            }
         };
 
         c.call_on_id("txos", |txopan: &mut Panel<LinearLayout>| {

@@ -22,6 +22,7 @@ type ChannelInfo struct {
 	PeerID        string
 	Data          [32]byte
 	Pkh           [20]byte
+	LastUpdate    uint64
 }
 type ChannelListReply struct {
 	Channels []ChannelInfo
