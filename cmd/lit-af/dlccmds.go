@@ -416,7 +416,7 @@ func (lc *litAfClient) DlcImportOracle(textArgs []string) error {
 		return err
 	}
 
-	fmt.Fprintf(color.Output, "Oracle succesfully registered under ID %d\n",
+	fmt.Fprintf(color.Output, "Oracle successfully registered under ID %d\n",
 		reply.Oracle.Idx)
 	return nil
 }
@@ -442,7 +442,7 @@ func (lc *litAfClient) DlcAddOracle(textArgs []string) error {
 		return err
 	}
 
-	fmt.Fprintf(color.Output, "Oracle succesfully registered under ID %d\n",
+	fmt.Fprintf(color.Output, "Oracle successfully registered under ID %d\n",
 		reply.Oracle.Idx)
 	return nil
 }
@@ -550,7 +550,7 @@ func (lc *litAfClient) DlcNewContract(textArgs []string) error {
 		return err
 	}
 
-	fmt.Fprint(color.Output, "Contract succesfully created\n\n")
+	fmt.Fprint(color.Output, "Contract successfully created\n\n")
 	PrintContract(reply.Contract)
 	return nil
 }
@@ -641,7 +641,7 @@ func (lc *litAfClient) DlcSetContractOracle(textArgs []string) error {
 		return err
 	}
 
-	fmt.Fprint(color.Output, "Oracle set succesfully\n")
+	fmt.Fprint(color.Output, "Oracle set successfully\n")
 
 	return nil
 }
@@ -671,7 +671,7 @@ func (lc *litAfClient) DlcSetContractDatafeed(textArgs []string) error {
 		return err
 	}
 
-	fmt.Fprint(color.Output, "Datafeed set succesfully\n")
+	fmt.Fprint(color.Output, "Datafeed set successfully\n")
 
 	return nil
 }
@@ -701,7 +701,7 @@ func (lc *litAfClient) DlcSetContractRPoint(textArgs []string) error {
 		return err
 	}
 
-	fmt.Fprint(color.Output, "R-point set succesfully\n")
+	fmt.Fprint(color.Output, "R-point set successfully\n")
 
 	return nil
 }
@@ -731,7 +731,7 @@ func (lc *litAfClient) DlcSetContractSettlementTime(textArgs []string) error {
 		return err
 	}
 
-	fmt.Fprint(color.Output, "Settlement time set succesfully\n")
+	fmt.Fprint(color.Output, "Settlement time set successfully\n")
 
 	return nil
 }
@@ -766,7 +766,7 @@ func (lc *litAfClient) DlcSetContractFunding(textArgs []string) error {
 		return err
 	}
 
-	fmt.Fprint(color.Output, "Funding set succesfully\n")
+	fmt.Fprint(color.Output, "Funding set successfully\n")
 
 	return nil
 }
@@ -832,7 +832,7 @@ func (lc *litAfClient) DlcSetContractDivision(textArgs []string) error {
 		return err
 	}
 
-	fmt.Fprint(color.Output, "Funding set succesfully\n")
+	fmt.Fprint(color.Output, "Funding set successfully\n")
 
 	return nil
 }
@@ -863,7 +863,7 @@ func (lc *litAfClient) DlcOfferContract(textArgs []string) error {
 		return err
 	}
 
-	fmt.Fprint(color.Output, "Offer sent set succesfully\n")
+	fmt.Fprint(color.Output, "Offer sent set successfully\n")
 
 	return nil
 }
@@ -887,7 +887,7 @@ func (lc *litAfClient) dlcContractRespond(textArgs []string, aor bool) error {
 	if aor {
 		fmt.Fprintf(color.Output, "Offer acceptance initiated. Use [dlc contract view %d] to see the status.\n", cIdx)
 	} else {
-		fmt.Fprint(color.Output, "Offer declined succesfully\n")
+		fmt.Fprint(color.Output, "Offer declined successfully\n")
 	}
 
 	return nil
@@ -945,7 +945,7 @@ func (lc *litAfClient) DlcSettleContract(textArgs []string) error {
 		return err
 	}
 
-	fmt.Fprint(color.Output, "Contract settled succesfully\n")
+	fmt.Fprint(color.Output, "Contract settled successfully\n")
 
 	return nil
 }

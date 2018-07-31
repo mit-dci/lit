@@ -136,7 +136,7 @@ const (
 	// BC2Net represents the BC2 test network
 	LiteTest4Net BitcoinNet = 0xf1c8d2fd
 
-	// LiteRegNet is the litecoin regression test network (disticnt from testnet4)
+	// LiteRegNet is the litecoin regression test network (distinct from testnet4)
 	LiteRegNet BitcoinNet = 0xdab5bffa
 )
 
