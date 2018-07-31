@@ -59,7 +59,11 @@ func (s *SPVCon) incomingMessageHandler() {
 			s.GetDataHandler(m)
 
 		default:
-			log.Printf("Got unknown message type %s\n", xm.Command())
+			if m != nil {
+				log.Printf("Got unknown message type %s\n", m.Command())
+			} else {
+				log.Printf("Got nil message")
+			}
 		}
 	}
 	return
