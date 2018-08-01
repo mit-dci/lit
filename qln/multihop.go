@@ -202,15 +202,19 @@ func (nd *LitNode) MultihopPaymentSettleHandler(msg lnutil.MultihopPaymentSettle
 	idHash := fastsha256.Sum256(id[:])
 	copy(pkh[:], idHash[:20])
 	var sendToPkh [20]byte
+	var shouldForward bool
 	for i, node := range inFlight.Path {
-		if bytes.Equal(pkh[:], node[:]) {
+		if bytes.Equal(pkh[:], node[:]) && i > 0 {
 			sendToPkh = inFlight.Path[i-1]
+			shouldForward = true
 		}
 	}
 
-	sendToIdx, _ := nd.FindPeerIndexByAddress(bech32.Encode("ln", sendToPkh[:]))
-	msg.PeerIdx = sendToIdx
-	nd.OmniOut <- msg
+	if shouldForward {
+		sendToIdx, _ := nd.FindPeerIndexByAddress(bech32.Encode("ln", sendToPkh[:]))
+		msg.PeerIdx = sendToIdx
+		nd.OmniOut <- msg
+	}
 
 	return nil
 }
