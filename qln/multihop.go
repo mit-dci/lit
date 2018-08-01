@@ -92,6 +92,7 @@ func (nd *LitNode) MultihopPaymentAckHandler(msg lnutil.MultihopPaymentAckMsg) e
 			log.Printf("offering HTLC")
 			err := nd.OfferHTLC(qc, uint32(mh.Amt), mh.HHash, 100, [32]byte{})
 			if err != nil {
+				log.Printf("error offering HTLC: %s", err.Error())
 				return err
 			}
 
@@ -165,6 +166,7 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 	nd.RemoteMtx.Unlock()
 	err := nd.OfferHTLC(qc, uint32(msg.Amount), msg.HHash, 100, [32]byte{})
 	if err != nil {
+		log.Printf("error offering HTLC: %s", err.Error())
 		return err
 	}
 
