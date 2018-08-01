@@ -16,6 +16,8 @@ import (
 )
 
 func (nd *LitNode) OfferHTLC(qc *Qchan, amt uint32, RHash [32]byte, locktime uint32, data [32]byte) error {
+	log.Printf("starting HTLC offer")
+
 	if amt >= 1<<30 {
 		return fmt.Errorf("max send 1G sat (1073741823)")
 	}
@@ -618,18 +620,18 @@ func (nd *LitNode) PreimageSigHandler(msg lnutil.PreimageSigMsg, qc *Qchan) erro
 		if qc.State.HTLCs[msg.Idx].RHash != RHash {
 			return fmt.Errorf("Preimage does not hash to expected value. Expected %x got %x", qc.State.HTLCs[msg.Idx].RHash, RHash)
 		}
-
-		go func() {
-			txids, err := nd.ClaimHTLC(msg.R)
-			if err != nil {
-				log.Printf("error claiming HTLCs: %s", err.Error())
-			}
-
-			for _, id := range txids {
-				log.Printf("claimed HTLC with txid: %x", id)
-			}
-		}()
 	}
+
+	go func() {
+		txids, err := nd.ClaimHTLC(msg.R)
+		if err != nil {
+			log.Printf("error claiming HTLCs: %s", err.Error())
+		}
+
+		for _, id := range txids {
+			log.Printf("claimed HTLC with txid: %x", id)
+		}
+	}()
 
 	// update to the next state to verify
 	qc.State.StateIdx++
