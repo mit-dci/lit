@@ -615,8 +615,8 @@ func (nd *LitNode) PreimageSigHandler(msg lnutil.PreimageSigMsg, qc *Qchan) erro
 		timeout = true
 	}
 
+	RHash := fastsha256.Sum256(msg.R[:])
 	if !timeout {
-		RHash := fastsha256.Sum256(msg.R[:])
 		if qc.State.HTLCs[msg.Idx].RHash != RHash {
 			return fmt.Errorf("Preimage does not hash to expected value. Expected %x got %x", qc.State.HTLCs[msg.Idx].RHash, RHash)
 		}
@@ -629,7 +629,7 @@ func (nd *LitNode) PreimageSigHandler(msg lnutil.PreimageSigMsg, qc *Qchan) erro
 		}
 
 		if len(txids) == 0 {
-			log.Printf("found no other HTLCs to claim with R: %x", msg.R)
+			log.Printf("found no other HTLCs to claim with R: %x, RHash: %x", msg.R, RHash)
 		}
 
 		for _, id := range txids {
@@ -861,6 +861,7 @@ func (nd *LitNode) FindHTLCsByHash(hash [32]byte) ([]HTLC, []*Qchan, error) {
 	}
 	for _, q := range qc {
 		for _, h := range q.State.HTLCs {
+			log.Printf("Trying RHash: %x against: %x", h.RHash, hash)
 			if bytes.Equal(h.RHash[:], hash[:]) {
 				htlcs = append(htlcs, h)
 				channels = append(channels, q)
