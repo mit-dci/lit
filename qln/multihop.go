@@ -103,6 +103,7 @@ func (nd *LitNode) MultihopPaymentAckHandler(msg lnutil.MultihopPaymentAckMsg) e
 			outMsg := lnutil.NewMultihopPaymentSetupMsg(firstHopIdx, mh.Amt, msg.HHash, mh.Path, data)
 			fmt.Printf("Sending multihoppaymentsetup to peer %d\n", firstHopIdx)
 			nd.OmniOut <- outMsg
+			break
 		}
 	}
 	return nil
