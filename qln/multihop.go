@@ -65,7 +65,7 @@ func (nd *LitNode) MultihopPaymentRequestHandler(msg lnutil.MultihopPaymentReque
 func (nd *LitNode) MultihopPaymentAckHandler(msg lnutil.MultihopPaymentAckMsg) error {
 	fmt.Printf("Received multihop payment ack from peer %d, hash %x\n", msg.Peer(), msg.HHash)
 
-	for _, mh := range nd.InProgMultihop {
+	for idx, mh := range nd.InProgMultihop {
 		targetNode := mh.Path[len(mh.Path)-1]
 		targetIdx, _ := nd.FindPeerIndexByAddress(bech32.Encode("ln", targetNode[:]))
 		if msg.Peer() == targetIdx {
@@ -89,8 +89,11 @@ func (nd *LitNode) MultihopPaymentAckHandler(msg lnutil.MultihopPaymentAckMsg) e
 			}
 
 			nd.RemoteMtx.Unlock()
-			log.Printf("offering HTLC with RHash: %x", mh.HHash)
-			err := nd.OfferHTLC(qc, uint32(mh.Amt), mh.HHash, 100, [32]byte{})
+
+			nd.InProgMultihop[idx].HHash = msg.HHash
+
+			log.Printf("offering HTLC with RHash: %x", msg.HHash)
+			err := nd.OfferHTLC(qc, uint32(mh.Amt), msg.HHash, 100, [32]byte{})
 			if err != nil {
 				log.Printf("error offering HTLC: %s", err.Error())
 				return err
@@ -111,7 +114,7 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 	var nullBytes [16]byte
 	for _, mh := range nd.InProgMultihop {
 		hash := fastsha256.Sum256(mh.PreImage[:])
-		if mh.PreImage != nullBytes && bytes.Equal(msg.HHash[:], hash[:]) {
+		if !bytes.Equal(mh.PreImage[:], nullBytes[:]) && bytes.Equal(msg.HHash[:], hash[:]) {
 			// We already know this. If we have a Preimage, then we're the receiving
 			// end and we should send a settlement message to the
 			// predecessor
