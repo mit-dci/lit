@@ -629,7 +629,7 @@ func (nd *LitNode) PreimageSigHandler(msg lnutil.PreimageSigMsg, qc *Qchan) erro
 		}
 
 		if len(txids) == 0 {
-			log.Printf("found no other HTLCs to claim")
+			log.Printf("found no other HTLCs to claim with R: %x", msg.R)
 		}
 
 		for _, id := range txids {
