@@ -137,17 +137,21 @@ func (nd *LitNode) MultihopPaymentAckHandler(msg lnutil.MultihopPaymentAckMsg) e
 				// Allow 5 blocks of leeway per hop in case people's wallets are out of sync
 				locktime := height + int32(len(mh.Path)*(consts.DefaultLockTime+5))
 
-				log.Printf("offering HTLC with RHash: %x", msg.HHash)
-				err = nd.OfferHTLC(qc, uint32(mh.Amt), msg.HHash, uint32(locktime), [32]byte{})
-				if err != nil {
-					log.Printf("error offering HTLC: %s", err.Error())
-					return err
-				}
+				// This handler needs to return before OfferHTLC can work
+				go func() {
+					log.Printf("offering HTLC with RHash: %x", msg.HHash)
+					err = nd.OfferHTLC(qc, uint32(mh.Amt), msg.HHash, uint32(locktime), [32]byte{})
+					if err != nil {
+						log.Printf("error offering HTLC: %s", err.Error())
+						return
+					}
 
-				var data [32]byte
-				outMsg := lnutil.NewMultihopPaymentSetupMsg(firstHopIdx, mh.Amt, mh.Cointype, msg.HHash, mh.Path, data)
-				fmt.Printf("Sending multihoppaymentsetup to peer %d\n", firstHopIdx)
-				nd.OmniOut <- outMsg
+					var data [32]byte
+					outMsg := lnutil.NewMultihopPaymentSetupMsg(firstHopIdx, mh.Amt, mh.Cointype, msg.HHash, mh.Path, data)
+					fmt.Printf("Sending multihoppaymentsetup to peer %d\n", firstHopIdx)
+					nd.OmniOut <- outMsg
+				}()
+
 				break
 			}
 		}
@@ -260,14 +264,19 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 	}
 
 	nd.RemoteMtx.Unlock()
-	log.Printf("offering HTLC with RHash: %x", msg.HHash)
-	err = nd.OfferHTLC(qc, uint32(msg.Amount), msg.HHash, locktime-consts.DefaultLockTime, [32]byte{})
-	if err != nil {
-		log.Printf("error offering HTLC: %s", err.Error())
-		return err
-	}
 
-	msg.PeerIdx = sendToIdx
-	nd.OmniOut <- msg
+	// This handler needs to return so run this in a goroutine
+	go func() {
+		log.Printf("offering HTLC with RHash: %x", msg.HHash)
+		err = nd.OfferHTLC(qc, uint32(msg.Amount), msg.HHash, locktime-consts.DefaultLockTime, [32]byte{})
+		if err != nil {
+			log.Printf("error offering HTLC: %s", err.Error())
+			return
+		}
+
+		msg.PeerIdx = sendToIdx
+		nd.OmniOut <- msg
+	}()
+
 	return nil
 }
