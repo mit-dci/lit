@@ -5,11 +5,11 @@ import (
 	"log"
 
 	"github.com/mit-dci/lit/btcutil/btcec"
-	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
+	"github.com/mit-dci/lit/wire"
 )
 
 /*
@@ -112,10 +112,13 @@ func (nd *LitNode) FundChannel(
 	nd.InProg.mtx.Lock()
 	//	defer nd.InProg.mtx.Lock()
 
-	_, ok = nd.ConnectedCoinTypes[cointype] ; if !ok {
+	_, ok = nd.ConnectedCoinTypes[cointype]
+	if !ok {
 		nd.InProg.mtx.Unlock()
 		return 0, fmt.Errorf("No daemon of type %d connected. Can't fund, only receive", cointype)
 	}
+
+	fee := nd.SubWallet[cointype].Fee() * 1000
 
 	if nd.InProg.PeerIdx != 0 {
 		nd.InProg.mtx.Unlock()
@@ -135,14 +138,14 @@ func (nd *LitNode) FundChannel(
 		return 0, fmt.Errorf("Can't send %d in %d capacity channel", initSend, ccap)
 	}
 
-	if initSend < consts.MinOutput {
+	if initSend < consts.MinOutput+fee {
 		nd.InProg.mtx.Unlock()
-		return 0, fmt.Errorf("Can't send %d as initial send because MinOutput is %d", initSend, consts.MinOutput)
+		return 0, fmt.Errorf("Can't send %d as initial send because MinOutput is %d", initSend, consts.MinOutput+fee)
 	}
 
-	if ccap-initSend < consts.MinOutput {
+	if ccap-initSend < consts.MinOutput+fee {
 		nd.InProg.mtx.Unlock()
-		return 0, fmt.Errorf("Can't send %d as initial send because MinOutput is %d and you would only have %d", initSend, consts.MinOutput, ccap-initSend)
+		return 0, fmt.Errorf("Can't send %d as initial send because MinOutput is %d and you would only have %d", initSend, consts.MinOutput+fee, ccap-initSend)
 	}
 
 	// TODO - would be convenient if it auto connected to the peer huh
