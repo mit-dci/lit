@@ -78,9 +78,12 @@ func (nd *LitNode) MultihopPaymentRequestHandler(msg lnutil.MultihopPaymentReque
 	// TODO: check we have the requested cointype
 	inFlight.Cointype = msg.Cointype
 	rand.Read(inFlight.PreImage[:])
+	hash := fastsha256.Sum256(inFlight.PreImage[:])
+
+	inFlight.HHash = hash
+
 	nd.InProgMultihop = append(nd.InProgMultihop, inFlight)
 
-	hash := fastsha256.Sum256(inFlight.PreImage[:])
 	outMsg := lnutil.NewMultihopPaymentAckMsg(msg.Peer(), hash)
 	nd.OmniOut <- outMsg
 	return nil
