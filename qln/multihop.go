@@ -75,7 +75,6 @@ func (nd *LitNode) MultihopPaymentRequestHandler(msg lnutil.MultihopPaymentReque
 	copy(pkh[:], idHash[:20])
 	inFlight.Path = [][20]byte{pkh}
 
-	// TODO: check we have the requested cointype
 	inFlight.Cointype = msg.Cointype
 	rand.Read(inFlight.PreImage[:])
 	hash := fastsha256.Sum256(inFlight.PreImage[:])
@@ -249,7 +248,6 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 	nd.RemoteMtx.Lock()
 	var qc *Qchan
 	for _, ch := range nd.RemoteCons[sendToIdx].QCs {
-		// TODO: should specify the exact channel on the route, not just the peer
 		if ch.Coin() == inFlight.Cointype && ch.State.MyAmt-consts.MinOutput > msg.Amount && !ch.CloseData.Closed {
 			qc = ch
 			break
