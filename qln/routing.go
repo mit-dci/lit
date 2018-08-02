@@ -108,7 +108,7 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, coinType uint32, amount int64, f
 			break
 		}
 
-		fmt.Print("Finding edges for %s...\n", bech32.Encode("ln", bestNode[:]))
+		fmt.Printf("Finding edges for %s...\n", bech32.Encode("ln", bestNode[:]))
 		for _, channel := range nd.ChannelMap[bestNode] {
 			fmt.Printf("Checking %s\n", bech32.Encode("ln", channel.BPKH[:]))
 			capOk := (channel.ACapacity-consts.MinOutput-fee >= amount)
