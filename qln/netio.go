@@ -34,7 +34,7 @@ func (nd *LitNode) FindPeerIndexByAddress(lnAdr string) (uint32, error) {
 	nd.RemoteMtx.Lock()
 	for idx, peer := range nd.RemoteCons {
 		var pubKey [33]byte
-		copy(pubKey[:], peer.Con.RemotePub.SerializeCompressed())
+		copy(pubKey[:], peer.Con.RemotePub().SerializeCompressed())
 		adr := lnutil.LitAdrFromPubkey(pubKey)
 		if adr == lnAdr {
 			nd.RemoteMtx.Unlock()
