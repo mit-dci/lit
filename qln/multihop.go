@@ -20,11 +20,13 @@ func (nd *LitNode) PayMultihop(dstLNAdr string, coinType uint32, amount int64) (
 	}
 
 	copy(targetAdr[:], adr)
+	log.Printf("Finding route to %s", dstLNAdr)
 	path, err := nd.FindPath(targetAdr, coinType, amount)
 
 	if err != nil {
 		return false, err
 	}
+	log.Printf("Done route to %s", dstLNAdr)
 
 	inFlight := new(InFlightMultihop)
 	inFlight.Path = path
@@ -38,8 +40,10 @@ func (nd *LitNode) PayMultihop(dstLNAdr string, coinType uint32, amount int64) (
 		return false, err
 	}
 
+	log.Printf("Sending payment request to %s", dstLNAdr)
 	msg := lnutil.NewMultihopPaymentRequestMsg(idx)
 	nd.OmniOut <- msg
+	log.Printf("Done sending payment request to %s", dstLNAdr)
 	return true, nil
 }
 
@@ -164,6 +168,7 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 	}
 
 	if qc == nil {
+		nd.RemoteMtx.Unlock()
 		return fmt.Errorf("could not find suitable channel to route payment")
 	}
 
