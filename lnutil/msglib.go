@@ -1995,11 +1995,14 @@ func (msg DlcContractSigProofMsg) MsgType() uint8 {
 type MultihopPaymentRequestMsg struct {
 	// The index of the peer we're communicating with
 	PeerIdx uint32
+	// The type of coin we're requesting to send
+	Cointype uint32
 }
 
-func NewMultihopPaymentRequestMsg(peerIdx uint32) MultihopPaymentRequestMsg {
+func NewMultihopPaymentRequestMsg(peerIdx uint32, cointype uint32) MultihopPaymentRequestMsg {
 	msg := new(MultihopPaymentRequestMsg)
 	msg.PeerIdx = peerIdx
+	msg.Cointype = cointype
 	return *msg
 }
 
@@ -2008,6 +2011,14 @@ func NewMultihopPaymentRequestMsgFromBytes(b []byte,
 
 	msg := new(MultihopPaymentRequestMsg)
 	msg.PeerIdx = peerIdx
+
+	buf := bytes.NewBuffer(b[1:])
+
+	err := binary.Read(buf, binary.BigEndian, &msg.Cointype)
+	if err != nil {
+		return *msg, err
+	}
+
 	return *msg, nil
 }
 
@@ -2016,6 +2027,7 @@ func (msg MultihopPaymentRequestMsg) Bytes() []byte {
 	var buf bytes.Buffer
 
 	buf.WriteByte(msg.MsgType())
+	binary.Write(&buf, binary.BigEndian, msg.Cointype)
 	return buf.Bytes()
 }
 
@@ -2086,17 +2098,20 @@ type MultihopPaymentSetupMsg struct {
 	NodeRoute [][20]byte
 	// Amount in satoshi we're paying
 	Amount int64
+	// Coin type we're transacting
+	Cointype uint32
 	// Data associated with the payment
 	Data [32]byte
 }
 
-func NewMultihopPaymentSetupMsg(peerIdx uint32, amount int64, hHash [32]byte, nodeRoute [][20]byte, data [32]byte) MultihopPaymentSetupMsg {
+func NewMultihopPaymentSetupMsg(peerIdx uint32, amount int64, cointype uint32, hHash [32]byte, nodeRoute [][20]byte, data [32]byte) MultihopPaymentSetupMsg {
 	msg := new(MultihopPaymentSetupMsg)
 	msg.PeerIdx = peerIdx
 	msg.HHash = hHash
 	msg.NodeRoute = nodeRoute
 	msg.Data = data
 	msg.Amount = amount
+	msg.Cointype = cointype
 	return *msg
 }
 
@@ -2116,7 +2131,14 @@ func NewMultihopPaymentSetupMsgFromBytes(b []byte,
 	}
 	amount, _ := wire.ReadVarInt(buf, 0)
 	msg.Amount = int64(amount)
+
+	err := binary.Read(buf, binary.BigEndian, &msg.Cointype)
+	if err != nil {
+		return *msg, err
+	}
+
 	copy(msg.Data[:], buf.Next(32))
+
 	return *msg, nil
 }
 
@@ -2132,6 +2154,9 @@ func (msg MultihopPaymentSetupMsg) Bytes() []byte {
 	}
 
 	wire.WriteVarInt(&buf, 0, uint64(msg.Amount))
+
+	binary.Write(&buf, binary.BigEndian, msg.Cointype)
+
 	buf.Write(msg.Data[:])
 
 	return buf.Bytes()

@@ -11,6 +11,7 @@ import (
 
 	"github.com/awalterschulze/gographviz"
 	"github.com/mit-dci/lit/bech32"
+	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/crypto/fastsha256"
 	"github.com/mit-dci/lit/lnutil"
 )
@@ -71,7 +72,7 @@ func (nd *LitNode) VisualiseGraph() string {
 	return "di" + graph.String()
 }
 
-func (nd *LitNode) FindPath(targetPkh [20]byte, coinType uint32, amount int64) ([][20]byte, error) {
+func (nd *LitNode) FindPath(targetPkh [20]byte, coinType uint32, amount int64, fee int64) ([][20]byte, error) {
 
 	var myIdPkh [20]byte
 	idHash := fastsha256.Sum256(nd.IdKey().PubKey().SerializeCompressed())
@@ -110,7 +111,7 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, coinType uint32, amount int64) (
 		fmt.Print("Finding edges for %s...\n", bech32.Encode("ln", bestNode[:]))
 		for _, channel := range nd.ChannelMap[bestNode] {
 			fmt.Printf("Checking %s\n", bech32.Encode("ln", channel.BPKH[:]))
-			capOk := (channel.ACapacity >= amount)
+			capOk := (channel.ACapacity-consts.MinOutput-fee >= amount)
 			isTarget := bytes.Equal(targetPkh[:], channel.BPKH[:])
 			coinTypeMatch := (coinType == channel.CoinType)
 

@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
-	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/elkrem"
+	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/watchtower"
 	"github.com/mit-dci/lit/wire"
@@ -144,10 +144,12 @@ type LitNode struct {
 }
 
 type InFlightMultihop struct {
-	Path     [][20]byte
-	Amt      int64
-	HHash    [32]byte
-	PreImage [16]byte
+	Path      [][20]byte
+	Amt       int64
+	HHash     [32]byte
+	PreImage  [16]byte
+	Cointype  uint32
+	Succeeded bool
 }
 
 type RemotePeer struct {

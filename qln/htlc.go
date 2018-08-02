@@ -755,7 +755,7 @@ func (nd *LitNode) ClaimHTLC(R [16]byte) ([][32]byte, error) {
 				tx, err := nd.ClaimHTLCOnChain(q, h)
 				if err != nil {
 					log.Printf("Error claiming HTLC: %s", err.Error())
-					return nil, err
+					continue
 				}
 				nd.SetHTLCClearedOnChain(q, h)
 				txids = append(txids, tx.TxHash())
@@ -767,15 +767,27 @@ func (nd *LitNode) ClaimHTLC(R [16]byte) ([][32]byte, error) {
 
 				nd.RemoteMtx.Unlock()
 				if !ok {
-					return nil, fmt.Errorf("Couldn't find peer %d in RemoteCons", q.Peer())
+					log.Printf("Couldn't find peer %d in RemoteCons", q.Peer())
+					continue
 				}
 				qc, ok := peer.QCs[q.Idx()]
 				if !ok {
-					return nil, fmt.Errorf("Couldn't find channel %d in peer.QCs", q.Idx())
+					log.Printf("Couldn't find channel %d in peer.QCs", q.Idx())
+					continue
 				}
 
 				log.Printf("Cleaing HTLC from channel [%d] idx [%d]\n", q.Idx(), h.Idx)
-				nd.ClearHTLC(qc, R, h.Idx, [32]byte{})
+				err = nd.ClearHTLC(qc, R, h.Idx, [32]byte{})
+				if err != nil {
+					log.Printf("failed to clear HTLC: %s", err.Error())
+					continue
+				}
+			}
+
+			for idx, mu := range nd.InProgMultihop {
+				if bytes.Equal(mu.HHash[:], RHash[:]) && !mu.Succeeded {
+					nd.InProgMultihop[idx].Succeeded = true
+				}
 			}
 		}
 	}
@@ -861,7 +873,6 @@ func (nd *LitNode) FindHTLCsByHash(hash [32]byte) ([]HTLC, []*Qchan, error) {
 	}
 	for _, q := range qc {
 		for _, h := range q.State.HTLCs {
-			log.Printf("Trying RHash: %x against: %x", h.RHash, hash)
 			if bytes.Equal(h.RHash[:], hash[:]) {
 				htlcs = append(htlcs, h)
 				channels = append(channels, q)
