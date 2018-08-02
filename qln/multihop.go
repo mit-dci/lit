@@ -127,8 +127,19 @@ func (nd *LitNode) MultihopPaymentAckHandler(msg lnutil.MultihopPaymentAckMsg) e
 
 				nd.InProgMultihop[idx].HHash = msg.HHash
 
+				// Calculate what initial locktime we need
+				wal, ok := nd.SubWallet[mh.Cointype]
+				if !ok {
+					return fmt.Errorf("not connected to wallet for cointype %d", mh.Cointype)
+				}
+
+				height := wal.CurrentHeight()
+
+				// Allow 5 blocks of leeway per hop in case people's wallets are out of sync
+				locktime := height + int32(len(mh.Path)*(consts.DefaultLockTime+5))
+
 				log.Printf("offering HTLC with RHash: %x", msg.HHash)
-				err = nd.OfferHTLC(qc, uint32(mh.Amt), msg.HHash, 100, [32]byte{})
+				err = nd.OfferHTLC(qc, uint32(mh.Amt), msg.HHash, uint32(locktime), [32]byte{})
 				if err != nil {
 					log.Printf("error offering HTLC: %s", err.Error())
 					return err
@@ -173,9 +184,11 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 	}
 
 	var found bool
+	var locktime uint32
 	for idx, h := range HTLCs {
 		if h.Incoming && !h.Cleared && !h.Clearing && !h.ClearedOnChain && h.Amt == msg.Amount && chans[idx].Coin() == msg.Cointype {
 			found = true
+			locktime = h.Locktime
 			break
 		}
 
@@ -187,6 +200,16 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 
 	if !found {
 		return fmt.Errorf("no corresponding incoming HTLC found for multihop payment with RHash: %x", msg.HHash)
+	}
+
+	wal, ok := nd.SubWallet[msg.Cointype]
+	if !ok {
+		return fmt.Errorf("not connected to wallet for cointype %d", msg.Cointype)
+	}
+
+	height := wal.CurrentHeight()
+	if locktime-consts.DefaultLockTime < uint32(height+consts.DefaultLockTime) {
+		return fmt.Errorf("locktime of preceeding hop is too close for comfort: %d, height: %d", locktime-consts.DefaultLockTime, height)
 	}
 
 	inFlight := new(InFlightMultihop)
@@ -240,7 +263,7 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 
 	nd.RemoteMtx.Unlock()
 	log.Printf("offering HTLC with RHash: %x", msg.HHash)
-	err = nd.OfferHTLC(qc, uint32(msg.Amount), msg.HHash, 100, [32]byte{})
+	err = nd.OfferHTLC(qc, uint32(msg.Amount), msg.HHash, locktime-consts.DefaultLockTime, [32]byte{})
 	if err != nil {
 		log.Printf("error offering HTLC: %s", err.Error())
 		return err
