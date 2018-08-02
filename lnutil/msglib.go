@@ -51,10 +51,9 @@ const (
 	MSGID_LINK_DESC = 0x70 // Describes a new channel for routing
 
 	//Multihop payment messages
-	MSGID_PAY_REQ    = 0x75 // Request payment
-	MSGID_PAY_ACK    = 0x76 // Acknowledge payment (share preimage hash)
-	MSGID_PAY_SETUP  = 0x77 // Setup a payment route
-	MSGID_PAY_SETTLE = 0x78 // Settle payment route
+	MSGID_PAY_REQ   = 0x75 // Request payment
+	MSGID_PAY_ACK   = 0x76 // Acknowledge payment (share preimage hash)
+	MSGID_PAY_SETUP = 0x77 // Setup a payment route
 
 	//Discreet log contracts messages
 	MSGID_DLC_OFFER               = 0x90 // Offer a contract
@@ -150,8 +149,6 @@ func LitMsgFromBytes(b []byte, peerid uint32) (LitMsg, error) {
 		return NewMultihopPaymentAckMsgFromBytes(b, peerid)
 	case MSGID_PAY_SETUP:
 		return NewMultihopPaymentSetupMsgFromBytes(b, peerid)
-	case MSGID_PAY_SETTLE:
-		return NewMultihopPaymentSettleMsgFromBytes(b, peerid)
 
 	case MSGID_DUALFUNDINGREQ:
 		return NewDualFundingReqMsgFromBytes(b, peerid)
@@ -2148,51 +2145,4 @@ func (msg MultihopPaymentSetupMsg) Peer() uint32 {
 // MsgType returns the type of this message
 func (msg MultihopPaymentSetupMsg) MsgType() uint8 {
 	return MSGID_PAY_SETUP
-}
-
-// MultihopPaymentSettleMsg settles a multihop payment. It is sent from
-// the last hop back to the previous one, which will forward it to the previous hop until
-// the source is reached
-type MultihopPaymentSettleMsg struct {
-	// The index of the peer we're communicating with
-	PeerIdx uint32
-	// The preimage to prove the next hop accepted our payment, or that we are the destination
-	PreImage [16]byte
-}
-
-func NewMultihopPaymentSettleMsg(peerIdx uint32, preImage [16]byte) MultihopPaymentSettleMsg {
-	msg := new(MultihopPaymentSettleMsg)
-	msg.PeerIdx = peerIdx
-	msg.PreImage = preImage
-	return *msg
-}
-
-func NewMultihopPaymentSettleMsgFromBytes(b []byte,
-	peerIdx uint32) (MultihopPaymentSettleMsg, error) {
-
-	msg := new(MultihopPaymentSettleMsg)
-	msg.PeerIdx = peerIdx
-	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
-	copy(msg.PreImage[:], buf.Next(16))
-	return *msg, nil
-}
-
-// Bytes serializes a MultihopPaymentSettleMsg into a byte array
-func (msg MultihopPaymentSettleMsg) Bytes() []byte {
-	var buf bytes.Buffer
-
-	buf.WriteByte(msg.MsgType())
-	buf.Write(msg.PreImage[:])
-
-	return buf.Bytes()
-}
-
-// Peer returns the peer index this message was received from/sent to
-func (msg MultihopPaymentSettleMsg) Peer() uint32 {
-	return msg.PeerIdx
-}
-
-// MsgType returns the type of this message
-func (msg MultihopPaymentSettleMsg) MsgType() uint8 {
-	return MSGID_PAY_SETTLE
 }

@@ -128,9 +128,6 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 				if err != nil {
 					log.Printf("error claiming HTLC: %s", err.Error())
 				}
-
-				outMsg := lnutil.NewMultihopPaymentSettleMsg(msg.Peer(), mh.PreImage)
-				nd.OmniOut <- outMsg
 			}()
 
 			return nil
@@ -182,45 +179,5 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 
 	msg.PeerIdx = sendToIdx
 	nd.OmniOut <- msg
-	return nil
-}
-
-func (nd *LitNode) MultihopPaymentSettleHandler(msg lnutil.MultihopPaymentSettleMsg) error {
-	fmt.Printf("Received multihop payment settle from peer %d\n", msg.Peer())
-	found := false
-	inFlight := new(InFlightMultihop)
-
-	for _, mh := range nd.InProgMultihop {
-		hash := fastsha256.Sum256(msg.PreImage[:])
-		if bytes.Equal(hash[:], mh.HHash[:]) {
-			inFlight = mh
-			found = true
-		}
-	}
-
-	if !found {
-		return fmt.Errorf("Unmatched settle message received")
-	}
-
-	// Forward
-	var pkh [20]byte
-	id := nd.IdKey().PubKey().SerializeCompressed()
-	idHash := fastsha256.Sum256(id[:])
-	copy(pkh[:], idHash[:20])
-	var sendToPkh [20]byte
-	var shouldForward bool
-	for i, node := range inFlight.Path {
-		if bytes.Equal(pkh[:], node[:]) && i > 0 {
-			sendToPkh = inFlight.Path[i-1]
-			shouldForward = true
-		}
-	}
-
-	if shouldForward {
-		sendToIdx, _ := nd.FindPeerIndexByAddress(bech32.Encode("ln", sendToPkh[:]))
-		msg.PeerIdx = sendToIdx
-		nd.OmniOut <- msg
-	}
-
 	return nil
 }
