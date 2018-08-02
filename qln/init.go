@@ -123,8 +123,7 @@ func (nd *LitNode) LinkBaseWallet(
 		rootpriv, birthHeight, resync, host, nd.LitFolder, proxy, param)
 
 	if err != nil {
-		log.Println(err)
-		return nil
+		return err
 	}
 
 	if nd.ConnectedCoinTypes == nil {
