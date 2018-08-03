@@ -14,6 +14,7 @@ type ChannelInfo struct {
 	OutPoint      string
 	CoinType      uint32
 	Closed        bool
+	Failed        bool
 	Capacity      int64
 	MyBalance     int64
 	Height        int32  // block height of channel fund confirmation
@@ -52,6 +53,7 @@ func (r *LitRPC) ChannelList(args ChanArgs, reply *ChannelListReply) error {
 		reply.Channels[i].OutPoint = q.Op.String()
 		reply.Channels[i].CoinType = q.Coin()
 		reply.Channels[i].Closed = q.CloseData.Closed
+		reply.Channels[i].Failed = q.State.Failed
 		reply.Channels[i].Capacity = q.Value
 		reply.Channels[i].MyBalance = q.State.MyAmt
 		reply.Channels[i].Height = q.Height

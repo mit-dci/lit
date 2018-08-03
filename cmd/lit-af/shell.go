@@ -297,7 +297,10 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	}
 
 	for _, c := range openChannels {
-		if c.Height <= 0 {
+		if c.Failed {
+			c := color.New(color.FgYellow)
+			c.Printf("Failed:       ")
+		} else if c.Height <= 0 {
 			c := color.New(color.FgGreen).Add(color.Underline)
 			c.Printf("Unconfirmed:")
 			fmt.Fprintf(color.Output, lnutil.Green("  "))

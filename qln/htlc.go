@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/btcutil/txscript"
@@ -43,6 +44,7 @@ func (nd *LitNode) OfferHTLC(qc *Qchan, amt uint32, RHash [32]byte, locktime uin
 	err := nd.ReloadQchanState(qc)
 	if err != nil {
 		// don't clear to send here; something is wrong with the channel
+		nd.FailChannel(qc)
 		qc.ChanMtx.Unlock()
 		return err
 	}
@@ -112,6 +114,7 @@ func (nd *LitNode) OfferHTLC(qc *Qchan, amt uint32, RHash [32]byte, locktime uin
 	err = nd.SaveQchanState(qc)
 	if err != nil {
 		// don't clear to send here; something is wrong with the channel
+		nd.FailChannel(qc)
 		qc.ChanMtx.Unlock()
 		return err
 	}
@@ -120,6 +123,7 @@ func (nd *LitNode) OfferHTLC(qc *Qchan, amt uint32, RHash [32]byte, locktime uin
 
 	err = nd.SendHashSig(qc)
 	if err != nil {
+		nd.FailChannel(qc)
 		qc.ChanMtx.Unlock()
 		return err
 	}
@@ -129,12 +133,18 @@ func (nd *LitNode) OfferHTLC(qc *Qchan, amt uint32, RHash [32]byte, locktime uin
 	log.Println("got pre CTS...")
 	qc.ChanMtx.Unlock()
 
+	timeout := time.NewTimer(time.Second * consts.ChannelTimeout)
+
 	cts = false
 	for !cts {
 		qc.ChanMtx.Lock()
 		select {
 		case <-qc.ClearToSend:
 			cts = true
+		case <-timeout.C:
+			nd.FailChannel(qc)
+			qc.ChanMtx.Unlock()
+			return fmt.Errorf("channel failed: operation timed out")
 		default:
 			qc.ChanMtx.Unlock()
 		}
@@ -192,6 +202,7 @@ func (nd *LitNode) HashSigHandler(msg lnutil.HashSigMsg, qc *Qchan) error {
 	// load state from disk
 	err := nd.ReloadQchanState(qc)
 	if err != nil {
+		nd.FailChannel(qc)
 		return fmt.Errorf("HashSigHandler ReloadQchan err %s", err.Error())
 	}
 
@@ -263,6 +274,7 @@ func (nd *LitNode) HashSigHandler(msg lnutil.HashSigMsg, qc *Qchan) error {
 
 	// they have to actually send you money
 	if msg.Amt < consts.MinOutput {
+		nd.FailChannel(qc)
 		return fmt.Errorf("HashSigHandler err: HTLC amount %d less than minOutput", msg.Amt)
 	}
 
@@ -271,6 +283,7 @@ func (nd *LitNode) HashSigHandler(msg lnutil.HashSigMsg, qc *Qchan) error {
 
 	// check if this push is takes them below minimum output size
 	if theirAmt < consts.MinOutput {
+		nd.FailChannel(qc)
 		return fmt.Errorf(
 			"making HTLC of size %s reduces them too low; counterparty bal %s fee %s consts.MinOutput %s",
 			lnutil.SatoshiColor(int64(msg.Amt)),
@@ -292,6 +305,7 @@ func (nd *LitNode) HashSigHandler(msg lnutil.HashSigMsg, qc *Qchan) error {
 	// TODO: There are more signatures required
 	err = qc.VerifySigs(msg.CommitmentSignature, msg.HTLCSigs)
 	if err != nil {
+		nd.FailChannel(qc)
 		return fmt.Errorf("HashSigHandler err %s", err.Error())
 	}
 	qc.State.ElkPoint = curElk
@@ -310,6 +324,7 @@ func (nd *LitNode) HashSigHandler(msg lnutil.HashSigMsg, qc *Qchan) error {
 	// and maybe collision; still haven't checked
 	err = nd.SaveQchanState(qc)
 	if err != nil {
+		qc.State.Failed = true
 		return fmt.Errorf("HashSigHandler SaveQchanState err %s", err.Error())
 	}
 
@@ -351,23 +366,27 @@ func (nd *LitNode) HashSigHandler(msg lnutil.HashSigMsg, qc *Qchan) error {
 	qc.State.MyNextHTLCBase = qc.State.MyN2HTLCBase
 	qc.State.MyN2HTLCBase, err = nd.GetUsePub(kg, UseHTLCBase)
 	if err != nil {
+		qc.State.Failed = true
 		return err
 	}
 
 	// save channel with new HTLCBases
 	err = nd.SaveQchanState(qc)
 	if err != nil {
+		qc.State.Failed = true
 		return fmt.Errorf("HashSigHandler SaveQchanState err %s", err.Error())
 	}
 
 	if qc.State.Collision != 0 || qc.State.CollidingHTLC != nil || qc.State.CollidingHashPreimage || qc.State.CollidingHashDelta {
 		err = nd.SendGapSigRev(qc)
 		if err != nil {
+			qc.State.Failed = true
 			return fmt.Errorf("HashSigHandler SendGapSigRev err %s", err.Error())
 		}
 	} else { // saved to db, now proceed to create & sign their tx
 		err = nd.SendSigRev(qc)
 		if err != nil {
+			qc.State.Failed = true
 			return fmt.Errorf("HashSigHandler SendSigRev err %s", err.Error())
 		}
 	}
@@ -393,6 +412,7 @@ func (nd *LitNode) ClearHTLC(qc *Qchan, R [16]byte, HTLCIdx uint32, data [32]byt
 	err := nd.ReloadQchanState(qc)
 	if err != nil {
 		// don't clear to send here; something is wrong with the channel
+		qc.State.Failed = true
 		qc.ChanMtx.Unlock()
 		return err
 	}
@@ -464,6 +484,7 @@ func (nd *LitNode) ClearHTLC(qc *Qchan, R [16]byte, HTLCIdx uint32, data [32]byt
 	err = nd.SaveQchanState(qc)
 	if err != nil {
 		// don't clear to send here; something is wrong with the channel
+		qc.State.Failed = true
 		qc.ChanMtx.Unlock()
 		return err
 	}
@@ -472,6 +493,7 @@ func (nd *LitNode) ClearHTLC(qc *Qchan, R [16]byte, HTLCIdx uint32, data [32]byt
 
 	err = nd.SendPreimageSig(qc, HTLCIdx)
 	if err != nil {
+		qc.State.Failed = true
 		qc.ChanMtx.Unlock()
 		return err
 	}
@@ -479,12 +501,18 @@ func (nd *LitNode) ClearHTLC(qc *Qchan, R [16]byte, HTLCIdx uint32, data [32]byt
 	log.Println("got pre CTS...")
 	qc.ChanMtx.Unlock()
 
+	timeoutTimer := time.NewTimer(time.Second * consts.ChannelTimeout)
+
 	cts = false
 	for !cts {
 		qc.ChanMtx.Lock()
 		select {
 		case <-qc.ClearToSend:
 			cts = true
+		case <-timeoutTimer.C:
+			qc.State.Failed = true
+			qc.ChanMtx.Unlock()
+			return fmt.Errorf("channel failed: operation timed out")
 		default:
 			qc.ChanMtx.Unlock()
 		}
@@ -542,6 +570,7 @@ func (nd *LitNode) PreimageSigHandler(msg lnutil.PreimageSigMsg, qc *Qchan) erro
 	// load state from disk
 	err := nd.ReloadQchanState(qc)
 	if err != nil {
+		qc.State.Failed = true
 		return fmt.Errorf("PreimageSigHandler ReloadQchan err %s", err.Error())
 	}
 
@@ -565,28 +594,6 @@ func (nd *LitNode) PreimageSigHandler(msg lnutil.PreimageSigMsg, qc *Qchan) erro
 	for _, h := range qc.State.HTLCs {
 		if h.Clearing {
 			clearingIdxs = append(clearingIdxs, h.Idx)
-		}
-	}
-
-	inProgHTLC := qc.State.InProgHTLC
-	if collision {
-		if inProgHTLC != nil {
-			// PreimageSig-HashSig collision. Temporarily remove inprog HTLC for
-			// verifying the signature, then do a GapSigRev
-			qc.State.InProgHTLC = nil
-			qc.State.CollidingHashPreimage = true
-		} else if len(clearingIdxs) > 0 {
-			// PreimageSig-PreimageSig collision.
-			// Remove the clearing state for signature verification and
-			// add back afterwards.
-			for _, idx := range clearingIdxs {
-				qh := &qc.State.HTLCs[idx]
-				qh.Clearing = false
-			}
-			qc.State.CollidingPreimages = true
-		} else {
-			// PreimageSig-DeltaSig collision. Figure out later.
-			qc.State.CollidingPreimageDelta = true
 		}
 	}
 
@@ -637,6 +644,28 @@ func (nd *LitNode) PreimageSigHandler(msg lnutil.PreimageSigMsg, qc *Qchan) erro
 		}
 	}()
 
+	inProgHTLC := qc.State.InProgHTLC
+	if collision {
+		if inProgHTLC != nil {
+			// PreimageSig-HashSig collision. Temporarily remove inprog HTLC for
+			// verifying the signature, then do a GapSigRev
+			qc.State.InProgHTLC = nil
+			qc.State.CollidingHashPreimage = true
+		} else if len(clearingIdxs) > 0 {
+			// PreimageSig-PreimageSig collision.
+			// Remove the clearing state for signature verification and
+			// add back afterwards.
+			for _, idx := range clearingIdxs {
+				qh := &qc.State.HTLCs[idx]
+				qh.Clearing = false
+			}
+			qc.State.CollidingPreimages = true
+		} else {
+			// PreimageSig-DeltaSig collision. Figure out later.
+			qc.State.CollidingPreimageDelta = true
+		}
+	}
+
 	// update to the next state to verify
 	qc.State.StateIdx++
 
@@ -659,6 +688,7 @@ func (nd *LitNode) PreimageSigHandler(msg lnutil.PreimageSigMsg, qc *Qchan) erro
 	// TODO: There are more signatures required
 	err = qc.VerifySigs(msg.CommitmentSignature, msg.HTLCSigs)
 	if err != nil {
+		qc.State.Failed = true
 		return fmt.Errorf("PreimageSigHandler err %s", err.Error())
 	}
 	qc.State.ElkPoint = stashElk
@@ -686,6 +716,7 @@ func (nd *LitNode) PreimageSigHandler(msg lnutil.PreimageSigMsg, qc *Qchan) erro
 			UseHTLCBase)
 
 		if err != nil {
+			qc.State.Failed = true
 			return err
 		}
 	}
@@ -697,17 +728,20 @@ func (nd *LitNode) PreimageSigHandler(msg lnutil.PreimageSigMsg, qc *Qchan) erro
 	// and maybe collision; still haven't checked
 	err = nd.SaveQchanState(qc)
 	if err != nil {
+		qc.State.Failed = true
 		return fmt.Errorf("PreimageSigHandler SaveQchanState err %s", err.Error())
 	}
 
 	if qc.State.Collision != 0 || qc.State.CollidingHashPreimage || qc.State.CollidingPreimages || qc.State.CollidingPreimageDelta {
 		err = nd.SendGapSigRev(qc)
 		if err != nil {
+			qc.State.Failed = true
 			return fmt.Errorf("PreimageSigHandler SendGapSigRev err %s", err.Error())
 		}
 	} else { // saved to db, now proceed to create & sign their tx
 		err = nd.SendSigRev(qc)
 		if err != nil {
+			qc.State.Failed = true
 			return fmt.Errorf("PreimageSigHandler SendSigRev err %s", err.Error())
 		}
 	}

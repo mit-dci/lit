@@ -216,6 +216,11 @@ func (s *StatCom) ToBytes() ([]byte, error) {
 		}
 	}
 
+	err = binary.Write(&buf, binary.BigEndian, s.Failed)
+	if err != nil {
+		return nil, err
+	}
+
 	return buf.Bytes(), nil
 }
 
@@ -350,6 +355,11 @@ func StatComFromBytes(b []byte) (*StatCom, error) {
 		}
 
 		s.HTLCs = append(s.HTLCs, h)
+	}
+
+	err = binary.Read(buf, binary.BigEndian, &s.Failed)
+	if err != nil {
+		return nil, err
 	}
 
 	return &s, nil

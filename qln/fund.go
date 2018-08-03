@@ -382,21 +382,25 @@ func (nd *LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 	// save channel to db
 	err = nd.SaveQChan(q)
 	if err != nil {
+		nd.FailChannel(q)
 		return fmt.Errorf("PointRespHandler SaveQchanState err %s", err.Error())
 	}
 
 	// when funding a channel, give them the first *3* elkpoints.
 	elkPointZero, err := q.ElkPoint(false, 0)
 	if err != nil {
+		nd.FailChannel(q)
 		return err
 	}
 	elkPointOne, err := q.ElkPoint(false, 1)
 	if err != nil {
+		nd.FailChannel(q)
 		return err
 	}
 
 	elkPointTwo, err := q.N2ElkPointForThem()
 	if err != nil {
+		nd.FailChannel(q)
 		return err
 	}
 
@@ -521,6 +525,7 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 	// save new channel to db
 	err = nd.SaveQChan(qc)
 	if err != nil {
+		nd.FailChannel(qc)
 		log.Printf("QChanDescHandler err %s", err.Error())
 		return
 	}
@@ -528,6 +533,7 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 	// load ... the thing I just saved.  why?
 	qc, err = nd.GetQchan(opArr)
 	if err != nil {
+		nd.FailChannel(qc)
 		log.Printf("QChanDescHandler GetQchan err %s", err.Error())
 		return
 	}
@@ -535,23 +541,27 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 	// when funding a channel, give them the first *2* elkpoints.
 	theirElkPointZero, err := qc.ElkPoint(false, 0)
 	if err != nil {
+		nd.FailChannel(qc)
 		log.Printf("QChanDescHandler err %s", err.Error())
 		return
 	}
 	theirElkPointOne, err := qc.ElkPoint(false, 1)
 	if err != nil {
+		nd.FailChannel(qc)
 		log.Printf("QChanDescHandler err %s", err.Error())
 		return
 	}
 
 	theirElkPointTwo, err := qc.N2ElkPointForThem()
 	if err != nil {
+		nd.FailChannel(qc)
 		log.Printf("QChanDescHandler err %s", err.Error())
 		return
 	}
 
 	sig, _, err := nd.SignState(qc)
 	if err != nil {
+		nd.FailChannel(qc)
 		log.Printf("QChanDescHandler SignState err %s", err.Error())
 		return
 	}
@@ -577,6 +587,7 @@ func (nd *LitNode) QChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePeer) {
 	// load channel to save their refund address
 	qc, err := nd.GetQchan(opArr)
 	if err != nil {
+		nd.FailChannel(qc)
 		log.Printf("QChanAckHandler GetQchan err %s", err.Error())
 		return
 	}
@@ -592,6 +603,7 @@ func (nd *LitNode) QChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePeer) {
 
 	err = qc.VerifySigs(sig, nil)
 	if err != nil {
+		nd.FailChannel(qc)
 		log.Printf("QChanAckHandler VerifySig err %s", err.Error())
 		return
 	}
@@ -599,6 +611,7 @@ func (nd *LitNode) QChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePeer) {
 	// verify worked; Save state 1 to DB
 	err = nd.SaveQchanState(qc)
 	if err != nil {
+		nd.FailChannel(qc)
 		log.Printf("QChanAckHandler SaveQchanState err %s", err.Error())
 		return
 	}
@@ -608,6 +621,7 @@ func (nd *LitNode) QChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePeer) {
 	// sign their com tx to send
 	sig, _, err = nd.SignState(qc)
 	if err != nil {
+		nd.FailChannel(qc)
 		log.Printf("QChanAckHandler SignState err %s", err.Error())
 		return
 	}
@@ -615,12 +629,14 @@ func (nd *LitNode) QChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePeer) {
 	// OK to fund.
 	err = nd.SubWallet[qc.Coin()].ReallySend(&qc.Op.Hash)
 	if err != nil {
+		nd.FailChannel(qc)
 		log.Printf("QChanAckHandler ReallySend err %s", err.Error())
 		return
 	}
 
 	err = nd.SubWallet[qc.Coin()].WatchThis(qc.Op)
 	if err != nil {
+		nd.FailChannel(qc)
 		log.Printf("QChanAckHandler WatchThis err %s", err.Error())
 		return
 	}
@@ -665,18 +681,21 @@ func (nd *LitNode) SigProofHandler(msg lnutil.SigProofMsg, peer *RemotePeer) {
 
 	qc, err := nd.GetQchan(opArr)
 	if err != nil {
+		nd.FailChannel(qc)
 		log.Printf("SigProofHandler err %s", err.Error())
 		return
 	}
 
 	wal, ok := nd.SubWallet[qc.Coin()]
 	if !ok {
+		nd.FailChannel(qc)
 		log.Printf("Not connected to coin type %d\n", qc.Coin())
 		return
 	}
 
 	err = qc.VerifySigs(msg.Signature, nil)
 	if err != nil {
+		nd.FailChannel(qc)
 		log.Printf("SigProofHandler err %s", err.Error())
 		return
 	}
@@ -684,6 +703,7 @@ func (nd *LitNode) SigProofHandler(msg lnutil.SigProofMsg, peer *RemotePeer) {
 	// sig OK, save
 	err = nd.SaveQchanState(qc)
 	if err != nil {
+		nd.FailChannel(qc)
 		log.Printf("SigProofHandler err %s", err.Error())
 		return
 	}
@@ -691,6 +711,7 @@ func (nd *LitNode) SigProofHandler(msg lnutil.SigProofMsg, peer *RemotePeer) {
 	err = wal.WatchThis(op)
 
 	if err != nil {
+		nd.FailChannel(qc)
 		log.Printf("SigProofHandler err %s", err.Error())
 		return
 	}

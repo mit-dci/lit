@@ -161,7 +161,7 @@ func (nd *LitNode) cleanStaleChannels() {
 
 	for pkh, node := range nd.ChannelMap {
 		for _, channel := range node {
-			if channel.Timestamp+600 >= now {
+			if channel.Timestamp+consts.ChannelAdvTimeout >= now {
 				newChannelMap[pkh] = append(newChannelMap[pkh], channel)
 			}
 		}
@@ -177,7 +177,7 @@ func (nd *LitNode) advertiseLinks(seq uint32) {
 
 	for _, peer := range nd.RemoteCons {
 		for _, q := range peer.QCs {
-			if !q.CloseData.Closed && q.State.MyAmt > 0 {
+			if !q.CloseData.Closed && q.State.MyAmt > consts.MinOutput+q.State.Fee && !q.State.Failed {
 				var outmsg lnutil.LinkMsg
 				outmsg.CoinType = q.Coin()
 				outmsg.Seq = seq
