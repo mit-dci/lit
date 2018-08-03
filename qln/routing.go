@@ -177,7 +177,7 @@ func (nd *LitNode) advertiseLinks(seq uint32) {
 
 	for _, peer := range nd.RemoteCons {
 		for _, q := range peer.QCs {
-			if !q.CloseData.Closed && q.State.MyAmt > consts.MinOutput+q.State.Fee && !q.State.Failed {
+			if !q.CloseData.Closed && q.State.MyAmt > 2*(consts.MinOutput+q.State.Fee) && !q.State.Failed {
 				var outmsg lnutil.LinkMsg
 				outmsg.CoinType = q.Coin()
 				outmsg.Seq = seq
