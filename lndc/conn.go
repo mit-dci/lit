@@ -29,7 +29,7 @@ type Conn struct {
 
 // A compile-time assertion to ensure that Conn meets the net.Conn interface.
 var _ net.Conn = (*Conn)(nil)
-
+var Noise_XK bool
 // Dial attempts to establish an encrypted+authenticated connection with the
 // remote peer located at address which has remotePub as its long-term static
 // public key. In the case of a handshake failure, the connection is closed and
@@ -39,12 +39,12 @@ func Dial(localPriv *btcec.PrivateKey, ipAddr string, remotePKH string, remotePK
 	var conn net.Conn
 	var err error
 	var empty [33]byte
-	var noise_xk = false
+	var Noise_XK = false
 	if remotePK != empty {
-		log.Println("Connecting via noise_XK since we know remotePK")
-		noise_xk = true
+		log.Println("Connecting via Noise_XK since we know remotePK")
+		Noise_XK = true
 	}
-	if noise_xk {
+	if Noise_XK {
 		SetConsts()
 	}
 	conn, err = dialer("tcp", ipAddr)
@@ -81,7 +81,7 @@ func Dial(localPriv *btcec.PrivateKey, ipAddr string, remotePKH string, remotePK
 		b.conn.Close()
 		return nil, err
 	}
-	if !noise_xk {
+	if !Noise_XK {
 		remotePK, err = b.noise.RecvActTwo(actTwo)
 		if err != nil {
 			b.conn.Close()
