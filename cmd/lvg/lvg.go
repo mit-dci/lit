@@ -14,7 +14,6 @@ import (
 
 type Hash [32]byte
 
-
 const (
 	letterBytes   = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	letterIdxBits = 6
@@ -63,7 +62,7 @@ func GenNewAddress() (*btcec.PublicKey, []byte, error) {
 
 	pubKey := privKey.PubKey()
 
-	for i := 0 ; i < 600000 ; i ++ {
+	for i := 0; i < 600000; i++ {
 		//if grind(pubKey, genNonceSecure(10)) < PoWTarget {
 		//	return pubKey, nil
 		//}
