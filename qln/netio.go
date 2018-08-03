@@ -9,6 +9,8 @@ import (
 	"time"
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/lndc"
+	"github.com/mit-dci/lit/bech32"
+	"github.com/mit-dci/lit/crypto/fastsha256"
 	"github.com/mit-dci/lit/lnutil"
 	nat "github.com/mit-dci/lit/nat"
 )
@@ -161,11 +163,19 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 		}
 	}
 
+	var remotePK [33]byte
+	for _, pubkey := range nd.KnownPubkeys {
+		idHash := fastsha256.Sum256(pubkey[:])
+		adr := bech32.Encode("ln", idHash[:20])
+		if adr == who {
+			remotePK = pubkey
+		}
+	}
 	// get my private ID key
 	idPriv := nd.IdKey()
 
 	// Assign remote connection
-	newConn, err := lndc.Dial(idPriv, where, who, net.Dial)
+	newConn, err := lndc.Dial(idPriv, where, who, remotePK, net.Dial)
 	if err != nil {
 		return err
 	}

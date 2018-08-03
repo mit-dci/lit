@@ -2,12 +2,12 @@ package lndc
 
 import (
 	"bytes"
+	"fmt"
 	"io"
+	"log"
 	"math"
 	"net"
-	"log"
 	"time"
-	"fmt"
 
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/lnutil"
@@ -34,12 +34,20 @@ var _ net.Conn = (*Conn)(nil)
 // remote peer located at address which has remotePub as its long-term static
 // public key. In the case of a handshake failure, the connection is closed and
 // a non-nil error is returned.
-func Dial(localPriv *btcec.PrivateKey, ipAddr string, remotePKH string,
+func Dial(localPriv *btcec.PrivateKey, ipAddr string, remotePKH string, remotePK [33]byte,
 	dialer func(string, string) (net.Conn, error)) (*Conn, error) {
 	var conn net.Conn
 	var err error
+	var empty [33]byte
+	var noise_xk = false
+	if remotePK != empty {
+		log.Println("Connecting via noise_XK since we know remotePK")
+		noise_xk = true
+	}
+	if noise_xk {
+		SetConsts()
+	}
 	conn, err = dialer("tcp", ipAddr)
-	log.Println("ipAddr is", ipAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -48,9 +56,8 @@ func Dial(localPriv *btcec.PrivateKey, ipAddr string, remotePKH string,
 		conn:  conn,
 		noise: NewNoiseMachine(true, localPriv),
 	}
-
 	// Initiate the handshake by sending the first act to the receiver.
-	actOne, err := b.noise.GenActOne()
+	actOne, err := b.noise.GenActOne(remotePK)
 	if err != nil {
 		b.conn.Close()
 		return nil, err
@@ -69,22 +76,28 @@ func Dial(localPriv *btcec.PrivateKey, ipAddr string, remotePKH string,
 	// remotePub), then read the second act after which we'll be able to
 	// send our static public key to the remote peer with strong forward
 	// secrecy.
-	var actTwo [ActTwoSize]byte
+	actTwo := make([]byte, ActTwoSize)
 	if _, err := io.ReadFull(conn, actTwo[:]); err != nil {
 		b.conn.Close()
 		return nil, err
 	}
-	s, err := b.noise.RecvActTwo(actTwo)
-	if err != nil {
-		b.conn.Close()
-		return nil, err
+	if !noise_xk {
+		remotePK, err = b.noise.RecvActTwo(actTwo)
+		if err != nil {
+			b.conn.Close()
+			return nil, err
+		}
+	} else {
+		if _, err := b.noise.RecvActTwo(actTwo); err != nil {
+			b.conn.Close()
+			return nil, err
+		}
 	}
-
-	log.Println("Received pubkey", s)
-	if lnutil.LitAdrFromPubkey(s) != remotePKH {
+	log.Println("Received pubkey", remotePK)
+	if lnutil.LitAdrFromPubkey(remotePK) != remotePKH {
 		return nil, fmt.Errorf("Remote PKH doesn't match. Quitting!")
 	}
-	log.Printf("Received PKH %s matches", lnutil.LitAdrFromPubkey(s))
+	log.Printf("Received PKH %s matches", lnutil.LitAdrFromPubkey(remotePK))
 
 	// Finally, complete the handshake by sending over our encrypted static
 	// key and execute the final ECDH operation.

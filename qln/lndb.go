@@ -132,6 +132,8 @@ type LitNode struct {
 	// The URL from which lit attempts to resolve the LN address
 	TrackerURL string
 
+	KnownPubkeys map[uint32][33]byte
+
 	ChannelMap    map[[20]byte][]lnutil.LinkMsg
 	ChannelMapMtx sync.Mutex
 	AdvTimeout    *time.Ticker

@@ -82,6 +82,18 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 	nd.OmniOut = make(chan lnutil.LitMsg, 10)
 	nd.OmniIn = make(chan lnutil.LitMsg, 10)
 
+	nd.KnownPubkeys = make(map[uint32][33]byte)
+	var empty [33]byte
+	i := uint32(1)
+	for {
+		pubKey, _ := nd.GetPubHostFromPeerIdx(i)
+		if pubKey == empty {
+			log.Printf("Done, tried %d hosts, none matched\n", i-1)
+			break
+		}
+		nd.KnownPubkeys[i] = pubKey
+		i++
+	}
 	//	go nd.OmniHandler()
 	go nd.OutMessager()
 
