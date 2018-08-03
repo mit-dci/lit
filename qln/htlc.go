@@ -841,7 +841,7 @@ func (nd *LitNode) ClaimHTLCTimeouts(coinType uint32, height int32) ([][32]byte,
 					tx, err := nd.ClaimHTLCOnChain(q, h)
 					if err != nil {
 						log.Printf("Error claiming HTLC: %s", err.Error())
-						return nil, err
+						continue
 					}
 					nd.SetHTLCClearedOnChain(q, h)
 					txids = append(txids, tx.TxHash())
@@ -860,7 +860,11 @@ func (nd *LitNode) ClaimHTLCTimeouts(coinType uint32, height int32) ([][32]byte,
 						return nil, fmt.Errorf("Couldn't find channel %d in peer.QCs", q.Idx())
 					}
 					log.Printf("Timing out HTLC from channel [%d] idx [%d]\n", q.Idx(), h.Idx)
-					nd.ClearHTLC(qc, [16]byte{}, h.Idx, [32]byte{})
+					err = nd.ClearHTLC(qc, [16]byte{}, h.Idx, [32]byte{})
+					if err != nil {
+						log.Printf("error clearing HTLC: %s", err.Error())
+						continue
+					}
 				}
 			}
 		}
