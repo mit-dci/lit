@@ -152,7 +152,7 @@ func (nd *LitNode) CloseReqHandler(msg lnutil.CloseReqMsg) {
 
 	worked := pSig.Verify(hash, theirPubKey)
 	if !worked {
-		log.Printf("CloseReqHandler Sig err invalid signature on close tx %s", err.Error())
+		log.Printf("CloseReqHandler Sig err invalid signature on close tx")
 		return
 	}
 
