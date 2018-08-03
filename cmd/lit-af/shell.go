@@ -244,7 +244,11 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	lReply := new(litrpc.ListeningPortsReply)
 	dfReply := new(litrpc.PendingDualFundReply)
 
-	err := lc.Call("LitRPC.ListConnections", nil, pReply)
+	err := lc.Call("LitRPC.Balance", nil, bReply)
+	if err != nil {
+		return err
+	}
+	err = lc.Call("LitRPC.ListConnections", nil, pReply)
 	if err != nil {
 		return err
 	}
@@ -279,14 +283,18 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	}
 
 	for _, c := range closedChannels {
-		fmt.Fprintf(color.Output, lnutil.Red("Closed:       "))
-		fmt.Fprintf(
-			color.Output,
-			"%s (peer %d) type %d %s\n\t cap: %s bal: %s h: %d state: %d data: %x pkh: %x\n",
-			lnutil.White(c.CIdx), c.PeerIdx, c.CoinType,
-			lnutil.OutPoint(c.OutPoint),
-			lnutil.SatoshiColor(c.Capacity), lnutil.SatoshiColor(c.MyBalance),
-			c.Height, c.StateNum, c.Data, c.Pkh)
+		for _, walBal := range bReply.Balances {
+			if walBal.CoinType == c.CoinType {
+				fmt.Fprintf(color.Output, lnutil.Red("Closed:       "))
+				fmt.Fprintf(
+					color.Output,
+					"%s (peer %d) type %d %s\n\t cap: %s bal: %s h: %d state: %d data: %x pkh: %x\n",
+					lnutil.White(c.CIdx), c.PeerIdx, c.CoinType,
+					lnutil.OutPoint(c.OutPoint),
+					lnutil.SatoshiColor(c.Capacity), lnutil.SatoshiColor(c.MyBalance),
+					c.Height, c.StateNum, c.Data, c.Pkh)
+			}
+		}
 	}
 
 	for _, c := range openChannels {
@@ -298,13 +306,17 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		} else {
 			fmt.Fprintf(color.Output, lnutil.Green("Open:         "))
 		}
-		fmt.Fprintf(
-			color.Output,
-			"%s (peer %d) type %d %s\n\t cap: %s bal: %s h: %d state: %d data: %x pkh: %x\n",
-			lnutil.White(c.CIdx), c.PeerIdx, c.CoinType,
-			lnutil.OutPoint(c.OutPoint),
-			lnutil.SatoshiColor(c.Capacity), lnutil.SatoshiColor(c.MyBalance),
-			c.Height, c.StateNum, c.Data, c.Pkh)
+		for _, walBal := range bReply.Balances {
+			if walBal.CoinType == c.CoinType {
+				fmt.Fprintf(
+					color.Output,
+					"%s (peer %d) type %d %s\n\t cap: %s bal: %s h: %d state: %d data: %x pkh: %x\n",
+					lnutil.White(c.CIdx), c.PeerIdx, c.CoinType,
+					lnutil.OutPoint(c.OutPoint),
+					lnutil.SatoshiColor(c.Capacity), lnutil.SatoshiColor(c.MyBalance),
+					c.Height, c.StateNum, c.Data, c.Pkh)
+			}
+		}
 	}
 
 	err = lc.Call("LitRPC.PendingDualFund", nil, dfReply)
@@ -312,14 +324,18 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		return err
 	}
 	if dfReply.Pending {
-		fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Pending Dual Funding Request:"))
-		fmt.Fprintf(
-			color.Output, "\t%s %d\t%s %d\t%s %s\t%s %s\n\n",
-			lnutil.Header("Peer:"), dfReply.PeerIdx,
-			lnutil.Header("Type:"), dfReply.CoinType,
-			lnutil.Header("Their Amt:"), lnutil.SatoshiColor(dfReply.TheirAmount),
-			lnutil.Header("Req Amt:"), lnutil.SatoshiColor(dfReply.RequestedAmount),
-		)
+		for _, walBal := range bReply.Balances {
+			if walBal.CoinType == dfReply.CoinType {
+				fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Pending Dual Funding Request:"))
+				fmt.Fprintf(
+					color.Output, "\t%s %d\t%s %d\t%s %s\t%s %s\n\n",
+					lnutil.Header("Peer:"), dfReply.PeerIdx,
+					lnutil.Header("Type:"), dfReply.CoinType,
+					lnutil.Header("Their Amt:"), lnutil.SatoshiColor(dfReply.TheirAmount),
+					lnutil.Header("Req Amt:"), lnutil.SatoshiColor(dfReply.RequestedAmount),
+				)
+			}
+		}
 	}
 
 	err = lc.Call("LitRPC.TxoList", nil, tReply)
@@ -362,11 +378,6 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	for i, a := range aReply.WitAddresses {
 		fmt.Fprintf(color.Output, "%d %s (%s)\n", i+1,
 			lnutil.Address(a), lnutil.Address(aReply.LegacyAddresses[i]))
-	}
-
-	err = lc.Call("LitRPC.Balance", nil, bReply)
-	if err != nil {
-		return err
 	}
 
 	for _, walBal := range bReply.Balances {
