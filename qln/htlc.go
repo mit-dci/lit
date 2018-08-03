@@ -19,6 +19,10 @@ import (
 func (nd *LitNode) OfferHTLC(qc *Qchan, amt uint32, RHash [32]byte, locktime uint32, data [32]byte) error {
 	log.Printf("starting HTLC offer")
 
+	if qc.State.Failed {
+		return fmt.Errorf("cannot offer HTLC, channel failed")
+	}
+
 	if amt >= 1<<30 {
 		return fmt.Errorf("max send 1G sat (1073741823)")
 	}
@@ -80,14 +84,9 @@ func (nd *LitNode) OfferHTLC(qc *Qchan, amt uint32, RHash [32]byte, locktime uin
 
 	// if we got here, but channel is not in rest state, try to fix it.
 	if qc.State.Delta != 0 || qc.State.InProgHTLC != nil {
-		err = nd.ReSendMsg(qc)
-		if err != nil {
-			qc.ClearToSend <- true
-			qc.ChanMtx.Unlock()
-			return err
-		}
+		nd.FailChannel(qc)
 		qc.ChanMtx.Unlock()
-		return fmt.Errorf("Didn't send.  Recovered though, so try again!")
+		return fmt.Errorf("channel not in rest state")
 	}
 
 	qc.State.Data = data
@@ -324,7 +323,7 @@ func (nd *LitNode) HashSigHandler(msg lnutil.HashSigMsg, qc *Qchan) error {
 	// and maybe collision; still haven't checked
 	err = nd.SaveQchanState(qc)
 	if err != nil {
-		qc.State.Failed = true
+		nd.FailChannel(qc)
 		return fmt.Errorf("HashSigHandler SaveQchanState err %s", err.Error())
 	}
 
@@ -366,27 +365,27 @@ func (nd *LitNode) HashSigHandler(msg lnutil.HashSigMsg, qc *Qchan) error {
 	qc.State.MyNextHTLCBase = qc.State.MyN2HTLCBase
 	qc.State.MyN2HTLCBase, err = nd.GetUsePub(kg, UseHTLCBase)
 	if err != nil {
-		qc.State.Failed = true
+		nd.FailChannel(qc)
 		return err
 	}
 
 	// save channel with new HTLCBases
 	err = nd.SaveQchanState(qc)
 	if err != nil {
-		qc.State.Failed = true
+		nd.FailChannel(qc)
 		return fmt.Errorf("HashSigHandler SaveQchanState err %s", err.Error())
 	}
 
 	if qc.State.Collision != 0 || qc.State.CollidingHTLC != nil || qc.State.CollidingHashPreimage || qc.State.CollidingHashDelta {
 		err = nd.SendGapSigRev(qc)
 		if err != nil {
-			qc.State.Failed = true
+			nd.FailChannel(qc)
 			return fmt.Errorf("HashSigHandler SendGapSigRev err %s", err.Error())
 		}
 	} else { // saved to db, now proceed to create & sign their tx
 		err = nd.SendSigRev(qc)
 		if err != nil {
-			qc.State.Failed = true
+			nd.FailChannel(qc)
 			return fmt.Errorf("HashSigHandler SendSigRev err %s", err.Error())
 		}
 	}
@@ -394,6 +393,10 @@ func (nd *LitNode) HashSigHandler(msg lnutil.HashSigMsg, qc *Qchan) error {
 }
 
 func (nd *LitNode) ClearHTLC(qc *Qchan, R [16]byte, HTLCIdx uint32, data [32]byte) error {
+	if qc.State.Failed {
+		return fmt.Errorf("cannot clear, channel failed")
+	}
+
 	// see if channel is busy
 	// lock this channel
 	cts := false
@@ -412,7 +415,7 @@ func (nd *LitNode) ClearHTLC(qc *Qchan, R [16]byte, HTLCIdx uint32, data [32]byt
 	err := nd.ReloadQchanState(qc)
 	if err != nil {
 		// don't clear to send here; something is wrong with the channel
-		qc.State.Failed = true
+		nd.FailChannel(qc)
 		qc.ChanMtx.Unlock()
 		return err
 	}
@@ -466,14 +469,9 @@ func (nd *LitNode) ClearHTLC(qc *Qchan, R [16]byte, HTLCIdx uint32, data [32]byt
 
 	// if we got here, but channel is not in rest state, try to fix it.
 	if qc.State.Delta != 0 || qc.State.InProgHTLC != nil {
-		err = nd.ReSendMsg(qc)
-		if err != nil {
-			qc.ClearToSend <- true
-			qc.ChanMtx.Unlock()
-			return err
-		}
+		nd.FailChannel(qc)
 		qc.ChanMtx.Unlock()
-		return fmt.Errorf("Didn't send.  Recovered though, so try again!")
+		return fmt.Errorf("channel not in rest state")
 	}
 
 	qc.State.HTLCs[HTLCIdx].Clearing = true
@@ -484,7 +482,7 @@ func (nd *LitNode) ClearHTLC(qc *Qchan, R [16]byte, HTLCIdx uint32, data [32]byt
 	err = nd.SaveQchanState(qc)
 	if err != nil {
 		// don't clear to send here; something is wrong with the channel
-		qc.State.Failed = true
+		nd.FailChannel(qc)
 		qc.ChanMtx.Unlock()
 		return err
 	}
@@ -493,7 +491,7 @@ func (nd *LitNode) ClearHTLC(qc *Qchan, R [16]byte, HTLCIdx uint32, data [32]byt
 
 	err = nd.SendPreimageSig(qc, HTLCIdx)
 	if err != nil {
-		qc.State.Failed = true
+		nd.FailChannel(qc)
 		qc.ChanMtx.Unlock()
 		return err
 	}
@@ -510,7 +508,7 @@ func (nd *LitNode) ClearHTLC(qc *Qchan, R [16]byte, HTLCIdx uint32, data [32]byt
 		case <-qc.ClearToSend:
 			cts = true
 		case <-timeoutTimer.C:
-			qc.State.Failed = true
+			nd.FailChannel(qc)
 			qc.ChanMtx.Unlock()
 			return fmt.Errorf("channel failed: operation timed out")
 		default:
@@ -570,7 +568,7 @@ func (nd *LitNode) PreimageSigHandler(msg lnutil.PreimageSigMsg, qc *Qchan) erro
 	// load state from disk
 	err := nd.ReloadQchanState(qc)
 	if err != nil {
-		qc.State.Failed = true
+		nd.FailChannel(qc)
 		return fmt.Errorf("PreimageSigHandler ReloadQchan err %s", err.Error())
 	}
 
@@ -688,7 +686,7 @@ func (nd *LitNode) PreimageSigHandler(msg lnutil.PreimageSigMsg, qc *Qchan) erro
 	// TODO: There are more signatures required
 	err = qc.VerifySigs(msg.CommitmentSignature, msg.HTLCSigs)
 	if err != nil {
-		qc.State.Failed = true
+		nd.FailChannel(qc)
 		return fmt.Errorf("PreimageSigHandler err %s", err.Error())
 	}
 	qc.State.ElkPoint = stashElk
@@ -716,7 +714,7 @@ func (nd *LitNode) PreimageSigHandler(msg lnutil.PreimageSigMsg, qc *Qchan) erro
 			UseHTLCBase)
 
 		if err != nil {
-			qc.State.Failed = true
+			nd.FailChannel(qc)
 			return err
 		}
 	}
@@ -728,20 +726,20 @@ func (nd *LitNode) PreimageSigHandler(msg lnutil.PreimageSigMsg, qc *Qchan) erro
 	// and maybe collision; still haven't checked
 	err = nd.SaveQchanState(qc)
 	if err != nil {
-		qc.State.Failed = true
+		nd.FailChannel(qc)
 		return fmt.Errorf("PreimageSigHandler SaveQchanState err %s", err.Error())
 	}
 
 	if qc.State.Collision != 0 || qc.State.CollidingHashPreimage || qc.State.CollidingPreimages || qc.State.CollidingPreimageDelta {
 		err = nd.SendGapSigRev(qc)
 		if err != nil {
-			qc.State.Failed = true
+			nd.FailChannel(qc)
 			return fmt.Errorf("PreimageSigHandler SendGapSigRev err %s", err.Error())
 		}
 	} else { // saved to db, now proceed to create & sign their tx
 		err = nd.SendSigRev(qc)
 		if err != nil {
-			qc.State.Failed = true
+			nd.FailChannel(qc)
 			return fmt.Errorf("PreimageSigHandler SendSigRev err %s", err.Error())
 		}
 	}

@@ -86,28 +86,12 @@ Receive Rev for previous state
 
 */
 
-// SendNextMsg determines what message needs to be sent next
-// based on the channel state.  It then calls the appropriate function.
-func (nd *LitNode) ReSendMsg(qc *Qchan) error {
-
-	// DeltaSig
-	if qc.State.Delta < 0 {
-		log.Printf("Sending previously sent DeltaSig\n")
-		return nd.SendDeltaSig(qc)
-	}
-
-	// SigRev
-	if qc.State.Delta > 0 {
-		log.Printf("Sending previously sent SigRev\n")
-		return nd.SendSigRev(qc)
-	}
-
-	// Rev
-	return nd.SendREV(qc)
-}
-
 // PushChannel initiates a state update by sending a DeltaSig
 func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
+	if qc.State.Failed {
+		return fmt.Errorf("cannot push, channel failed")
+	}
+
 	// sanity checks
 	if amt >= 1<<30 {
 		return fmt.Errorf("max send 1G sat (1073741823)")
@@ -182,14 +166,9 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 
 	// if we got here, but channel is not in rest state, try to fix it.
 	if qc.State.Delta != 0 {
-		err = nd.ReSendMsg(qc)
-		if err != nil {
-			qc.ClearToSend <- true
-			qc.ChanMtx.Unlock()
-			return err
-		}
+		nd.FailChannel(qc)
 		qc.ChanMtx.Unlock()
-		return fmt.Errorf("Didn't send.  Recovered though, so try again!")
+		return fmt.Errorf("channel not in rest state")
 	}
 
 	qc.State.Data = data
