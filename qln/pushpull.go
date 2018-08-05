@@ -500,6 +500,12 @@ func (nd *LitNode) SendGapSigRev(q *Qchan) error {
 		}
 	}
 
+	for _, h := range q.State.HTLCs {
+		if h.Clearing && !h.Cleared && (h.Incoming != (h.R == [16]byte{})) {
+			q.State.MyAmt += h.Amt
+		}
+	}
+
 	// sign state n+1
 
 	// TODO: send the sigs
@@ -593,6 +599,12 @@ func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
 	if q.State.CollidingHTLC != nil {
 		if !q.State.CollidingHTLC.Incoming {
 			q.State.MyAmt -= q.State.CollidingHTLC.Amt
+		}
+	}
+
+	for _, h := range q.State.HTLCs {
+		if h.Clearing && !h.Cleared && (h.Incoming != (h.R == [16]byte{})) {
+			q.State.MyAmt += h.Amt
 		}
 	}
 
