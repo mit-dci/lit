@@ -999,6 +999,7 @@ func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {
 
 // FailChannel sets the fail flag on the channel and attempts to save it
 func (nd *LitNode) FailChannel(q *Qchan) {
+	nd.ReloadQchanState(q)
 	q.State.Failed = true
 	nd.SaveQchanState(q)
 }
