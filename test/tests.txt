@@ -1,0 +1,11 @@
+# This is just to test the integration test framework.
+testlib
+
+# Network tests.
+connect
+
+# Basic channel tests.
+
+# DLC tests
+
+# Multihop tests

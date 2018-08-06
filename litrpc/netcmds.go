@@ -52,7 +52,7 @@ type ConnectReply struct {
 	PeerIdx uint32
 }
 
-func (r *LitRPC) Connect(args ConnectArgs, reply *ConnnReply) error {
+func (r *LitRPC) Connect(args ConnectArgs, reply *ConnectReply) error {
 
 	// first, see if the peer to connect to is referenced by peer index.
 	var connectAdr string
@@ -74,7 +74,7 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *ConnnReply) error {
 		connectAdr = args.LNAddr
 	}
 
-	idx, err = r.Node.DialPeer(connectAdr)
+	idx, err := r.Node.DialPeer(connectAdr)
 	if err != nil {
 		return err
 	}

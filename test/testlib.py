@@ -22,6 +22,12 @@ def new_port():
     next_unused_port += 1
     return port
 
+def get_root_data_dir():
+    if 'LIT_ITEST_ROOT' in os.environ:
+        return os.environ['LIT_ITEST_ROOT']
+    else:
+        return "%s/_data" % paths.abspath(paths.dirname(__file__))
+
 datadirnums = {}
 def new_data_dir(name):
     global datadirnums
@@ -31,7 +37,7 @@ def new_data_dir(name):
         datadirnums[name] += 1
     else:
         datadirnums[name] = 1 # set the next unused to "1"
-    p = "%s/_data/%s%s" % (paths.abspath(paths.dirname(__file__)), name, id)
+    p = paths.join(get_root_data_dir(), name + str(id))
     os.makedirs(p, exist_ok=True)
     return p
 
@@ -86,16 +92,17 @@ class LitNode():
                 return bal['SyncHeight']
         return -1
 
-    def connect_to_peer(self, lnaddr):
-        res = self.rpc.Connect({'LNAddr': lnaddr})
+    def connect_to_peer(self, other):
+        addr = other.lnid + '@127.0.0.1:' + str(other.p2p_port)
+        res = self.rpc.Connect(LNAddr=addr)
         if "_error" not in res:
-            raise AssertError("couldn't connect to " + lnaddr)
+            self.peer_mapping[other.lnid] = res['PeerIdx']
         else:
-            self.peer_mapping[lnaddr] = res['PeerIdx']
+            raise AssertError("couldn't connect to " + lnaddr)
 
-    def get_peer_id(self, lnaddr):
-        if lnaddr in self.peer_mapping:
-            return self.peer_mapping[lnaddr]
+    def get_peer_id(self, other):
+        if other.lnid in self.peer_mapping:
+            return self.peer_mapping[other.lnid]
         else:
             return None
 
@@ -150,7 +157,7 @@ class BitcoinNode():
         testutil.wait_until(ck_ready, errmsg="took too long to load wallet")
 
         # Activate SegWit (apparently this is how you do it)
-        self.rpc.generate(600)
+        self.rpc.generate(500)
         def ck_segwit():
             bci = self.rpc.getblockchaininfo()
             try:
@@ -172,7 +179,8 @@ class TestEnv():
         self.bitcoind = BitcoinNode()
         self.lits = []
         for i in range(litcnt):
-            self.lits.append(LitNode(self.bitcoind))
+            node = LitNode(self.bitcoind)
+            self.lits.append(node)
         logger.info("started nodes!  syncing...")
 
         time.sleep(5)
