@@ -58,15 +58,15 @@ class LitNode():
         args = [
             LIT_BIN,
             "-v",
+            "--reg", "127.0.0.1:" + str(bcnode.p2p_port),
+            "--tn3", "", # disable autoconnect
             "--dir", self.data_dir,
             "--rpcport=" + str(self.rpc_port),
-            "--tn3", "", # disable autoconnect
-            "--reg", "localhost:" + str(bcnode.p2p_port),
             "--autoReconnect",
             "--autoListenPort=" + str(self.p2p_port)
         ]
         self.proc = subprocess.Popen(args,
-            stdin=subprocess.PIPE,
+            stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL)
 
@@ -77,6 +77,12 @@ class LitNode():
         # Make it listen to P2P connections!
         self.rpc.Listen(Port=":" + str(self.p2p_port))
         testutil.wait_until_port("localhost", self.p2p_port)
+
+    def get_sync_height(self):
+        for bal in self.rpc.balance():
+            if bal['CoinType'] == REGTEST_COINTYPE:
+                return bal['SyncHeight']
+        return -1
 
     def shutdown(self):
         if self.proc is not None:
@@ -96,6 +102,7 @@ class BitcoinNode():
             "bitcoind",
             "-regtest",
             "-server",
+            "-printtoconsole",
             "-datadir=" + self.data_dir,
             "-port=" + str(self.p2p_port),
             "-rpcuser=rpcuser",
@@ -108,6 +115,7 @@ class BitcoinNode():
 
         # Make the RPC client for it.
         testutil.wait_until_port("localhost", self.rpc_port)
+        testutil.wait_until_port("localhost", self.p2p_port)
         self.rpc = btcrpc.BtcClient("localhost", self.rpc_port, "rpcuser", "rpcpass")
 
         # Make sure that we're actually ready to accept RPC calls.
@@ -120,7 +128,7 @@ class BitcoinNode():
         testutil.wait_until(ck_ready, errmsg="took too long to load wallet")
 
         # Activate SegWit (apparently this is how you do it)
-        self.rpc.generate(500)
+        self.rpc.generate(600)
         def ck_segwit():
             bci = self.rpc.getblockchaininfo()
             try:
@@ -135,3 +143,42 @@ class BitcoinNode():
             self.proc = None
         else:
             pass # do nothing I guess?
+
+class TestEnv():
+    def __init__(self, litcnt):
+        logger.info("starting nodes...")
+        self.bitcoind = BitcoinNode()
+        self.lits = []
+        for i in range(litcnt):
+            self.lits.append(LitNode(self.bitcoind))
+        logger.info("started nodes!  syncing...")
+
+        time.sleep(5)
+
+        # Sync the nodes
+        try:
+            self.generate_block(count=0)
+        except Exception as e:
+            logger.warning("probem syncing nodes, exiting (" + str(e) + ")")
+            self.shutdown()
+        logger.info("nodes synced!")
+
+    def get_height(self):
+        return self.bitcoind.rpc.getblockchaininfo()['blocks']
+
+    def generate_block(self, count=1):
+        if count > 0:
+            self.bitcoind.rpc.generate(count)
+        h = self.get_height()
+        def ck_lits_synced():
+            for l in self.lits:
+                sh = l.get_sync_height()
+                if sh != h:
+                    return False
+            return True
+        testutil.wait_until(ck_lits_synced, errmsg="lits aren't syncing to bitcoind")
+
+    def shutdown(self):
+        for l in self.lits:
+            l.shutdown()
+        self.bitcoind.shutdown()

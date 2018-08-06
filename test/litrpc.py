@@ -57,4 +57,4 @@ class LitClient():
 
     def balance(self):
         """Get wallit balance"""
-        return self.Balance()
+        return self.Balance()['Balances']
