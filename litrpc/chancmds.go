@@ -23,9 +23,22 @@ type ChannelInfo struct {
 	PeerID        string
 	Data          [32]byte
 	Pkh           [20]byte
+	HTLCs         []HTLCInfo
 }
 type ChannelListReply struct {
 	Channels []ChannelInfo
+}
+type HTLCInfo struct {
+	Idx            uint32
+	Incoming       bool
+	Amt            int64
+	RHash          [32]byte
+	Locktime       uint32
+	R              [16]byte
+	Cleared        bool
+	Clearing       bool
+	ClearedOnChain bool
+	InProg         bool
 }
 
 // ChannelList sends back a list of every (open?) channel with some
@@ -62,6 +75,57 @@ func (r *LitRPC) ChannelList(args ChanArgs, reply *ChannelListReply) error {
 		reply.Channels[i].CIdx = q.KeyGen.Step[4] & 0x7fffffff
 		reply.Channels[i].Data = q.State.Data
 		reply.Channels[i].Pkh = q.WatchRefundAdr
+
+		for _, h := range q.State.HTLCs {
+			hi := HTLCInfo{
+				h.Idx,
+				h.Incoming,
+				h.Amt,
+				h.RHash,
+				h.Locktime,
+				h.R,
+				h.Cleared,
+				h.Clearing,
+				h.ClearedOnChain,
+				false,
+			}
+
+			reply.Channels[i].HTLCs = append(reply.Channels[i].HTLCs, hi)
+		}
+
+		if q.State.InProgHTLC != nil {
+			h := q.State.InProgHTLC
+			hi := HTLCInfo{
+				h.Idx,
+				h.Incoming,
+				h.Amt,
+				h.RHash,
+				h.Locktime,
+				h.R,
+				h.Cleared,
+				h.Clearing,
+				h.ClearedOnChain,
+				true,
+			}
+			reply.Channels[i].HTLCs = append(reply.Channels[i].HTLCs, hi)
+		}
+
+		if q.State.CollidingHTLC != nil {
+			h := q.State.CollidingHTLC
+			hi := HTLCInfo{
+				h.Idx,
+				h.Incoming,
+				h.Amt,
+				h.RHash,
+				h.Locktime,
+				h.R,
+				h.Cleared,
+				h.Clearing,
+				h.ClearedOnChain,
+				true,
+			}
+			reply.Channels[i].HTLCs = append(reply.Channels[i].HTLCs, hi)
+		}
 	}
 	return nil
 }

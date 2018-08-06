@@ -11,6 +11,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/mit-dci/lit/coinparam"
+	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/lnutil"
 )
@@ -263,6 +264,16 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		}
 	}
 
+	err = lc.Call("LitRPC.Balance", nil, bReply)
+	if err != nil {
+		return err
+	}
+
+	walHeights := map[uint32]int32{}
+	for _, b := range bReply.Balances {
+		walHeights[b.CoinType] = b.SyncHeight
+	}
+
 	err = lc.Call("LitRPC.ChannelList", nil, cReply)
 	if err != nil {
 		return err
@@ -289,11 +300,11 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		fmt.Fprintf(color.Output, lnutil.Red("Closed:       "))
 		fmt.Fprintf(
 			color.Output,
-			"%s (peer %d) type %d %s\n\t cap: %s bal: %s h: %d state: %d data: %x pkh: %x\n",
+			"%s (peer %d) type %d %s\n\t cap: %s bal: %s h: %d state: %d data: %x HTLCs: %d\n",
 			lnutil.White(c.CIdx), c.PeerIdx, c.CoinType,
 			lnutil.OutPoint(c.OutPoint),
 			lnutil.SatoshiColor(c.Capacity), lnutil.SatoshiColor(c.MyBalance),
-			c.Height, c.StateNum, c.Data, c.Pkh)
+			c.Height, c.StateNum, c.Data, len(c.HTLCs))
 	}
 
 	for _, c := range openChannels {
@@ -308,13 +319,51 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		} else {
 			fmt.Fprintf(color.Output, lnutil.Green("Open:         "))
 		}
+
+		var nHTLCs int
+		for _, h := range c.HTLCs {
+			if !h.Cleared && !h.ClearedOnChain {
+				nHTLCs++
+			}
+		}
+
 		fmt.Fprintf(
 			color.Output,
-			"%s (peer %d) type %d %s\n\t cap: %s bal: %s h: %d state: %d data: %x pkh: %x\n",
+			"%s (peer %d) type %d %s\n\t cap: %s bal: %s h: %d state: %d data: %x HTLCs: %d\n",
 			lnutil.White(c.CIdx), c.PeerIdx, c.CoinType,
 			lnutil.OutPoint(c.OutPoint),
 			lnutil.SatoshiColor(c.Capacity), lnutil.SatoshiColor(c.MyBalance),
-			c.Height, c.StateNum, c.Data, c.Pkh)
+			c.Height, c.StateNum, c.Data, nHTLCs)
+
+		if len(c.HTLCs) > 0 {
+			fmt.Fprintf(color.Output, "\t\t%s\n", lnutil.Header("HTLCs:"))
+		}
+
+		for _, h := range c.HTLCs {
+			walHeight := walHeights[c.CoinType]
+			locktime := int32(h.Locktime) - walHeight
+
+			if h.Cleared || h.ClearedOnChain {
+				// Don't bother showing cleared HTLCs that are > 2* the default lock time old
+				if locktime < -2*consts.DefaultLockTime {
+					continue
+				}
+
+				fmt.Fprintf(color.Output, lnutil.Red("\tCleared:      "))
+			} else if h.Clearing || h.InProg {
+				c := color.New(color.FgYellow)
+				c.Printf("\tIn progress:  ")
+			} else {
+				fmt.Fprintf(color.Output, lnutil.Green("\tUncleared:    "))
+			}
+
+			fmt.Fprintf(color.Output,
+				"%s incoming: %t amt: %s RHash: %x R: %x locktime: %d\n",
+				lnutil.White(h.Idx), h.Incoming, lnutil.SatoshiColor(h.Amt), h.RHash,
+				h.R,
+				locktime,
+			)
+		}
 	}
 
 	err = lc.Call("LitRPC.PendingDualFund", nil, dfReply)
@@ -372,11 +421,6 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	for i, a := range aReply.WitAddresses {
 		fmt.Fprintf(color.Output, "%d %s (%s)\n", i+1,
 			lnutil.Address(a), lnutil.Address(aReply.LegacyAddresses[i]))
-	}
-
-	err = lc.Call("LitRPC.Balance", nil, bReply)
-	if err != nil {
-		return err
 	}
 
 	for _, walBal := range bReply.Balances {
