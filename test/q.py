@@ -11,11 +11,11 @@ print('started!')
 lits = []
 for r in range(5):
     print('starting lit')
-    l = testlib.LitNode(bc.rpc_port)
+    l = testlib.LitNode(bc)
     print('started!')
     lits.append(l)
 
-time.sleep(30)
+time.sleep(15)
 
 bc.shutdown()
 for l in lits:

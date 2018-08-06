@@ -10,7 +10,7 @@ LIT_BIN = "%s/../lit" % paths.abspath(paths.dirname(__file__))
 
 REGTEST_COINTYPE = 257
 
-next_unused_port = 10000
+next_unused_port = 11000
 def new_port():
     global next_unused_port
     port = next_unused_port
@@ -25,7 +25,7 @@ def new_data_dir(name):
         id = datadirnums[name]
         datadirnums[name] += 1
     else:
-        datadirnums[name] = id # set it to 0
+        datadirnums[name] = 1 # set the next unused to "1"
     p = "%s/_data/%s%s" % (paths.abspath(paths.dirname(__file__)), name, id)
     os.makedirs(p, exist_ok=True)
     return p
@@ -39,14 +39,15 @@ def next_id():
     return m
 
 class LitNode():
-    def __init__(self, bcnodeport):
+    def __init__(self, bcnode):
+        self.id = next_id()
         self.p2p_port = new_port()
         self.rpc_port = new_port()
         self.data_dir = new_data_dir("lit")
 
         # Write a hexkey to the privkey file
         with open(paths.join(self.data_dir, "privkey.hex"), 'w+') as f:
-            f.write("1" * 63 + str(next_id()) + "\n") # won't work if >=16 lits
+            f.write("1" * 63 + str(self.id) + "\n") # won't work if >=16 lits
 
         # Now figure out the args to use and then start Lit.
         args = [
@@ -55,21 +56,20 @@ class LitNode():
             "--dir", self.data_dir,
             "--rpcport=" + str(self.rpc_port),
             "--tn3", "", # disable autoconnect
-            "--reg", "localhost:" + str(bcnodeport),
-            #"--autoReconnect",
-            #"--autoListenPort=" + str(self.p2p_port)
+            "--reg", "localhost:" + str(bcnode.p2p_port),
+            "--autoReconnect",
+            "--autoListenPort=" + str(self.p2p_port)
         ]
         self.proc = subprocess.Popen(args,
             stdin=subprocess.PIPE,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL)
-        time.sleep(5) # wait for things to get started
+        time.sleep(1)
 
         # Make the RPC client for future use, too.
         self.rpc = litrpc.LitClient("localhost", str(self.rpc_port))
 
-        # Make it listen to connections!
-        print('trying to listen on ' + str(self.p2p_port))
+        # Make it listen to P2P connections!
         self.rpc.Listen(Port=":" + str(self.p2p_port))
 
     def shutdown(self):
@@ -86,12 +86,16 @@ class BitcoinNode():
         self.data_dir = new_data_dir("bitcoind")
         args = [
             "bitcoind",
+            "-v"
             "-regtest",
             "-datadir=" + self.data_dir,
             "-rpcport=" + str(self.rpc_port),
             "-port=" + str(self.p2p_port)
         ]
-        self.proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.proc = subprocess.Popen(args,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL)
+        time.sleep(2.5)
 
     def shutdown(self):
         if self.proc is not None:
