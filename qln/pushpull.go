@@ -960,6 +960,15 @@ func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {
 	for idx, h := range qc.State.HTLCs {
 		if h.Clearing && !h.Cleared {
 			qc.State.HTLCs[idx].Cleared = true
+
+			nd.MultihopMutex.Lock()
+			defer nd.MultihopMutex.Unlock()
+			for i, mu := range nd.InProgMultihop {
+				if bytes.Equal(mu.HHash[:], qc.State.HTLCs[idx].RHash[:]) && !mu.Succeeded {
+					nd.InProgMultihop[i].Succeeded = true
+					nd.InProgMultihop[i].PreImage = qc.State.HTLCs[idx].R
+				}
+			}
 		}
 	}
 

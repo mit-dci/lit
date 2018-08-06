@@ -251,6 +251,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	bReply := new(litrpc.BalanceReply)
 	lReply := new(litrpc.ListeningPortsReply)
 	dfReply := new(litrpc.PendingDualFundReply)
+	mhReply := new(litrpc.MultihopPaymentsReply)
 
 	err := lc.Call("LitRPC.ListConnections", nil, pReply)
 	if err != nil {
@@ -364,6 +365,36 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 				locktime,
 			)
 		}
+	}
+
+	err = lc.Call("LitRPC.ListMultihopPayments", nil, mhReply)
+	if err != nil {
+		return err
+	}
+
+	if len(mhReply.Payments) > 0 {
+		fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Multihop Payments:"))
+	}
+
+	for _, p := range mhReply.Payments {
+		if p.Succeeded {
+			fmt.Fprintf(color.Output, lnutil.Green("Completed: "))
+		} else {
+			c := color.New(color.FgYellow)
+			c.Printf("Pending:   ")
+		}
+
+		path := p.Path[0]
+		for i := 1; i < len(p.Path); i++ {
+			path += " -> " + p.Path[i]
+		}
+
+		fmt.Fprintf(color.Output,
+			"cointype: %d amt: %s RHash: %x R: %x path: %s \n",
+			p.Cointype, lnutil.SatoshiColor(p.Amt), p.RHash,
+			p.R,
+			path,
+		)
 	}
 
 	err = lc.Call("LitRPC.PendingDualFund", nil, dfReply)

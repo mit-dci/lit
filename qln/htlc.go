@@ -816,11 +816,14 @@ func (nd *LitNode) ClaimHTLC(R [16]byte) ([][32]byte, error) {
 				}
 			}
 
+			nd.MultihopMutex.Lock()
 			for idx, mu := range nd.InProgMultihop {
 				if bytes.Equal(mu.HHash[:], RHash[:]) && !mu.Succeeded {
 					nd.InProgMultihop[idx].Succeeded = true
+					nd.InProgMultihop[idx].PreImage = R
 				}
 			}
+			nd.MultihopMutex.Unlock()
 		}
 	}
 	return txids, nil

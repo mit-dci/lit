@@ -5,6 +5,7 @@ import (
 	"log"
 	"strconv"
 
+	"github.com/mit-dci/lit/bech32"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/qln"
 )
@@ -152,5 +153,43 @@ type ChannelGraphReply struct {
 
 func (r *LitRPC) GetChannelMap(args NoArgs, reply *ChannelGraphReply) error {
 	reply.Graph = r.Node.VisualiseGraph()
+	return nil
+}
+
+// ------------ Show multihop payments
+type MultihopPaymentInfo struct {
+	RHash     [32]byte
+	R         [16]byte
+	Amt       int64
+	Cointype  uint32
+	Path      []string
+	Succeeded bool
+}
+
+type MultihopPaymentsReply struct {
+	Payments []MultihopPaymentInfo
+}
+
+func (r *LitRPC) ListMultihopPayments(args NoArgs, reply *MultihopPaymentsReply) error {
+	r.Node.MultihopMutex.Lock()
+	defer r.Node.MultihopMutex.Unlock()
+	for _, p := range r.Node.InProgMultihop {
+		var path []string
+		for _, hop := range p.Path {
+			path = append(path, bech32.Encode("ln", hop[:]))
+		}
+
+		i := MultihopPaymentInfo{
+			p.HHash,
+			p.PreImage,
+			p.Amt,
+			p.Cointype,
+			path,
+			p.Succeeded,
+		}
+
+		reply.Payments = append(reply.Payments, i)
+	}
+
 	return nil
 }

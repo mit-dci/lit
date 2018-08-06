@@ -55,7 +55,10 @@ func (nd *LitNode) PayMultihop(dstLNAdr string, coinType uint32, amount int64) (
 	inFlight.Path = path
 	inFlight.Amt = amount
 	inFlight.Cointype = coinType
+
+	nd.MultihopMutex.Lock()
 	nd.InProgMultihop = append(nd.InProgMultihop, inFlight)
+	nd.MultihopMutex.Unlock()
 
 	log.Printf("Sending payment request to %s", dstLNAdr)
 	msg := lnutil.NewMultihopPaymentRequestMsg(idx, coinType)
@@ -81,7 +84,9 @@ func (nd *LitNode) MultihopPaymentRequestHandler(msg lnutil.MultihopPaymentReque
 
 	inFlight.HHash = hash
 
+	nd.MultihopMutex.Lock()
 	nd.InProgMultihop = append(nd.InProgMultihop, inFlight)
+	nd.MultihopMutex.Unlock()
 
 	outMsg := lnutil.NewMultihopPaymentAckMsg(msg.Peer(), hash)
 	nd.OmniOut <- outMsg
@@ -91,6 +96,8 @@ func (nd *LitNode) MultihopPaymentRequestHandler(msg lnutil.MultihopPaymentReque
 func (nd *LitNode) MultihopPaymentAckHandler(msg lnutil.MultihopPaymentAckMsg) error {
 	fmt.Printf("Received multihop payment ack from peer %d, hash %x\n", msg.Peer(), msg.HHash)
 
+	nd.MultihopMutex.Lock()
+	defer nd.MultihopMutex.Unlock()
 	for idx, mh := range nd.InProgMultihop {
 		var nullHash [32]byte
 		if !mh.Succeeded && bytes.Equal(nullHash[:], mh.HHash[:]) {
@@ -163,6 +170,8 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 	fmt.Printf("Received multihop payment setup from peer %d, hash %x\n", msg.Peer(), msg.HHash)
 
 	var nullBytes [16]byte
+	nd.MultihopMutex.Lock()
+	defer nd.MultihopMutex.Unlock()
 	for _, mh := range nd.InProgMultihop {
 		hash := fastsha256.Sum256(mh.PreImage[:])
 		if !bytes.Equal(mh.PreImage[:], nullBytes[:]) && bytes.Equal(msg.HHash[:], hash[:]) {

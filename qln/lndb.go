@@ -141,6 +141,7 @@ type LitNode struct {
 	Nat      string
 
 	InProgMultihop []*InFlightMultihop
+	MultihopMutex  sync.Mutex
 }
 
 type InFlightMultihop struct {
