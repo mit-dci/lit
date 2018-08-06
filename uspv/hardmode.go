@@ -176,7 +176,7 @@ func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
 	for _, tx := range m.Transactions {
 		if s.MatchTx(tx) {
 			log.Printf("found matching tx %s\n", tx.TxHash().String())
-			s.TxUpToWallit <- lnutil.TxAndHeight{tx, hah.height}
+			s.TxUpToWallit <- lnutil.TxAndHeight{Tx: tx, Height: hah.height}
 		}
 	}
 

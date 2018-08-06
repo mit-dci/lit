@@ -198,8 +198,7 @@ func (nd *LitNode) ChannelHandler(msg lnutil.LitMsg, peer *RemotePeer) error {
 	case lnutil.ChanDescMsg: // CHANNEL DESCRIPTION
 		log.Printf("Got channel description from %x\n", msg.Peer())
 
-		nd.QChanDescHandler(message)
-		return nil
+		return nd.QChanDescHandler(message)
 
 	case lnutil.ChanAckMsg: // CHANNEL ACKNOWLEDGE
 		log.Printf("Got channel acknowledgement from %x\n", msg.Peer())
@@ -545,7 +544,7 @@ func (nd *LitNode) HandleContractOPEvent(c *lnutil.DlcContract,
 			txClaim := wire.NewMsgTx()
 			txClaim.Version = 2
 
-			settleOutpoint := wire.OutPoint{opEvent.Tx.TxHash(), pkhIdx}
+			settleOutpoint := wire.OutPoint{Hash: opEvent.Tx.TxHash(), Index: pkhIdx}
 			txClaim.AddTxIn(wire.NewTxIn(&settleOutpoint, nil, nil))
 
 			addr, err := wal.NewAdr()

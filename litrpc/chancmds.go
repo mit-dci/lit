@@ -410,7 +410,7 @@ func (r *LitRPC) DumpPrivs(args NoArgs, reply *DumpReply) error {
 		if err != nil {
 			return err
 		}
-		wif := btcutil.WIF{priv, true, wal.Params().PrivateKeyID}
+		wif := btcutil.WIF{PrivKey: priv, CompressPubKey: true, NetID: wal.Params().PrivateKeyID}
 		thisTxo.WIF = wif.String()
 
 		reply.Privs = append(reply.Privs, thisTxo)
@@ -440,7 +440,7 @@ func (r *LitRPC) DumpPrivs(args NoArgs, reply *DumpReply) error {
 			if err != nil {
 				return err
 			}
-			wif := btcutil.WIF{priv, true, wal.Params().PrivateKeyID}
+			wif := btcutil.WIF{PrivKey: priv, CompressPubKey: true, NetID: wal.Params().PrivateKeyID}
 
 			theseTxos[i].WIF = wif.String()
 		}

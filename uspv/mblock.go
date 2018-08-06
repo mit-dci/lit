@@ -165,5 +165,4 @@ func checkMBlock(m *wire.MsgMerkleBlock) ([]*chainhash.Hash, error) {
 			m.Flags = m.Flags[1:]
 		}
 	}
-	return nil, fmt.Errorf("ran out of things to do?")
 }

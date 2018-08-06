@@ -518,7 +518,7 @@ func (w *Wallit) IngestMany(txs []*wire.MsgTx, height int32) (uint32, error) {
 					// confirmed now) we don't need to re-register.
 					existing := dufb.Get(txob[:36])
 					if existing == nil {
-						err = w.Hook.RegisterOutPoint(wire.OutPoint{tx.TxHash(), uint32(j)})
+						err = w.Hook.RegisterOutPoint(wire.OutPoint{Hash: tx.TxHash(), Index: uint32(j)})
 						if err != nil {
 							return err
 						}

@@ -66,7 +66,6 @@ func (s *SPVCon) incomingMessageHandler() {
 			}
 		}
 	}
-	return
 }
 
 // this one seems kindof pointless?  could get ridf of it and let
@@ -86,7 +85,6 @@ func (s *SPVCon) outgoingMessageHandler() {
 		}
 		s.WBytes += uint64(n)
 	}
-	return
 }
 
 // fPositiveHandler monitors false positives and when it gets enough of them,
@@ -172,7 +170,6 @@ func (s *SPVCon) TxHandler(tx *wire.MsgTx) {
 	if !ok {
 		log.Printf("Tx %s unknown, will not ingest\n", tx.TxHash().String())
 		panic("unknown tx")
-		return
 	}
 
 	// check for double spends ...?
@@ -195,7 +192,7 @@ func (s *SPVCon) TxHandler(tx *wire.MsgTx) {
 
 	// send txs up to wallit
 	if s.MatchTx(tx) {
-		s.TxUpToWallit <- lnutil.TxAndHeight{tx, height}
+		s.TxUpToWallit <- lnutil.TxAndHeight{Tx: tx, Height: height}
 	}
 }
 
