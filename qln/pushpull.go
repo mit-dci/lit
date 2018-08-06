@@ -635,12 +635,6 @@ func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
 	// go back to sequential elkpoints
 	q.State.ElkPoint = stashElkPoint
 
-	for idx, h := range q.State.HTLCs {
-		if h.Clearing && !h.Cleared {
-			q.State.HTLCs[idx].Cleared = true
-		}
-	}
-
 	if !bytes.Equal(msg.N2HTLCBase[:], q.State.N2HTLCBase[:]) {
 		q.State.NextHTLCBase = q.State.N2HTLCBase
 		q.State.N2HTLCBase = msg.N2HTLCBase
@@ -964,9 +958,9 @@ func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {
 			nd.MultihopMutex.Lock()
 			defer nd.MultihopMutex.Unlock()
 			for i, mu := range nd.InProgMultihop {
-				if bytes.Equal(mu.HHash[:], qc.State.HTLCs[idx].RHash[:]) && !mu.Succeeded {
+				if bytes.Equal(mu.HHash[:], h.RHash[:]) && !mu.Succeeded {
 					nd.InProgMultihop[i].Succeeded = true
-					nd.InProgMultihop[i].PreImage = qc.State.HTLCs[idx].R
+					nd.InProgMultihop[i].PreImage = h.R
 				}
 			}
 		}
