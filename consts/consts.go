@@ -12,6 +12,6 @@ const (
 	MinSendAmt        = 10000            // minimum amount that can be sent through a chan
 	MaxTxLen          = 100000           // maximum number of tx's that can be ingested at once
 	DefaultLockTime   = 500
-	ChannelTimeout    = 8  // channel operation timeout in seconds before failing the channel
+	ChannelTimeout    = 60 // channel operation timeout in seconds before failing the channel
 	ChannelAdvTimeout = 60 // max allowed seconds between channel advertisements before deletion
 )
