@@ -43,7 +43,8 @@ class LitClient():
             return resp
         else:
             logger.warning('rpc call not OK: {}'.format(req.status_code))
-            return req.json()['error']
+            err = req.json()['error']
+            err['_error'] = True
 
     def __getattr__(self, name):
         """Dispatches any unrecognised messages to the websocket connection"""

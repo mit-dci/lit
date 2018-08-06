@@ -49,6 +49,7 @@ class LitNode():
         self.p2p_port = new_port()
         self.rpc_port = new_port()
         self.data_dir = new_data_dir("lit")
+        self.peer_mapping = {}
 
         # Write a hexkey to the privkey file
         with open(paths.join(self.data_dir, "privkey.hex"), 'w+') as f:
@@ -75,14 +76,35 @@ class LitNode():
         self.rpc = litrpc.LitClient("localhost", str(self.rpc_port))
 
         # Make it listen to P2P connections!
-        self.rpc.Listen(Port=":" + str(self.p2p_port))
+        lres = self.rpc.Listen(Port=":" + str(self.p2p_port))
         testutil.wait_until_port("localhost", self.p2p_port)
+        self.lnid = lres["Adr"]
 
     def get_sync_height(self):
         for bal in self.rpc.balance():
             if bal['CoinType'] == REGTEST_COINTYPE:
                 return bal['SyncHeight']
         return -1
+
+    def connect_to_peer(self, lnaddr):
+        res = self.rpc.Connect({'LNAddr': lnaddr})
+        if "_error" not in res:
+            raise AssertError("couldn't connect to " + lnaddr)
+        else:
+            self.peer_mapping[lnaddr] = res['PeerIdx']
+
+    def get_peer_id(self, lnaddr):
+        if lnaddr in self.peer_mapping:
+            return self.peer_mapping[lnaddr]
+        else:
+            return None
+
+    def make_new_addr(self):
+        res = self.rpc.Address({'NumToMake': 1, 'CoinType': REGTEST_COINTYPE})
+        if "_error" not in res:
+            return res['WitAddresses'][0]
+        else:
+            return None
 
     def shutdown(self):
         if self.proc is not None:

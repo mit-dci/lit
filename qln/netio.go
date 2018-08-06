@@ -2,15 +2,15 @@ package qln
 
 import (
 	"fmt"
-	"log"
-	"net"
-	"strings"
-	"strconv"
-	"time"
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
 	nat "github.com/mit-dci/lit/nat"
+	"log"
+	"net"
+	"strconv"
+	"strings"
+	"time"
 )
 
 // Gets the list of ports where LitNode is listening for incoming connections,
@@ -147,7 +147,7 @@ func splitAdrString(adr string) (string, string) {
 }
 
 // DialPeer makes an outgoing connection to another node.
-func (nd *LitNode) DialPeer(connectAdr string) error {
+func (nd *LitNode) DialPeer(connectAdr string) (uint32, error) {
 	var err error
 
 	// parse address and get pkh / host / port
@@ -157,7 +157,7 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 	if where == "" {
 		where, _, err = Lookup(who, nd.TrackerURL, nd.ProxyURL)
 		if err != nil {
-			return err
+			return 0, err
 		}
 	}
 
@@ -167,7 +167,7 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 	// Assign remote connection
 	newConn, err := lndc.Dial(idPriv, where, who, net.Dial)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	// if connect is successful, either query for already existing peer index, or
@@ -177,7 +177,7 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 	// we're connecting out, also specify the hostname&port
 	peerIdx, err := nd.GetPeerIdx(newConn.RemotePub(), newConn.RemoteAddr().String())
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	// also retrieve their nickname, if they have one
@@ -194,7 +194,7 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 	// each connection to a peer gets its own LNDCReader
 	go nd.LNDCReader(&p)
 
-	return nil
+	return peerIdx, nil
 }
 
 // OutMessager takes messages from the outbox and sends them to the ether. net.
@@ -223,7 +223,7 @@ func (nd *LitNode) OutMessager() {
 type PeerInfo struct {
 	PeerNumber uint32
 	RemoteHost string
-	LitAdr 	   string
+	LitAdr     string
 	Nickname   string
 }
 
