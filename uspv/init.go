@@ -76,7 +76,7 @@ func (s *SPVCon) GetListOfNodes() ([]string, error) {
 
 // DialNode receives a list of node ips and then tries to connect to them one by one.
 func (s *SPVCon) DialNode(listOfNodes []string) (net.Conn, error) {
-	var con net.Conn
+
 	// now have some IPs, go through and try to connect to one.
 	var err error
 	var con net.Conn
