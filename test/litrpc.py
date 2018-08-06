@@ -13,7 +13,7 @@ import time
 
 import requests # pip3 install requests
 
-logger = logging.getLogger("litrpc")
+logger = logging.getLogger("testframework")
 
 max_id = 10000
 
@@ -26,7 +26,7 @@ class LitClient():
 
     def send_message(self, method, params):
         """Sends a POST message to the lit node"""
-        logger.debug("Sending rpc message to %s:%s %s(%s)".format(self.ip, self.port, method, str(params)))
+        logger.debug("Sending lit rpc message to %s:%s %s(%s)".format(self.ip, self.port, method, str(params)))
 
         jsonreq = {
             'method': "LitRPC.%s" % method,

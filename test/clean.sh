@@ -1,2 +1,2 @@
 #!/bin/sh
-rm -rf _data
+rm -rf _data/
