@@ -96,22 +96,31 @@ class LitNode():
         addr = other.lnid + '@127.0.0.1:' + str(other.p2p_port)
         res = self.rpc.Connect(LNAddr=addr)
         if "_error" not in res:
-            self.peer_mapping[other.lnid] = res['PeerIdx']
+            self.update_peers()
+            if self.peer_mapping[other.lnid] != res['PeerIdx']:
+                raise AssertError("new peer ID doesn't match reported ID")
         else:
             raise AssertError("couldn't connect to " + lnaddr)
 
     def get_peer_id(self, other):
-        if other.lnid in self.peer_mapping:
-            return self.peer_mapping[other.lnid]
-        else:
-            return None
+        self.update_peers()
+        return self.peer_mapping[other.lnid]
 
     def make_new_addr(self):
-        res = self.rpc.Address({'NumToMake': 1, 'CoinType': REGTEST_COINTYPE})
+        res = self.rpc.Address(NumToMake=1, CoinType=REGTEST_COINTYPE)
         if "_error" not in res:
             return res['WitAddresses'][0]
         else:
-            return None
+            raise AssertError("unable to create new address")
+
+    def update_peers(self):
+        res = self.rpc.ListConnections()
+        if "_error" in res:
+            raise AssertError("couldn't ask for peers")
+        pm = {}
+        for p in res['Connections']:
+            pm[p['LitAdr']] = p['PeerNumber']
+        self.peer_mapping = pm
 
     def shutdown(self):
         if self.proc is not None:
