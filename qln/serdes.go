@@ -367,6 +367,9 @@ bytes   desc   at offset
 length 126
 
 peeridx is inferred from position in db.
+
+^^^ a lot of this data is outdated, just read the code below!
+
 */
 //TODO !!! don't store the outpoint!  it's redundant!!!!!
 // it's just a nonce and a refund, that's it! 40 bytes!
@@ -391,11 +394,17 @@ func (q *Qchan) ToBytes() ([]byte, error) {
 		return nil, err
 	}
 
+	// write the timestamp data
+	lubuf := make([]byte, 8)
+	binary.BigEndian.PutUint64(lubuf, q.LastUpdate)
+	buf.Write(lubuf)
+
 	// then serialize the utxo part
 	uBytes, err := q.PorTxo.Bytes()
 	if err != nil {
 		return nil, err
 	}
+
 	// and write that into the buffer
 	_, err = buf.Write(uBytes)
 	if err != nil {
@@ -408,19 +417,25 @@ func (q *Qchan) ToBytes() ([]byte, error) {
 
 // QchanFromBytes turns bytes into a Qchan.
 // the first 99 bytes are the 3 pubkeys: channel, refund, HAKD base
+// then 8 bytes for a timestamp
 // then 8 bytes for the DH mask
 // the rest is the utxo
 func QchanFromBytes(b []byte) (Qchan, error) {
 	var q Qchan
 
-	if len(b) < 205 {
-		return q, fmt.Errorf("Got %d bytes for qchan, expect 205+", len(b))
+	if len(b) < 213 {
+		return q, fmt.Errorf("Got %d bytes for qchan, expect 213+", len(b))
 	}
 
 	copy(q.TheirPub[:], b[:33])
 	copy(q.TheirRefundPub[:], b[33:66])
 	copy(q.TheirHAKDBase[:], b[66:99])
-	u, err := portxo.PorTxoFromBytes(b[99:])
+
+	tsbuf := make([]byte, 8)
+	copy(tsbuf, b[99:107])
+	q.LastUpdate = binary.BigEndian.Uint64(tsbuf)
+
+	u, err := portxo.PorTxoFromBytes(b[107:])
 	if err != nil {
 		return q, err
 	}
@@ -428,6 +443,9 @@ func QchanFromBytes(b []byte) (Qchan, error) {
 	q.PorTxo = *u // assign the utxo
 	// hard-coded.  save this soon, it's easy
 	q.Delay = 5
+
+	// pls werk
+	q.LastUpdate = binary.BigEndian.Uint64(b[len(b)-8 : len(b)])
 
 	return q, nil
 }
