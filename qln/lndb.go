@@ -1,6 +1,8 @@
 package qln
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"log"
 	"sync"
@@ -132,7 +134,7 @@ type LitNode struct {
 	// The URL from which lit attempts to resolve the LN address
 	TrackerURL string
 
-	ChannelMap    map[[20]byte][]lnutil.LinkMsg
+	ChannelMap    map[[20]byte][]LinkDesc
 	ChannelMapMtx sync.Mutex
 	AdvTimeout    *time.Ticker
 
@@ -144,6 +146,11 @@ type LitNode struct {
 	MultihopMutex  sync.Mutex
 }
 
+type LinkDesc struct {
+	Link  lnutil.LinkMsg
+	Dirty bool
+}
+
 type InFlightMultihop struct {
 	Path      [][20]byte
 	Amt       int64
@@ -151,6 +158,54 @@ type InFlightMultihop struct {
 	PreImage  [16]byte
 	Cointype  uint32
 	Succeeded bool
+}
+
+func (p *InFlightMultihop) Bytes() []byte {
+	var buf bytes.Buffer
+
+	wire.WriteVarInt(&buf, 0, uint64(len(p.Path)))
+	for _, nd := range p.Path {
+		buf.Write(nd[:])
+	}
+
+	wire.WriteVarInt(&buf, 0, uint64(p.Amt))
+
+	buf.Write(p.HHash[:])
+	buf.Write(p.PreImage[:])
+
+	binary.Write(&buf, binary.BigEndian, p.Cointype)
+	binary.Write(&buf, binary.BigEndian, p.Succeeded)
+
+	return buf.Bytes()
+}
+
+func InFlightMultihopFromBytes(b []byte) (*InFlightMultihop, error) {
+	mh := new(InFlightMultihop)
+
+	buf := bytes.NewBuffer(b) // get rid of messageType
+
+	hops, _ := wire.ReadVarInt(buf, 0)
+	mh.Path = make([][20]byte, hops)
+	for i := uint64(0); i < hops; i++ {
+		copy(mh.Path[i][:], buf.Next(20))
+	}
+	amount, _ := wire.ReadVarInt(buf, 0)
+	mh.Amt = int64(amount)
+
+	copy(mh.HHash[:], buf.Next(32))
+	copy(mh.PreImage[:], buf.Next(16))
+
+	err := binary.Read(buf, binary.BigEndian, &mh.Cointype)
+	if err != nil {
+		return mh, err
+	}
+
+	err = binary.Read(buf, binary.BigEndian, &mh.Succeeded)
+	if err != nil {
+		return mh, err
+	}
+
+	return mh, nil
 }
 
 type RemotePeer struct {
@@ -789,4 +844,51 @@ func (nd *LitNode) GetQchanByIdx(cIdx uint32) (*Qchan, error) {
 		return nil, err
 	}
 	return qc, nil
+}
+
+// SaveMultihopPayment saves a new (or updates an existing) multihop payment in the database
+func (nd *LitNode) SaveMultihopPayment(p *InFlightMultihop) error {
+	err := nd.LitDB.Update(func(btx *bolt.Tx) error {
+		cmp := btx.Bucket(BKTPayments)
+		if cmp == nil {
+			return fmt.Errorf("SaveMultihopPayment: no payments bucket")
+		}
+
+		// save hash : payment
+		err := cmp.Put(p.HHash[:], p.Bytes())
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (nd *LitNode) GetAllMultihopPayments() ([]*InFlightMultihop, error) {
+	var payments []*InFlightMultihop
+
+	err := nd.LitDB.View(func(btx *bolt.Tx) error {
+		bkt := btx.Bucket(BKTPayments)
+		if bkt == nil {
+			return fmt.Errorf("no payments bucket")
+		}
+
+		return bkt.ForEach(func(RHash []byte, paymentBytes []byte) error {
+			payment, err := InFlightMultihopFromBytes(paymentBytes)
+			if err != nil {
+				return err
+			}
+
+			// add to slice
+			payments = append(payments, payment)
+			return nil
+		})
+	})
+
+	return payments, err
 }

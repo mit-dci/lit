@@ -86,6 +86,11 @@ func (nd *LitNode) MultihopPaymentRequestHandler(msg lnutil.MultihopPaymentReque
 
 	nd.MultihopMutex.Lock()
 	nd.InProgMultihop = append(nd.InProgMultihop, inFlight)
+	err := nd.SaveMultihopPayment(inFlight)
+	if err != nil {
+		nd.MultihopMutex.Unlock()
+		return err
+	}
 	nd.MultihopMutex.Unlock()
 
 	outMsg := lnutil.NewMultihopPaymentAckMsg(msg.Peer(), hash)
@@ -132,6 +137,10 @@ func (nd *LitNode) MultihopPaymentAckHandler(msg lnutil.MultihopPaymentAckMsg) e
 				nd.RemoteMtx.Unlock()
 
 				nd.InProgMultihop[idx].HHash = msg.HHash
+				err = nd.SaveMultihopPayment(nd.InProgMultihop[idx])
+				if err != nil {
+					return err
+				}
 
 				// Calculate what initial locktime we need
 				wal, ok := nd.SubWallet[mh.Cointype]
@@ -152,6 +161,15 @@ func (nd *LitNode) MultihopPaymentAckHandler(msg lnutil.MultihopPaymentAckMsg) e
 						log.Printf("error offering HTLC: %s", err.Error())
 						return
 					}
+
+					// Set the dirty flag on each of the nodes' channels we used
+					nd.ChannelMapMtx.Lock()
+					for _, hop := range nd.InProgMultihop[idx].Path {
+						for i := range nd.ChannelMap[hop] {
+							nd.ChannelMap[hop][i].Dirty = true
+						}
+					}
+					nd.ChannelMapMtx.Unlock()
 
 					var data [32]byte
 					outMsg := lnutil.NewMultihopPaymentSetupMsg(firstHopIdx, mh.Amt, mh.Cointype, msg.HHash, mh.Path, data)
@@ -231,6 +249,11 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 	inFlight.Cointype = msg.Cointype
 	nd.InProgMultihop = append(nd.InProgMultihop, inFlight)
 
+	err = nd.SaveMultihopPayment(inFlight)
+	if err != nil {
+		return err
+	}
+
 	// Forward
 	var pkh [20]byte
 	id := nd.IdKey().PubKey().SerializeCompressed()
@@ -282,6 +305,18 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 			log.Printf("error offering HTLC: %s", err.Error())
 			return
 		}
+
+		// Set the dirty flag on the nodes' channels in this route so we
+		// don't attempt to use them for routing before we get an link update
+		nd.ChannelMapMtx.Lock()
+		for _, hop := range msg.NodeRoute {
+			if _, ok := nd.ChannelMap[hop]; ok {
+				for idx := range nd.ChannelMap[hop] {
+					nd.ChannelMap[hop][idx].Dirty = true
+				}
+			}
+		}
+		nd.ChannelMapMtx.Unlock()
 
 		msg.PeerIdx = sendToIdx
 		nd.OmniOut <- msg

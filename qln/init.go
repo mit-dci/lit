@@ -75,6 +75,11 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 	nd.InProgDual = new(InFlightDualFund)
 	nd.InProgDual.done = make(chan *DualFundingResult, 1)
 
+	nd.InProgMultihop, err = nd.GetAllMultihopPayments()
+	if err != nil {
+		return nil, err
+	}
+
 	nd.RemoteCons = make(map[uint32]*RemotePeer)
 
 	nd.SubWallet = make(map[uint32]UWallet)
@@ -204,6 +209,11 @@ func (nd *LitNode) OpenDB(filename string) error {
 		}
 
 		_, err = btx.CreateBucketIfNotExists(BKTHTLCOPs)
+		if err != nil {
+			return err
+		}
+
+		_, err = btx.CreateBucketIfNotExists(BKTPayments)
 		if err != nil {
 			return err
 		}

@@ -961,6 +961,10 @@ func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {
 				if bytes.Equal(mu.HHash[:], h.RHash[:]) && !mu.Succeeded {
 					nd.InProgMultihop[i].Succeeded = true
 					nd.InProgMultihop[i].PreImage = h.R
+					err = nd.SaveMultihopPayment(nd.InProgMultihop[i])
+					if err != nil {
+						return err
+					}
 				}
 			}
 		}

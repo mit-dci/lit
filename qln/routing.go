@@ -19,7 +19,7 @@ import (
 func (nd *LitNode) InitRouting() {
 	nd.ChannelMapMtx.Lock()
 	defer nd.ChannelMapMtx.Unlock()
-	nd.ChannelMap = make(map[[20]byte][]lnutil.LinkMsg)
+	nd.ChannelMap = make(map[[20]byte][]LinkDesc)
 
 	nd.AdvTimeout = time.NewTicker(15 * time.Second)
 
@@ -49,21 +49,21 @@ func (nd *LitNode) VisualiseGraph() string {
 		}
 
 		for _, channel := range node {
-			theirLnAdr := bech32.Encode("ln", channel.BPKH[:])
+			theirLnAdr := bech32.Encode("ln", channel.Link.BPKH[:])
 			if !graph.IsNode(theirLnAdr) {
 				graph.AddNode("Lit", theirLnAdr, nil)
 			}
 
 			attrs := make(map[string]string)
 
-			switch channel.CoinType {
+			switch channel.Link.CoinType {
 			case 0:
 				attrs["color"] = "orange"
 			case 28:
 				attrs["color"] = "green"
 			}
 
-			attrs["label"] = strconv.FormatUint(uint64(channel.CoinType), 10)
+			attrs["label"] = strconv.FormatUint(uint64(channel.Link.CoinType), 10)
 
 			graph.AddEdge(lnAdr, theirLnAdr, true, attrs)
 		}
@@ -73,7 +73,6 @@ func (nd *LitNode) VisualiseGraph() string {
 }
 
 func (nd *LitNode) FindPath(targetPkh [20]byte, coinType uint32, amount int64, fee int64) ([][20]byte, error) {
-
 	var myIdPkh [20]byte
 	idHash := fastsha256.Sum256(nd.IdKey().PubKey().SerializeCompressed())
 	copy(myIdPkh[:], idHash[:20])
@@ -88,6 +87,9 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, coinType uint32, amount int64, f
 
 	var nodeHeap distanceHeap
 	heap.Push(&nodeHeap, distance[myIdPkh])
+
+	nd.ChannelMapMtx.Lock()
+	defer nd.ChannelMapMtx.Unlock()
 
 	for nodeHeap.Len() != 0 {
 		partialPath := heap.Pop(&nodeHeap).(nodeWithDist)
@@ -110,31 +112,31 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, coinType uint32, amount int64, f
 
 		fmt.Printf("Finding edges for %s...\n", bech32.Encode("ln", bestNode[:]))
 		for _, channel := range nd.ChannelMap[bestNode] {
-			fmt.Printf("Checking %s\n", bech32.Encode("ln", channel.BPKH[:]))
-			capOk := (channel.ACapacity-consts.MinOutput-fee >= amount)
-			isTarget := bytes.Equal(targetPkh[:], channel.BPKH[:])
-			coinTypeMatch := (coinType == channel.CoinType)
+			fmt.Printf("Checking %s\n", bech32.Encode("ln", channel.Link.BPKH[:]))
+			capOk := (channel.Link.ACapacity-consts.MinOutput-fee >= amount)
+			isTarget := bytes.Equal(targetPkh[:], channel.Link.BPKH[:])
+			coinTypeMatch := (coinType == channel.Link.CoinType)
 
-			fmt.Printf("Capok: [%t] - isTarget: [%t] - coinTypeMatch [%t]\n", capOk, isTarget, coinTypeMatch)
+			fmt.Printf("Capok: [%t] - isTarget: [%t] - coinTypeMatch [%t] - dirty [%t]\n", capOk, isTarget, coinTypeMatch, channel.Dirty)
 
-			if capOk && (!isTarget || (isTarget && coinTypeMatch)) {
+			if !channel.Dirty && capOk && (!isTarget || (isTarget && coinTypeMatch)) {
 
 				tempDist := partialPath.Dist + 1
-				_, exists := distance[channel.BPKH]
+				_, exists := distance[channel.Link.BPKH]
 
-				if !exists || (exists && tempDist < distance[channel.BPKH].Dist) {
+				if !exists || (exists && tempDist < distance[channel.Link.BPKH].Dist) {
 					// We could use this. Explore further
 
-					distance[channel.BPKH] = nodeWithDist{
+					distance[channel.Link.BPKH] = nodeWithDist{
 						Dist: tempDist,
-						Pkh:  channel.BPKH,
+						Pkh:  channel.Link.BPKH,
 					}
 
-					prev[channel.BPKH] = bestNode
+					prev[channel.Link.BPKH] = bestNode
 
-					fmt.Printf("Pushing %s onto heap\n", bech32.Encode("ln", channel.BPKH[:]))
+					fmt.Printf("Pushing %s onto heap\n", bech32.Encode("ln", channel.Link.BPKH[:]))
 
-					heap.Push(&nodeHeap, distance[channel.BPKH])
+					heap.Push(&nodeHeap, distance[channel.Link.BPKH])
 				}
 			}
 		}
@@ -148,6 +150,7 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, coinType uint32, amount int64, f
 	for !bytes.Equal(route[0][:], myIdPkh[:]) {
 		route = append([][20]byte{prev[route[0]]}, route...)
 	}
+
 	return route, nil
 }
 
@@ -155,13 +158,13 @@ func (nd *LitNode) cleanStaleChannels() {
 	nd.ChannelMapMtx.Lock()
 	defer nd.ChannelMapMtx.Unlock()
 
-	newChannelMap := make(map[[20]byte][]lnutil.LinkMsg)
+	newChannelMap := make(map[[20]byte][]LinkDesc)
 
 	now := time.Now().Unix()
 
 	for pkh, node := range nd.ChannelMap {
 		for _, channel := range node {
-			if channel.Timestamp+consts.ChannelAdvTimeout >= now {
+			if channel.Link.Timestamp+consts.ChannelAdvTimeout >= now {
 				newChannelMap[pkh] = append(newChannelMap[pkh], channel)
 			}
 		}
@@ -177,7 +180,7 @@ func (nd *LitNode) advertiseLinks(seq uint32) {
 
 	for _, peer := range nd.RemoteCons {
 		for _, q := range peer.QCs {
-			if !q.CloseData.Closed && q.State.MyAmt > 2*(consts.MinOutput+q.State.Fee) && !q.State.Failed {
+			if !q.CloseData.Closed && q.State.MyAmt >= 2*(consts.MinOutput+q.State.Fee) && !q.State.Failed {
 				var outmsg lnutil.LinkMsg
 				outmsg.CoinType = q.Coin()
 				outmsg.Seq = seq
@@ -224,15 +227,16 @@ func (nd *LitNode) LinkMsgHandler(msg lnutil.LinkMsg) {
 	if _, ok := nd.ChannelMap[msg.APKH]; ok {
 		// Check if link state is most recent (seq)
 		for i, v := range nd.ChannelMap[msg.APKH] {
-			if bytes.Compare(v.PKHScript[:], msg.PKHScript[:]) == 0 {
+			if bytes.Compare(v.Link.PKHScript[:], msg.PKHScript[:]) == 0 {
 				// This is the link we've been looking for
-				if msg.Seq <= v.Seq {
+				if msg.Seq <= v.Link.Seq {
 					// Old advert
 					return
 				}
 
 				// Update channel map
-				nd.ChannelMap[msg.APKH][i] = msg
+				nd.ChannelMap[msg.APKH][i].Link = msg
+				nd.ChannelMap[msg.APKH][i].Dirty = false
 
 				newChan = false
 				break
@@ -242,13 +246,13 @@ func (nd *LitNode) LinkMsgHandler(msg lnutil.LinkMsg) {
 
 	if newChan {
 		// New peer or new channel
-		nd.ChannelMap[msg.APKH] = append(nd.ChannelMap[msg.APKH], msg)
+		nd.ChannelMap[msg.APKH] = append(nd.ChannelMap[msg.APKH], LinkDesc{msg, false})
 	}
 
 	// Rebroadcast
 	origIdx := msg.PeerIdx
 
-	for peerIdx, _ := range nd.RemoteCons {
+	for peerIdx := range nd.RemoteCons {
 		if peerIdx != origIdx {
 			msg.PeerIdx = peerIdx
 
