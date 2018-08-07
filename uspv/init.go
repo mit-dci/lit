@@ -213,6 +213,7 @@ func (s *SPVCon) Connect(remoteNode string) error {
 			listOfNodes = listOfNodes[1:]
 			continue
 		}
+		s.con = con
 		err = s.Handshake(listOfNodes)
 		if err != nil {
 			handShakeFailed = true
@@ -234,7 +235,6 @@ func (s *SPVCon) Connect(remoteNode string) error {
 			continue
 		}
 	}
-	s.con = con // actually assign it.
 
 	if !handShakeFailed && !connEstablished {
 		// this case happens when user provided node fails to connect
