@@ -115,7 +115,7 @@ class LitNode():
 
     def shutdown(self):
         if self.proc is not None:
-            self.proc.terminate()
+            self.proc.kill()
             self.proc = None
         else:
             pass # do nothing I guess?
@@ -168,7 +168,7 @@ class BitcoinNode():
 
     def shutdown(self):
         if self.proc is not None:
-            self.proc.terminate()
+            self.proc.kill()
             self.proc = None
         else:
             pass # do nothing I guess?
@@ -183,7 +183,7 @@ class TestEnv():
             self.lits.append(node)
         logger.info("started nodes!  syncing...")
 
-        time.sleep(5)
+        time.sleep(1)
 
         # Sync the nodes
         try:

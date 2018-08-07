@@ -77,10 +77,8 @@ func (nd *LitNode) TCPListener(
 
 	// Don't announce on the tracker if we are communicating via SOCKS proxy
 	if nd.ProxyURL == "" {
-		err = Announce(idPriv, lisIpPort, adr, nd.TrackerURL)
-		if err != nil {
-			log.Printf("Announcement error %s", err.Error())
-		}
+		// this should happen asynchronously
+		go GoAnnounce(idPriv, lisIpPort, adr, nd.TrackerURL)
 	}
 
 	log.Printf("Listening on %s\n", listener.Addr().String())
@@ -126,6 +124,13 @@ func (nd *LitNode) TCPListener(
 	nd.LisIpPorts = append(nd.LisIpPorts, lisIpPort)
 	nd.RemoteMtx.Unlock()
 	return adr, nil
+}
+
+func GoAnnounce(priv *btcec.PrivateKey, litport string, litadr string, trackerURL string) {
+	err := Announce(priv, litport, litadr, trackerURL)
+	if err != nil {
+		log.Printf("Announcement error %s", err.Error())
+	}
 }
 
 // ParseAdrString splits a string like

@@ -1,5 +1,5 @@
 # This is just to test the integration test framework.
-testlib
+#testlib
 
 # Network tests.
 connect
