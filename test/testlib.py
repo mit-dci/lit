@@ -99,11 +99,11 @@ class LitNode():
             self.update_peers()
             if self.peer_mapping[other.lnid] != res['PeerIdx']:
                 raise AssertError("new peer ID doesn't match reported ID")
+            other.update_peers()
         else:
             raise AssertError("couldn't connect to " + lnaddr)
 
     def get_peer_id(self, other):
-        self.update_peers()
         return self.peer_mapping[other.lnid]
 
     def make_new_addr(self):

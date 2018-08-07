@@ -13,7 +13,6 @@ def run_test(env):
     print('Connected')
     alice.rpc.Say(Peer=alice.get_peer_id(bob), Message="hello!")
     print('Alice said hello to Bob.')
-    bob.update_peers()
     bob.rpc.Say(Peer=bob.get_peer_id(alice), Message="world!")
     print('Bob said hello to Alice.')
     # TODO Use "Say" to talk from Bob to Alice
