@@ -10,6 +10,8 @@ for t in $tests; do
 done
 echo '========'
 
+rm -rf $datadir
+
 n=0
 
 for t in $tests; do
@@ -30,7 +32,5 @@ for t in $tests; do
 	echo '----'
 	n=$(($n + 1))
 done
-
-rm -rf $datadir
 
 echo "All ($n) tests passed."

@@ -61,6 +61,11 @@ class LitNode():
         with open(paths.join(self.data_dir, "privkey.hex"), 'w+') as f:
             f.write("1" * 63 + str(self.id) + "\n") # won't work if >=16 lits
 
+        # See if we should print stdout
+        outputredir = subprocess.DEVNULL
+        if os.getenv("LIT_OUTPUT_SHOW", default="0") == "1":
+            outputredir = None
+
         # Now figure out the args to use and then start Lit.
         args = [
             LIT_BIN,
@@ -74,8 +79,8 @@ class LitNode():
         ]
         self.proc = subprocess.Popen(args,
             stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL)
+            stdout=outputredir,
+            stderr=outputredir)
 
         # Make the RPC client for future use, too.
         testutil.wait_until_port("localhost", self.rpc_port)
@@ -121,6 +126,15 @@ class LitNode():
         for p in res['Connections']:
             pm[p['LitAdr']] = p['PeerNumber']
         self.peer_mapping = pm
+
+    def get_balance_info(self, cointype=None):
+        ct = REGTEST_COINTYPE
+        if cointype is not None: # I had to do this because of reasons.
+            ct = cointype
+        for b in self.rpc.balance():
+            if b['CoinType'] == ct:
+                return b
+        return None
 
     def shutdown(self):
         if self.proc is not None:
@@ -192,7 +206,7 @@ class TestEnv():
             self.lits.append(node)
         logger.info("started nodes!  syncing...")
 
-        time.sleep(1)
+        time.sleep(0.1)
 
         # Sync the nodes
         try:

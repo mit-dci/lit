@@ -1,8 +1,11 @@
 # This is just to test the integration test framework.
-#testlib
+testlib
 
 # Network tests.
 connect
+receive
+#send
+send2
 
 # Basic channel tests.
 
