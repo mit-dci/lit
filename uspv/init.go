@@ -13,6 +13,7 @@ import (
 	"github.com/mit-dci/lit/wire"
 	"golang.org/x/net/proxy"
 )
+
 // IP4 ...
 func IP4(ipAddress string) bool {
 	parseIP := net.ParseIP(ipAddress)
@@ -75,6 +76,7 @@ func (s *SPVCon) GetListOfNodes() ([]string, error) {
 
 // DialNode receives a list of node ips and then tries to connect to them one by one.
 func (s *SPVCon) DialNode(listOfNodes []string) (net.Conn, error) {
+
 	// now have some IPs, go through and try to connect to one.
 	var err error
 	var con net.Conn
@@ -117,6 +119,7 @@ func (s *SPVCon) DialNode(listOfNodes []string) (net.Conn, error) {
 	}
 	return con, nil
 }
+
 // Handshake ...
 func (s *SPVCon) Handshake(listOfNodes []string) error {
 	// assign version bits for local node
