@@ -8,6 +8,8 @@ import (
 	"net"
 	"os"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/wire"
@@ -69,7 +71,6 @@ func (s *SPVCon) GetListOfNodes() ([]string, error) {
 	if len(listOfNodes) == 0 {
 		return nil, fmt.Errorf("No peers found connected to DNS Seeds. Please provide a host to connect to.")
 	}
-	log.Println(listOfNodes)
 	return listOfNodes, nil
 }
 
@@ -77,7 +78,17 @@ func (s *SPVCon) GetListOfNodes() ([]string, error) {
 func (s *SPVCon) DialNode(listOfNodes []string) error {
 	// now have some IPs, go through and try to connect to one.
 	var err error
-	for i, ip := range listOfNodes {
+	var wg sync.WaitGroup
+	// attempt sonnecting to only ot as many nodes specified by the user.
+	var slice int
+	slice = len(listOfNodes)
+	if s.maxConnections < len(listOfNodes) {
+		slice = s.maxConnections
+	}
+	listOfNodes = listOfNodes[:slice]
+	queue := make(chan net.Conn, 1)
+	wg.Add(len(listOfNodes))
+	for i, ip := range listOfNodes[:slice] { // Maintaining 10 parallel connections should be enough?
 		// try to connect to all nodes in this range
 		var conString, conMode string
 		// need to check whether conString is ipv4 or ipv6
@@ -92,10 +103,16 @@ func (s *SPVCon) DialNode(listOfNodes []string) error {
 			if err != nil {
 				return err
 			}
-
-			s.con, err = d.Dial(conMode, conString)
+			s.conns[0], err = d.Dial(conMode, conString)
 		} else {
-			s.con, err = net.Dial(conMode, conString)
+			d := net.Dialer{Timeout: time.Millisecond * 500}
+			// get only the fastest nodes, drop the other ones
+			// disconnect nodes if they don't respond within 1 sec
+			// put all ips into a go routine and collect them later
+			go func(i int) {
+				dummy, _ := d.Dial(conMode, conString)
+				queue <- dummy
+			}(i)
 		}
 
 		if err != nil {
@@ -108,15 +125,24 @@ func (s *SPVCon) DialNode(listOfNodes []string) error {
 				return fmt.Errorf(" Tried to connect to all available node Addresses. Failed")
 			}
 		}
-		break
 	}
+	go func() {
+		for conn := range queue {
+			if conn != nil {
+				s.conns = append(s.conns, conn)
+			}
+			wg.Done()
+		}
+	}()
+	wg.Wait()
+	s.conns[0] = s.conns[0] // remove this
 	return nil
 }
 
 func (s *SPVCon) Handshake(listOfNodes []string) error {
 	// assign version bits for local node
 	s.localVersion = VERSION
-	myMsgVer, err := wire.NewMsgVersionFromConn(s.con, 0, 0)
+	myMsgVer, err := wire.NewMsgVersionFromConn(s.conns[0], 0, 0)
 	if err != nil {
 		return err
 	}
@@ -130,16 +156,16 @@ func (s *SPVCon) Handshake(listOfNodes []string) error {
 	myMsgVer.AddService(wire.SFNodeWitness)
 	// this actually sends
 	n, err := wire.WriteMessageWithEncodingN(
-		s.con, myMsgVer, s.localVersion,
+		s.conns[0], myMsgVer, s.localVersion,
 		wire.BitcoinNet(s.Param.NetMagicBytes), wire.LatestEncoding)
 	if err != nil {
 		return err
 	}
 	s.WBytes += uint64(n)
 	log.Printf("wrote %d byte version message to %s\n",
-		n, s.con.RemoteAddr().String())
+		n, s.conns[0].RemoteAddr().String())
 	n, m, b, err := wire.ReadMessageWithEncodingN(
-		s.con, s.localVersion,
+		s.conns[0], s.localVersion,
 		wire.BitcoinNet(s.Param.NetMagicBytes), wire.LatestEncoding)
 	if err != nil {
 		return err
@@ -172,7 +198,7 @@ func (s *SPVCon) Handshake(listOfNodes []string) error {
 
 	mva := wire.NewMsgVerAck()
 	n, err = wire.WriteMessageWithEncodingN(
-		s.con, mva, s.localVersion,
+		s.conns[0], mva, s.localVersion,
 		wire.BitcoinNet(s.Param.NetMagicBytes), wire.LatestEncoding)
 	if err != nil {
 		return err
@@ -202,33 +228,27 @@ func (s *SPVCon) Connect(remoteNode string) error {
 	}
 	handShakeFailed := false //need to be in this scope to access it here
 	connEstablished := false
-	for len(listOfNodes) != 0 {
-		err = s.DialNode(listOfNodes)
-		if err != nil {
-			log.Println(err)
-			log.Printf("Couldn't dial node %s, Moving on", listOfNodes[0])
-			listOfNodes = listOfNodes[1:]
-			continue
-		}
+	err = s.DialNode(listOfNodes)
+	if err != nil {
+		log.Println(err)
+		log.Fatalf("Couldn't dial any node, quitting!")
+	}
+	for len(s.conns) != 0 {
 		err = s.Handshake(listOfNodes)
 		if err != nil {
 			handShakeFailed = true
-			log.Printf("Handshake with %s failed. Moving on. Error: %s", listOfNodes[0], err.Error())
+			log.Printf("Handshake failed. Moving on. Error: %s", err.Error())
 			if len(listOfNodes) == 1 { // when the list is empty, error out
 				return fmt.Errorf("Couldn't establish connection with any remote node. Exiting.")
 			}
 			// means we either have a sapm node or didn't get a resonse. So we Try again
-			log.Println(err)
-			log.Println("Couldn't establish connection with node. Proceeding to the next one")
-			listOfNodes = listOfNodes[1:]
-			connEstablished = false
+			log.Println("Couldn't establish connection with node. Proceeding to the next one", err)
+			s.conns = s.conns[1:]
 		} else {
 			connEstablished = true
 		}
 		if connEstablished { // connection should be established, still checking for safety
 			break
-		} else {
-			continue
 		}
 	}
 

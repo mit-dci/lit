@@ -10,14 +10,14 @@ import (
 
 func (s *SPVCon) incomingMessageHandler() {
 	for {
-		n, xm, _, err := wire.ReadMessageWithEncodingN(s.con, s.localVersion,
+		n, xm, _, err := wire.ReadMessageWithEncodingN(s.conns[0], s.localVersion,
 			wire.BitcoinNet(s.Param.NetMagicBytes), wire.LatestEncoding)
 		if err != nil {
 			log.Printf("ReadMessageWithEncodingN error.  Disconnecting from given peer. %s\n", err.Error())
 			if s.randomNodesOK { // if user wants to connect to localhost, let him do so
 				s.Connect("yes") // really any YupString here
 			} else {
-				s.con.Close()
+				s.conns[0].Close()
 				return
 			}
 		}
@@ -78,7 +78,7 @@ func (s *SPVCon) outgoingMessageHandler() {
 			log.Printf("ERROR: nil message to outgoingMessageHandler\n")
 			continue
 		}
-		n, err := wire.WriteMessageWithEncodingN(s.con, msg, s.localVersion,
+		n, err := wire.WriteMessageWithEncodingN(s.conns[0], msg, s.localVersion,
 			wire.BitcoinNet(s.Param.NetMagicBytes), wire.LatestEncoding)
 
 		if err != nil {

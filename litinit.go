@@ -100,7 +100,6 @@ func litSetup(conf *config) *[32]byte {
 	logFilePath := filepath.Join(conf.LitHomeDir, "lit.log")
 
 	logfile, err := os.OpenFile(logFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	// TODO ... what's this do?
 	defer logfile.Close()
 
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
