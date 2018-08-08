@@ -14,7 +14,6 @@ import (
 	"golang.org/x/net/proxy"
 )
 
-// IP4 ...
 func IP4(ipAddress string) bool {
 	parseIP := net.ParseIP(ipAddress)
 	if parseIP.To4() == nil {
@@ -76,7 +75,6 @@ func (s *SPVCon) GetListOfNodes() ([]string, error) {
 
 // DialNode receives a list of node ips and then tries to connect to them one by one.
 func (s *SPVCon) DialNode(listOfNodes []string) (net.Conn, error) {
-
 	// now have some IPs, go through and try to connect to one.
 	var err error
 	var con net.Conn
@@ -120,7 +118,6 @@ func (s *SPVCon) DialNode(listOfNodes []string) (net.Conn, error) {
 	return con, nil
 }
 
-// Handshake ...
 func (s *SPVCon) Handshake(listOfNodes []string) error {
 	// assign version bits for local node
 	s.localVersion = VERSION
@@ -196,7 +193,7 @@ func (s *SPVCon) Handshake(listOfNodes []string) error {
 func (s *SPVCon) Connect(remoteNode string) error {
 	var err error
 	var listOfNodes []string
-	if lnutil.YupString(remoteNode) { // TODO Make this better.  Perhaps a "connection target"?
+	if lnutil.YupString(remoteNode) {
 		s.randomNodesOK = true
 		// if remoteNode is "yes" but no IP specified, use DNS seed
 		listOfNodes, err = s.GetListOfNodes()
@@ -208,7 +205,7 @@ func (s *SPVCon) Connect(remoteNode string) error {
 	} else { // else connect to user-specified node
 		listOfNodes = []string{remoteNode}
 	}
-	handShakeFailed := false // need to be in this scope to access it here
+	handShakeFailed := false //need to be in this scope to access it here
 	connEstablished := false
 	for len(listOfNodes) != 0 {
 		s.con, err = s.DialNode(listOfNodes)
