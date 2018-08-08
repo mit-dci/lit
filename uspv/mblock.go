@@ -8,6 +8,7 @@ import (
 	"github.com/mit-dci/lit/wire"
 )
 
+// MakeMerkleParent ...
 func MakeMerkleParent(left, right *chainhash.Hash) *chainhash.Hash {
 	// dupes can screw things up; CVE-2012-2459. check for them
 	if left != nil && right != nil && left.IsEqual(right) {
@@ -165,5 +166,4 @@ func checkMBlock(m *wire.MsgMerkleBlock) ([]*chainhash.Hash, error) {
 			m.Flags = m.Flags[1:]
 		}
 	}
-	return nil, fmt.Errorf("ran out of things to do?")
 }
