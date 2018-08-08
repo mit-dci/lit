@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 
 import testlib
-import testlib_combinatoric_tests
+import test_combinators
 
 def run_test(env):
     lit1 = env.lits[0]
     lit2 = env.lits[1]
-    testlib_combinatoric_tests.run_close_test(env, lit1, lit2, lit1)
+    test_combinators.run_close_test(env, lit1, lit2, lit1)
 
 if __name__ == '__main__':
     env = None
