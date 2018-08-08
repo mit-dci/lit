@@ -389,6 +389,7 @@ func (r *LitRPC) Address(args *AddressArgs, reply *AddressReply) error {
 	reply.CoinTypes = make([]uint32, len(allAdr))
 	reply.WitAddresses = make([]string, len(allAdr))
 	reply.LegacyAddresses = make([]string, len(allAdr))
+	var bech32adr string
 
 	for i, a := range allAdr {
 
@@ -409,6 +410,7 @@ func (r *LitRPC) Address(args *AddressArgs, reply *AddressReply) error {
 		}
 		reply.WitAddresses[i] = bech32adr
 	}
+	log.Println("GENERATING ADDRESS", bech32adr)
 
 	return nil
 }

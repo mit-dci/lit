@@ -193,7 +193,7 @@ func (s *SPVCon) Handshake(listOfNodes []string) error {
 func (s *SPVCon) Connect(remoteNode string) error {
 	var err error
 	var listOfNodes []string
-	if lnutil.YupString(remoteNode) {
+	if lnutil.YupString(remoteNode) { // TODO Make this better.  Perhaps a "connection target"?
 		s.randomNodesOK = true
 		// if remoteNode is "yes" but no IP specified, use DNS seed
 		listOfNodes, err = s.GetListOfNodes()
@@ -205,7 +205,7 @@ func (s *SPVCon) Connect(remoteNode string) error {
 	} else { // else connect to user-specified node
 		listOfNodes = []string{remoteNode}
 	}
-	handShakeFailed := false //need to be in this scope to access it here
+	handShakeFailed := false // need to be in this scope to access it here
 	connEstablished := false
 	for len(listOfNodes) != 0 {
 		s.con, err = s.DialNode(listOfNodes)
