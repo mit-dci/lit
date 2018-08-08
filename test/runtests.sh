@@ -76,3 +76,7 @@ echo 'All tests completed.'
 echo "Passed: $n"
 echo "Failed: $fail"
 echo "Ignored: $ign"
+
+if [ "$fail" -ne "0" ]; then
+	exit 1
+fi
