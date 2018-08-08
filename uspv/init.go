@@ -14,7 +14,6 @@ import (
 	"golang.org/x/net/proxy"
 )
 
-// IP4 ...
 func IP4(ipAddress string) bool {
 	parseIP := net.ParseIP(ipAddress)
 	if parseIP.To4() == nil {
@@ -76,22 +75,21 @@ func (s *SPVCon) GetListOfNodes() ([]string, error) {
 
 // DialNode receives a list of node ips and then tries to connect to them one by one.
 func (s *SPVCon) DialNode(listOfNodes []string) (net.Conn, error) {
-
 	// now have some IPs, go through and try to connect to one.
 	var err error
 	var con net.Conn
-	for _, ip := range listOfNodes {
+	for i, ip := range listOfNodes {
 		// try to connect to all nodes in this range
+		var conString, conMode string
 		// need to check whether conString is ipv4 or ipv6
-		var conString string
-		var conMode string
 		conString, conMode, err = s.parseRemoteNode(ip)
 		if err != nil {
 			log.Printf("parse error for node (skipped): %s", err)
 			continue
 		}
+		log.Printf("Attempting connection to node at %s\n",
+			conString)
 
-		log.Printf("Attempting connection to node at %s...", conString)
 		if s.ProxyURL != "" {
 			log.Printf("Attempting to connect via proxy %s", s.ProxyURL)
 			var d proxy.Dialer
@@ -106,15 +104,20 @@ func (s *SPVCon) DialNode(listOfNodes []string) (net.Conn, error) {
 		}
 
 		if err != nil {
-			log.Printf("Connected to %s!", conString)
-			return con, nil
+			if i != len(listOfNodes)-1 {
+				log.Println(err.Error())
+				continue
+			} else if i == len(listOfNodes)-1 {
+				log.Println(err)
+				// all nodes have been exhausted, we move on to the next one, if any.
+				return nil, fmt.Errorf(" Tried to connect to all available node Addresses. Failed")
+			}
 		}
+		break
 	}
-	// all nodes have been exhausted, we move on to the next one, if any.
-	return nil, fmt.Errorf("Tried to connect to all available node addresses, failed")
+	return con, nil
 }
 
-// Handshake ...
 func (s *SPVCon) Handshake(listOfNodes []string) error {
 	// assign version bits for local node
 	s.localVersion = VERSION
@@ -190,7 +193,7 @@ func (s *SPVCon) Handshake(listOfNodes []string) error {
 func (s *SPVCon) Connect(remoteNode string) error {
 	var err error
 	var listOfNodes []string
-	if lnutil.YupString(remoteNode) { // TODO Make this better.  Perhaps a "connection target"?
+	if lnutil.YupString(remoteNode) {
 		s.randomNodesOK = true
 		// if remoteNode is "yes" but no IP specified, use DNS seed
 		listOfNodes, err = s.GetListOfNodes()
@@ -202,18 +205,16 @@ func (s *SPVCon) Connect(remoteNode string) error {
 	} else { // else connect to user-specified node
 		listOfNodes = []string{remoteNode}
 	}
-	handShakeFailed := false // need to be in this scope to access it here
+	handShakeFailed := false //need to be in this scope to access it here
 	connEstablished := false
-	var con net.Conn
 	for len(listOfNodes) != 0 {
-		con, err = s.DialNode(listOfNodes)
+		s.con, err = s.DialNode(listOfNodes)
 		if err != nil {
 			log.Println(err)
 			log.Printf("Couldn't dial node %s, Moving on", listOfNodes[0])
 			listOfNodes = listOfNodes[1:]
 			continue
 		}
-		s.con = con
 		err = s.Handshake(listOfNodes)
 		if err != nil {
 			handShakeFailed = true
