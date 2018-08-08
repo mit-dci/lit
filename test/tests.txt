@@ -4,7 +4,7 @@ testlib
 # Network tests.
 connect
 receive
-#send
+send
 send2
 
 # Basic channel tests.

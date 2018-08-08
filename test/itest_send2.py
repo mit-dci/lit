@@ -31,7 +31,7 @@ def run_test(env):
 
     # Validate.
     fbal1 = lit.get_balance_info()['TxoTotal']
-    print('lit2 balance:', fbal1)
+    print('lit1 balance:', fbal1)
     fbal2 = lit2.get_balance_info()['TxoTotal']
     print('lit2 balance:', fbal2)
     if fbal2 != 50000000:
