@@ -390,8 +390,8 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		}
 
 		fmt.Fprintf(color.Output,
-			"cointype: %d amt: %s RHash: %x R: %x path: %s \n",
-			p.Cointype, lnutil.SatoshiColor(p.Amt), p.RHash,
+			"amt: %s RHash: %x R: %x path: %s \n",
+			lnutil.SatoshiColor(p.Amt), p.RHash,
 			p.R,
 			path,
 		)

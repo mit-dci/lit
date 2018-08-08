@@ -161,7 +161,6 @@ type MultihopPaymentInfo struct {
 	RHash     [32]byte
 	R         [16]byte
 	Amt       int64
-	Cointype  uint32
 	Path      []string
 	Succeeded bool
 }
@@ -176,14 +175,13 @@ func (r *LitRPC) ListMultihopPayments(args NoArgs, reply *MultihopPaymentsReply)
 	for _, p := range r.Node.InProgMultihop {
 		var path []string
 		for _, hop := range p.Path {
-			path = append(path, bech32.Encode("ln", hop[:]))
+			path = append(path, fmt.Sprintf("%s:%d", bech32.Encode("ln", hop.Node[:]), hop.CoinType))
 		}
 
 		i := MultihopPaymentInfo{
 			p.HHash,
 			p.PreImage,
 			p.Amt,
-			p.Cointype,
 			path,
 			p.Succeeded,
 		}

@@ -72,83 +72,142 @@ func (nd *LitNode) VisualiseGraph() string {
 	return "di" + graph.String()
 }
 
-func (nd *LitNode) FindPath(targetPkh [20]byte, coinType uint32, amount int64, fee int64) ([][20]byte, error) {
+func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinType uint32, amount int64, fee int64) ([]lnutil.RouteHop, error) {
 	var myIdPkh [20]byte
 	idHash := fastsha256.Sum256(nd.IdKey().PubKey().SerializeCompressed())
 	copy(myIdPkh[:], idHash[:20])
 
-	distance := make(map[[20]byte]nodeWithDist)
-	distance[myIdPkh] = nodeWithDist{
-		Dist: 0,
-		Pkh:  myIdPkh,
-	}
-
-	prev := make(map[[20]byte][20]byte)
-
+	distance := make(map[lnutil.RouteHop]nodeWithDist)
 	var nodeHeap distanceHeap
-	heap.Push(&nodeHeap, distance[myIdPkh])
 
 	nd.ChannelMapMtx.Lock()
 	defer nd.ChannelMapMtx.Unlock()
+
+	nwd := nodeWithDist{
+		Dist:     0,
+		Pkh:      myIdPkh,
+		CoinType: originCoinType,
+		Amt:      amount,
+	}
+	distance[lnutil.RouteHop{myIdPkh, originCoinType}] = nwd
+	heap.Push(&nodeHeap, nwd)
+
+	prev := make(map[lnutil.RouteHop]lnutil.RouteHop)
 
 	for nodeHeap.Len() != 0 {
 		partialPath := heap.Pop(&nodeHeap).(nodeWithDist)
 		bestNode := partialPath.Pkh
 
-		route := [][20]byte{bestNode}
-		for !bytes.Equal(route[0][:], myIdPkh[:]) {
-			route = append([][20]byte{prev[route[0]]}, route...)
+		route := []lnutil.RouteHop{{bestNode, partialPath.CoinType}}
+		for !(bytes.Equal(route[0].Node[:], myIdPkh[:]) && originCoinType == route[0].CoinType) {
+			route = append([]lnutil.RouteHop{prev[route[0]]}, route...)
 		}
 
 		fmt.Print("Analyzing route: ")
 		for _, node := range route {
-			fmt.Printf("-> %s", bech32.Encode("ln", node[:]))
+			fmt.Printf("-> %s:%d", bech32.Encode("ln", node.Node[:]), node.CoinType)
 		}
 		fmt.Print("\n")
 
-		if bytes.Equal(bestNode[:], targetPkh[:]) {
+		if bytes.Equal(bestNode[:], targetPkh[:]) && partialPath.CoinType == destCoinType {
 			break
 		}
 
 		fmt.Printf("Finding edges for %s...\n", bech32.Encode("ln", bestNode[:]))
 		for _, channel := range nd.ChannelMap[bestNode] {
-			fmt.Printf("Checking %s\n", bech32.Encode("ln", channel.Link.BPKH[:]))
-			capOk := (channel.Link.ACapacity-consts.MinOutput-fee >= amount)
+			fmt.Printf("Checking %s:%d\n", bech32.Encode("ln", channel.Link.BPKH[:]), channel.Link.CoinType)
+
+			var rd *lnutil.RateDesc
+
+			// do we need to exchange?
+			// is the last hop coin type the same as this one?
+			if partialPath.CoinType != channel.Link.CoinType {
+				// we need to exchange, but is it possible?
+				var rates []lnutil.RateDesc
+				for _, link := range nd.ChannelMap[bestNode] {
+					if link.Link.CoinType == partialPath.CoinType {
+						rates = link.Link.Rates
+						break
+					}
+				}
+
+				for _, rate := range rates {
+					if rate.CoinType == channel.Link.CoinType && rate.Rate > 0 {
+						rd = &rate
+						break
+					}
+				}
+
+				// it's not possible to exchange these two coin types
+				fmt.Printf("can't exchange %d for %d via %s", partialPath.CoinType, channel.Link.CoinType, bech32.Encode("ln", channel.Link.BPKH[:]))
+				continue
+			}
+
+			amtRqd := partialPath.Amt
+
+			// We need to exchange for this hop
+			if rd != nil {
+				// required capacity is last hop amt * rate
+				if rd.Reciprocal {
+					// prior hop coin type is worth less than this one
+					amtRqd = partialPath.Amt / rd.Rate
+				} else {
+					// prior hop coin type is worth more than this one
+					amtRqd = partialPath.Amt * rd.Rate
+				}
+			}
+
+			if amtRqd < consts.MinOutput+fee {
+				// exchanging to this point has pushed the amount too low
+				fmt.Printf("exchanging %d for %d via %s pushes the amount too low: %d", partialPath.CoinType, channel.Link.CoinType, bech32.Encode("ln", channel.Link.BPKH[:]), amtRqd)
+				continue
+			}
+
+			capOk := (channel.Link.ACapacity >= amtRqd)
 			isTarget := bytes.Equal(targetPkh[:], channel.Link.BPKH[:])
-			coinTypeMatch := (coinType == channel.Link.CoinType)
+			coinTypeMatch := (destCoinType == channel.Link.CoinType)
 
 			fmt.Printf("Capok: [%t] - isTarget: [%t] - coinTypeMatch [%t] - dirty [%t]\n", capOk, isTarget, coinTypeMatch, channel.Dirty)
 
 			if !channel.Dirty && capOk && (!isTarget || (isTarget && coinTypeMatch)) {
 
 				tempDist := partialPath.Dist + 1
-				_, exists := distance[channel.Link.BPKH]
+				dist, exists := distance[lnutil.RouteHop{channel.Link.BPKH, channel.Link.CoinType}]
 
-				if !exists || (exists && tempDist < distance[channel.Link.BPKH].Dist) {
+				var prevDist int64
+				if exists {
+					prevDist = dist.Dist
+				}
+
+				if !exists || (exists && tempDist < prevDist) {
 					// We could use this. Explore further
 
-					distance[channel.Link.BPKH] = nodeWithDist{
-						Dist: tempDist,
-						Pkh:  channel.Link.BPKH,
+					newDist := nodeWithDist{
+						Dist:     tempDist,
+						Pkh:      channel.Link.BPKH,
+						CoinType: channel.Link.CoinType,
+						Amt:      amtRqd,
 					}
 
-					prev[channel.Link.BPKH] = bestNode
+					distance[lnutil.RouteHop{channel.Link.BPKH, channel.Link.CoinType}] = newDist
 
-					fmt.Printf("Pushing %s onto heap\n", bech32.Encode("ln", channel.Link.BPKH[:]))
+					prev[lnutil.RouteHop{channel.Link.BPKH, channel.Link.CoinType}] = lnutil.RouteHop{partialPath.Pkh, partialPath.CoinType}
 
-					heap.Push(&nodeHeap, distance[channel.Link.BPKH])
+					fmt.Printf("Pushing %s:%d onto heap\n", bech32.Encode("ln", channel.Link.BPKH[:]), channel.Link.CoinType)
+
+					heap.Push(&nodeHeap, newDist)
 				}
 			}
 		}
 	}
 
-	if _, ok := prev[targetPkh]; !ok {
-		return nil, fmt.Errorf("No route to target %x", bech32.Encode("ln", targetPkh[:]))
+	if _, ok := prev[lnutil.RouteHop{targetPkh, destCoinType}]; !ok {
+		return nil, fmt.Errorf("No route to target %s:%d", bech32.Encode("ln", targetPkh[:]), destCoinType)
 	}
 
-	route := [][20]byte{prev[targetPkh], targetPkh}
-	for !bytes.Equal(route[0][:], myIdPkh[:]) {
-		route = append([][20]byte{prev[route[0]]}, route...)
+	route := []lnutil.RouteHop{prev[lnutil.RouteHop{targetPkh, destCoinType}], {targetPkh, destCoinType}}
+	for !(bytes.Equal(route[0].Node[:], myIdPkh[:]) && route[0].CoinType == originCoinType) {
+		route = append([]lnutil.RouteHop{prev[route[0]]}, route...)
 	}
 
 	return route, nil
@@ -174,40 +233,49 @@ func (nd *LitNode) cleanStaleChannels() {
 }
 
 func (nd *LitNode) advertiseLinks(seq uint32) {
+	caps := make(map[[20]byte]map[uint32]int64)
+
 	nd.RemoteMtx.Lock()
-
-	var msgs []lnutil.LinkMsg
-
 	for _, peer := range nd.RemoteCons {
 		for _, q := range peer.QCs {
 			if !q.CloseData.Closed && q.State.MyAmt >= 2*(consts.MinOutput+q.State.Fee) && !q.State.Failed {
-				var outmsg lnutil.LinkMsg
-				outmsg.CoinType = q.Coin()
-				outmsg.Seq = seq
+				outHash := fastsha256.Sum256(peer.Con.RemotePub().SerializeCompressed())
+				var BPKH [20]byte
+				copy(BPKH[:], outHash[:20])
 
-				var idPub [33]byte
-				copy(idPub[:], nd.IdKey().PubKey().SerializeCompressed())
+				if _, ok := caps[BPKH]; !ok {
+					caps[BPKH] = make(map[uint32]int64)
+				}
 
-				var theirIdPub [33]byte
-				copy(theirIdPub[:], peer.Con.RemotePub().SerializeCompressed())
-
-				outHash := fastsha256.Sum256(idPub[:])
-				copy(outmsg.APKH[:], outHash[:20])
-
-				outHash = fastsha256.Sum256(theirIdPub[:])
-				copy(outmsg.BPKH[:], outHash[:20])
-
-				outmsg.ACapacity = q.State.MyAmt
-				copy(outmsg.PKHScript[:], q.Op.Hash.CloneBytes()[:20])
-
-				outmsg.PeerIdx = math.MaxUint32
-
-				msgs = append(msgs, outmsg)
+				caps[BPKH][q.Coin()] += q.State.MyAmt - consts.MinOutput - q.State.Fee
 			}
 		}
 	}
 
 	nd.RemoteMtx.Unlock()
+
+	var msgs []lnutil.LinkMsg
+
+	outHash := fastsha256.Sum256(nd.IdKey().PubKey().SerializeCompressed())
+	var APKH [20]byte
+	copy(APKH[:], outHash[:20])
+
+	for BPKH, node := range caps {
+		for coin, capacity := range node {
+			var outmsg lnutil.LinkMsg
+			outmsg.CoinType = coin
+			outmsg.Seq = seq
+
+			outmsg.APKH = APKH
+			outmsg.BPKH = BPKH
+
+			outmsg.ACapacity = capacity
+
+			outmsg.PeerIdx = math.MaxUint32
+
+			msgs = append(msgs, outmsg)
+		}
+	}
 
 	for _, msg := range msgs {
 		nd.LinkMsgHandler(msg)
@@ -227,7 +295,7 @@ func (nd *LitNode) LinkMsgHandler(msg lnutil.LinkMsg) {
 	if _, ok := nd.ChannelMap[msg.APKH]; ok {
 		// Check if link state is most recent (seq)
 		for i, v := range nd.ChannelMap[msg.APKH] {
-			if bytes.Compare(v.Link.PKHScript[:], msg.PKHScript[:]) == 0 {
+			if bytes.Equal(v.Link.BPKH[:], msg.BPKH[:]) && v.Link.CoinType == msg.CoinType {
 				// This is the link we've been looking for
 				if msg.Seq <= v.Link.Seq {
 					// Old advert

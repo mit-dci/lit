@@ -651,13 +651,14 @@ func (r *LitRPC) ClearHTLC(args ClearHTLCArgs, reply *ClearHTLCReply) error {
 }
 
 type PayMultihopArgs struct {
-	DestLNAdr string
-	CoinType  uint32
-	Amt       int64
+	DestLNAdr      string
+	DestCoinType   uint32
+	OriginCoinType uint32
+	Amt            int64
 }
 
 // PayMultihop tries to find a multi-hop path to send the payment along
 func (r *LitRPC) PayMultihop(args PayMultihopArgs, reply *StatusReply) error {
-	_, err := r.Node.PayMultihop(args.DestLNAdr, args.CoinType, args.Amt)
+	_, err := r.Node.PayMultihop(args.DestLNAdr, args.OriginCoinType, args.DestCoinType, args.Amt)
 	return err
 }

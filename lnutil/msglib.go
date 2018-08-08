@@ -1180,15 +1180,58 @@ func (self WatchDelMsg) MsgType() uint8 { return MSGID_WATCH_DELETE }
 
 // Link message
 
+// To find how much 1 satoshi of coin type A will cost you in coin type B,
+// if Reciprocal is false, 1 satoshi of A will buy you `rate` satoshis of B.
+// Otherwise, 1 satoshi of B will buy you `rate` satoshis of A. This avoids the
+// use of floating point for deciding price.
+type RateDesc struct {
+	CoinType   uint32
+	Rate       int64
+	Reciprocal bool
+}
+
+func NewRateDescFromBytes(b []byte) (RateDesc, error) {
+	var rd RateDesc
+
+	buf := bytes.NewBuffer(b)
+
+	err := binary.Read(buf, binary.BigEndian, &rd.CoinType)
+	if err != nil {
+		return rd, err
+	}
+
+	err = binary.Read(buf, binary.BigEndian, &rd.Rate)
+	if err != nil {
+		return rd, err
+	}
+
+	err = binary.Read(buf, binary.BigEndian, &rd.Reciprocal)
+	if err != nil {
+		return rd, err
+	}
+
+	return rd, nil
+}
+
+func (rd *RateDesc) Bytes() []byte {
+	var buf bytes.Buffer
+
+	binary.Write(&buf, binary.BigEndian, rd.CoinType)
+	binary.Write(&buf, binary.BigEndian, rd.Rate)
+	binary.Write(&buf, binary.BigEndian, rd.Reciprocal)
+
+	return buf.Bytes()
+}
+
 type LinkMsg struct {
 	PeerIdx   uint32
-	PKHScript [20]byte // ChanPKH (channel ID)
 	APKH      [20]byte // APKH (A's LN address)
 	ACapacity int64    // ACapacity (A's channel balance)
 	BPKH      [20]byte // BPKH (B's LN address)
 	CoinType  uint32   // CoinType (Network of the channel)
 	Seq       uint32   // seq (Link state sequence #)
 	Timestamp int64
+	Rates     []RateDesc
 }
 
 func NewLinkMsgFromBytes(b []byte, peerIDX uint32) (LinkMsg, error) {
@@ -1201,12 +1244,35 @@ func NewLinkMsgFromBytes(b []byte, peerIDX uint32) (LinkMsg, error) {
 
 	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
 
-	copy(sm.PKHScript[:], buf.Next(20))
 	copy(sm.APKH[:], buf.Next(20))
-	_ = binary.Read(buf, binary.BigEndian, &sm.ACapacity)
+	err := binary.Read(buf, binary.BigEndian, &sm.ACapacity)
+	if err != nil {
+		return *sm, err
+	}
 	copy(sm.BPKH[:], buf.Next(20))
-	_ = binary.Read(buf, binary.BigEndian, &sm.CoinType)
-	_ = binary.Read(buf, binary.BigEndian, &sm.Seq)
+	err = binary.Read(buf, binary.BigEndian, &sm.CoinType)
+	if err != nil {
+		return *sm, err
+	}
+	err = binary.Read(buf, binary.BigEndian, &sm.Seq)
+	if err != nil {
+		return *sm, err
+	}
+
+	var nRates uint32
+	err = binary.Read(buf, binary.BigEndian, &nRates)
+	if err != nil {
+		return *sm, err
+	}
+
+	for i := uint32(0); i < nRates; i++ {
+		rd, err := NewRateDescFromBytes(buf.Next(13))
+		if err != nil {
+			return *sm, err
+		}
+
+		sm.Rates = append(sm.Rates, rd)
+	}
 
 	return *sm, nil
 }
@@ -1217,8 +1283,6 @@ func (self LinkMsg) Bytes() []byte {
 
 	buf.WriteByte(self.MsgType())
 
-	buf.Write(self.PKHScript[:])
-
 	buf.Write(self.APKH[:])
 	binary.Write(&buf, binary.BigEndian, self.ACapacity)
 
@@ -1226,6 +1290,13 @@ func (self LinkMsg) Bytes() []byte {
 
 	binary.Write(&buf, binary.BigEndian, self.CoinType)
 	binary.Write(&buf, binary.BigEndian, self.Seq)
+
+	nRates := uint32(len(self.Rates))
+	binary.Write(&buf, binary.BigEndian, nRates)
+
+	for _, rate := range self.Rates {
+		buf.Write(rate.Bytes())
+	}
 
 	return buf.Bytes()
 }
@@ -2086,6 +2157,39 @@ func (msg MultihopPaymentAckMsg) MsgType() uint8 {
 	return MSGID_PAY_ACK
 }
 
+type RouteHop struct {
+	Node     [20]byte
+	CoinType uint32
+}
+
+func (rh *RouteHop) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.Write(rh.Node[:])
+	binary.Write(&buf, binary.BigEndian, rh.CoinType)
+
+	return buf.Bytes()
+}
+
+func NewRouteHopFromBytes(b []byte) (*RouteHop, error) {
+	buf := bytes.NewBuffer(b)
+
+	if buf.Len() < 24 {
+		return nil, fmt.Errorf("not enough bytes for RouteHop")
+	}
+
+	rh := new(RouteHop)
+
+	copy(rh.Node[:], buf.Next(20))
+
+	err := binary.Read(buf, binary.BigEndian, &rh.CoinType)
+	if err != nil {
+		return nil, err
+	}
+
+	return rh, nil
+}
+
 // MultihopPaymentSetupMsg forms a new multihop payment. It is sent to
 // the next-in-line peer, which will forward it to the next hop until
 // the target is reached
@@ -2095,23 +2199,17 @@ type MultihopPaymentSetupMsg struct {
 	// The hash to the preimage we use to clear out the HTLCs
 	HHash [32]byte
 	// The PKHs (in order) of the nodes we're using.
-	NodeRoute [][20]byte
-	// Amount in satoshi we're paying
-	Amount int64
-	// Coin type we're transacting
-	Cointype uint32
+	NodeRoute []RouteHop
 	// Data associated with the payment
 	Data [32]byte
 }
 
-func NewMultihopPaymentSetupMsg(peerIdx uint32, amount int64, cointype uint32, hHash [32]byte, nodeRoute [][20]byte, data [32]byte) MultihopPaymentSetupMsg {
+func NewMultihopPaymentSetupMsg(peerIdx uint32, hHash [32]byte, nodeRoute []RouteHop, data [32]byte) MultihopPaymentSetupMsg {
 	msg := new(MultihopPaymentSetupMsg)
 	msg.PeerIdx = peerIdx
 	msg.HHash = hHash
 	msg.NodeRoute = nodeRoute
 	msg.Data = data
-	msg.Amount = amount
-	msg.Cointype = cointype
 	return *msg
 }
 
@@ -2124,17 +2222,13 @@ func NewMultihopPaymentSetupMsgFromBytes(b []byte,
 	copy(msg.HHash[:], buf.Next(32))
 
 	hops, _ := wire.ReadVarInt(buf, 0)
-	msg.NodeRoute = make([][20]byte, hops)
 	for i := uint64(0); i < hops; i++ {
-		copy(msg.NodeRoute[i][:], buf.Next(20))
+		rh, err := NewRouteHopFromBytes(buf.Next(24))
+		if err != nil {
+			return *msg, err
+		}
 
-	}
-	amount, _ := wire.ReadVarInt(buf, 0)
-	msg.Amount = int64(amount)
-
-	err := binary.Read(buf, binary.BigEndian, &msg.Cointype)
-	if err != nil {
-		return *msg, err
+		msg.NodeRoute = append(msg.NodeRoute, *rh)
 	}
 
 	copy(msg.Data[:], buf.Next(32))
@@ -2150,12 +2244,8 @@ func (msg MultihopPaymentSetupMsg) Bytes() []byte {
 	buf.Write(msg.HHash[:])
 	wire.WriteVarInt(&buf, 0, uint64(len(msg.NodeRoute)))
 	for _, nd := range msg.NodeRoute {
-		buf.Write(nd[:])
+		buf.Write(nd.Bytes())
 	}
-
-	wire.WriteVarInt(&buf, 0, uint64(msg.Amount))
-
-	binary.Write(&buf, binary.BigEndian, msg.Cointype)
 
 	buf.Write(msg.Data[:])
 

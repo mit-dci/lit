@@ -152,11 +152,10 @@ type LinkDesc struct {
 }
 
 type InFlightMultihop struct {
-	Path      [][20]byte
+	Path      []lnutil.RouteHop
 	Amt       int64
 	HHash     [32]byte
 	PreImage  [16]byte
-	Cointype  uint32
 	Succeeded bool
 }
 
@@ -165,7 +164,7 @@ func (p *InFlightMultihop) Bytes() []byte {
 
 	wire.WriteVarInt(&buf, 0, uint64(len(p.Path)))
 	for _, nd := range p.Path {
-		buf.Write(nd[:])
+		buf.Write(nd.Bytes())
 	}
 
 	wire.WriteVarInt(&buf, 0, uint64(p.Amt))
@@ -173,7 +172,6 @@ func (p *InFlightMultihop) Bytes() []byte {
 	buf.Write(p.HHash[:])
 	buf.Write(p.PreImage[:])
 
-	binary.Write(&buf, binary.BigEndian, p.Cointype)
 	binary.Write(&buf, binary.BigEndian, p.Succeeded)
 
 	return buf.Bytes()
@@ -185,9 +183,13 @@ func InFlightMultihopFromBytes(b []byte) (*InFlightMultihop, error) {
 	buf := bytes.NewBuffer(b) // get rid of messageType
 
 	hops, _ := wire.ReadVarInt(buf, 0)
-	mh.Path = make([][20]byte, hops)
 	for i := uint64(0); i < hops; i++ {
-		copy(mh.Path[i][:], buf.Next(20))
+		hop, err := lnutil.NewRouteHopFromBytes(buf.Next(24))
+		if err != nil {
+			return nil, err
+		}
+
+		mh.Path = append(mh.Path, *hop)
 	}
 	amount, _ := wire.ReadVarInt(buf, 0)
 	mh.Amt = int64(amount)
@@ -195,12 +197,7 @@ func InFlightMultihopFromBytes(b []byte) (*InFlightMultihop, error) {
 	copy(mh.HHash[:], buf.Next(32))
 	copy(mh.PreImage[:], buf.Next(16))
 
-	err := binary.Read(buf, binary.BigEndian, &mh.Cointype)
-	if err != nil {
-		return mh, err
-	}
-
-	err = binary.Read(buf, binary.BigEndian, &mh.Succeeded)
+	err := binary.Read(buf, binary.BigEndian, &mh.Succeeded)
 	if err != nil {
 		return mh, err
 	}

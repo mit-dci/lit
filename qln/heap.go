@@ -1,8 +1,10 @@
 package qln
 
 type nodeWithDist struct {
-	Dist int64
-	Pkh  [20]byte
+	Dist     int64
+	Pkh      [20]byte
+	CoinType uint32
+	Amt      int64
 }
 
 // distanceHeap is a min-distance heap that's used within our path finding

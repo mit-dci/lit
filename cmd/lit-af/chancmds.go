@@ -610,16 +610,23 @@ func (lc *litAfClient) PayMultihop(textArgs []string) error {
 	reply := new(litrpc.StatusReply)
 
 	if len(textArgs) < 3 {
-		return fmt.Errorf("need args: paymultihop dest cointype amount")
+		return fmt.Errorf("need args: paymultihop dest destCoinType originCoinType amount")
 	}
 
 	args.DestLNAdr = textArgs[0]
-	cointype, err := strconv.Atoi(textArgs[1])
+	destcointype, err := strconv.Atoi(textArgs[1])
 	if err != nil {
 		return err
 	}
-	args.CoinType = uint32(cointype)
-	amount, err := strconv.Atoi(textArgs[2])
+	args.DestCoinType = uint32(destcointype)
+
+	origincointype, err := strconv.Atoi(textArgs[2])
+	if err != nil {
+		return err
+	}
+	args.OriginCoinType = uint32(origincointype)
+
+	amount, err := strconv.Atoi(textArgs[3])
 	if err != nil {
 		return err
 	}

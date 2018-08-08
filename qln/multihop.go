@@ -12,16 +12,16 @@ import (
 	"github.com/mit-dci/lit/lnutil"
 )
 
-func (nd *LitNode) PayMultihop(dstLNAdr string, coinType uint32, amount int64) (bool, error) {
+func (nd *LitNode) PayMultihop(dstLNAdr string, originCoinType uint32, destCoinType uint32, amount int64) (bool, error) {
 	var targetAdr [20]byte
 	_, adr, err := bech32.Decode(dstLNAdr)
 	if err != nil {
 		return false, err
 	}
 
-	wal, ok := nd.SubWallet[coinType]
+	wal, ok := nd.SubWallet[originCoinType]
 	if !ok {
-		return false, fmt.Errorf("not connected to cointype %d", coinType)
+		return false, fmt.Errorf("not connected to cointype %d", originCoinType)
 	}
 
 	fee := wal.Fee() * 1000
@@ -40,7 +40,7 @@ func (nd *LitNode) PayMultihop(dstLNAdr string, coinType uint32, amount int64) (
 
 	copy(targetAdr[:], adr)
 	log.Printf("Finding route to %s", dstLNAdr)
-	path, err := nd.FindPath(targetAdr, coinType, amount, fee)
+	path, err := nd.FindPath(targetAdr, destCoinType, originCoinType, amount, fee)
 	if err != nil {
 		return false, err
 	}
@@ -53,15 +53,12 @@ func (nd *LitNode) PayMultihop(dstLNAdr string, coinType uint32, amount int64) (
 
 	inFlight := new(InFlightMultihop)
 	inFlight.Path = path
-	inFlight.Amt = amount
-	inFlight.Cointype = coinType
-
 	nd.MultihopMutex.Lock()
 	nd.InProgMultihop = append(nd.InProgMultihop, inFlight)
 	nd.MultihopMutex.Unlock()
 
 	log.Printf("Sending payment request to %s", dstLNAdr)
-	msg := lnutil.NewMultihopPaymentRequestMsg(idx, coinType)
+	msg := lnutil.NewMultihopPaymentRequestMsg(idx, destCoinType)
 	nd.OmniOut <- msg
 	log.Printf("Done sending payment request to %s", dstLNAdr)
 	return true, nil
@@ -76,9 +73,8 @@ func (nd *LitNode) MultihopPaymentRequestHandler(msg lnutil.MultihopPaymentReque
 	id, _ := nd.GetPubHostFromPeerIdx(msg.Peer())
 	idHash := fastsha256.Sum256(id[:])
 	copy(pkh[:], idHash[:20])
-	inFlight.Path = [][20]byte{pkh}
+	inFlight.Path = []lnutil.RouteHop{{pkh, msg.Cointype}}
 
-	inFlight.Cointype = msg.Cointype
 	rand.Read(inFlight.PreImage[:])
 	hash := fastsha256.Sum256(inFlight.PreImage[:])
 
@@ -107,7 +103,7 @@ func (nd *LitNode) MultihopPaymentAckHandler(msg lnutil.MultihopPaymentAckMsg) e
 		var nullHash [32]byte
 		if !mh.Succeeded && bytes.Equal(nullHash[:], mh.HHash[:]) {
 			targetNode := mh.Path[len(mh.Path)-1]
-			targetIdx, err := nd.FindPeerIndexByAddress(bech32.Encode("ln", targetNode[:]))
+			targetIdx, err := nd.FindPeerIndexByAddress(bech32.Encode("ln", targetNode.Node[:]))
 			if err != nil {
 				return fmt.Errorf("not connected to destination peer")
 			}
@@ -115,7 +111,7 @@ func (nd *LitNode) MultihopPaymentAckHandler(msg lnutil.MultihopPaymentAckMsg) e
 				fmt.Printf("Found the right pending multihop. Sending setup msg to first hop\n")
 				// found the right one. Set this up
 				firstHop := mh.Path[1]
-				firstHopIdx, err := nd.FindPeerIndexByAddress(bech32.Encode("ln", firstHop[:]))
+				firstHopIdx, err := nd.FindPeerIndexByAddress(bech32.Encode("ln", firstHop.Node[:]))
 				if err != nil {
 					return fmt.Errorf("not connected to first hop in route")
 				}
@@ -123,7 +119,7 @@ func (nd *LitNode) MultihopPaymentAckHandler(msg lnutil.MultihopPaymentAckMsg) e
 				nd.RemoteMtx.Lock()
 				var qc *Qchan
 				for _, ch := range nd.RemoteCons[firstHopIdx].QCs {
-					if ch.Coin() == mh.Cointype && ch.State.MyAmt-consts.MinOutput-ch.State.Fee >= mh.Amt && !ch.CloseData.Closed && !ch.State.Failed {
+					if ch.Coin() == mh.Path[0].CoinType && ch.State.MyAmt-consts.MinOutput-ch.State.Fee >= mh.Amt && !ch.CloseData.Closed && !ch.State.Failed {
 						qc = ch
 						break
 					}
@@ -143,9 +139,9 @@ func (nd *LitNode) MultihopPaymentAckHandler(msg lnutil.MultihopPaymentAckMsg) e
 				}
 
 				// Calculate what initial locktime we need
-				wal, ok := nd.SubWallet[mh.Cointype]
+				wal, ok := nd.SubWallet[firstHop.CoinType]
 				if !ok {
-					return fmt.Errorf("not connected to wallet for cointype %d", mh.Cointype)
+					return fmt.Errorf("not connected to wallet for cointype %d", firstHop.CoinType)
 				}
 
 				height := wal.CurrentHeight()
@@ -165,14 +161,17 @@ func (nd *LitNode) MultihopPaymentAckHandler(msg lnutil.MultihopPaymentAckMsg) e
 					// Set the dirty flag on each of the nodes' channels we used
 					nd.ChannelMapMtx.Lock()
 					for _, hop := range nd.InProgMultihop[idx].Path {
-						for i := range nd.ChannelMap[hop] {
-							nd.ChannelMap[hop][i].Dirty = true
+						for i, channel := range nd.ChannelMap[hop.Node] {
+							if channel.Link.CoinType == hop.CoinType {
+								nd.ChannelMap[hop.Node][i].Dirty = true
+								break
+							}
 						}
 					}
 					nd.ChannelMapMtx.Unlock()
 
 					var data [32]byte
-					outMsg := lnutil.NewMultihopPaymentSetupMsg(firstHopIdx, mh.Amt, mh.Cointype, msg.HHash, mh.Path, data)
+					outMsg := lnutil.NewMultihopPaymentSetupMsg(firstHopIdx, msg.HHash, mh.Path, data)
 					fmt.Printf("Sending multihoppaymentsetup to peer %d\n", firstHopIdx)
 					nd.OmniOut <- outMsg
 				}()
@@ -207,6 +206,32 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 		}
 	}
 
+	inFlight := new(InFlightMultihop)
+	inFlight.Path = msg.NodeRoute
+	inFlight.HHash = msg.HHash
+
+	// Forward
+	var pkh [20]byte
+	id := nd.IdKey().PubKey().SerializeCompressed()
+	idHash := fastsha256.Sum256(id[:])
+	copy(pkh[:], idHash[:20])
+	var nextHop, ourHop, incomingHop lnutil.RouteHop
+	for i, node := range inFlight.Path {
+		if bytes.Equal(pkh[:], node.Node[:]) {
+			if i+1 >= len(inFlight.Path) || i == 0 {
+				return fmt.Errorf("path is invalid")
+			}
+			nextHop = inFlight.Path[i+1]
+			ourHop = inFlight.Path[i]
+			incomingHop = inFlight.Path[i-1]
+			break
+		}
+
+		if i+1 >= len(inFlight.Path) {
+			return fmt.Errorf("path is invalid")
+		}
+	}
+
 	// Check there is a corresponding incoming HTLC
 	HTLCs, chans, err := nd.FindHTLCsByHash(msg.HHash)
 	if err != nil {
@@ -214,11 +239,11 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 	}
 
 	var found bool
-	var locktime uint32
+	var prevHTLC *HTLC
 	for idx, h := range HTLCs {
-		if h.Incoming && !h.Cleared && !h.Clearing && !h.ClearedOnChain && h.Amt == msg.Amount && chans[idx].Coin() == msg.Cointype {
+		if h.Incoming && !h.Cleared && !h.Clearing && !h.ClearedOnChain && chans[idx].Coin() == incomingHop.CoinType {
 			found = true
-			locktime = h.Locktime
+			prevHTLC = &h
 			break
 		}
 
@@ -232,21 +257,18 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 		return fmt.Errorf("no corresponding incoming HTLC found for multihop payment with RHash: %x", msg.HHash)
 	}
 
-	wal, ok := nd.SubWallet[msg.Cointype]
+	wal, ok := nd.SubWallet[ourHop.CoinType]
 	if !ok {
-		return fmt.Errorf("not connected to wallet for cointype %d", msg.Cointype)
+		return fmt.Errorf("not connected to wallet for cointype %d", ourHop.CoinType)
 	}
+
+	fee := wal.Fee() * 1000
 
 	height := wal.CurrentHeight()
-	if locktime-consts.DefaultLockTime < uint32(height+consts.DefaultLockTime) {
-		return fmt.Errorf("locktime of preceeding hop is too close for comfort: %d, height: %d", locktime-consts.DefaultLockTime, height)
+	if prevHTLC.Locktime-consts.DefaultLockTime < uint32(height+consts.DefaultLockTime) {
+		return fmt.Errorf("locktime of preceeding hop is too close for comfort: %d, height: %d", prevHTLC.Locktime-consts.DefaultLockTime, height)
 	}
 
-	inFlight := new(InFlightMultihop)
-	inFlight.Path = msg.NodeRoute
-	inFlight.Amt = msg.Amount
-	inFlight.HHash = msg.HHash
-	inFlight.Cointype = msg.Cointype
 	nd.InProgMultihop = append(nd.InProgMultihop, inFlight)
 
 	err = nd.SaveMultihopPayment(inFlight)
@@ -254,19 +276,7 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 		return err
 	}
 
-	// Forward
-	var pkh [20]byte
-	id := nd.IdKey().PubKey().SerializeCompressed()
-	idHash := fastsha256.Sum256(id[:])
-	copy(pkh[:], idHash[:20])
-	var sendToPkh [20]byte
-	for i, node := range inFlight.Path {
-		if bytes.Equal(pkh[:], node[:]) {
-			sendToPkh = inFlight.Path[i+1]
-		}
-	}
-
-	lnAdr := bech32.Encode("ln", sendToPkh[:])
+	lnAdr := bech32.Encode("ln", nextHop.Node[:])
 
 	//Connect to the node
 	if _, err := nd.FindPeerIndexByAddress(lnAdr); err != nil {
@@ -281,10 +291,54 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 		return fmt.Errorf("not connected to peer in route")
 	}
 
+	amtRqd := prevHTLC.Amt
+
+	// do we need to exchange?
+	// is the last hop coin type the same as this one?
+	if incomingHop.CoinType != ourHop.CoinType {
+		// we need to exchange, but is it possible?
+		var rd *lnutil.RateDesc
+		var rates []lnutil.RateDesc
+		nd.ChannelMapMtx.Lock()
+		defer nd.ChannelMapMtx.Unlock()
+		for _, link := range nd.ChannelMap[pkh] {
+			if link.Link.CoinType == incomingHop.CoinType {
+				rates = link.Link.Rates
+				break
+			}
+		}
+
+		for _, rate := range rates {
+			if rate.CoinType == ourHop.CoinType && rate.Rate > 0 {
+				rd = &rate
+				break
+			}
+		}
+
+		// it's not possible to exchange these two coin types
+		if rd == nil {
+			return fmt.Errorf("can't exchange %d for %d via us", incomingHop.CoinType, ourHop.CoinType)
+		}
+
+		// required capacity is last hop amt * rate
+		if rd.Reciprocal {
+			// prior hop coin type is worth less than this one
+			amtRqd /= rd.Rate
+		} else {
+			// prior hop coin type is worth more than this one
+			amtRqd *= rd.Rate
+		}
+	}
+
+	if amtRqd < consts.MinOutput+fee {
+		// exchanging to this point has pushed the amount too low
+		return fmt.Errorf("exchanging %d for %d via us pushes the amount too low: %d", incomingHop.CoinType, ourHop.CoinType, amtRqd)
+	}
+
 	nd.RemoteMtx.Lock()
 	var qc *Qchan
 	for _, ch := range nd.RemoteCons[sendToIdx].QCs {
-		if ch.Coin() == inFlight.Cointype && ch.State.MyAmt-consts.MinOutput > msg.Amount && !ch.CloseData.Closed && !ch.State.Failed {
+		if ch.Coin() == ourHop.CoinType && ch.State.MyAmt-consts.MinOutput-fee > amtRqd && !ch.CloseData.Closed && !ch.State.Failed {
 			qc = ch
 			break
 		}
@@ -300,7 +354,7 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 	// This handler needs to return so run this in a goroutine
 	go func() {
 		log.Printf("offering HTLC with RHash: %x", msg.HHash)
-		err = nd.OfferHTLC(qc, uint32(msg.Amount), msg.HHash, locktime-consts.DefaultLockTime, [32]byte{})
+		err = nd.OfferHTLC(qc, uint32(amtRqd), msg.HHash, prevHTLC.Locktime-consts.DefaultLockTime, [32]byte{})
 		if err != nil {
 			log.Printf("error offering HTLC: %s", err.Error())
 			return
@@ -310,9 +364,12 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 		// don't attempt to use them for routing before we get an link update
 		nd.ChannelMapMtx.Lock()
 		for _, hop := range msg.NodeRoute {
-			if _, ok := nd.ChannelMap[hop]; ok {
-				for idx := range nd.ChannelMap[hop] {
-					nd.ChannelMap[hop][idx].Dirty = true
+			if _, ok := nd.ChannelMap[hop.Node]; ok {
+				for idx, channel := range nd.ChannelMap[hop.Node] {
+					if channel.Link.CoinType == hop.CoinType {
+						nd.ChannelMap[hop.Node][idx].Dirty = true
+						break
+					}
 				}
 			}
 		}
