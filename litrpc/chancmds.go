@@ -117,9 +117,9 @@ func (r *LitRPC) FundChannel(args FundArgs, reply *FundReply) error {
 
 	spendable := allPorTxos.SumWitness(nowHeight)
 
-	if args.Capacity > spendable-consts.SafeFee {
+	if args.Capacity > spendable-wal.Fee()*consts.JusticeTxBump {
 		return fmt.Errorf("Wanted %d but %d available for channel creation",
-			args.Capacity, spendable-consts.SafeFee)
+			args.Capacity, spendable-wal.Fee()*consts.JusticeTxBump)
 	}
 
 	idx, err := r.Node.FundChannel(

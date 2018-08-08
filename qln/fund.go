@@ -474,7 +474,7 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 	// similar to SIGREV in pushpull
 
 	// TODO assumes both parties use same fee
-	qc.State.Fee = wal.Fee() * 1000
+	qc.State.Fee = wal.Fee() * consts.QcStateFee
 	qc.State.MyAmt = msg.InitPayment
 
 	qc.State.Data = msg.Data

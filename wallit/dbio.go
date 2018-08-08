@@ -124,7 +124,7 @@ func (w *Wallit) NewAdr160() ([20]byte, error) {
 		// update the db with number of created keys
 		return nil
 	})
-	if n > 1<<30 {
+	if n > consts.MaxKeyLimit {
 		return empty160, fmt.Errorf("Got %d keys stored, expect something reasonable", n)
 	}
 
