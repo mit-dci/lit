@@ -11,7 +11,8 @@ The actual tests are in each of the `itest_foo.py` files.
 
 ## Deps
 
-You'll need the `requests` library, but that's about it.
+You'll need the `requests` library, and `bitcoind` on your PATH, but that's
+about it.
 
 ```sh
 pip3 install requests

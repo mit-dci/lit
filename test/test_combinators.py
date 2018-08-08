@@ -133,7 +133,7 @@ def run_pushbreak_test(env, initiator, target, breaker):
     print('Breaking channel... (with Bob)')
     tt0 = target.get_balance_info()['TxoTotal']
     res = breaker.rpc.BreakChannel(ChanIdx=chan_id)
-    print('Status:', 'lol nope // FIXME')
+    print('Status:', str(res))
     print('Mining new block(s) to confirm closure...')
     env.generate_block(count=20)
     tt1 = target.get_balance_info()['TxoTotal']
@@ -236,9 +236,8 @@ def run_break_test(env, initiator, target, breaker):
 
     # Now close the channel.
     print('Now breaking channel...')
-    breaker.rpc.BreakChannel(ChanIdx=chan_id)
-
-    print('// TODO Make BreakChannel return a status.')
+    res = breaker.rpc.BreakChannel(ChanIdx=chan_id)
+    print('Status:', str(res))
 
     # Now we figure out the balances at 2 points in time.
     print(str(initiator.get_balance_info()))

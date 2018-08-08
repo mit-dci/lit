@@ -45,6 +45,5 @@ clean:
 test: lit
 	build/env.sh ./gotests.sh
 ifeq ($(with-python), true)
-	python3 test/test_basic.py -c reg --dumplogs
-	python3 test/test_break.py -c reg --dumplogs
+	cd test && ./runtests.sh
 endif
