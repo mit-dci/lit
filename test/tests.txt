@@ -1,4 +1,4 @@
-# This is just to test the integration test framework.
+# Meta-test for the test framework
 testlib
 
 # Network tests
@@ -10,7 +10,7 @@ send
 send2
 setgetfee
 
-# Basic channel tests.
+# Basic channel tests
 fund
 close
 close_reverse
