@@ -17,6 +17,10 @@ import (
 	"github.com/mit-dci/lit/sig64"
 )
 
+type RCRequestAuthArgs struct {
+	PubKey [33]byte
+}
+
 func (nd *LitNode) RemoteControlRequestHandler(msg lnutil.RemoteControlRpcRequestMsg, peer *RemotePeer) error {
 	var pubKey [33]byte
 	transportAuthenticated := true
@@ -34,7 +38,20 @@ func (nd *LitNode) RemoteControlRequestHandler(msg lnutil.RemoteControlRpcReques
 		return err
 	}
 
-	if !auth.Allowed {
+	// Whitelisted method(s)
+	whitelisted := false
+	if msg.Method == "LitRPC.RequestRemoteControlAuthorization" {
+		whitelisted = true
+		args := new(RCRequestAuthArgs)
+		args.PubKey = pubKey
+		msg.Args, err = json.Marshal(args)
+		if err != nil {
+			log.Printf("Error while updating RequestRemoteControlAuthorization arguments: %s", err.Error())
+			return err
+		}
+	}
+
+	if !auth.Allowed && !whitelisted {
 		err = fmt.Errorf("Received remote control request from unauthorized peer: %x", pubKey)
 		log.Println(err.Error())
 
@@ -42,7 +59,6 @@ func (nd *LitNode) RemoteControlRequestHandler(msg lnutil.RemoteControlRpcReques
 		nd.OmniOut <- outMsg
 
 		return err
-
 	}
 
 	if !transportAuthenticated {
@@ -159,45 +175,34 @@ func (nd *LitNode) RemoteControlResponseHandler(msg lnutil.RemoteControlRpcRespo
 // and perhaps authorize up to a certain amount for
 // commands like send / push
 type RemoteControlAuthorization struct {
-	Allowed bool
+	PubKey            [33]byte
+	Allowed           bool
+	UnansweredRequest bool
 }
 
 func (r *RemoteControlAuthorization) Bytes() []byte {
 	var buf bytes.Buffer
 
-	if r.Allowed {
-		buf.WriteByte(1)
-	} else {
-		buf.WriteByte(0)
-	}
+	binary.Write(&buf, binary.BigEndian, r.Allowed)
+	binary.Write(&buf, binary.BigEndian, r.UnansweredRequest)
 	return buf.Bytes()
 }
 
-func RemoteControlAuthorizationFromBytes(b []byte) *RemoteControlAuthorization {
+func RemoteControlAuthorizationFromBytes(b []byte, pubKey [33]byte) *RemoteControlAuthorization {
 	r := new(RemoteControlAuthorization)
-	r.Allowed = false
-	if b != nil && len(b) > 0 {
-		r.Allowed = (b[0] == 1)
-	}
+	buf := bytes.NewBuffer(b)
+	binary.Read(buf, binary.BigEndian, &r.Allowed)
+	binary.Read(buf, binary.BigEndian, &r.UnansweredRequest)
+	r.PubKey = pubKey
 	return r
 }
 
 func (nd *LitNode) SaveRemoteControlAuthorization(pub [33]byte, auth *RemoteControlAuthorization) error {
-	if !auth.Allowed {
-		return nd.RemoveRemoteControlAuthorization(pub)
-	}
 	return nd.LitDB.Update(func(btx *bolt.Tx) error {
 		cbk := btx.Bucket(BKTRCAuth)
 		// serialize state
 		b := auth.Bytes()
 		return cbk.Put(pub[:], b)
-	})
-}
-
-func (nd *LitNode) RemoveRemoteControlAuthorization(pub [33]byte) error {
-	return nd.LitDB.Update(func(btx *bolt.Tx) error {
-		cbk := btx.Bucket(BKTRCAuth)
-		return cbk.Delete(pub[:])
 	})
 }
 
@@ -208,19 +213,37 @@ func (nd *LitNode) GetRemoteControlAuthorization(pub [33]byte) (*RemoteControlAu
 	// then it has access to our private key (file) and is most likely running from our
 	// localhost. So we always accept this.
 	if bytes.Equal(pub[:], nd.DefaultRemoteControlKey.SerializeCompressed()) {
-		log.Printf("Received key [%x] matches default key [%x], so allowing\n", pub[:], nd.DefaultRemoteControlKey.SerializeCompressed())
-
 		r.Allowed = true
 		return r, nil
 	}
-	log.Printf("Received key [%x] doesnt default key [%x], so allowing\n", pub[:], nd.DefaultRemoteControlKey.SerializeCompressed())
 
 	err := nd.LitDB.View(func(btx *bolt.Tx) error {
 		cbk := btx.Bucket(BKTRCAuth)
 		// serialize state
 		b := cbk.Get(pub[:])
-		r = RemoteControlAuthorizationFromBytes(b)
+		r = RemoteControlAuthorizationFromBytes(b, pub)
 		return nil
+	})
+	return r, err
+}
+
+func (nd *LitNode) GetPendingRemoteControlRequests() ([]*RemoteControlAuthorization, error) {
+	r := make([]*RemoteControlAuthorization, 0)
+	err := nd.LitDB.View(func(btx *bolt.Tx) error {
+		cbk := btx.Bucket(BKTRCAuth)
+		// serialize state
+		err := cbk.ForEach(func(k, v []byte) error {
+			log.Printf("%x : %s\n", k, v)
+			if len(v) >= 2 {
+				if v[1] != 0x00 {
+					var pubKey [33]byte
+					copy(pubKey[:], k)
+					r = append(r, RemoteControlAuthorizationFromBytes(v, pubKey))
+				}
+			}
+			return nil
+		})
+		return err
 	})
 	return r, err
 }

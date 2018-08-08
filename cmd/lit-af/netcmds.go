@@ -53,6 +53,13 @@ var rcSendCommand = &Command{
 	ShortDescription: "Sends a remote control message",
 }
 
+// Request remote control access
+var rcRequestCommand = &Command{
+	Format:           fmt.Sprintf("%s\n", lnutil.White("rcreq")),
+	Description:      "If this lit-af key has not been authorized on the server, this command will let the server know you want access. Another client that is privileged can authorize you then.\n",
+	ShortDescription: "Requests remote control authorization",
+}
+
 // graph gets the channel map
 func (lc *litAfClient) Graph(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
@@ -204,6 +211,22 @@ func (lc *litAfClient) RemoteControlSend(textArgs []string) error {
 	}
 
 	err = lc.Call("LitRPC.RemoteControlSend", args, reply)
+	fmt.Fprintf(color.Output, "%s\n", reply.Status)
+	return nil
+}
+
+func (lc *litAfClient) RemoteControlRequest(textArgs []string) error {
+	stopEx, err := CheckHelpCommand(rcRequestCommand, textArgs, 0)
+	if err != nil || stopEx {
+		return err
+	}
+	args := new(litrpc.RCRequestAuthArgs)
+	reply := new(litrpc.StatusReply)
+
+	// No need to fill it in, since this will be handled
+	// by the RPC server (inserts the pubkey from the lndc connection)
+
+	err = lc.Call("LitRPC.RequestRemoteControlAuthorization", args, reply)
 	fmt.Fprintf(color.Output, "%s\n", reply.Status)
 	return nil
 }

@@ -165,14 +165,14 @@ func (r *LitRPC) RemoteControlAuth(args RCAuthArgs, reply *StatusReply) error {
 
 	pub, err := btcec.ParsePubKey(args.PubKey, btcec.S256())
 	if err != nil {
-		log.Printf("Error deserializing pubkey: %s", err.Error())
+		reply.Status = fmt.Sprintf("Error deserializing pubkey: %s", err.Error())
 		return err
 	}
 	compressedPubKey := pub.SerializeCompressed()
 	var pubKey [33]byte
 	copy(pubKey[:], compressedPubKey[:])
 
-	log.Printf("Authorizing pubkey [%x] [%t]\n", pubKey, args.Authorization)
+	args.Authorization.UnansweredRequest = false
 
 	err = r.Node.SaveRemoteControlAuthorization(pubKey, args.Authorization)
 	if err != nil {
@@ -180,6 +180,11 @@ func (r *LitRPC) RemoteControlAuth(args RCAuthArgs, reply *StatusReply) error {
 		return err
 	}
 
+	action := "Granted"
+	if !args.Authorization.Allowed {
+		action = "Denied / revoked"
+	}
+	reply.Status = fmt.Sprintf("%s remote control access for pubkey [%x]", action, pubKey)
 	return nil
 }
 
@@ -197,4 +202,47 @@ func (r *LitRPC) RemoteControlSend(args RCSendArgs, reply *StatusReply) error {
 	log.Printf("Sending RC message to peer [%d]\n", args.PeerIdx)
 	r.Node.OmniOut <- msg
 	return nil
+}
+
+type RCRequestAuthArgs struct {
+	PubKey [33]byte
+}
+
+func (r *LitRPC) RequestRemoteControlAuthorization(args RCRequestAuthArgs, reply *StatusReply) error {
+	auth := new(qln.RemoteControlAuthorization)
+	auth.Allowed = false
+	auth.UnansweredRequest = true
+
+	err := r.Node.SaveRemoteControlAuthorization(args.PubKey, auth)
+	if err != nil {
+		log.Printf("Error saving auth request: %s", err.Error())
+		return err
+	}
+
+	reply.Status = fmt.Sprintf("Access requested for pubkey [%x]", args.PubKey)
+	return nil
+}
+
+type RCPendingAuthRequestsReply struct {
+	PubKeys [][33]byte
+}
+
+func (r *LitRPC) ListPendingRemoteControlAuthRequests(args NoArgs, reply *RCPendingAuthRequestsReply) error {
+	auth := new(qln.RemoteControlAuthorization)
+	auth.Allowed = false
+	auth.UnansweredRequest = true
+
+	requests, err := r.Node.GetPendingRemoteControlRequests()
+	if err != nil {
+		log.Printf("Error saving auth request: %s", err.Error())
+		return err
+	}
+
+	reply.PubKeys = make([][33]byte, len(requests))
+	for i, r := range requests {
+		reply.PubKeys[i] = r.PubKey
+	}
+
+	return nil
+
 }
