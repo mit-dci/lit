@@ -71,7 +71,6 @@ func (s *SPVCon) GetListOfNodes() ([]string, error) {
 	if len(listOfNodes) == 0 {
 		return nil, fmt.Errorf("No peers found connected to DNS Seeds. Please provide a host to connect to.")
 	}
-	log.Println(listOfNodes)
 	return listOfNodes, nil
 }
 
@@ -80,9 +79,16 @@ func (s *SPVCon) DialNode(listOfNodes []string) error {
 	// now have some IPs, go through and try to connect to one.
 	var err error
 	var wg sync.WaitGroup
+	// attempt sonnecting to only ot as many nodes specified by the user.
+	var slice int
+	slice = len(listOfNodes)
+	if s.maxConnections < len(listOfNodes) {
+		slice = s.maxConnections
+	}
+	listOfNodes = listOfNodes[:slice]
 	queue := make(chan net.Conn, 1)
 	wg.Add(len(listOfNodes))
-	for i, ip := range listOfNodes { // Maintaining 10 parallel connections should be enough?
+	for i, ip := range listOfNodes[:slice] { // Maintaining 10 parallel connections should be enough?
 		// try to connect to all nodes in this range
 		var conString, conMode string
 		// need to check whether conString is ipv4 or ipv6

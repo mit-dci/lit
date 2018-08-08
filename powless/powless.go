@@ -105,7 +105,7 @@ type APILink struct {
 
 // Start starts the APIlink
 func (a *APILink) Start(
-	startHeight int32, host, path string, proxyURL string, params *coinparam.Params) (
+	startHeight int32, host, path string, proxyURL string, maxConnections int, params *coinparam.Params) (
 	chan lnutil.TxAndHeight, chan int32, error) {
 
 	a.proxyURL = proxyURL

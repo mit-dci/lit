@@ -15,6 +15,7 @@ type SPVCon struct {
 	// store all open tcp connections to bitcoin nodes
 	// can just drop the connection if it misbehaves
 	conns []net.Conn
+	maxConnections int
 	// Enhanced SPV modes for users who have outgrown easy mode SPV
 	// but have not yet graduated to full nodes.
 	HardMode bool   // hard mode doesn't use filters.
