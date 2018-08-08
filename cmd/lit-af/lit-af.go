@@ -97,6 +97,12 @@ func main() {
 	keyFilePath := filepath.Join(lc.litHomeDir, defaultKeyFileName)
 	remote := false
 
+	// create home directory if it does not exist
+	_, err := os.Stat(lc.litHomeDir)
+	if os.IsNotExist(err) {
+		os.Mkdir(lc.litHomeDir, 0700)
+	}
+
 	if _, err := os.Stat(keyFilePath); os.IsNotExist(err) {
 		// If the keyfile does not exist, we're probably not running on the
 		// same machine as lit. So we have a remote connection. Which is fine,
