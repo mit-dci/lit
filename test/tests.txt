@@ -16,6 +16,7 @@ close
 break
 push
 pushclose
+pushbreak
 
 # DLC tests
 

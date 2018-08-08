@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import testlib
+import testutil
 
 fee = 20
 initialsend = 200000
@@ -43,17 +44,18 @@ def run_test(env):
     print('Created channel ( ID', chan_id, ')')
 
     # Now we confirm the block.
-    env.generate_block(count=1000)
+    env.generate_block(count=5)
 
     # Now close the channel.
     print('Now breaking channel...')
     lit1.rpc.BreakChannel(ChanIdx=chan_id)
+
     print('// TODO Make BreakChannel return a status.')
 
-    # Now we figure out the balances at 2 points in time..
+    # Now we figure out the balances at 2 points in time.
     print(str(lit1.get_balance_info()))
     print('Fast-forwarding time...')
-    env.generate_block(count=1000) # Just to escape the locktime to make sure we get our money.
+    env.generate_block(count=5) # Just to escape the locktime to make sure we get our money.
     bi2 = lit1.get_balance_info()
     print(str(bi2))
 

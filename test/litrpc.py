@@ -37,15 +37,13 @@ class LitClient():
         self.msg_id = (self.msg_id + 1) % max_id
 
         req = requests.post('http://{}:{}/oneoff'.format(self.ip, self.port), json=jsonreq)
-        if req.status_code == 200:
+        if req.json()['error'] is None:
             resp = req.json()['result']
             logger.debug("Received rpc response from %s:%s method: %s Response: %s." % (self.ip, self.port, method, str(resp)))
             return resp
         else:
             logger.warning('rpc call not OK: {}'.format(req.status_code))
-            err = req.json()['error']
-            err['_error'] = True
-            return err
+            return req.json()['error']
 
     def __getattr__(self, name):
         """Dispatches any unrecognised messages to the websocket connection"""
