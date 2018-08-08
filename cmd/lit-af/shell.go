@@ -133,6 +133,17 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		return parseErr(err, "dlc")
 	}
 
+	// remote control
+	if cmd == "rcauth" {
+		err = lc.RemoteControlAuth(args)
+		return parseErr(err, "rcauth")
+	}
+
+	if cmd == "rcsend" {
+		err = lc.RemoteControlSend(args)
+		return parseErr(err, "rcsend")
+	}
+
 	// fund and create a new channel
 	if cmd == "fund" {
 		err = lc.FundChannel(args)
@@ -421,7 +432,7 @@ func (lc *litAfClient) Help(textArgs []string) error {
 	if len(textArgs) == 0 {
 
 		fmt.Fprintf(color.Output, lnutil.Header("Commands:\n"))
-		listofCommands := []*Command{helpCommand, sayCommand, lsCommand, addressCommand, sendCommand, fanCommand, sweepCommand, lisCommand, conCommand, dlcCommand, fundCommand, dualFundCommand, watchCommand, pushCommand, closeCommand, breakCommand, addHTLCCommand, clearHTLCCommand, historyCommand, offCommand, exitCommand}
+		listofCommands := []*Command{helpCommand, sayCommand, lsCommand, addressCommand, sendCommand, fanCommand, sweepCommand, lisCommand, conCommand, dlcCommand, fundCommand, dualFundCommand, watchCommand, pushCommand, closeCommand, breakCommand, addHTLCCommand, clearHTLCCommand, rcAuthCommand, rcSendCommand, historyCommand, offCommand, exitCommand}
 		printHelp(listofCommands)
 		fmt.Fprintf(color.Output, "\n\n")
 		fmt.Fprintf(color.Output, lnutil.Header("Coins:\n"))

@@ -2,12 +2,12 @@ package lndc
 
 import (
 	"bytes"
+	"fmt"
 	"io"
+	"log"
 	"math"
 	"net"
-	"log"
 	"time"
-	"fmt"
 
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/lnutil"

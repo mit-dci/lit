@@ -1,9 +1,12 @@
 package main
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/mit-dci/lit/qln"
 
 	"github.com/fatih/color"
 	"github.com/mit-dci/lit/litrpc"
@@ -35,6 +38,19 @@ var graphCommand = &Command{
 	Format:           fmt.Sprintf("%s\n", lnutil.White("graph")),
 	Description:      fmt.Sprintf("Dump the channel graph in graphviz DOT format\n"),
 	ShortDescription: "Shows the channel map\n",
+}
+
+var rcAuthCommand = &Command{
+	Format:           fmt.Sprintf("%s %s\n", lnutil.White("rcauth"), lnutil.ReqColor("pub", "auth (true|false)")),
+	Description:      "Authorizes a remote peer by pubkey for sending remote control commands over LNDC\n",
+	ShortDescription: "Manages authorization for remote control",
+}
+
+// Temporary command for testing. Remove when there's an actual remote control library.
+var rcSendCommand = &Command{
+	Format:           fmt.Sprintf("%s %s\n", lnutil.White("rcsend"), lnutil.ReqColor("peer", "msg")),
+	Description:      "Sends a remote control message to peer [peer]. [msg] is hex encoded\n",
+	ShortDescription: "Sends a remote control message",
 }
 
 // graph gets the channel map
@@ -161,6 +177,52 @@ func (lc *litAfClient) Say(textArgs []string) error {
 	if err != nil {
 		return err
 	}
+	fmt.Fprintf(color.Output, "%s\n", reply.Status)
+	return nil
+}
+
+func (lc *litAfClient) RemoteControlAuth(textArgs []string) error {
+	stopEx, err := CheckHelpCommand(rcAuthCommand, textArgs, 2)
+	if err != nil || stopEx {
+		return err
+	}
+	args := new(litrpc.RCAuthArgs)
+	reply := new(litrpc.StatusReply)
+
+	args.PubKey, err = hex.DecodeString(textArgs[0])
+	if err != nil {
+		return fmt.Errorf("Could not decode pubkey: %s", err.Error())
+	}
+
+	args.Authorization = new(qln.RemoteControlAuthorization)
+	args.Authorization.Allowed = lnutil.YupString(textArgs[1])
+
+	err = lc.Call("LitRPC.RemoteControlAuth", args, reply)
+	fmt.Fprintf(color.Output, "%s\n", reply.Status)
+	return nil
+}
+
+func (lc *litAfClient) RemoteControlSend(textArgs []string) error {
+	stopEx, err := CheckHelpCommand(rcAuthCommand, textArgs, 2)
+	if err != nil || stopEx {
+		return err
+	}
+	args := new(litrpc.RCSendArgs)
+	reply := new(litrpc.StatusReply)
+
+	peerIdx, err := strconv.Atoi(textArgs[0])
+	if err != nil {
+		return err
+	}
+
+	args.PeerIdx = uint32(peerIdx)
+
+	args.Msg, err = hex.DecodeString(textArgs[1])
+	if err != nil {
+		return fmt.Errorf("Could not decode message: %s", err.Error())
+	}
+
+	err = lc.Call("LitRPC.RemoteControlSend", args, reply)
 	fmt.Fprintf(color.Output, "%s\n", reply.Status)
 	return nil
 }
