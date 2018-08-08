@@ -53,6 +53,7 @@ func (nd *LitNode) PayMultihop(dstLNAdr string, originCoinType uint32, destCoinT
 
 	inFlight := new(InFlightMultihop)
 	inFlight.Path = path
+	inFlight.Amt = amount
 	nd.MultihopMutex.Lock()
 	nd.InProgMultihop = append(nd.InProgMultihop, inFlight)
 	nd.MultihopMutex.Unlock()
