@@ -12,8 +12,9 @@ import (
 )
 
 type SPVCon struct {
-	con net.Conn // the (probably tcp) connection to the node
-
+	// store all open tcp connections to bitcoin nodes
+	// can just drop the connection if it misbehaves
+	conns []net.Conn
 	// Enhanced SPV modes for users who have outgrown easy mode SPV
 	// but have not yet graduated to full nodes.
 	HardMode bool   // hard mode doesn't use filters.
