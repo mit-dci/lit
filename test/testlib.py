@@ -63,7 +63,9 @@ class LitNode():
 
         # See if we should print stdout
         outputredir = subprocess.DEVNULL
-        if os.getenv("LIT_OUTPUT_SHOW", default="0") == "1":
+        ev_output_show = os.getenv("LIT_OUTPUT_SHOW", default="0")
+        ev_show_id = os.getenv("LIT_ID_SHOW", default="X")
+        if ev_output_show == "1" and (ev_show_id == "X" or ev_show_id == str(self.id)):
             outputredir = None
 
         # Now figure out the args to use and then start Lit.

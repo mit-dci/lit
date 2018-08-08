@@ -1,13 +1,21 @@
 # This is just to test the integration test framework.
 testlib
 
-# Network tests.
+# Network tests
 connect
+
+# Wallet tests
 receive
 send
 send2
+setgetfee
 
 # Basic channel tests.
+fund
+close
+break
+push
+pushclose
 
 # DLC tests
 
