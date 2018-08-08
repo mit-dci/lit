@@ -74,25 +74,6 @@ func (lc *litAfClient) Graph(textArgs []string) error {
 	return nil
 }
 
-// RequestAsync keeps requesting messages from the server.  The server blocks
-// and will send a response once it gets one.  Once the rpc client receives a
-// response, it will immediately request another.
-func (lc *litAfClient) RequestAsync() {
-	for {
-		args := new(litrpc.NoArgs)
-		reply := new(litrpc.StatusReply)
-
-		err := lc.rpccon.Call("LitRPC.GetMessages", args, reply)
-		if err != nil {
-			fmt.Fprintf(color.Output, "RequestAsync error %s\n", lnutil.Red(err.Error()))
-			break
-			// end loop on first error.  it's probably a connection error
-
-		}
-		fmt.Fprintf(color.Output, "%s\n", reply.Status)
-	}
-}
-
 // Lis starts listening.  Takes args of port to listen on.
 func (lc *litAfClient) Lis(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {

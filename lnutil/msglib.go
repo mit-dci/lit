@@ -1992,7 +1992,9 @@ func (msg DlcContractSigProofMsg) MsgType() uint8 {
 type RemoteControlRpcRequestMsg struct {
 	PeerIdx    uint32
 	PubKey     [33]byte
-	Json       []byte
+	Method     string
+	Idx        uint64
+	Args       []byte
 	Sig        [64]byte
 	DigestType uint8
 }
@@ -2007,9 +2009,13 @@ func NewRemoteControlRpcRequestMsgFromBytes(b []byte,
 	copy(msg.PubKey[:], buf.Next(33))
 	copy(msg.Sig[:], buf.Next(64))
 	binary.Read(buf, binary.BigEndian, &msg.DigestType)
-	jsonLength, _ := wire.ReadVarInt(buf, 0)
+	binary.Read(buf, binary.BigEndian, &msg.Idx)
 
-	msg.Json = buf.Next(int(jsonLength))
+	methodLength, _ := wire.ReadVarInt(buf, 0)
+	msg.Method = string(buf.Next(int(methodLength)))
+
+	argsLength, _ := wire.ReadVarInt(buf, 0)
+	msg.Args = buf.Next(int(argsLength))
 	return *msg, nil
 }
 
@@ -2021,8 +2027,15 @@ func (msg RemoteControlRpcRequestMsg) Bytes() []byte {
 	buf.Write(msg.PubKey[:])
 	buf.Write(msg.Sig[:])
 	binary.Write(&buf, binary.BigEndian, msg.DigestType)
-	wire.WriteVarInt(&buf, 0, uint64(len(msg.Json)))
-	buf.Write(msg.Json)
+	binary.Write(&buf, binary.BigEndian, msg.Idx)
+
+	methodBytes := []byte(msg.Method)
+	wire.WriteVarInt(&buf, 0, uint64(len(methodBytes)))
+	buf.Write(methodBytes)
+
+	wire.WriteVarInt(&buf, 0, uint64(len(msg.Args)))
+	buf.Write(msg.Args)
+
 	return buf.Bytes()
 }
 
@@ -2038,14 +2051,18 @@ func (msg RemoteControlRpcRequestMsg) MsgType() uint8 {
 
 type RemoteControlRpcResponseMsg struct {
 	PeerIdx uint32
-	Json    []byte
+	Idx     uint64
+	Error   bool
+	Result  []byte
 }
 
-func NewRemoteControlRpcResponseMsg(peerIdx uint32, json []byte) RemoteControlRpcResponseMsg {
+func NewRemoteControlRpcResponseMsg(peerIdx uint32, msgIdx uint64, isError bool, json []byte) RemoteControlRpcResponseMsg {
 
 	msg := new(RemoteControlRpcResponseMsg)
 	msg.PeerIdx = peerIdx
-	msg.Json = json
+	msg.Idx = msgIdx
+	msg.Error = isError
+	msg.Result = json
 	return *msg
 }
 
@@ -2053,8 +2070,15 @@ func NewRemoteControlRpcResponseMsgFromBytes(b []byte,
 	peerIdx uint32) (RemoteControlRpcResponseMsg, error) {
 
 	msg := new(RemoteControlRpcResponseMsg)
+	buf := bytes.NewBuffer(b[1:])
+
 	msg.PeerIdx = peerIdx
-	msg.Json = b[1:]
+	binary.Read(buf, binary.BigEndian, &msg.Idx)
+	binary.Read(buf, binary.BigEndian, &msg.Error)
+
+	resultLength, _ := wire.ReadVarInt(buf, 0)
+	msg.Result = buf.Next(int(resultLength))
+
 	return *msg, nil
 }
 
@@ -2063,7 +2087,11 @@ func (msg RemoteControlRpcResponseMsg) Bytes() []byte {
 	var buf bytes.Buffer
 
 	buf.WriteByte(msg.MsgType())
-	buf.Write(msg.Json)
+	binary.Write(&buf, binary.BigEndian, msg.Idx)
+	binary.Write(&buf, binary.BigEndian, msg.Error)
+
+	wire.WriteVarInt(&buf, 0, uint64(len(msg.Result)))
+	buf.Write(msg.Result)
 	return buf.Bytes()
 }
 

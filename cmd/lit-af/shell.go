@@ -411,7 +411,7 @@ func (lc *litAfClient) Stop(textArgs []string) error {
 
 	fmt.Fprintf(color.Output, "%s\n", reply.Status)
 
-	lc.rpccon.Close()
+	//lc.rpccon.Close()
 	return fmt.Errorf("stopped remote lit node")
 }
 

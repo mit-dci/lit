@@ -48,6 +48,11 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 		return nil, err
 	}
 
+	kg.Step[3] = 1 | 1<<31
+	rcPriv, err := kg.DerivePrivateKey(rootPrivKey)
+	nd.DefaultRemoteControlKey = rcPriv.PubKey()
+	rcPriv = nil
+
 	nd.TrackerURL = trackerURL
 
 	nd.ProxyURL = proxyURL

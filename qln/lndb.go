@@ -3,7 +3,6 @@ package qln
 import (
 	"fmt"
 	"log"
-	"net/rpc"
 	"sync"
 	"time"
 
@@ -91,6 +90,8 @@ type LitNode struct {
 
 	IdentityKey *btcec.PrivateKey
 
+	DefaultRemoteControlKey *btcec.PublicKey
+
 	// all nodes have a watchtower.  but could have a tower without a node
 	Tower watchtower.Watcher
 
@@ -137,7 +138,7 @@ type LitNode struct {
 	ChannelMapMtx sync.Mutex
 	AdvTimeout    *time.Ticker
 
-	LocalRPCCon *rpc.Client
+	RPC interface{}
 
 	// Contains the URL string to connect to a SOCKS5 proxy, if provided
 	ProxyURL string

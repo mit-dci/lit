@@ -3,13 +3,9 @@ package main
 import (
 	"fmt"
 	"log"
-	"net/rpc/jsonrpc"
 	"os"
 	"time"
 
-	"golang.org/x/net/websocket"
-
-	flags "github.com/jessevdk/go-flags"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/lnutil"
@@ -63,7 +59,7 @@ var (
 	defaultHomeDir               = os.Getenv("HOME")
 	defaultRpcport               = uint16(8001)
 	defaultRpchost               = "localhost"
-	defaultAutoReconnect         = false
+	defaultAutoReconnect         = true
 	defaultAutoListenPort        = ":2448"
 	defaultAutoReconnectInterval = int64(60)
 	defaultUpnPFlag              = false
@@ -190,21 +186,11 @@ func main() {
 	rpcl.Node = node
 	rpcl.OffButton = make(chan bool, 1)
 
-	go litrpc.RPCListen(rpcl, conf.Rpchost, conf.Rpcport)
-
 	if conf.AutoReconnect {
 		node.AutoReconnect(conf.AutoListenPort, conf.AutoReconnectInterval)
 	}
 
-	origin := "http://127.0.0.1/"
-	urlString := fmt.Sprintf("ws://%s:%d/ws", conf.Rpchost, conf.Rpcport)
-	wsConn, err := websocket.Dial(urlString, "", origin)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer wsConn.Close()
-
-	node.LocalRPCCon = jsonrpc.NewClient(wsConn)
+	node.RPC = rpcl
 
 	<-rpcl.OffButton
 	log.Printf("Got stop request\n")

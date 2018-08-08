@@ -2,9 +2,12 @@ package qln
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"log"
+	"reflect"
+	"strings"
 
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/btcutil"
@@ -15,75 +18,138 @@ import (
 )
 
 func (nd *LitNode) RemoteControlRequestHandler(msg lnutil.RemoteControlRpcRequestMsg, peer *RemotePeer) error {
+	var pubKey [33]byte
+	transportAuthenticated := true
+	copy(pubKey[:], peer.Con.RemotePub().SerializeCompressed())
 
-	log.Printf("Received remote control request from [%x]\nSignature:[%x]\n\n%s", msg.PubKey, msg.Sig, string(msg.Json))
+	if msg.PubKey != [33]byte{} {
+		pubKey = msg.PubKey
+		transportAuthenticated = false
+	}
+	log.Printf("Received remote control request [%s] from [%x]\n\n%s", msg.Method, pubKey, string(msg.Args))
 
-	auth, err := nd.GetRemoteControlAuthorization(msg.PubKey)
+	auth, err := nd.GetRemoteControlAuthorization(pubKey)
 	if err != nil {
 		log.Printf("Error while checking authorization for remote control: %s", err.Error())
 		return err
 	}
 
 	if !auth.Allowed {
-		err = fmt.Errorf("Received remote control request from unauthorized peer: %x", msg.PubKey)
+		err = fmt.Errorf("Received remote control request from unauthorized peer: %x", pubKey)
 		log.Println(err.Error())
+
+		outMsg := lnutil.NewRemoteControlRpcResponseMsg(msg.Peer(), msg.Idx, true, []byte("Unauthorized"))
+		nd.OmniOut <- outMsg
+
 		return err
-	}
-	var digest []byte
-	if msg.DigestType == lnutil.DIGEST_TYPE_SHA256 {
-		hash := fastsha256.Sum256(msg.Json)
-		digest = make([]byte, len(hash))
-		copy(digest[:], hash[:])
-	} else if msg.DigestType == lnutil.DIGEST_TYPE_RIPEMD160 {
-		hash := btcutil.Hash160(msg.Json)
-		digest = make([]byte, len(hash))
-		copy(digest[:], hash[:])
+
 	}
 
-	pub, err := btcec.ParsePubKey(msg.PubKey[:], btcec.S256())
-	if err != nil {
-		log.Printf("Error parsing public key for remote control: %s", err.Error())
-		return err
-	}
-	sig := sig64.SigDecompress(msg.Sig)
-	signature, err := btcec.ParseDERSignature(sig, btcec.S256())
-	if err != nil {
-		log.Printf("Error parsing signature for remote control: %s", err.Error())
-		return err
-	}
+	if !transportAuthenticated {
+		// If the message specifies a pubkey, then we haven't authenticated this message via the
+		// lndc transport already. So we need to check the signature embedded in the message.
 
-	if !signature.Verify(digest, pub) {
-		err = fmt.Errorf("Signature verification failed in remote control request")
-		log.Println(err.Error())
-		return err
+		var hashBuf bytes.Buffer
+		hashBuf.Write(msg.Args)
+		hashBuf.Write([]byte(msg.Method))
+		binary.Write(&hashBuf, binary.BigEndian, msg.Idx)
+
+		var digest []byte
+		if msg.DigestType == lnutil.DIGEST_TYPE_SHA256 {
+			hash := fastsha256.Sum256(hashBuf.Bytes())
+			digest = make([]byte, len(hash))
+			copy(digest[:], hash[:])
+		} else if msg.DigestType == lnutil.DIGEST_TYPE_RIPEMD160 {
+			hash := btcutil.Hash160(hashBuf.Bytes())
+			digest = make([]byte, len(hash))
+			copy(digest[:], hash[:])
+		}
+
+		pub, err := btcec.ParsePubKey(msg.PubKey[:], btcec.S256())
+		if err != nil {
+			log.Printf("Error parsing public key for remote control: %s", err.Error())
+			return err
+		}
+		sig := sig64.SigDecompress(msg.Sig)
+		signature, err := btcec.ParseDERSignature(sig, btcec.S256())
+		if err != nil {
+			log.Printf("Error parsing signature for remote control: %s", err.Error())
+			return err
+		}
+
+		if !signature.Verify(digest, pub) {
+			err = fmt.Errorf("Signature verification failed in remote control request")
+			log.Println(err.Error())
+			return err
+		}
 	}
 
 	obj := map[string]interface{}{}
-	err = json.Unmarshal(msg.Json, &obj)
+	err = json.Unmarshal(msg.Args, &obj)
 	if err != nil {
 		log.Printf("Could not parse JSON: %s", err.Error())
 		return err
 	}
 
 	go func() {
-		var reply interface{}
-		nd.LocalRPCCon.Call("LitRPC."+obj["method"].(string), obj["args"], reply)
-
-		replyJSON, err := json.Marshal(reply)
-		if err != nil {
-			log.Printf("Could not produce reply JSON: %s", err.Error())
+		if !strings.HasPrefix(msg.Method, "LitRPC.") {
+			log.Printf("Remote control method does not start with `LitRPC.`. We don't know any better. Yet.")
+			return
 		}
+		methodName := strings.TrimPrefix(msg.Method, "LitRPC.")
+		rpcType := reflect.ValueOf(nd.RPC)
+		if rpcType.IsValid() {
+			method := rpcType.MethodByName(methodName)
+			if method.IsValid() {
 
-		log.Printf("Reply for remote control: %s\n", replyJSON)
-		/*
-			response := lnutil.NewRemoteControlRpcResponseMsg(msg.Peer(), replyJSON)
-			nd.OmniOut <- response*/
+				// Our RPC calls always have params as (args, reply)
+				argsType := method.Type().In(0)
+				argsPointer := false
+				if argsType.Kind() == reflect.Ptr {
+					argsPointer = true
+					argsType = argsType.Elem()
+				}
+
+				argsPayload := reflect.New(argsType)
+
+				err = json.Unmarshal(msg.Args, &argsPayload)
+				if err != nil {
+					log.Printf("Error parsing json argument: %s", err.Error())
+					return
+				}
+
+				replyType := method.Type().In(1).Elem()
+				replyPayload := reflect.New(replyType)
+
+				if !argsPointer {
+					argsPayload = argsPayload.Elem()
+				}
+				result := method.Call([]reflect.Value{argsPayload, replyPayload})
+
+				var reply []byte
+				replyIsError := false
+				if !result[0].IsNil() {
+					replyIsError = true
+					err = result[0].Interface().(error)
+					reply = []byte(err.Error())
+				} else {
+					reply, err = json.Marshal(replyPayload)
+					if err != nil {
+						replyIsError = true
+						reply = []byte(err.Error())
+					}
+				}
+
+				outMsg := lnutil.NewRemoteControlRpcResponseMsg(msg.Peer(), msg.Idx, replyIsError, reply)
+				nd.OmniOut <- outMsg
+			}
+		}
 	}()
 	return nil
 }
 
 func (nd *LitNode) RemoteControlResponseHandler(msg lnutil.RemoteControlRpcResponseMsg, peer *RemotePeer) error {
-	log.Printf("Received remote control reply from peer %d:\n%s", msg.Peer(), string(msg.Json))
+	log.Printf("Received remote control reply from peer %d:\n%s", msg.Peer(), string(msg.Result))
 	return nil
 }
 
@@ -137,6 +203,18 @@ func (nd *LitNode) RemoveRemoteControlAuthorization(pub [33]byte) error {
 
 func (nd *LitNode) GetRemoteControlAuthorization(pub [33]byte) (*RemoteControlAuthorization, error) {
 	r := new(RemoteControlAuthorization)
+
+	// If the client uses our default remote control key (derived from our root priv)
+	// then it has access to our private key (file) and is most likely running from our
+	// localhost. So we always accept this.
+	if bytes.Equal(pub[:], nd.DefaultRemoteControlKey.SerializeCompressed()) {
+		log.Printf("Received key [%x] matches default key [%x], so allowing\n", pub[:], nd.DefaultRemoteControlKey.SerializeCompressed())
+
+		r.Allowed = true
+		return r, nil
+	}
+	log.Printf("Received key [%x] doesnt default key [%x], so allowing\n", pub[:], nd.DefaultRemoteControlKey.SerializeCompressed())
+
 	err := nd.LitDB.View(func(btx *bolt.Tx) error {
 		cbk := btx.Bucket(BKTRCAuth)
 		// serialize state
