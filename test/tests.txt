@@ -13,10 +13,14 @@ setgetfee
 # Basic channel tests.
 fund
 close
+close_reverse
 break
+break_reverse
 push
 pushclose
+pushclose_reverse
 pushbreak
+pushbreak_reverse
 
 # DLC tests
 
