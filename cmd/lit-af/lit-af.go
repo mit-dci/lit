@@ -57,6 +57,7 @@ type litAfClient struct {
 	remote           string
 	port             uint16
 	lnconn           *lndc.Conn
+	addr             string
 	litHomeDir       string
 	requestNonce     uint64
 	requestNonceMtx  sync.Mutex
@@ -74,12 +75,18 @@ func setConfig(lc *litAfClient) {
 	hostptr := flag.String("node", "127.0.0.1", "host to connect to")
 	portptr := flag.Int("p", 2448, "port to connect to")
 	dirptr := flag.String("dir", filepath.Join(os.Getenv("HOME"), litHomeDirName), "directory to save settings")
+	addrptr := flag.String("addr", "", "address of the host we're connecting to (if not running on the same machine as lit)")
 
 	flag.Parse()
 
 	lc.remote = *hostptr
 	lc.port = uint16(*portptr)
 	lc.litHomeDir = *dirptr
+	lc.addr = *addrptr
+
+	if lnutil.LitAdrOK(lc.addr) && lc.remote == "127.0.0.1" {
+		// probably need to look up when addr is set but node is still localhost
+	}
 }
 
 // for now just testing how to connect and get messages back and forth
@@ -88,6 +95,21 @@ func main() {
 	setConfig(lc)
 
 	keyFilePath := filepath.Join(lc.litHomeDir, defaultKeyFileName)
+	remote := false
+
+	if _, err := os.Stat(keyFilePath); os.IsNotExist(err) {
+		// If the keyfile does not exist, we're probably not running on the
+		// same machine as lit. So we have a remote connection. Which is fine,
+		// but then we need a little more info.
+
+		// Plus, just to be sure we'll save the local key in a different file
+		keyFilePath = filepath.Join(lc.litHomeDir, "lit-af-key.hex")
+		remote = true
+
+		if !lnutil.LitAdrOK(lc.addr) {
+			log.Fatal("Since you are remotely connecting to lit, you need to specify the node's LN address using the -addr parameter")
+		}
+	}
 
 	// read key file (generate if not found)
 	privKey, err := lnutil.ReadKeyFile(keyFilePath)
@@ -104,24 +126,26 @@ func main() {
 	kg.Step[0] = 44 | 1<<31
 	kg.Step[1] = 513 | 1<<31
 	kg.Step[2] = 9 | 1<<31
-	kg.Step[3] = 0 | 1<<31
-	kg.Step[4] = 0 | 1<<31
-	localIDPriv, err := kg.DerivePrivateKey(rootPrivKey)
-	if err != nil {
-		log.Fatal(err)
-	}
-	var localIDPub [33]byte
-	copy(localIDPub[:], localIDPriv.PubKey().SerializeCompressed())
-	localLNAdr := lnutil.LitAdrFromPubkey(localIDPub)
-	localIDPriv = nil
-
 	kg.Step[3] = 1 | 1<<31
+	kg.Step[4] = 0 | 1<<31
 	lc.key, err = kg.DerivePrivateKey(rootPrivKey)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("Using key [%x] for connections to lit\n", lc.key.PubKey().SerializeCompressed())
+	localLNAdr := lc.addr
+
+	if !remote {
+		kg.Step[3] = 0 | 1<<31
+		localIDPriv, err := kg.DerivePrivateKey(rootPrivKey)
+		if err != nil {
+			log.Fatal(err)
+		}
+		var localIDPub [33]byte
+		copy(localIDPub[:], localIDPriv.PubKey().SerializeCompressed())
+		localLNAdr = lnutil.LitAdrFromPubkey(localIDPub)
+		localIDPriv = nil
+	}
 
 	privKey = nil
 	rootPrivKey = nil
