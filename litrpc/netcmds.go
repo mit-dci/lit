@@ -5,7 +5,7 @@ import (
 	"log"
 	"strconv"
 
-	"github.com/adiabat/btcd/btcec"
+	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/qln"
 )
