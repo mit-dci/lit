@@ -112,7 +112,7 @@ func (nd *LitNode) RemoteControlRequestHandler(msg lnutil.RemoteControlRpcReques
 
 				argsPayload := reflect.New(argsType)
 
-				err = json.Unmarshal(msg.Args, &argsPayload)
+				err = json.Unmarshal(msg.Args, argsPayload.Interface())
 				if err != nil {
 					log.Printf("Error parsing json argument: %s", err.Error())
 					return
@@ -133,7 +133,7 @@ func (nd *LitNode) RemoteControlRequestHandler(msg lnutil.RemoteControlRpcReques
 					err = result[0].Interface().(error)
 					reply = []byte(err.Error())
 				} else {
-					reply, err = json.Marshal(replyPayload)
+					reply, err = json.Marshal(replyPayload.Interface())
 					if err != nil {
 						replyIsError = true
 						reply = []byte(err.Error())
