@@ -192,6 +192,12 @@ func main() {
 
 	node.RPC = rpcl
 
+	rpcProxy, err := litrpc.NewLocalLndcRpcWebsocketProxy()
+	if err != nil {
+		log.Fatal(err)
+	}
+	go rpcProxy.Listen(conf.Rpchost, conf.Rpcport)
+
 	<-rpcl.OffButton
 	log.Printf("Got stop request\n")
 	time.Sleep(time.Second)
