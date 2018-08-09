@@ -258,17 +258,24 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 		return fmt.Errorf("no corresponding incoming HTLC found for multihop payment with RHash: %x", msg.HHash)
 	}
 
-	wal, ok := nd.SubWallet[nextHop.CoinType]
+	wal, ok := nd.SubWallet[ourHop.CoinType]
+	if !ok {
+		return fmt.Errorf("not connected to wallet for cointype %d", ourHop.CoinType)
+	}
+
+	height := wal.CurrentHeight()
+	if prevHTLC.Locktime-consts.DefaultLockTime < uint32(height+consts.DefaultLockTime) {
+		return fmt.Errorf("locktime of preceeding hop is too close for comfort: %d, height: %d", prevHTLC.Locktime-consts.DefaultLockTime, height)
+	}
+
+	wal, ok = nd.SubWallet[nextHop.CoinType]
 	if !ok {
 		return fmt.Errorf("not connected to wallet for cointype %d", nextHop.CoinType)
 	}
 
 	fee := wal.Fee() * 1000
 
-	height := wal.CurrentHeight()
-	if prevHTLC.Locktime-consts.DefaultLockTime < uint32(height+consts.DefaultLockTime) {
-		return fmt.Errorf("locktime of preceeding hop is too close for comfort: %d, height: %d", prevHTLC.Locktime-consts.DefaultLockTime, height)
-	}
+	newLocktime := ((((prevHTLC.Locktime - uint32(height)) / consts.DefaultLockTime) - 1) * consts.DefaultLockTime) + uint32(wal.CurrentHeight())
 
 	nd.InProgMultihop = append(nd.InProgMultihop, inFlight)
 
@@ -355,7 +362,7 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 	// This handler needs to return so run this in a goroutine
 	go func() {
 		log.Printf("offering HTLC with RHash: %x", msg.HHash)
-		err = nd.OfferHTLC(qc, uint32(amtRqd), msg.HHash, prevHTLC.Locktime-consts.DefaultLockTime, [32]byte{})
+		err = nd.OfferHTLC(qc, uint32(amtRqd), msg.HHash, newLocktime, [32]byte{})
 		if err != nil {
 			log.Printf("error offering HTLC: %s", err.Error())
 			return
