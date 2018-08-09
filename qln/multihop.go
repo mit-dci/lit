@@ -242,7 +242,7 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 	var found bool
 	var prevHTLC *HTLC
 	for idx, h := range HTLCs {
-		if h.Incoming && !h.Cleared && !h.Clearing && !h.ClearedOnChain && chans[idx].Coin() == ourHop.CoinType {
+		if h.Incoming && !h.Cleared && !h.Clearing && !h.ClearedOnChain && chans[idx].Coin() == incomingHop.CoinType {
 			found = true
 			prevHTLC = &h
 			break
@@ -258,9 +258,9 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 		return fmt.Errorf("no corresponding incoming HTLC found for multihop payment with RHash: %x", msg.HHash)
 	}
 
-	wal, ok := nd.SubWallet[ourHop.CoinType]
+	wal, ok := nd.SubWallet[incomingHop.CoinType]
 	if !ok {
-		return fmt.Errorf("not connected to wallet for cointype %d", ourHop.CoinType)
+		return fmt.Errorf("not connected to wallet for cointype %d", incomingHop.CoinType)
 	}
 
 	height := wal.CurrentHeight()
@@ -268,9 +268,9 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 		return fmt.Errorf("locktime of preceeding hop is too close for comfort: %d, height: %d", prevHTLC.Locktime-consts.DefaultLockTime, height)
 	}
 
-	wal, ok = nd.SubWallet[nextHop.CoinType]
+	wal, ok = nd.SubWallet[ourHop.CoinType]
 	if !ok {
-		return fmt.Errorf("not connected to wallet for cointype %d", nextHop.CoinType)
+		return fmt.Errorf("not connected to wallet for cointype %d", ourHop.CoinType)
 	}
 
 	fee := wal.Fee() * 1000
@@ -303,21 +303,21 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 
 	// do we need to exchange?
 	// is the last hop coin type the same as this one?
-	if nextHop.CoinType != ourHop.CoinType {
+	if incomingHop.CoinType != ourHop.CoinType {
 		// we need to exchange, but is it possible?
 		var rd *lnutil.RateDesc
 		var rates []lnutil.RateDesc
 		nd.ChannelMapMtx.Lock()
 		defer nd.ChannelMapMtx.Unlock()
 		for _, link := range nd.ChannelMap[pkh] {
-			if link.Link.CoinType == nextHop.CoinType {
+			if link.Link.CoinType == ourHop.CoinType {
 				rates = link.Link.Rates
 				break
 			}
 		}
 
 		for _, rate := range rates {
-			if rate.CoinType == ourHop.CoinType && rate.Rate > 0 {
+			if rate.CoinType == incomingHop.CoinType && rate.Rate > 0 {
 				rd = &rate
 				break
 			}
@@ -346,7 +346,7 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 	nd.RemoteMtx.Lock()
 	var qc *Qchan
 	for _, ch := range nd.RemoteCons[sendToIdx].QCs {
-		if ch.Coin() == nextHop.CoinType && ch.State.MyAmt-consts.MinOutput-fee >= amtRqd && !ch.CloseData.Closed && !ch.State.Failed {
+		if ch.Coin() == ourHop.CoinType && ch.State.MyAmt-consts.MinOutput-fee >= amtRqd && !ch.CloseData.Closed && !ch.State.Failed {
 			qc = ch
 			break
 		}
