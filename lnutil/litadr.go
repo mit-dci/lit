@@ -2,6 +2,7 @@ package lnutil
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/mit-dci/lit/bech32"
 	"github.com/mit-dci/lit/btcutil/base58"
@@ -111,4 +112,22 @@ func LitAdrBytes(adr string) ([]byte, error) {
 // OldAddressFromPKH returns a base58 string from a 20 byte pubkey hash
 func OldAddressFromPKH(pkHash [20]byte, netID byte) string {
 	return base58.CheckEncode(pkHash[:], netID)
+}
+
+// ParseAdrString splits a string like
+// "ln1yrvw48uc3atg8e2lzs43mh74m39vl785g4ehem@myhost.co:8191 into a separate
+// pkh part and network part, adding the network part if needed
+func ParseAdrString(adr string) (string, string) {
+
+	if !strings.ContainsRune(adr, ':') && strings.ContainsRune(adr, '@') {
+		adr += ":2448"
+	}
+
+	idHost := strings.Split(adr, "@")
+
+	if len(idHost) == 1 {
+		return idHost[0], ""
+	}
+
+	return idHost[0], idHost[1]
 }
