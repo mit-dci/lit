@@ -135,6 +135,8 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 			if partialPath.CoinType != channel.Link.CoinType {
 				// we need to exchange, but is it possible?
 				var rates []lnutil.RateDesc
+
+				// first get the list of rates
 				for _, link := range nd.ChannelMap[bestNode] {
 					if link.Link.CoinType == partialPath.CoinType {
 						rates = link.Link.Rates
@@ -142,6 +144,9 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 					}
 				}
 
+				fmt.Printf("got rates for %d: %v", partialPath.CoinType, rates)
+
+				// then find the rate we want
 				for _, rate := range rates {
 					if rate.CoinType == channel.Link.CoinType && rate.Rate > 0 {
 						rd = &rate
@@ -151,7 +156,7 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 
 				if rd == nil {
 					// it's not possible to exchange these two coin types
-					fmt.Printf("can't exchange %d for %d via %s", partialPath.CoinType, channel.Link.CoinType, bech32.Encode("ln", channel.Link.BPKH[:]))
+					fmt.Printf("can't exchange %d for %d via %s\n", partialPath.CoinType, channel.Link.CoinType, bech32.Encode("ln", bestNode[:]))
 					continue
 				}
 			}
@@ -172,7 +177,7 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 
 			if amtRqd < consts.MinOutput+fee {
 				// exchanging to this point has pushed the amount too low
-				fmt.Printf("exchanging %d for %d via %s pushes the amount too low: %d", partialPath.CoinType, channel.Link.CoinType, bech32.Encode("ln", channel.Link.BPKH[:]), amtRqd)
+				fmt.Printf("exchanging %d for %d via %s pushes the amount too low: %d\n", partialPath.CoinType, channel.Link.CoinType, bech32.Encode("ln", channel.Link.BPKH[:]), amtRqd)
 				continue
 			}
 
