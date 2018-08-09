@@ -149,9 +149,11 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 					}
 				}
 
-				// it's not possible to exchange these two coin types
-				fmt.Printf("can't exchange %d for %d via %s", partialPath.CoinType, channel.Link.CoinType, bech32.Encode("ln", channel.Link.BPKH[:]))
-				continue
+				if rd == nil {
+					// it's not possible to exchange these two coin types
+					fmt.Printf("can't exchange %d for %d via %s", partialPath.CoinType, channel.Link.CoinType, bech32.Encode("ln", channel.Link.BPKH[:]))
+					continue
+				}
 			}
 
 			amtRqd := partialPath.Amt
