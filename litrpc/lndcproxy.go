@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/mit-dci/lit/btcutil/btcec"
 	"golang.org/x/net/websocket"
 )
 
@@ -18,7 +19,7 @@ func NewLocalLndcRpcWebsocketProxy() (*LndcRpcWebsocketProxy, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewLocalLndcRpcWebsocketProxyWithLndc(client), nil
+	return newLndcRpcWebsocketProxyWithLndc(client), nil
 }
 
 func NewLocalLndcRpcWebsocketProxyWithPort(port uint32) (*LndcRpcWebsocketProxy, error) {
@@ -26,7 +27,7 @@ func NewLocalLndcRpcWebsocketProxyWithPort(port uint32) (*LndcRpcWebsocketProxy,
 	if err != nil {
 		return nil, err
 	}
-	return NewLocalLndcRpcWebsocketProxyWithLndc(client), nil
+	return newLndcRpcWebsocketProxyWithLndc(client), nil
 }
 
 func NewLocalLndcRpcWebsocketProxyWithHomeDirAndPort(litHomeDir string, port uint32) (*LndcRpcWebsocketProxy, error) {
@@ -34,10 +35,18 @@ func NewLocalLndcRpcWebsocketProxyWithHomeDirAndPort(litHomeDir string, port uin
 	if err != nil {
 		return nil, err
 	}
-	return NewLocalLndcRpcWebsocketProxyWithLndc(client), nil
+	return newLndcRpcWebsocketProxyWithLndc(client), nil
 }
 
-func NewLocalLndcRpcWebsocketProxyWithLndc(lndcRpcClient *LndcRpcClient) *LndcRpcWebsocketProxy {
+func NewLndcRpcWebsocketProxy(litAdr string, key *btcec.PrivateKey) (*LndcRpcWebsocketProxy, error) {
+	client, err := NewLndcRpcClient(litAdr, key)
+	if err != nil {
+		return nil, err
+	}
+	return newLndcRpcWebsocketProxyWithLndc(client), nil
+}
+
+func newLndcRpcWebsocketProxyWithLndc(lndcRpcClient *LndcRpcClient) *LndcRpcWebsocketProxy {
 	proxy := new(LndcRpcWebsocketProxy)
 	proxy.lndcRpcClient = lndcRpcClient
 	return proxy
