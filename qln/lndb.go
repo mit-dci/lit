@@ -144,6 +144,8 @@ type LitNode struct {
 
 	InProgMultihop []*InFlightMultihop
 	MultihopMutex  sync.Mutex
+
+	ExchangeRates map[uint32][]lnutil.RateDesc
 }
 
 type LinkDesc struct {

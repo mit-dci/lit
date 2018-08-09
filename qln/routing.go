@@ -2,8 +2,13 @@ package qln
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"math"
+	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -20,6 +25,12 @@ func (nd *LitNode) InitRouting() {
 	nd.ChannelMapMtx.Lock()
 	defer nd.ChannelMapMtx.Unlock()
 	nd.ChannelMap = make(map[[20]byte][]LinkDesc)
+	nd.ExchangeRates = make(map[uint32][]lnutil.RateDesc)
+
+	err := nd.PopulateRates()
+	if err != nil {
+		log.Printf("failure loading exchange rates: %s", err.Error())
+	}
 
 	nd.AdvTimeout = time.NewTicker(15 * time.Second)
 
@@ -271,6 +282,10 @@ func (nd *LitNode) advertiseLinks(seq uint32) {
 
 			outmsg.ACapacity = capacity
 
+			if rates, ok := nd.ExchangeRates[coin]; ok {
+				outmsg.Rates = rates
+			}
+
 			outmsg.PeerIdx = math.MaxUint32
 
 			msgs = append(msgs, outmsg)
@@ -329,4 +344,25 @@ func (nd *LitNode) LinkMsgHandler(msg lnutil.LinkMsg) {
 			}(msg)
 		}
 	}
+}
+
+func (nd *LitNode) PopulateRates() error {
+	ratesPath := filepath.Join(nd.LitFolder, "rates.json")
+
+	jsonFile, err := os.Open(ratesPath)
+	if err != nil {
+		return err
+	}
+	defer jsonFile.Close()
+
+	byteValue, err := ioutil.ReadAll(jsonFile)
+	if err != nil {
+		return err
+	}
+	err = json.Unmarshal(byteValue, &nd.ExchangeRates)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
