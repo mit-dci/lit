@@ -138,17 +138,17 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 
 				// first get the list of rates
 				for _, link := range nd.ChannelMap[bestNode] {
-					if link.Link.CoinType == partialPath.CoinType {
+					if link.Link.CoinType == channel.Link.CoinType {
 						rates = link.Link.Rates
 						break
 					}
 				}
 
-				fmt.Printf("got rates for %d: %v", partialPath.CoinType, rates)
+				fmt.Printf("got rates for %d: %v\n", partialPath.CoinType, rates)
 
 				// then find the rate we want
 				for _, rate := range rates {
-					if rate.CoinType == channel.Link.CoinType && rate.Rate > 0 {
+					if rate.CoinType == partialPath.CoinType && rate.Rate > 0 {
 						rd = &rate
 						break
 					}
