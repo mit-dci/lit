@@ -83,6 +83,31 @@ func (nd *LitNode) VisualiseGraph() string {
 	return "di" + graph.String()
 }
 
+// FindPathBF uses Bellman-Ford to find the path with the best price
+func (nd *LitNode) FindPathBF(targetPkh [20]byte, destCoinType uint32, originCoinType uint32, amount int64, fee int64) ([]lnutil.RouteHop, error) {
+	var myIdPkh [20]byte
+	idHash := fastsha256.Sum256(nd.IdKey().PubKey().SerializeCompressed())
+	copy(myIdPkh[:], idHash[:20])
+
+	var vertices []lnutil.RouteHop
+	//var edges []
+
+	distance := make(map[lnutil.RouteHop]float64)
+	predecessor := make(map[lnutil.RouteHop]*lnutil.RouteHop)
+
+	nd.ChannelMapMtx.Lock()
+	for _, channels := range nd.ChannelMap {
+		for _, channel := range channels {
+			vertex := lnutil.RouteHop{channel.BPKH, channel.CoinType}
+			distance[vertex] = math.MaxFloat64
+
+		}
+	}
+	nd.ChannelMapMtx.Unlock()
+
+}
+
+// FindPath uses Dijkstra's algorithm to find the path with the fewest hops
 func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinType uint32, amount int64, fee int64) ([]lnutil.RouteHop, error) {
 	var myIdPkh [20]byte
 	idHash := fastsha256.Sum256(nd.IdKey().PubKey().SerializeCompressed())
