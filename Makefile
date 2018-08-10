@@ -41,6 +41,7 @@ clean:
 	rm -rf build/_workspace/
 	rm -f cmd/lit-af/lit-af
 	rm -f cmd/glit/glit
+	cd test && ./clean.sh
 
 test: lit
 	build/env.sh ./gotests.sh
