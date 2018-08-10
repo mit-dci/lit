@@ -2,15 +2,16 @@ package qln
 
 import (
 	"fmt"
-	"log"
-	"net"
-	"strings"
-	"strconv"
-	"time"
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
 	nat "github.com/mit-dci/lit/nat"
+	shortadr "github.com/mit-dci/lit/shortadr"
+	"log"
+	"net"
+	"strconv"
+	"strings"
+	"time"
 )
 
 // Gets the list of ports where LitNode is listening for incoming connections,
@@ -73,6 +74,10 @@ func (nd *LitNode) TCPListener(
 	var idPub [33]byte
 	copy(idPub[:], idPriv.PubKey().SerializeCompressed())
 
+	byteString := idPub
+	log.Println("WATCH THIS", byteString, idPub)
+	vanity := shortadr.GenVanityAdr(byteString, "lqp") //define vanity address needed here
+	log.Println("VANITY ADR", vanity)
 	adr := lnutil.LitAdrFromPubkey(idPub)
 
 	// Don't announce on the tracker if we are communicating via SOCKS proxy
@@ -223,7 +228,7 @@ func (nd *LitNode) OutMessager() {
 type PeerInfo struct {
 	PeerNumber uint32
 	RemoteHost string
-	LitAdr 	   string
+	LitAdr     string
 	Nickname   string
 }
 

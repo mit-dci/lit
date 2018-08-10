@@ -69,6 +69,7 @@ func LitAdrFromPubkey(in [33]byte) string {
 	return bech32.Encode("ln", doubleSha[:20])
 }
 
+func ShorterAdrFromPubkey(in [31]byte, nonce [20]byte){}
 // LitAdrOK make sure the address is OK.  Either it has a valid checksum, or
 // it's shortened and doesn't.
 func LitAdrOK(adr string) bool {
