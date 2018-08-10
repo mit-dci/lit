@@ -89,8 +89,15 @@ func (nd *LitNode) FindPathBF(targetPkh [20]byte, destCoinType uint32, originCoi
 	idHash := fastsha256.Sum256(nd.IdKey().PubKey().SerializeCompressed())
 	copy(myIdPkh[:], idHash[:20])
 
+	type channelEdge struct {
+		W float64
+		U lnutil.RouteHop
+		V lnutil.RouteHop
+	}
+
+	// set up initial graph
+	var edges []channelEdge
 	var vertices []lnutil.RouteHop
-	//var edges []
 
 	distance := make(map[lnutil.RouteHop]float64)
 	predecessor := make(map[lnutil.RouteHop]*lnutil.RouteHop)
@@ -98,13 +105,75 @@ func (nd *LitNode) FindPathBF(targetPkh [20]byte, destCoinType uint32, originCoi
 	nd.ChannelMapMtx.Lock()
 	for _, channels := range nd.ChannelMap {
 		for _, channel := range channels {
-			vertex := lnutil.RouteHop{channel.BPKH, channel.CoinType}
+			vertex := lnutil.RouteHop{channel.Link.BPKH, channel.Link.CoinType}
 			distance[vertex] = math.MaxFloat64
 
+			for _, rate := range channel.Link.Rates {
+				var price float64
+				if rate.Reciprocal {
+					price = 1.0 / float64(rate.Rate)
+				} else {
+					price = float64(rate.Rate)
+				}
+
+				weight := -math.Log(price)
+
+				edge := channelEdge{
+					weight,
+					lnutil.RouteHop{
+						channel.Link.APKH,
+						rate.CoinType,
+					},
+					vertex,
+				}
+
+				edges = append(edges, edge)
+			}
 		}
 	}
 	nd.ChannelMapMtx.Unlock()
 
+	for v := range distance {
+		vertices = append(vertices, v)
+	}
+
+	distance[lnutil.RouteHop{myIdPkh, originCoinType}] = 0
+
+	// relax the edges
+	for i := 0; i < len(vertices); i++ {
+		var relaxed bool
+		for _, edge := range edges {
+			if distance[edge.U]+edge.W < distance[edge.V] {
+				distance[edge.V] = distance[edge.U] + edge.W
+				predecessor[edge.V] = &edge.U
+				relaxed = true
+			}
+		}
+
+		// we didn't relax any edges in the last round so we can quit early
+		if !relaxed {
+			break
+		}
+	}
+
+	// check for negative-weight cycles
+	for _, edge := range edges {
+		if distance[edge.U]+edge.W < distance[edge.V] {
+			return nil, fmt.Errorf("negative weight cycle in channel graph")
+		}
+	}
+
+	weight, ok := distance[lnutil.RouteHop{targetPkh, destCoinType}]
+	if !ok || weight == math.MaxFloat64 {
+		return nil, fmt.Errorf("no route to destination could be found")
+	}
+
+	route := []lnutil.RouteHop{*predecessor[lnutil.RouteHop{targetPkh, destCoinType}], {targetPkh, destCoinType}}
+	for predecessor[route[0]] != nil {
+		route = append([]lnutil.RouteHop{*predecessor[route[0]]}, route...)
+	}
+
+	return route, nil
 }
 
 // FindPath uses Dijkstra's algorithm to find the path with the fewest hops
