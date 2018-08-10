@@ -41,21 +41,21 @@ func AdrWorker(
 }
 
 // doOneTry is a single hash attempt with a key and nonce
-func DoOneTry(key [33]byte, id, nonce uint64) [20]byte {
+func DoOneTry(key [33]byte, id, nonce uint64) (hash [20]byte) {
 	var buf bytes.Buffer
 	buf.Write(key[:])
 	binary.Write(&buf, binary.BigEndian, id)
 	binary.Write(&buf, binary.BigEndian, nonce)
 
 	shaoutput := fastsha256.Sum256(buf.Bytes())
-	var hash [20]byte
 	copy(hash[:], shaoutput[:20])
-	return hash
+	return
 }
 
 // CheckWork returns the number of leading 0 bits
+// make it not crash with all zero hash arguments
 func CheckWork(hash [20]byte) (i uint8) {
-	for ; (hash[i/8]>>(7-(i%8)))&1 == 0; i++ {
+	for ; i < 160 && (hash[i/8]>>(7-(i%8)))&1 == 0; i++ {
 	}
-	return i
+	return
 }
