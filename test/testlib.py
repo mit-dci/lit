@@ -123,7 +123,7 @@ class LitNode():
     def update_peers(self):
         res = self.rpc.ListConnections()
         if "_error" in res:
-            raise AssertError("couldn't ask for peers")
+            raise AssertionError("couldn't ask for peers")
         pm = {}
         for p in res['Connections']:
             pm[p['LitAdr']] = p['PeerNumber']
@@ -137,6 +137,21 @@ class LitNode():
             if b['CoinType'] == ct:
                 return b
         return None
+
+    def open_channel(self, peer, capacity, initialsend, cointype=None):
+        ct = REGTEST_COINTYPE
+        if cointype is not None: # I had to do thi because of reasons.
+            ct = cointype
+        res = self.rpc.FundChannel(
+            Peer=self.get_peer_id(peer),
+            CoinType=ct,
+            Capacity=capacity,
+            InitialSend=initialsend,
+            Data=None) # maybe use [0 for _ in range(32)] or something?
+        if type(res) is str:
+            raise AssertionError('failed to open channel: ' + str(res))
+        else:
+            return res['ChanIdx']
 
     def shutdown(self):
         if self.proc is not None:

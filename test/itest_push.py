@@ -32,37 +32,29 @@ def run_test(env):
     print('fees set to', fee, '(per byte)')
 
     # Now actually do the funding.
-    # TODO Abstract this call onto the LitNode object.
-    res = lit1.rpc.FundChannel(
-        Peer=lit1.get_peer_id(lit2),
-        CoinType=testlib.REGTEST_COINTYPE,
-        Capacity=capacity,
-        InitialSend=initialsend,
-        Data=None) # maybe use [0 for _ in range(32)] or something?
-
-    chan_id = res['ChanIdx']
-    print('Created channel ( ID', chan_id, ')')
+    cid = lit1.open_channel(lit2, capacity, initialsend)
+    print('Created channel:', cid)
 
     # Now we confirm the block.
     env.generate_block()
 
     # Figure out if it's actually open now.
-    res = lit1.rpc.ChannelList(ChanIdx=chan_id)
+    res = lit1.rpc.ChannelList(ChanIdx=cid)
     cinfo = res['Channels'][0]
     assert cinfo['Height'] == env.get_height(), "Channel height doesn't match new block."
 
     # Now update the balances back and forth a bit to make sure it all works.
     ct0 = lit1.get_balance_info()['ChanTotal']
-    lit1.rpc.Push(ChanIdx=chan_id, Amt=1000, Data=None)
+    lit1.rpc.Push(ChanIdx=cid, Amt=1000, Data=None)
     ct1 = lit1.get_balance_info()['ChanTotal']
     assert ct1 == ct0 - 1000, "channel update didn't work properly"
-    lit1.rpc.Push(ChanIdx=chan_id, Amt=10000, Data=None)
+    lit1.rpc.Push(ChanIdx=cid, Amt=10000, Data=None)
     ct2 = lit1.get_balance_info()['ChanTotal']
     assert ct2 == ct1 - 10000, "channel update didn't work properly"
-    lit2.rpc.Push(ChanIdx=chan_id, Amt=5000, Data=None)
+    lit2.rpc.Push(ChanIdx=cid, Amt=5000, Data=None)
     ct3 = lit1.get_balance_info()['ChanTotal']
     assert ct3 == ct2 + 5000, "channel update didn't work properly"
-    lit1.rpc.Push(ChanIdx=chan_id, Amt=250, Data=None)
+    lit1.rpc.Push(ChanIdx=cid, Amt=250, Data=None)
     ct4 = lit1.get_balance_info()['ChanTotal']
     assert ct4 == ct3 - 250, "channel update didn't work properly"
 

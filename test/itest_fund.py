@@ -32,29 +32,15 @@ def run_test(env):
     print('fees set to', fee, '(per byte)')
 
     # Now actually do the funding.
-    # TODO Abstract this call onto the LitNode object.
-    res = lit1.rpc.FundChannel(
-        Peer=lit1.get_peer_id(lit2),
-        CoinType=testlib.REGTEST_COINTYPE,
-        Capacity=capacity,
-        InitialSend=initialsend,
-        Data=None) # maybe use [0 for _ in range(32)] or something?
-
-    assert res is not None, "got None result to Fund, something is wrong!"
-
-    if "_error" in res:
-        print(str(res))
-        raise AssertionError("Failed to create channel!")
-
-    print('Status:', res['Status'])
-    chan_id = res['ChanIdx']
+    cid = lit1.open_channel(lit2, capacity, initialsend)
+    print('Created channel:', cid)
 
     # Now we confirm the block.
     env.generate_block()
     print('Mined new block to confirm channel')
 
     # Figure out if it's actually open now.
-    res = lit1.rpc.ChannelList(ChanIdx=chan_id)
+    res = lit1.rpc.ChannelList(ChanIdx=cid)
     cinfo = res['Channels'][0]
     assert cinfo['Height'] == env.get_height(), "Channel height doesn't match new block."
 

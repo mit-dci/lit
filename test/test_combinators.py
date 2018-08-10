@@ -34,29 +34,21 @@ def run_pushclose_test(env, initiator, target, closer):
     print('fees set to', fee, '(per byte)')
 
     # Now actually do the funding.
-    # TODO Abstract this call onto the LitNode object.
-    res = initiator.rpc.FundChannel(
-        Peer=initiator.get_peer_id(target),
-        CoinType=testlib.REGTEST_COINTYPE,
-        Capacity=capacity,
-        InitialSend=initialsend,
-        Data=None) # maybe use [0 for _ in range(32)] or something?
-
-    chan_id = res['ChanIdx']
-    print('Created channel ( ID', chan_id, ')')
+    cid = initiator.open_channel(target, capacity, initialsend)
+    print('Created channel:', cid)
 
     # Now we confirm the block.
     env.generate_block()
 
     # Figure out if it's actually open now.
-    res = initiator.rpc.ChannelList(ChanIdx=chan_id)
+    res = initiator.rpc.ChannelList(ChanIdx=cid)
     cinfo = res['Channels'][0]
     assert cinfo['Height'] == env.get_height(), "Channel height doesn't match new block."
 
     # Send the money through the channel.
     ct0initiator = initiator.get_balance_info()['ChanTotal']
     ct0target = target.get_balance_info()['ChanTotal']
-    initiator.rpc.Push(ChanIdx=chan_id, Amt=pushsend, Data=None)
+    initiator.rpc.Push(ChanIdx=cid, Amt=pushsend, Data=None)
     ct1initiator = initiator.get_balance_info()['ChanTotal']
     ct1target = target.get_balance_info()['ChanTotal']
     assert ct1initiator == ct0initiator - pushsend, "channel balances don't match up"
@@ -65,7 +57,7 @@ def run_pushclose_test(env, initiator, target, closer):
     # Close it, but Alice be the initiator.
     print('Closing channel... (with Alice)')
     tt0 = target.get_balance_info()['TxoTotal']
-    res = closer.rpc.CloseChannel(ChanIdx=chan_id)
+    res = closer.rpc.CloseChannel(ChanIdx=cid)
     print('Status:', res['Status'])
     print('Mining new block(s) to confirm closure...')
     env.generate_block(count=20)
@@ -101,29 +93,21 @@ def run_pushbreak_test(env, initiator, target, breaker):
     print('fees set to', fee, '(per byte)')
 
     # Now actually do the funding.
-    # TODO Abstract this call onto the LitNode object.
-    res = initiator.rpc.FundChannel(
-        Peer=initiator.get_peer_id(target),
-        CoinType=testlib.REGTEST_COINTYPE,
-        Capacity=capacity,
-        InitialSend=initialsend,
-        Data=None) # maybe use [0 for _ in range(32)] or something?
-
-    chan_id = res['ChanIdx']
-    print('Created channel ( ID', chan_id, ')')
+    cid = initiator.open_channel(target, capacity, initialsend)
+    print('Created channel:', cid)
 
     # Now we confirm the block.
     env.generate_block()
 
     # Figure out if it's actually open now.
-    res = initiator.rpc.ChannelList(ChanIdx=chan_id)
+    res = initiator.rpc.ChannelList(ChanIdx=cid)
     cinfo = res['Channels'][0]
     assert cinfo['Height'] == env.get_height(), "Channel height doesn't match new block."
 
     # Send the money through the channel.
     ct0initiator = initiator.get_balance_info()['ChanTotal']
     ct0target = target.get_balance_info()['ChanTotal']
-    initiator.rpc.Push(ChanIdx=chan_id, Amt=pushsend, Data=None)
+    initiator.rpc.Push(ChanIdx=cid, Amt=pushsend, Data=None)
     ct1initiator = initiator.get_balance_info()['ChanTotal']
     ct1target = target.get_balance_info()['ChanTotal']
     assert ct1initiator == ct0initiator - pushsend, "channel balances don't match up"
@@ -132,7 +116,7 @@ def run_pushbreak_test(env, initiator, target, breaker):
     # Close it, but Bob be the initiator.
     print('Breaking channel... (with Bob)')
     tt0 = target.get_balance_info()['TxoTotal']
-    res = breaker.rpc.BreakChannel(ChanIdx=chan_id)
+    res = breaker.rpc.BreakChannel(ChanIdx=cid)
     print('Status:', str(res))
     print('Mining new block(s) to confirm closure...')
     env.generate_block(count=20)
@@ -167,23 +151,15 @@ def run_close_test(env, initiator, target, closer):
     target.rpc.SetFee(Fee=fee, CoinType=testlib.REGTEST_COINTYPE)
 
     # Now actually do the funding.
-    # TODO Abstract this call onto the LitNode object.
-    res = initiator.rpc.FundChannel(
-        Peer=initiator.get_peer_id(target),
-        CoinType=testlib.REGTEST_COINTYPE,
-        Capacity=capacity,
-        InitialSend=initialsend,
-        Data=None) # maybe use [0 for _ in range(32)] or something?
-
-    chan_id = res['ChanIdx']
-    print('Created channel ( ID', chan_id, ')')
+    cid = initiator.open_channel(target, capacity, initialsend)
+    print('Created channel:', cid)
 
     # Now we confirm the block.
     env.generate_block()
 
     # Now close the channel.
     print('Now closing...')
-    res = closer.rpc.CloseChannel(ChanIdx=chan_id)
+    res = closer.rpc.CloseChannel(ChanIdx=cid)
     print('Status:', res['Status'])
     env.generate_block()
 
@@ -220,23 +196,18 @@ def run_break_test(env, initiator, target, breaker):
     target.rpc.SetFee(Fee=fee, CoinType=testlib.REGTEST_COINTYPE)
 
     # Now actually do the funding.
-    # TODO Abstract this call onto the LitNode object.
-    res = initiator.rpc.FundChannel(
-        Peer=initiator.get_peer_id(target),
-        CoinType=testlib.REGTEST_COINTYPE,
-        Capacity=capacity,
-        InitialSend=initialsend,
-        Data=None) # maybe use [0 for _ in range(32)] or something?
+    cid = initiator.open_channel(target, capacity, initialsend)
+    print('Created channel:', cid)
 
-    chan_id = res['ChanIdx']
-    print('Created channel ( ID', chan_id, ')')
+    # Now we confirm the block.
+    env.generate_block()
 
     # Now we confirm the block.
     env.generate_block(count=5)
 
     # Now close the channel.
     print('Now breaking channel...')
-    res = breaker.rpc.BreakChannel(ChanIdx=chan_id)
+    res = breaker.rpc.BreakChannel(ChanIdx=cid)
     print('Status:', str(res))
 
     # Now we figure out the balances at 2 points in time.
@@ -246,6 +217,6 @@ def run_break_test(env, initiator, target, breaker):
     bi2 = initiator.get_balance_info()
     print(str(bi2))
 
-    print(str(initiator.rpc.ChannelList(ChanIdx=chan_id)['Channels']))
+    print(str(initiator.rpc.ChannelList(ChanIdx=cid)['Channels']))
     assert bi2['ChanTotal'] == 0, "channel balance isn't zero!"
     # TODO Make sure the channel actually gets broken.
