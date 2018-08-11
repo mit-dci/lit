@@ -83,22 +83,26 @@ func (nd *LitNode) VisualiseGraph() string {
 	return "di" + graph.String()
 }
 
-// FindPathBF uses Bellman-Ford to find the path with the best price
-func (nd *LitNode) FindPathBF(targetPkh [20]byte, destCoinType uint32, originCoinType uint32, amount int64, fee int64) ([]lnutil.RouteHop, error) {
+// FindPath uses Bellman-Ford and Dijkstra to find the path with the best price that has enough capacity to route the payment
+func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinType uint32, amount int64, fee int64) ([]lnutil.RouteHop, error) {
 	var myIdPkh [20]byte
 	idHash := fastsha256.Sum256(nd.IdKey().PubKey().SerializeCompressed())
 	copy(myIdPkh[:], idHash[:20])
 
 	type channelEdge struct {
-		W float64
-		U lnutil.RouteHop
-		V lnutil.RouteHop
+		W        float64
+		U        lnutil.RouteHop
+		V        lnutil.RouteHop
+		Rate     lnutil.RateDesc
+		Capacity int64
 	}
 
 	type channelEdgeLight struct {
-		W float64
-		U int
-		V int
+		W        float64
+		U        int
+		V        int
+		Rate     lnutil.RateDesc
+		Capacity int64
 	}
 
 	// set up initial graph
@@ -131,12 +135,15 @@ func (nd *LitNode) FindPathBF(targetPkh [20]byte, destCoinType uint32, originCoi
 						rate.CoinType,
 					},
 					vertex,
+					rate,
+					channel.Link.ACapacity,
 				}
 
 				edges = append(edges, edge)
 			}
 		}
 	}
+	nd.ChannelMapMtx.Unlock()
 
 	var predecessor []int
 	var distance []float64
@@ -153,11 +160,11 @@ func (nd *LitNode) FindPathBF(targetPkh [20]byte, destCoinType uint32, originCoi
 			edge.W,
 			verticesMap[edge.U],
 			verticesMap[edge.V],
+			edge.Rate,
+			edge.Capacity,
 		})
 
 	}
-
-	nd.ChannelMapMtx.Unlock()
 
 	// find my ID in map
 	myId, ok := verticesMap[lnutil.RouteHop{myIdPkh, originCoinType}]
@@ -182,6 +189,8 @@ func (nd *LitNode) FindPathBF(targetPkh [20]byte, destCoinType uint32, originCoi
 				0,
 				len(vertices) - 1,
 				idx,
+				lnutil.RateDesc{},
+				0,
 			})
 		}
 	}
@@ -248,18 +257,45 @@ func (nd *LitNode) FindPathBF(targetPkh [20]byte, destCoinType uint32, originCoi
 		partialPath := heap.Pop(&nodeHeap).(nodeWithDist)
 
 		for _, edge := range dEdges[partialPath.Node] {
+			amtRqd := partialPath.Amt
+
+			if edge.Rate.CoinType != vertices[partialPath.Node].CoinType {
+				// required capacity is last hop amt * rate
+				if edge.Rate.Reciprocal {
+					// prior hop coin type is worth less than this one
+					amtRqd /= edge.Rate.Rate
+				} else {
+					// prior hop coin type is worth more than this one
+					amtRqd *= edge.Rate.Rate
+				}
+			}
+
+			if amtRqd < consts.MinOutput+fee {
+				// this amount is too small to route
+				continue
+			}
+
+			if amtRqd > edge.Capacity {
+				// this channel doesn't have enough capacity
+				continue
+			}
+
 			alt := dDistance[partialPath.Node].Dist + edge.W
 			if dDistance[edge.V] == nil {
 				dDistance[edge.V] = &nodeWithDist{
 					alt,
 					edge.V,
-					0,
+					amtRqd,
 				}
-				predecessor[edge.V] = edge.U
 			} else if alt < dDistance[edge.V].Dist {
 				dDistance[edge.V].Dist = alt
-				predecessor[edge.V] = edge.U
+				dDistance[edge.V].Amt = amtRqd
+			} else {
+				continue
 			}
+
+			predecessor[edge.V] = edge.U
+			heap.Push(&nodeHeap, dDistance[edge.V])
 		}
 	}
 
@@ -280,9 +316,9 @@ func (nd *LitNode) FindPathBF(targetPkh [20]byte, destCoinType uint32, originCoi
 	return route, nil
 }
 
-// FindPath uses Dijkstra's algorithm to find the path with the fewest hops
+/* FindPath uses Dijkstra's algorithm to find the path with the fewest hops
 func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinType uint32, amount int64, fee int64) ([]lnutil.RouteHop, error) {
-	/*var myIdPkh [20]byte
+	var myIdPkh [20]byte
 	idHash := fastsha256.Sum256(nd.IdKey().PubKey().SerializeCompressed())
 	copy(myIdPkh[:], idHash[:20])
 
@@ -424,10 +460,10 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 	route := []lnutil.RouteHop{prev[lnutil.RouteHop{targetPkh, destCoinType}], {targetPkh, destCoinType}}
 	for !(bytes.Equal(route[0].Node[:], myIdPkh[:]) && route[0].CoinType == originCoinType) {
 		route = append([]lnutil.RouteHop{prev[route[0]]}, route...)
-	}*/
+	}
 
 	return nil, nil
-}
+}*/
 
 func (nd *LitNode) cleanStaleChannels() {
 	nd.ChannelMapMtx.Lock()
