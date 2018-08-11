@@ -95,18 +95,24 @@ func (nd *LitNode) FindPathBF(targetPkh [20]byte, destCoinType uint32, originCoi
 		V lnutil.RouteHop
 	}
 
+	type channelEdgeLight struct {
+		W float64
+		U int
+		V int
+	}
+
 	// set up initial graph
 	var edges []channelEdge
 	var vertices []lnutil.RouteHop
+	var edgesLight []channelEdgeLight
 
-	distance := make(map[lnutil.RouteHop]float64)
-	predecessor := make(map[lnutil.RouteHop]*lnutil.RouteHop)
+	verticesMap := make(map[lnutil.RouteHop]int)
 
 	nd.ChannelMapMtx.Lock()
 	for _, channels := range nd.ChannelMap {
 		for _, channel := range channels {
 			vertex := lnutil.RouteHop{channel.Link.BPKH, channel.Link.CoinType}
-			distance[vertex] = math.MaxFloat64
+			verticesMap[vertex] = -1
 
 			for _, rate := range channel.Link.Rates {
 				var price float64
@@ -131,21 +137,62 @@ func (nd *LitNode) FindPathBF(targetPkh [20]byte, destCoinType uint32, originCoi
 			}
 		}
 	}
-	nd.ChannelMapMtx.Unlock()
 
-	for v := range distance {
-		vertices = append(vertices, v)
+	var predecessor []int
+	var distance []float64
+
+	for k, _ := range verticesMap {
+		vertices = append(vertices, k)
+		distance = append(distance, math.MaxFloat64)
+		predecessor = append(predecessor, -1)
+		verticesMap[k] = len(vertices) - 1
 	}
 
-	distance[lnutil.RouteHop{myIdPkh, originCoinType}] = 0
+	for _, edge := range edges {
+		edgesLight = append(edgesLight, channelEdgeLight{
+			edge.W,
+			verticesMap[edge.U],
+			verticesMap[edge.V],
+		})
 
-	// relax the edges
+	}
+
+	nd.ChannelMapMtx.Unlock()
+
+	// find my ID in map
+	myId, ok := verticesMap[lnutil.RouteHop{myIdPkh, originCoinType}]
+	if !ok {
+		return nil, fmt.Errorf("origin node not found")
+	}
+
+	targetId, ok := verticesMap[lnutil.RouteHop{targetPkh, destCoinType}]
+	if !ok {
+		return nil, fmt.Errorf("destination node not found")
+	}
+
+	// add dummy vertex q to the map
+	vertices = append(vertices, lnutil.RouteHop{[20]byte{}, 0})
+	distance = append(distance, 0)
+	predecessor = append(predecessor, -1)
+
+	// connect q to every other vertex
+	for idx := range vertices {
+		if idx < len(vertices)-1 {
+			edgesLight = append(edgesLight, channelEdgeLight{
+				0,
+				len(vertices) - 1,
+				idx,
+			})
+		}
+	}
+
+	// relax the edges from q
 	for i := 0; i < len(vertices); i++ {
 		var relaxed bool
-		for _, edge := range edges {
+		for _, edge := range edgesLight {
 			if distance[edge.U]+edge.W < distance[edge.V] {
 				distance[edge.V] = distance[edge.U] + edge.W
-				predecessor[edge.V] = &edge.U
+				predecessor[edge.V] = edge.U
 				relaxed = true
 			}
 		}
@@ -157,20 +204,77 @@ func (nd *LitNode) FindPathBF(targetPkh [20]byte, destCoinType uint32, originCoi
 	}
 
 	// check for negative-weight cycles
-	for _, edge := range edges {
+	for _, edge := range edgesLight {
 		if distance[edge.U]+edge.W < distance[edge.V] {
 			return nil, fmt.Errorf("negative weight cycle in channel graph")
 		}
 	}
 
-	weight, ok := distance[lnutil.RouteHop{targetPkh, destCoinType}]
-	if !ok || weight == math.MaxFloat64 {
-		return nil, fmt.Errorf("no route to destination could be found")
+	// reweight original graph
+	for idx, edge := range edgesLight {
+		edgesLight[idx].W += distance[edge.U] - distance[edge.V]
 	}
 
-	route := []lnutil.RouteHop{*predecessor[lnutil.RouteHop{targetPkh, destCoinType}], {targetPkh, destCoinType}}
-	for predecessor[route[0]] != nil {
-		route = append([]lnutil.RouteHop{*predecessor[route[0]]}, route...)
+	// remove q and its edges
+	edgesLight = edgesLight[:len(edges)]
+	vertices = vertices[:len(vertices)-1]
+	predecessor = predecessor[:len(predecessor)-1]
+	distance = distance[:len(distance)-1]
+
+	// run dijkstra over the reweighted graph to find the lowest weight route
+	// with enough capacity to route the amount we want to send
+	dDistance := make([]*nodeWithDist, len(vertices))
+	dEdges := make([][]channelEdgeLight, len(vertices))
+
+	dDistance[myId] = &nodeWithDist{
+		0,
+		myId,
+		amount,
+	}
+
+	for idx := range predecessor {
+		predecessor[idx] = -1
+	}
+
+	for _, edge := range edgesLight {
+		dEdges[edge.U] = append(dEdges[edge.U], edge)
+	}
+
+	var nodeHeap distanceHeap
+
+	heap.Push(&nodeHeap, dDistance[myId])
+
+	for nodeHeap.Len() > 0 {
+		partialPath := heap.Pop(&nodeHeap).(nodeWithDist)
+
+		for _, edge := range dEdges[partialPath.Node] {
+			alt := dDistance[partialPath.Node].Dist + edge.W
+			if dDistance[edge.V] == nil {
+				dDistance[edge.V] = &nodeWithDist{
+					alt,
+					edge.V,
+					0,
+				}
+				predecessor[edge.V] = edge.U
+			} else if alt < dDistance[edge.V].Dist {
+				dDistance[edge.V].Dist = alt
+				predecessor[edge.V] = edge.U
+			}
+		}
+	}
+
+	if dDistance[targetId] == nil {
+		return nil, fmt.Errorf("no route from origin to destination could be found")
+	}
+
+	routeIds := []int{predecessor[targetId], targetId}
+	for predecessor[routeIds[0]] != -1 {
+		routeIds = append([]int{predecessor[routeIds[0]]}, routeIds...)
+	}
+
+	var route []lnutil.RouteHop
+	for _, id := range routeIds {
+		route = append(route, vertices[id])
 	}
 
 	return route, nil
@@ -178,7 +282,7 @@ func (nd *LitNode) FindPathBF(targetPkh [20]byte, destCoinType uint32, originCoi
 
 // FindPath uses Dijkstra's algorithm to find the path with the fewest hops
 func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinType uint32, amount int64, fee int64) ([]lnutil.RouteHop, error) {
-	var myIdPkh [20]byte
+	/*var myIdPkh [20]byte
 	idHash := fastsha256.Sum256(nd.IdKey().PubKey().SerializeCompressed())
 	copy(myIdPkh[:], idHash[:20])
 
@@ -320,9 +424,9 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 	route := []lnutil.RouteHop{prev[lnutil.RouteHop{targetPkh, destCoinType}], {targetPkh, destCoinType}}
 	for !(bytes.Equal(route[0].Node[:], myIdPkh[:]) && route[0].CoinType == originCoinType) {
 		route = append([]lnutil.RouteHop{prev[route[0]]}, route...)
-	}
+	}*/
 
-	return route, nil
+	return nil, nil
 }
 
 func (nd *LitNode) cleanStaleChannels() {
