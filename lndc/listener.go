@@ -3,10 +3,13 @@ package lndc
 import (
 	"errors"
 	"io"
+	"log"
 	"net"
 	"time"
 
 	"github.com/mit-dci/lit/btcutil/btcec"
+	//"github.com/mit-dci/lit/shortadr"
+	//"github.com/mit-dci/lit/lnutil"
 )
 
 // defaultHandshakes is the maximum number of handshakes that can be done in
@@ -20,8 +23,8 @@ const defaultHandshakes = 1000
 // connection.
 type Listener struct {
 	localStatic *btcec.PrivateKey
-
-	tcp *net.TCPListener
+	nonce       uint64
+	tcp         *net.TCPListener
 
 	handshakeSema chan struct{}
 	conns         chan maybeConn
@@ -33,32 +36,30 @@ var _ net.Listener = (*Listener)(nil)
 
 // NewListener returns a new net.Listener which enforces the lndc scheme
 // during both initial connection establishment and data transfer.
-func NewListener(localStatic *btcec.PrivateKey, listenAddr string) (*Listener,
-	error) {
+func NewListener(localStatic *btcec.PrivateKey,
+	listenAddr string, bestNonce uint64) (*Listener, error) {
 	addr, err := net.ResolveTCPAddr("tcp", listenAddr)
 	if err != nil {
 		return nil, err
 	}
-
 	l, err := net.ListenTCP("tcp", addr)
 	if err != nil {
 		return nil, err
 	}
-
 	lndcListener := &Listener{
 		localStatic:   localStatic,
+		nonce:         bestNonce, // this nonce can vary iteration wise, if desired
 		tcp:           l,
 		handshakeSema: make(chan struct{}, defaultHandshakes),
 		conns:         make(chan maybeConn),
 		quit:          make(chan struct{}),
 	}
-
 	for i := 0; i < defaultHandshakes; i++ {
 		lndcListener.handshakeSema <- struct{}{}
 	}
 
 	go lndcListener.listen()
-
+	log.Println("NewListener ADDR:", lndcListener.tcp.Addr())
 	return lndcListener, nil
 }
 
@@ -124,7 +125,7 @@ func (l *Listener) doHandshake(conn net.Conn) {
 	}
 	// Next, progress the handshake processes by sending over our ephemeral
 	// key for the session along with an authenticating tag.
-	actTwo, err := lndcConn.noise.GenActTwo()
+	actTwo, err := lndcConn.noise.GenActTwo(l.nonce)
 	if err != nil {
 		lndcConn.conn.Close()
 		l.rejectConn(err)

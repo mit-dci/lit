@@ -2,15 +2,16 @@ package lndc
 
 import (
 	"bytes"
+	"fmt"
 	"io"
+	"log"
 	"math"
 	"net"
-	"log"
 	"time"
-	"fmt"
 
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/shortadr"
 )
 
 // Conn is an implementation of net.Conn which enforces an authenticated key
@@ -74,17 +75,37 @@ func Dial(localPriv *btcec.PrivateKey, ipAddr string, remotePKH string,
 		b.conn.Close()
 		return nil, err
 	}
-	s, err := b.noise.RecvActTwo(actTwo)
+	s, nonce, err := b.noise.RecvActTwo(actTwo)
 	if err != nil {
 		b.conn.Close()
 		return nil, err
 	}
 
+	log.Println("RECEIVED NONCE:", nonce)
+
 	log.Println("Received pubkey", s)
-	if lnutil.LitAdrFromPubkey(s) != remotePKH {
-		return nil, fmt.Errorf("Remote PKH doesn't match. Quitting!")
+	if len(remotePKH) < 41 {
+		// it is a short address
+		adrBytes := shortadr.DoOneTry(s, 0, nonce)
+		var adr []byte
+		log.Println(adrBytes)
+		for i := 0; i < len(adrBytes); i++ {
+			if adrBytes[i] != 0 {
+				adr = append(adr, adrBytes[i])
+			}
+		}
+		adrString := lnutil.LitVanityFromPubkey(adr)
+		log.Println("ADR:", adrString)
+		if adrString != remotePKH {
+			return nil, fmt.Errorf("Short Remote PKH doesn't match. Quitting!")
+		}
+		log.Printf("Received short PKH %s matches", adrString)
+	} else {
+		if lnutil.LitAdrFromPubkey(s) != remotePKH {
+			return nil, fmt.Errorf("Remote PKH doesn't match. Quitting!")
+		}
+		log.Printf("Received PKH %s matches", lnutil.LitAdrFromPubkey(s))
 	}
-	log.Printf("Received PKH %s matches", lnutil.LitAdrFromPubkey(s))
 
 	// Finally, complete the handshake by sending over our encrypted static
 	// key and execute the final ECDH operation.

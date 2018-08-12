@@ -16,19 +16,11 @@ import (
 
 // Gets the list of ports where LitNode is listening for incoming connections,
 // & the connection key
-func (nd *LitNode) GetLisAddressAndPorts() (
-	string, []string) {
-
-	idPriv := nd.IdKey()
-	var idPub [33]byte
-	copy(idPub[:], idPriv.PubKey().SerializeCompressed())
-
-	lisAdr := lnutil.LitAdrFromPubkey(idPub)
+func (nd *LitNode) GetLisPorts() ([]string) {
 	nd.RemoteMtx.Lock()
 	ports := nd.LisIpPorts
 	nd.RemoteMtx.Unlock()
-
-	return lisAdr, ports
+	return ports
 }
 
 // TCPListener starts a litNode listening for incoming LNDC connections
@@ -99,7 +91,7 @@ func (nd *LitNode) TCPListener(lisIpPort string,
 				log.Println("STOPPED CHAN", i)
 			}
 		}()
-		log.Println("LITADR", lnutil.LitVanityFromPubkey(bestHash[:], powbytes), bestNonce)
+		log.Println("LITADR", lnutil.LitVanityFromPubkey(bestHash[:]), bestNonce)
 	} else if vanityArg {
 		vanityAddressReply := make(chan shortadr.VanityReply)
 		if len(vanityStr) > 20 {
@@ -117,14 +109,13 @@ func (nd *LitNode) TCPListener(lisIpPort string,
 		}
 	}
 
-	listener, err := lndc.NewListener(nd.IdKey(), lisIpPort)
+	listener, err := lndc.NewListener(nd.IdKey(), lisIpPort, bestNonce)
 	if err != nil {
 		return "", err
 	}
-
 	//pub, id, nonce uint64, bestBits uint8, bestNonce chan uint64, stop chan bool
 	//adr := lnutil.LitAdrFromPubkey(idPub)
-	adr := lnutil.LitVanityFromPubkey(bestHash[:], powbytes/2)
+	adr := lnutil.LitVanityFromPubkey(bestHash[:])
 
 	// Don't announce on the tracker if we are communicating via SOCKS proxy
 	if nd.ProxyURL == "" {

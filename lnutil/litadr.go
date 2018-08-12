@@ -75,9 +75,14 @@ func LitFunAdrFromPubkey(in [20]byte) string {
 	return bech32.Encode("ln", in[:])
 }
 
-func LitVanityFromPubkey(in []byte, powBytes uint8) string {
-	log.Println("BLAH", in[powBytes/4:20], in[:20])
-	return bech32.Encode("ln", in[powBytes/4:20])
+func LitVanityFromPubkey(in []byte) string {
+	var adr []byte
+	for i := 0 ; i < len(in) ; i++ {
+		if in[i] != 0 {
+			adr = append(adr, in[i])
+		}
+	}
+	return bech32.Encode("ln", adr)
 }
 
 func ShorterAdrFromPubkey(in [31]byte, nonce [20]byte) {}

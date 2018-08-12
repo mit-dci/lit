@@ -36,14 +36,15 @@ func (r *LitRPC) Listen(args ListenArgs, reply *ListeningPortsReply) error {
 	if args.Port == "" {
 		args.Port = ":2448"
 	}
-	_, err := r.Node.TCPListener(args.Port, args.Short,
+	adr, err := r.Node.TCPListener(args.Port, args.Short,
 		args.ShortZeros, args.Vanity, args.VanityStr)
 
 	if err != nil {
 		return err
 	}
 
-	reply.Adr, reply.LisIpPorts = r.Node.GetLisAddressAndPorts()
+	reply.Adr = adr
+	reply.LisIpPorts = r.Node.GetLisPorts()
 
 	return nil
 }
@@ -126,7 +127,7 @@ func (r *LitRPC) ListConnections(args NoArgs, reply *ListConnectionsReply) error
 }
 
 func (r *LitRPC) GetListeningPorts(args NoArgs, reply *ListeningPortsReply) error {
-	reply.Adr, reply.LisIpPorts = r.Node.GetLisAddressAndPorts()
+	reply.LisIpPorts = r.Node.GetLisPorts()
 	return nil
 }
 

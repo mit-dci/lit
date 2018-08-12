@@ -93,7 +93,7 @@ func FunAdrWorker(
 func DoOneTry(key [33]byte, id, nonce uint64) [20]byte {
 	var buf bytes.Buffer
 	buf.Write(key[:])
-	binary.Write(&buf, binary.BigEndian, id)
+	//binary.Write(&buf, binary.BigEndian, id)
 	binary.Write(&buf, binary.BigEndian, nonce)
 
 	shaoutput := fastsha256.Sum256(buf.Bytes())
