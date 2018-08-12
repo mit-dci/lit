@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/fatih/color"
 	"github.com/mit-dci/lit/litrpc"
@@ -89,12 +88,72 @@ func (lc *litAfClient) Lis(textArgs []string) error {
 	reply := new(litrpc.ListeningPortsReply)
 
 	args.Port = ":2448"
-	if len(textArgs) > 0 {
-		if strings.Contains(textArgs[0], ":") {
-			args.Port = textArgs[0]
+	if len(textArgs) >= 1 {
+		// check whether the argument is a port
+		_, err := strconv.Atoi(textArgs[0])
+		if err != nil {
+			// assume this error is due to the arg is not an int
+			fmt.Println("expected")
+			if len(textArgs) > 1 {
+				if textArgs[0] == "short" {
+					args.Short = true
+					if len(textArgs) == 2 {
+						shortzeros, err := strconv.Atoi(textArgs[1])
+						if err != nil {
+							fmt.Println("failed to activate short listen address mode")
+							return fmt.Errorf("%s", err)
+						}
+						args.ShortZeros = uint8(shortzeros)
+						fmt.Println("activating short listen address mode with zeros:", args.ShortZeros)
+					} else {
+						return fmt.Errorf("please specify how much work (in zeros of hashes) to perform")
+					}
+				} else if textArgs[0] == "vanity" {
+					args.Vanity = true
+					if len(textArgs) == 2 {
+						args.VanityStr = textArgs[1]
+					} else {
+						return fmt.Errorf("invalid format, please only specify the vanity string that you want")
+					}
+					fmt.Println("vanity listen address mode activated:", args.VanityStr)
+				}
+			}
 		} else {
+			// user input: lis <portNumber> blah
+			// check whether blah refers to short / vanity addresses
 			args.Port = ":" + textArgs[0]
+			if len(textArgs) > 1 {
+				if textArgs[1] == "short" {
+					args.Short = true
+					if len(textArgs) == 3 {
+						shortzeros, err := strconv.Atoi(textArgs[2])
+						if err != nil {
+							fmt.Println("failed to activate short listen address mode")
+							return fmt.Errorf("%s", err)
+						}
+						args.ShortZeros = uint8(shortzeros)
+						fmt.Println("activating short listen address mode with zeros:", args.ShortZeros)
+					} else {
+						return fmt.Errorf("please specify how much work (in zeros of hashes) to perform")
+					}
+				} else if textArgs[1] == "vanity" {
+					args.Vanity = true
+					if len(textArgs) == 3 {
+						args.VanityStr = textArgs[2]
+					} else {
+						return fmt.Errorf("invalid format, please only specify the vanity string that you want")
+					}
+					fmt.Println("vanity listen address mode activated:", args.VanityStr)
+				}
+			}
 		}
+	}
+	type ListenArgs struct {
+		Port       string
+		Short      bool
+		Vanity     bool
+		ShortZeros uint8
+		VanityStr  string
 	}
 
 	err := lc.Call("LitRPC.Listen", args, reply)

@@ -1,93 +1,112 @@
 package shortadr
 
 import (
-	"crypto/rand" // slows down nonce generation a lot, could use math/rand maybe?
-	"github.com/mit-dci/lit/crypto/fastsha256"
-	"github.com/mit-dci/lit/bech32"
-	"encoding/hex"
-	mathrand "math/rand"
+	"bytes"
+	"encoding/binary"
+	//"encoding/hex"
+	"github.com/btcsuite/fastsha256"
+	"github.com/mit-dci/lit/lnutil"
 	"log"
 )
 
-const (
-	letterBytes   = "$_!;abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	letterIdxBits = 6
-	letterIdxMask = 1<<letterIdxBits - 1
-)
-
-func GenNonceSecure(length int) []byte {
-	length = mathrand.Intn(20)
-	// math/rand is much faster than crypto/rand, so I guess its fine to sacrifice
-	// some randomness for much speed
-	result := make([]byte, length)
-	bufferSize := int(float64(length) * 1.3)
-	for i, j, randomBytes := 0, 0, []byte{}; i < length; j++ {
-		if j%bufferSize == 0 {
-			randomBytes = GetRandomness(bufferSize)
-		}
-		if idx := int(randomBytes[j%length] & letterIdxMask); idx < len(letterBytes) {
-			result[i] = letterBytes[idx]
-			i++
-		}
-	}
-	return result
+type ShortReply struct {
+	BestNonce uint64
+	BestHash  [20]byte
 }
 
-// GetRandomness returns the requested number of bytes using crypto/rand
-func GetRandomness(length int) []byte {
-	var randomBytes = make([]byte, length)
-	_, err := rand.Read(randomBytes)
-	if err != nil {
-		log.Fatal("Unable to generate random bytes")
-	}
-	return randomBytes
+type VanityReply struct {
+	BestNonce uint64
+	BestHash  string
 }
 
-func Grind(byteString [33]byte, nonce []byte) []byte {
-	data := make([]byte, 64) // 44 + 20 bytes
-	copy(data[45:64], nonce)
-	copy(data[:44], byteString[:])
-	shasum := fastsha256.Sum256(data)
-	return shasum[:32]
-}
+/*
+initial short address code.  You can spin up a bunch of worker goroutines
+(1 per core?)  and give them different IDs.  They will try sequential nonces,
+and report back when they find nonces that have more work than the minWork they're
+given.  They'll keep reporting better and better nonces until either they loop
+around the uint64 (which will take a long time, and should be avoided), or they're
+given a kill command via the stop channel.
+*/
 
-func CheckProofOfWork(in []byte) int {
-	pow := 0
-	for _, byte := range in {
-		if byte != 0 {
-			break
+// AdrWorker is a goroutine that looks for a short hash.
+// pub is the pub key to work on.  ID & Nonce is the nonce to start at.
+// BestNonce is a channel that returns the best nonce each time one is found
+// stop is a channel that kills this worker
+func ShortAdrWorker(
+	pub [33]byte, id, nonce uint64, bestBits uint8,
+	vanity chan ShortReply, stop chan bool) ([20]byte, uint64) {
+
+	var empty [20]byte
+	var hash [20]byte //define outside to save on assignement delays each time
+	var bits uint8
+	defer close(vanity)
+	for {
+		select { // select here so we don't block on an unrequested mblock
+		case _ = <-stop: // got order to stop
+			return empty, uint64(0)
+		default:
+			hash = DoOneTry(pub, id, nonce)
+			bits = CheckWork(hash)
+			//log.Println("HASH", hex.EncodeToString(hash[:]), hash[:], "BITS", bits)
+			if bits > bestBits {
+				bestBits = bits
+				res := new(ShortReply)
+				res.BestNonce = nonce
+				res.BestHash = hash
+				vanity <- *res
+			}
 		}
-		pow++
+		nonce++
 	}
-	return pow
+	return hash, nonce
 }
 
-func GenVanityAdr(byteString [33]byte, vanityStr string) string {
-	// generate your own vanity address based on your PoW bytes
-	nonce := GenNonceSecure(20)
-	a := Grind(byteString, nonce)
-	vanityLen := len(vanityStr)
-	vanityStr = vanityStr[:vanityLen]
-	if vanityLen > 20 {
-		vanityLen = 20
-		vanityStr = vanityStr[:20]
-	}
-	vanity := bech32.Encode("ln", a[vanityLen:])
-	for vanity[0:vanityLen] != vanityStr {
-		//if grind(byteString, genNonceSecure(10)) < PoWTarget {
-		//	return byteString, nil
-		//}
-		nonce = GenNonceSecure(20)
-		a = Grind(byteString, nonce)
-		if CheckProofOfWork(a) == vanityLen {
-			log.Println("A:", hex.EncodeToString(a), "NONCE FOUND:", hex.EncodeToString(nonce))
-			//temp := make([]byte, 30+20)
-			//copy(temp[0:30], a)
-			//copy(temp[31:50], nonce)
-			vanity = bech32.Encode("ln", a[vanityLen:]) // 18 bytes passed, 33 - 15PoW bytes
-			vanity = 	vanity[:3] + vanity[4:]
-			log.Println("VANITY", vanity)
+func FunAdrWorker(
+	pub [33]byte, id, nonce uint64, bestStr string,
+	vanity chan VanityReply, stop chan bool) ([20]byte, uint64) {
+
+	var empty [20]byte
+	var hash [20]byte //define outside to save on assignement delays each time
+	bestStrLen := len(bestStr)
+	defer close(vanity)
+	log.Println("Vanity mode: On")
+	for {
+		select { // select here so we don't block on an unrequested mblock
+		case _ = <-stop: // got order to stop
+			return empty, uint64(0)
+		default:
+			hash = DoOneTry(pub, id, nonce)
+			if lnutil.LitFunAdrFromPubkey(hash)[3:3+bestStrLen] == bestStr {
+				res := new(VanityReply)
+				res.BestNonce = nonce
+				res.BestHash = lnutil.LitFunAdrFromPubkey(hash)
+				vanity <- *res
+			}
 		}
+		nonce++
 	}
-	return vanity
+	return hash, nonce
+}
+
+// doOneTry is a single hash attempt with a key and nonce
+func DoOneTry(key [33]byte, id, nonce uint64) [20]byte {
+	var buf bytes.Buffer
+	buf.Write(key[:])
+	binary.Write(&buf, binary.BigEndian, id)
+	binary.Write(&buf, binary.BigEndian, nonce)
+
+	shaoutput := fastsha256.Sum256(buf.Bytes())
+	var hash [20]byte
+	copy(hash[:], shaoutput[:20])
+	return hash
+}
+
+// CheckWork returns the number of leading 0 bits
+func CheckWork(hash [20]byte) (i uint8) {
+	for ; (hash[i/8]>>(7-(i%8)))&1 == 0; i++ {
+		// hash[i/8] for the byte we're looking at
+		// >>(7-(i%8)) right shift for the bit that we want
+		// &1 to convert to single bit
+	}
+	return i
 }

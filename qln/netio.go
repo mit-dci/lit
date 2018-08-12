@@ -32,8 +32,8 @@ func (nd *LitNode) GetLisAddressAndPorts() (
 }
 
 // TCPListener starts a litNode listening for incoming LNDC connections
-func (nd *LitNode) TCPListener(
-	lisIpPort string) (string, error) {
+func (nd *LitNode) TCPListener(lisIpPort string,
+	shortArg bool, shortZeros uint8, vanityArg bool, vanityStr string) (string, error) {
 	idPriv := nd.IdKey()
 
 	// do UPnP / pmp port forwarding
@@ -66,18 +66,51 @@ func (nd *LitNode) TCPListener(
 			}
 		}
 	}
+
+	var idPub [33]byte
+	copy(idPub[:], idPriv.PubKey().SerializeCompressed())
+
+	stop := make(chan bool)
+	MaxUint64 := uint64(1<<64 - 1)
+	NoOfWorkers := uint64(10) // 100 for testing, get from user, max 1 million
+	Start := MaxUint64 / NoOfWorkers
+	i := uint64(0)
+
+	if shortArg {
+		powbytes := 4 * shortZeros
+		shortAddressReply := make(chan shortadr.ShortReply)
+		for ; i < NoOfWorkers; i++ {
+			go shortadr.ShortAdrWorker(idPub, i, Start*i, powbytes, shortAddressReply, stop)
+		}
+		for vanityAddr := range shortAddressReply {
+			if shortadr.CheckWork(vanityAddr.BestHash)/8 >= shortZeros {
+				log.Println("BEST NONCE:", vanityAddr.BestNonce)
+				log.Println("LITADR", lnutil.LitVanityFromPubkey(vanityAddr.BestHash[:], powbytes))
+			}
+		}
+	} else if vanityArg {
+		vanityAddressReply := make(chan shortadr.VanityReply)
+		if len(vanityStr) > 20 {
+			return "", fmt.Errorf("Given Length greater than hash length")
+		}
+		if !lnutil.IsBech32String(vanityStr) {
+			return "", fmt.Errorf("Address contains non bech32 characters. Characters must be in charset: qpzry9x8gf2tvdw0s3jn54khce6mua7l")
+		}
+		for ; i < NoOfWorkers; i++ {
+			go shortadr.FunAdrWorker(idPub, i, Start*i, vanityStr, vanityAddressReply, stop)
+		}
+		for funAddr := range vanityAddressReply {
+			log.Println("BEST NONCE:", funAddr.BestNonce)
+			log.Println("BESH HASH:", funAddr.BestHash)
+		}
+	}
+
 	listener, err := lndc.NewListener(nd.IdKey(), lisIpPort)
 	if err != nil {
 		return "", err
 	}
 
-	var idPub [33]byte
-	copy(idPub[:], idPriv.PubKey().SerializeCompressed())
-
-	byteString := idPub
-	log.Println("WATCH THIS", byteString, idPub)
-	vanity := shortadr.GenVanityAdr(byteString, "lqp") //define vanity address needed here
-	log.Println("VANITY ADR", vanity)
+	//pub, id, nonce uint64, bestBits uint8, bestNonce chan uint64, stop chan bool
 	adr := lnutil.LitAdrFromPubkey(idPub)
 
 	// Don't announce on the tracker if we are communicating via SOCKS proxy

@@ -2,6 +2,8 @@ package lnutil
 
 import (
 	"fmt"
+	"log"
+	"regexp"
 
 	"github.com/mit-dci/lit/bech32"
 	"github.com/mit-dci/lit/btcutil/base58"
@@ -69,7 +71,17 @@ func LitAdrFromPubkey(in [33]byte) string {
 	return bech32.Encode("ln", doubleSha[:20])
 }
 
-func ShorterAdrFromPubkey(in [31]byte, nonce [20]byte){}
+func LitFunAdrFromPubkey(in [20]byte) string {
+	return bech32.Encode("ln", in[:])
+}
+
+func LitVanityFromPubkey(in []byte, powBytes uint8) string {
+	log.Println("BLAH", in[powBytes/4:20], in[:20])
+	return bech32.Encode("ln", in[powBytes/4:20])
+}
+
+func ShorterAdrFromPubkey(in [31]byte, nonce [20]byte) {}
+
 // LitAdrOK make sure the address is OK.  Either it has a valid checksum, or
 // it's shortened and doesn't.
 func LitAdrOK(adr string) bool {
@@ -112,4 +124,11 @@ func LitAdrBytes(adr string) ([]byte, error) {
 // OldAddressFromPKH returns a base58 string from a 20 byte pubkey hash
 func OldAddressFromPKH(pkHash [20]byte, netID byte) string {
 	return base58.CheckEncode(pkHash[:], netID)
+}
+
+func IsBech32String(in string) bool {
+	const charset = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+	var IsBech32 = regexp.MustCompile(`^[qpzry9x8gf2tvdw0s3jn54khce6mua7l]+$`).MatchString
+	log.Println("IS BECH32?", IsBech32(in))
+	return IsBech32(in)
 }

@@ -1,0 +1,17 @@
+2018/08/10 18:47:50.216778 No file /Users/varunramg/go/src/github.com/mit-dci/lit/temp/privkey.hex, generating.
+2018/08/10 18:47:50.216853 passphrase: 
+2018/08/10 18:47:52.332446 interrupted
+2018/08/12 17:29:50.841195 No file /Users/varunramg/go/src/github.com/mit-dci/lit/temp/privkey.hex, generating.
+2018/08/12 17:29:50.841710 passphrase: 
+2018/08/12 17:29:51.892411 repeat passphrase: 
+2018/08/12 17:29:52.064840 
+2018/08/12 17:29:52.065454 WARNING!! Key file not encrypted!!
+2018/08/12 17:29:52.065594 Anyone who can read the key file can take everything!
+2018/08/12 17:29:52.065748 You should start over and use a good passphrase!
+2018/08/12 17:29:52.065803 Saved unencrypted key at /Users/varunramg/go/src/github.com/mit-dci/lit/temp/privkey.hex
+2018/08/12 17:29:52.066109 WARNING!! Key file not encrypted!!
+2018/08/12 17:29:52.066171 Anyone who can read the key file can take everything!
+2018/08/12 17:29:52.066213 You should start over and use a good passphrase!
+2018/08/12 17:30:06.040799 WARNING!! Key file not encrypted!!
+2018/08/12 17:30:06.041136 Anyone who can read the key file can take everything!
+2018/08/12 17:30:06.041182 You should start over and use a good passphrase!
