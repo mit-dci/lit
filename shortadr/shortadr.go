@@ -47,13 +47,14 @@ func ShortAdrWorker(
 		default:
 			hash = DoOneTry(pub, id, nonce)
 			bits = CheckWork(hash)
-			//log.Println("HASH", hex.EncodeToString(hash[:]), hash[:], "BITS", bits)
 			if bits > bestBits {
 				bestBits = bits
 				res := new(ShortReply)
 				res.BestNonce = nonce
 				res.BestHash = hash
+				log.Println("LOOK HERE", hash, nonce, bits)
 				vanity <- *res
+				//return empty, uint64(0)
 			}
 		}
 		nonce++

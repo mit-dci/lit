@@ -70,24 +70,36 @@ func (nd *LitNode) TCPListener(lisIpPort string,
 	var idPub [33]byte
 	copy(idPub[:], idPriv.PubKey().SerializeCompressed())
 
-	stop := make(chan bool)
+	var stop [10]chan bool
 	MaxUint64 := uint64(1<<64 - 1)
 	NoOfWorkers := uint64(10) // 100 for testing, get from user, max 1 million
 	Start := MaxUint64 / NoOfWorkers
 	i := uint64(0)
 
+	var bestNonce uint64
+	var bestHash [20]byte
+	powbytes := 8 * shortZeros
+
 	if shortArg {
-		powbytes := 4 * shortZeros
 		shortAddressReply := make(chan shortadr.ShortReply)
 		for ; i < NoOfWorkers; i++ {
-			go shortadr.ShortAdrWorker(idPub, i, Start*i, powbytes, shortAddressReply, stop)
+			go shortadr.ShortAdrWorker(idPub, i, Start*i, powbytes, shortAddressReply, stop[i])
 		}
 		for vanityAddr := range shortAddressReply {
 			if shortadr.CheckWork(vanityAddr.BestHash)/8 >= shortZeros {
-				log.Println("BEST NONCE:", vanityAddr.BestNonce)
-				log.Println("LITADR", lnutil.LitVanityFromPubkey(vanityAddr.BestHash[:], powbytes))
+				log.Println("BEST NONCE:", vanityAddr.BestNonce, vanityAddr.BestHash[:])
+				bestNonce = vanityAddr.BestNonce
+				bestHash = vanityAddr.BestHash
+				break
 			}
 		}
+		go func() {
+			for ; i < NoOfWorkers; i++ {
+				stop[i] <- true
+				log.Println("STOPPED CHAN", i)
+			}
+		}()
+		log.Println("LITADR", lnutil.LitVanityFromPubkey(bestHash[:], powbytes), bestNonce)
 	} else if vanityArg {
 		vanityAddressReply := make(chan shortadr.VanityReply)
 		if len(vanityStr) > 20 {
@@ -97,7 +109,7 @@ func (nd *LitNode) TCPListener(lisIpPort string,
 			return "", fmt.Errorf("Address contains non bech32 characters. Characters must be in charset: qpzry9x8gf2tvdw0s3jn54khce6mua7l")
 		}
 		for ; i < NoOfWorkers; i++ {
-			go shortadr.FunAdrWorker(idPub, i, Start*i, vanityStr, vanityAddressReply, stop)
+			go shortadr.FunAdrWorker(idPub, i, Start*i, vanityStr, vanityAddressReply, stop[0])
 		}
 		for funAddr := range vanityAddressReply {
 			log.Println("BEST NONCE:", funAddr.BestNonce)
@@ -111,7 +123,8 @@ func (nd *LitNode) TCPListener(lisIpPort string,
 	}
 
 	//pub, id, nonce uint64, bestBits uint8, bestNonce chan uint64, stop chan bool
-	adr := lnutil.LitAdrFromPubkey(idPub)
+	//adr := lnutil.LitAdrFromPubkey(idPub)
+	adr := lnutil.LitVanityFromPubkey(bestHash[:], powbytes/2)
 
 	// Don't announce on the tracker if we are communicating via SOCKS proxy
 	if nd.ProxyURL == "" {
@@ -122,7 +135,7 @@ func (nd *LitNode) TCPListener(lisIpPort string,
 	}
 
 	log.Printf("Listening on %s\n", listener.Addr().String())
-	log.Printf("Listening with ln address: %s \n", adr)
+	log.Printf("Listening with ln address: %s and nonce: %d\n", adr, bestNonce)
 
 	go func() {
 		for {
