@@ -1,6 +1,7 @@
 package litrpc
 
 import (
+	"fmt"
 	"encoding/hex"
 
 	"github.com/mit-dci/lit/dlc"
@@ -380,7 +381,7 @@ type SettleContractReply struct {
 // SettleContract uses the value and signature from the oracle to settle the
 // contract and send the equivalent settlement transaction to the blockchain.
 // It will subsequently claim the contract output back to our wallet
-func (r *LitRPC) SettleContract(args SettleContractArgs,
+func (r *LitRPC) SettleeContract(args SettleContractArgs,
 	reply *SettleContractReply) error {
 	var err error
 
@@ -392,4 +393,25 @@ func (r *LitRPC) SettleContract(args SettleContractArgs,
 
 	reply.Success = true
 	return nil
+}
+
+// DeleteContract deletes a contract from the database
+func (r *LitRPC) DeleteContract(args DeleteContractArgs, reply *DeleteContractReply) error {
+	var err error
+	fmt.Printf("dlccmds.go: deleting %d", args.CIdx)
+	err = r.Node.DlcManager.DeleteContract(args.CIdx)
+	if err != nil {
+		return err
+	}
+
+	reply.Success = true
+	return nil
+}
+
+type DeleteContractArgs struct {
+	CIdx        uint64
+}
+
+type DeleteContractReply struct {
+	Success      bool
 }
