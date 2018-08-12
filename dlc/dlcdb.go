@@ -204,3 +204,26 @@ func (mgr *DlcManager) ListContracts() ([]*lnutil.DlcContract, error) {
 
 	return contracts, nil
 }
+
+// DeleteContract deletes a contract from the database by index.
+func (mgr *DlcManager) DeleteContract(idx uint64) (error) {
+	fmt.Printf("dlcdb.go: deleting %d", idx)	
+	err := mgr.DLCDB.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket(BKTContracts)
+
+		var wb bytes.Buffer
+		binary.Write(&wb, binary.BigEndian, idx)
+		err := b.Delete(wb.Bytes())
+
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return err
+	}
+	return nil
+}
