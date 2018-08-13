@@ -20,11 +20,9 @@ func (r *LitRPC) TestLog(arg string, reply *string) error {
 // ------------------------- listen
 
 type ListenArgs struct {
-	Port string
-	Short bool
-	Vanity bool
+	Port       string
+	Short      bool
 	ShortZeros uint8
-	VanityStr string
 }
 
 type ListeningPortsReply struct {
@@ -36,15 +34,13 @@ func (r *LitRPC) Listen(args ListenArgs, reply *ListeningPortsReply) error {
 	if args.Port == "" {
 		args.Port = ":2448"
 	}
-	adr, err := r.Node.TCPListener(args.Port, args.Short,
-		args.ShortZeros, args.Vanity, args.VanityStr)
+	adr, err := r.Node.TCPListener(args.Port, args.Short, args.ShortZeros)
 
 	if err != nil {
 		return err
 	}
 
 	reply.Adr = adr
-	reply.LisIpPorts = r.Node.GetLisPorts()
 
 	return nil
 }

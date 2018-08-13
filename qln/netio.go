@@ -25,7 +25,7 @@ func (nd *LitNode) GetLisPorts() []string {
 
 // TCPListener starts a litNode listening for incoming LNDC connections
 func (nd *LitNode) TCPListener(lisIpPort string,
-	shortArg bool, shortZeros uint8, vanityArg bool, vanityStr string) (string, error) {
+	shortArg bool, shortZeros uint8) (string, error) {
 	idPriv := nd.IdKey()
 
 	// do UPnP / pmp port forwarding
@@ -92,23 +92,7 @@ func (nd *LitNode) TCPListener(lisIpPort string,
 			}
 		}()
 		log.Println("LITADR", lnutil.LitVanityFromPubkey(bestHash[:]), bestNonce)
-	} else if vanityArg {
-		vanityAddressReply := make(chan shortadr.VanityReply)
-		if len(vanityStr) > 20 {
-			return "", fmt.Errorf("Given Length greater than hash length")
-		}
-		if !lnutil.IsBech32String(vanityStr) {
-			return "", fmt.Errorf("Address contains non bech32 characters. Characters must be in charset: qpzry9x8gf2tvdw0s3jn54khce6mua7l")
-		}
-		for ; i < NoOfWorkers; i++ {
-			go shortadr.FunAdrWorker(idPub, i, Start*i, vanityStr, vanityAddressReply, stop[0])
-		}
-		for funAddr := range vanityAddressReply {
-			log.Println("BEST NONCE:", funAddr.BestNonce)
-			log.Println("BESH HASH:", funAddr.BestHash)
-		}
 	}
-
 	listener, err := lndc.NewListener(nd.IdKey(), lisIpPort, bestNonce)
 	if err != nil {
 		return "", err
@@ -132,7 +116,10 @@ func (nd *LitNode) TCPListener(lisIpPort string,
 
 	log.Printf("Listening on %s\n", listener.Addr().String())
 	log.Printf("Listening with ln address: %s and nonce: %d\n", adr, bestNonce)
-
+	nd.RemoteMtx.Lock()
+	nd.LisIpPorts = append(nd.LisIpPorts, lisIpPort)
+	nd.RemoteMtx.Unlock()
+	log.Println("LISTENING ON PORT", nd.LisIpPorts)
 	go func() {
 		for {
 			netConn, err := listener.Accept() // this blocks
@@ -169,9 +156,6 @@ func (nd *LitNode) TCPListener(lisIpPort string,
 			go nd.LNDCReader(&peer)
 		}
 	}()
-	nd.RemoteMtx.Lock()
-	nd.LisIpPorts = append(nd.LisIpPorts, lisIpPort)
-	nd.RemoteMtx.Unlock()
 	return adr, nil
 }
 

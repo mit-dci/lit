@@ -13,7 +13,7 @@ import (
 // previously known peers.
 func (nd *LitNode) AutoReconnect(listenPort string, interval int64) {
 	// Listen myself after a timeout
-	nd.TCPListener(listenPort, false, 0, false, "")
+	nd.TCPListener(listenPort, false, 0)
 
 	// Reconnect to other nodes after an interval
 	ticker := time.NewTicker(time.Duration(interval) * time.Second)

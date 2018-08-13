@@ -108,14 +108,6 @@ func (lc *litAfClient) Lis(textArgs []string) error {
 					} else {
 						return fmt.Errorf("please specify how much work (in zeros of hashes) to perform")
 					}
-				} else if textArgs[0] == "vanity" {
-					args.Vanity = true
-					if len(textArgs) == 2 {
-						args.VanityStr = textArgs[1]
-					} else {
-						return fmt.Errorf("invalid format, please only specify the vanity string that you want")
-					}
-					fmt.Println("vanity listen address mode activated:", args.VanityStr)
 				}
 			}
 		} else {
@@ -136,14 +128,6 @@ func (lc *litAfClient) Lis(textArgs []string) error {
 					} else {
 						return fmt.Errorf("please specify how much work (in zeros of hashes) to perform")
 					}
-				} else if textArgs[1] == "vanity" {
-					args.Vanity = true
-					if len(textArgs) == 3 {
-						args.VanityStr = textArgs[2]
-					} else {
-						return fmt.Errorf("invalid format, please only specify the vanity string that you want")
-					}
-					fmt.Println("vanity listen address mode activated:", args.VanityStr)
 				}
 			}
 		}
@@ -151,20 +135,15 @@ func (lc *litAfClient) Lis(textArgs []string) error {
 	type ListenArgs struct {
 		Port       string
 		Short      bool
-		Vanity     bool
 		ShortZeros uint8
-		VanityStr  string
 	}
 
 	err := lc.Call("LitRPC.Listen", args, reply)
 	if err != nil {
 		return err
 	}
-	if len(reply.LisIpPorts) == 0 {
-		return fmt.Errorf("no listening port returned")
-	}
 
-	fmt.Fprintf(color.Output, "listening on %s@%s\n", reply.Adr, reply.LisIpPorts[0])
+	fmt.Fprintf(color.Output, "listening on %s@%s\n", reply.Adr, args.Port)
 
 	return nil
 }
