@@ -83,7 +83,6 @@ func (s *SPVCon) DialNode(listOfNodes []string) (net.Conn, error) {
 		var conString, conMode string
 		// need to check whether conString is ipv4 or ipv6
 		conString, conMode, err := s.parseRemoteNode(ip)
-		log.Printf("Attempting connection to node at %s\n", conString)
 		if err != nil {
 			log.Printf("parse error for node (skipped): %s", err)
 			continue
@@ -204,8 +203,7 @@ func (s *SPVCon) Connect(remoteNode string) error {
 	handShakeFailed := false // need to be in this scope to access it here
 	connEstablished := false
 	for len(listOfNodes) != 0 {
-		con, err := s.DialNode(listOfNodes)
-		s.con = con
+		s.con, err = s.DialNode(listOfNodes)
 		if err != nil {
 			log.Println(err)
 			log.Printf("Couldn't dial node %s, Moving on", listOfNodes[0])
