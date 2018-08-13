@@ -355,17 +355,6 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 		for _, edge := range dEdges[partialPath.Node] {
 			amtRqd := partialPath.Amt
 
-			if edge.Rate.CoinType != vertices[partialPath.Node].CoinType {
-				// required capacity is last hop amt * rate
-				if edge.Rate.Reciprocal {
-					// prior hop coin type is worth less than this one
-					amtRqd /= edge.Rate.Rate
-				} else {
-					// prior hop coin type is worth more than this one
-					amtRqd *= edge.Rate.Rate
-				}
-			}
-
 			if amtRqd < consts.MinOutput+fee {
 				// this amount is too small to route
 				log.Printf("ignoring %x:%d->%x:%d because amount rqd: %d less than minOutput+fee: %d", vertices[edge.U].Node, vertices[edge.U].CoinType, vertices[edge.V].Node, vertices[edge.V].CoinType, amtRqd, consts.MinOutput+fee)
@@ -378,19 +367,32 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 				continue
 			}
 
+			nextAmt := amtRqd
+
+			// required capacity for next hop is last hop amt * rate
+			if edge.Rate.Reciprocal {
+				// prior hop coin type is worth less than this one
+				nextAmt /= edge.Rate.Rate
+			} else {
+				// prior hop coin type is worth more than this one
+				nextAmt *= edge.Rate.Rate
+			}
+
 			alt := dDistance[partialPath.Node].Dist + edge.W
 			if dDistance[edge.V] == nil {
 				dDistance[edge.V] = &nodeWithDist{
 					alt,
 					edge.V,
-					amtRqd,
+					nextAmt,
 				}
 			} else if alt < dDistance[edge.V].Dist {
 				dDistance[edge.V].Dist = alt
-				dDistance[edge.V].Amt = amtRqd
+				dDistance[edge.V].Amt = nextAmt
 			} else {
 				continue
 			}
+
+			log.Printf("could use edge %x:%d->%x:%d amt: %d", vertices[edge.U].Node, vertices[edge.U].CoinType, vertices[edge.V].Node, vertices[edge.V].CoinType, amtRqd)
 
 			predecessor[edge.V] = edge.U
 			heap.Push(&nodeHeap, *dDistance[edge.V])
