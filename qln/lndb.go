@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
-	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/elkrem"
+	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/watchtower"
 	"github.com/mit-dci/lit/wire"
@@ -137,14 +137,15 @@ type LitNode struct {
 	AdvTimeout    *time.Ticker
 
 	// Contains the URL string to connect to a SOCKS5 proxy, if provided
-	ProxyURL string
-	Nat      string
+	ProxyURL  string
+	Nat       string
 }
 
 type RemotePeer struct {
 	Idx      uint32 // the peer index
 	Nickname string
 	Con      *lndc.Conn
+	Nonce    uint64
 	QCs      map[uint32]*Qchan   // keep map of all peer's channels in ram
 	OpMap    map[[36]byte]uint32 // quick lookup for channels
 }

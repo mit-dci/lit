@@ -77,7 +77,7 @@ func LitFunAdrFromPubkey(in [20]byte) string {
 
 func LitVanityFromPubkey(in []byte) string {
 	var adr []byte
-	for i := 0 ; i < len(in) ; i++ {
+	for i := 0; i < len(in); i++ {
 		if in[i] != 0 {
 			adr = append(adr, in[i])
 		}

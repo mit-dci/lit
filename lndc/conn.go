@@ -36,13 +36,14 @@ var _ net.Conn = (*Conn)(nil)
 // public key. In the case of a handshake failure, the connection is closed and
 // a non-nil error is returned.
 func Dial(localPriv *btcec.PrivateKey, ipAddr string, remotePKH string,
-	dialer func(string, string) (net.Conn, error)) (*Conn, error) {
+	dialer func(string, string) (net.Conn, error)) (*Conn, uint64, error) {
 	var conn net.Conn
 	var err error
+	zero := uint64(0)
 	conn, err = dialer("tcp", ipAddr)
 	log.Println("ipAddr is", ipAddr)
 	if err != nil {
-		return nil, err
+		return nil, zero, err
 	}
 
 	b := &Conn{
@@ -54,11 +55,11 @@ func Dial(localPriv *btcec.PrivateKey, ipAddr string, remotePKH string,
 	actOne, err := b.noise.GenActOne()
 	if err != nil {
 		b.conn.Close()
-		return nil, err
+		return nil, zero, err
 	}
 	if _, err := conn.Write(actOne[:]); err != nil {
 		b.conn.Close()
-		return nil, err
+		return nil, zero, err
 	}
 
 	// We'll ensure that we get ActTwo from the remote peer in a timely
@@ -73,12 +74,12 @@ func Dial(localPriv *btcec.PrivateKey, ipAddr string, remotePKH string,
 	var actTwo [ActTwoSize]byte
 	if _, err := io.ReadFull(conn, actTwo[:]); err != nil {
 		b.conn.Close()
-		return nil, err
+		return nil, zero, err
 	}
 	s, nonce, err := b.noise.RecvActTwo(actTwo)
 	if err != nil {
 		b.conn.Close()
-		return nil, err
+		return nil, zero, err
 	}
 
 	log.Println("RECEIVED NONCE:", nonce)
@@ -97,12 +98,12 @@ func Dial(localPriv *btcec.PrivateKey, ipAddr string, remotePKH string,
 		adrString := lnutil.LitVanityFromPubkey(adr)
 		log.Println("ADR:", adrString)
 		if adrString != remotePKH {
-			return nil, fmt.Errorf("Short Remote PKH doesn't match. Quitting!")
+			return nil, zero, fmt.Errorf("Short Remote PKH doesn't match. Quitting!")
 		}
 		log.Printf("Received short PKH %s matches", adrString)
 	} else {
 		if lnutil.LitAdrFromPubkey(s) != remotePKH {
-			return nil, fmt.Errorf("Remote PKH doesn't match. Quitting!")
+			return nil, zero, fmt.Errorf("Remote PKH doesn't match. Quitting!")
 		}
 		log.Printf("Received PKH %s matches", lnutil.LitAdrFromPubkey(s))
 	}
@@ -112,18 +113,18 @@ func Dial(localPriv *btcec.PrivateKey, ipAddr string, remotePKH string,
 	actThree, err := b.noise.GenActThree()
 	if err != nil {
 		b.conn.Close()
-		return nil, err
+		return nil, zero, err
 	}
 	if _, err := conn.Write(actThree[:]); err != nil {
 		b.conn.Close()
-		return nil, err
+		return nil, zero, err
 	}
 
 	// We'll reset the deadline as it's no longer critical beyond the
 	// initial handshake.
 	conn.SetReadDeadline(time.Time{})
 
-	return b, nil
+	return b, nonce, nil
 }
 
 // ReadNextMessage uses the connection in a message-oriented instructing it to

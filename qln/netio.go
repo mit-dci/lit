@@ -16,7 +16,7 @@ import (
 
 // Gets the list of ports where LitNode is listening for incoming connections,
 // & the connection key
-func (nd *LitNode) GetLisPorts() ([]string) {
+func (nd *LitNode) GetLisPorts() []string {
 	nd.RemoteMtx.Lock()
 	ports := nd.LisIpPorts
 	nd.RemoteMtx.Unlock()
@@ -68,7 +68,7 @@ func (nd *LitNode) TCPListener(lisIpPort string,
 	Start := MaxUint64 / NoOfWorkers
 	i := uint64(0)
 
-	var bestNonce uint64
+	bestNonce := uint64(0)
 	var bestHash [20]byte
 	powbytes := 8 * shortZeros
 
@@ -115,7 +115,12 @@ func (nd *LitNode) TCPListener(lisIpPort string,
 	}
 	//pub, id, nonce uint64, bestBits uint8, bestNonce chan uint64, stop chan bool
 	//adr := lnutil.LitAdrFromPubkey(idPub)
-	adr := lnutil.LitVanityFromPubkey(bestHash[:])
+	var adr string
+	if bestNonce != 0 {
+		adr = lnutil.LitVanityFromPubkey(bestHash[:])
+	} else {
+		adr = lnutil.LitAdrFromPubkey(idPub)
+	}
 
 	// Don't announce on the tracker if we are communicating via SOCKS proxy
 	if nd.ProxyURL == "" {
@@ -207,7 +212,7 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 	idPriv := nd.IdKey()
 
 	// Assign remote connection
-	newConn, err := lndc.Dial(idPriv, where, who, net.Dial)
+	newConn, nonce, err := lndc.Dial(idPriv, where, who, net.Dial)
 	if err != nil {
 		return err
 	}
@@ -229,6 +234,7 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 	var p RemotePeer
 	p.Con = newConn
 	p.Idx = peerIdx
+	p.Nonce = nonce
 	p.Nickname = nickname
 	nd.RemoteCons[peerIdx] = &p
 	nd.RemoteMtx.Unlock()
@@ -278,7 +284,14 @@ func (nd *LitNode) GetConnectedPeerList() []PeerInfo {
 		newPeer.PeerNumber = k
 		newPeer.RemoteHost = v.Con.RemoteAddr().String()
 		newPeer.Nickname = v.Nickname
+
 		newPeer.LitAdr = lnutil.LitAdrFromPubkey(pubArr)
+		if v.Nonce != 0 {
+			// short addresses
+			log.Println("it should come here")
+			hash := shortadr.DoOneTry(pubArr, 0, v.Nonce) // get the hash with zeros
+			newPeer.LitAdr = lnutil.LitVanityFromPubkey(hash[:])
+		}
 		peers = append(peers, newPeer)
 	}
 	return peers
