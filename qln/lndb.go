@@ -111,7 +111,7 @@ type LitNode struct {
 	RemoteMtx  sync.Mutex
 
 	// WatchCon is currently just for the watchtower
-	WatchCon *lndc.LNDConn // merge these later
+	//WatchCon *lndc.LNDConn // merge these later // FIXME Where is this?
 
 	// OmniChan is the channel for the OmniHandler
 	OmniIn  chan lnutil.LitMsg

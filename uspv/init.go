@@ -80,6 +80,7 @@ func (s *SPVCon) DialNode(listOfNodes []string) (net.Conn, error) {
 	var con net.Conn
 	for _, ip := range listOfNodes {
 		// try to connect to all nodes in this range
+		var conString, conMode string
 		// need to check whether conString is ipv4 or ipv6
 		conString, conMode, err := s.parseRemoteNode(ip)
 		log.Printf("Attempting connection to node at %s\n", conString)
@@ -87,8 +88,9 @@ func (s *SPVCon) DialNode(listOfNodes []string) (net.Conn, error) {
 			log.Printf("parse error for node (skipped): %s", err)
 			continue
 		}
+		log.Printf("Attempting connection to node at %s\n",
+			conString)
 
-		log.Printf("Attempting connection to node at %s...", conString)
 		if s.ProxyURL != "" {
 			log.Printf("Attempting to connect via proxy %s", s.ProxyURL)
 			var d proxy.Dialer
@@ -108,8 +110,7 @@ func (s *SPVCon) DialNode(listOfNodes []string) (net.Conn, error) {
 		}
 
 	}
-	// all nodes have been exhausted, we move on to the next one, if any.
-	return nil, fmt.Errorf("Tried to connect to all available node addresses, failed")
+	return con, nil
 }
 
 // Handshake ...
@@ -202,9 +203,8 @@ func (s *SPVCon) Connect(remoteNode string) error {
 	}
 	handShakeFailed := false // need to be in this scope to access it here
 	connEstablished := false
-	var con net.Conn
 	for len(listOfNodes) != 0 {
-		con, err = s.DialNode(listOfNodes)
+		con, err := s.DialNode(listOfNodes)
 		s.con = con
 		if err != nil {
 			log.Println(err)
@@ -212,7 +212,6 @@ func (s *SPVCon) Connect(remoteNode string) error {
 			listOfNodes = listOfNodes[1:]
 			continue
 		}
-		s.con = con
 		err = s.Handshake(listOfNodes)
 		if err != nil {
 			handShakeFailed = true
