@@ -106,9 +106,13 @@ func RPCListen(rpcl *LitRPC, host string, port uint16) {
 
 	listenString := fmt.Sprintf("%s:%d", host, port)
 
+	// Actual rpc interfaces
 	http.Handle("/ws", websocket.Handler(serveWS))
+	http.HandleFunc("/oneoff", serveOneoffs)
+
+	// Other webui "things"
 	http.HandleFunc("/static/", WebUIHandler)
 	http.HandleFunc("/", WebUIHandler)
-	http.HandleFunc("/oneoff", serveOneoffs)
+
 	log.Fatal(http.ListenAndServe(listenString, nil))
 }

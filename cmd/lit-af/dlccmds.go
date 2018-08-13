@@ -885,7 +885,7 @@ func (lc *litAfClient) dlcContractRespond(textArgs []string, aor bool) error {
 	}
 
 	if aor {
-		fmt.Fprintf(color.Output, "Offer acceptance initiated. Use [dlc contract view %d] to see the status.\n", cIdx)
+		fmt.Fprintf(color.Output, "Offer acceptance initiated. Use `dlc contract view %d` to see the status.\n", cIdx)
 	} else {
 		fmt.Fprint(color.Output, "Offer declined successfully\n")
 	}

@@ -59,6 +59,7 @@ class BCNode():
                 break  # break out of loop on success
             except requests.exceptions.ConnectionError as e:
                 time.sleep(0.25)
+        time.sleep(5) # Extra time to sleep.
 
     def send_message(self, method, pos_args, named_args):
         if pos_args and named_args:

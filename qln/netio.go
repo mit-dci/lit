@@ -2,15 +2,15 @@ package qln
 
 import (
 	"fmt"
-	"log"
-	"net"
-	"strings"
-	"strconv"
-	"time"
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
 	nat "github.com/mit-dci/lit/nat"
+	"log"
+	"net"
+	"strconv"
+	"strings"
+	"time"
 )
 
 // Gets the list of ports where LitNode is listening for incoming connections,
@@ -223,7 +223,7 @@ func (nd *LitNode) OutMessager() {
 type PeerInfo struct {
 	PeerNumber uint32
 	RemoteHost string
-	LitAdr 	   string
+	LitAdr     string
 	Nickname   string
 }
 

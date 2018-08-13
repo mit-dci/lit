@@ -9,6 +9,7 @@ and communicate with it over RPC."""
 import logging
 import os
 import subprocess
+import time
 
 from litpy import litrpc
 
@@ -41,6 +42,7 @@ class LitNode():
         logger.debug("Starting litnode %d with args %s" % (self.index, str(self.args)))
         assert os.path.isfile(LIT_BIN), "lit binary not found at %s" % LIT_BIN
         self.process = subprocess.Popen([LIT_BIN] + self.args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        time.sleep(5)
 
     def stop_node(self):
         try:
