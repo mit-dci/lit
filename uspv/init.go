@@ -82,9 +82,7 @@ func (s *SPVCon) DialNode(listOfNodes []string) error {
 		var conString, conMode string
 		// need to check whether conString is ipv4 or ipv6
 		conString, conMode, err = s.parseRemoteNode(ip)
-		log.Printf("Attempting connection to node at %s\n",
-			conString)
-
+		log.Printf("Attempting connection to node at %s\n", conString)
 		if s.ProxyURL != "" {
 			log.Printf("Attempting to connect via proxy %s", s.ProxyURL)
 			var d proxy.Dialer
@@ -108,9 +106,9 @@ func (s *SPVCon) DialNode(listOfNodes []string) error {
 				return fmt.Errorf(" Tried to connect to all available node Addresses. Failed")
 			}
 		}
-		break
 	}
-	return nil
+	// all nodes have been exhausted, we move on to the next one, if any.
+	return fmt.Errorf(" Tried to connect to all available node Addresses. Failed")
 }
 
 func (s *SPVCon) Handshake(listOfNodes []string) error {
