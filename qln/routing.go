@@ -128,16 +128,22 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 
 				weight := -math.Log(price)
 
+				origin := lnutil.RouteHop{
+					channel.Link.APKH,
+					rate.CoinType,
+				}
+
+				verticesMap[origin] = -1
+
 				edge := channelEdge{
 					weight,
-					lnutil.RouteHop{
-						channel.Link.APKH,
-						rate.CoinType,
-					},
+					origin,
 					vertex,
 					rate,
 					channel.Link.ACapacity,
 				}
+
+				log.Printf("adding edge: %x:%d->%x:%d", edge.U.Node, edge.U.CoinType, edge.V.Node, edge.V.CoinType)
 
 				edges = append(edges, edge)
 			}
@@ -153,6 +159,7 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 		distance = append(distance, math.MaxFloat64)
 		predecessor = append(predecessor, -1)
 		verticesMap[k] = len(vertices) - 1
+		log.Printf("vertex %x:%d: %d", k.Node, k.CoinType, len(vertices)-1)
 	}
 
 	for _, edge := range edges {
@@ -163,8 +170,31 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 			edge.Rate,
 			edge.Capacity,
 		})
-
+		U := vertices[edgesLight[len(edgesLight)-1].U]
+		V := vertices[edgesLight[len(edgesLight)-1].V]
+		log.Printf("adding edgeLight: %x:%d->%x:%d", U.Node, U.CoinType, V.Node, V.CoinType)
 	}
+
+	graph := gographviz.NewGraph()
+	graph.SetName("\"bf-step\"")
+	for _, edge := range edgesLight {
+		U := fmt.Sprintf("\"%x:%d\"", vertices[edge.U].Node, vertices[edge.U].CoinType)
+		V := fmt.Sprintf("\"%x:%d\"", vertices[edge.V].Node, vertices[edge.V].CoinType)
+		if !graph.IsNode(U) {
+			graph.AddNode("\"bf-step\"", U, nil)
+		}
+		if !graph.IsNode(V) {
+			graph.AddNode("\"bf-step\"", V, nil)
+		}
+
+		attrs := make(map[string]string)
+
+		attrs["label"] = fmt.Sprintf("\"weight: %f64, trade: %d->%d\"", edge.W, vertices[edge.U].CoinType, vertices[edge.V].CoinType)
+
+		graph.AddEdge(U, V, true, attrs)
+	}
+
+	log.Printf("bf-step graph: \n %s", "di"+graph.String())
 
 	// find my ID in map
 	myId, ok := verticesMap[lnutil.RouteHop{myIdPkh, originCoinType}]
@@ -251,7 +281,7 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 
 	var nodeHeap distanceHeap
 
-	heap.Push(&nodeHeap, dDistance[myId])
+	heap.Push(&nodeHeap, *dDistance[myId])
 
 	for nodeHeap.Len() > 0 {
 		partialPath := heap.Pop(&nodeHeap).(nodeWithDist)
@@ -295,7 +325,7 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 			}
 
 			predecessor[edge.V] = edge.U
-			heap.Push(&nodeHeap, dDistance[edge.V])
+			heap.Push(&nodeHeap, *dDistance[edge.V])
 		}
 	}
 
