@@ -41,7 +41,6 @@ func Dial(localPriv *btcec.PrivateKey, ipAddr string, remotePKH string,
 	var err error
 	zero := uint64(0)
 	conn, err = dialer("tcp", ipAddr)
-	log.Println("ipAddr is", ipAddr)
 	if err != nil {
 		return nil, zero, err
 	}
@@ -82,25 +81,14 @@ func Dial(localPriv *btcec.PrivateKey, ipAddr string, remotePKH string,
 		return nil, zero, err
 	}
 
-	log.Println("RECEIVED NONCE:", nonce)
-
-	log.Println("Received pubkey", s)
+	log.Println("Received pubkey, nonce", s, nonce)
 	if len(remotePKH) < 41 {
-		// it is a short address
-		adrBytes := shortadr.DoOneTry(s, 0, nonce)
-		var adr []byte
-		log.Println(adrBytes)
-		for i := 0; i < len(adrBytes); i++ {
-			if adrBytes[i] != 0 {
-				adr = append(adr, adrBytes[i])
-			}
-		}
-		adrString := lnutil.LitVanityFromPubkey(adr)
-		log.Println("ADR:", adrString)
-		if adrString != remotePKH {
+		// it is a short address, so hash and get back the address
+		adr := shortadr.GetShortPKH(s, nonce)
+		if adr != remotePKH {
 			return nil, zero, fmt.Errorf("Short Remote PKH doesn't match. Quitting!")
 		}
-		log.Printf("Received short PKH %s matches", adrString)
+		log.Printf("Received short PKH %s matches", adr)
 	} else {
 		if lnutil.LitAdrFromPubkey(s) != remotePKH {
 			return nil, zero, fmt.Errorf("Remote PKH doesn't match. Quitting!")

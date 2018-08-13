@@ -16,8 +16,12 @@ var sayCommand = &Command{
 }
 
 var lisCommand = &Command{
-	Format:           fmt.Sprintf("%s%s\n", lnutil.White("lis"), lnutil.OptColor("port")),
-	Description:      fmt.Sprintf("Start listening for incoming connections. The port number, if omitted, defaults to 2448.\n"),
+	Format:           fmt.Sprintf("%s%s%s%s\n", lnutil.White("lis"), lnutil.OptColor("port"), lnutil.OptColor("short"), lnutil.OptColor("powBytes")),
+	Description:      fmt.Sprintf("%s\n%s\n%s%s\n",
+		"Start listening for incoming connections",
+		"The port number, if omitted, defaults to 2448",
+		"Short addresses requires an argument (powbytes) and does sufficient ",
+		"computation to achieve a lower difficulty than the target specified"),
 	ShortDescription: "Start listening for incoming connections.\n",
 }
 
@@ -93,7 +97,6 @@ func (lc *litAfClient) Lis(textArgs []string) error {
 		_, err := strconv.Atoi(textArgs[0])
 		if err != nil {
 			// assume this error is due to the arg is not an int
-			fmt.Println("expected")
 			if len(textArgs) > 1 {
 				if textArgs[0] == "short" {
 					args.Short = true
@@ -104,15 +107,15 @@ func (lc *litAfClient) Lis(textArgs []string) error {
 							return fmt.Errorf("%s", err)
 						}
 						args.ShortZeros = uint8(shortzeros)
-						fmt.Println("activating short listen address mode with zeros:", args.ShortZeros)
+						fmt.Printf("generating short listen address with %d pow bytes\n", args.ShortZeros)
 					} else {
-						return fmt.Errorf("please specify how much work (in zeros of hashes) to perform")
+						return fmt.Errorf("please specify how much work in bytes you want to perform")
 					}
 				}
 			}
 		} else {
 			// user input: lis <portNumber> blah
-			// check whether blah refers to short / vanity addresses
+			// check whether blah refers to short addresses with / without port number
 			args.Port = ":" + textArgs[0]
 			if len(textArgs) > 1 {
 				if textArgs[1] == "short" {
@@ -124,18 +127,13 @@ func (lc *litAfClient) Lis(textArgs []string) error {
 							return fmt.Errorf("%s", err)
 						}
 						args.ShortZeros = uint8(shortzeros)
-						fmt.Println("activating short listen address mode with zeros:", args.ShortZeros)
+						fmt.Printf("generating short listen address with %d pow bytes", args.ShortZeros)
 					} else {
-						return fmt.Errorf("please specify how much work (in zeros of hashes) to perform")
+						return fmt.Errorf("please specify how much work in bytes you want to perform")
 					}
 				}
 			}
 		}
-	}
-	type ListenArgs struct {
-		Port       string
-		Short      bool
-		ShortZeros uint8
 	}
 
 	err := lc.Call("LitRPC.Listen", args, reply)

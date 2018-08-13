@@ -109,6 +109,10 @@ type LitNode struct {
 	RemoteCons         map[uint32]*RemotePeer
 	RemoteMtx          sync.Mutex
 
+
+	// MaxThreads defines the maximum nubmer of channels that can be spawned for
+	// generating short addresses
+	MaxThreads int
 	// OmniChan is the channel for the OmniHandler
 	OmniIn  chan lnutil.LitMsg
 	OmniOut chan lnutil.LitMsg
@@ -145,7 +149,7 @@ type RemotePeer struct {
 	Idx      uint32 // the peer index
 	Nickname string
 	Con      *lndc.Conn
-	Nonce    uint64
+	Nonce    uint64 // nonce for short PKH, defaults to zero
 	QCs      map[uint32]*Qchan   // keep map of all peer's channels in ram
 	OpMap    map[[36]byte]uint32 // quick lookup for channels
 }

@@ -9,7 +9,6 @@ import (
 )
 
 var n = flag.Int("n", 1e5, "Number of goroutines to create")
-
 var ch = make(chan byte)
 var counter = 0
 
@@ -53,4 +52,5 @@ func main() {
 	fmt.Printf("Per goroutine:\n")
 	fmt.Printf("  Memory: %.2f bytes\n", float64(m1.Sys-m0.Sys)/float64(*n))
 	fmt.Printf("  Time:   %f µs\n", float64(t1-t0)/float64(*n)/1e3)
+	fmt.FPrintf("Based on your computer's memory, divide for max number of channels")
 }

@@ -3,10 +3,8 @@ package shortadr
 import (
 	"bytes"
 	"encoding/binary"
-	//"encoding/hex"
 	"github.com/btcsuite/fastsha256"
 	"github.com/mit-dci/lit/lnutil"
-	"log"
 )
 
 type ShortReply struct {
@@ -14,18 +12,14 @@ type ShortReply struct {
 	BestHash  [20]byte
 }
 
-type VanityReply struct {
-	BestNonce uint64
-	BestHash  string
-}
-
 /*
-initial short address code.  You can spin up a bunch of worker goroutines
-(1 per core?)  and give them different IDs.  They will try sequential nonces,
+You can spin up a bunch of worker goroutines (1 per core? user specified?)
+and give them different IDs.  They will try sequential nonces,
 and report back when they find nonces that have more work than the minWork they're
 given.  They'll keep reporting better and better nonces until either they loop
 around the uint64 (which will take a long time, and should be avoided), or they're
-given a kill command via the stop channel.
+given a kill command via the stop channel. Right now, they've been configured to
+give one suitable nonce per channel run
 */
 
 // AdrWorker is a goroutine that looks for a short hash.
@@ -36,8 +30,7 @@ func ShortAdrWorker(
 	pub [33]byte, id, nonce uint64, bestBits uint8,
 	vanity chan ShortReply, stop chan bool) ([20]byte, uint64) {
 
-	var empty [20]byte
-	var hash [20]byte //define outside to save on assignement delays each time
+	var empty, hash [20]byte
 	var bits uint8
 	defer close(vanity)
 	for {
@@ -45,42 +38,13 @@ func ShortAdrWorker(
 		case _ = <-stop: // got order to stop
 			return empty, uint64(0)
 		default:
-			hash = DoOneTry(pub, id, nonce)
+			hash = HashOnce(pub, id, nonce)
 			bits = CheckWork(hash)
 			if bits > bestBits {
 				bestBits = bits
 				res := new(ShortReply)
 				res.BestNonce = nonce
 				res.BestHash = hash
-				log.Println("LOOK HERE", hash, nonce, bits)
-				vanity <- *res
-				//return empty, uint64(0)
-			}
-		}
-		nonce++
-	}
-	return hash, nonce
-}
-
-func FunAdrWorker(
-	pub [33]byte, id, nonce uint64, bestStr string,
-	vanity chan VanityReply, stop chan bool) ([20]byte, uint64) {
-
-	var empty [20]byte
-	var hash [20]byte //define outside to save on assignement delays each time
-	bestStrLen := len(bestStr)
-	defer close(vanity)
-	log.Println("Vanity mode: On")
-	for {
-		select { // select here so we don't block on an unrequested mblock
-		case _ = <-stop: // got order to stop
-			return empty, uint64(0)
-		default:
-			hash = DoOneTry(pub, id, nonce)
-			if lnutil.LitFunAdrFromPubkey(hash)[3:3+bestStrLen] == bestStr {
-				res := new(VanityReply)
-				res.BestNonce = nonce
-				res.BestHash = lnutil.LitFunAdrFromPubkey(hash)
 				vanity <- *res
 			}
 		}
@@ -89,11 +53,10 @@ func FunAdrWorker(
 	return hash, nonce
 }
 
-// doOneTry is a single hash attempt with a key and nonce
-func DoOneTry(key [33]byte, id, nonce uint64) [20]byte {
+// HashOnce is a single hash attempt with a key and nonce
+func HashOnce(key [33]byte, id, nonce uint64) [20]byte {
 	var buf bytes.Buffer
 	buf.Write(key[:])
-	//binary.Write(&buf, binary.BigEndian, id)
 	binary.Write(&buf, binary.BigEndian, nonce)
 
 	shaoutput := fastsha256.Sum256(buf.Bytes())
@@ -110,4 +73,15 @@ func CheckWork(hash [20]byte) (i uint8) {
 		// &1 to convert to single bit
 	}
 	return i
+}
+
+func GetShortPKH(s [33]byte, nonce uint64) string {
+	adrBytes := HashOnce(s, 0, nonce)
+	var adr []byte
+	for i := 0; i < len(adrBytes); i++ {
+		if adrBytes[i] != 0 {
+			adr = append(adr, adrBytes[i])
+		}
+	}
+	return lnutil.LitShortAdrFromPubkey(adr)
 }

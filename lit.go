@@ -39,7 +39,7 @@ type config struct { // define a struct for usage with go-flags
 	ReSync bool `short:"r" long:"reSync" description:"Resync from the given tip."`
 	Tower  bool `long:"tower" description:"Watchtower: Run a watching node"`
 	Hard   bool `short:"t" long:"hard" description:"Flag to set networks."`
-  
+
 	Verbose bool `short:"v" long:"verbose" description:"Set verbosity to true."`
 	// rpc server config
 	Rpcport uint16 `short:"p" long:"rpcport" description:"Set RPC port to connect to"`
@@ -48,7 +48,9 @@ type config struct { // define a struct for usage with go-flags
 	AutoReconnect         bool   `long:"autoReconnect" description:"Attempts to automatically reconnect to known peers periodically."`
 	AutoReconnectInterval int64  `long:"autoReconnectInterval" description:"The interval (in seconds) the reconnect logic should be executed"`
 	AutoListenPort        string `long:"autoListenPort" description:"When auto reconnect enabled, starts listening on this port"`
-	Params                *coinparam.Params
+
+	MaxThreads int `long:"maxThreads" description:"Set the maximum number of threads that you would like lit to run on. Run shortadr-benchmark for measuring the performance of your system"`
+	Params     *coinparam.Params
 }
 
 var (
@@ -63,6 +65,7 @@ var (
 	defaultAutoListenPort        = ":2448"
 	defaultAutoReconnectInterval = int64(60)
 	defaultUpnPFlag              = false
+	defaultMaxThreads            = 10
 )
 
 func fileExists(name string) bool {
@@ -160,6 +163,7 @@ func main() {
 		AutoReconnect:         defaultAutoReconnect,
 		AutoListenPort:        defaultAutoListenPort,
 		AutoReconnectInterval: defaultAutoReconnectInterval,
+		MaxThreads:            defaultMaxThreads,
 	}
 
 	key := litSetup(&conf)
@@ -168,10 +172,13 @@ func main() {
 		conf.LitProxyURL = conf.ProxyURL
 		conf.ChainProxyURL = conf.ProxyURL
 	}
-
+	if conf.MaxThreads < 0 {
+		log.Fatal("Number of threads can't be negative. Quitting!")
+		conf.MaxThreads = defaultMaxThreads
+	}
 	// Setup LN node.  Activate Tower if in hard mode.
 	// give node and below file pathof lit home directory
-	node, err := qln.NewLitNode(key, conf.LitHomeDir, conf.TrackerURL, conf.LitProxyURL, conf.Nat)
+	node, err := qln.NewLitNode(key, conf.LitHomeDir, conf.TrackerURL, conf.LitProxyURL, conf.Nat, conf.MaxThreads)
 	if err != nil {
 		log.Fatal(err)
 	}
