@@ -113,40 +113,106 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 	verticesMap := make(map[lnutil.RouteHop]int)
 
 	nd.ChannelMapMtx.Lock()
+
+	// for each node visit the nodes connected via its channels and add a
+	// BPKH:channel_cointype vertex to the graph for each of its channels.
+	// Then for the current node (APKH), for each channel add an edge from
+	// APKH:channel_cointype to each BPKH:cointype pair in the graph.
+
 	for _, channels := range nd.ChannelMap {
 		for _, channel := range channels {
-			vertex := lnutil.RouteHop{channel.Link.BPKH, channel.Link.CoinType}
-			verticesMap[vertex] = -1
+			var newEdges []channelEdge
+			origin := lnutil.RouteHop{
+				channel.Link.APKH,
+				channel.Link.CoinType,
+			}
+			verticesMap[origin] = -1
 
-			for _, rate := range channel.Link.Rates {
-				var price float64
-				if rate.Reciprocal {
-					price = 1.0 / float64(rate.Rate)
-				} else {
-					price = float64(rate.Rate)
+			for _, theirChannel := range nd.ChannelMap[channel.Link.BPKH] {
+				if theirChannel.Link.BPKH != channel.Link.APKH {
+					var rd *lnutil.RateDesc
+					for _, rate := range theirChannel.Link.Rates {
+						if rate.CoinType == channel.Link.CoinType {
+							rd = &rate
+							break
+						}
+					}
+
+					if rd == nil {
+						// this trade is not possible
+						continue
+					}
+
+					vertex := lnutil.RouteHop{
+						channel.Link.BPKH,
+						theirChannel.Link.CoinType,
+					}
+					verticesMap[vertex] = -1
+
+					var price float64
+					if rd.Reciprocal {
+						price = 1.0 / float64(rd.Rate)
+					} else {
+						price = float64(rd.Rate)
+					}
+
+					weight := -math.Log(price)
+
+					edge := channelEdge{
+						weight,
+						origin,
+						vertex,
+						*rd,
+						channel.Link.ACapacity,
+					}
+
+					log.Printf("adding edge: %x:%d->%x:%d", edge.U.Node, edge.U.CoinType, edge.V.Node, edge.V.CoinType)
+
+					newEdges = append(newEdges, edge)
+				}
+			}
+
+			var addSink bool
+			// this vertex is a sink
+			if len(newEdges) == 0 {
+				addSink = true
+			} else {
+				var found bool
+				for _, edge := range newEdges {
+					if edge.V.CoinType == channel.Link.CoinType {
+						found = true
+						break
+					}
 				}
 
-				weight := -math.Log(price)
+				addSink = !found
+			}
 
-				origin := lnutil.RouteHop{
-					channel.Link.APKH,
-					rate.CoinType,
+			if addSink {
+				vertex := lnutil.RouteHop{
+					channel.Link.BPKH,
+					channel.Link.CoinType,
 				}
-
-				verticesMap[origin] = -1
+				verticesMap[vertex] = -1
 
 				edge := channelEdge{
-					weight,
+					0,
 					origin,
 					vertex,
-					rate,
+					lnutil.RateDesc{
+						channel.Link.CoinType,
+						1,
+						false,
+					},
 					channel.Link.ACapacity,
 				}
 
-				log.Printf("adding edge: %x:%d->%x:%d", edge.U.Node, edge.U.CoinType, edge.V.Node, edge.V.CoinType)
+				log.Printf("adding sink: %x:%d->%x:%d", edge.U.Node, edge.U.CoinType, edge.V.Node, edge.V.CoinType)
 
-				edges = append(edges, edge)
+				newEdges = append(newEdges, edge)
 			}
+
+			edges = append(edges, newEdges...)
 		}
 	}
 	nd.ChannelMapMtx.Unlock()
@@ -302,11 +368,13 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 
 			if amtRqd < consts.MinOutput+fee {
 				// this amount is too small to route
+				log.Printf("ignoring %x:%d->%x:%d because amount rqd: %d less than minOutput+fee: %d", vertices[edge.U].Node, vertices[edge.U].CoinType, vertices[edge.V].Node, vertices[edge.V].CoinType, amtRqd, consts.MinOutput+fee)
 				continue
 			}
 
 			if amtRqd > edge.Capacity {
 				// this channel doesn't have enough capacity
+				log.Printf("ignoring %x:%d->%x:%d because amount rqd: %d less than capacity: %d", vertices[edge.U].Node, vertices[edge.U].CoinType, vertices[edge.V].Node, vertices[edge.V].CoinType, amtRqd, edge.Capacity)
 				continue
 			}
 
@@ -345,155 +413,6 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 
 	return route, nil
 }
-
-/* FindPath uses Dijkstra's algorithm to find the path with the fewest hops
-func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinType uint32, amount int64, fee int64) ([]lnutil.RouteHop, error) {
-	var myIdPkh [20]byte
-	idHash := fastsha256.Sum256(nd.IdKey().PubKey().SerializeCompressed())
-	copy(myIdPkh[:], idHash[:20])
-
-	distance := make(map[lnutil.RouteHop]nodeWithDist)
-	var nodeHeap distanceHeap
-
-	nd.ChannelMapMtx.Lock()
-	defer nd.ChannelMapMtx.Unlock()
-
-	nwd := nodeWithDist{
-		Dist:     0,
-		Pkh:      myIdPkh,
-		CoinType: originCoinType,
-		Amt:      amount,
-	}
-	distance[lnutil.RouteHop{myIdPkh, originCoinType}] = nwd
-	heap.Push(&nodeHeap, nwd)
-
-	prev := make(map[lnutil.RouteHop]lnutil.RouteHop)
-
-	for nodeHeap.Len() != 0 {
-		partialPath := heap.Pop(&nodeHeap).(nodeWithDist)
-		bestNode := partialPath.Pkh
-
-		route := []lnutil.RouteHop{{bestNode, partialPath.CoinType}}
-		for !(bytes.Equal(route[0].Node[:], myIdPkh[:]) && originCoinType == route[0].CoinType) {
-			route = append([]lnutil.RouteHop{prev[route[0]]}, route...)
-		}
-
-		fmt.Print("Analyzing route: ")
-		for _, node := range route {
-			fmt.Printf("-> %s:%d", bech32.Encode("ln", node.Node[:]), node.CoinType)
-		}
-		fmt.Print("\n")
-
-		if bytes.Equal(bestNode[:], targetPkh[:]) && partialPath.CoinType == destCoinType {
-			break
-		}
-
-		fmt.Printf("Finding edges for %s...\n", bech32.Encode("ln", bestNode[:]))
-		for _, channel := range nd.ChannelMap[bestNode] {
-			fmt.Printf("Checking %s:%d\n", bech32.Encode("ln", channel.Link.BPKH[:]), channel.Link.CoinType)
-
-			var rd *lnutil.RateDesc
-
-			// do we need to exchange?
-			// is the last hop coin type the same as this one?
-			if partialPath.CoinType != channel.Link.CoinType {
-				// we need to exchange, but is it possible?
-				var rates []lnutil.RateDesc
-
-				// first get the list of rates
-				for _, link := range nd.ChannelMap[bestNode] {
-					if link.Link.CoinType == channel.Link.CoinType {
-						rates = link.Link.Rates
-						break
-					}
-				}
-
-				fmt.Printf("got rates for %d: %v\n", partialPath.CoinType, rates)
-
-				// then find the rate we want
-				for _, rate := range rates {
-					if rate.CoinType == partialPath.CoinType && rate.Rate > 0 {
-						rd = &rate
-						break
-					}
-				}
-
-				if rd == nil {
-					// it's not possible to exchange these two coin types
-					fmt.Printf("can't exchange %d for %d via %s\n", partialPath.CoinType, channel.Link.CoinType, bech32.Encode("ln", bestNode[:]))
-					continue
-				}
-			}
-
-			amtRqd := partialPath.Amt
-
-			// We need to exchange for this hop
-			if rd != nil {
-				// required capacity is last hop amt * rate
-				if rd.Reciprocal {
-					// prior hop coin type is worth less than this one
-					amtRqd = partialPath.Amt / rd.Rate
-				} else {
-					// prior hop coin type is worth more than this one
-					amtRqd = partialPath.Amt * rd.Rate
-				}
-			}
-
-			if amtRqd < consts.MinOutput+fee {
-				// exchanging to this point has pushed the amount too low
-				fmt.Printf("exchanging %d for %d via %s pushes the amount too low: %d\n", partialPath.CoinType, channel.Link.CoinType, bech32.Encode("ln", channel.Link.BPKH[:]), amtRqd)
-				continue
-			}
-
-			capOk := (channel.Link.ACapacity >= amtRqd)
-			isTarget := bytes.Equal(targetPkh[:], channel.Link.BPKH[:])
-			coinTypeMatch := (destCoinType == channel.Link.CoinType)
-
-			fmt.Printf("Capok: [%t] - isTarget: [%t] - coinTypeMatch [%t] - dirty [%t]\n", capOk, isTarget, coinTypeMatch, channel.Dirty)
-
-			if !channel.Dirty && capOk && (!isTarget || (isTarget && coinTypeMatch)) {
-
-				tempDist := partialPath.Dist + 1
-				dist, exists := distance[lnutil.RouteHop{channel.Link.BPKH, channel.Link.CoinType}]
-
-				var prevDist int64
-				if exists {
-					prevDist = dist.Dist
-				}
-
-				if !exists || (exists && tempDist < prevDist) {
-					// We could use this. Explore further
-
-					newDist := nodeWithDist{
-						Dist:     tempDist,
-						Pkh:      channel.Link.BPKH,
-						CoinType: channel.Link.CoinType,
-						Amt:      amtRqd,
-					}
-
-					distance[lnutil.RouteHop{channel.Link.BPKH, channel.Link.CoinType}] = newDist
-
-					prev[lnutil.RouteHop{channel.Link.BPKH, channel.Link.CoinType}] = lnutil.RouteHop{partialPath.Pkh, partialPath.CoinType}
-
-					fmt.Printf("Pushing %s:%d onto heap\n", bech32.Encode("ln", channel.Link.BPKH[:]), channel.Link.CoinType)
-
-					heap.Push(&nodeHeap, newDist)
-				}
-			}
-		}
-	}
-
-	if _, ok := prev[lnutil.RouteHop{targetPkh, destCoinType}]; !ok {
-		return nil, fmt.Errorf("No route to target %s:%d", bech32.Encode("ln", targetPkh[:]), destCoinType)
-	}
-
-	route := []lnutil.RouteHop{prev[lnutil.RouteHop{targetPkh, destCoinType}], {targetPkh, destCoinType}}
-	for !(bytes.Equal(route[0].Node[:], myIdPkh[:]) && route[0].CoinType == originCoinType) {
-		route = append([]lnutil.RouteHop{prev[route[0]]}, route...)
-	}
-
-	return nil, nil
-}*/
 
 func (nd *LitNode) cleanStaleChannels() {
 	nd.ChannelMapMtx.Lock()
