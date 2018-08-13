@@ -88,6 +88,7 @@ func (s *SPVCon) DialNode(listOfNodes []string) (net.Conn, error) {
 			continue
 		}
 
+		log.Printf("Attempting connection to node at %s...", conString)
 		if s.ProxyURL != "" {
 			log.Printf("Attempting to connect via proxy %s", s.ProxyURL)
 			var d proxy.Dialer
@@ -211,6 +212,7 @@ func (s *SPVCon) Connect(remoteNode string) error {
 			listOfNodes = listOfNodes[1:]
 			continue
 		}
+		s.con = con
 		err = s.Handshake(listOfNodes)
 		if err != nil {
 			handShakeFailed = true

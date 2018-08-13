@@ -35,6 +35,10 @@ func moreWork(a, b []*wire.BlockHeader, p *coinparam.Params) bool {
 	pos := 0 //can safely assume this thanks to the first check
 	for i := min(len(a), len(b)) - 1; i >= 1; i-- {
 		hash := a[i-1].BlockHash()
+		log.Println("HASH")
+		log.Println(hash)
+		log.Println(a[i].PrevBlock.IsEqual(&hash))
+		log.Println(b[i].PrevBlock.IsEqual(&hash))
 		if a[i].PrevBlock.IsEqual(&hash) && b[i].PrevBlock.IsEqual(&hash) {
 			isMoreWork = true
 			pos = i
