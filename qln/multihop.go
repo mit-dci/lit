@@ -112,6 +112,7 @@ func (nd *LitNode) MultihopPaymentAckHandler(msg lnutil.MultihopPaymentAckMsg) e
 				fmt.Printf("Found the right pending multihop. Sending setup msg to first hop\n")
 				// found the right one. Set this up
 				firstHop := mh.Path[1]
+				ourHop := mh.Path[0]
 				firstHopIdx, err := nd.FindPeerIndexByAddress(bech32.Encode("ln", firstHop.Node[:]))
 				if err != nil {
 					return fmt.Errorf("not connected to first hop in route")
@@ -120,7 +121,7 @@ func (nd *LitNode) MultihopPaymentAckHandler(msg lnutil.MultihopPaymentAckMsg) e
 				nd.RemoteMtx.Lock()
 				var qc *Qchan
 				for _, ch := range nd.RemoteCons[firstHopIdx].QCs {
-					if ch.Coin() == mh.Path[0].CoinType && ch.State.MyAmt-consts.MinOutput-ch.State.Fee >= mh.Amt && !ch.CloseData.Closed && !ch.State.Failed {
+					if ch.Coin() == ourHop.CoinType && ch.State.MyAmt-consts.MinOutput-ch.State.Fee >= mh.Amt && !ch.CloseData.Closed && !ch.State.Failed {
 						qc = ch
 						break
 					}
@@ -140,9 +141,9 @@ func (nd *LitNode) MultihopPaymentAckHandler(msg lnutil.MultihopPaymentAckMsg) e
 				}
 
 				// Calculate what initial locktime we need
-				wal, ok := nd.SubWallet[firstHop.CoinType]
+				wal, ok := nd.SubWallet[ourHop.CoinType]
 				if !ok {
-					return fmt.Errorf("not connected to wallet for cointype %d", firstHop.CoinType)
+					return fmt.Errorf("not connected to wallet for cointype %d", ourHop.CoinType)
 				}
 
 				height := wal.CurrentHeight()
