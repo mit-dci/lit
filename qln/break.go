@@ -21,9 +21,9 @@ func (nd *LitNode) BreakChannel(q *Qchan) error {
 
 	if q.CloseData.Closed {
 		if q.CloseData.CloseHeight != 0 {
-		return fmt.Errorf("Can't break channel %d with peer %d, already closed\n", q.Idx(), q.Peer())
+			return fmt.Errorf("Can't break channel %d with peer %d, already closed\n", q.Idx(), q.Peer())
 		}
-		return fmt.Errorf("Can't break channel %d with peer %d, tx already broadcast, wait for confirmation.\n", q.Idx(),  q.Peer())
+		return fmt.Errorf("Can't break channel %d with peer %d, tx already broadcast, wait for confirmation.\n", q.Idx(), q.Peer())
 	}
 
 	log.Printf("breaking (%d,%d)\n", q.Peer(), q.Idx())
@@ -40,6 +40,21 @@ func (nd *LitNode) BreakChannel(q *Qchan) error {
 
 	// set delta to 0... needed for break
 	q.State.Delta = 0
+
+	for i, h := range q.State.HTLCs {
+		if !h.Cleared && h.Clearing {
+			q.State.HTLCs[i].Clearing = false
+		}
+	}
+
+	if q.State.InProgHTLC != nil {
+		q.State.InProgHTLC = nil
+	}
+
+	if q.State.CollidingHTLC != nil {
+		q.State.CollidingHTLC = nil
+	}
+
 	tx, err := nd.SignBreakTx(q)
 	if err != nil {
 		return err
