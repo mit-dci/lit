@@ -16,6 +16,7 @@ import (
 
 	"github.com/awalterschulze/gographviz"
 	"github.com/mit-dci/lit/bech32"
+	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/crypto/fastsha256"
 	"github.com/mit-dci/lit/lnutil"
@@ -84,7 +85,7 @@ func (nd *LitNode) VisualiseGraph() string {
 }
 
 // FindPath uses Bellman-Ford and Dijkstra to find the path with the best price that has enough capacity to route the payment
-func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinType uint32, amount int64, fee int64) ([]lnutil.RouteHop, error) {
+func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinType uint32, amount int64) ([]lnutil.RouteHop, error) {
 	var myIdPkh [20]byte
 	idHash := fastsha256.Sum256(nd.IdKey().PubKey().SerializeCompressed())
 	copy(myIdPkh[:], idHash[:20])
@@ -363,6 +364,14 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 		partialPath := heap.Pop(&nodeHeap).(nodeWithDist)
 
 		log.Printf("popped %s:%d from heap", bech32.Encode("ln", vertices[partialPath.Node].Node[:]), vertices[partialPath.Node].CoinType)
+
+		p, ok := coinparam.RegisteredNets[vertices[partialPath.Node].CoinType]
+		if !ok {
+			log.Printf("ignoring %s:%d because cointype is unknown", bech32.Encode("ln", vertices[partialPath.Node].Node[:]), vertices[partialPath.Node].CoinType)
+			continue
+		}
+
+		fee := p.FeePerByte * 1000
 
 		for _, edge := range dEdges[partialPath.Node] {
 			log.Printf("considering edge %s:%d", bech32.Encode("ln", vertices[edge.V].Node[:]), vertices[edge.V].CoinType)

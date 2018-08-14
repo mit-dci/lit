@@ -40,7 +40,7 @@ func (nd *LitNode) PayMultihop(dstLNAdr string, originCoinType uint32, destCoinT
 
 	copy(targetAdr[:], adr)
 	log.Printf("Finding route to %s", dstLNAdr)
-	path, err := nd.FindPath(targetAdr, destCoinType, originCoinType, amount, fee)
+	path, err := nd.FindPath(targetAdr, destCoinType, originCoinType, amount)
 	if err != nil {
 		return false, err
 	}
