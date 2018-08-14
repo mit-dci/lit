@@ -61,7 +61,7 @@ func (s *SPVCon) GetListOfNodes() ([]string, error) {
 		// need this temp in order to capture the error from net.LookupHost
 		// also need this to report the number of IPs we get from a seed
 		if err != nil {
-			log.Printf("Have difficulty trying to conenct to %s. Going to the next seed", seed)
+			log.Printf("Have difficulty trying to connect to %s. Going to the next seed", seed)
 			continue
 		}
 		listOfNodes = append(listOfNodes, temp...)
@@ -150,6 +150,7 @@ func (s *SPVCon) Handshake(listOfNodes []string) error {
 		s.con, s.localVersion,
 		wire.BitcoinNet(s.Param.NetMagicBytes), wire.LatestEncoding)
 	if err != nil {
+		log.Println(err)
 		return err
 	}
 	s.RBytes += uint64(n)
