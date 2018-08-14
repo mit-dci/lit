@@ -188,26 +188,6 @@ func (nd *LitNode) MultihopPaymentAckHandler(msg lnutil.MultihopPaymentAckMsg) e
 func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMsg) error {
 	fmt.Printf("Received multihop payment setup from peer %d, hash %x\n", msg.Peer(), msg.HHash)
 
-	var nullBytes [16]byte
-	nd.MultihopMutex.Lock()
-	defer nd.MultihopMutex.Unlock()
-	for _, mh := range nd.InProgMultihop {
-		hash := fastsha256.Sum256(mh.PreImage[:])
-		if !bytes.Equal(mh.PreImage[:], nullBytes[:]) && bytes.Equal(msg.HHash[:], hash[:]) {
-			// We already know this. If we have a Preimage, then we're the receiving
-			// end and we should send a settlement message to the
-			// predecessor
-			go func() {
-				_, err := nd.ClaimHTLC(mh.PreImage)
-				if err != nil {
-					log.Printf("error claiming HTLC: %s", err.Error())
-				}
-			}()
-
-			return nil
-		}
-	}
-
 	inFlight := new(InFlightMultihop)
 	inFlight.Path = msg.NodeRoute
 	inFlight.HHash = msg.HHash
@@ -217,20 +197,18 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 	id := nd.IdKey().PubKey().SerializeCompressed()
 	idHash := fastsha256.Sum256(id[:])
 	copy(pkh[:], idHash[:20])
-	var nextHop, ourHop, incomingHop lnutil.RouteHop
+	var nextHop, ourHop, incomingHop *lnutil.RouteHop
 	for i, node := range inFlight.Path {
 		if bytes.Equal(pkh[:], node.Node[:]) {
-			if i+1 >= len(inFlight.Path) || i == 0 {
+			if i == 0 {
 				return fmt.Errorf("path is invalid")
 			}
-			nextHop = inFlight.Path[i+1]
-			ourHop = inFlight.Path[i]
-			incomingHop = inFlight.Path[i-1]
+			if i+1 < len(inFlight.Path) {
+				nextHop = &inFlight.Path[i+1]
+			}
+			ourHop = &inFlight.Path[i]
+			incomingHop = &inFlight.Path[i-1]
 			break
-		}
-
-		if i+1 >= len(inFlight.Path) {
-			return fmt.Errorf("path is invalid")
 		}
 	}
 
@@ -257,6 +235,31 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 
 	if !found {
 		return fmt.Errorf("no corresponding incoming HTLC found for multihop payment with RHash: %x", msg.HHash)
+	}
+
+	var nullBytes [16]byte
+	nd.MultihopMutex.Lock()
+	defer nd.MultihopMutex.Unlock()
+	for _, mh := range nd.InProgMultihop {
+		hash := fastsha256.Sum256(mh.PreImage[:])
+
+		if !bytes.Equal(mh.PreImage[:], nullBytes[:]) && bytes.Equal(msg.HHash[:], hash[:]) && mh.Path[len(mh.Path)-1].CoinType == incomingHop.CoinType {
+			// We already know this. If we have a Preimage, then we're the receiving
+			// end and we should send a settlement message to the
+			// predecessor
+			go func() {
+				_, err := nd.ClaimHTLC(mh.PreImage)
+				if err != nil {
+					log.Printf("error claiming HTLC: %s", err.Error())
+				}
+			}()
+
+			return nil
+		}
+	}
+
+	if nextHop == nil {
+		return fmt.Errorf("route is invalid")
 	}
 
 	wal, ok := nd.SubWallet[incomingHop.CoinType]
@@ -385,6 +388,7 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 		nd.ChannelMapMtx.Unlock()
 
 		msg.PeerIdx = sendToIdx
+		msg.NodeRoute = msg.NodeRoute[1:]
 		nd.OmniOut <- msg
 	}()
 

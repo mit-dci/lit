@@ -119,8 +119,11 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 	// Then for the current node (APKH), for each channel add an edge from
 	// APKH:channel_cointype to each BPKH:cointype pair in the graph.
 
-	for _, channels := range nd.ChannelMap {
+	for pkh, channels := range nd.ChannelMap {
+		log.Printf("processing channels from %s", bech32.Encode("ln", pkh[:]))
+
 		for _, channel := range channels {
+			log.Printf("...processing channel %s:%d", bech32.Encode("ln", channel.Link.BPKH[:]), channel.Link.CoinType)
 			var newEdges []channelEdge
 			origin := lnutil.RouteHop{
 				channel.Link.APKH,
@@ -128,8 +131,11 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 			}
 			verticesMap[origin] = -1
 
+			coinTypes := map[uint32]bool{}
+
 			for _, theirChannel := range nd.ChannelMap[channel.Link.BPKH] {
-				if theirChannel.Link.BPKH != channel.Link.APKH {
+				log.Printf("......checking outbound connection %s:%d", bech32.Encode("ln", theirChannel.Link.BPKH[:]), theirChannel.Link.CoinType)
+				if _, ok := coinTypes[theirChannel.Link.CoinType]; !ok {
 					var rd *lnutil.RateDesc
 					for _, rate := range theirChannel.Link.Rates {
 						if rate.CoinType == channel.Link.CoinType {
@@ -140,6 +146,7 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 
 					if rd == nil {
 						// this trade is not possible
+						log.Printf(".........ignoring channel because trade %d->%d is not possible", channel.Link.CoinType, theirChannel.Link.CoinType)
 						continue
 					}
 
@@ -166,9 +173,12 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 						channel.Link.ACapacity,
 					}
 
-					log.Printf("adding edge: %x:%d->%x:%d", edge.U.Node, edge.U.CoinType, edge.V.Node, edge.V.CoinType)
+					log.Printf(".........adding edge: %s:%d->%s:%d", bech32.Encode("ln", edge.U.Node[:]), edge.U.CoinType, bech32.Encode("ln", edge.V.Node[:]), edge.V.CoinType)
 
 					newEdges = append(newEdges, edge)
+					coinTypes[theirChannel.Link.CoinType] = true
+				} else {
+					log.Printf(".........ignoring channel because its cointype has already been covered")
 				}
 			}
 
@@ -207,7 +217,7 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 					channel.Link.ACapacity,
 				}
 
-				log.Printf("adding sink: %x:%d->%x:%d", edge.U.Node, edge.U.CoinType, edge.V.Node, edge.V.CoinType)
+				log.Printf("...adding sink: %s:%d->%s:%d", bech32.Encode("ln", edge.U.Node[:]), edge.U.CoinType, bech32.Encode("ln", edge.V.Node[:]), edge.V.CoinType)
 
 				newEdges = append(newEdges, edge)
 			}
@@ -244,8 +254,8 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 	graph := gographviz.NewGraph()
 	graph.SetName("\"bf-step\"")
 	for _, edge := range edgesLight {
-		U := fmt.Sprintf("\"%x:%d\"", vertices[edge.U].Node, vertices[edge.U].CoinType)
-		V := fmt.Sprintf("\"%x:%d\"", vertices[edge.V].Node, vertices[edge.V].CoinType)
+		U := fmt.Sprintf("\"%s:%d\"", bech32.Encode("ln", vertices[edge.U].Node[:]), vertices[edge.U].CoinType)
+		V := fmt.Sprintf("\"%s:%d\"", bech32.Encode("ln", vertices[edge.V].Node[:]), vertices[edge.V].CoinType)
 		if !graph.IsNode(U) {
 			graph.AddNode("\"bf-step\"", U, nil)
 		}
@@ -352,7 +362,11 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 	for nodeHeap.Len() > 0 {
 		partialPath := heap.Pop(&nodeHeap).(nodeWithDist)
 
+		log.Printf("popped %s:%d from heap", bech32.Encode("ln", vertices[partialPath.Node].Node[:]), vertices[partialPath.Node].CoinType)
+
 		for _, edge := range dEdges[partialPath.Node] {
+			log.Printf("considering edge %s:%d", bech32.Encode("ln", vertices[edge.V].Node[:]), vertices[edge.V].CoinType)
+
 			amtRqd := partialPath.Amt
 
 			if amtRqd < consts.MinOutput+fee {
