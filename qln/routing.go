@@ -406,7 +406,7 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 				continue
 			}
 
-			log.Printf("could use edge %x:%d->%x:%d amt: %d", vertices[edge.U].Node, vertices[edge.U].CoinType, vertices[edge.V].Node, vertices[edge.V].CoinType, amtRqd)
+			log.Printf("could use edge %s:%d->%s:%d amt: %d capacity: %d", bech32.Encode("ln", vertices[edge.U].Node[:]), vertices[edge.U].CoinType, bech32.Encode("ln", vertices[edge.V].Node[:]), vertices[edge.V].CoinType, amtRqd, edge.Capacity)
 
 			predecessor[edge.V] = edge.U
 			heap.Push(&nodeHeap, *dDistance[edge.V])
@@ -464,7 +464,13 @@ func (nd *LitNode) advertiseLinks(seq uint32) {
 					caps[BPKH] = make(map[uint32]int64)
 				}
 
-				caps[BPKH][q.Coin()] += q.State.MyAmt - consts.MinOutput - q.State.Fee
+				amt := q.State.MyAmt - consts.MinOutput - q.State.Fee
+
+				// Since we don't yet perform multi-path routing, the capacity
+				// is the maximum available single channel capacity
+				if caps[BPKH][q.Coin()] < amt {
+					caps[BPKH][q.Coin()] = amt
+				}
 			}
 		}
 	}
