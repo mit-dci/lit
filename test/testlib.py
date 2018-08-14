@@ -4,6 +4,7 @@ import time
 import signal
 import subprocess
 import logging
+import random
 
 import testutil
 import btcrpc
@@ -41,17 +42,10 @@ def new_data_dir(name):
     os.makedirs(p, exist_ok=True)
     return p
 
-MSG = "01234567890abcdef"
-msg_i = 0
-def next_id():
-    global msg_i
-    m = MSG[msg_i]
-    msg_i += 1
-    return m
+hexchars = "0123456789abcdef"
 
 class LitNode():
     def __init__(self, bcnode):
-        self.id = next_id()
         self.p2p_port = new_port()
         self.rpc_port = new_port()
         self.data_dir = new_data_dir("lit")
@@ -59,7 +53,11 @@ class LitNode():
 
         # Write a hexkey to the privkey file
         with open(paths.join(self.data_dir, "privkey.hex"), 'w+') as f:
-            f.write("1" * 63 + str(self.id) + "\n") # won't work if >=16 lits
+            s = ''
+            for _ in range(64):
+                s += hexchars[random.randint(0, len(hexchars) - 1)]
+            print('Using key:', s)
+            f.write(s + "\n")
 
         # See if we should print stdout
         outputredir = subprocess.DEVNULL
@@ -102,28 +100,20 @@ class LitNode():
     def connect_to_peer(self, other):
         addr = other.lnid + '@127.0.0.1:' + str(other.p2p_port)
         res = self.rpc.Connect(LNAddr=addr)
-        if "_error" not in res:
-            self.update_peers()
-            if self.peer_mapping[other.lnid] != res['PeerIdx']:
-                raise AssertError("new peer ID doesn't match reported ID")
-            other.update_peers()
-        else:
-            raise AssertError("couldn't connect to " + lnaddr)
+        self.update_peers()
+        if 'PeerIdx' in res and self.peer_mapping[other.lnid] != res['PeerIdx']:
+            raise AssertError("new peer ID doesn't match reported ID")
+        other.update_peers()
 
     def get_peer_id(self, other):
         return self.peer_mapping[other.lnid]
 
     def make_new_addr(self):
         res = self.rpc.Address(NumToMake=1, CoinType=REGTEST_COINTYPE)
-        if "_error" not in res:
-            return res['WitAddresses'][0]
-        else:
-            raise AssertError("unable to create new address")
+        return res['WitAddresses'][0]
 
     def update_peers(self):
         res = self.rpc.ListConnections()
-        if "_error" in res:
-            raise AssertionError("couldn't ask for peers")
         pm = {}
         for p in res['Connections']:
             pm[p['LitAdr']] = p['PeerNumber']
@@ -148,10 +138,7 @@ class LitNode():
             Capacity=capacity,
             InitialSend=initialsend,
             Data=None) # maybe use [0 for _ in range(32)] or something?
-        if type(res) is str:
-            raise AssertionError('failed to open channel: ' + str(res))
-        else:
-            return res['ChanIdx']
+        return res['ChanIdx']
 
     def shutdown(self):
         if self.proc is not None:
