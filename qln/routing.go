@@ -90,10 +90,16 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 	idHash := fastsha256.Sum256(nd.IdKey().PubKey().SerializeCompressed())
 	copy(myIdPkh[:], idHash[:20])
 
+	type routeHop struct {
+		Node     [20]byte
+		CoinType uint32
+		Terminus bool
+	}
+
 	type channelEdge struct {
 		W        float64
-		U        lnutil.RouteHop
-		V        lnutil.RouteHop
+		U        routeHop
+		V        routeHop
 		Rate     lnutil.RateDesc
 		Capacity int64
 	}
@@ -108,10 +114,10 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 
 	// set up initial graph
 	var edges []channelEdge
-	var vertices []lnutil.RouteHop
+	var vertices []routeHop
 	var edgesLight []channelEdgeLight
 
-	verticesMap := make(map[lnutil.RouteHop]int)
+	verticesMap := make(map[routeHop]int)
 
 	nd.ChannelMapMtx.Lock()
 
@@ -126,9 +132,10 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 		for _, channel := range channels {
 			log.Printf("...processing channel %s:%d", bech32.Encode("ln", channel.Link.BPKH[:]), channel.Link.CoinType)
 			var newEdges []channelEdge
-			origin := lnutil.RouteHop{
+			origin := routeHop{
 				channel.Link.APKH,
 				channel.Link.CoinType,
+				false,
 			}
 			verticesMap[origin] = -1
 
@@ -151,9 +158,10 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 						continue
 					}
 
-					vertex := lnutil.RouteHop{
+					vertex := routeHop{
 						channel.Link.BPKH,
 						theirChannel.Link.CoinType,
+						false,
 					}
 					verticesMap[vertex] = -1
 
@@ -183,45 +191,28 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 				}
 			}
 
-			var addSink bool
-			// this vertex is a sink
-			if len(newEdges) == 0 {
-				addSink = true
-			} else {
-				var found bool
-				for _, edge := range newEdges {
-					if edge.V.CoinType == channel.Link.CoinType {
-						found = true
-						break
-					}
-				}
-
-				addSink = !found
+			vertex := routeHop{
+				channel.Link.BPKH,
+				channel.Link.CoinType,
+				true,
 			}
+			verticesMap[vertex] = -1
 
-			if addSink {
-				vertex := lnutil.RouteHop{
-					channel.Link.BPKH,
+			edge := channelEdge{
+				0,
+				origin,
+				vertex,
+				lnutil.RateDesc{
 					channel.Link.CoinType,
-				}
-				verticesMap[vertex] = -1
-
-				edge := channelEdge{
-					0,
-					origin,
-					vertex,
-					lnutil.RateDesc{
-						channel.Link.CoinType,
-						1,
-						false,
-					},
-					channel.Link.ACapacity,
-				}
-
-				log.Printf("...adding sink: %s:%d->%s:%d", bech32.Encode("ln", edge.U.Node[:]), edge.U.CoinType, bech32.Encode("ln", edge.V.Node[:]), edge.V.CoinType)
-
-				newEdges = append(newEdges, edge)
+					1,
+					false,
+				},
+				channel.Link.ACapacity,
 			}
+
+			log.Printf("...adding sink: %s:%d->%s:%d", bech32.Encode("ln", edge.U.Node[:]), edge.U.CoinType, bech32.Encode("ln", edge.V.Node[:]), edge.V.CoinType)
+
+			newEdges = append(newEdges, edge)
 
 			edges = append(edges, newEdges...)
 		}
@@ -257,11 +248,18 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 	for _, edge := range edgesLight {
 		U := fmt.Sprintf("\"%s:%d\"", bech32.Encode("ln", vertices[edge.U].Node[:]), vertices[edge.U].CoinType)
 		V := fmt.Sprintf("\"%s:%d\"", bech32.Encode("ln", vertices[edge.V].Node[:]), vertices[edge.V].CoinType)
+
+		nodeAttrs := make(map[string]string)
+		if vertices[edge.V].Terminus {
+			nodeAttrs["peripheries"] = "2"
+			V = fmt.Sprintf("\"%s:%d terminus\"", bech32.Encode("ln", vertices[edge.V].Node[:]), vertices[edge.V].CoinType)
+		}
+
 		if !graph.IsNode(U) {
 			graph.AddNode("\"bf-step\"", U, nil)
 		}
 		if !graph.IsNode(V) {
-			graph.AddNode("\"bf-step\"", V, nil)
+			graph.AddNode("\"bf-step\"", V, nodeAttrs)
 		}
 
 		attrs := make(map[string]string)
@@ -274,18 +272,18 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 	log.Printf("bf-step graph: \n %s", "di"+graph.String())
 
 	// find my ID in map
-	myId, ok := verticesMap[lnutil.RouteHop{myIdPkh, originCoinType}]
+	myId, ok := verticesMap[routeHop{myIdPkh, originCoinType, false}]
 	if !ok {
 		return nil, fmt.Errorf("origin node not found")
 	}
 
-	targetId, ok := verticesMap[lnutil.RouteHop{targetPkh, destCoinType}]
+	targetId, ok := verticesMap[routeHop{targetPkh, destCoinType, true}]
 	if !ok {
 		return nil, fmt.Errorf("destination node not found")
 	}
 
 	// add dummy vertex q to the map
-	vertices = append(vertices, lnutil.RouteHop{[20]byte{}, 0})
+	vertices = append(vertices, routeHop{[20]byte{}, 0, false})
 	distance = append(distance, 0)
 	predecessor = append(predecessor, -1)
 
@@ -423,7 +421,7 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 	}
 
 	for target, dist := range dDistance {
-		if dist != nil {
+		if dist != nil && vertices[target].Terminus {
 			price := math.Exp(-dist.Dist)
 			log.Printf("%s:%d: cap (recv): %d, price: %f64, cap (send): %d", bech32.Encode("ln", vertices[target].Node[:]), vertices[target].CoinType, dist.Amt, price, int(float64(dist.Amt)/price))
 		}
@@ -440,7 +438,7 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 
 	var route []lnutil.RouteHop
 	for _, id := range routeIds {
-		route = append(route, vertices[id])
+		route = append(route, lnutil.RouteHop{vertices[id].Node, vertices[id].CoinType})
 	}
 
 	return route, nil
