@@ -15,6 +15,7 @@ import (
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/watchtower"
 	"github.com/mit-dci/lit/wire"
 )
@@ -668,6 +669,17 @@ func (nd *LitNode) ReloadQchanState(q *Qchan) error {
 		if err != nil {
 			return err
 		}
+
+		txoBytes := qcBucket.Get(KEYutxo)
+		if txoBytes == nil {
+			return fmt.Errorf("utxo value empty")
+		}
+		u, err := portxo.PorTxoFromBytes(txoBytes[99:])
+		if err != nil {
+			return err
+		}
+
+		q.PorTxo = *u // assign the utxo
 
 		// load elkrem from elkrem bucket.
 		q.ElkRcv, err = elkrem.ElkremReceiverFromBytes(qcBucket.Get(KEYElkRecv))
