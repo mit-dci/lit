@@ -966,6 +966,20 @@ func GetHTLCOut(q *Qchan, h HTLC, tx *wire.MsgTx, mine bool) (*wire.TxOut, uint3
 }
 
 func (q *Qchan) GetCloseTxs() (*wire.MsgTx, []*wire.MsgTx, bool, error) {
+	for i, h := range q.State.HTLCs {
+		if !h.Cleared && h.Clearing {
+			q.State.HTLCs[i].Clearing = false
+		}
+	}
+
+	if q.State.InProgHTLC != nil {
+		q.State.InProgHTLC = nil
+	}
+
+	if q.State.CollidingHTLC != nil {
+		q.State.CollidingHTLC = nil
+	}
+
 	mine := true
 	stateTx, htlcSpends, _, err := q.BuildStateTxs(mine)
 	if err != nil {
