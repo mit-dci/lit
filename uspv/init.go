@@ -135,7 +135,6 @@ func (s *SPVCon) DialNode(listOfNodes []string) error {
 		}
 	}()
 	wg.Wait()
-	s.conns[0] = s.conns[0] // remove this
 	return nil
 }
 
