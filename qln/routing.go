@@ -422,6 +422,13 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 		}
 	}
 
+	for target, dist := range dDistance {
+		if dist != nil {
+			price := math.Exp(-dist.Dist)
+			log.Printf("%s:%d: cap (recv): %d, price: %f64, cap (send): %d", bech32.Encode("ln", vertices[target].Node[:]), vertices[target].CoinType, dist.Amt, price, int(float64(dist.Amt)/price))
+		}
+	}
+
 	if dDistance[targetId] == nil {
 		return nil, fmt.Errorf("no route from origin to destination could be found")
 	}
