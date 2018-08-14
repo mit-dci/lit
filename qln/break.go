@@ -47,13 +47,8 @@ func (nd *LitNode) BreakChannel(q *Qchan) error {
 		}
 	}
 
-	if q.State.InProgHTLC != nil {
-		q.State.InProgHTLC = nil
-	}
-
-	if q.State.CollidingHTLC != nil {
-		q.State.CollidingHTLC = nil
-	}
+	q.State.InProgHTLC = nil
+	q.State.CollidingHTLC = nil
 
 	tx, err := nd.SignBreakTx(q)
 	if err != nil {

@@ -972,13 +972,8 @@ func (q *Qchan) GetCloseTxs() (*wire.MsgTx, []*wire.MsgTx, bool, error) {
 		}
 	}
 
-	if q.State.InProgHTLC != nil {
-		q.State.InProgHTLC = nil
-	}
-
-	if q.State.CollidingHTLC != nil {
-		q.State.CollidingHTLC = nil
-	}
+	q.State.InProgHTLC = nil
+	q.State.CollidingHTLC = nil
 
 	mine := true
 	stateTx, htlcSpends, _, err := q.BuildStateTxs(mine)
