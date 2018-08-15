@@ -44,9 +44,9 @@ type SPVCon struct {
 
 	//[doesn't work without fancy mutexes, nevermind, just use header file]
 	// localHeight   int32  // block height we're on
-	remoteHeight  int32  // block height they're on
+	remoteHeight  []int32  // block height they're on
 	localVersion  uint32 // version we report
-	remoteVersion uint32 // version remote node
+	remoteVersion []uint32 // version remote node
 
 	// what's the point of the input queue? remove? leave for now...
 	inMsgQueue  chan wire.Message // Messages coming in from remote node

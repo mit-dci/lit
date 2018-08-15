@@ -3,23 +3,20 @@ package uspv
 import (
 	"log"
 
-	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/btcutil/bloom"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/wire"
 )
 
-func (s *SPVCon) incomingMessageHandler() {
+func (s *SPVCon) incomingMessageHandler(peerIdx int) {
 	for {
-		n, xm, _, err := wire.ReadMessageWithEncodingN(s.conns[0], s.localVersion,
+		log.Printf("Received message from peer %d", peerIdx)
+		n, xm, _, err := wire.ReadMessageWithEncodingN(s.conns[peerIdx], s.localVersion,
 			wire.BitcoinNet(s.Param.NetMagicBytes), wire.LatestEncoding)
 		if err != nil {
-			log.Printf("ReadMessageWithEncodingN error.  Disconnecting from given peer. %s\n", err.Error())
-			if s.randomNodesOK { // if user wants to connect to localhost, let him do so
-				s.Connect("yes") // really any YupString here
-			} else {
-				s.conns[0].Close()
-				return
-			}
+			log.Printf("ReadMessageWithEncodingN error Disconnecting from given peer. %s\n", err.Error())
+			s.conns[peerIdx].Close()
+			return
 		}
 		s.RBytes += uint64(n)
 		//		log.Printf("Got %d byte %s message\n", n, xm.Command())
@@ -27,7 +24,7 @@ func (s *SPVCon) incomingMessageHandler() {
 		case *wire.MsgVersion:
 			log.Printf("Got version message.  Agent %s, version %d, at height %d\n",
 				m.UserAgent, m.ProtocolVersion, m.LastBlock)
-			s.remoteVersion = uint32(m.ProtocolVersion) // weird cast! bug?
+			s.remoteVersion = append(s.remoteVersion, uint32(m.ProtocolVersion))
 		case *wire.MsgVerAck:
 			log.Printf("Got verack.  Whatever.\n")
 		case *wire.MsgAddr:
@@ -69,18 +66,18 @@ func (s *SPVCon) incomingMessageHandler() {
 	return
 }
 
-// this one seems kindof pointless?  could get ridf of it and let
+// this one seems kindof pointless?  could get rid of it and let
 // functions call WriteMessageWithEncodingN themselves...
-func (s *SPVCon) outgoingMessageHandler() {
+func (s *SPVCon) outgoingMessageHandler(peerIdx int) {
 	for {
+		//log.Printf("Sending message to peer %d", peerIdx)
 		msg := <-s.outMsgQueue
 		if msg == nil {
 			log.Printf("ERROR: nil message to outgoingMessageHandler\n")
 			continue
 		}
-		n, err := wire.WriteMessageWithEncodingN(s.conns[0], msg, s.localVersion,
+		n, err := wire.WriteMessageWithEncodingN(s.conns[peerIdx], msg, s.localVersion,
 			wire.BitcoinNet(s.Param.NetMagicBytes), wire.LatestEncoding)
-
 		if err != nil {
 			log.Printf("Write message error: %s", err.Error())
 		}
