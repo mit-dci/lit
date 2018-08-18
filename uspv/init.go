@@ -11,8 +11,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/wire"
+
 	"golang.org/x/net/proxy"
 )
 
@@ -141,6 +143,7 @@ func (s *SPVCon) DialNode(listOfNodesParent []string) error {
 func (s *SPVCon) Handshake(peerIdx int) error {
 	// assign version bits for local node
 	s.localVersion = VERSION
+	log.Printf("Initiating handshake with peer %d", peerIdx+1)
 	myMsgVer, err := wire.NewMsgVersionFromConn(s.conns[peerIdx], 0, 0)
 	if err != nil {
 		return err
@@ -177,12 +180,14 @@ func (s *SPVCon) Handshake(peerIdx int) error {
 		log.Printf("connected to %s", mv.UserAgent)
 	}
 
-	if mv.ProtocolVersion < 70013 {
-		//70014 -> core v0.13.1, so we should be fine
+	if !(mv.ProtocolVersion >= consts.LastSupportedVersion) {
 		return fmt.Errorf("Remote node version: %x too old, disconnecting.", mv.ProtocolVersion)
 	}
 
-	if !((strings.Contains(s.Param.Name, "lite") && strings.Contains(mv.UserAgent, "LitecoinCore")) || strings.Contains(mv.UserAgent, "Satoshi") || strings.Contains(mv.UserAgent, "btcd")) {
+	if !((strings.Contains(s.Param.Name, "lite") &&
+		strings.Contains(mv.UserAgent, "LitecoinCore")) ||
+		strings.Contains(mv.UserAgent, "Satoshi") ||
+		strings.Contains(mv.UserAgent, "btcd")) {
 		// TODO: improve this filtering criterion
 		return fmt.Errorf("Spam node. Returning!")
 	}
@@ -207,7 +212,7 @@ func (s *SPVCon) Handshake(peerIdx int) error {
 	return nil
 }
 
-func ConnCheck(in []bool) bool {
+func connCheck(in []bool) bool {
 	for _, val := range in {
 		if val == true {
 			return val
@@ -219,13 +224,12 @@ func ConnCheck(in []bool) bool {
 func (s *SPVCon) ConnectToMaxConns(listOfNodes []string) ([]string, error) {
 	var empty []string
 	var err error
-	if !s.randomNodesOK { // conneect to user provided node
+	if !s.randomNodesOK { // connect to user provided node
 		err = s.DialNode(listOfNodes)
 		return listOfNodes, err
 	}
 	for len(listOfNodes)-s.maxConnections > 0 && len(s.conns) < s.maxConnections {
 		// make sure we get atleast one active connection from the DNS Seeds
-		log.Printf("Active Conns: %d", len(s.conns))
 		err = s.DialNode(listOfNodes)
 		if err != nil {
 			log.Println(err) // no need to take action on this error since this doesn't
@@ -261,7 +265,6 @@ func (s *SPVCon) Connect(remoteNode string) error {
 	} else { // else connect to user-specified node
 		listOfNodes = []string{remoteNode}
 	}
-	log.Println("LSIT OF NODES", listOfNodes)
 	// Connect to maxConns nodes
 	listOfNodes, err = s.ConnectToMaxConns(listOfNodes)
 	if err != nil {
@@ -271,7 +274,7 @@ func (s *SPVCon) Connect(remoteNode string) error {
 	// Now we have the connections, try handshakes
 	// Some peers might have weird version numbers, etc, so we drop them
 	// hence we collect maxConns from above since there are bound to be spam nodes
-	// which would get dropped and reduce the number of active connections
+	// which would be dropped and reduce the number of active connections
 	log.Printf("Trying to connect to %d node(s)", len(s.conns))
 	for k := 0; k < len(s.conns); k++ {
 		err := s.Handshake(k)
@@ -288,14 +291,19 @@ func (s *SPVCon) Connect(remoteNode string) error {
 		}
 		handshakeEstablished = append(handshakeEstablished, true)
 		connEstablished = append(connEstablished, true)
-		// setup streams to receive and send wire messages
-		// one for each connection
-		s.inMsgQueue = make(chan wire.Message)
+	}
+	// Now we have the connectiosn and peerIdxs ready
+	// The loop below initializes the messages that we need to send other nodes
+	// setup streams to receive and send wire messages
+	for k := 0; k < len(s.conns)-1; k++ {
 		go s.incomingMessageHandler(k)
-		s.outMsgQueue = make(chan wire.Message)
 		go s.outgoingMessageHandler(k)
 	}
-	if !ConnCheck(connEstablished) && !ConnCheck(handshakeEstablished) {
+
+	log.Printf("No. of active connections: %d", len(s.conns))
+	// final number of active connections
+	//s.inMsgQueue = make([]chan wire.Message, len(s.conns))
+	if !connCheck(connEstablished) && !connCheck(handshakeEstablished) {
 		// if no handhsake and connection established
 		// this case happens when user provided node fails to connect
 		return fmt.Errorf("Couldn't establish connection with any node. Exiting.")
@@ -315,7 +323,10 @@ func (s *SPVCon) Connect(remoteNode string) error {
 	}
 	s.fPositives = make(chan int32, 4000) // a block full, approx
 	s.inWaitState = make(chan bool, 1)
-	go s.fPositiveHandler()
+
+	for k := 0; k < len(s.conns); k++ {
+		go s.fPositiveHandler(k) // start one false positive handler for each node
+	}
 
 	// if s.HardMode { // what about for non-hard?  send filter?
 	// 	Ignore filters now; switch to filters fed to SPVcon from TS

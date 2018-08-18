@@ -125,12 +125,21 @@ func (s *SPVCon) Start(
 		return nil, nil, err
 	}
 
-	err = s.AskForHeaders()
-	if err != nil {
-		log.Printf("AskForHeaders error\n")
-		return nil, nil, err
+	for i := range s.outMsgQueue {
+	   s.outMsgQueue[i] = make(chan wire.Message)
 	}
-
+	// ask for headers from maxConnection Peers
+	// in case the number of connections is less than maxConnections, no need to worry
+	// since outMsgQueue is an array stores stuff that we don't use as well
+	for k := 0; k < s.maxConnections; k++ {
+		err = s.AskForHeaders(k) // when starting, assume that alteast
+		// one connection is active, else just error out
+		if err != nil {
+			log.Printf("AskForHeaders error from peer %d\n", k+1)
+			 //ignore error sicne we're asking from a lot of guys
+			//return err
+		}
+	}
 	return s.TxUpToWallit, s.CurrentHeightChan, nil
 }
 
@@ -172,7 +181,11 @@ func (s *SPVCon) PushTx(tx *wire.MsgTx) error {
 		return err
 	}
 	// broadcast inv message
-	s.outMsgQueue <- invMsg
+	for k := 0 ; k < len(s.conns) ; k ++ {
+		// spam all nodes with our tx
+		// maybe could have a pref order for nodes or something in the future
+		s.outMsgQueue[k] <- invMsg
+	}
 
 	// TODO wait a few seconds here for a reject message and return it
 	return nil

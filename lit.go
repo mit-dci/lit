@@ -65,7 +65,7 @@ var (
 	defaultAutoListenPort        = ":2448"
 	defaultAutoReconnectInterval = int64(60)
 	defaultUpnPFlag              = false
-	defaultMaxConnections = 120
+	defaultMaxConnections = 5
 )
 
 func fileExists(name string) bool {

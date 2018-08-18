@@ -133,9 +133,9 @@ func calcRoot(hashes []*chainhash.Hash) *chainhash.Hash {
 
 // RefilterLocal reconstructs the local in-memory bloom filter.  It does
 // this by calling GimmeFilter() but doesn't broadcast the result.
-func (s *SPVCon) Refilter(f *bloom.Filter) {
+func (s *SPVCon) Refilter(f *bloom.Filter, peerIdx int) {
 	if !s.HardMode {
-		s.SendFilter(f)
+		s.SendFilter(f, peerIdx)
 	}
 }
 
@@ -193,10 +193,16 @@ func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
 		// this way the only thing that triggers waitstate is asking for headers,
 		// getting 0, calling AskForMerkBlocks(), and seeing you don't need any.
 		// that way you are pretty sure you're synced up.
-		err = s.AskForHeaders()
-		if err != nil {
-			log.Printf("Merkle block error: %s\n", err.Error())
-			return
+
+		// ask all nodes for headers
+		for k := 0 ; k < len(s.conns) ; k ++ {
+			err = s.AskForHeaders(k)
+			if err != nil {
+				log.Printf("Merkle block error: %s\n", err.Error())
+				// should we actually return here considering we're
+				// asking many node for headers?
+				return
+			}
 		}
 	}
 	return
