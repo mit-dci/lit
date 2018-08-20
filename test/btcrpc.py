@@ -31,13 +31,15 @@ class BtcClient():
         }
 
         req = requests.post(self.rpc_url, headers={"Content-type": "application/json"}, data=json.dumps(reqbody))
-        if req.status_code == 200:
+        if req.status_code != 200:
+            raise AssertionError('RPC error: HTTP response code is ' + str(req.status_code))
+
+        if req.json()['error'] is None:
             resp = req.json()['result']
             logger.debug("Received rpc response from %s:%s method: %s Response: %s." % (self.ip, self.port, method, str(resp)))
             return resp
         else:
-            logger.debug('rpc call to {} not OK: {}'.format(method, req.status_code))
-            return req.json()['error']
+            raise AssertionError('RPC call failed: ' + str(req.json()['error']))
 
     def __getattr__(self, name):
         def dispatcher(*args, **kwargs):
