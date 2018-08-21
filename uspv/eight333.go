@@ -290,7 +290,6 @@ func (s *SPVCon) AskForHeaders(peerIdx int) error {
 		log.Printf("AskForHeaders GetHeaderAtHeight error\n")
 		return err
 	}
-
 	tHash := tipheader.BlockHash()
 	err = ghdr.AddBlockLocatorHash(&tHash)
 	if err != nil {

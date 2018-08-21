@@ -50,7 +50,7 @@ type config struct { // define a struct for usage with go-flags
 	AutoListenPort        string `long:"autoListenPort" description:"When auto reconnect enabled, starts listening on this port"`
 
 	MaxConnections int `short:"m" long:"maxConnections" description:"Define the maximum number of nodes to connect to"`
-	Params                *coinparam.Params
+	Params         *coinparam.Params
 }
 
 var (
@@ -65,7 +65,7 @@ var (
 	defaultAutoListenPort        = ":2448"
 	defaultAutoReconnectInterval = int64(60)
 	defaultUpnPFlag              = false
-	defaultMaxConnections = 5
+	defaultMaxConnections        = 5
 )
 
 func fileExists(name string) bool {
@@ -163,7 +163,7 @@ func main() {
 		AutoReconnect:         defaultAutoReconnect,
 		AutoListenPort:        defaultAutoListenPort,
 		AutoReconnectInterval: defaultAutoReconnectInterval,
-		MaxConnections : defaultMaxConnections,
+		MaxConnections:        defaultMaxConnections,
 	}
 
 	key := litSetup(&conf)
