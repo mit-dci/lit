@@ -480,3 +480,21 @@ func (r *LitRPC) ClaimHTLC(args *ClaimHTLCArgs, reply *TxidsReply) error {
 
 	return nil
 }
+
+// Pay Invoice
+type PayInvoiceArgs struct {
+	Invoice string
+}
+
+type PayInvoiceReply struct {
+	Txid string
+}
+
+func (r *LitRPC) PayInvoice(args *PayInvoiceArgs, reply *PayInvoiceReply) error {
+	var err error
+	reply.Txid, err = r.Node.PayInvoice(args.Invoice)
+	if err != nil {
+		return err
+	}
+	return nil
+}

@@ -9,6 +9,13 @@ import (
 	"github.com/mit-dci/lit/lnutil"
 )
 
+var payCommand = &Command{
+	Format: fmt.Sprintf(
+		"%s%s\n", lnutil.White("pay"), lnutil.ReqColor("invoice")),
+	Description:      "Redeem the given amount in satoshis to the given address defined by the invoice.\n",
+	ShortDescription: "Redeem invoice for the given amount.\n",
+}
+
 var sendCommand = &Command{
 	Format: fmt.Sprintf(
 		"%s%s\n", lnutil.White("send"), lnutil.ReqColor("address", "amount")),
@@ -38,6 +45,25 @@ var sweepCommand = &Command{
 	Description: "Move UTXOs with many 1-in-1-out txs.\n",
 	// TODO: Make this more clear.
 	ShortDescription: "Move UTXOs with many 1-in-1-out txs.\n",
+}
+
+func (lc *litAfClient) Pay(textArgs []string) error {
+	stopEx, err := CheckHelpCommand(payCommand, textArgs, 1)
+	if err != nil || stopEx {
+		return err
+	}
+
+	args := new(litrpc.PayInvoiceArgs)
+	reply := new(litrpc.PayInvoiceReply)
+
+	args.Invoice = textArgs[0]
+	err = lc.Call("LitRPC.PayInvoice", args, reply)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(color.Output, "sent txid(s): %s\n", reply.Txid)
+	return nil
 }
 
 // Send sends coins somewhere
