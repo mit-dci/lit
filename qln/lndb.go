@@ -7,11 +7,12 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
-	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/elkrem"
+	"github.com/mit-dci/lit/eventbus"
+	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/watchtower"
 	"github.com/mit-dci/lit/wire"
@@ -89,6 +90,9 @@ type LitNode struct {
 	LitFolder string // path to save stuff
 
 	IdentityKey *btcec.PrivateKey
+
+	// event bus
+	Events eventbus.EventBus
 
 	// all nodes have a watchtower.  but could have a tower without a node
 	Tower watchtower.Watcher
