@@ -1,8 +1,10 @@
 package eventbus
 
-import "testing"
-import "fmt"
-import "time"
+import (
+	"fmt"
+	"testing"
+	"time"
+)
 
 func TestBusSimple(t *testing.T) {
 	bus := NewEventBus()
