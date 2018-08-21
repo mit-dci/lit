@@ -80,7 +80,11 @@ func (b *EventBus) Publish(event Event) (bool, error) {
 
 	// Make a copy of the handler list so we don't block for longer than we need to.
 	b.mutex.Lock()
-	b.eventMutexes[name].Lock()
+	eventMutex, present := b.eventMutexes[name]
+	if !present {
+		return true, nil
+	}
+	eventMutex.Lock()
 	src := b.handlers[name]
 	hs := make([]*eventhandler, len(src))
 	copy(hs, src)
@@ -116,7 +120,7 @@ func (b *EventBus) Publish(event Event) (bool, error) {
 
 	}
 
-	b.eventMutexes[name].Unlock()
+	eventMutex.Unlock()
 	return ok, nil
 
 }
