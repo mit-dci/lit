@@ -58,6 +58,20 @@ func TestBusAsync(t *testing.T) {
 
 	r := <-c
 	fmt.Printf("got result: %d\n", r)
+
+}
+
+func TestBusNoHandlers(t *testing.T) {
+
+	bus := NewEventBus()
+
+	bus.Publish(FooEvent{
+		msg:   "lol",
+		async: false,
+	})
+
+	println("event fired with no handlers ok")
+
 	return
 
 }
