@@ -1,19 +1,23 @@
 package eventbus
 
-import "sync"
-import "fmt"
+import (
+	"fmt"
+	"sync"
+)
 
 // An EventBus takes events and forwards them to event handlers matched by name.
 type EventBus struct {
-	handlers map[string][]*eventhandler
-	mutex    *sync.Mutex
+	handlers     map[string][]*eventhandler
+	eventMutexes map[string]*sync.Mutex
+	mutex        *sync.Mutex
 }
 
 // NewEventBus creates a new event bus without any event handlers.
 func NewEventBus() EventBus {
 	return EventBus{
-		handlers: map[string][]*eventhandler{},
-		mutex:    &sync.Mutex{},
+		handlers:     map[string][]*eventhandler{},
+		eventMutexes: map[string]*sync.Mutex{}, // Make triggering events safe.
+		mutex:        &sync.Mutex{},            // Make adding events/handlers safe.
 	}
 }
 
@@ -31,6 +35,7 @@ type EventHandleResult uint8
 
 type eventhandler struct {
 	handleFunc func(Event) EventHandleResult
+	mutex      *sync.Mutex // Make sure we don't race a handler against itself.
 }
 
 // RegisterHandler registers an event handler function by name
@@ -40,11 +45,13 @@ func (b *EventBus) RegisterHandler(eventName string, hFunc func(Event) EventHand
 
 	h := &eventhandler{
 		handleFunc: hFunc,
+		mutex:      &sync.Mutex{},
 	}
 
 	// We might need to make a new array of handlers.
 	if _, ok := b.handlers[eventName]; !ok {
 		b.handlers[eventName] = make([]*eventhandler, 0)
+		b.eventMutexes[eventName] = &sync.Mutex{}
 	}
 
 	b.handlers[eventName] = append(b.handlers[eventName], h)
@@ -73,6 +80,7 @@ func (b *EventBus) Publish(event Event) (bool, error) {
 
 	// Make a copy of the handler list so we don't block for longer than we need to.
 	b.mutex.Lock()
+	b.eventMutexes[name].Lock()
 	src := b.handlers[name]
 	hs := make([]*eventhandler, len(src))
 	copy(hs, src)
@@ -108,6 +116,7 @@ func (b *EventBus) Publish(event Event) (bool, error) {
 
 	}
 
+	b.eventMutexes[name].Unlock()
 	return ok, nil
 
 }
@@ -128,7 +137,9 @@ func (b *EventBus) PublishNonblocking(event Event) error {
 }
 
 func callEventHandler(handler *eventhandler, event Event) (EventHandleResult, error) {
+	handler.mutex.Lock()
 	r := handler.handleFunc(event)
+	handler.mutex.Unlock()
 	return r, nil // TODO Catch panics.
 }
 
