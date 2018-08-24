@@ -95,14 +95,9 @@ func GenInvoice() error {
 func RetrieveInvoiceInfo() (InvoiceReply, error) {
 	// maybe have a custom data structure for invoices? idk
 	log.Println("Retrieving invoice info from storage")
-	// what we really have to do here on the invoice requester's side
-	// is that we need to look through our storage and get the invoice details
-	// related to the invoice identifier
-	// Right now, we'll skip that and hardcode stuff to test stuff
-	// 1bcrt100
 	var reply InvoiceReply
 	reply.Id = "1"
-	reply.CoinType = "bcrt"
+	reply.CoinType = "tb"
 	reply.Amount = 100
 	return reply, nil
 }
@@ -228,11 +223,15 @@ func (nd *LitNode) GetBalancesOfCoinType(checkCoinType uint32) (CoinBalReply, er
 	}
 	return empty, fmt.Errorf("No coin daemon running, can't pay!")
 }
-func (nd *LitNode) PayInvoiceHandler(destAdr string, invoiceAmount uint64, cointype string) error {
+func (nd *LitNode) PayInvoiceHandler(destAdr string, invoiceAmount uint64, cointype string, invoiceId string) error {
 	// Now we have the destination address and the amount to be paid the that address
 	// There are two ways we can pay this invoice
 	// 1. Open a channel directly with the peer and push the amount
 	// 2. Find a route to the peer using multi hop and then pay that user.
+	// In this we need to check whether we have the currency requested by the user
+	// as well. If we do, great, we can pay in that currency. If not, we have to
+	// find someone who is willing to take our coin x and exchange it for
+	// requested coin y with multi hop.
 	// First, lets do 1.
 	// In order to do 1, the minimum fund must be Minoutput + fee()*1000
 	// with the default values that's 180k sat
@@ -268,6 +267,7 @@ func (nd *LitNode) PayInvoiceHandler(destAdr string, invoiceAmount uint64, coint
 	ctr := uint32(1)
 	var empty [33]byte
 
+	log.Println("Do we have funds on this cointype in the first place?")
 	log.Println("COINTYPE", cointype)
 	for {
 		pubKey, _ := nd.GetPubHostFromPeerIdx(ctr)
@@ -283,6 +283,7 @@ func (nd *LitNode) PayInvoiceHandler(destAdr string, invoiceAmount uint64, coint
 
 		idHash := fastsha256.Sum256(pubKey[:])
 		adr := bech32.Encode("ln", idHash[:20])
+		log.Println("ADDRESS", adr)
 		if adr == destAdr {
 			log.Println("We have the address in our past history")
 			localPeerIdx = ctr
@@ -297,18 +298,16 @@ func (nd *LitNode) PayInvoiceHandler(destAdr string, invoiceAmount uint64, coint
 		ctr++
 	}
 	chanExists := false
-	var qChannel *Qchan
 	if connectedEarlier { // || conExists is omitted here
 		qcs, err := nd.GetAllQchans()
 		if err != nil {
 			return err
 		}
 		for _, q := range qcs {
-			if q.KeyGen.Step[3]&0x7fffffff == localPeerIdx && !q.CloseData.Closed {
+			if q.KeyGen.Step[3]&0x7fffffff == localPeerIdx {
 				// this means I have / had a channel with him
 				log.Println("We have / had a channel, this is cool")
 				chanExists = true
-				qChannel = q
 			}
 		}
 	}
@@ -320,22 +319,6 @@ func (nd *LitNode) PayInvoiceHandler(destAdr string, invoiceAmount uint64, coint
 			conExists = true
 		}
 		log.Println("Just push funds in the channel if it has capacity")
-		var data [32]byte
-
-		qc, ok := rp.QCs[qChannel.Idx()]
-		if !ok {
-			return fmt.Errorf("peer %d doesn't have channel %d",
-				qChannel.Peer(), qChannel.Idx())
-		}
-		qc.Height = qChannel.Height
-
-		err := nd.PushChannel(qc, uint32(invoiceAmount), data)
-		if err != nil {
-			qChannel.ClearToSend <- true
-			log.Println("err", err)
-			log.Println("ERROR WHILE PUSHING FUNDS!!")
-			return fmt.Errorf("ERROR WHILE PUSHING FUNDS!!")
-		}
 		// get a list of all channels
 		// check which one ahs capacity and can be closed safely
 		// push funds in that
@@ -369,7 +352,7 @@ func (nd *LitNode) PayInvoice(invoice string) (string, error) {
 	// and then gice the invoice id so that we recieve the other infromation
 	// which we then collect
 	// call GetInvoiceInfo()
-	invoiceId, coinType, invoiceAmount, err := ParseInvoice("1bcrt100")
+	invoiceId, coinType, invoiceAmount, err := ParseInvoice("1bcrt1000")
 	log.Printf("parsed invoiceId: %s, coinType: %s, invoice Amoint: %d ",
 		invoiceId, coinType, invoiceAmount)
 
@@ -398,27 +381,24 @@ func (nd *LitNode) PayInvoice(invoice string) (string, error) {
 	// amount + fees exist on our account to pay for the invoice
 	defaultFeePerByte := balance.FeeRate // Replace this with a fee estimation RPC
 	log.Println("Default fee for this coin is:", balance.FeeRate)
-	avgTxSize := int64(200)
+	avgTxSize := int64(200
 
-	log.Println(invoiceDetails.Amount, defaultFeePerByte*avgTxSize)
 	balNeeded := invoiceDetails.Amount + uint64(defaultFeePerByte*avgTxSize)
 	balHave := uint64(balance.MatureWitty)
 
 	if balHave < balNeeded {
 		log.Println("have insufficient witness amount, need to send on chain" +
 			" or weight between sending via different coins")
-		// TODO: check other coins' balances
+		if balHave < balNeeded {
+			log.Println("Have non witness coins though, maybe convert those to witness" +
+			"and try or something")
+		}
 	}
-	log.Println("WE HAVE THE BALANCE TO PAY!!", balHave, balNeeded)
+	log.Println("WE HAVE THE BALANCE TO PAY!!", balHave, balWitty)
 	// check for multiple coin balances here as well
 	// might need rates for conversion, etc if we don't have required funds in one
 	// coin
-	// We have to
-	// find someone who is willing to take our coin x and exchange it for
-	// requested coin y with multi hop.
-	log.Printf("Paying invoice: %s with destination address: %s, amount: %d"+
-		" and cointype: %s", invoice, destAdr, balNeeded, coinType)
-	err = nd.PayInvoiceHandler(destAdr, balNeeded, invoiceDetails.CoinType)
+	err = nd.PayInvoiceHandler(destAdr, invoiceDetails.Amount, invoiceDetails.CoinType, invoiceId)
 	if err != nil {
 		return "", err
 	}
