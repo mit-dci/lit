@@ -4,13 +4,16 @@ import (
 	"fmt"
 	"log"
 	//"math"
+	"net"
 	"regexp"
-	"strconv"
+	//"strconv"
 	"strings"
 
-	"github.com/mit-dci/lit/bech32"
-	"github.com/mit-dci/lit/consts"
-	"github.com/mit-dci/lit/crypto/fastsha256"
+	//"github.com/mit-dci/lit/bech32"
+	//"github.com/mit-dci/lit/consts"
+	//"github.com/mit-dci/lit/crypto/fastsha256"
+	"github.com/mit-dci/lit/lndc"
+	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 )
 
@@ -20,71 +23,6 @@ func IsBech32String(in string) bool {
 	return IsBech32(in)
 }
 
-// ParseInvoice parses the received invoice in step 2 after dialling the peer
-// with the given invoiceid
-func ParseInvoice(rightSeparator string) (string, string, uint64, error) {
-	// invoiceId, coinType, uint64(amount), nil
-	log.Println("Parsing invoiceid")
-
-	// Give this invoice to people. Let them dial you back up to know more info
-	// on this
-	invoiceId := rightSeparator[:1]
-	rightSeparator = rightSeparator[1:]
-
-	var i int
-	var chars rune
-	var coinType string
-	log.Println("ABSORBING chars", rightSeparator)
-	for i, chars = range rightSeparator {
-		if chars > 64 && chars < 123 { // 0 - 9
-			// convert ascii to int
-			coinType += string(int(chars))
-			continue
-		}
-		break
-	}
-	rightSeparator = rightSeparator[i:]
-
-	var amountStr string
-	var tmp bool
-	for i, chars = range rightSeparator {
-		if chars > 47 && chars < 58 { // 0 - 9
-			// convert ascii to int
-			amountStr += string(int(chars))
-			continue
-		}
-		tmp = true // if the thing in the last part is not a number,
-		// means someone has attached spam to that and we must quit
-		break
-	}
-	// rightSeparator = rightSeparator[i:] we don't bother about its value
-	// since we already have amountStr
-	if tmp {
-		// the zero check is to cover for cases where rightSeparator is empty
-		// but for some reason go wants to return 0 for that as well
-		log.Println("Extra data added at the end. Invalid invoice!")
-		return "", "", 0, fmt.Errorf("Extra data added. Invalid invoice!")
-	}
-	log.Printf("CoinType: %s, "+
-		"Amount: %s", coinType, amountStr)
-
-	amount, err := strconv.ParseInt(amountStr, 10, 64)
-	if err != nil {
-		return "", "", 0, fmt.Errorf("Error while parsing amounts")
-	}
-	if amount > consts.MaxChanCapacity {
-		log.Println("Requested amount is greater than max channel capacity. Failed to send")
-	}
-	log.Println("Printing invoice id", invoiceId)
-	return invoiceId, coinType, uint64(amount), nil
-}
-
-type InvoiceReply struct {
-	Id       string // alphanumeric / bech32?
-	CoinType string // SLIP0173 cointypes
-	Amount   uint64 // Amoutn in uint64
-}
-
 // GenInvoice generates an invoiceid and then stores the extra stuff in a map
 // to send out to the peer in the case it is required in the future.
 func GenInvoice() error {
@@ -92,7 +30,7 @@ func GenInvoice() error {
 	return nil
 }
 
-func RetrieveInvoiceInfo() (InvoiceReply, error) {
+func RetrieveInvoiceInfo() (lnutil.InvoiceReplyMsg, error) {
 	// maybe have a custom data structure for invoices? idk
 	log.Println("Retrieving invoice info from storage")
 	// what we really have to do here on the invoice requester's side
@@ -100,26 +38,69 @@ func RetrieveInvoiceInfo() (InvoiceReply, error) {
 	// related to the invoice identifier
 	// Right now, we'll skip that and hardcode stuff to test stuff
 	// 1bcrt100
-	var reply InvoiceReply
-	reply.Id = "1"
-	reply.CoinType = "bcrt"
-	reply.Amount = 100
-	return reply, nil
+	var msg lnutil.InvoiceReplyMsg
+	msg.Id = "1"
+	msg.CoinType = "bcrt"
+	msg.Amount = 10000
+	return msg, nil
 }
-func GetInvoiceInfo(destAdr string) (InvoiceReply, error) {
+
+// type InvoiceReplyMsg struct {
+// 	PeerIdx  uint32
+// 	Id       string
+// 	CoinType string
+// 	Amount   uint64
+// }
+
+// type InvoiceMsg struct {
+// 	PeerIdx uint32
+// 	Id      string
+// }
+
+func (nd *LitNode) GetInvoiceReplyInfo(msg lnutil.InvoiceReplyMsg,
+	peer *RemotePeer) (lnutil.InvoiceReplyMsg, error) {
+	// so someone sent me details of their invoice, cool. If I requested that,
+	// great I'll store it in my map. Else, random spammer trying to trick me,
+	// so not going to store.
+	// how do I know its not a random spammer? Check my sentInvoiceReq map. If
+	// the guy is in that, great, lets just return conns and pay him. Else, spammer
+	var dummy lnutil.InvoiceReplyMsg
+	log.Println("RECV MSG", msg, peer.Idx)
+	for _, invoices := range nd.SentInvoiceReq {
+		if invoices.PeerIdx == peer.Idx && invoices.Id == msg.Id {
+			// this is an invoice we sent and and invoice that has the correct id
+			log.Println("Both match, paying now")
+			_, err := nd.PayInvoice(msg, peer)
+			if err != nil {
+				return dummy, err
+			}
+			// call the pay handler here
+		}
+	}
+	log.Println("LIST OF SENT INVOICES", nd.SentInvoiceReq)
+	return dummy, nil
+}
+
+func (nd *LitNode) GetInvoiceInfo(msg lnutil.InvoiceMsg, peer *RemotePeer) (lnutil.InvoiceReplyMsg, error) {
 	// call the tracker to find the ip address
 	// dial the address and then do a custom handshake with the peer to get the
 	// invoice
+	log.Printf("Retrieving details for invoice id: %s requested by peer: %d", msg.Id, msg.PeerIdx)
 	invoice, err := RetrieveInvoiceInfo()
 	if err != nil {
 		log.Println("Error while retrieving invoice. Exiting")
 		return invoice, fmt.Errorf("Error while retrieving invoice. Exiting")
 	}
-	log.Println("INVOICE:", invoice)
+	invoice.PeerIdx = peer.Idx
+	var replyStr []byte
+	replyStr = append(replyStr, []byte("H")...)
+	replyStr = append(replyStr, invoice.Bytes()...)
+	//testStr := []byte(reply.Id) // this should be the actual invoice preceeded by I
+	_, err = peer.Con.Write(replyStr)
 	return invoice, nil
 }
 
-func SplitInvoiceId(invoice string) (string, string, error) {
+func (nd *LitNode) SplitInvoiceId(invoice string) (string, string, error) {
 	// Invoice format:
 	// An invoice majorly consists of three parts - the address you want to pay
 	// to, and then a separator followed by the invoice identifier.
@@ -228,7 +209,8 @@ func (nd *LitNode) GetBalancesOfCoinType(checkCoinType uint32) (CoinBalReply, er
 	}
 	return empty, fmt.Errorf("No coin daemon running, can't pay!")
 }
-func (nd *LitNode) PayInvoiceHandler(destAdr string, invoiceAmount uint64, cointype string) error {
+func (nd *LitNode) PayInvoiceHandler(peer *RemotePeer,
+	invoiceAmount uint64, cointype string) error {
 	// Now we have the destination address and the amount to be paid the that address
 	// There are two ways we can pay this invoice
 	// 1. Open a channel directly with the peer and push the amount
@@ -261,89 +243,61 @@ func (nd *LitNode) PayInvoiceHandler(destAdr string, invoiceAmount uint64, coint
 	// if there is a channel and we aren't connected, connect.
 	// else do nothing, proceed to open a new channel
 
-	connectedEarlier := false
-	conExists := false
-	localPeerIdx := uint32(0)
-	var rp RemotePeer
-	ctr := uint32(1)
-	var empty [33]byte
-
-	log.Println("COINTYPE", cointype)
-	for {
-		pubKey, _ := nd.GetPubHostFromPeerIdx(ctr)
-		if pubKey == empty {
-			// we've reached the end of our list of peers which we ahve connected to
-			// in the past. break.
-			break
-		}
-
-		nd.RemoteMtx.Lock()
-		_, connected := nd.RemoteCons[ctr]
-		nd.RemoteMtx.Unlock()
-
-		idHash := fastsha256.Sum256(pubKey[:])
-		adr := bech32.Encode("ln", idHash[:20])
-		if adr == destAdr {
-			log.Println("We have the address in our past history")
-			localPeerIdx = ctr
-			connectedEarlier = true
-			if connected {
-				log.Println("We are connected to this peer")
-				conExists = true
-				rp = *nd.RemoteCons[ctr]
-			}
-			break
-		}
-		ctr++
-	}
 	chanExists := false
-	var qChannel *Qchan
-	if connectedEarlier { // || conExists is omitted here
-		qcs, err := nd.GetAllQchans()
-		if err != nil {
-			return err
-		}
-		for _, q := range qcs {
-			if q.KeyGen.Step[3]&0x7fffffff == localPeerIdx && !q.CloseData.Closed {
-				// this means I have / had a channel with him
-				log.Println("We have / had a channel, this is cool")
-				chanExists = true
-				qChannel = q
-			}
+	var chanIdx uint32
+
+	qcs, err := nd.GetAllQchans()
+	if err != nil {
+		return err
+	}
+	for _, q := range qcs {
+		if q.KeyGen.Step[3]&0x7fffffff == peer.Idx && !q.CloseData.Closed &&
+			uint64(q.Value) > invoiceAmount && uint64(q.State.MyAmt) > invoiceAmount {
+			// we have a channel which is open, has capacity greater than the
+			// invoice AMount and we have a balance greater than invoiceAmount
+			log.Printf("Found a channel %d to push funds from", q.KeyGen.Step[4]&0x7fffffff)
+			chanExists = true
+			chanIdx = q.KeyGen.Step[4] & 0x7fffffff
+			break
 		}
 	}
 
 	if chanExists {
-		if !conExists {
-			// connect and see what to do
-			log.Println("Channel exists but we aren't connected. So connecting.")
-			conExists = true
-		}
-		log.Println("Just push funds in the channel if it has capacity")
 		var data [32]byte
-
-		qc, ok := rp.QCs[qChannel.Idx()]
+		dummyqc, err := nd.GetQchanByIdx(chanIdx)
+		if err != nil {
+			return err
+		}
+		// map read, need mutex...?
+		nd.RemoteMtx.Lock()
+		peer1, ok := nd.RemoteCons[dummyqc.Peer()]
+		nd.RemoteMtx.Unlock()
+		if !ok {
+			return fmt.Errorf("not connected to peer %d for channel %d",
+				dummyqc.Peer(), dummyqc.Idx())
+		}
+		qc, ok := peer1.QCs[dummyqc.Idx()]
 		if !ok {
 			return fmt.Errorf("peer %d doesn't have channel %d",
-				qChannel.Peer(), qChannel.Idx())
+				dummyqc.Peer(), dummyqc.Idx())
 		}
-		qc.Height = qChannel.Height
 
-		err := nd.PushChannel(qc, uint32(invoiceAmount), data)
-		if err != nil {
-			qChannel.ClearToSend <- true
-			log.Println("err", err)
-			log.Println("ERROR WHILE PUSHING FUNDS!!")
-			return fmt.Errorf("ERROR WHILE PUSHING FUNDS!!")
+		log.Printf("channel %s\n", qc.Op.String())
+
+		if qc.CloseData.Closed {
+			// check for one last time if the channel is closed
+			return fmt.Errorf("Channel %d already closed by tx %s",
+				chanIdx, qc.CloseData.CloseTxid.String())
 		}
-		// get a list of all channels
-		// check which one ahs capacity and can be closed safely
-		// push funds in that
-		log.Println("Active connection:", rp)
-		// in case no single channel has capacity, push funds through
-		// multiple channles is possible. Else just break
-	} else if connectedEarlier && !chanExists {
-		// this case is the same as connectign to a random peer. But we know
+
+		qc.Height = dummyqc.Height
+		err = nd.PushChannel(qc, uint32(invoiceAmount), data)
+		if err != nil {
+			log.Println("ERROR", err)
+			return err
+		}
+	} else {
+		// this case is the same as connecting to a random peer. But we know
 		// this guy already. So just print some stuff and then fall through
 		log.Println("we need to weigh the option between creating a new channel and multi hop")
 	}
@@ -357,28 +311,74 @@ func (nd *LitNode) PayInvoiceHandler(destAdr string, invoiceAmount uint64, coint
 	log.Println("Paying your invoice ultra securely")
 	return nil
 }
-func (nd *LitNode) PayInvoice(invoice string) (string, error) {
-	// log.Println("Calls litrpc. Cool, QUitting")
-	//destAdr, invoiceAmount, invoiceId, err := SplitInvoiceId(invoice)
-	destAdr, invoiceId, err := SplitInvoiceId(invoice)
-	if err != nil {
-		return "", err
+
+func (nd *LitNode) InvoiceDial(invoiceRequester string) (RemotePeer, error) {
+	var temp RemotePeer
+	var err error
+	// parse address and get pkh / host / port
+	who, where := splitAdrString(invoiceRequester)
+
+	// If we couldn't deduce a URL, look it up on the tracker
+	if where == "" {
+		where, _, err = Lookup(who, nd.TrackerURL, nd.ProxyURL)
+		if err != nil {
+			return temp, err
+		}
 	}
-	log.Printf("Parsed invoice with destination address: %s and invoice id: %s", destAdr, invoiceId)
+
+	// get my private ID key
+	idPriv := nd.IdKey()
+
+	// Assign remote connection
+	newConn, err := lndc.Dial(idPriv, where, who, net.Dial)
+	if err != nil {
+		return temp, err
+	}
+
+	peerIdx, err := nd.GetPeerIdx(newConn.RemotePub(), newConn.RemoteAddr().String())
+	if err != nil {
+		return temp, err
+	}
+
+	// also retrieve their nickname, if they have one
+	nickname := nd.GetNicknameFromPeerIdx(uint32(peerIdx))
+
+	nd.RemoteMtx.Lock()
+	temp.Con = newConn
+	temp.Idx = peerIdx
+	temp.Nickname = nickname
+	nd.RemoteCons[peerIdx] = &temp
+	nd.RemoteMtx.Unlock()
+	// each connection to a peer gets its own LNDCReader
+	go nd.LNDCReader(&temp)
+	return temp, nil
+}
+
+func (nd *LitNode) PayInvoice(invoiceMsg lnutil.InvoiceReplyMsg, peer *RemotePeer) (string, error) {
 	// Now after this point, we know the invoice id, so we need to dial the peer
-	// and then gice the invoice id so that we recieve the other infromation
+	// and then give the invoice id so that we recieve the other information
 	// which we then collect
 	// call GetInvoiceInfo()
-	invoiceId, coinType, invoiceAmount, err := ParseInvoice("1bcrt100")
-	log.Printf("parsed invoiceId: %s, coinType: %s, invoice Amoint: %d ",
-		invoiceId, coinType, invoiceAmount)
+	// 	PeerIdx  uint32
+	// 	Id       string
+	// 	CoinType string
+	// 	Amount   uint64
 
-	invoiceDetails, err := GetInvoiceInfo(destAdr)
-	if err != nil {
-		return "", err
-	}
-	log.Println("INVOICE DETAILS", invoiceDetails)
-	//log.Printf("Sending %d satoshi equivalent to address: %s with invoice ID %d\n", invoiceAmount, destAdr, invoiceId)
+	invoiceId := invoiceMsg.Id
+	coinType := invoiceMsg.CoinType
+	invoiceAmount := invoiceMsg.Amount
+	log.Printf("Sending %d satoshi equivalent to peer: %s with invoice ID %d\n", invoiceAmount, invoiceId, invoiceId)
+
+	// here we should ocnnect to hte peer to know details about the invoice
+	// after cononecting to the guy, send him a InvoiceMsg telling him we have
+	// na invoice id. Based on his repsonse, set all the values below.
+
+	// write an invoiceMsg to the peer saying that you want details for a specific
+	// invoice
+	// You need to wait for the reply now in order to get details on the specific
+	// invoice that you want to pay
+	// But how?
+	//log.Println("WRITTEN BYTES", bytesWritten)
 	var coinTypeInt uint32
 	switch coinType {
 	case "tb":
@@ -400,8 +400,7 @@ func (nd *LitNode) PayInvoice(invoice string) (string, error) {
 	log.Println("Default fee for this coin is:", balance.FeeRate)
 	avgTxSize := int64(200)
 
-	log.Println(invoiceDetails.Amount, defaultFeePerByte*avgTxSize)
-	balNeeded := invoiceDetails.Amount + uint64(defaultFeePerByte*avgTxSize)
+	balNeeded := invoiceAmount + uint64(defaultFeePerByte*avgTxSize)
 	balHave := uint64(balance.MatureWitty)
 
 	if balHave < balNeeded {
@@ -416,9 +415,10 @@ func (nd *LitNode) PayInvoice(invoice string) (string, error) {
 	// We have to
 	// find someone who is willing to take our coin x and exchange it for
 	// requested coin y with multi hop.
-	log.Printf("Paying invoice: %s with destination address: %s, amount: %d"+
-		" and cointype: %s", invoice, destAdr, balNeeded, coinType)
-	err = nd.PayInvoiceHandler(destAdr, balNeeded, invoiceDetails.CoinType)
+
+	// invoice stuff should end here, just pay using hte hadnler and then store
+	//  the payment in PaidInvoiceReq once done
+	err = nd.PayInvoiceHandler(peer, balNeeded, coinType)
 	if err != nil {
 		return "", err
 	}

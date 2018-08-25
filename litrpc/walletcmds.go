@@ -492,9 +492,35 @@ type PayInvoiceReply struct {
 
 func (r *LitRPC) PayInvoice(args *PayInvoiceArgs, reply *PayInvoiceReply) error {
 	var err error
-	reply.Txid, err = r.Node.PayInvoice(args.Invoice)
+	// send a message out to the peer asking for details
+	// parse the recieved message
+	destAdr, invoiceId, err := r.Node.SplitInvoiceId(args.Invoice)
 	if err != nil {
 		return err
 	}
+	log.Printf("Parsed invoice with destination address: %s and invoice id: %s", destAdr, invoiceId)
+
+	invoiceRequester := destAdr + "@:2448" // for testing
+
+	rp, err := r.Node.InvoiceDial(invoiceRequester)
+	if err != nil {
+		return err
+	}
+	// now I have the remote Peer
+	// send it a byte message
+	testStr := []byte("I1") // this should be the actual invoice preceeded by I
+	bytesWritten, err := rp.Con.Write(testStr)
+	log.Println("BYTES WRITTEN", bytesWritten)
+	log.Println("LITRPC", r.Node.RemoteCons[4])
+
+	// store this invoice in our list of sent invoices
+	var sentInvoice lnutil.InvoiceMsg
+	sentInvoice.Id = invoiceId
+	sentInvoice.PeerIdx = rp.Idx
+	r.Node.SentInvoiceReq = append(r.Node.SentInvoiceReq, sentInvoice)
+	//reply.Txid, err = r.Node.PayInvoice(args.Invoice)
+	//if err != nil {
+	//	return err
+	//}
 	return nil
 }

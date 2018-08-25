@@ -109,6 +109,10 @@ type LitNode struct {
 	RemoteCons         map[uint32]*RemotePeer
 	RemoteMtx          sync.Mutex
 
+	SentInvoiceReq []lnutil.InvoiceMsg
+	PendingInvoiceReq []lnutil.InvoiceReplyMsg
+	PaidInvoiceReq []lnutil.InvoiceReplyMsg
+
 	// OmniChan is the channel for the OmniHandler
 	OmniIn  chan lnutil.LitMsg
 	OmniOut chan lnutil.LitMsg

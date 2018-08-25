@@ -39,6 +39,10 @@ const (
 	MSGID_FWDMSG     = 0x40
 	MSGID_FWDAUTHREQ = 0x41
 
+	// invoice identifier
+	MSGID_LITINVOICEREPLY = 0x48 // H?
+	MSGID_LITINVOICE      = 0x49 // I = 0x49
+
 	//not implemented
 	MSGID_SELFPUSH = 0x50
 
@@ -159,6 +163,10 @@ func LitMsgFromBytes(b []byte, peerid uint32) (LitMsg, error) {
 		return NewDlcContractFundingSigsMsgFromBytes(b, peerid)
 	case MSGID_DLC_SIGPROOF:
 		return NewDlcContractSigProofMsgFromBytes(b, peerid)
+	case MSGID_LITINVOICE:
+		return DecryptInvoiceIdentifier(b, peerid)
+	case MSGID_LITINVOICEREPLY:
+		return DecryptInvoice(b, peerid)
 
 	default:
 		return nil, fmt.Errorf("Unknown message of type %d ", msgType)
@@ -565,6 +573,18 @@ type DeltaSigMsg struct {
 	HTLCSigs  [][64]byte
 }
 
+type InvoiceReplyMsg struct {
+	PeerIdx  uint32
+	Id       string
+	CoinType string
+	Amount   uint64
+}
+
+type InvoiceMsg struct {
+	PeerIdx uint32
+	Id      string
+}
+
 func NewDeltaSigMsg(peerid uint32, OP wire.OutPoint, DELTA int32, SIG [64]byte, HTLCSigs [][64]byte, data [32]byte) DeltaSigMsg {
 	d := new(DeltaSigMsg)
 	d.PeerIdx = peerid
@@ -574,6 +594,29 @@ func NewDeltaSigMsg(peerid uint32, OP wire.OutPoint, DELTA int32, SIG [64]byte, 
 	d.Data = data
 	d.HTLCSigs = HTLCSigs
 	return *d
+}
+
+func DecryptInvoice(b []byte, peerid uint32) (InvoiceReplyMsg, error) {
+	var reply InvoiceReplyMsg
+	fmt.Println("RECVD", b)
+	reply.Id = string(b[1:2])
+	fmt.Println("reply id", reply.Id)
+	b = b[2:]
+	reply.CoinType = string(b[0:4])
+	fmt.Println("reply cointpye", reply.CoinType)
+	b = b[4:]
+	x, _ := binary.Varint(b)
+	fmt.Println("DECRYPTED", x)
+	reply.Amount = uint64(x)
+	return reply, nil
+}
+
+func DecryptInvoiceIdentifier(b []byte, peerid uint32) (InvoiceMsg, error) {
+	msg := new(InvoiceMsg)
+	msg.Id = string(b[1:])
+	msg.PeerIdx = peerid
+	fmt.Printf("Decrypting invoice request, invoice id: %d and peerid: %d", msg.Id, msg.PeerIdx)
+	return *msg, nil
 }
 
 func NewDeltaSigMsgFromBytes(b []byte, peerid uint32) (DeltaSigMsg, error) {
@@ -618,6 +661,29 @@ func (self DeltaSigMsg) Bytes() []byte {
 	}
 	return msg
 }
+
+func (self InvoiceMsg) Bytes() []byte {
+	var msg []byte
+	msg = append(msg, self.Id...)
+	return msg
+}
+
+func (self InvoiceReplyMsg) Bytes() []byte {
+	var msg []byte
+	msg = append(msg, self.Id...)
+	msg = append(msg, self.CoinType...)
+	buf := make([]byte, binary.MaxVarintLen64)
+	n := binary.PutVarint(buf, int64(self.Amount))
+	b := buf[:n]
+	msg = append(msg, b...)
+	return msg
+}
+
+func (self InvoiceMsg) Peer() uint32   { return self.PeerIdx }
+func (self InvoiceMsg) MsgType() uint8 { return MSGID_LITINVOICE }
+
+func (self InvoiceReplyMsg) Peer() uint32   { return self.PeerIdx }
+func (self InvoiceReplyMsg) MsgType() uint8 { return MSGID_LITINVOICEREPLY }
 
 func (self DeltaSigMsg) Peer() uint32   { return self.PeerIdx }
 func (self DeltaSigMsg) MsgType() uint8 { return MSGID_DELTASIG }
