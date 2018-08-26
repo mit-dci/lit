@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/mit-dci/lit/bech32"
-	//"github.com/mit-dci/lit/consts"
+	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/crypto/fastsha256"
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
@@ -257,6 +257,21 @@ func (nd *LitNode) InvoiceDial(invoiceRequester string) (RemotePeer, error) {
 	return temp, nil
 }
 
+type FundReply struct {
+	Status     string
+	ChanIdx    uint32
+	FundHeight int32
+}
+
+type FundArgs struct {
+	Peer        uint32 // who to make the channel with
+	CoinType    uint32 // what coin to use
+	Capacity    int64  // later can be minimum capacity
+	Roundup     int64  // ignore for now; can be used to round-up capacity
+	InitialSend int64  // Initial send of -1 means "ALL"
+	Data        [32]byte
+}
+
 func (nd *LitNode) PayInvoiceBkp(req lnutil.InvoiceReplyMsg,
 	destAdr string, invoice string) (uint64, error) {
 
@@ -318,6 +333,7 @@ func (nd *LitNode) PayInvoiceBkp(req lnutil.InvoiceReplyMsg,
 	// We could have some structure for storing other balances as well.
 	// Need it for multi hop anyway?
 	if err != nil {
+		// either the daemon isn't running or some other weird error.
 		return 0, nil
 	}
 
@@ -373,7 +389,7 @@ func (nd *LitNode) PayInvoiceBkp(req lnutil.InvoiceReplyMsg,
 	}
 	for _, q := range qcs {
 		if q.KeyGen.Step[3]&0x7fffffff == req.PeerIdx && !q.CloseData.Closed &&
-			q.State.MyAmt > req.Amount && q.Value > req.Amount {
+			q.State.MyAmt > int64(req.Amount) && q.Value > int64(req.Amount) {
 			// get an open channel with required capacity
 			// do we check for confirmation height as well?
 			chanExists = true
@@ -391,7 +407,8 @@ func (nd *LitNode) PayInvoiceBkp(req lnutil.InvoiceReplyMsg,
 		log.Println("set fee for this coin is:", balance.FeeRate)
 		avgTxSize := int64(200) // maybe have a function for this as well for accuracy
 
-		balNeeded := req.Amount + uint64(defaultFeePerByte*avgTxSize)
+		balNeeded := req.Amount + uint64(defaultFeePerByte*avgTxSize) + uint64(consts.MinOutput) + uint64(balance.FeeRate*1000)
+		// sum of required amount +  minOutput + justicetx Fee
 		balHave := uint64(balance.MatureWitty)
 
 		if balHave < balNeeded {
@@ -399,9 +416,49 @@ func (nd *LitNode) PayInvoiceBkp(req lnutil.InvoiceReplyMsg,
 				" or weight between sending via different coins")
 			// TODO: check other coins' balances
 		}
-		return 0, nil
+
+		var fundParams FundArgs
+		var data [32]byte
+		fundParams.Peer = req.PeerIdx
+		fundParams.CoinType = coinType
+		fundParams.Capacity = int64(100 * req.Amount)
+		if int64(100*req.Amount) < consts.MinChanCapacity {
+			fundParams.Capacity = consts.MinChanCapacity
+		}
+		fundParams.InitialSend = consts.MinOutput + balance.FeeRate*1000
+		if fundParams.InitialSend > fundParams.Capacity {
+			fundParams.Capacity = fundParams.InitialSend * 2
+		}
+		if fundParams.Capacity > int64(consts.MaxChanCapacity) {
+			fundParams.Capacity = consts.MaxChanCapacity
+		}
+		fundParams.Data = data
+		if fundParams.Capacity > int64(balHave) {
+			return 0, fmt.Errorf("Insufficient funds to start a new channel")
+		}
+
+		var err error
+		if nd.InProg != nil && nd.InProg.PeerIdx != 0 {
+			return 0, fmt.Errorf("channel with peer %d not done yet", nd.InProg.PeerIdx)
+		}
+
+		if fundParams.Capacity > balance.MatureWitty-consts.SafeFee {
+			return 0, fmt.Errorf("Wanted %d but %d available for channel creation",
+				fundParams.Capacity, balance.MatureWitty-consts.SafeFee)
+		}
+
+		fundParams.InitialSend = fundParams.InitialSend + int64(req.Amount)
+		idx, err := nd.FundChannel(
+			fundParams.Peer, fundParams.CoinType, fundParams.Capacity, fundParams.InitialSend, fundParams.Data)
+		if err != nil {
+			return 0, err
+		}
+		log.Printf("Opened channel %d with peer %d", idx, req.PeerIdx)
+		// Now we have a channel to push funds into, fall through to the case below
+		// sleep a bit
+		return uint64(idx), nil
 	}
-	log.Println("Just push funds in the channel if it has capacity")
+	log.Println("Pushinf funds in existing / created channel")
 	var data [32]byte
 
 	qc, ok := rpx.QCs[qChannel.Idx()]
@@ -417,5 +474,6 @@ func (nd *LitNode) PayInvoiceBkp(req lnutil.InvoiceReplyMsg,
 		log.Println("ERROR WHILE PUSHING FUNDS!!", err)
 		return 0, fmt.Errorf("ERROR WHILE PUSHING FUNDS!!")
 	}
+
 	return qc.State.StateIdx, nil
 }
