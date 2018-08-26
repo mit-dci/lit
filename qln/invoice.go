@@ -17,7 +17,7 @@ import (
 	"github.com/mit-dci/lit/portxo"
 )
 
-func (nd *LitNode) ReturnQchan() (*Qchan) {
+func (nd *LitNode) ReturnQchan() *Qchan {
 	var q *Qchan
 	return q
 }
@@ -77,16 +77,9 @@ func (nd *LitNode) GetInvoiceReplyInfo(msg lnutil.InvoiceReplyMsg,
 	for _, invoices := range nd.SentInvoiceReq {
 		if invoices.PeerIdx == peer.Idx && invoices.Id == msg.Id {
 			// this is an invoice we sent and and invoice that has the correct id
-			log.Println("WORKSINSIDE?", nd.RemoteCons[4])
-			log.Println("Both match, paying now")
 			msg.PeerIdx = peer.Idx // overwrite the remote node's peer id before
-			// passing it
+			// storing it in PendingInvoiceReq so that litrpc can take it up
 			nd.PendingInvoiceReq = append(nd.PendingInvoiceReq, msg)
-			// _, err := nd.PayInvoice(msg, peer)
-			// if err != nil {
-			// 	return dummy, err
-			// }
-			// call the pay handler here
 		}
 	}
 	log.Println("LIST OF SENT INVOICES", nd.SentInvoiceReq)
@@ -221,108 +214,6 @@ func (nd *LitNode) GetBalancesOfCoinType(checkCoinType uint32) (CoinBalReply, er
 	}
 	return empty, fmt.Errorf("No coin daemon running, can't pay!")
 }
-func (nd *LitNode) PayInvoiceHandler(peer *RemotePeer,
-	invoiceAmount uint64, cointype string) error {
-	// Now we have the destination address and the amount to be paid the that address
-	// There are two ways we can pay this invoice
-	// 1. Open a channel directly with the peer and push the amount
-	// 2. Find a route to the peer using multi hop and then pay that user.
-	// First, lets do 1.
-	// In order to do 1, the minimum fund must be Minoutput + fee()*1000
-	// with the default values that's 180k sat
-
-	// Define Channel capacity to be 100 times the amount the user is planning
-	// to send via the invoice. 100 times is reasonable? I guess..
-
-	// type PeerInfo struct {
-	// 	PeerNumber uint32
-	//	RemoteHost string
-	// 	LitAdr 	   string
-	// 	Nickname   string
-	// }
-
-	// type RemotePeer struct {
-	// 	Idx      uint32 // the peer index
-	// 	Nickname string
-	// 	Con      *lndc.Conn
-	// 	QCs      map[uint32]*Qchan   // keep map of all peer's channels in ram
-	// 	OpMap    map[[36]byte]uint32 // quick lookup for channels
-	// }
-
-	// Dial Peer
-	// go through list of open channels
-	// if there is a channel with this peer and we already have a connection, good
-	// if there is a channel and we aren't connected, connect.
-	// else do nothing, proceed to open a new channel
-
-	chanExists := false
-	var chanIdx uint32
-
-	qcs, err := nd.GetAllQchans()
-	if err != nil {
-		return err
-	}
-	for _, q := range qcs {
-		if q.KeyGen.Step[3]&0x7fffffff == peer.Idx && !q.CloseData.Closed &&
-			uint64(q.Value) > invoiceAmount && uint64(q.State.MyAmt) > invoiceAmount {
-			// we have a channel which is open, has capacity greater than the
-			// invoice AMount and we have a balance greater than invoiceAmount
-			log.Printf("Found a channel %d to push funds from", q.KeyGen.Step[4]&0x7fffffff)
-			chanExists = true
-			chanIdx = q.KeyGen.Step[4] & 0x7fffffff
-			break
-		}
-	}
-
-	if chanExists {
-		var data [32]byte
-		dummyqc, err := nd.GetQchanByIdx(chanIdx)
-		if err != nil {
-			return err
-		}
-		// map read, need mutex...?
-		nd.RemoteMtx.Lock()
-		peer1, ok := nd.RemoteCons[dummyqc.Peer()]
-		nd.RemoteMtx.Unlock()
-		if !ok {
-			return fmt.Errorf("not connected to peer %d for channel %d",
-				dummyqc.Peer(), dummyqc.Idx())
-		}
-		qc, ok := peer1.QCs[dummyqc.Idx()]
-		if !ok {
-			return fmt.Errorf("peer %d doesn't have channel %d",
-				dummyqc.Peer(), dummyqc.Idx())
-		}
-
-		log.Printf("channel %s\n", qc.Op.String())
-
-		if qc.CloseData.Closed {
-			// check for one last time if the channel is closed
-			return fmt.Errorf("Channel %d already closed by tx %s",
-				chanIdx, qc.CloseData.CloseTxid.String())
-		}
-
-		qc.Height = dummyqc.Height
-		err = nd.PushChannel(qc, uint32(invoiceAmount), data)
-		if err != nil {
-			log.Println("ERROR", err)
-			return err
-		}
-	} else {
-		// this case is the same as connecting to a random peer. But we know
-		// this guy already. So just print some stuff and then fall through
-		log.Println("we need to weigh the option between creating a new channel and multi hop")
-	}
-
-	// err := nd.DialPeer(destAdr)
-	// if err != nil {
-	// 	return err
-	// }
-	// Assign peer, cointype, capacity, initialsend, data and then
-	// nd.FundChannel(args.Peer, args.CoinType, args.Capacity, args.InitialSend, args.Data)
-	log.Println("Paying your invoice ultra securely")
-	return nil
-}
 
 func (nd *LitNode) InvoiceDial(invoiceRequester string) (RemotePeer, error) {
 	var temp RemotePeer
@@ -366,79 +257,78 @@ func (nd *LitNode) InvoiceDial(invoiceRequester string) (RemotePeer, error) {
 	return temp, nil
 }
 
-func (nd *LitNode) PayInvoice(invoiceMsg lnutil.InvoiceReplyMsg, peer *RemotePeer) (string, error) {
-	// Now after this point, we know the invoice id, so we need to dial the peer
-	// and then give the invoice id so that we recieve the other information
-	// which we then collect
-	// call GetInvoiceInfo()
-	// 	PeerIdx  uint32
-	// 	Id       string
-	// 	CoinType string
-	// 	Amount   uint64
+func (nd *LitNode) PayInvoiceBkp(req lnutil.InvoiceReplyMsg,
+	destAdr string, invoice string) (uint64, error) {
 
-	invoiceId := invoiceMsg.Id
-	coinType := invoiceMsg.CoinType
-	invoiceAmount := invoiceMsg.Amount
-	log.Printf("Sending %d satoshi equivalent to peer: %s with invoice ID %d\n", invoiceAmount, invoiceId, invoiceId)
+	// Two ways we can pay this invoice
+	// 1. Pay through an existing channel ie push funds through an existing channel
+	// 2. Two alternatives:
+	// 		a. Open a channel directly with the peer and push the amount
+	// 		b. Find a route to the peer using multi hop and then pay that user.
+	//				i. But this is only if the guy who wants to pay has some channel open
+	// 			 ii. If he doesn't, then we're better off opening a new channel with him?
 
-	// here we should ocnnect to hte peer to know details about the invoice
-	// after cononecting to the guy, send him a InvoiceMsg telling him we have
-	// na invoice id. Based on his repsonse, set all the values below.
+	// First, lets do 1.
+	// Lets check balances before falling throguh to the channel code. It helps
+	// save time if we know that there is no suitable channel that can pay the amount
+	// After checking balances, check if the connection still exists. The remote peer
+	// may have disconnected in the 3 seconds that we wait for it to respond. If
+	// the connection is sitll alive, get teh appropriate channel id and then push
+	// funds in that channel.
 
-	// write an invoiceMsg to the peer saying that you want details for a specific
-	// invoice
-	// You need to wait for the reply now in order to get details on the specific
-	// invoice that you want to pay
-	// But how?
-	//log.Println("WRITTEN BYTES", bytesWritten)
-	var coinTypeInt uint32
-	switch coinType {
-	case "tb":
-		coinTypeInt = uint32(1) // the numbers are what we define, not SLIP stuff
-	case "bcrt":
-		coinTypeInt = uint32(257)
-	default:
-		coinTypeInt = uint32(257)
-	}
-	log.Println("COIN TYPE INT:", coinTypeInt)
-	balance, err := nd.GetBalancesOfCoinType(uint32(coinTypeInt))
-	if err != nil {
-		return "", nil
-	}
+	// On 2,
+	// Lets define Channel capacity to be 100 times the amount the user is planning
+	// to send via the invoice. 100 times is reasonable? I guess..
+	// If someone wants to pay the same guy for more than 100 times, just open a new
+	// channel
+	// We need to weigh between on chain fees for opening a new channel and  the multi
+	// hop fees. As it stands right now, the multi hop fees is way lesser and as a
+	// result, we see if we have ANY open channel and hten try multi hop through it.
+	// if that doesn't work, fall back to the default case of opening a new channel.
 
-	// now have the balance of all running coin daemons. Need to check whether
-	// amount + fees exist on our account to pay for the invoice
-	defaultFeePerByte := balance.FeeRate // Replace this with a fee estimation RPC
-	log.Println("Default fee for this coin is:", balance.FeeRate)
-	avgTxSize := int64(200)
+	// this is the remotePeer struct defined elsewhere. Easy reference.
+	// type RemotePeer struct {
+	// 	Idx      uint32 // the peer index
+	// 	Nickname string
+	// 	Con      *lndc.Conn
+	// 	QCs      map[uint32]*Qchan   // keep map of all peer's channels in ram
+	// 	OpMap    map[[36]byte]uint32 // quick lookup for channels
+	// }
 
-	balNeeded := invoiceAmount + uint64(defaultFeePerByte*avgTxSize)
-	balHave := uint64(balance.MatureWitty)
+	// Dial Peer
+	// go through list of open channels
+	// if there is a channel with this peer and we already have a connection, good
+	// if there is a channel and we aren't connected, connect.
+	// else do nothing, proceed to open a new channel
 
-	if balHave < balNeeded {
-		log.Println("have insufficient witness amount, need to send on chain" +
-			" or weight between sending via different coins")
-		// TODO: check other coins' balances
-	}
-	log.Println("WE HAVE THE BALANCE TO PAY!!", balHave, balNeeded)
-	// check for multiple coin balances here as well
-	// might need rates for conversion, etc if we don't have required funds in one
-	// coin
-	// We have to
-	// find someone who is willing to take our coin x and exchange it for
-	// requested coin y with multi hop.
-
-	// invoice stuff should end here, just pay using hte hadnler and then store
-	//  the payment in PaidInvoiceReq once done
-	err = nd.PayInvoiceHandler(peer, balNeeded, coinType)
-	if err != nil {
-		return "", err
-	}
-	return "0x00000000000000000000000000000000", nil
-}
-
-func (nd *LitNode) PayInvoiceBkp(req lnutil.InvoiceReplyMsg, destAdr string, invoice string) error {
 	log.Println("paying for the invoice now")
+	// check if I have sufficient  money to pay for this invoice
+
+	var coinType uint32
+	switch req.CoinType {
+	case "tb":
+		coinType = uint32(1) // the numbers are what we define, not SLIP stuff
+	case "bcrt":
+		coinType = uint32(257)
+	default:
+		coinType = uint32(257)
+	}
+	balance, err := nd.GetBalancesOfCoinType(uint32(coinType))
+	// get coinbalances of the daemon running
+	// We could have some structure for storing other balances as well.
+	// Need it for multi hop anyway?
+	if err != nil {
+		return 0, nil
+	}
+
+	if balance.MatureWitty < int64(req.Amount) {
+		// only witness balance since the cheapest option is to push funds through
+		// an existing channel
+		log.Println("Insufficient balance to pay this invoice")
+		return 0, fmt.Errorf("Insufficient balance to pay this invoice")
+	}
+	log.Printf("We have %d, paying %d from that", balance, req.Amount)
+
 	conExists := false
 	var empty [33]byte
 	var rpx RemotePeer
@@ -449,64 +339,83 @@ func (nd *LitNode) PayInvoiceBkp(req lnutil.InvoiceReplyMsg, destAdr string, inv
 		// we've reached the end of our list of peers which we ahve connected to
 		// in the past. break.
 		log.Println("no pubkey found. quitting!")
-		fmt.Errorf("no pubkey found. quitting!")
+		return 0, fmt.Errorf("no pubkey found. quitting!")
 	}
 
 	nd.RemoteMtx.Lock()
 	_, connected := nd.RemoteCons[req.PeerIdx]
+	// see if the peer is connected. Don't store the remote peer here.
 	nd.RemoteMtx.Unlock()
 
 	idHash := fastsha256.Sum256(pubKey[:])
 	adr := bech32.Encode("ln", idHash[:20])
-	if adr == destAdr {
+	if adr == destAdr { // sanity check regarding addresses
 		log.Println("Addresses match")
 		if connected {
 			log.Println("We are connected to this peer")
 			conExists = true
-			rpx = *nd.RemoteCons[req.PeerIdx]
+			rpx = *nd.RemoteCons[req.PeerIdx] // store the remote peer here
 		}
 	} else {
+		// the remote PKH doesn't match what we have, some weird case. exit
 		log.Println("remote address doesn't match. quitting!")
-		fmt.Errorf("remote address doesn't match. quitting!")
+		return 0, fmt.Errorf("remote address doesn't match. quitting!")
 	}
 	if !conExists {
-		log.Println("Not connected to peer")
-		return fmt.Errorf("Not connected to peer")
+		// per disconnected in the 3s that we waited. No money for them.
+		log.Println("Not connected to peer, not paying invoice!")
+		return 0, fmt.Errorf("Not connected to peer, not paying invoice!")
 	}
 	chanExists := false
 	qcs, err := nd.GetAllQchans()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	for _, q := range qcs {
-		if q.KeyGen.Step[3]&0x7fffffff == req.PeerIdx && !q.CloseData.Closed {
-			// this means I have / had a channel with him
-			log.Println("We have / had a channel, this is cool")
+		if q.KeyGen.Step[3]&0x7fffffff == req.PeerIdx && !q.CloseData.Closed &&
+			q.State.MyAmt > req.Amount && q.Value > req.Amount {
+			// get an open channel with required capacity
+			// do we check for confirmation height as well?
 			chanExists = true
 			qChannel = q
 		}
 	}
 
-	if chanExists {
-		log.Println("Just push funds in the channel if it has capacity")
-		var data [32]byte
-
-		qc, ok := rpx.QCs[qChannel.Idx()]
-		if !ok {
-			return fmt.Errorf("peer %d doesn't have channel %d",
-				qChannel.Peer(), qChannel.Idx())
-		}
-		qc.Height = qChannel.Height
-
-		log.Println("Paying %d towards invoice %s", req.Amount, invoice)
-		err := nd.PushChannel(qc, uint32(req.Amount), data)
-		if err != nil {
-			//qChannel.ClearToSend <- true
-			log.Println("ERROR WHILE PUSHING FUNDS!!", err)
-			return fmt.Errorf("ERROR WHILE PUSHING FUNDS!!")
-		}
-	} else {
+	// check if chanExists
+	if !chanExists {
+		// First need to check for multi hop fees. Then need to check if we have funds
+		// to open a new channel
 		log.Println("we need to weigh the option between creating a new channel and multi hop")
+		defaultFeePerByte := balance.FeeRate
+		// Needs a good fee estimation RPC since fees may be wild
+		log.Println("set fee for this coin is:", balance.FeeRate)
+		avgTxSize := int64(200) // maybe have a function for this as well for accuracy
+
+		balNeeded := req.Amount + uint64(defaultFeePerByte*avgTxSize)
+		balHave := uint64(balance.MatureWitty)
+
+		if balHave < balNeeded {
+			log.Println("have insufficient witness amount, need to send on chain" +
+				" or weight between sending via different coins")
+			// TODO: check other coins' balances
+		}
+		return 0, nil
 	}
-	return nil
+	log.Println("Just push funds in the channel if it has capacity")
+	var data [32]byte
+
+	qc, ok := rpx.QCs[qChannel.Idx()]
+	if !ok {
+		return 0, fmt.Errorf("peer %d doesn't have channel %d",
+			qChannel.Peer(), qChannel.Idx())
+	}
+	qc.Height = qChannel.Height
+
+	log.Println("Paying %d towards invoice %s", req.Amount, invoice)
+	err = nd.PushChannel(qc, uint32(req.Amount), data)
+	if err != nil {
+		log.Println("ERROR WHILE PUSHING FUNDS!!", err)
+		return 0, fmt.Errorf("ERROR WHILE PUSHING FUNDS!!")
+	}
+	return qc.State.StateIdx, nil
 }

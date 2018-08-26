@@ -62,7 +62,7 @@ func (lc *litAfClient) Pay(textArgs []string) error {
 		return err
 	}
 
-	fmt.Fprintf(color.Output, "sent txid(s): %s\n", reply.Txid)
+	fmt.Fprintf(color.Output, "sent txid(s): %s at state %d\n", reply.Txid, reply.StateIdx)
 	return nil
 }
 

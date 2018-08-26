@@ -490,6 +490,7 @@ type PayInvoiceArgs struct {
 
 type PayInvoiceReply struct {
 	Txid string
+	StateIdx uint64
 }
 
 func (r *LitRPC) PayInvoice(args *PayInvoiceArgs, reply *PayInvoiceReply) error {
@@ -520,29 +521,19 @@ func (r *LitRPC) PayInvoice(args *PayInvoiceArgs, reply *PayInvoiceReply) error 
 	sentInvoice.PeerIdx = rpx.Idx
 	r.Node.SentInvoiceReq = append(r.Node.SentInvoiceReq, sentInvoice)
 
-	time.Sleep(10 * time.Second)
+	time.Sleep(3 * time.Second) // wait for the peer to reply
+	// I guess this is ugly, but it works for now, maybe refactor later.
 
-	log.Println("PIR", r.Node.PendingInvoiceReq)
 	for _, req := range r.Node.PendingInvoiceReq {
 		if req.Id == invoiceId && sentInvoice.PeerIdx == req.PeerIdx {
 			// this is the invoice that we sent. Pay
-			err := r.Node.PayInvoiceBkp(req, destAdr, args.Invoice)
+			stateIdx, err := r.Node.PayInvoiceBkp(req, destAdr, args.Invoice)
 			if err != nil {
 				return err
 			}
+			reply.StateIdx = stateIdx
+			return nil
 		}
 	}
-
-	// err := r.Node.DialPeer(destAdr)
-	// if err != nil {
-	// 	return err
-	// }
-	// Assign peer, cointype, capacity, initialsend, data and then
-	// r.Node.FundChannel(args.Peer, args.CoinType, args.Capacity, args.InitialSend, args.Data)
-	log.Println("Paying your invoice ultra securely")
-	//reply.Txid, err = r.Node.PayInvoice(args.Invoice)
-	//if err != nil {
-	//	return err
-	//}
-	return nil
+	return fmt.Errorf("Didn't pay invoice due to errors!")
 }
