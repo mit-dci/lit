@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"github.com/mit-dci/lit/bech32"
 	"github.com/mit-dci/lit/consts"
+	"github.com/mit-dci/lit/crypto/fastsha256"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/wire"
 	"log"
 	"time"
-	"github.com/mit-dci/lit/crypto/fastsha256"
 )
 
 type TxidsReply struct {
@@ -514,7 +514,6 @@ func (r *LitRPC) PayInvoice(args *PayInvoiceArgs, reply *PayInvoiceReply) error 
 	bytesWritten, err := rpx.Con.Write(testStr)
 	log.Println("BYTES WRITTEN", bytesWritten)
 
-
 	// store this invoice in our list of sent invoices
 	var sentInvoice lnutil.InvoiceMsg
 	sentInvoice.Id = invoiceId
@@ -528,59 +527,54 @@ func (r *LitRPC) PayInvoice(args *PayInvoiceArgs, reply *PayInvoiceReply) error 
 		if req.Id == invoiceId && sentInvoice.PeerIdx == req.PeerIdx {
 			// this is the invoice that we sent. Pay
 			log.Println("paying for the invoice now")
-			connectedEarlier, conExists := false, false
-			localPeerIdx, ctr := uint32(0), uint32(1)
+			conExists := false
 			var empty [33]byte
 
-			for {
-				pubKey, _ := r.Node.GetPubHostFromPeerIdx(ctr)
-				if pubKey == empty {
-					// we've reached the end of our list of peers which we ahve connected to
-					// in the past. break.
-					break
-				}
+			pubKey, _ := r.Node.GetPubHostFromPeerIdx(req.PeerIdx)
+			if pubKey == empty {
+				// we've reached the end of our list of peers which we ahve connected to
+				// in the past. break.
+				log.Println("no pubkey found. quitting!")
+				fmt.Errorf("no pubkey found. quitting!")
+			}
 
-				r.Node.RemoteMtx.Lock()
-				_, connected := r.Node.RemoteCons[ctr]
-				r.Node.RemoteMtx.Unlock()
+			r.Node.RemoteMtx.Lock()
+			_, connected := r.Node.RemoteCons[req.PeerIdx]
+			r.Node.RemoteMtx.Unlock()
 
-				idHash := fastsha256.Sum256(pubKey[:])
-				adr := bech32.Encode("ln", idHash[:20])
-				if adr == destAdr {
-					log.Println("We have the address in our past history")
-					localPeerIdx = ctr
-					connectedEarlier = true
-					if connected {
-						log.Println("We are connected to this peer")
-						conExists = true
-						rpx = *r.Node.RemoteCons[ctr]
-					}
-					break
+			idHash := fastsha256.Sum256(pubKey[:])
+			adr := bech32.Encode("ln", idHash[:20])
+			if adr == destAdr {
+				log.Println("Addresses match")
+				if connected {
+					log.Println("We are connected to this peer")
+					conExists = true
+					rpx = *r.Node.RemoteCons[req.PeerIdx]
 				}
-				ctr++
+			} else {
+				log.Println("remote address doesn't match. quitting!")
+				fmt.Errorf("remote address doesn't match. quitting!")
+			}
+			if !conExists {
+				log.Println("Not connected to peer")
+				return fmt.Errorf("Not connected to peer")
 			}
 			chanExists := false
-			qChannel := r.Node.ReturnQchan()
-			if connectedEarlier { // || conExists is omitted here
-				qcs, err := r.Node.GetAllQchans()
-				if err != nil {
-					return err
-				}
-				for _, q := range qcs {
-					if q.KeyGen.Step[3]&0x7fffffff == localPeerIdx && !q.CloseData.Closed {
-						// this means I have / had a channel with him
-						log.Println("We have / had a channel, this is cool")
-						chanExists = true
-						qChannel = q
-					}
+			qChannel := r.Node.ReturnQchan() // || conExists is omitted here
+			qcs, err := r.Node.GetAllQchans()
+			if err != nil {
+				return err
+			}
+			for _, q := range qcs {
+				if q.KeyGen.Step[3]&0x7fffffff == req.PeerIdx && !q.CloseData.Closed {
+					// this means I have / had a channel with him
+					log.Println("We have / had a channel, this is cool")
+					chanExists = true
+					qChannel = q
 				}
 			}
 
 			if chanExists {
-				if !conExists {
-					log.Println("Channel exists but we aren't connected. So connecting.")
-					conExists = true
-				}
 				log.Println("Just push funds in the channel if it has capacity")
 				var data [32]byte
 
@@ -591,13 +585,14 @@ func (r *LitRPC) PayInvoice(args *PayInvoiceArgs, reply *PayInvoiceReply) error 
 				}
 				qc.Height = qChannel.Height
 
-				err := r.Node.PushChannel(qc, uint32(991), data)
+				log.Println("Paying %d towards invoice %s", req.Amount, args.Invoice)
+				err := r.Node.PushChannel(qc, uint32(req.Amount), data)
 				if err != nil {
-					qChannel.ClearToSend <- true
+					//qChannel.ClearToSend <- true
 					log.Println("ERROR WHILE PUSHING FUNDS!!", err)
 					return fmt.Errorf("ERROR WHILE PUSHING FUNDS!!")
 				}
-			} else if connectedEarlier && !chanExists {
+			} else {
 				log.Println("we need to weigh the option between creating a new channel and multi hop")
 			}
 
