@@ -309,7 +309,6 @@ func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 			dummyqc.Peer(), dummyqc.Idx())
 	}
 	qc, ok := peer.QCs[dummyqc.Idx()]
-	log.Println("KTX", dummyqc.Idx(), args.ChanIdx)
 
 	if !ok {
 		return fmt.Errorf("peer %d doesn't have channel %d",

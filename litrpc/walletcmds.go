@@ -8,6 +8,8 @@ import (
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/wire"
 	"log"
+	"time"
+	"github.com/mit-dci/lit/crypto/fastsha256"
 )
 
 type TxidsReply struct {
@@ -502,22 +504,113 @@ func (r *LitRPC) PayInvoice(args *PayInvoiceArgs, reply *PayInvoiceReply) error 
 
 	invoiceRequester := destAdr + "@:2448" // for testing
 
-	rp, err := r.Node.InvoiceDial(invoiceRequester)
+	rpx, err := r.Node.InvoiceDial(invoiceRequester)
 	if err != nil {
 		return err
 	}
 	// now I have the remote Peer
 	// send it a byte message
 	testStr := []byte("I1") // this should be the actual invoice preceeded by I
-	bytesWritten, err := rp.Con.Write(testStr)
+	bytesWritten, err := rpx.Con.Write(testStr)
 	log.Println("BYTES WRITTEN", bytesWritten)
-	log.Println("LITRPC", r.Node.RemoteCons[4])
+
 
 	// store this invoice in our list of sent invoices
 	var sentInvoice lnutil.InvoiceMsg
 	sentInvoice.Id = invoiceId
-	sentInvoice.PeerIdx = rp.Idx
+	sentInvoice.PeerIdx = rpx.Idx
 	r.Node.SentInvoiceReq = append(r.Node.SentInvoiceReq, sentInvoice)
+
+	time.Sleep(10 * time.Second)
+
+	log.Println("PIR", r.Node.PendingInvoiceReq)
+	for _, req := range r.Node.PendingInvoiceReq {
+		if req.Id == invoiceId && sentInvoice.PeerIdx == req.PeerIdx {
+			// this is the invoice that we sent. Pay
+			log.Println("paying for the invoice now")
+			connectedEarlier, conExists := false, false
+			localPeerIdx, ctr := uint32(0), uint32(1)
+			var empty [33]byte
+
+			for {
+				pubKey, _ := r.Node.GetPubHostFromPeerIdx(ctr)
+				if pubKey == empty {
+					// we've reached the end of our list of peers which we ahve connected to
+					// in the past. break.
+					break
+				}
+
+				r.Node.RemoteMtx.Lock()
+				_, connected := r.Node.RemoteCons[ctr]
+				r.Node.RemoteMtx.Unlock()
+
+				idHash := fastsha256.Sum256(pubKey[:])
+				adr := bech32.Encode("ln", idHash[:20])
+				if adr == destAdr {
+					log.Println("We have the address in our past history")
+					localPeerIdx = ctr
+					connectedEarlier = true
+					if connected {
+						log.Println("We are connected to this peer")
+						conExists = true
+						rpx = *r.Node.RemoteCons[ctr]
+					}
+					break
+				}
+				ctr++
+			}
+			chanExists := false
+			qChannel := r.Node.ReturnQchan()
+			if connectedEarlier { // || conExists is omitted here
+				qcs, err := r.Node.GetAllQchans()
+				if err != nil {
+					return err
+				}
+				for _, q := range qcs {
+					if q.KeyGen.Step[3]&0x7fffffff == localPeerIdx && !q.CloseData.Closed {
+						// this means I have / had a channel with him
+						log.Println("We have / had a channel, this is cool")
+						chanExists = true
+						qChannel = q
+					}
+				}
+			}
+
+			if chanExists {
+				if !conExists {
+					log.Println("Channel exists but we aren't connected. So connecting.")
+					conExists = true
+				}
+				log.Println("Just push funds in the channel if it has capacity")
+				var data [32]byte
+
+				qc, ok := rpx.QCs[qChannel.Idx()]
+				if !ok {
+					return fmt.Errorf("peer %d doesn't have channel %d",
+						qChannel.Peer(), qChannel.Idx())
+				}
+				qc.Height = qChannel.Height
+
+				err := r.Node.PushChannel(qc, uint32(991), data)
+				if err != nil {
+					qChannel.ClearToSend <- true
+					log.Println("ERROR WHILE PUSHING FUNDS!!", err)
+					return fmt.Errorf("ERROR WHILE PUSHING FUNDS!!")
+				}
+			} else if connectedEarlier && !chanExists {
+				log.Println("we need to weigh the option between creating a new channel and multi hop")
+			}
+
+		}
+	}
+
+	// err := r.Node.DialPeer(destAdr)
+	// if err != nil {
+	// 	return err
+	// }
+	// Assign peer, cointype, capacity, initialsend, data and then
+	// r.Node.FundChannel(args.Peer, args.CoinType, args.Capacity, args.InitialSend, args.Data)
+	log.Println("Paying your invoice ultra securely")
 	//reply.Txid, err = r.Node.PayInvoice(args.Invoice)
 	//if err != nil {
 	//	return err

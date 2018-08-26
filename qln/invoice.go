@@ -17,6 +17,10 @@ import (
 	"github.com/mit-dci/lit/portxo"
 )
 
+func (nd *LitNode) ReturnQchan() (*Qchan) {
+	var q *Qchan
+	return q
+}
 func IsBech32String(in string) bool {
 	const charset = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 	var IsBech32 = regexp.MustCompile(`^[qpzry9x8gf2tvdw0s3jn54khce6mua7l]+$`).MatchString
@@ -57,6 +61,10 @@ func RetrieveInvoiceInfo() (lnutil.InvoiceReplyMsg, error) {
 // 	Id      string
 // }
 
+func (nd *LitNode) DummyFunc() *RemotePeer {
+	log.Println("WORKS?", nd.RemoteCons[4])
+	return nd.RemoteCons[4]
+}
 func (nd *LitNode) GetInvoiceReplyInfo(msg lnutil.InvoiceReplyMsg,
 	peer *RemotePeer) (lnutil.InvoiceReplyMsg, error) {
 	// so someone sent me details of their invoice, cool. If I requested that,
@@ -69,11 +77,15 @@ func (nd *LitNode) GetInvoiceReplyInfo(msg lnutil.InvoiceReplyMsg,
 	for _, invoices := range nd.SentInvoiceReq {
 		if invoices.PeerIdx == peer.Idx && invoices.Id == msg.Id {
 			// this is an invoice we sent and and invoice that has the correct id
+			log.Println("WORKSINSIDE?", nd.RemoteCons[4])
 			log.Println("Both match, paying now")
-			_, err := nd.PayInvoice(msg, peer)
-			if err != nil {
-				return dummy, err
-			}
+			msg.PeerIdx = peer.Idx // overwrite the remote node's peer id before
+			// passing it
+			nd.PendingInvoiceReq = append(nd.PendingInvoiceReq, msg)
+			// _, err := nd.PayInvoice(msg, peer)
+			// if err != nil {
+			// 	return dummy, err
+			// }
 			// call the pay handler here
 		}
 	}
