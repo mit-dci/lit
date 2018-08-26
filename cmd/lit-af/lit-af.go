@@ -146,7 +146,7 @@ func (lc *litAfClient) Call(serviceMethod string, args interface{}, reply interf
 	select {
 	case err := <-c:
 		return err
-	case <-time.After(time.Second * 30):
+	case <-time.After(time.Second * 10):
 		return errors.New("RPC call timed out")
 	}
 }

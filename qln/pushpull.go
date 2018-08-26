@@ -227,6 +227,7 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	log.Printf("got pre CTS... \n")
 	// block until clear to send is full again
 	qc.ChanMtx.Unlock()
+
 	cts = false
 	for !cts {
 		qc.ChanMtx.Lock()
