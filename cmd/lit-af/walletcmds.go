@@ -12,8 +12,15 @@ import (
 var payCommand = &Command{
 	Format: fmt.Sprintf(
 		"%s%s\n", lnutil.White("pay"), lnutil.ReqColor("invoice")),
-	Description:      "Redeem the given amount in satoshis to the given address defined by the invoice.\n",
-	ShortDescription: "Redeem invoice for the given amount.\n",
+	Description:      "Pay the given amount in satoshis to the given address defined by the invoice.\n",
+	ShortDescription: "Pay invoice for the given amount.\n",
+}
+
+var genCommand = &Command{
+	Format: fmt.Sprintf(
+		"%s%s%s\n", lnutil.White("gen"), lnutil.ReqColor("cointype"), lnutil.ReqColor("amount")),
+	Description:      "Request the passed amount in satoshis / equivalent units as an invoice.\n",
+	ShortDescription: "Generate invoice for the given amount and cointype\n",
 }
 
 var sendCommand = &Command{
@@ -45,6 +52,31 @@ var sweepCommand = &Command{
 	Description: "Move UTXOs with many 1-in-1-out txs.\n",
 	// TODO: Make this more clear.
 	ShortDescription: "Move UTXOs with many 1-in-1-out txs.\n",
+}
+
+func (lc *litAfClient) GenInvoice(textArgs []string) error {
+	stopEx, err := CheckHelpCommand(genCommand, textArgs, 2)
+	if err != nil || stopEx {
+		return err
+	}
+
+	args := new(litrpc.GenInvoiceArgs)
+	reply := new(litrpc.GenInvoiceReply)
+
+	args.CoinType = textArgs[0]
+	amount, err := strconv.Atoi(textArgs[1])
+	if err != nil {
+		return err
+	}
+	args.Amount = uint64(amount)
+
+	err = lc.Call("LitRPC.GenInvoice", args, reply)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(color.Output, "generated invoice %s\n", reply.Invoice)
+	return nil
 }
 
 func (lc *litAfClient) Pay(textArgs []string) error {

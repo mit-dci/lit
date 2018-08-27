@@ -109,8 +109,15 @@ type LitNode struct {
 	RemoteCons         map[uint32]*RemotePeer
 	RemoteMtx          sync.Mutex
 
+	// Gen Invoice Stuff
+	GenInvoiceReq map[string]lnutil.GenInvoiceParams
+	// have a map because to checking if an item exists in a slice is O(n)
+	// Pay Invoice Stuff
+	// keep track of all invocie requests made to an external peer
 	SentInvoiceReq []lnutil.InvoiceMsg
+	// user responded to us and we have to pay the guy now
 	PendingInvoiceReq []lnutil.InvoiceReplyMsg
+	// we've paid this guy, store it in the db file now
 	PaidInvoiceReq []lnutil.InvoiceReplyMsg
 
 	// OmniChan is the channel for the OmniHandler

@@ -573,6 +573,11 @@ type DeltaSigMsg struct {
 	HTLCSigs  [][64]byte
 }
 
+type GenInvoiceParams struct {
+	CoinType string
+	Amount uint64
+}
+
 type InvoiceReplyMsg struct {
 	PeerIdx  uint32
 	Id       string

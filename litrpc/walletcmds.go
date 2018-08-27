@@ -483,16 +483,69 @@ func (r *LitRPC) ClaimHTLC(args *ClaimHTLCArgs, reply *TxidsReply) error {
 	return nil
 }
 
+// Gen Invoice
+type GenInvoiceArgs struct {
+	CoinType string
+	Amount   uint64
+}
+
+type GenInvoiceReply struct {
+	Invoice string
+}
+
 // Pay Invoice
 type PayInvoiceArgs struct {
 	Invoice string
 }
 
 type PayInvoiceReply struct {
-	Txid string
+	Txid     string
 	StateIdx uint64
 }
 
+func (r *LitRPC) GenInvoice(args *GenInvoiceArgs, reply *GenInvoiceReply) error {
+	log.Println("CALLIGN GEN INVOICE, COOL!")
+	idPriv := r.Node.IdKey()
+	var idPub [33]byte
+	copy(idPub[:], idPriv.PubKey().SerializeCompressed())
+	adr := lnutil.LitAdrFromPubkey(idPub)
+	// now we have the listening address that the peer has to connect to
+	// generate Invoice Id here
+	// general stuff - it can be any single byte character
+	// but restricting to alphanumeric. That gives us 36 concurrent payments
+	// which is still good (36 / 3  = 12 tps) (3 s is for the wait delay in response)
+
+	// so we need a new invoices.db file
+	invoiceId, err := r.Node.GenInvoiceId(args.CoinType, args.Amount)
+	if err != nil {
+		return err
+	}
+
+	// check here if passed cointype really exists or not
+	existingCoins := [...]string{"tb", "bcrt"}
+	// find a nicer way to collect this information
+	validCoin := false
+	for _, coin := range existingCoins {
+		if args.CoinType == coin {
+			validCoin = true
+		}
+	}
+	if !validCoin {
+		return fmt.Errorf("Coin not yet supported. Add support!")
+	}
+	log.Printf("Generated invoice: %s_%s", adr, invoiceId)
+	// now we have the invoiceId ready, store it in GenInvoiceReq
+	var invoiceStorage lnutil.GenInvoiceParams
+	invoiceStorage.CoinType = args.CoinType
+	invoiceStorage.Amount = args.Amount
+	if len(r.Node.GenInvoiceReq) == 0 {
+		r.Node.GenInvoiceReq = make(map[string]lnutil.GenInvoiceParams)
+	}
+	r.Node.GenInvoiceReq[invoiceId] = invoiceStorage
+	log.Println("INVOICE STORAGE", r.Node.GenInvoiceReq)
+	return nil
+
+}
 func (r *LitRPC) PayInvoice(args *PayInvoiceArgs, reply *PayInvoiceReply) error {
 	var err error
 	// send a message out to the peer asking for details

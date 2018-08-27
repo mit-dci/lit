@@ -29,6 +29,12 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 		return nil, err
 	}
 
+	litinvoicepath := filepath.Join(nd.LitFolder, "invoices.db")
+	err := nd.OpenDB(litinvoicepath)
+	if err != nil {
+		return nil, err
+	}
+
 	// Maybe make a new parameter set for "LN".. meh
 	// TODO change this to a non-coin
 	rootPrivKey, err := hdkeychain.NewMaster(privKey[:], &coinparam.TestNet3Params)

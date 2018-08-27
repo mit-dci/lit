@@ -29,9 +29,19 @@ func IsBech32String(in string) bool {
 
 // GenInvoice generates an invoiceid and then stores the extra stuff in a map
 // to send out to the peer in the case it is required in the future.
-func GenInvoice() error {
-	log.Println("Generating invoice for requested payment")
-	return nil
+func (nd *LitNode) GenInvoiceId(cointype string, amount uint64) (string, error) {
+	// so now we have to generate invoiceIds and store them in GenInvoiceReq
+	// InvoiceId string
+	// CoinType string
+	// Amount uint64
+	var chars = "123456789abcdefghijklmnopqrstuvwxyz"
+	_, exists := nd.GenInvoiceReq[chars[0:1]]
+	i := 0
+	for exists { // the invoice exists, so need a different invoiceId
+		i++
+		_, exists = nd.GenInvoiceReq[chars[i:i+1]]
+	}
+	return chars[i : i+1], nil
 }
 
 func RetrieveInvoiceInfo() (lnutil.InvoiceReplyMsg, error) {
