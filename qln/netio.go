@@ -32,6 +32,8 @@ func (nd *LitNode) FindPeerIndexByAddress(lnAdr string) (uint32, error) {
 // TCPListener starts a litNode listening for incoming LNDC connections.
 func (nd *LitNode) TCPListener(lisIpPort string) (string, error) {
 
+	log.Printf("Trying to listen on %s\n", lisIpPort)
+
 	err := nd.PeerMan.ListenOnPort(lisIpPort)
 	if err != nil {
 		return "", err
@@ -39,7 +41,6 @@ func (nd *LitNode) TCPListener(lisIpPort string) (string, error) {
 
 	lnaddr := nd.PeerMan.GetExternalAddress()
 
-	log.Printf("Listening on %s\n", lisIpPort)
 	log.Printf("Listening with ln address: %s \n", lnaddr)
 
 	// Don't announce on the tracker if we are communicating via SOCKS proxy

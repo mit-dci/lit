@@ -2,6 +2,7 @@ package eventbus
 
 import (
 	"fmt"
+	"log"
 	"sync"
 )
 
@@ -55,6 +56,7 @@ func (b *EventBus) RegisterHandler(eventName string, hFunc func(Event) EventHand
 	}
 
 	b.handlers[eventName] = append(b.handlers[eventName], h)
+	log.Printf("Registered handler for %s\n", eventName)
 
 	b.mutex.Unlock()
 
@@ -82,6 +84,7 @@ func (b *EventBus) Publish(event Event) (bool, error) {
 	b.mutex.Lock()
 	eventMutex, present := b.eventMutexes[name]
 	if !present {
+		b.mutex.Unlock() // unlock it early
 		return true, nil
 	}
 	eventMutex.Lock()
@@ -94,6 +97,8 @@ func (b *EventBus) Publish(event Event) (bool, error) {
 	f := event.Flags()
 	async := (f & EFLAG_ASYNC_UNSAFE) != 0
 	uncan := (f & EFLAG_UNCANCELLABLE) != 0
+
+	log.Printf("found %d handlers for %s\n", len(hs), name)
 
 	// Actually iterate over all the handlers and make them run.
 	ok := true
@@ -109,7 +114,7 @@ func (b *EventBus) Publish(event Event) (bool, error) {
 			// Since it's not async we might cancel it.
 			res, err := callEventHandler(h, event)
 			if err != nil {
-				// TODO Error handling.
+				log.Printf("Error in event handler for %s: %s", name, err.Error())
 			}
 
 			if res == EHANDLE_CANCEL && !uncan {

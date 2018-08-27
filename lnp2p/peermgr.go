@@ -10,6 +10,7 @@ import (
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnio"
 	"github.com/mit-dci/lit/portxo"
+	"log"
 	"net"
 	"sync"
 )
@@ -197,12 +198,15 @@ func (pm *PeerManager) ListenOnPort(addr string) error {
 	// Try to start listening.
 	listener, err := lndc.NewListener(pm.idkey, addr)
 	if err != nil {
+		log.Printf("listening failed: %s\n", err.Error())
 		pm.ebus.Publish(StopListeningPortEvent{
 			ListenAddr: addr,
 			Reason:     "initfail",
 		})
 		return err
 	}
+
+	threadobj.listener = listener
 
 	// Install the thread object.
 	pm.mtx.Lock()
