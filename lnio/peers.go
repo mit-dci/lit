@@ -1,6 +1,7 @@
 package lnio
 
-// LnAddr is just a bech32-encoded pubkey
+// LnAddr is just a bech32-encoded pubkey.
+// TODO Move this to another package so it's more obviously not *just* IO-related.
 type LnAddr string
 
 // LitPeerStorage is storage for peer data.

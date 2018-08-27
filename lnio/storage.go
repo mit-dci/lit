@@ -2,8 +2,10 @@ package lnio
 
 // LitStorage is an abstract wrapper layer around an arbitrary database.
 type LitStorage interface {
-	Open(string) error
+	Open(dbpath string) error
+	IsSingleFile() bool
 	Close() error
+
 	GetWalletDB(uint32) LitWalletStorage
 	GetPeerDB() LitPeerStorage
 	GetChannelDB() LitChannelStorage
