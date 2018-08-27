@@ -137,13 +137,18 @@ func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lnio.LnAddr, proxy
 
 	pi, err := pm.peerdb.GetPeerInfo(*lnaddr)
 	if err != nil {
-		println(err)
+		println(err.Error())
 		// TODO deal with this
+	}
+
+	pnick := ""
+	if pi != nil {
+		pnick = *pi.Nickname
 	}
 
 	// Now that we've got the connection, actually create the peer object.
 	p := &Peer{
-		nickname: pi.Nickname,
+		nickname: &pnick,
 		conn:     lndcconn,
 	}
 

@@ -2,8 +2,10 @@ package lnbolt
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/lnio"
+	"log"
 )
 
 var (
@@ -17,7 +19,7 @@ type peerboltdb struct {
 	db *bolt.DB
 }
 
-func (pdb peerboltdb) init() error {
+func (pdb *peerboltdb) init() error {
 	err := pdb.db.Update(func(tx *bolt.Tx) error {
 		for _, n := range pdbbuckets {
 			_, err := tx.CreateBucketIfNotExists(n)
@@ -33,7 +35,7 @@ func (pdb peerboltdb) init() error {
 	return nil
 }
 
-func (pdb peerboltdb) GetPeerAddrs() ([]lnio.LnAddr, error) {
+func (pdb *peerboltdb) GetPeerAddrs() ([]lnio.LnAddr, error) {
 
 	addrs := make([]lnio.LnAddr, 0)
 
@@ -62,10 +64,15 @@ func (pdb peerboltdb) GetPeerAddrs() ([]lnio.LnAddr, error) {
 	return addrs, nil
 }
 
-func (pdb peerboltdb) GetPeerInfo(addr lnio.LnAddr) (*lnio.PeerInfo, error) {
+func (pdb *peerboltdb) GetPeerInfo(addr lnio.LnAddr) (*lnio.PeerInfo, error) {
 
 	var raw []byte
 	var err error
+
+	if pdb.db == nil {
+		log.Printf("PDB.db is nil!")
+		return nil, fmt.Errorf("PDB.db is nil")
+	}
 
 	// Just get the raw data from the DB.
 	err = pdb.db.View(func(tx *bolt.Tx) error {
@@ -75,6 +82,10 @@ func (pdb peerboltdb) GetPeerInfo(addr lnio.LnAddr) (*lnio.PeerInfo, error) {
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	if raw == nil {
+		return nil, nil
 	}
 
 	var pi lnio.PeerInfo
@@ -87,7 +98,7 @@ func (pdb peerboltdb) GetPeerInfo(addr lnio.LnAddr) (*lnio.PeerInfo, error) {
 
 }
 
-func (pdb peerboltdb) GetPeerInfos() (map[lnio.LnAddr]lnio.PeerInfo, error) {
+func (pdb *peerboltdb) GetPeerInfos() (map[lnio.LnAddr]lnio.PeerInfo, error) {
 
 	var out map[lnio.LnAddr]lnio.PeerInfo
 	var err error
@@ -126,7 +137,7 @@ func (pdb peerboltdb) GetPeerInfos() (map[lnio.LnAddr]lnio.PeerInfo, error) {
 
 }
 
-func (pdb peerboltdb) AddPeer(addr lnio.LnAddr, pi lnio.PeerInfo) error {
+func (pdb *peerboltdb) AddPeer(addr lnio.LnAddr, pi lnio.PeerInfo) error {
 
 	var err error
 
@@ -154,7 +165,7 @@ func (pdb peerboltdb) AddPeer(addr lnio.LnAddr, pi lnio.PeerInfo) error {
 
 }
 
-func (pdb peerboltdb) DeletePeer(addr lnio.LnAddr) error {
+func (pdb *peerboltdb) DeletePeer(addr lnio.LnAddr) error {
 
 	var err error
 

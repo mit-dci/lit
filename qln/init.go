@@ -8,6 +8,8 @@ import (
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/eventbus"
+	"github.com/mit-dci/lit/lnio"
+	"github.com/mit-dci/lit/lnio/backends/lnbolt" // TODO Abstract this more.
 	"github.com/mit-dci/lit/lnp2p"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/logging"
@@ -40,12 +42,25 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 		return nil, err
 	}
 
+	db2 := &lnbolt.LitBoltDB{}
+	var dbx lnio.LitStorage
+	dbx = db2
+	err = dbx.Open(filepath.Join(nd.LitFolder, "db2"))
+	if err != nil {
+		return nil, err
+	}
+	nd.NewLitDB = dbx
+	err = nd.NewLitDB.Check()
+	if err != nil {
+		return nil, err
+	}
+
 	// Event system setup.
 	ebus := eventbus.NewEventBus()
 	nd.Events = &ebus
 
 	// Peer manager
-	nd.PeerMan, err = lnp2p.NewPeerManager(rootPrivKey, nil, &ebus)
+	nd.PeerMan, err = lnp2p.NewPeerManager(rootPrivKey, nd.NewLitDB.GetPeerDB(), &ebus)
 	if err != nil {
 		return nil, err
 	}

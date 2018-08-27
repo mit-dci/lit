@@ -9,6 +9,8 @@ type LitStorage interface {
 	GetWalletDB(uint32) LitWalletStorage
 	GetPeerDB() LitPeerStorage
 	GetChannelDB() LitChannelStorage
+
+	Check() error
 }
 
 // LitWalletStorage is storage for wallet data.

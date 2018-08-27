@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/lnio"
+	"os"
 	"path"
 )
 
@@ -16,12 +17,14 @@ type LitBoltDB struct {
 }
 
 // Open .
-func (db LitBoltDB) Open(dbpath string) error {
+func (db *LitBoltDB) Open(dbpath string) error {
 
 	// Sanity check.
 	if db.open {
 		return fmt.Errorf("tried to open an open BoltDB database")
 	}
+
+	os.Mkdir(dbpath, os.ModeDir|0700)
 
 	// Figure out file paths.
 	wpath := path.Join(dbpath, "wallet.db")
@@ -30,18 +33,18 @@ func (db LitBoltDB) Open(dbpath string) error {
 
 	var err error
 
-	walletdb, err := bolt.Open(wpath, 0600, nil)
+	walletdb, err := bolt.Open(wpath, 0644, nil)
 	if err != nil {
 		return err
 	}
 
-	peerdb, err := bolt.Open(ppath, 0600, nil)
+	peerdb, err := bolt.Open(ppath, 0644, nil)
 	if err != nil {
 		walletdb.Close()
 		return err
 	}
 
-	chandb, err := bolt.Open(cpath, 0600, nil)
+	chandb, err := bolt.Open(cpath, 0644, nil)
 	if err != nil {
 		walletdb.Close()
 		peerdb.Close()
@@ -59,12 +62,12 @@ func (db LitBoltDB) Open(dbpath string) error {
 }
 
 // IsSingleFile .
-func (LitBoltDB) IsSingleFile() bool {
+func (*LitBoltDB) IsSingleFile() bool {
 	return false
 }
 
 // Close .
-func (db LitBoltDB) Close() error {
+func (db *LitBoltDB) Close() error {
 
 	// Sanity check.
 	if !db.open {
@@ -93,18 +96,46 @@ func (db LitBoltDB) Close() error {
 
 }
 
+// Check .
+func (db *LitBoltDB) Check() error {
+
+	if db.walletdb == nil {
+		return fmt.Errorf("Wallet DB is nil")
+	}
+
+	if db.peerdb == nil {
+		return fmt.Errorf("Peer DB is nil")
+	}
+
+	if db.chandb == nil {
+		return fmt.Errorf("Channel DB is nil")
+	}
+
+	return nil
+
+}
+
 // GetWalletDB .
-func (db LitBoltDB) GetWalletDB(cointype uint32) lnio.LitWalletStorage {
+func (db *LitBoltDB) GetWalletDB(cointype uint32) lnio.LitWalletStorage {
 	return nil
 }
 
 // GetPeerDB .
-func (db LitBoltDB) GetPeerDB() lnio.LitPeerStorage {
-	w := peerboltdb{db.peerdb}
-	return w
+func (db *LitBoltDB) GetPeerDB() lnio.LitPeerStorage {
+	w := peerboltdb{}
+	w.db = db.peerdb
+
+	err := w.init()
+	if err != nil {
+		panic(err)
+	}
+
+	var w2 lnio.LitPeerStorage
+	w2 = &w
+	return w2
 }
 
 // GetChannelDB .
-func (db LitBoltDB) GetChannelDB() lnio.LitChannelStorage {
+func (db *LitBoltDB) GetChannelDB() lnio.LitChannelStorage {
 	return nil
 }
