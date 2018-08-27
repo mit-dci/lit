@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"log"
 
-	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
-	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/btcutil/bloom"
+	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/wire"
 )
 
 var (
+	// WitMagicBytes ...
 	WitMagicBytes = []byte{0x6a, 0x24, 0xaa, 0x21, 0xa9, 0xed}
 )
 
@@ -131,8 +132,8 @@ func calcRoot(hashes []*chainhash.Hash) *chainhash.Hash {
 	return hashes[0]
 }
 
-// RefilterLocal reconstructs the local in-memory bloom filter.  It does
-// this by calling GimmeFilter() but doesn't broadcast the result.
+// Refilter reconstructs the local in-memory bloom filter.  It does this by
+// calling GimmeFilter() but doesn't broadcast the result.
 func (s *SPVCon) Refilter(f *bloom.Filter) {
 	if !s.HardMode {
 		s.SendFilter(f)
