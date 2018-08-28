@@ -39,7 +39,7 @@ func Dial(localPriv *btcec.PrivateKey, ipAddr string, remoteAddress string,
 
 	var remotePKH string
 	var remotePK [33]byte
-	if len(remoteAddress) == 41 { // its a remotePKH
+	if remoteAddress[0:3] == "ln1" { // its a remote PKH
 		remotePKH = remoteAddress
 	} else if len(remoteAddress) == 33 { // remotePK
 		temp := []byte(remoteAddress)
@@ -100,7 +100,7 @@ func Dial(localPriv *btcec.PrivateKey, ipAddr string, remoteAddress string,
 		}
 	}
 	log.Println("Received pubkey", remotePK)
-	if lnutil.LitAdrFromPubkey(remotePK) != remotePKH&& !Noise_XK {
+	if lnutil.LitAdrFromPubkey(remotePK) != remotePKH && !Noise_XK {
 		// for noise_XK dont check PKH and PK because we'd have already checked this
 		// the last time we connected to this guy
 		return nil, fmt.Errorf("Remote PKH doesn't match. Quitting!")
