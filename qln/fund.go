@@ -161,6 +161,8 @@ func (nd *LitNode) FundChannel(
 		return 0, err
 	}
 
+	log.Printf("next channel idx: %d", cIdx)
+
 	nd.InProg.ChanIdx = cIdx
 	nd.InProg.PeerIdx = peerIdx
 	nd.InProg.Amt = ccap

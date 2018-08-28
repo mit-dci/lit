@@ -159,6 +159,10 @@ func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lnio.LnAddr, proxy
 	// (it took me a while to realize I forgot this)
 	pm.registerPeer(p)
 
+	// Now start listening for inbound traffic.
+	// (it *also* took me a while to realize I forgot *this*)
+	go processConnectionInboundTraffic(p, pm)
+
 	// Return
 	return p, nil
 
