@@ -29,6 +29,14 @@ func makeTmpNewPeerHandler(nd *LitNode) func(eventbus.Event) eventbus.EventHandl
 		nd.RemoteMtx.Unlock()
 		nd.PeerMapMtx.Unlock()
 
+		// make a local map of outpoints to channel indexes
+		// iterate through all this peer's channels to extract outpoints
+		rpeer.OpMap = make(map[[36]byte]uint32)
+		for _, q := range rpeer.QCs {
+			opArr := lnutil.OutPointToBytes(q.Op)
+			rpeer.OpMap[opArr] = q.Idx()
+		}
+
 		return eventbus.EHANDLE_OK
 	}
 }
@@ -40,14 +48,6 @@ func makeTmpMsgHandler(nd *LitNode) func(eventbus.Event) eventbus.EventHandleRes
 	 * Bless me father for I have sinned...
 	 */
 
-	var err error
-
-	// this is to keep track of peers to see which ones we need to do late-setup for
-	loaded := make([]*lnp2p.Peer, 0)
-
-	// idk what this is lol
-	var opArrs map[*lnp2p.Peer][36]byte
-
 	return func(e eventbus.Event) eventbus.EventHandleResult {
 		ev := e.(lnp2p.NetMessageRecvEvent)
 
@@ -56,44 +56,32 @@ func makeTmpMsgHandler(nd *LitNode) func(eventbus.Event) eventbus.EventHandleRes
 		npeer := ev.Peer
 		peer := nd.PeerMap[npeer]
 
-		// Check to see if we're done the prep for this one already.
-		found := false
-		for _, p := range loaded {
-			if ev.Peer == p {
-				found = true
-			}
+		var err error
+
+		// init the qchan map thingy, this is quite inefficient
+		err = nd.PopulateQchanMap(peer)
+		if err != nil {
+			log.Printf("error initing peer: %s", err.Error())
+			return eventbus.EHANDLE_OK
 		}
 
-		// If not, then do so.
-		if !found {
-			// init the qchan map thingy
-			err = nd.PopulateQchanMap(peer)
-			if err != nil {
-				log.Printf("error initing peer: %s", err.Error())
-				return eventbus.EHANDLE_OK
-			}
-
-			// make a local map of outpoints to channel indexes
-			// iterate through all this peer's channels to extract outpoints
-			peer.OpMap = make(map[[36]byte]uint32)
-			for _, q := range peer.QCs {
-				opArrs[npeer] = lnutil.OutPointToBytes(q.Op)
-				peer.OpMap[opArrs[npeer]] = q.Idx()
-			}
-		}
-
+		// TODO Remove this.  Also it's quite inefficient the way it's written at the moment.
 		var chanIdx uint32
 		chanIdx = 0
 		if len(rawbuf) > 38 {
-			opArr := opArrs[npeer]
-			copy(opArr[:], rawbuf[1:37])
+			var opArr [36]byte
+			for _, q := range peer.QCs {
+				b := lnutil.OutPointToBytes(q.Op)
+				peer.OpMap[b] = q.Idx()
+			}
+			copy(opArr[:], rawbuf[1:37]) // yay for magic numbers /s
 			chanCheck, ok := peer.OpMap[opArr]
 			if ok {
 				chanIdx = chanCheck
 			}
 		}
 
-		log.Printf("chanIdx is %x\n", chanIdx)
+		log.Printf("chanIdx is %d, InProg is %d\n", chanIdx, nd.InProg.ChanIdx)
 
 		if chanIdx != 0 {
 			err = nd.PeerHandler(*msg, peer.QCs[chanIdx], peer)

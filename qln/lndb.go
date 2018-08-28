@@ -144,9 +144,6 @@ type LitNode struct {
 	// queue for async messages to RPC user
 	UserMessageBox chan string
 
-	// The port(s) in which it listens for incoming connections
-	LisIpPorts []string
-
 	// The URL from which lit attempts to resolve the LN address
 	TrackerURL string
 
@@ -253,6 +250,7 @@ type InFlightFund struct {
 
 func (inff *InFlightFund) Clear() {
 	inff.PeerIdx = 0
+	log.Printf("HAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
 	inff.ChanIdx = 0
 
 	inff.Amt = 0
