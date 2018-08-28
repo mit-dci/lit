@@ -63,8 +63,7 @@ func establishTestConnection(wrong bool) (net.Conn, net.Conn, func(), error) {
 	}
 	remoteConnChan := make(chan maybeNetConn, 1)
 	go func() {
-		var empty [33]byte
-		remoteConn, err := Dial(remotePriv, netAddr, pkh, empty, net.Dial)
+		remoteConn, err := Dial(remotePriv, netAddr, pkh, net.Dial)
 		if err != nil {
 			log.Println(err)
 		}
@@ -200,8 +199,7 @@ func TestConcurrentHandshakes(t *testing.T) {
 	}
 
 	go func() {
-		var empty [33]byte
-		remoteConn, err := Dial(remotePriv, netAddr, pubKey, empty, net.Dial)
+		remoteConn, err := Dial(remotePriv, netAddr, pubKey, net.Dial)
 		connChan <- maybeNetConn{remoteConn, err}
 	}()
 
