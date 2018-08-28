@@ -121,7 +121,6 @@ func processConnectionInboundTraffic(peer *Peer, pm *PeerManager) {
 
 		// Make a buf and read into it.
 		buf := make([]byte, 1<<24)
-		log.Printf("waiting for input as %s\n", pm.GetExternalAddress())
 		n, err := peer.conn.Read(buf)
 		if err != nil {
 			log.Printf("Error reading from peer: %s\n", err.Error())
@@ -145,7 +144,6 @@ func processConnectionInboundTraffic(peer *Peer, pm *PeerManager) {
 		// Publish the event to the event bus so qln or something can pick it up.
 		// TODO Refactor this.
 		pm.ebus.Publish(NetMessageRecvEvent{&m, peer, buf})
-		log.Printf("sent event! %s\n", pm.GetExternalAddress())
 
 	}
 
