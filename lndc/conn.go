@@ -34,17 +34,23 @@ var Noise_XK bool
 // remote peer located at address which has remotePub as its long-term static
 // public key. In the case of a handshake failure, the connection is closed and
 // a non-nil error is returned.
-func Dial(localPriv *btcec.PrivateKey, ipAddr string, remotePKH string, remotePK [33]byte,
+func Dial(localPriv *btcec.PrivateKey, ipAddr string, remoteAddress string,
 	dialer func(string, string) (net.Conn, error)) (*Conn, error) {
+
+	var remotePKH string
+	var remotePK [33]byte
+	if len(remoteAddress) == 41 { // its a remotePKH
+		remotePKH = remoteAddress
+	} else if len(remoteAddress) == 33 { // remotePK
+		temp := []byte(remoteAddress)
+		copy(remotePK[:], temp)
+	}
 	var conn net.Conn
 	var err error
 	var empty [33]byte
-	var Noise_XK = false
 	if remotePK != empty {
 		log.Println("Connecting via Noise_XK since we know remotePK")
 		Noise_XK = true
-	}
-	if Noise_XK {
 		SetConsts()
 	}
 	conn, err = dialer("tcp", ipAddr)
@@ -94,7 +100,9 @@ func Dial(localPriv *btcec.PrivateKey, ipAddr string, remotePKH string, remotePK
 		}
 	}
 	log.Println("Received pubkey", remotePK)
-	if lnutil.LitAdrFromPubkey(remotePK) != remotePKH {
+	if lnutil.LitAdrFromPubkey(remotePK) != remotePKH&& !Noise_XK {
+		// for noise_XK dont check PKH and PK because we'd have already checked this
+		// the last time we connected to this guy
 		return nil, fmt.Errorf("Remote PKH doesn't match. Quitting!")
 	}
 	log.Printf("Received PKH %s matches", lnutil.LitAdrFromPubkey(remotePK))

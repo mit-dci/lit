@@ -113,13 +113,8 @@ func (l *Listener) doHandshake(conn net.Conn) {
 	// connecting node doesn't know our long-term static public key, then
 	// this portion will fail with a non-nil error.
 	actOne := make([]byte, ActOneSize)
-	log.Println("DEFAULTs", HandshakeVersion)
+	log.Println("Handshake Version", HandshakeVersion)
 	if _, err := io.ReadFull(conn, actOne[:]); err != nil {
-		lndcConn.conn.Close()
-		l.rejectConn(err)
-		return
-	}
-	if err := lndcConn.noise.RecvActOne(actOne); err != nil {
 		lndcConn.conn.Close()
 		l.rejectConn(err)
 		return
@@ -128,6 +123,11 @@ func (l *Listener) doHandshake(conn net.Conn) {
 		HandshakeVersion = byte(0)
 		ActTwoSize = 50
 	} // no need for else as default covers XX
+	if err := lndcConn.noise.RecvActOne(actOne); err != nil {
+		lndcConn.conn.Close()
+		l.rejectConn(err)
+		return
+	}
 	// Next, progress the handshake processes by sending over our ephemeral
 	// key for the session along with an authenticating tag.
 	actTwo, err := lndcConn.noise.GenActTwo(HandshakeVersion)

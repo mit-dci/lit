@@ -320,7 +320,7 @@ func EphemeralGenerator(gen func() (*btcec.PrivateKey, error)) func(*Machine) {
 // XK(s, rs):
 // 	INITIATOR <- s
 //  INITIATOR -> e, es        RESPONDER
-//  INITIATOR <- e, ee,       RESPONDER
+//  INITIATOR <- e, ee        RESPONDER
 //  INITIATOR -> s, se        RESPONDER
 // s refers to the static key (or public key) belonging to an entity
 // e refers to the ephemeral key
@@ -489,10 +489,9 @@ func (b *Machine) RecvActOne(actOne []byte) error {
 
 	if actOne[0] == 0 {
 		// es
-		s := ecdh(b.remoteEphemeral, b.localStatic)
-		b.mixKey(s)
+		es := ecdh(b.remoteEphemeral, b.localStatic)
+		b.mixKey(es)
 	}
-
 	_, err = b.DecryptAndHash(p[:])
 	return err // nil means Act one completed successfully
 }

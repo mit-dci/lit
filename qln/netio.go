@@ -2,17 +2,17 @@ package qln
 
 import (
 	"fmt"
-	"log"
-	"net"
-	"strings"
-	"strconv"
-	"time"
-	"github.com/mit-dci/lit/btcutil/btcec"
-	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/bech32"
+	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/crypto/fastsha256"
+	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
 	nat "github.com/mit-dci/lit/nat"
+	"log"
+	"net"
+	"strconv"
+	"strings"
+	"time"
 )
 
 // Gets the list of ports where LitNode is listening for incoming connections,
@@ -164,22 +164,33 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 	}
 
 	var remotePK [33]byte
+	var noisexk bool
 	for _, pubkey := range nd.KnownPubkeys {
 		idHash := fastsha256.Sum256(pubkey[:])
 		adr := bech32.Encode("ln", idHash[:20])
 		if adr == who {
 			remotePK = pubkey
+			noisexk = true
 		}
 	}
 	// get my private ID key
 	idPriv := nd.IdKey()
-
+	var newConn *lndc.Conn
 	// Assign remote connection
-	newConn, err := lndc.Dial(idPriv, where, who, remotePK, net.Dial)
-	if err != nil {
-		return err
+	if noisexk {
+		var remotePKdup [33]byte
+		temp := []byte(string(remotePK[:]))
+		copy(remotePKdup[:], temp)
+		newConn, err = lndc.Dial(idPriv, where, string(remotePK[:]), net.Dial)
+		if err != nil {
+			return err
+		}
+	} else {
+		newConn, err = lndc.Dial(idPriv, where, who, net.Dial)
+		if err != nil {
+			return err
+		}
 	}
-
 	// if connect is successful, either query for already existing peer index, or
 	// if the peer is new, make a new index, and save the hostname&port
 
@@ -233,7 +244,7 @@ func (nd *LitNode) OutMessager() {
 type PeerInfo struct {
 	PeerNumber uint32
 	RemoteHost string
-	LitAdr 	   string
+	LitAdr     string
 	Nickname   string
 }
 
