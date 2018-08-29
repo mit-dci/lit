@@ -10,6 +10,7 @@ import (
 	"github.com/mit-dci/lit/btcutil/hdkeychain"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/dlc"
+	"github.com/mit-dci/lit/invoice"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/wallit"
@@ -66,6 +67,27 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 		return nil, err
 	}
 
+	// Create a new manager for the discreet log contracts
+	nd.InvoiceManager, err = invoice.NewManager(filepath.Join(nd.LitFolder, "invoice.db"))
+	if err != nil {
+		return nil, err
+	}
+	log.Println("CREATED NEW INVOICE DB")
+	var test lnutil.InvoiceReplyMsg
+	test.PeerIdx = uint32(60000)
+	test.Id = "2"
+	test.CoinType = "bcrt"
+	test.Amount = 100000
+	err = nd.InvoiceManager.SaveGeneratedInvoice(&test)
+	if err != nil {
+		log.Println("ERROR WHILE TRYING TO SAVE INVOICE", err)
+		return nd, fmt.Errorf("ERROR WHILE TRYING TO SAVE INVOICE")
+	}
+	x, err := nd.InvoiceManager.LoadGeneratedInvoice("2")
+	if err != nil {
+		return nd, fmt.Errorf("ERROR WHILE TRYING OT READ INVOICE")
+	}
+	log.Println("MSG IS", x)
 	// make maps and channels
 	nd.UserMessageBox = make(chan string, 32)
 

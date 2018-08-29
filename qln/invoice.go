@@ -67,10 +67,6 @@ func RetrieveInvoiceInfo() (lnutil.InvoiceReplyMsg, error) {
 // 	Id      string
 // }
 
-func (nd *LitNode) DummyFunc() *RemotePeer {
-	log.Println("WORKS?", nd.RemoteCons[4])
-	return nd.RemoteCons[4]
-}
 func (nd *LitNode) GetInvoiceReplyInfo(msg lnutil.InvoiceReplyMsg,
 	peer *RemotePeer) (lnutil.InvoiceReplyMsg, error) {
 	// so someone sent me details of their invoice, cool. If I requested that,
@@ -109,14 +105,6 @@ func (nd *LitNode) GetInvoiceInfo(msg lnutil.InvoiceMsg, peer *RemotePeer) (lnut
 	//testStr := []byte(reply.Id) // this should be the actual invoice preceeded by I
 	_, err = peer.Con.Write(replyStr)
 	return invoice, nil
-}
-
-func reverseStr(s string) string {
-	chars := []rune(s)
-	for i, j := 0, len(chars)-1; i < j; i, j = i+1, j-1 {
-		chars[i], chars[j] = chars[j], chars[i]
-	}
-	return string(chars)
 }
 
 func (nd *LitNode) SplitInvoiceId(invoice string) (string, string, error) {

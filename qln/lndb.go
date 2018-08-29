@@ -12,6 +12,7 @@ import (
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/elkrem"
+	"github.com/mit-dci/lit/invoice"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/watchtower"
 	"github.com/mit-dci/lit/wire"
@@ -95,6 +96,8 @@ type LitNode struct {
 
 	// discreet log contract manager
 	DlcManager *dlc.DlcManager
+
+	InvoiceManager *invoice.InvoiceManager
 
 	// BaseWallet is the underlying wallet which keeps track of utxos, secrets,
 	// and network i/o
