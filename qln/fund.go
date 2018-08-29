@@ -165,7 +165,6 @@ func (nd *LitNode) FundChannel(
 
 	nd.InProg.ChanIdx = cIdx
 	nd.InProg.PeerIdx = peerIdx
-	log.Printf("AHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH")
 	nd.InProg.Amt = ccap
 	nd.InProg.InitSend = initSend
 	nd.InProg.Data = data

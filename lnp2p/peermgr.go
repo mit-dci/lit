@@ -48,7 +48,7 @@ func NewPeerManager(rootkey *hdkeychain.ExtendedKey, pdb lnio.LitPeerStorage, bu
 		idkey:          k,
 		peerdb:         pdb,
 		ebus:           bus,
-		peers:          []lnio.LnAddr{},
+		peers:          make([]lnio.LnAddr, 1),
 		peerMap:        map[lnio.LnAddr]*Peer{},
 		listeningPorts: map[string]*listeningthread{},
 		mtx:            &sync.Mutex{},
@@ -87,7 +87,7 @@ func (pm *PeerManager) GetPeerIdx(peer *Peer) int32 {
 			return int32(i)
 		}
 	}
-	return -1
+	return 0
 }
 
 // GetPeer returns the peer with the given lnaddr.
@@ -101,7 +101,7 @@ func (pm *PeerManager) GetPeer(lnaddr lnio.LnAddr) *Peer {
 
 // GetPeerByIdx is a compatibility function for getting a peer by its "peer id".
 func (pm *PeerManager) GetPeerByIdx(id int32) *Peer {
-	if id < 0 || id >= int32(len(pm.peers)) {
+	if id <= 0 || id > int32(len(pm.peers)) {
 		return nil
 	}
 	return pm.peerMap[pm.peers[id]]
