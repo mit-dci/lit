@@ -71,7 +71,7 @@ func InvoiceReplyMsgFromBytes(in []byte) (lnutil.InvoiceReplyMsg, error) {
 	}
 	// now we have the coutner at which to slice
 	constructedMessage := lnutil.InvoiceReplyMsg{
-		PeerIdx:  uint32(60000),
+		PeerIdx:  uint32(2),
 		Id:       string(invoiceId),
 		CoinType: string(in[0 : i-1]),
 		Amount:   uint64(amount), // convery slice to uint64

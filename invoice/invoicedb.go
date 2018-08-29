@@ -203,7 +203,7 @@ func (mgr *InvoiceManager) LoadSentInvoiceReq(peerIdx uint32, invoiceId string) 
 					return err
 				}
 				fmt.Println("BINGO")
-				fmt.Println("CATCH HIST", msg.PeerIdx == peerIdx)
+				fmt.Println("CATCH HIST", msg.PeerIdx == peerIdx, msg.PeerIdx, peerIdx)
 			}
 			return nil
 		})
