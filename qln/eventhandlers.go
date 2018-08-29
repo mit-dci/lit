@@ -14,10 +14,13 @@ func makeTmpNewPeerHandler(nd *LitNode) func(eventbus.Event) eventbus.EventHandl
 
 		peerIdx := uint32(nd.PeerMan.GetPeerIdx(ee.Peer))
 
+		log.Printf("creating new fake RemotePeer %d\n", peerIdx)
+
 		rpeer := &RemotePeer{
 			Idx:      peerIdx,
 			Con:      ee.Conn,
 			Nickname: ee.Peer.GetNickname(),
+			QCs:      make(map[uint32]*Qchan),
 		}
 
 		nd.PeerMapMtx.Lock()
@@ -28,6 +31,9 @@ func makeTmpNewPeerHandler(nd *LitNode) func(eventbus.Event) eventbus.EventHandl
 
 		nd.RemoteMtx.Unlock()
 		nd.PeerMapMtx.Unlock()
+
+		// populate things
+		nd.PopulateQchanMap(rpeer)
 
 		// make a local map of outpoints to channel indexes
 		// iterate through all this peer's channels to extract outpoints
@@ -48,6 +54,8 @@ func makeTmpMsgHandler(nd *LitNode) func(eventbus.Event) eventbus.EventHandleRes
 	 * Bless me father for I have sinned...
 	 */
 
+	inited := make(map[*RemotePeer]struct{})
+
 	return func(e eventbus.Event) eventbus.EventHandleResult {
 		ev := e.(lnp2p.NetMessageRecvEvent)
 
@@ -58,11 +66,17 @@ func makeTmpMsgHandler(nd *LitNode) func(eventbus.Event) eventbus.EventHandleRes
 
 		var err error
 
-		// init the qchan map thingy, this is quite inefficient
-		err = nd.PopulateQchanMap(peer)
-		if err != nil {
-			log.Printf("error initing peer: %s", err.Error())
-			return eventbus.EHANDLE_OK
+		if _, ok := inited[peer]; !ok {
+
+			// init the qchan map thingy, this is quite inefficient
+			err = nd.PopulateQchanMap(peer)
+			if err != nil {
+				log.Printf("error initing peer: %s", err.Error())
+				return eventbus.EHANDLE_OK
+			}
+
+			inited[peer] = struct{}{} // :thinking:
+
 		}
 
 		// TODO Remove this.  Also it's quite inefficient the way it's written at the moment.
