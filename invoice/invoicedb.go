@@ -4,7 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"log"
+	//"log"
+	"strconv"
 
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/lnutil"
@@ -58,14 +59,12 @@ func (mgr *InvoiceManager) InitDB(dbPath string) error {
 	return nil
 }
 
-
 func (mgr *InvoiceManager) SaveGeneratedInvoice(invoice *lnutil.InvoiceReplyMsg) error {
 	err := mgr.InvoiceDB.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(BKTGeneratedInvoices)
 
 		var writeBuffer bytes.Buffer
 		binary.Write(&writeBuffer, binary.BigEndian, invoice.Id)
-		log.Println("STORING INVOICE", invoice)
 		err := b.Put([]byte(invoice.Id), invoice.Bytes())
 		// index by invoice ID
 
@@ -90,6 +89,50 @@ func (mgr *InvoiceManager) LoadGeneratedInvoice(invoiceId string) (lnutil.Invoic
 		if v == nil {
 			return fmt.Errorf("InvoiceId %d does not exist", invoiceId)
 		}
+		msg, err = InvoiceReplyMsgFromBytes(v)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return msg, err
+	}
+	return msg, nil
+}
+
+func (mgr *InvoiceManager) SaveSentInvoicesOut(invoice *lnutil.InvoiceMsg) error {
+	// log invoices which we send to peers indexed by most recent added first
+	err := mgr.InvoiceDB.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket(BKTSentInvoicesOut)
+
+		var writeBuffer bytes.Buffer
+		binary.Write(&writeBuffer, binary.BigEndian, invoice.PeerIdx)
+		temp := strconv.Itoa(int(invoice.PeerIdx))
+		err := b.Put([]byte(temp), invoice.Bytes())
+		// index by invoice ID
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// LoadOracle loads an oracle from the database by index.
+func (mgr *InvoiceManager) LoadSentInvoicesOut(peerIdx string) (lnutil.InvoiceMsg, error) {
+	// retrieve the peerId attached to the given peerIdx. Hopefully should be one
+	var msg lnutil.InvoiceMsg
+	var err error
+	err = mgr.InvoiceDB.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(BKTSentInvoicesOut)
+		v := b.Get([]byte(peerIdx))
+		if v == nil {
+			return fmt.Errorf("peerIdx %d does not exist", peerIdx)
+		}
 		msg, err = InvoiceMsgFromBytes(v)
 		if err != nil {
 			return err
@@ -99,6 +142,78 @@ func (mgr *InvoiceManager) LoadGeneratedInvoice(invoiceId string) (lnutil.Invoic
 	if err != nil {
 		return msg, err
 	}
-	log.Println("PRITNED THIS OUT", msg)
+	// convert string to uint32
+	temp, err := strconv.Atoi(peerIdx)
+	if err != nil {
+		return msg, err
+	}
+	msg.PeerIdx = uint32(temp)
+	return msg, nil
+}
+
+// BKTSentInvoiceReq
+// Most stuff below this is just a repetition of what we've seen before, have to repeat.
+// is there a better way to do it?
+func (mgr *InvoiceManager) SaveSentInvoiceReq(invoice *lnutil.InvoiceReplyMsg) error {
+	// we sent someone an invoice request
+	err := mgr.InvoiceDB.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket(BKTSentInvoiceReq)
+
+		var writeBuffer bytes.Buffer
+		binary.Write(&writeBuffer, binary.BigEndian, invoice.Id)
+		err := b.Put([]byte(invoice.Id), invoice.Bytes())
+		// index by invoice ID
+
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Need to ask sent invoices indexed by peerId since there may be multiple ivnoiceIds
+// that we ask from different peers
+// but key, value pairs, so need to go through multiple ones
+func (mgr *InvoiceManager) LoadSentInvoiceReq(peerIdx uint32, invoiceId string) (lnutil.InvoiceReplyMsg, error) {
+	// do we need both peeridx and invoiceId here? idk
+	var msg lnutil.InvoiceReplyMsg
+	var err error
+	err = mgr.InvoiceDB.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(BKTGeneratedInvoices)
+
+		v := b.Get([]byte(invoiceId))
+		msg, err = InvoiceReplyMsgFromBytes(v)
+		if err != nil {
+			return err
+		}
+		// 	PeerIdx  uint32
+		// 	Id       string
+		// 	CoinType string
+		// 	Amount   uint64
+		b.ForEach(func(k, v []byte) error {
+			fmt.Printf("key=%s, value=%s\n", k, v)
+			if k[0] == invoiceId[0] {
+				fmt.Println("INVOICE ID", k[0])
+				msg, err = InvoiceReplyMsgFromBytes(v)
+				if err != nil {
+					return err
+				}
+				fmt.Println("BINGO")
+				fmt.Println("CATCH HIST", msg.PeerIdx == peerIdx)
+			}
+			return nil
+		})
+		if v == nil {
+			return fmt.Errorf("InvoiceId %d does not exist", invoiceId)
+		}
+		return nil
+	})
+	if err != nil {
+		return msg, err
+	}
 	return msg, nil
 }

@@ -72,7 +72,8 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 	if err != nil {
 		return nil, err
 	}
-	log.Println("CREATED NEW INVOICE DB")
+
+	// test stuff for invoices, delete this once done
 	var test lnutil.InvoiceReplyMsg
 	test.PeerIdx = uint32(60000)
 	test.Id = "2"
@@ -87,7 +88,38 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 	if err != nil {
 		return nd, fmt.Errorf("ERROR WHILE TRYING OT READ INVOICE")
 	}
-	log.Println("MSG IS", x)
+	log.Println("RETRIEVING MESSAGE FROM SaveGeneratedInvoice", x.Id, x.CoinType, x.Amount, x.PeerIdx)
+
+	// 	PeerIdx uint32
+	// 	Id      string
+	var test2 lnutil.InvoiceMsg
+	test2.PeerIdx = uint32(2)
+	test2.Id = "q"
+	err = nd.InvoiceManager.SaveSentInvoicesOut(&test2)
+	if err != nil {
+		log.Println("ERROR WHILE TRYING TO LOAD INVOICEMSG")
+		return nd, fmt.Errorf("ERROR WHILE TRYING TO LOAD INVOICEMSG")
+	}
+	x1, err := nd.InvoiceManager.LoadSentInvoicesOut("2")
+	// search for all invoices belonging to this peer
+	// might have to execute multiple times?
+	if err != nil {
+		log.Println("ERROR WHILE TRYING TO LAOD SENT INVOICES")
+		return nd, fmt.Errorf("ERROR WHILE TRYING TO LAOD SENT INVOICES")
+	}
+	log.Println("RETRIEVING MESSAGE FROM SentInvoicesOut", x1.PeerIdx, x1.Id)
+
+	err = nd.InvoiceManager.SaveSentInvoiceReq(&test)
+	if err != nil {
+		log.Println("FAILED WHILE STORING AN INVOCIE OUT TO ANOTHER PEER")
+		return nd, fmt.Errorf("FAILED WHILE STORING AN INVOCIE OUT TO ANOTHER PEER")
+	}
+	x2, err := nd.InvoiceManager.LoadSentInvoiceReq(2, "2") //pass peerIdx, invoiceId
+	if err != nil {
+		log.Println("FAILED WHILE STORING AN INVOCIE OUT TO ANOTHER PEER")
+		return nd, fmt.Errorf("FAILED WHILE STORING AN INVOCIE OUT TO ANOTHER PEER")
+	}
+	log.Println("X2=", x2)
 	// make maps and channels
 	nd.UserMessageBox = make(chan string, 32)
 

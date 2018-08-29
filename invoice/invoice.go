@@ -42,7 +42,14 @@ import (
 // so import everything from lnutil (and don't import this there)
 // the Bytes() function is defined in lnutil, but the reverse isnt, which
 // means that we have to do that here
-func InvoiceMsgFromBytes(in []byte) (lnutil.InvoiceReplyMsg, error) {
+
+func InvoiceMsgFromBytes(in []byte) (lnutil.InvoiceMsg, error) {
+	var dummy lnutil.InvoiceMsg
+	log.Println("calling InvoiceMsgFromBytes", string(in))
+	dummy.Id = string(in)
+	return dummy, nil
+}
+func InvoiceReplyMsgFromBytes(in []byte) (lnutil.InvoiceReplyMsg, error) {
 	// the received merssage is something similar to [50 98 99 114 116 192 154 12]
 	// for an invoice 0, 2, bcrt, 100000
 	// But when reading throguh the byte slice, we do not know whether this is the
@@ -62,7 +69,6 @@ func InvoiceMsgFromBytes(in []byte) (lnutil.InvoiceReplyMsg, error) {
 	if err != nil {
 		return dummy, fmt.Errorf("Unable to convert amount to uint64")
 	}
-	log.Println(amount)
 	// now we have the coutner at which to slice
 	constructedMessage := lnutil.InvoiceReplyMsg{
 		PeerIdx:  uint32(60000),
@@ -70,6 +76,5 @@ func InvoiceMsgFromBytes(in []byte) (lnutil.InvoiceReplyMsg, error) {
 		CoinType: string(in[0 : i-1]),
 		Amount:   uint64(amount), // convery slice to uint64
 	}
-	log.Println("CONSTR", constructedMessage)
 	return constructedMessage, nil
 }
