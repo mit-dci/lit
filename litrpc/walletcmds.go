@@ -504,7 +504,6 @@ type PayInvoiceReply struct {
 }
 
 func (r *LitRPC) GenInvoice(args *GenInvoiceArgs, reply *GenInvoiceReply) error {
-	log.Println("CALLIGN GEN INVOICE, COOL!")
 	idPriv := r.Node.IdKey()
 	var idPub [33]byte
 	copy(idPub[:], idPriv.PubKey().SerializeCompressed())
@@ -533,7 +532,8 @@ func (r *LitRPC) GenInvoice(args *GenInvoiceArgs, reply *GenInvoiceReply) error 
 	if !validCoin {
 		return fmt.Errorf("Coin not yet supported. Add support!")
 	}
-	log.Printf("Generated invoice: %s_%s", adr, invoiceId)
+	log.Printf("Generated invoice: %s1%s", adr, invoiceId)
+	// 1 is the identifier
 	// now we have the invoiceId ready, store it in GenInvoiceReq
 	var invoiceStorage lnutil.GenInvoiceParams
 	invoiceStorage.CoinType = args.CoinType
@@ -555,7 +555,7 @@ func (r *LitRPC) PayInvoice(args *PayInvoiceArgs, reply *PayInvoiceReply) error 
 		return err
 	}
 	log.Printf("Parsed invoice with destination address: %s and invoice id: %s", destAdr, invoiceId)
-
+	// we must look at the tracker here, but this works for now..
 	invoiceRequester := destAdr + "@:2448" // for testing
 
 	rpx, err := r.Node.InvoiceDial(invoiceRequester)

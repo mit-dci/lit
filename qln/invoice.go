@@ -7,7 +7,7 @@ import (
 	"net"
 	"regexp"
 	//"strconv"
-	"strings"
+	//"strings"
 
 	"github.com/mit-dci/lit/bech32"
 	"github.com/mit-dci/lit/consts"
@@ -17,10 +17,6 @@ import (
 	"github.com/mit-dci/lit/portxo"
 )
 
-func (nd *LitNode) ReturnQchan() *Qchan {
-	var q *Qchan
-	return q
-}
 func IsBech32String(in string) bool {
 	const charset = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 	var IsBech32 = regexp.MustCompile(`^[qpzry9x8gf2tvdw0s3jn54khce6mua7l]+$`).MatchString
@@ -115,6 +111,14 @@ func (nd *LitNode) GetInvoiceInfo(msg lnutil.InvoiceMsg, peer *RemotePeer) (lnut
 	return invoice, nil
 }
 
+func reverseStr(s string) string {
+	chars := []rune(s)
+	for i, j := 0, len(chars)-1; i < j; i, j = i+1, j-1 {
+		chars[i], chars[j] = chars[j], chars[i]
+	}
+	return string(chars)
+}
+
 func (nd *LitNode) SplitInvoiceId(invoice string) (string, string, error) {
 	// Invoice format:
 	// An invoice majorly consists of three parts - the address you want to pay
@@ -146,28 +150,34 @@ func (nd *LitNode) SplitInvoiceId(invoice string) (string, string, error) {
 	// Next step after verifying ids: 1+4+9=14
 	// (id + curr ticker + amount)
 	// 9 = (int)(math.Log10(float64(consts.MaxChanCapacity))+1)
-	maxInvoiceLength := 43 // 1 extra for the separator
+	maxInvoiceLength := 43 // 1 extra for the separator + 1 for the invoice
 	// Min invoice Length: 21+1
 	// Next step after verifying ids: 1+2+5=8
 	// (id + currency ticker + min sat amount)
 	// 5 = (int)(math.Log10(float64(consts.MinSendAmt))+1)
-	minInvoicelength := 23 // 1 extra for the separator
+	minInvoicelength := 23 // 1 extra for the separator + 1 for the invoice
 
-	log.Println(maxInvoiceLength, minInvoicelength)
 	invoiceLength := len(invoice)
 	if invoiceLength > maxInvoiceLength || invoiceLength < minInvoicelength {
 		// having 1 as invoice length in order to check whether this works
 		// error printed by appropriate handlers, no need to print it here.
 		return "", "", fmt.Errorf("Invalid invoice length")
 	}
-	separatorPosition := strings.Index(invoice, "_")
-	destAdr := invoice[0:separatorPosition]
+
+	if invoice[(invoiceLength-2):invoiceLength-1] != "1"  {
+		// check whether the invoice has a valid invoice identifier
+		log.Println("Contains spam data. Exiting")
+		return "", "", fmt.Errorf("Invalid Invoice, doesn't contain identifier. Exiting")
+	}
+
+	invoiceId := invoice[invoiceLength-1]
+	destAdr := invoice[0:len(invoice)-4] // 111 + invoiceId
 	// check if destAdr is valid here
 	if !IsBech32String(destAdr[3:]) { // cut off the starting ln1
 		log.Println("Payee address invalid. Quitting!")
 	}
-	rightSeparator := invoice[separatorPosition+1 : invoiceLength]
-	return destAdr, rightSeparator, nil
+
+	return destAdr, string(invoiceId), nil
 }
 
 type CoinBalReply struct {
