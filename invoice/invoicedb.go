@@ -215,3 +215,121 @@ func (mgr *InvoiceManager) LoadSentInvoiceReq(peerIdx uint32, invoiceId string) 
 	}
 	return finmsg, nil
 }
+
+func (mgr *InvoiceManager) SavePendingInvoice(invoice *lnutil.InvoiceReplyMsg) error {
+	err := mgr.InvoiceDB.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket(BKTPendingInvoices)
+
+		var writeBuffer bytes.Buffer
+		binary.Write(&writeBuffer, binary.BigEndian, invoice.Id)
+		err := b.Put([]byte(invoice.Id), invoice.Bytes())
+		// index by invoice ID
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (mgr *InvoiceManager) LoadPendingInvoiceReq(peerIdx uint32,
+	invoiceId string) (lnutil.InvoiceReplyMsg, error) {
+	// do we need both peeridx and invoiceId here? idk
+	var err error
+	var finmsg lnutil.InvoiceReplyMsg
+	err = mgr.InvoiceDB.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(BKTPendingInvoices)
+
+		v := b.Get([]byte(invoiceId))
+		// 	PeerIdx  uint32
+		// 	Id       string
+		// 	CoinType string
+		// 	Amount   uint64
+		b.ForEach(func(k, v []byte) error {
+			fmt.Printf("key=%s, value=%s\n", k, v)
+			if k[0] == invoiceId[0] {
+				msg, err := InvoiceReplyMsgFromBytes(v)
+				if err != nil {
+					return err
+				}
+				log.Println("MSG", msg, peerIdx)
+				if msg.PeerIdx != peerIdx {
+					log.Println("NOPE, ANOTHER GUY'S INVOCIE")
+				} else {
+					finmsg = msg
+				}
+			}
+			return nil
+		})
+		if v == nil {
+			return fmt.Errorf("InvoiceId %d does not exist", invoiceId)
+		}
+		return nil
+	})
+	if err != nil {
+		return finmsg, err
+	}
+	return finmsg, nil
+}
+
+func (mgr *InvoiceManager) SavePaidInvoice(invoice *lnutil.InvoiceReplyMsg) error {
+	err := mgr.InvoiceDB.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket(BKTPaidInvoices)
+
+		var writeBuffer bytes.Buffer
+		binary.Write(&writeBuffer, binary.BigEndian, invoice.Id)
+		err := b.Put([]byte(invoice.Id), invoice.Bytes())
+		// index by invoice ID
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (mgr *InvoiceManager) LoadPaidInvoiceReq(peerIdx uint32,
+	invoiceId string) (lnutil.InvoiceReplyMsg, error) {
+	// do we need both peeridx and invoiceId here? idk
+	var err error
+	var finmsg lnutil.InvoiceReplyMsg
+	err = mgr.InvoiceDB.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(BKTPaidInvoices)
+
+		v := b.Get([]byte(invoiceId))
+		// 	PeerIdx  uint32
+		// 	Id       string
+		// 	CoinType string
+		// 	Amount   uint64
+		b.ForEach(func(k, v []byte) error {
+			fmt.Printf("key=%s, value=%s\n", k, v)
+			if k[0] == invoiceId[0] {
+				msg, err := InvoiceReplyMsgFromBytes(v)
+				if err != nil {
+					return err
+				}
+				log.Println("MSG", msg, peerIdx)
+				if msg.PeerIdx != peerIdx {
+					log.Println("NOPE, ANOTHER GUY'S INVOCIE")
+				} else {
+					finmsg = msg
+				}
+			}
+			return nil
+		})
+		if v == nil {
+			return fmt.Errorf("InvoiceId %d does not exist", invoiceId)
+		}
+		return nil
+	})
+	if err != nil {
+		return finmsg, err
+	}
+	return finmsg, nil
+}
