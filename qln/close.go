@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
@@ -63,6 +64,7 @@ func (nd *LitNode) CoopClose(q *Qchan) error {
 
 	// save channel state as closed.  We know the txid... even though that
 	// txid may not actually happen.
+	q.LastUpdate = uint64(time.Now().UnixNano() / 1000)
 	q.CloseData.Closed = true
 	q.CloseData.CloseTxid = tx.TxHash()
 	err = nd.SaveQchanUtxoData(q)
@@ -184,6 +186,7 @@ func (nd *LitNode) CloseReqHandler(msg lnutil.CloseReqMsg) {
 	log.Printf(lnutil.TxToString(tx))
 
 	// save channel state to db as closed.
+	q.LastUpdate = uint64(time.Now().UnixNano() / 1000)
 	q.CloseData.Closed = true
 	q.CloseData.CloseTxid = tx.TxHash()
 	err = nd.SaveQchanUtxoData(q)

@@ -1,32 +1,50 @@
-# Lit integration tests
+# Lit Integration Tests
 
-This directory contains lit integration tests, which start lit and bitcoind/litecoind nodes and test functionality.
+Lit's integration test suite was quite outdated, so as of 2018-08-03 we started
+rewriting them.  Now they're waaay cooler and easier to write.
 
-### Directory Structure
+All of the tests are in Python and built on the the `testlib` library, which
+manages creating instances of lit and and bitcoind and getting them to talk to
+each other without worrying about the details.
 
-- `lit_test_framework.py` is the test framework. Individual test cases should import this and subclass the LitTest class
-- `litnode.py` contains a class representing a lit node. This can be used to start/stop the node and communicate with it over the websocket RPC.
-- `bcnode.py` contains a class representing a bitcoind node or litecoin node. These can be used to start/stop the bitcoin/litecoin nodes and communicate with them over RPC.
-- `test_*.py` individual tests cases.
+The actual tests are in each of the `itest_foo.py` files.
 
-### Dependencies
+## Deps
 
-- websocket-client (`pip install websocket-client`)
-- requests (`pip install requests`)
-- bitcoind and litecoind on the path
+You'll need the `requests` library, and `bitcoind` on your PATH, but that's
+about it.
 
-### Running tests
-
-Run tests with `./test_[testname].py`
-
-Logs from tests can be combined into a single log file using the `combine_logs` tool. To run the tool:
-
-```
-combine_logs.py -c <test directory> | less -r
+```sh
+pip3 install requests
 ```
 
-further help is available by running `combine_logs.py -h`
+## Running the tests
 
-### Adding tests
+There's a separate shell script that can manage executing all the tests.  It
+also manages setting up data directories for tests, which are stored in `_data`.
 
-New tests should be named `tests_[description].py`. They should import the `LitTest` class from `lit_test_framework.py`. The test should subclass the `LitTest` class and override the `run_test()` method to include its own test logic. See `test_basic.py` for an example.
+```sh
+./runtests.sh <tests...>
+```
+
+You can specify specific tests or pick which ones you want to run out of the
+list in `tests.txt`.  It also supports Bash's job control, so if you C-c out of
+the script it'll properly handle cleaning up the current test and skipping over
+the remaining ones.
+
+## Envvars
+
+* `LIT_OUTPUT_SHOW` - Tell the testlib to show output from all Lit(s)
+
+* `LIT_ID_SHOW` - Used with the above, *only* show output from this Lit
+
+* `LIT_ITEST_ROOT` - Data dir path, only works when running tests directly.
+
+## Notes
+
+Some of the tests have a `_reverse` suffix.  This means that they do mostly the
+same thing as the test without the `_reverse` suffix, but the difference between
+them is the opposite node closes the channel between the two tests.  For these
+the actual test code is probably in `test_combinators.py` and that's used as a
+library in the main test script.  You can see the settings in the main script as
+as pass slightly different arguments to the function that runs it.

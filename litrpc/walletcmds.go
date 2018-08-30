@@ -2,13 +2,12 @@ package litrpc
 
 import (
 	"fmt"
-	"log"
-
 	"github.com/mit-dci/lit/bech32"
 	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/wire"
+	"log"
 )
 
 type TxidsReply struct {
@@ -334,7 +333,10 @@ type AddressArgs struct {
 	NumToMake uint32
 	CoinType  uint32
 }
+
+// TODO Make this contain an array of structures not a structure of arrays.
 type AddressReply struct {
+	CoinTypes       []uint32
 	WitAddresses    []string
 	LegacyAddresses []string
 }
@@ -384,12 +386,16 @@ func (r *LitRPC) Address(args *AddressArgs, reply *AddressReply) error {
 		}
 	}
 
+	reply.CoinTypes = make([]uint32, len(allAdr))
 	reply.WitAddresses = make([]string, len(allAdr))
 	reply.LegacyAddresses = make([]string, len(allAdr))
 
 	for i, a := range allAdr {
-		// convert 20 byte array to old address
 
+		// Store the cointype
+		reply.CoinTypes[i] = ctypesPerAdr[i]
+
+		// convert 20 byte array to old address
 		param := r.Node.SubWallet[ctypesPerAdr[i]].Params()
 
 		oldadr := lnutil.OldAddressFromPKH(a, param.PubKeyHashAddrID)
@@ -403,6 +409,48 @@ func (r *LitRPC) Address(args *AddressArgs, reply *AddressReply) error {
 		}
 		reply.WitAddresses[i] = bech32adr
 	}
+
+	return nil
+}
+
+// More human-readable replies
+func (r *LitRPC) GetAddresses(args *NoArgs, reply *AddressReply) error {
+
+	// return index
+	ri := 0
+
+	cts := make([]uint32, 0)
+	was := make([]string, 0)
+	las := make([]string, 0)
+
+	for cointype, wal := range r.Node.SubWallet {
+
+		walAdr, err := wal.AdrDump()
+		if err != nil {
+			panic("this should never happen, I don't think")
+		}
+
+		for _, pubkey := range walAdr {
+
+			param := r.Node.SubWallet[cointype].Params()
+			cts = append(cts, cointype)
+
+			b32, err := bech32.SegWitV0Encode(param.Bech32Prefix, pubkey[:])
+			if err != nil {
+				panic("error encoding bech32 address")
+			}
+
+			was = append(was, b32)
+			las = append(las, lnutil.OldAddressFromPKH(pubkey, param.PubKeyHashAddrID))
+
+			ri++
+		}
+
+	}
+
+	reply.CoinTypes = cts
+	reply.WitAddresses = was
+	reply.LegacyAddresses = las
 
 	return nil
 }

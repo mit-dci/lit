@@ -24,6 +24,7 @@ type ChannelInfo struct {
 	Data          [32]byte
 	Pkh           [20]byte
 	HTLCs         []HTLCInfo
+	LastUpdate    uint64
 }
 type ChannelListReply struct {
 	Channels []ChannelInfo
@@ -75,7 +76,6 @@ func (r *LitRPC) ChannelList(args ChanArgs, reply *ChannelListReply) error {
 		reply.Channels[i].CIdx = q.KeyGen.Step[4] & 0x7fffffff
 		reply.Channels[i].Data = q.State.Data
 		reply.Channels[i].Pkh = q.WatchRefundAdr
-
 		for _, h := range q.State.HTLCs {
 			hi := HTLCInfo{
 				h.Idx,
@@ -126,6 +126,7 @@ func (r *LitRPC) ChannelList(args ChanArgs, reply *ChannelListReply) error {
 			}
 			reply.Channels[i].HTLCs = append(reply.Channels[i].HTLCs, hi)
 		}
+		reply.Channels[i].LastUpdate = q.LastUpdate
 	}
 	return nil
 }

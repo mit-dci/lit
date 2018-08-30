@@ -45,6 +45,9 @@ type Qchan struct {
 	ClearToSend chan bool // send a true here when you get a rev
 	ChanMtx     sync.Mutex
 	// exists only in ram, doesn't touch disk
+
+	LastUpdate uint64 // unix timestamp of last update (milliseconds)
+
 }
 
 // 4 + 1 + 8 + 32 + 4 + 33 + 33 + 1 + 5 + 32 + 64 = 217 bytes

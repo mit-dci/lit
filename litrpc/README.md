@@ -299,6 +299,7 @@ Args:
 Returns:
 
 * `Status (string)`
+* `PeerIdx (uint32)`
 
 ### AssignNickname
 
@@ -462,6 +463,19 @@ Args:
 
 Returns:
 
+* `CoinTypes (uint32 list)`
+* `WitAddresses (string list)`
+* `LegacyAddresses (string list)`
+
+If you set NumToMake to 0, it'll return all the addresses of the type.
+
+### GetAddresses
+
+Args: *none*
+
+Returns:
+
+* `CoinTypes (uint32 list)`
 * `WitAddresses (string list)`
 * `LegacyAddresses (string list)`
 
@@ -482,6 +496,7 @@ type ChannelInfo struct {
 	PeerID        string
 	Data          [32]byte
 	Pkh           [20]byte
+	LastUpdate    uint64
 }
 ```
 
