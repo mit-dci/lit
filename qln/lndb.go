@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
-	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/elkrem"
+	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/watchtower"
 	"github.com/mit-dci/lit/wire"
@@ -106,8 +106,12 @@ type LitNode struct {
 	DefaultCoin uint32
 
 	ConnectedCoinTypes map[uint32]bool
-	RemoteCons         map[uint32]*RemotePeer
-	RemoteMtx          sync.Mutex
+
+	RemoteCons map[uint32]*RemotePeer
+	RemoteMtx  sync.Mutex
+
+	// WatchCon is currently just for the watchtower
+	//WatchCon *lndc.LNDConn // merge these later // FIXME Where is this?
 
 	// OmniChan is the channel for the OmniHandler
 	OmniIn  chan lnutil.LitMsg
