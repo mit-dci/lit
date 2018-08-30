@@ -3,13 +3,14 @@ package qln
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/mit-dci/lit/btcutil/btcec"
-	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
+	"github.com/mit-dci/lit/wire"
 )
 
 /*
@@ -112,7 +113,8 @@ func (nd *LitNode) FundChannel(
 	nd.InProg.mtx.Lock()
 	//	defer nd.InProg.mtx.Lock()
 
-	_, ok = nd.ConnectedCoinTypes[cointype] ; if !ok {
+	_, ok = nd.ConnectedCoinTypes[cointype]
+	if !ok {
 		nd.InProg.mtx.Unlock()
 		return 0, fmt.Errorf("No daemon of type %d connected. Can't fund, only receive", cointype)
 	}
@@ -311,6 +313,9 @@ func (nd *LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 	// derive elkrem sender root from HD keychain
 	elkRoot, _ := nd.GetElkremRoot(q.KeyGen)
 	q.ElkSnd = elkrem.NewElkremSender(elkRoot)
+
+	// set the time
+	q.LastUpdate = uint64(time.Now().UnixNano() / 1000)
 
 	// get txo for channel
 	txo, err := lnutil.FundTxOut(q.MyPub, q.TheirPub, nd.InProg.Amt)

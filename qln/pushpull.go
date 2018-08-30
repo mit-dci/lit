@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
@@ -213,6 +214,7 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 
 	err = nd.SendDeltaSig(qc)
 	if err != nil {
+		qc.LastUpdate = uint64(time.Now().UnixNano() / 1000)
 		qc.ChanMtx.Unlock()
 		// don't clear; something is wrong with the network
 		return err
@@ -416,6 +418,7 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 	}
 
 	// update to the next state to verify
+	qc.LastUpdate = uint64(time.Now().UnixNano() / 1000)
 	qc.State.StateIdx++
 	// regardless of collision, raise amt
 	qc.State.MyAmt += int64(incomingDelta)
@@ -612,6 +615,7 @@ func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
 	// state is already incremented from DeltaSigHandler, increment again for n+2
 	// (note that we've moved n here.)
 	q.State.StateIdx++
+	q.LastUpdate = uint64(time.Now().UnixNano() / 1000)
 
 	// verify the sig
 
@@ -904,6 +908,7 @@ func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {
 	}
 	prevAmt := qc.State.MyAmt - int64(qc.State.Delta)
 	qc.State.Delta = 0
+	qc.LastUpdate = uint64(time.Now().UnixNano() / 1000)
 
 	if !bytes.Equal(msg.N2HTLCBase[:], qc.State.N2HTLCBase[:]) {
 		qc.State.NextHTLCBase = qc.State.N2HTLCBase

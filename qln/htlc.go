@@ -900,7 +900,8 @@ func GetHTLCOut(q *Qchan, h HTLC, tx *wire.MsgTx, mine bool) (*wire.TxOut, uint3
 			return out, uint32(i), nil
 		}
 	}
-	return nil, 0, nil
+
+	return nil, 0, fmt.Errorf("Could not find HTLC output with desired PkScript")
 }
 
 func (q *Qchan) GetCloseTxs() (*wire.MsgTx, []*wire.MsgTx, bool, error) {
@@ -950,6 +951,9 @@ func (nd *LitNode) ClaimHTLCOnChain(q *Qchan, h HTLC) (*wire.MsgTx, error) {
 	stateTxID := stateTx.TxHash()
 
 	htlcTxo, i, err := GetHTLCOut(q, h, stateTx, mine)
+	if err != nil {
+		return nil, err
+	}
 
 	curElk, err := q.ElkSnd.AtIndex(q.State.StateIdx)
 	if err != nil {

@@ -5,10 +5,10 @@ import (
 	"log"
 	"os"
 
-	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
-	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/btcutil/bloom"
+	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/wire"
 )
 
 const (
@@ -16,7 +16,7 @@ const (
 	keyFileName    = "testseed.hex"
 	headerFileName = "headers.bin"
 
-	// version hardcoded for now, probably ok...?
+	// VERSION hardcoded for now, probably ok...?
 	// 70012 is for segnet... make this an init var?
 	VERSION = 70012
 )
@@ -35,7 +35,7 @@ func (s *SPVCon) GimmeFilter() (*bloom.Filter, error) {
 
 	// note there could be false positives since we're just looking
 	// for the 20 byte PKH without the opcodes.
-	for a160, _ := range s.TrackingAdrs { // add 20-byte pubkeyhash
+	for a160 := range s.TrackingAdrs { // add 20-byte pubkeyhash
 		//		log.Printf("adding address hash %x\n", a160)
 		f.Add(a160[:])
 	}
@@ -45,7 +45,7 @@ func (s *SPVCon) GimmeFilter() (*bloom.Filter, error) {
 
 	// actually... we should monitor addresses, not txids, right?
 	// or no...?
-	for wop, _ := range s.TrackingOPs {
+	for wop := range s.TrackingOPs {
 		// try just outpoints, not the txids as well
 		f.AddOutPoint(&wop)
 	}
@@ -158,6 +158,7 @@ func NewRootAndHeight(b chainhash.Hash, h int32) (hah HashAndHeight) {
 	return
 }
 
+// IngestMerkleBlock ...
 func (s *SPVCon) IngestMerkleBlock(m *wire.MsgMerkleBlock) {
 
 	txids, err := checkMBlock(m) // check self-consistency
@@ -186,7 +187,7 @@ func (s *SPVCon) IngestMerkleBlock(m *wire.MsgMerkleBlock) {
 	}
 
 	for _, txid := range txids {
-		err := s.OKTxid(txid, hah.height)
+		err = s.OKTxid(txid, hah.height)
 		if err != nil {
 			log.Printf("Txid store error: %s\n", err.Error())
 			return
@@ -276,6 +277,7 @@ func (s *SPVCon) IngestHeaders(m *wire.MsgHeaders) (bool, error) {
 	return true, nil
 }
 
+// AskForHeaders ...
 func (s *SPVCon) AskForHeaders() error {
 	ghdr := wire.NewMsgGetHeaders()
 	ghdr.ProtocolVersion = s.localVersion
@@ -327,7 +329,7 @@ func (s *SPVCon) AskForHeaders() error {
 	return nil
 }
 
-// AskForMerkBlocks requests blocks from current to last
+// AskForBlocks requests blocks from current to last
 // right now this asks for 1 block per getData message.
 // Maybe it's faster to ask for many in each message?
 func (s *SPVCon) AskForBlocks() error {
@@ -393,7 +395,7 @@ func (s *SPVCon) AskForBlocks() error {
 
 		bHash := hdr.BlockHash()
 		// create inventory we're asking for
-		iv1 := new(wire.InvVect)
+		var iv1 *wire.InvVect
 		// if hardmode, ask for legit blocks, none of this ralphy stuff
 		// I don't think you can have a queue for SPV.  You miss stuff.
 		// also ask if someone wants rawblocks, like the watchtower
