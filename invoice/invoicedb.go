@@ -108,6 +108,22 @@ func (mgr *InvoiceManager) SaveRepliedInvoice(invoice *lnutil.InvoiceMsg) error 
 	return nil
 }
 
+func (mgr *InvoiceManager) DoesKeyExist(bucketName []byte, invoiceId string) (bool, error) {
+	free := false
+	var err error
+	err = mgr.InvoiceDB.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(bucketName)
+		v := b.Get([]byte(invoiceId))
+		if v == nil {
+			free = true
+		} else {
+			log.Println(v)
+		}
+		return nil
+	})
+	return free, err
+}
+
 // LoadOracle loads an oracle from the database by index.
 func (mgr *InvoiceManager) LoadRepliedInvoice(peerIdx string) (lnutil.InvoiceMsg, error) {
 	// retrieve the peerId attached to the given peerIdx. Hopefully there should be one

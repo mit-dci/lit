@@ -534,15 +534,17 @@ func (r *LitRPC) GenInvoice(args *GenInvoiceArgs, reply *GenInvoiceReply) error 
 	}
 	log.Printf("Generated invoice: %s1%s", adr, invoiceId)
 	// 1 is the identifier
-	// now we have the invoiceId ready, store it in GenInvoiceReq
-	var invoiceStorage lnutil.GenInvoiceParams
+	// store this generated invoice in the db that we have
+	var invoiceStorage lnutil.InvoiceReplyMsg
 	invoiceStorage.CoinType = args.CoinType
 	invoiceStorage.Amount = args.Amount
-	if len(r.Node.GenInvoiceReq) == 0 {
-		r.Node.GenInvoiceReq = make(map[string]lnutil.GenInvoiceParams)
+	invoiceStorage.PeerIdx = uint32(60000)
+	invoiceStorage.Id = invoiceId
+
+	err = r.Node.InvoiceManager.SaveGeneratedInvoice(&invoiceStorage)
+	if err != nil {
+		return err
 	}
-	r.Node.GenInvoiceReq[invoiceId] = invoiceStorage
-	log.Println("INVOICE STORAGE", r.Node.GenInvoiceReq)
 	return nil
 
 }

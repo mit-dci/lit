@@ -12,6 +12,7 @@ import (
 	"github.com/mit-dci/lit/bech32"
 	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/crypto/fastsha256"
+	invoice "github.com/mit-dci/lit/invoice"
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
@@ -31,12 +32,19 @@ func (nd *LitNode) GenInvoiceId(cointype string, amount uint64) (string, error) 
 	// CoinType string
 	// Amount uint64
 	var chars = "123456789abcdefghijklmnopqrstuvwxyz"
-	_, exists := nd.GenInvoiceReq[chars[0:1]]
 	i := 0
-	for exists { // the invoice exists, so need a different invoiceId
-		i++
-		_, exists = nd.GenInvoiceReq[chars[i:i+1]]
+	free, err := nd.InvoiceManager.DoesKeyExist(invoice.BKTGeneratedInvoices, string(chars[i]))
+	if err != nil {
+		return "", err
 	}
+	for !free { // the invoice exists, so need a different invoiceId
+		i++
+		free, err = nd.InvoiceManager.DoesKeyExist(invoice.BKTGeneratedInvoices, string(chars[i]))
+		if err != nil {
+			return "", err
+		}
+	}
+	log.Println("GOT A FREE INVOICEID", chars[i:i+1])
 	return chars[i : i+1], nil
 }
 
