@@ -77,10 +77,8 @@ func (nd *LitNode) TCPListener(
 
 	// Don't announce on the tracker if we are communicating via SOCKS proxy
 	if nd.ProxyURL == "" {
-		err = Announce(idPriv, lisIpPort, adr, nd.TrackerURL)
-		if err != nil {
-			log.Printf("Announcement error %s", err.Error())
-		}
+		// this should happen asynchronously
+		go GoAnnounce(idPriv, lisIpPort, adr, nd.TrackerURL)
 	}
 
 	log.Printf("Listening on %s\n", listener.Addr().String())
@@ -128,6 +126,13 @@ func (nd *LitNode) TCPListener(
 	return adr, nil
 }
 
+func GoAnnounce(priv *btcec.PrivateKey, litport string, litadr string, trackerURL string) {
+	err := Announce(priv, litport, litadr, trackerURL)
+	if err != nil {
+		log.Printf("Announcement error %s", err.Error())
+	}
+}
+
 // ParseAdrString splits a string like
 // "ln1yrvw48uc3atg8e2lzs43mh74m39vl785g4ehem@myhost.co:8191 into a separate
 // pkh part and network part, adding the network part if needed
@@ -147,7 +152,7 @@ func splitAdrString(adr string) (string, string) {
 }
 
 // DialPeer makes an outgoing connection to another node.
-func (nd *LitNode) DialPeer(connectAdr string) error {
+func (nd *LitNode) DialPeer(connectAdr string) (uint32, error) {
 	var err error
 
 	// parse address and get pkh / host / port
@@ -157,7 +162,7 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 	if where == "" {
 		where, _, err = Lookup(who, nd.TrackerURL, nd.ProxyURL)
 		if err != nil {
-			return err
+			return 0, err
 		}
 	}
 
@@ -167,7 +172,7 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 	// Assign remote connection
 	newConn, err := lndc.Dial(idPriv, where, who, net.Dial)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	// if connect is successful, either query for already existing peer index, or
@@ -177,7 +182,7 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 	// we're connecting out, also specify the hostname&port
 	peerIdx, err := nd.GetPeerIdx(newConn.RemotePub(), newConn.RemoteAddr().String())
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	// also retrieve their nickname, if they have one
@@ -194,7 +199,7 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 	// each connection to a peer gets its own LNDCReader
 	go nd.LNDCReader(&p)
 
-	return nil
+	return peerIdx, nil
 }
 
 // OutMessager takes messages from the outbox and sends them to the ether. net.
