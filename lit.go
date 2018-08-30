@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/signal"
 	"time"
 
 	"github.com/mit-dci/lit/coinparam"
@@ -192,16 +191,6 @@ func main() {
 	if conf.AutoReconnect {
 		node.AutoReconnect(conf.AutoListenPort, conf.AutoReconnectInterval)
 	}
-
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	go func() {
-		for sig := range c {
-			log.Println("Writing invocies to db", sig)
-			// sig is a ^C, handle it
-			os.Exit(1)
-		}
-	}()
 
 	<-rpcl.OffButton
 	log.Printf("Got stop request\n")

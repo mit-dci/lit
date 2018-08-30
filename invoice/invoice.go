@@ -1,8 +1,6 @@
 package invoice
 
 import (
-	"bytes"
-	"encoding/binary"
 	"fmt"
 	"github.com/mit-dci/lit/lnutil"
 	"log"
@@ -54,27 +52,20 @@ func InvoiceReplyMsgFromBytes(in []byte) (lnutil.InvoiceReplyMsg, error) {
 	// for an invoice 0, 2, bcrt, 100000
 	// But when reading throguh the byte slice, we do not know whether this is the
 	// coinType or the amount. So..
-	invoiceId := in[0]
-	in = in[1:] // cut the invoice off
-	var i int
-	for i = len(in) - 1; i >= 0; i-- {
-		if in[i] > 60 { // rough limit for int byte chars
-			break
-		}
-	}
-	var dummy lnutil.InvoiceReplyMsg
-	amtSlice := in[i-1:]
-	buf := bytes.NewBuffer(amtSlice)
-	amount, err := binary.ReadVarint(buf)
-	if err != nil {
-		return dummy, fmt.Errorf("Unable to convert amount to uint64")
-	}
+	peerIdx := lnutil.BtU32((in[0:4]))
+	invoiceId := in[4]
+	in = in[4:] // cut the invoice and peeridx off
+	// cutoff the last 8 bytes for the amount
+	rsLength := len(in) // remaining Slice Length
+	amount := in[rsLength-8:]
+	coinType := string(in[1:rsLength-8])
 	// now we have the coutner at which to slice
 	constructedMessage := lnutil.InvoiceReplyMsg{
-		PeerIdx:  uint32(2),
+		PeerIdx:  peerIdx, // why is this hardcoded?
 		Id:       string(invoiceId),
-		CoinType: string(in[0 : i-1]),
-		Amount:   uint64(amount), // convery slice to uint64
+		CoinType: coinType,
+		Amount:   lnutil.BtU64(amount), // convery slice to uint64
 	}
+	fmt.Println("Decrypted message from bytes:", constructedMessage)
 	return constructedMessage, nil
 }

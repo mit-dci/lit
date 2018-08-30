@@ -611,7 +611,6 @@ func DecryptInvoice(b []byte, peerid uint32) (InvoiceReplyMsg, error) {
 	fmt.Println("reply cointpye", reply.CoinType)
 	b = b[4:]
 	x, _ := binary.Varint(b)
-	fmt.Println("DECRYPTED", x)
 	reply.Amount = uint64(x)
 	return reply, nil
 }
@@ -675,12 +674,10 @@ func (self InvoiceMsg) Bytes() []byte {
 
 func (self InvoiceReplyMsg) Bytes() []byte {
 	var msg []byte
+	msg = append(msg, U32tB(self.PeerIdx)...)
 	msg = append(msg, self.Id...)
 	msg = append(msg, self.CoinType...)
-	buf := make([]byte, binary.MaxVarintLen64)
-	n := binary.PutVarint(buf, int64(self.Amount))
-	b := buf[:n]
-	msg = append(msg, b...)
+	msg = append(msg, U64tB(self.Amount)...)
 	return msg
 }
 

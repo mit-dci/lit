@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	//"log"
+	"log"
 	"strconv"
 
 	"github.com/boltdb/bolt"
@@ -67,7 +67,6 @@ func (mgr *InvoiceManager) SaveGeneratedInvoice(invoice *lnutil.InvoiceReplyMsg)
 		binary.Write(&writeBuffer, binary.BigEndian, invoice.Id)
 		err := b.Put([]byte(invoice.Id), invoice.Bytes())
 		// index by invoice ID
-
 		if err != nil {
 			return err
 		}
@@ -124,7 +123,7 @@ func (mgr *InvoiceManager) SaveSentInvoicesOut(invoice *lnutil.InvoiceMsg) error
 
 // LoadOracle loads an oracle from the database by index.
 func (mgr *InvoiceManager) LoadSentInvoicesOut(peerIdx string) (lnutil.InvoiceMsg, error) {
-	// retrieve the peerId attached to the given peerIdx. Hopefully should be one
+	// retrieve the peerId attached to the given peerIdx. Hopefully there should be one
 	var msg lnutil.InvoiceMsg
 	var err error
 	err = mgr.InvoiceDB.View(func(tx *bolt.Tx) error {
@@ -155,7 +154,7 @@ func (mgr *InvoiceManager) LoadSentInvoicesOut(peerIdx string) (lnutil.InvoiceMs
 // Most stuff below this is just a repetition of what we've seen before, have to repeat.
 // is there a better way to do it?
 func (mgr *InvoiceManager) SaveSentInvoiceReq(invoice *lnutil.InvoiceReplyMsg) error {
-	// we sent someone an invoice request
+	// we sent someone an invoice request ie we want to pay them money
 	err := mgr.InvoiceDB.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(BKTSentInvoiceReq)
 
@@ -180,16 +179,12 @@ func (mgr *InvoiceManager) SaveSentInvoiceReq(invoice *lnutil.InvoiceReplyMsg) e
 // but key, value pairs, so need to go through multiple ones
 func (mgr *InvoiceManager) LoadSentInvoiceReq(peerIdx uint32, invoiceId string) (lnutil.InvoiceReplyMsg, error) {
 	// do we need both peeridx and invoiceId here? idk
-	var msg lnutil.InvoiceReplyMsg
 	var err error
+	var finmsg lnutil.InvoiceReplyMsg
 	err = mgr.InvoiceDB.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(BKTGeneratedInvoices)
 
 		v := b.Get([]byte(invoiceId))
-		msg, err = InvoiceReplyMsgFromBytes(v)
-		if err != nil {
-			return err
-		}
 		// 	PeerIdx  uint32
 		// 	Id       string
 		// 	CoinType string
@@ -197,13 +192,16 @@ func (mgr *InvoiceManager) LoadSentInvoiceReq(peerIdx uint32, invoiceId string) 
 		b.ForEach(func(k, v []byte) error {
 			fmt.Printf("key=%s, value=%s\n", k, v)
 			if k[0] == invoiceId[0] {
-				fmt.Println("INVOICE ID", k[0])
-				msg, err = InvoiceReplyMsgFromBytes(v)
+				msg, err := InvoiceReplyMsgFromBytes(v)
 				if err != nil {
 					return err
 				}
-				fmt.Println("BINGO")
-				fmt.Println("CATCH HIST", msg.PeerIdx == peerIdx, msg.PeerIdx, peerIdx)
+				log.Println("MSG", msg, peerIdx)
+				if msg.PeerIdx != peerIdx {
+					log.Println("NOPE, ANOTHER GUY'S INVOCIE")
+				} else {
+					finmsg = msg
+				}
 			}
 			return nil
 		})
@@ -213,7 +211,7 @@ func (mgr *InvoiceManager) LoadSentInvoiceReq(peerIdx uint32, invoiceId string) 
 		return nil
 	})
 	if err != nil {
-		return msg, err
+		return finmsg, err
 	}
-	return msg, nil
+	return finmsg, nil
 }
