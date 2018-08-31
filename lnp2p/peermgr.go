@@ -20,17 +20,29 @@ type pubkey *btcec.PublicKey
 
 // PeerManager .
 type PeerManager struct {
+
+	// Biographical.
 	idkey  privkey
 	peerdb lnio.LitPeerStorage
 	ebus   *eventbus.EventBus
+	mproc  MessageProcessor
 
+	// Peer tracking.
 	peers   []lnio.LnAddr // compatibility
 	peerMap map[lnio.LnAddr]*Peer
 
+	// Accepting connections.
 	listeningPorts map[string]*listeningthread
 
+	// Outgoing messages.
+	sending  bool
+	outqueue chan outgoingmsg
+
+	// Sync.
 	mtx *sync.Mutex
 }
+
+const outgoingbuf = 16
 
 // ProxySettings .
 type ProxySettings struct {
@@ -48,13 +60,21 @@ func NewPeerManager(rootkey *hdkeychain.ExtendedKey, pdb lnio.LitPeerStorage, bu
 		idkey:          k,
 		peerdb:         pdb,
 		ebus:           bus,
+		mproc:          NewMessageProcessor(),
 		peers:          make([]lnio.LnAddr, 1),
 		peerMap:        map[lnio.LnAddr]*Peer{},
 		listeningPorts: map[string]*listeningthread{},
+		sending:        true,
+		outqueue:       make(chan outgoingmsg, outgoingbuf),
 		mtx:            &sync.Mutex{},
 	}
 
 	return pm, nil
+}
+
+// GetMessageProcessor gets the message processor for this peer manager that's passed incoming messasges from peers.
+func (pm *PeerManager) GetMessageProcessor() *MessageProcessor {
+	return &pm.mproc
 }
 
 // GetExternalAddress returns the human-readable LN address
@@ -183,6 +203,7 @@ func (pm *PeerManager) registerPeer(peer *Peer) {
 	pm.peers = append(pm.peers, lnaddr)
 	pm.peerMap[lnaddr] = peer
 	peer.idx = &pidx
+	peer.pmgr = pm
 
 	// Announce the peer has been added.
 	e := NewPeerEvent{
@@ -195,6 +216,43 @@ func (pm *PeerManager) registerPeer(peer *Peer) {
 		Conn:      peer.conn,
 	}
 	pm.ebus.Publish(e)
+
+}
+
+func (pm *PeerManager) unregisterPeer(peer *Peer) {
+
+	// Again, sensitive changes we should get a lock to do first.
+	pm.mtx.Lock()
+	defer pm.mtx.Unlock()
+
+	log.Printf("peermgr: Unregistering peer: %s\n", peer.GetLnAddr())
+
+	// Remove the peer idx entry.
+	idx := pm.GetPeerIdx(peer)
+	pm.peers[idx] = ""
+
+	// Remove the actual peer entry.
+	pm.peerMap[peer.GetLnAddr()] = nil
+
+	// More cleanup.
+	peer.conn = nil
+	peer.idx = nil
+	peer.pmgr = nil
+
+}
+
+// DisconnectPeer disconnects a peer from ourselves and does relevant cleanup.
+func (pm *PeerManager) DisconnectPeer(peer *Peer) error {
+
+	err := peer.conn.Close()
+	if err != nil {
+		return err
+	}
+
+	// This will cause the peer disconnect event to be raised when the reader
+	// goroutine started to exit and run the unregistration
+
+	return nil
 
 }
 
@@ -302,4 +360,32 @@ func (pm *PeerManager) StopListening(addr string) error {
 	lt.listener.Close()
 	return nil
 
+}
+
+// StartSending starts a goroutine to start sending queued messages out to peers.
+func (pm *PeerManager) StartSending() error {
+	if pm.sending {
+		return fmt.Errorf("already sending")
+	}
+	pm.sending = true
+	go sendMessages(pm.outqueue)
+	return nil
+}
+
+// StopSending has us stop sending new messages to peers.
+func (pm *PeerManager) StopSending() error {
+	if !pm.sending {
+		return fmt.Errorf("not sending")
+	}
+	pm.outqueue <- outgoingmsg{nil, nil} // stops the sending goroutine
+	pm.sending = false
+	return nil
+}
+
+func (pm *PeerManager) queueMessageToPeer(peer *Peer, msg Message) error {
+	if !pm.sending {
+		return fmt.Errorf("sending is disabled on this peer manager, need to start it?")
+	}
+	pm.outqueue <- outgoingmsg{peer, &msg}
+	return nil
 }

@@ -83,10 +83,11 @@ func acceptConnections(listener *lndc.Listener, listenAddr string, pm *PeerManag
 			idx:      nil,
 		}
 
-		// Don't do any locking here since registerPeer take a lock and Go's
+		// Don't do any locking here since registerPeer takes a lock and Go's
 		// mutex isn't reentrant.
 		pm.registerPeer(npeer)
 
+		// Start a goroutine to process inbound traffic for this peer.
 		go processConnectionInboundTraffic(npeer, pm)
 
 	}
@@ -126,9 +127,9 @@ func processConnectionInboundTraffic(peer *Peer, pm *PeerManager) {
 			log.Printf("Error reading from peer: %s\n", err.Error())
 			peer.conn.Close()
 			return
-		} else {
-			log.Printf("Got message of len %d from peer %s\n", n, peer.GetLnAddr())
 		}
+
+		log.Printf("Got message of len %d from peer %s\n", n, peer.GetLnAddr())
 
 		// Truncate it.
 		buf = buf[:n]
@@ -144,6 +145,9 @@ func processConnectionInboundTraffic(peer *Peer, pm *PeerManager) {
 		// Publish the event to the event bus so qln or something can pick it up.
 		// TODO Refactor this.
 		pm.ebus.Publish(NetMessageRecvEvent{&m, peer, buf})
+
+		// Send to the message processor.
+		pm.mproc.HandleMessage(peer, buf)
 
 	}
 

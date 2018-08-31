@@ -13,7 +13,8 @@ type Peer struct {
 	conn     *lndc.Conn
 	idpubkey pubkey
 
-	idx *uint32 // deprecated
+	idx  *uint32 // deprecated
+	pmgr *PeerManager
 }
 
 // GetIdx is a compatibility function.
@@ -45,4 +46,20 @@ func (p *Peer) GetRemoteAddr() string {
 // GetPubkey gets the public key for the user.
 func (p *Peer) GetPubkey() btcec.PublicKey {
 	return *p.idpubkey
+}
+
+// GetPrettyName returns a more human-readable name, such as the nickname if
+// available or a trucated version of the LN address otherwise.
+func (p *Peer) GetPrettyName() string {
+	if p.nickname != nil {
+		return *p.nickname
+	}
+
+	return string(p.GetLnAddr()[:10]) + "~"
+}
+
+// SendQueuedMessage adds the message to the queue to be sent to this peer.
+// This queue is shared across all peers.
+func (p *Peer) SendQueuedMessage(msg Message) error {
+	return p.pmgr.queueMessageToPeer(p, msg)
 }
