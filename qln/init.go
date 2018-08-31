@@ -68,7 +68,8 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 	// Register adapter event handlers.  These are for hooking in the new peer management with the old one.
 	h1 := makeTmpNewPeerHandler(nd)
 	nd.Events.RegisterHandler("lnp2p.peer.new", h1)
-	// TODO removing peers, etc.
+	h2 := makeTmpDisconnectPeerHandler(nd)
+	nd.Events.RegisterHandler("lnp2p.peer.disconnect", h2)
 
 	// Sets up handlers for all the messages we need to handle.
 	nd.registerHandlers()
@@ -129,7 +130,6 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 	nd.SubWallet = make(map[uint32]UWallet)
 
 	nd.OmniOut = make(chan lnutil.LitMsg, 10)
-	nd.OmniIn = make(chan lnutil.LitMsg, 10)
 
 	//	go nd.OmniHandler()
 	go nd.OutMessager()

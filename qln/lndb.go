@@ -128,7 +128,6 @@ type LitNode struct {
 	RemoteMtx          sync.Mutex
 
 	// OmniChan is the channel for the OmniHandler
-	OmniIn  chan lnutil.LitMsg
 	OmniOut chan lnutil.LitMsg
 
 	// the current channel that in the process of being created
