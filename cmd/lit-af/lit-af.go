@@ -46,9 +46,7 @@ const (
 )
 
 type litAfClient struct {
-	remote        string
-	port          uint16
-	addr          string
+	con           string
 	litHomeDir    string
 	lndcRpcClient *litrpc.LndcRpcClient
 }
@@ -60,21 +58,13 @@ type Command struct {
 }
 
 func setConfig(lc *litAfClient) {
-	hostptr := flag.String("node", "127.0.0.1", "host to connect to")
-	portptr := flag.Int("p", 2448, "port to connect to")
+	conptr := flag.String("con", "@:2448", "host to connect to in the form of [<lnadr>@][<host>][:<port>]")
 	dirptr := flag.String("dir", filepath.Join(os.Getenv("HOME"), litHomeDirName), "directory to save settings")
-	addrptr := flag.String("addr", "", "address of the host we're connecting to (if not running on the same machine as lit)")
 
 	flag.Parse()
 
-	lc.remote = *hostptr
-	lc.port = uint16(*portptr)
+	lc.con = *conptr
 	lc.litHomeDir = *dirptr
-	lc.addr = *addrptr
-
-	if lnutil.LitAdrOK(lc.addr) && lc.remote == "127.0.0.1" {
-		// probably need to look up when addr is set but node is still localhost
-	}
 }
 
 // for now just testing how to connect and get messages back and forth
@@ -90,14 +80,17 @@ func main() {
 		os.Mkdir(lc.litHomeDir, 0700)
 	}
 
-	if litrpc.LndcRpcCanConnectLocallyWithHomeDir(lc.litHomeDir) {
-		lc.lndcRpcClient, err = litrpc.NewLocalLndcRpcClientWithHomeDirAndPort(lc.litHomeDir, uint32(lc.port))
+	adr, host, port := lnutil.ParseAdrStringWithPort(lc.con)
+
+	if litrpc.LndcRpcCanConnectLocallyWithHomeDir(lc.litHomeDir) && adr == "" && (host == "localhost" || host == "127.0.0.1") {
+
+		lc.lndcRpcClient, err = litrpc.NewLocalLndcRpcClientWithHomeDirAndPort(lc.litHomeDir, port)
 		if err != nil {
 			log.Fatal(err.Error())
 		}
 	} else {
-		if !lnutil.LitAdrOK(lc.addr) {
-			log.Fatal("Since you are remotely connecting to lit, you need to specify the node's LN address using the -addr parameter")
+		if !lnutil.LitAdrOK(adr) {
+			log.Fatal("lit address passed in -con parameter is not valid")
 		}
 
 		keyFilePath := filepath.Join(lc.litHomeDir, "lit-af-key.hex")
@@ -106,7 +99,7 @@ func main() {
 			log.Fatal(err.Error())
 		}
 		key, _ := btcec.PrivKeyFromBytes(btcec.S256(), privKey[:])
-		adr := fmt.Sprintf("%s@%s:%d", lc.addr, lc.remote, lc.port)
+		adr := fmt.Sprintf("%s@%s:%d", adr, host, port)
 		lc.lndcRpcClient, err = litrpc.NewLndcRpcClient(adr, key)
 		if err != nil {
 			log.Fatal(err.Error())
