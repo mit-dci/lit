@@ -2,6 +2,7 @@ package lnutil
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/mit-dci/lit/bech32"
@@ -118,16 +119,64 @@ func OldAddressFromPKH(pkHash [20]byte, netID byte) string {
 // "ln1yrvw48uc3atg8e2lzs43mh74m39vl785g4ehem@myhost.co:8191 into a separate
 // pkh part and network part, adding the network part if needed
 func ParseAdrString(adr string) (string, string) {
+	id, host, port := ParseAdrStringWithPort(adr)
+	if host == "" && port == 0 {
+		return id, ""
+	}
+	return id, fmt.Sprintf("%s:%d", host, port)
+}
 
+func ParseAdrStringWithPort(adr string) (string, string, uint32) {
+	// Check if it's just a number - then it will be returned as the port
+	if !strings.ContainsRune(adr, ':') && !strings.ContainsRune(adr, '@') {
+		port, err := strconv.ParseUint(adr, 10, 32)
+		if err == nil {
+			return "", "127.0.0.1", uint32(port)
+		}
+	}
+
+	// It's not a number, check if it starts with ln1,
+	// if so, return the address and no host info (since it has no @)
+	// Otherwise, assume it's a hostname and return empty adr and default port
+	if !strings.ContainsRune(adr, ':') && !strings.ContainsRune(adr, '@') {
+		if strings.HasPrefix(adr, "ln1") {
+			return adr, "", 0
+		} else {
+			return "", adr, 2448
+		}
+	}
+
+	lnAdr := ""
+	hostSpec := "localhost:2448"
+
+	// If it contains no @ but does contain a semicolon, expect this to be
+	// an empty ln-address but a host with a port
+	if strings.ContainsRune(adr, ':') && !strings.ContainsRune(adr, '@') {
+		hostSpec = adr
+	}
+
+	// If it is formatted like adr@host, but without a semicolon, append
+	// the default port.
 	if !strings.ContainsRune(adr, ':') && strings.ContainsRune(adr, '@') {
 		adr += ":2448"
 	}
 
-	idHost := strings.Split(adr, "@")
-
-	if len(idHost) == 1 {
-		return idHost[0], ""
+	if strings.ContainsRune(adr, '@') {
+		idHost := strings.Split(adr, "@")
+		lnAdr = idHost[0]
+		hostSpec = idHost[1]
 	}
 
-	return idHost[0], idHost[1]
+	var host string
+	var port uint32
+
+	hostString := strings.Split(hostSpec, ":")
+	host = hostString[0]
+	if len(hostString) == 1 {
+		port = 2448
+	} else {
+		port64, _ := strconv.ParseUint(hostString[1], 10, 32)
+		port = uint32(port64)
+	}
+	return lnAdr, host, port
 }
