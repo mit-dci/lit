@@ -109,24 +109,24 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 	}
 	log.Println("X1", x1.PeerIdx, x1.Id)
 
-	err = nd.InvoiceManager.SaveRequestedInvoice(&test)
+	err = nd.InvoiceManager.SaveRequestedInvoice(&test2)
 	if err != nil {
 		log.Println("FAILED WHILE STORING AN INVOICE SENT OUT TO ANOTHER PEER")
 		return nd, fmt.Errorf("FAILED WHILE STORING AN INVOICE SENT OUT TO ANOTHER PEER")
 	}
-	x2, err := nd.InvoiceManager.LoadRequestedInvoice(60000, "3") //pass peerIdx, invoiceId
+	x1, err = nd.InvoiceManager.LoadRequestedInvoice(2, "q") //pass peerIdx, invoiceId
 	if err != nil {
 		log.Println("FAILED WHILE STORING AN INVOICE SENT OUT TO ANOTHER PEER")
-		return nd, fmt.Errorf("FAILED WHILE STORING AN INVOICE SENT OUT TO ANOTHER PEER")
+		return nd, err
 	}
-	log.Println("X2", x2)
+	log.Println("X2", x1)
 
 	err = nd.InvoiceManager.SavePendingInvoice(&test)
 	if err != nil {
 		log.Println("FAILED TO STORE PENDING INVOICES")
 		return nd, fmt.Errorf("FAILED TO STORE PENDING INVOICES")
 	}
-	x2, err = nd.InvoiceManager.LoadPendingInvoice(60000, "3") //pass peerIdx, invoiceId
+	x2, err := nd.InvoiceManager.LoadPendingInvoice(60000, "3") //pass peerIdx, invoiceId
 	if err != nil {
 		log.Println("FAILED WHILE RETRIEVING A PENDING INVOICE")
 		return nd, fmt.Errorf("FAILED WHILE RETRIEVING A PENDING INVOICE")

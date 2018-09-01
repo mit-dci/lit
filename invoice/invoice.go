@@ -42,6 +42,9 @@ import (
 // means that we have to do that here
 
 func InvoiceMsgFromBytes(in []byte) (lnutil.InvoiceMsg, error) {
+	// InvoiceMsgFromBytes parses  onyl the value from the key value pair that we
+	// get from the db. So you need to set the peerIdx separately if you use this
+	// to load the value from the db at all
 	var dummy lnutil.InvoiceMsg
 	log.Println("calling InvoiceMsgFromBytes", string(in))
 	dummy.Id = string(in)

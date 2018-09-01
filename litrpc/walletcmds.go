@@ -567,28 +567,49 @@ func (r *LitRPC) PayInvoice(args *PayInvoiceArgs, reply *PayInvoiceReply) error 
 	// now I have the remote Peer
 	// send it a byte message
 	testStr := []byte("I1") // this should be the actual invoice preceeded by I
-	bytesWritten, err := rpx.Con.Write(testStr)
-	log.Println("BYTES WRITTEN", bytesWritten)
-
+	_, err = rpx.Con.Write(testStr)
+	if err != nil {
+		log.Println("Error while writing to remote peer")
+		return err
+	}
 	// store this invoice in our list of sent invoices
+	// store it in the sentinvocies database so that we can retrieve it later
 	var sentInvoice lnutil.InvoiceMsg
 	sentInvoice.Id = invoiceId
 	sentInvoice.PeerIdx = rpx.Idx
 	r.Node.SentInvoiceReq = append(r.Node.SentInvoiceReq, sentInvoice)
 
+	err = r.Node.InvoiceManager.SaveRequestedInvoice(&sentInvoice)
+	if err != nil {
+		log.Println("Error while sasving to requested invocies. returning")
+		return fmt.Errorf("Error while sasving to requested invocies. returning")
+	}
+
 	time.Sleep(3 * time.Second) // wait for the peer to reply
 	// I guess this is ugly, but it works for now, maybe refactor later.
 
-	for _, req := range r.Node.PendingInvoiceReq {
-		if req.Id == invoiceId && sentInvoice.PeerIdx == req.PeerIdx {
-			// this is the invoice that we sent. Pay
-			stateIdx, err := r.Node.PayInvoiceBkp(req, destAdr, args.Invoice)
-			if err != nil {
-				return err
-			}
-			reply.StateIdx = stateIdx
-			return nil
-		}
+	gotInvoice, err := r.Node.InvoiceManager.LoadPendingInvoice(rpx.Idx, invoiceId)
+	// check whether the invoice actualyl made it inside requested invoices
+	// this alreyad looks through all key vlaue pairs in the db so that we don't have to
+	if err != nil {
+		// no invoice found
+		return err
 	}
-	return fmt.Errorf("Didn't pay invoice due to errors!")
+	// gotInvoice is an InvoiceReplyMsg
+	// compare peeridx and chan idx with what we sent to the peer
+
+	// PeerIdx  uint32
+	// Id       string
+	// CoinType string
+	// Amount   uint64
+
+	if gotInvoice.PeerIdx == sentInvoice.PeerIdx && gotInvoice.Id == sentInvoice.Id {
+		stateIdx, err := r.Node.PayInvoice(gotInvoice, destAdr, args.Invoice)
+		if err != nil {
+			return err
+		}
+		reply.StateIdx = stateIdx
+	}
+	// this is the invoice that we sent. Pay
+	return nil
 }

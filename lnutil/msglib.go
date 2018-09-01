@@ -601,25 +601,37 @@ func NewDeltaSigMsg(peerid uint32, OP wire.OutPoint, DELTA int32, SIG [64]byte, 
 	return *d
 }
 
-func DecryptInvoice(b []byte, peerid uint32) (InvoiceReplyMsg, error) {
-	var reply InvoiceReplyMsg
-	fmt.Println("RECVD", b)
-	reply.Id = string(b[1:2])
-	fmt.Println("reply id", reply.Id)
-	b = b[2:]
-	reply.CoinType = string(b[0:4])
-	fmt.Println("reply cointpye", reply.CoinType)
-	b = b[4:]
-	x, _ := binary.Varint(b)
-	reply.Amount = uint64(x)
-	return reply, nil
+func DecryptInvoice(in []byte, peerid uint32) (InvoiceReplyMsg, error) {
+	// copied from invoice/, can't improt due to import cycles requirement
+	// the received merssage is something similar to [50 98 99 114 116 192 154 12]
+	// for an invoice 0, 2, bcrt, 100000
+	// But when reading throguh the byte slice, we do not know whether this is the
+	// coinType or the amount. So..
+	in = in[1:] // cut off the H at the beginning now that we don't need it
+	fmt.Println("INCOMING BYTES", in)
+	peerIdx := BtU32((in[0:4]))
+	invoiceId := in[4]
+	in = in[4:] // cut the invoice and peeridx off
+	// cutoff the last 8 bytes for the amount
+	rsLength := len(in) // remaining Slice Length
+	amount := in[rsLength-8:]
+	coinType := string(in[1:rsLength-8])
+	// now we have the coutner at which to slice
+	constructedMessage := InvoiceReplyMsg{
+		PeerIdx:  peerIdx, // why is this hardcoded?
+		Id:       string(invoiceId),
+		CoinType: coinType,
+		Amount:   BtU64(amount), // convery slice to uint64
+	}
+	fmt.Println("Decrypted message from bytes:", constructedMessage)
+	return constructedMessage, nil
 }
 
 func DecryptInvoiceIdentifier(b []byte, peerid uint32) (InvoiceMsg, error) {
 	msg := new(InvoiceMsg)
 	msg.Id = string(b[1:])
 	msg.PeerIdx = peerid
-	fmt.Printf("Decrypting invoice request, invoice id: %d and peerid: %d", msg.Id, msg.PeerIdx)
+	fmt.Printf("Decrypting invoice request, invoice id: %s and peerid: %d", msg.Id, msg.PeerIdx)
 	return *msg, nil
 }
 

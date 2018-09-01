@@ -27,7 +27,7 @@ func IsBech32String(in string) bool {
 // GenInvoice generates an invoiceid and then stores the extra stuff in a map
 // to send out to the peer in the case it is required in the future.
 func (nd *LitNode) GenInvoiceId(cointype string, amount uint64) (string, error) {
-	// so now we have to generate invoiceIds and store them in GenInvoiceReq
+	// so now we have to generate invoiceIds and store them in the database
 	// InvoiceId string
 	// CoinType string
 	// Amount uint64
@@ -46,21 +46,6 @@ func (nd *LitNode) GenInvoiceId(cointype string, amount uint64) (string, error) 
 	}
 	log.Println("GOT A FREE INVOICEID", chars[i:i+1])
 	return chars[i : i+1], nil
-}
-
-func RetrieveInvoiceInfo() (lnutil.InvoiceReplyMsg, error) {
-	// maybe have a custom data structure for invoices? idk
-	log.Println("Retrieving invoice info from storage")
-	// what we really have to do here on the invoice requester's side
-	// is that we need to look through our storage and get the invoice details
-	// related to the invoice identifier
-	// Right now, we'll skip that and hardcode stuff to test stuff
-	// 1bcrt100
-	var msg lnutil.InvoiceReplyMsg
-	msg.Id = "1"
-	msg.CoinType = "bcrt"
-	msg.Amount = 10000
-	return msg, nil
 }
 
 // type InvoiceReplyMsg struct {
@@ -88,8 +73,12 @@ func (nd *LitNode) GetInvoiceReplyInfo(msg lnutil.InvoiceReplyMsg,
 		if invoices.PeerIdx == peer.Idx && invoices.Id == msg.Id {
 			// this is an invoice we sent and and invoice that has the correct id
 			msg.PeerIdx = peer.Idx // overwrite the remote node's peer id before
-			// storing it in PendingInvoiceReq so that litrpc can take it up
-			nd.PendingInvoiceReq = append(nd.PendingInvoiceReq, msg)
+			// storing it in the database so taht litrpc can pick it up later
+			err := nd.InvoiceManager.SavePendingInvoice(&msg)
+			if err != nil {
+				return dummy, err
+			}
+			return msg, nil
 		}
 	}
 	log.Println("LIST OF SENT INVOICES", nd.SentInvoiceReq)
@@ -100,18 +89,22 @@ func (nd *LitNode) GetInvoiceInfo(msg lnutil.InvoiceMsg, peer *RemotePeer) (lnut
 	// call the tracker to find the ip address
 	// dial the address and then do a custom handshake with the peer to get the
 	// invoice
-	log.Printf("Retrieving details for invoice id: %s requested by peer: %d", msg.Id, msg.PeerIdx)
-	invoice, err := RetrieveInvoiceInfo()
+	invoice, err := nd.InvoiceManager.LoadGeneratedInvoice(msg.Id)
 	if err != nil {
 		log.Println("Error while retrieving invoice. Exiting")
 		return invoice, fmt.Errorf("Error while retrieving invoice. Exiting")
 	}
+	log.Printf("Peer %d requested invoice: %s", peer.Idx, invoice.Id)
 	invoice.PeerIdx = peer.Idx
 	var replyStr []byte
 	replyStr = append(replyStr, []byte("H")...)
 	replyStr = append(replyStr, invoice.Bytes()...)
 	//testStr := []byte(reply.Id) // this should be the actual invoice preceeded by I
 	_, err = peer.Con.Write(replyStr)
+	if err != nil {
+		log.Println("Error while retrieving invoice. Exiting!", err)
+		return invoice, err
+	}
 	return invoice, nil
 }
 
@@ -167,12 +160,12 @@ func (nd *LitNode) SplitInvoiceId(invoice string) (string, string, error) {
 	}
 
 	invoiceId := invoice[invoiceLength-1]
-	destAdr := invoice[0:len(invoice)-4] // 111 + invoiceId
+	destAdr := invoice[0:len(invoice)-2] // 111 + invoiceId
 	// check if destAdr is valid here
 	if !IsBech32String(destAdr[3:]) { // cut off the starting ln1
 		log.Println("Payee address invalid. Quitting!")
 	}
-
+	log.Println("DEST AFDR", destAdr)
 	return destAdr, string(invoiceId), nil
 }
 
@@ -288,7 +281,7 @@ type FundArgs struct {
 	Data        [32]byte
 }
 
-func (nd *LitNode) PayInvoiceBkp(req lnutil.InvoiceReplyMsg,
+func (nd *LitNode) PayInvoice(req lnutil.InvoiceReplyMsg,
 	destAdr string, invoice string) (uint64, error) {
 
 	// Two ways we can pay this invoice

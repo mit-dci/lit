@@ -161,7 +161,6 @@ func (nd *LitNode) LNDCReader(peer *RemotePeer) error {
 		}
 
 		log.Printf("chanIdx is %x\n", chanIdx)
-
 		if chanIdx != 0 {
 			err = nd.PeerHandler(routedMsg, peer.QCs[chanIdx], peer)
 		} else {

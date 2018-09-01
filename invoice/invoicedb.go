@@ -60,7 +60,7 @@ func (mgr *InvoiceManager) InitDB(dbPath string) error {
 }
 
 func (mgr *InvoiceManager) SaveGeneratedInvoice(invoice *lnutil.InvoiceReplyMsg) error {
-	return mgr.storeinBucket(BKTGeneratedInvoices, invoice)
+	return mgr.storeInvoiceReplyMsgInBucket(BKTGeneratedInvoices, invoice)
 }
 
 // LoadGeneratedInvoice loads a given invoice based on its invoiceId from memory
@@ -87,10 +87,11 @@ func (mgr *InvoiceManager) LoadGeneratedInvoice(invoiceId string) (lnutil.Invoic
 	return msg, nil
 }
 
-func (mgr *InvoiceManager) SaveRepliedInvoice(invoice *lnutil.InvoiceMsg) error {
+
+func (mgr *InvoiceManager) storeInvoiceMsgInBucket(bucketName []byte, invoice *lnutil.InvoiceMsg) (error) {
 	// log invoices which we send to peers indexed by most recent added first
 	err := mgr.InvoiceDB.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket(BKTRepliedInvoices)
+		b := tx.Bucket(bucketName)
 
 		var writeBuffer bytes.Buffer
 		binary.Write(&writeBuffer, binary.BigEndian, invoice.PeerIdx)
@@ -124,7 +125,11 @@ func (mgr *InvoiceManager) DoesKeyExist(bucketName []byte, invoiceId string) (bo
 	return free, err
 }
 
-// LoadOracle loads an oracle from the database by index.
+func (mgr *InvoiceManager) SaveRepliedInvoice(invoice *lnutil.InvoiceMsg) error {
+	// log invoices which we send to peers indexed by most recent added first
+	return mgr.storeInvoiceMsgInBucket(BKTRepliedInvoices, invoice)
+}
+
 func (mgr *InvoiceManager) LoadRepliedInvoice(peerIdx string) (lnutil.InvoiceMsg, error) {
 	// retrieve the peerId attached to the given peerIdx. Hopefully there should be one
 	var msg lnutil.InvoiceMsg
@@ -152,10 +157,9 @@ func (mgr *InvoiceManager) LoadRepliedInvoice(peerIdx string) (lnutil.InvoiceMsg
 	msg.PeerIdx = uint32(temp)
 	return msg, nil
 }
-
-// storeinBucket is a common handler that is shared between all instances
+// storeInvoiceReplyMsgInBucket is a common handler that is shared between all instances
 // which want to write to a bucket bucketName
-func (mgr *InvoiceManager) storeinBucket(bucketName []byte, invoice *lnutil.InvoiceReplyMsg) error {
+func (mgr *InvoiceManager) storeInvoiceReplyMsgInBucket(bucketName []byte, invoice *lnutil.InvoiceReplyMsg) error {
 	err := mgr.InvoiceDB.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketName)
 
@@ -217,18 +221,53 @@ func (mgr *InvoiceManager) loadFromBucket(bucketName []byte, peerIdx uint32,
 	return finmsg, nil
 }
 
-func (mgr *InvoiceManager) SaveRequestedInvoice(invoice *lnutil.InvoiceReplyMsg) error {
+func (mgr *InvoiceManager) SaveRequestedInvoice(invoice *lnutil.InvoiceMsg) error {
+	// if we requested an invoice from someone, all we need to know is their pubkley
+	// and invoice id to check against teh reply they send us. Cointype and Amount aren;t
+	// defined at this point yet
 	// we sent someone an invoice request ie we want to pay them money
-	return mgr.storeinBucket(BKTRequestedInvoices, invoice)
+	// log invoices which we send to peers indexed by most recent added first
+	return mgr.storeInvoiceMsgInBucket(BKTRequestedInvoices, invoice)
 }
 
 func (mgr *InvoiceManager) LoadRequestedInvoice(peerIdx uint32,
-	invoiceId string) (lnutil.InvoiceReplyMsg, error) {
-	return mgr.loadFromBucket(BKTRequestedInvoices, peerIdx, invoiceId)
+	invoiceId string) (lnutil.InvoiceMsg, error) {
+	// retrieve the peerId attached to the given peerIdx. Hopefully there should be one
+	// right now oncly returns the requested invoiceId
+	var err error
+	var finmsg lnutil.InvoiceMsg
+	err = mgr.InvoiceDB.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(BKTRequestedInvoices)
+		// since RequestedInvoices are indexed by peeridx
+		b.ForEach(func(k, v []byte) error {
+			fmt.Printf("key=%s, value=%s\n", k, v)
+			// k is a byte slice which needs to be converted to an int
+			// could by [51] or [xx, xx]
+			intk, _ := strconv.Atoi(string(k))
+			if err != nil {
+				return err
+			}
+			if intk == int(peerIdx) && bytes.Equal(v, []byte(invoiceId)) {
+				msg, err := InvoiceMsgFromBytes(v)
+				if err != nil {
+					return err
+				}
+				finmsg = msg
+				finmsg.PeerIdx = peerIdx
+				return nil
+			}
+			return nil
+		})
+		if len(finmsg.Id) == 0 {
+			return fmt.Errorf("InvoiceId %s fo peer %d does not exist", invoiceId, peerIdx)
+		}
+		return nil
+	})
+	return finmsg, err
 }
 
 func (mgr *InvoiceManager) SavePendingInvoice(invoice *lnutil.InvoiceReplyMsg) error {
-	return mgr.storeinBucket(BKTPendingInvoices, invoice)
+	return mgr.storeInvoiceReplyMsgInBucket(BKTPendingInvoices, invoice)
 }
 
 func (mgr *InvoiceManager) LoadPendingInvoice(peerIdx uint32,
@@ -237,7 +276,7 @@ func (mgr *InvoiceManager) LoadPendingInvoice(peerIdx uint32,
 }
 
 func (mgr *InvoiceManager) SavePaidInvoice(invoice *lnutil.InvoiceReplyMsg) error {
-	return mgr.storeinBucket(BKTPaidInvoices, invoice)
+	return mgr.storeInvoiceReplyMsgInBucket(BKTPaidInvoices, invoice)
 }
 
 func (mgr *InvoiceManager) LoadPaidInvoice(peerIdx uint32,
