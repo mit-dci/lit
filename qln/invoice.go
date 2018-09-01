@@ -69,19 +69,25 @@ func (nd *LitNode) GetInvoiceReplyInfo(msg lnutil.InvoiceReplyMsg,
 	// the guy is in that, great, lets just return conns and pay him. Else, spammer
 	var dummy lnutil.InvoiceReplyMsg
 	log.Println("RECV MSG", msg, peer.Idx)
-	for _, invoices := range nd.SentInvoiceReq {
-		if invoices.PeerIdx == peer.Idx && invoices.Id == msg.Id {
-			// this is an invoice we sent and and invoice that has the correct id
-			msg.PeerIdx = peer.Idx // overwrite the remote node's peer id before
-			// storing it in the database so taht litrpc can pick it up later
-			err := nd.InvoiceManager.SavePendingInvoice(&msg)
-			if err != nil {
-				return dummy, err
-			}
-			return msg, nil
-		}
+	// change this such that it reads from the database
+	// check the RequestedInvoices bucket
+	savedInvoice, err := nd.InvoiceManager.LoadRequestedInvoice(peer.Idx, msg.Id)
+	if err != nil {
+		log.Println("Error while retrieving invocie from storage")
+		return dummy, fmt.Errorf("Error while retrieving invocie from storage")
 	}
-	log.Println("LIST OF SENT INVOICES", nd.SentInvoiceReq)
+	// pass the peeridx, chan id and receive a invoicemsg
+	if savedInvoice.PeerIdx == peer.Idx && savedInvoice.Id == msg.Id {
+		// this is an invoice we sent and and invoice that has the correct id
+		msg.PeerIdx = peer.Idx // overwrite the remote node's peer id before
+		// storing it in the database so taht litrpc can pick it up later
+		log.Printf("Remote peer replied to an invoice %s. Storing in SavePendingInvoice", msg.Id)
+		err := nd.InvoiceManager.SavePendingInvoice(&msg)
+		if err != nil {
+			return dummy, err
+		}
+		return msg, nil
+	}
 	return dummy, nil
 }
 
@@ -104,6 +110,14 @@ func (nd *LitNode) GetInvoiceInfo(msg lnutil.InvoiceMsg, peer *RemotePeer) (lnut
 	if err != nil {
 		log.Println("Error while retrieving invoice. Exiting!", err)
 		return invoice, err
+	}
+	// now that we've sent out a message to the peer, we need to store it in
+	// BKTRepliedInvoices so that we can keep track of whether this has been paid
+	// or not
+	err = nd.InvoiceManager.SaveRepliedInvoice(msg)
+	if err != nil {
+		log.Println("Error while saving replied invoice", err)
+		// no need to exit here since we can get paid even if this fails
 	}
 	return invoice, nil
 }
@@ -153,14 +167,14 @@ func (nd *LitNode) SplitInvoiceId(invoice string) (string, string, error) {
 		return "", "", fmt.Errorf("Invalid invoice length")
 	}
 
-	if invoice[(invoiceLength-2):invoiceLength-1] != "1"  {
+	if invoice[(invoiceLength-2):invoiceLength-1] != "1" {
 		// check whether the invoice has a valid invoice identifier
 		log.Println("Contains spam data. Exiting")
 		return "", "", fmt.Errorf("Invalid Invoice, doesn't contain identifier. Exiting")
 	}
 
 	invoiceId := invoice[invoiceLength-1]
-	destAdr := invoice[0:len(invoice)-2] // 111 + invoiceId
+	destAdr := invoice[0 : len(invoice)-2] // 111 + invoiceId
 	// check if destAdr is valid here
 	if !IsBech32String(destAdr[3:]) { // cut off the starting ln1
 		log.Println("Payee address invalid. Quitting!")
@@ -483,6 +497,28 @@ func (nd *LitNode) PayInvoice(req lnutil.InvoiceReplyMsg,
 		log.Println("ERROR WHILE PUSHING FUNDS!!", err)
 		return 0, fmt.Errorf("ERROR WHILE PUSHING FUNDS!!")
 	}
-
+	// at this point, we've paid this peer and can store it in the lsit of paid invoices
 	return qc.State.StateIdx, nil
+}
+
+func (nd *LitNode) CleanupDbVals(invoice lnutil.InvoiceReplyMsg) error {
+	var err error
+	BKTRequestedInvoices := []byte("RequestedInvoices")
+	BKTPendingInvoices := []byte("PendingInvoices")
+	err = nd.InvoiceManager.DeleteInt(BKTRequestedInvoices, invoice.PeerIdx)
+	// requested invoices are indexed by peeridx and not invoiceId
+	if err != nil {
+		log.Println("Couldn't delete val from Requested invocies db")
+		return fmt.Errorf("Couldn't delete val from Requested invocies db")
+	}
+	err = nd.InvoiceManager.DeleteString(BKTPendingInvoices, invoice.Id)
+	// pending invoices are indexed by their invoiceIds rather than peerid's
+	if err != nil {
+		log.Println("Couldn't delete val from Pending invocies db")
+		return fmt.Errorf("Couldn't delete val from Pending invocies db")
+	}
+	// deletion complete, we can safely return without any issues now
+	// but the remote peer must delete its generated invoice and repliedinvoices
+	// and store in its GotPaidInvoices Bucket
+	return nil
 }

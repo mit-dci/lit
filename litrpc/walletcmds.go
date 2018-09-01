@@ -10,6 +10,8 @@ import (
 	"github.com/mit-dci/lit/wire"
 	"log"
 	"time"
+
+	qrcode "github.com/skip2/go-qrcode"
 )
 
 type TxidsReply struct {
@@ -538,20 +540,43 @@ func (r *LitRPC) GenInvoice(args *GenInvoiceArgs, reply *GenInvoiceReply) error 
 	var invoiceStorage lnutil.InvoiceReplyMsg
 	invoiceStorage.CoinType = args.CoinType
 	invoiceStorage.Amount = args.Amount
-	invoiceStorage.PeerIdx = uint32(60000)
+	invoiceStorage.PeerIdx = uint32(60000) // some random peerid for generated
+	// invoices since we don't need them. Could leave them empty, but that might
+	// affect error handling stuff later down the road somewhere. Something
+	// to visit at the end I guess
 	invoiceStorage.Id = invoiceId
 
 	err = r.Node.InvoiceManager.SaveGeneratedInvoice(&invoiceStorage)
 	if err != nil {
 		return err
 	}
+	// generate a qr code for the invoice so that people cna print it out or something
+	qrString := fmt.Sprintf("%s1%s", adr, invoiceId)
+	err = qrcode.WriteFile(qrString, qrcode.Highest, -1, "qr_" + invoiceId + ".png")
+	// 30% error recovery qr codes, could maybe decrease it, but better to have this
+	// in case some part of a qr gets burnt or something
+	// create a qr code in png format
+	if err != nil {
+		log.Println("Error while generating a qr code")
+		// don't return this error since its an addition
+	}
+	// If size is too small then a larger image is silently written
+	// usign a negative value for variable sized images
+	reply.Invoice = qrString
 	return nil
-
 }
 func (r *LitRPC) PayInvoice(args *PayInvoiceArgs, reply *PayInvoiceReply) error {
 	var err error
 	// send a message out to the peer asking for details
 	// parse the recieved message
+
+	temp, err:= r.Node.InvoiceManager.GetAllGotPaidInvoices()
+	if err != nil {
+		log.Println("Error while loading paid invoices")
+		return err
+	}
+	log.Println("T1", temp)
+	return nil
 	destAdr, invoiceId, err := r.Node.SplitInvoiceId(args.Invoice)
 	if err != nil {
 		return err
@@ -566,7 +591,8 @@ func (r *LitRPC) PayInvoice(args *PayInvoiceArgs, reply *PayInvoiceReply) error 
 	}
 	// now I have the remote Peer
 	// send it a byte message
-	testStr := []byte("I1") // this should be the actual invoice preceeded by I
+	msgString := "I" + invoiceId
+	testStr := []byte(msgString) // this should be the actual invoice preceeded by I
 	_, err = rpx.Con.Write(testStr)
 	if err != nil {
 		log.Println("Error while writing to remote peer")
@@ -610,6 +636,20 @@ func (r *LitRPC) PayInvoice(args *PayInvoiceArgs, reply *PayInvoiceReply) error 
 		}
 		reply.StateIdx = stateIdx
 	}
-	// this is the invoice that we sent. Pay
+	// if everything goes well until  here, means we paid the invoice. Add the invoice
+	// to the paidInvoice bucket and delete it from the generated address bucket
+	// to make the invoiceId free for other invoices to take up
+	err = r.Node.InvoiceManager.SavePaidInvoice(&gotInvoice)
+	if err != nil {
+		log.Println("Paid invoice, couldn't store it in the database")
+		return fmt.Errorf("Paid invoice, couldn't store it in the database")
+	}
+	err = r.Node.CleanupDbVals(gotInvoice)
+	if err != nil {
+		log.Println("Couldn't clear up the database after paying the peer, flush manually!")
+		return fmt.Errorf("Couldn't clear up the database after paying the peer, flush manually!")
+	}
+	// now we saved this to the list of invoices that we've paid. We should delete the
+	// invoice from pending, requested
 	return nil
 }

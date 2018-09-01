@@ -75,11 +75,11 @@ func (lc *litAfClient) GenInvoice(textArgs []string) error {
 		return err
 	}
 
-	fmt.Fprintf(color.Output, "generated invoice %s\n", reply.Invoice)
+	fmt.Fprintf(color.Output, "generated invoice %s worth %d %s coins", reply.Invoice, amount, args.CoinType)
 	return nil
 }
 
-func (lc *litAfClient) Pay(textArgs []string) error {
+func (lc *litAfClient) PayInvoice(textArgs []string) error {
 	stopEx, err := CheckHelpCommand(payCommand, textArgs, 1)
 	if err != nil || stopEx {
 		return err
@@ -94,7 +94,7 @@ func (lc *litAfClient) Pay(textArgs []string) error {
 		return err
 	}
 
-	fmt.Fprintf(color.Output, "sent txid(s): %s at state %d\n", reply.Txid, reply.StateIdx)
+	fmt.Fprintf(color.Output, "Paid invoice: %s", args.Invoice)
 	return nil
 }
 
