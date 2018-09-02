@@ -67,7 +67,7 @@ func InvoiceReplyMsgFromBytes(in []byte) (lnutil.InvoiceReplyMsg, error) {
 		PeerIdx:  peerIdx, // why is this hardcoded?
 		Id:       string(invoiceId),
 		CoinType: coinType,
-		Amount:   lnutil.BtU64(amount), // convery slice to uint64
+		Amount:   lnutil.BtU64(amount), // convert slice to uint64
 	}
 	fmt.Println("Decrypted message from bytes:", constructedMessage)
 	return constructedMessage, nil

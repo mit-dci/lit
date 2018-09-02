@@ -25,6 +25,8 @@ var (
 	// paid this invoice successfully, store in db
 	BKTGotPaidInvoices = []byte("GotPaidInvoices")
 	// we got paid for these invoices, nice
+	InvoicesPaid    = 0
+	InvoicesGotPaid = 0
 )
 
 // InitDB declares and instantiates invoices.db storage
@@ -58,6 +60,8 @@ func (mgr *InvoiceManager) InitDB(dbPath string) error {
 		if err != nil {
 			return err
 		}
+		InvoicesPaid = 0
+		InvoicesGotPaid = 0
 		_, err = tx.CreateBucketIfNotExists(BKTPaidInvoices)
 		return err
 	})
@@ -302,7 +306,25 @@ func (mgr *InvoiceManager) LoadPendingInvoice(peerIdx uint32,
 }
 
 func (mgr *InvoiceManager) SavePaidInvoice(invoice *lnutil.InvoiceReplyMsg) error {
-	return mgr.storeInvoiceReplyMsgInBucket(BKTPaidInvoices, invoice)
+	// save the invocies we got paid for in the bucket
+	err := mgr.InvoiceDB.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket(BKTPaidInvoices)
+
+		var writeBuffer bytes.Buffer
+		binary.Write(&writeBuffer, binary.BigEndian, invoice.Id)
+		err := b.Put([]byte(lnutil.U32tB(uint32(InvoicesPaid))), invoice.Bytes())
+		// taking advantage of the bytes method defined in lnutil
+		// index by invoice ID
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	InvoicesPaid++
+	return nil
 }
 
 func (mgr *InvoiceManager) LoadPaidInvoice(peerIdx uint32,
@@ -312,7 +334,24 @@ func (mgr *InvoiceManager) LoadPaidInvoice(peerIdx uint32,
 
 func (mgr *InvoiceManager) SaveGotPaidInvoice(invoice *lnutil.InvoiceReplyMsg) error {
 	// save the invocies we got paid for in the bucket
-	return mgr.storeInvoiceReplyMsgInBucket(BKTGotPaidInvoices, invoice)
+	err := mgr.InvoiceDB.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket(BKTGotPaidInvoices)
+
+		var writeBuffer bytes.Buffer
+		binary.Write(&writeBuffer, binary.BigEndian, invoice.Id)
+		err := b.Put([]byte(lnutil.U32tB(uint32(InvoicesGotPaid))), invoice.Bytes())
+		// taking advantage of the bytes method defined in lnutil
+		// index by invoice ID
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	InvoicesGotPaid++
+	return nil
 }
 
 func (mgr *InvoiceManager) displayAllKeyVals(bucketName []byte) ([]lnutil.InvoiceReplyMsg, error) {
@@ -373,7 +412,6 @@ func (mgr *InvoiceManager) displayAllKeyValsDup(bucketName []byte) ([]lnutil.Inv
 	return finmsg, err
 }
 
-
 // helper functions to return stuff easily via the RPC
 // might be repetitive, but avoids the need for people to call the displayAllKeyVals
 // function each time on byte strings
@@ -393,13 +431,13 @@ func (mgr *InvoiceManager) GetAllPendingInvoices() ([]lnutil.InvoiceReplyMsg, er
 	return mgr.displayAllKeyVals(BKTPendingInvoices)
 }
 func (mgr *InvoiceManager) GetAllPaidInvoices() ([]lnutil.InvoiceReplyMsg, error) {
-	// while getting the lsit of paid invoices, we must make sure that duplicate entries
+	// while getting the list of paid invoices, we must make sure that duplicate entries
 	// are also printed. Right now we index by peer, so need a solution for this
 	// need a new bucket for this to store an index for this
 	return mgr.displayAllKeyVals(BKTPaidInvoices)
 }
 func (mgr *InvoiceManager) GetAllGotPaidInvoices() ([]lnutil.InvoiceReplyMsg, error) {
-	// while getting the lsit of paid invoices, we must make sure that duplicate entries
+	// while getting the list of paid invoices, we must make sure that duplicate entries
 	// are also printed. Right now we index by peer, so need a solution for this
 	// need a new bucket for this to store an index for this
 	return mgr.displayAllKeyVals(BKTGotPaidInvoices)

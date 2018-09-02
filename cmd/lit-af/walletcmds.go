@@ -148,7 +148,7 @@ func (lc *litAfClient) ListInvoices() error {
 		fmt.Fprintf(color.Output, "%s\n", lnutil.Header("Active"))
 		for _, invoice := range reply.Invoices {
 			// its is an InvoiceReplyMsg
-			fmt.Fprintf(color.Output, "%s: %s, %s: %d, %s: %s\n\n",
+			fmt.Fprintf(color.Output, "%s: %s, %s: %d %s: %s\n",
 				lnutil.OutPoint("InvoiceID"), invoice.Id, lnutil.OutPoint("Amount"),
 					invoice.Amount, lnutil.OutPoint("CoinType"), invoice.CoinType)
 		}
@@ -161,7 +161,7 @@ func (lc *litAfClient) ListInvoices() error {
 		fmt.Fprintf(color.Output, "%s\n", lnutil.Header("Replied"))
 		for _, invoice := range replydup.Invoices {
 			// its is an InvoiceReplyMsg
-			fmt.Fprintf(color.Output, "%s: %d, %s: %s\n\n",
+			fmt.Fprintf(color.Output, "%s: %d %s: %s\n",
 				lnutil.OutPoint("Peer"), invoice.PeerIdx, lnutil.OutPoint("InvoiceID"), invoice.Id)
 		}
 	}
@@ -173,13 +173,13 @@ func (lc *litAfClient) ListInvoices() error {
 		fmt.Fprintf(color.Output, "%s\n", lnutil.Header("Got Paid"))
 		for _, invoice := range reply.Invoices {
 			// its is an InvoiceReplyMsg
-			fmt.Fprintf(color.Output, "%s: %d, %s: %s, %s: %d, %s: %s\n\n",
+			fmt.Fprintf(color.Output, "%s: %d %s: %s %s: %d %s: %s\n",
 				lnutil.OutPoint("Peer"), invoice.PeerIdx, lnutil.OutPoint("InvoiceID"), invoice.Id,
 				lnutil.OutPoint("Amount"), invoice.Amount, lnutil.OutPoint("CoinType"), invoice.CoinType)
 		}
 	}
 	fmt.Fprintf(color.Output, "%s\n", lnutil.Green("Remote Peers' Invoices"))
-	// these are invoices that we pay for
+	// these are invoices that we paid for
 	err = lc.Call("LitRPC.ListAllRequestedInvoices", args, replydup)
 	if err != nil {
 		return err
@@ -188,7 +188,7 @@ func (lc *litAfClient) ListInvoices() error {
 		fmt.Fprintf(color.Output, "%s\n", lnutil.Header("Requested"))
 		for _, invoice := range replydup.Invoices {
 			// its is an InvoiceReplyMsg
-			fmt.Fprintf(color.Output, "%s: %d, %s: %s\n\n",
+			fmt.Fprintf(color.Output, "%s: %d %s: %s\n",
 				lnutil.OutPoint("Peer"), invoice.PeerIdx, lnutil.OutPoint("InvoiceID"), invoice.Id)
 		}
 	}
@@ -200,7 +200,7 @@ func (lc *litAfClient) ListInvoices() error {
 		fmt.Fprintf(color.Output, "%s\n", lnutil.Header("Pending"))
 		for _, invoice := range reply.Invoices {
 			// its is an InvoiceReplyMsg
-			fmt.Fprintf(color.Output, "%s: %d, %s: %s, %s: %d, %s: %s\n\n",
+			fmt.Fprintf(color.Output, "%s: %d %s: %s %s: %d %s: %s\n",
 				lnutil.OutPoint("Peer"), invoice.PeerIdx, lnutil.OutPoint("InvoiceID"), invoice.Id,
 				lnutil.OutPoint("Amount"), invoice.Amount, lnutil.OutPoint("CoinType"), invoice.CoinType)
 		}
@@ -213,7 +213,7 @@ func (lc *litAfClient) ListInvoices() error {
 		fmt.Fprintf(color.Output, "%s\n", lnutil.Header("Paid"))
 		for _, invoice := range reply.Invoices {
 			// its is an InvoiceReplyMsg
-			fmt.Fprintf(color.Output, "%s: %d, %s: %s, %s: %d, %s: %s\n\n",
+			fmt.Fprintf(color.Output, "%s: %d %s: %s %s: %d %s: %s\n",
 				lnutil.OutPoint("Peer"), invoice.PeerIdx, lnutil.OutPoint("InvoiceID"), invoice.Id,
 				lnutil.OutPoint("Amount"), invoice.Amount, lnutil.OutPoint("CoinType"), invoice.CoinType)
 		}
