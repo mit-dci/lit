@@ -77,7 +77,7 @@ func (mgr *InvoiceManager) LoadGeneratedInvoice(invoiceId string) (lnutil.Invoic
 	var err error
 	err = mgr.InvoiceDB.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(BKTGeneratedInvoices)
-		v := b.Get([]byte(invoiceId))
+		v := b.Get([]byte(invoiceId)) // indexed by the invoiceId
 		if v == nil {
 			return fmt.Errorf("InvoiceId %d does not exist", invoiceId)
 		}

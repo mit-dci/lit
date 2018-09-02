@@ -570,13 +570,6 @@ func (r *LitRPC) PayInvoice(args *PayInvoiceArgs, reply *PayInvoiceReply) error 
 	// send a message out to the peer asking for details
 	// parse the recieved message
 
-	temp, err:= r.Node.InvoiceManager.GetAllGotPaidInvoices()
-	if err != nil {
-		log.Println("Error while loading paid invoices")
-		return err
-	}
-	log.Println("T1", temp)
-	return nil
 	destAdr, invoiceId, err := r.Node.SplitInvoiceId(args.Invoice)
 	if err != nil {
 		return err
@@ -603,7 +596,6 @@ func (r *LitRPC) PayInvoice(args *PayInvoiceArgs, reply *PayInvoiceReply) error 
 	var sentInvoice lnutil.InvoiceMsg
 	sentInvoice.Id = invoiceId
 	sentInvoice.PeerIdx = rpx.Idx
-	r.Node.SentInvoiceReq = append(r.Node.SentInvoiceReq, sentInvoice)
 
 	err = r.Node.InvoiceManager.SaveRequestedInvoice(&sentInvoice)
 	if err != nil {
@@ -640,11 +632,12 @@ func (r *LitRPC) PayInvoice(args *PayInvoiceArgs, reply *PayInvoiceReply) error 
 	// to the paidInvoice bucket and delete it from the generated address bucket
 	// to make the invoiceId free for other invoices to take up
 	err = r.Node.InvoiceManager.SavePaidInvoice(&gotInvoice)
+	// maybe need to store timestamp as well
 	if err != nil {
 		log.Println("Paid invoice, couldn't store it in the database")
 		return fmt.Errorf("Paid invoice, couldn't store it in the database")
 	}
-	err = r.Node.CleanupDbVals(gotInvoice)
+	err = r.Node.CleanupDbValsPayer(gotInvoice)
 	if err != nil {
 		log.Println("Couldn't clear up the database after paying the peer, flush manually!")
 		return fmt.Errorf("Couldn't clear up the database after paying the peer, flush manually!")

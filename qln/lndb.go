@@ -97,6 +97,7 @@ type LitNode struct {
 	// discreet log contract manager
 	DlcManager *dlc.DlcManager
 
+	// invoice manager
 	InvoiceManager *invoice.InvoiceManager
 
 	// BaseWallet is the underlying wallet which keeps track of utxos, secrets,
@@ -111,14 +112,6 @@ type LitNode struct {
 	ConnectedCoinTypes map[uint32]bool
 	RemoteCons         map[uint32]*RemotePeer
 	RemoteMtx          sync.Mutex
-
-	// Pay Invoice Stuff
-	// keep track of all invocie requests made to an external peer
-	SentInvoiceReq []lnutil.InvoiceMsg
-	// user responded to us and we have to pay the guy now
-	// PendingInvoiceReq []lnutil.InvoiceReplyMsg
-	// we've paid this guy, store it in the db file now
-	PaidInvoiceReq []lnutil.InvoiceReplyMsg
 
 	// OmniChan is the channel for the OmniHandler
 	OmniIn  chan lnutil.LitMsg

@@ -6,6 +6,7 @@ import (
 	//"math"
 	"net"
 	"regexp"
+	"time"
 	//"strconv"
 	//"strings"
 
@@ -114,11 +115,16 @@ func (nd *LitNode) GetInvoiceInfo(msg lnutil.InvoiceMsg, peer *RemotePeer) (lnut
 	// now that we've sent out a message to the peer, we need to store it in
 	// BKTRepliedInvoices so that we can keep track of whether this has been paid
 	// or not
-	err = nd.InvoiceManager.SaveRepliedInvoice(msg)
+	err = nd.InvoiceManager.SaveRepliedInvoice(&msg)
 	if err != nil {
 		log.Println("Error while saving replied invoice", err)
 		// no need to exit here since we can get paid even if this fails
 	}
+
+	// keep track of this invoice to see if we get paid sometime soon. One go routune
+	// func (nd *LitNode) MonitorInvoice(peerIdx uint32, invoiceAmount uint64, coinType string) error {
+	go nd.MonitorInvoice(invoice)
+	// this is the invoicereplymsg that we get from generated invoices
 	return invoice, nil
 }
 
@@ -501,7 +507,7 @@ func (nd *LitNode) PayInvoice(req lnutil.InvoiceReplyMsg,
 	return qc.State.StateIdx, nil
 }
 
-func (nd *LitNode) CleanupDbVals(invoice lnutil.InvoiceReplyMsg) error {
+func (nd *LitNode) CleanupDbValsPayer(invoice lnutil.InvoiceReplyMsg) error {
 	var err error
 	BKTRequestedInvoices := []byte("RequestedInvoices")
 	BKTPendingInvoices := []byte("PendingInvoices")
@@ -520,5 +526,110 @@ func (nd *LitNode) CleanupDbVals(invoice lnutil.InvoiceReplyMsg) error {
 	// deletion complete, we can safely return without any issues now
 	// but the remote peer must delete its generated invoice and repliedinvoices
 	// and store in its GotPaidInvoices Bucket
+	return nil
+}
+
+func (nd *LitNode) CleanupDbValsReceiver(invoice lnutil.InvoiceReplyMsg) error {
+	// delete the invoice from GeneratedInvoices and RepliedInvoices and add it to
+	// GotPaidInvoices so that we can  keep a track of all invoices that we got paid
+	// for
+	var err error
+	BKTGeneratedInvoices := []byte("GeneratedInvoices")
+	BKTRepliedInvoices := []byte("RepliedInvoices")
+
+	err = nd.InvoiceManager.DeleteString(BKTGeneratedInvoices, invoice.Id)
+	// generated invoices are indexed by invoiceId
+	if err != nil {
+		log.Println("Couldn't delete val from Generated invocies db")
+		return fmt.Errorf("Couldn't delete val from Generated invocies db")
+	}
+	err = nd.InvoiceManager.DeleteInt(BKTRepliedInvoices, invoice.PeerIdx)
+	// replied invoices are indexed by their PeerIdx
+	if err != nil {
+		log.Println("Couldn't delete val from Replied invocies db")
+		return fmt.Errorf("Couldn't delete val from Replied invocies db")
+	}
+	// deletion complete, we can safely return without any issues now
+	// but the remote peer must delete its generated invoice and repliedinvoices
+	// and store in its GotPaidInvoices Bucket
+	return nil
+}
+
+func (nd *LitNode) MonitorInvoice(invoice lnutil.InvoiceReplyMsg) error {
+	// MonitorInvoice will open a go routine that keeps track of all the payments
+	// made by a specific user towards a receiver. in case this balance increases,
+	// this payment is assumed to be part of the invoice. If the payment amount is less,
+	// we mark the payment as failed and don't delete the invoice. If the payment is
+	// more or equal we mark the payment as completed and delete the invoice.
+
+	// convenience handlers
+	peerIdx := invoice.PeerIdx
+	invoiceAmount := invoice.Amount
+	coinType := invoice.CoinType
+
+	var err error
+	var qcs []*Qchan
+	var currBalance, oldBalance uint64
+	var coinTypeInt uint32
+	switch coinType {
+	case "bcrt":
+		coinTypeInt = 257
+	case "tn3":
+		coinTypeInt = 1
+	default:
+		coinTypeInt = 1 // tn3
+	}
+
+	qcs, err = nd.GetAllQchans()
+	if err != nil {
+		return err
+	}
+
+	for _, q := range qcs {
+		if q.KeyGen.Step[3]&0x7fffffff == peerIdx && !q.CloseData.Closed && q.Coin() == coinTypeInt {
+			// this is the peer we're looking for. We need to track balances for this guy
+			oldBalance += uint64(q.State.MyAmt)
+		}
+	}
+
+	// var paid bool
+	// paid = false
+	currBalance = oldBalance
+	log.Println("OLD BALANCE: %d", oldBalance)
+	for currBalance < oldBalance+invoiceAmount {
+		// we need to get a lsit of all channels again because the peer may create
+		// a new channel
+		currBalance = 0
+		// reset currentBalance because we calculate that again in each run
+		qcs, err = nd.GetAllQchans()
+		for _, q := range qcs {
+			if q.KeyGen.Step[3]&0x7fffffff == peerIdx && !q.CloseData.Closed && q.Coin() == coinTypeInt {
+				// this is the peer we're looking for. We need to track balances for this guy
+				currBalance += uint64(q.State.MyAmt)
+			}
+		}
+		time.Sleep(3 * time.Second) // 3s time polling interval to see if we got paid
+		// is 3s too less? idk
+	}
+	// paid = true // need this bool for prompts maybe. else delete
+	log.Printf("We got paid for invoice: %s", invoice.Id)
+	// if we do come here, it means that we got paid, so delete the invoice from
+	// generated invoices to free up the invoiceId for future use.
+	err = nd.CleanupDbValsReceiver(invoice)
+	if err != nil {
+		log.Println("Couldn't delete invoice from db, manually flush")
+		// don't exit here since we already got paid
+	}
+	// now add this invoice to the GotPaidInvoices db soi that we can keep a track
+	// of all those invoices we got paid for. This could also be used to alert the user
+	// that he got paid simply by checking the invoice Id against the GotPaidInvoices db.
+	err = nd.InvoiceManager.SaveGotPaidInvoice(&invoice)
+	if err != nil {
+		log.Println("Couldn't save invoice to GotPaidInvoices")
+		// don't exit here because this doesn't affect anything
+		// but this would mean that we don't display the invoice to the user when he
+		// wants to see the list of invoices he's paid.
+	}
+	// now delete the invoice from GeneratedInvoices, RepliedInvoices
 	return nil
 }
