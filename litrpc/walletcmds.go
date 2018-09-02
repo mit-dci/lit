@@ -10,6 +10,7 @@ import (
 	"github.com/mit-dci/lit/wire"
 	"log"
 	"time"
+	invoice "github.com/mit-dci/lit/invoice"
 
 	qrcode "github.com/skip2/go-qrcode"
 )
@@ -97,6 +98,7 @@ type TxoInfo struct {
 
 	KeyPath string
 }
+
 type TxoListReply struct {
 	Txos []TxoInfo
 }
@@ -655,6 +657,9 @@ type LsInvoiceMsg struct {
 	Invoices []lnutil.InvoiceMsg
 }
 
+type LsPaidInvoiceStorageMsg struct {
+	Invoices []invoice.PaidInvoiceStorage
+}
 /*
 func (mgr *InvoiceManager) GetAllRepliedInvoices() ([]lnutil.InvoiceReplyMsg, error) {
 	return mgr.displayAllKeyValsDup(BKTRepliedInvoices)
@@ -695,16 +700,17 @@ func (r *LitRPC) ListAllPendingInvoices(args *NoArgs, reply *LsInvoiceReplyMsg) 
 	return nil
 }
 
-func (r *LitRPC) ListAllPaidInvoices(args *NoArgs, reply *LsInvoiceReplyMsg) error {
+func (r *LitRPC) ListAllPaidInvoices(args *NoArgs, reply *LsPaidInvoiceStorageMsg) error {
 	temp, err := r.Node.InvoiceManager.GetAllPaidInvoices()
 	if err != nil {
 		return err
 	}
+	log.Println("RPELIED INVOICE", temp)
 	reply.Invoices = temp
 	return nil
 }
 
-func (r *LitRPC) ListAllGotPaidInvoices(args *NoArgs, reply *LsInvoiceReplyMsg) error {
+func (r *LitRPC) ListAllGotPaidInvoices(args *NoArgs, reply *LsPaidInvoiceStorageMsg) error {
 	temp, err := r.Node.InvoiceManager.GetAllGotPaidInvoices()
 	if err != nil {
 		return err

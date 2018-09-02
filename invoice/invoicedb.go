@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"time"
 
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/lnutil"
@@ -305,14 +306,25 @@ func (mgr *InvoiceManager) LoadPendingInvoice(peerIdx uint32,
 	return mgr.loadFromBucket(BKTPendingInvoices, peerIdx, invoiceId)
 }
 
-func (mgr *InvoiceManager) SavePaidInvoice(invoice *lnutil.InvoiceReplyMsg) error {
+func (mgr *InvoiceManager) SaveInvoicesWithTimestamp(
+	invoice *lnutil.InvoiceReplyMsg, bucketName []byte, key int) error {
 	// save the invocies we got paid for in the bucket
+
+	// save the invocies we got paid for in the bucket
+	var temp PaidInvoiceStorage
+	temp.PeerIdx = invoice.PeerIdx
+	temp.Id = invoice.Id
+	temp.CoinType = invoice.CoinType
+	temp.Amount = invoice.Amount
+	temp.Timestamp = time.Now().Format("01/02/2006 15:04:05")
+	// have our own format so that we can be sure about the size of the timestamp
+
 	err := mgr.InvoiceDB.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket(BKTPaidInvoices)
+		b := tx.Bucket(bucketName)
 
 		var writeBuffer bytes.Buffer
-		binary.Write(&writeBuffer, binary.BigEndian, invoice.Id)
-		err := b.Put([]byte(lnutil.U32tB(uint32(InvoicesPaid))), invoice.Bytes())
+		binary.Write(&writeBuffer, binary.BigEndian, InvoicesPaid)
+		err := b.Put([]byte(lnutil.U32tB(uint32(InvoicesPaid))), temp.Bytes())
 		// taking advantage of the bytes method defined in lnutil
 		// index by invoice ID
 		if err != nil {
@@ -326,6 +338,9 @@ func (mgr *InvoiceManager) SavePaidInvoice(invoice *lnutil.InvoiceReplyMsg) erro
 	InvoicesPaid++
 	return nil
 }
+func (mgr *InvoiceManager) SavePaidInvoice(invoice *lnutil.InvoiceReplyMsg) error {
+	return mgr.SaveInvoicesWithTimestamp(invoice, BKTPaidInvoices, InvoicesPaid)
+}
 
 func (mgr *InvoiceManager) LoadPaidInvoice(peerIdx uint32,
 	invoiceId string) (lnutil.InvoiceReplyMsg, error) {
@@ -333,25 +348,35 @@ func (mgr *InvoiceManager) LoadPaidInvoice(peerIdx uint32,
 }
 
 func (mgr *InvoiceManager) SaveGotPaidInvoice(invoice *lnutil.InvoiceReplyMsg) error {
-	// save the invocies we got paid for in the bucket
-	err := mgr.InvoiceDB.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket(BKTGotPaidInvoices)
+	return mgr.SaveInvoicesWithTimestamp(invoice, BKTGotPaidInvoices, InvoicesGotPaid)
+}
 
-		var writeBuffer bytes.Buffer
-		binary.Write(&writeBuffer, binary.BigEndian, invoice.Id)
-		err := b.Put([]byte(lnutil.U32tB(uint32(InvoicesGotPaid))), invoice.Bytes())
-		// taking advantage of the bytes method defined in lnutil
-		// index by invoice ID
-		if err != nil {
-			return err
-		}
+func (mgr *InvoiceManager) displayInvoicesWithTimestamp(bucketName []byte) ([]PaidInvoiceStorage, error) {
+	// read through all the key value pairs in the bucket and return them as a slice
+	// so that we can display them in a nice way
+	var err error
+	var finmsg []PaidInvoiceStorage
+	err = mgr.InvoiceDB.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(bucketName)
+		b.ForEach(func(k, v []byte) error {
+			//fmt.Printf("key=%s, value=%s\n", k, v)
+			msg, err := PaidInvoiceStorageFromBytes(v)
+			if err != nil {
+				return err
+			}
+			finmsg = append(finmsg, msg)
+			return nil
+		})
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-	InvoicesGotPaid++
-	return nil
+	return finmsg, err
+}
+func (mgr *InvoiceManager) displayPaidInvoices() ([]PaidInvoiceStorage, error) {
+	return mgr.displayInvoicesWithTimestamp(BKTPaidInvoices)
+}
+
+func (mgr *InvoiceManager) displayGotPaidInvoices() ([]PaidInvoiceStorage, error) {
+	return mgr.displayInvoicesWithTimestamp(BKTGotPaidInvoices)
 }
 
 func (mgr *InvoiceManager) displayAllKeyVals(bucketName []byte) ([]lnutil.InvoiceReplyMsg, error) {
@@ -372,7 +397,6 @@ func (mgr *InvoiceManager) displayAllKeyVals(bucketName []byte) ([]lnutil.Invoic
 			if err != nil {
 				return err
 			}
-			log.Println("APPENDING MSG", msg)
 			finmsg = append(finmsg, msg)
 			return nil
 		})
@@ -382,13 +406,6 @@ func (mgr *InvoiceManager) displayAllKeyVals(bucketName []byte) ([]lnutil.Invoic
 }
 
 func (mgr *InvoiceManager) displayAllKeyValsDup(bucketName []byte) ([]lnutil.InvoiceMsg, error) {
-	// read through all the key value pairs in the bucket and return them as a slice
-	// so that we can display them in a nice way
-	// InvoiceReplyMsg params for easy reference
-	//	PeerIdx  uint32
-	//	Id       string
-	//	CoinType string
-	//	Amount   uint64
 	var err error
 	var finmsg []lnutil.InvoiceMsg
 	err = mgr.InvoiceDB.View(func(tx *bolt.Tx) error {
@@ -430,15 +447,15 @@ func (mgr *InvoiceManager) GetAllGeneratedInvoices() ([]lnutil.InvoiceReplyMsg, 
 func (mgr *InvoiceManager) GetAllPendingInvoices() ([]lnutil.InvoiceReplyMsg, error) {
 	return mgr.displayAllKeyVals(BKTPendingInvoices)
 }
-func (mgr *InvoiceManager) GetAllPaidInvoices() ([]lnutil.InvoiceReplyMsg, error) {
+func (mgr *InvoiceManager) GetAllPaidInvoices() ([]PaidInvoiceStorage, error) {
 	// while getting the list of paid invoices, we must make sure that duplicate entries
 	// are also printed. Right now we index by peer, so need a solution for this
 	// need a new bucket for this to store an index for this
-	return mgr.displayAllKeyVals(BKTPaidInvoices)
+	return mgr.displayPaidInvoices()
 }
-func (mgr *InvoiceManager) GetAllGotPaidInvoices() ([]lnutil.InvoiceReplyMsg, error) {
+func (mgr *InvoiceManager) GetAllGotPaidInvoices() ([]PaidInvoiceStorage, error) {
 	// while getting the list of paid invoices, we must make sure that duplicate entries
 	// are also printed. Right now we index by peer, so need a solution for this
 	// need a new bucket for this to store an index for this
-	return mgr.displayAllKeyVals(BKTGotPaidInvoices)
+	return mgr.displayGotPaidInvoices()
 }

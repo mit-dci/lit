@@ -623,6 +623,7 @@ func (nd *LitNode) MonitorInvoice(invoice lnutil.InvoiceReplyMsg) error {
 	// now add this invoice to the GotPaidInvoices db soi that we can keep a track
 	// of all those invoices we got paid for. This could also be used to alert the user
 	// that he got paid simply by checking the invoice Id against the GotPaidInvoices db.
+	// create an obejct of type PaidInvoiceStorage
 	err = nd.InvoiceManager.SaveGotPaidInvoice(&invoice)
 	if err != nil {
 		log.Println("Couldn't save invoice to GotPaidInvoices")

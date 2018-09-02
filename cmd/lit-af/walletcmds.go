@@ -165,17 +165,19 @@ func (lc *litAfClient) ListInvoices() error {
 				lnutil.OutPoint("Peer"), invoice.PeerIdx, lnutil.OutPoint("InvoiceID"), invoice.Id)
 		}
 	}
-	err = lc.Call("LitRPC.ListAllGotPaidInvoices", args, reply)
+	replyPaid := new(litrpc.LsPaidInvoiceStorageMsg)
+	err = lc.Call("LitRPC.ListAllGotPaidInvoices", args, replyPaid)
 	if err != nil {
 		return err
 	}
-	if len(reply.Invoices) > 0 {
+	if len(replyPaid.Invoices) > 0 {
 		fmt.Fprintf(color.Output, "%s\n", lnutil.Header("Got Paid"))
-		for _, invoice := range reply.Invoices {
+		for _, invoice := range replyPaid.Invoices {
 			// its is an InvoiceReplyMsg
-			fmt.Fprintf(color.Output, "%s: %d %s: %s %s: %d %s: %s\n",
+			fmt.Fprintf(color.Output, "%s: %d %s: %s %s: %d %s: %s %s: %s\n",
 				lnutil.OutPoint("Peer"), invoice.PeerIdx, lnutil.OutPoint("InvoiceID"), invoice.Id,
-				lnutil.OutPoint("Amount"), invoice.Amount, lnutil.OutPoint("CoinType"), invoice.CoinType)
+				lnutil.OutPoint("Amount"), invoice.Amount, lnutil.OutPoint("CoinType"), invoice.CoinType,
+				lnutil.OutPoint("Timestamp"), invoice.Timestamp)
 		}
 	}
 	fmt.Fprintf(color.Output, "%s\n", lnutil.Green("Remote Peers' Invoices"))
@@ -205,17 +207,18 @@ func (lc *litAfClient) ListInvoices() error {
 				lnutil.OutPoint("Amount"), invoice.Amount, lnutil.OutPoint("CoinType"), invoice.CoinType)
 		}
 	}
-	err = lc.Call("LitRPC.ListAllPaidInvoices", args, reply)
+	err = lc.Call("LitRPC.ListAllPaidInvoices", args, replyPaid)
 	if err != nil {
 		return err
 	}
-	if len(reply.Invoices) > 0 {
+	if len(replyPaid.Invoices) > 0 {
 		fmt.Fprintf(color.Output, "%s\n", lnutil.Header("Paid"))
-		for _, invoice := range reply.Invoices {
+		for _, invoice := range replyPaid.Invoices {
 			// its is an InvoiceReplyMsg
-			fmt.Fprintf(color.Output, "%s: %d %s: %s %s: %d %s: %s\n",
+			fmt.Fprintf(color.Output, "%s: %d %s: %s %s: %d %s: %s %s: %s\n",
 				lnutil.OutPoint("Peer"), invoice.PeerIdx, lnutil.OutPoint("InvoiceID"), invoice.Id,
-				lnutil.OutPoint("Amount"), invoice.Amount, lnutil.OutPoint("CoinType"), invoice.CoinType)
+				lnutil.OutPoint("Amount"), invoice.Amount, lnutil.OutPoint("CoinType"), invoice.CoinType,
+				lnutil.OutPoint("Timestamp"), invoice.Timestamp)
 		}
 	}
 	return nil
