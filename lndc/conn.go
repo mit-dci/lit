@@ -80,7 +80,7 @@ func Dial(localPriv *btcec.PrivateKey, ipAddr string, remotePKH string,
 		return nil, err
 	}
 
-	log.Println("Received pubkey", s, remotePKH, lnutil.LitAdrFromPubkey(s))
+	log.Println("Received pubkey", s)
 	if lnutil.LitAdrFromPubkey(s) != remotePKH {
 		return nil, fmt.Errorf("Remote PKH doesn't match. Quitting!")
 	}
