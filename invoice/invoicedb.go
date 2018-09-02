@@ -101,6 +101,7 @@ func (mgr *InvoiceManager) storeInvoiceMsgInBucket(bucketName []byte, invoice *l
 		var writeBuffer bytes.Buffer
 		binary.Write(&writeBuffer, binary.BigEndian, invoice.PeerIdx)
 		temp := strconv.Itoa(int(invoice.PeerIdx))
+		// indexing by peeridx
 		err := b.Put([]byte(temp), invoice.Bytes())
 		// index by invoice ID
 		if err != nil {
@@ -222,7 +223,6 @@ func (mgr *InvoiceManager) loadFromBucket(bucketName []byte, peerIdx uint32,
 		b := tx.Bucket(bucketName)
 		v := b.Get([]byte(invoiceId))
 		b.ForEach(func(k, v []byte) error {
-			fmt.Printf("key=%s, value=%s\n", k, v)
 			if k[0] == invoiceId[0] {
 				msg, err := InvoiceReplyMsgFromBytes(v)
 				if err != nil {
@@ -267,7 +267,6 @@ func (mgr *InvoiceManager) LoadRequestedInvoice(peerIdx uint32,
 		b := tx.Bucket(BKTRequestedInvoices)
 		// since RequestedInvoices are indexed by peeridx
 		b.ForEach(func(k, v []byte) error {
-			fmt.Printf("key=%s, value=%s\n", k, v)
 			// k is a byte slice which needs to be converted to an int
 			// could by [51] or [xx, xx]
 			intk, _ := strconv.Atoi(string(k))
@@ -313,7 +312,7 @@ func (mgr *InvoiceManager) LoadPaidInvoice(peerIdx uint32,
 
 func (mgr *InvoiceManager) SaveGotPaidInvoice(invoice *lnutil.InvoiceReplyMsg) error {
 	// save the invocies we got paid for in the bucket
-	return mgr.storeInvoiceReplyMsgInBucket(BKTPaidInvoices, invoice)
+	return mgr.storeInvoiceReplyMsgInBucket(BKTGotPaidInvoices, invoice)
 }
 
 func (mgr *InvoiceManager) displayAllKeyVals(bucketName []byte) ([]lnutil.InvoiceReplyMsg, error) {
@@ -329,7 +328,7 @@ func (mgr *InvoiceManager) displayAllKeyVals(bucketName []byte) ([]lnutil.Invoic
 	err = mgr.InvoiceDB.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketName)
 		b.ForEach(func(k, v []byte) error {
-			fmt.Printf("key=%s, value=%s\n", k, v)
+			//fmt.Printf("key=%s, value=%s\n", k, v)
 			msg, err := InvoiceReplyMsgFromBytes(v)
 			if err != nil {
 				return err
@@ -343,24 +342,65 @@ func (mgr *InvoiceManager) displayAllKeyVals(bucketName []byte) ([]lnutil.Invoic
 	return finmsg, err
 }
 
+func (mgr *InvoiceManager) displayAllKeyValsDup(bucketName []byte) ([]lnutil.InvoiceMsg, error) {
+	// read through all the key value pairs in the bucket and return them as a slice
+	// so that we can display them in a nice way
+	// InvoiceReplyMsg params for easy reference
+	//	PeerIdx  uint32
+	//	Id       string
+	//	CoinType string
+	//	Amount   uint64
+	var err error
+	var finmsg []lnutil.InvoiceMsg
+	err = mgr.InvoiceDB.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(bucketName)
+		b.ForEach(func(k, v []byte) error {
+			msg, err := InvoiceMsgFromBytes(v)
+			if err != nil {
+				return err
+			}
+			// convert k to uint32
+			kuint, err := strconv.Atoi(string(k))
+			if err != nil {
+				return err
+			}
+			msg.PeerIdx = uint32(kuint) // because the invociemsgfrombytes function doesn't parse peeridx
+			finmsg = append(finmsg, msg)
+			return nil
+		})
+		return nil
+	})
+	return finmsg, err
+}
+
+
 // helper functions to return stuff easily via the RPC
 // might be repetitive, but avoids the need for people to call the displayAllKeyVals
 // function each time on byte strings
+// need invoicemsges to work
+func (mgr *InvoiceManager) GetAllRepliedInvoices() ([]lnutil.InvoiceMsg, error) {
+	return mgr.displayAllKeyValsDup(BKTRepliedInvoices)
+}
+func (mgr *InvoiceManager) GetAllRequestedInvoices() ([]lnutil.InvoiceMsg, error) {
+	return mgr.displayAllKeyValsDup(BKTRequestedInvoices)
+}
+
+// need invoicereplymsges to work
 func (mgr *InvoiceManager) GetAllGeneratedInvoices() ([]lnutil.InvoiceReplyMsg, error) {
 	return mgr.displayAllKeyVals(BKTGeneratedInvoices)
-}
-func (mgr *InvoiceManager) GetAllRepliedInvoices() ([]lnutil.InvoiceReplyMsg, error) {
-	return mgr.displayAllKeyVals(BKTRepliedInvoices)
-}
-func (mgr *InvoiceManager) GetAllRequestedInvoices() ([]lnutil.InvoiceReplyMsg, error) {
-	return mgr.displayAllKeyVals(BKTRequestedInvoices)
 }
 func (mgr *InvoiceManager) GetAllPendingInvoices() ([]lnutil.InvoiceReplyMsg, error) {
 	return mgr.displayAllKeyVals(BKTPendingInvoices)
 }
 func (mgr *InvoiceManager) GetAllPaidInvoices() ([]lnutil.InvoiceReplyMsg, error) {
+	// while getting the lsit of paid invoices, we must make sure that duplicate entries
+	// are also printed. Right now we index by peer, so need a solution for this
+	// need a new bucket for this to store an index for this
 	return mgr.displayAllKeyVals(BKTPaidInvoices)
 }
 func (mgr *InvoiceManager) GetAllGotPaidInvoices() ([]lnutil.InvoiceReplyMsg, error) {
+	// while getting the lsit of paid invoices, we must make sure that duplicate entries
+	// are also printed. Right now we index by peer, so need a solution for this
+	// need a new bucket for this to store an index for this
 	return mgr.displayAllKeyVals(BKTGotPaidInvoices)
 }

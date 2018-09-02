@@ -74,6 +74,7 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 	}
 
 	// test stuff for invoices, delete this once done
+	/*
 	var test lnutil.InvoiceReplyMsg
 	test.PeerIdx = uint32(60000)
 	test.Id = "3"
@@ -144,6 +145,7 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 		return nd, fmt.Errorf("FAILED WHILE RETRIEVING A PENDING INVOICE")
 	}
 	log.Println("X4", x2)
+	*/
 	// make maps and channels
 	nd.UserMessageBox = make(chan string, 32)
 

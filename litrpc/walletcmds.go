@@ -552,7 +552,7 @@ func (r *LitRPC) GenInvoice(args *GenInvoiceArgs, reply *GenInvoiceReply) error 
 	}
 	// generate a qr code for the invoice so that people cna print it out or something
 	qrString := fmt.Sprintf("%s1%s", adr, invoiceId)
-	err = qrcode.WriteFile(qrString, qrcode.Highest, -1, "qr_" + invoiceId + ".png")
+	err = qrcode.WriteFile(qrString, qrcode.Highest, -1, "qr_"+invoiceId+".png")
 	// 30% error recovery qr codes, could maybe decrease it, but better to have this
 	// in case some part of a qr gets burnt or something
 	// create a qr code in png format
@@ -644,5 +644,88 @@ func (r *LitRPC) PayInvoice(args *PayInvoiceArgs, reply *PayInvoiceReply) error 
 	}
 	// now we saved this to the list of invoices that we've paid. We should delete the
 	// invoice from pending, requested
+	return nil
+}
+
+type LsInvoiceReplyMsg struct {
+	Invoices []lnutil.InvoiceReplyMsg
+}
+
+type LsInvoiceMsg struct {
+	Invoices []lnutil.InvoiceMsg
+}
+
+/*
+func (mgr *InvoiceManager) GetAllRepliedInvoices() ([]lnutil.InvoiceReplyMsg, error) {
+	return mgr.displayAllKeyValsDup(BKTRepliedInvoices)
+}
+func (mgr *InvoiceManager) GetAllRequestedInvoices() ([]lnutil.InvoiceMsg, error) {
+	return mgr.displayAllKeyValsDup(BKTRequestedInvoices)
+}
+
+// need invoicereplymsges to work
+func (mgr *InvoiceManager) GetAllGeneratedInvoices() ([]lnutil.InvoiceReplyMsg, error) {
+	return mgr.displayAllKeyValsDup(BKTGeneratedInvoices)
+}
+func (mgr *InvoiceManager) GetAllPendingInvoices() ([]lnutil.InvoiceReplyMsg, error) {
+	return mgr.displayAllKeyVals(BKTPendingInvoices)
+}
+func (mgr *InvoiceManager) GetAllPaidInvoices() ([]lnutil.InvoiceReplyMsg, error) {
+	return mgr.displayAllKeyVals(BKTPaidInvoices)
+}
+func (mgr *InvoiceManager) GetAllGotPaidInvoices() ([]lnutil.InvoiceReplyMsg, error) {
+	return mgr.displayAllKeyVals(BKTGotPaidInvoices)
+}
+*/
+func (r *LitRPC) ListAllGeneratedInvoices(args *NoArgs, reply *LsInvoiceReplyMsg) error {
+	temp, err := r.Node.InvoiceManager.GetAllGeneratedInvoices()
+	if err != nil {
+		return err
+	}
+	reply.Invoices = temp
+	return nil
+}
+
+func (r *LitRPC) ListAllPendingInvoices(args *NoArgs, reply *LsInvoiceReplyMsg) error {
+	temp, err := r.Node.InvoiceManager.GetAllPendingInvoices()
+	if err != nil {
+		return err
+	}
+	reply.Invoices = temp
+	return nil
+}
+
+func (r *LitRPC) ListAllPaidInvoices(args *NoArgs, reply *LsInvoiceReplyMsg) error {
+	temp, err := r.Node.InvoiceManager.GetAllPaidInvoices()
+	if err != nil {
+		return err
+	}
+	reply.Invoices = temp
+	return nil
+}
+
+func (r *LitRPC) ListAllGotPaidInvoices(args *NoArgs, reply *LsInvoiceReplyMsg) error {
+	temp, err := r.Node.InvoiceManager.GetAllGotPaidInvoices()
+	if err != nil {
+		return err
+	}
+	reply.Invoices = temp
+	return nil
+}
+
+func (r *LitRPC) ListAllRepliedInvoices(args *NoArgs, reply *LsInvoiceMsg) error {
+	temp, err := r.Node.InvoiceManager.GetAllRepliedInvoices()
+	if err != nil {
+		return err
+	}
+	reply.Invoices = temp
+	return nil
+}
+func (r *LitRPC) ListAllRequestedInvoices(args *NoArgs, reply *LsInvoiceMsg) error {
+	temp, err := r.Node.InvoiceManager.GetAllRequestedInvoices()
+	if err != nil {
+		return err
+	}
+	reply.Invoices = temp
 	return nil
 }

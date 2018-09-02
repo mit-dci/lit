@@ -9,6 +9,13 @@ import (
 	"github.com/mit-dci/lit/lnutil"
 )
 
+var invoiceCommand = &Command{
+	Format: fmt.Sprintf(
+		"%s%s%s%s\n", lnutil.White("invoice"), lnutil.OptColor("pay"), lnutil.OptColor("gen"), lnutil.OptColor("ls")),
+	Description:      "Pay, Generate or view invoices\n",
+	ShortDescription: "Pay, Generate or view invoices\n",
+}
+
 var payCommand = &Command{
 	Format: fmt.Sprintf(
 		"%s%s\n", lnutil.White("pay"), lnutil.ReqColor("invoice")),
@@ -54,6 +61,31 @@ var sweepCommand = &Command{
 	ShortDescription: "Move UTXOs with many 1-in-1-out txs.\n",
 }
 
+func (lc *litAfClient) Invoice(textArgs []string) error {
+	if len(textArgs) > 0 && textArgs[0] == "-h" {
+		fmt.Fprintf(color.Output, invoiceCommand.Format)
+		fmt.Fprintf(color.Output, invoiceCommand.Description)
+		return nil
+	}
+
+	if len(textArgs) == 0 {
+		fmt.Println("pick a command: pay, gen, ls")
+		return nil
+	}
+
+	cmd := textArgs[0]
+	if cmd == "gen" {
+		return lc.GenInvoice(textArgs[1:])
+	}
+	if cmd == "pay" {
+		return lc.PayInvoice(textArgs[1:])
+	}
+	if cmd == "ls" {
+		return lc.ListInvoices()
+	}
+	return fmt.Errorf("Invalid command passed along with invoice")
+}
+
 func (lc *litAfClient) GenInvoice(textArgs []string) error {
 	stopEx, err := CheckHelpCommand(genCommand, textArgs, 2)
 	if err != nil || stopEx {
@@ -95,6 +127,97 @@ func (lc *litAfClient) PayInvoice(textArgs []string) error {
 	}
 
 	fmt.Fprintf(color.Output, "Paid invoice: %s", args.Invoice)
+	return nil
+}
+
+func (lc *litAfClient) ListInvoices() error {
+	// so we need to pritn a list of all invoices here. For this, we need
+	// to receive all the invoices from all the databases and parse them in a nice format
+	// so that we can view stuff clearly. Somewhat similar to channel stuff, but
+	// less dense
+	reply := new(litrpc.LsInvoiceReplyMsg)
+	replydup := new(litrpc.LsInvoiceMsg)
+	args := new(litrpc.NoArgs)
+
+	fmt.Fprintf(color.Output, "%s\n", lnutil.Green("Our Invoices"))
+	err := lc.Call("LitRPC.ListAllGeneratedInvoices", args, reply)
+	if err != nil {
+		return err
+	}
+	if len(reply.Invoices) > 0 {
+		fmt.Fprintf(color.Output, "%s\n", lnutil.Header("Active"))
+		for _, invoice := range reply.Invoices {
+			// its is an InvoiceReplyMsg
+			fmt.Fprintf(color.Output, "%s: %s, %s: %d, %s: %s\n\n",
+				lnutil.OutPoint("InvoiceID"), invoice.Id, lnutil.OutPoint("Amount"),
+					invoice.Amount, lnutil.OutPoint("CoinType"), invoice.CoinType)
+		}
+	}
+	err = lc.Call("LitRPC.ListAllRepliedInvoices", args, replydup)
+	if err != nil {
+		return err
+	}
+	if len(replydup.Invoices) > 0 {
+		fmt.Fprintf(color.Output, "%s\n", lnutil.Header("Replied"))
+		for _, invoice := range replydup.Invoices {
+			// its is an InvoiceReplyMsg
+			fmt.Fprintf(color.Output, "%s: %d, %s: %s\n\n",
+				lnutil.OutPoint("Peer"), invoice.PeerIdx, lnutil.OutPoint("InvoiceID"), invoice.Id)
+		}
+	}
+	err = lc.Call("LitRPC.ListAllGotPaidInvoices", args, reply)
+	if err != nil {
+		return err
+	}
+	if len(reply.Invoices) > 0 {
+		fmt.Fprintf(color.Output, "%s\n", lnutil.Header("Got Paid"))
+		for _, invoice := range reply.Invoices {
+			// its is an InvoiceReplyMsg
+			fmt.Fprintf(color.Output, "%s: %d, %s: %s, %s: %d, %s: %s\n\n",
+				lnutil.OutPoint("Peer"), invoice.PeerIdx, lnutil.OutPoint("InvoiceID"), invoice.Id,
+				lnutil.OutPoint("Amount"), invoice.Amount, lnutil.OutPoint("CoinType"), invoice.CoinType)
+		}
+	}
+	fmt.Fprintf(color.Output, "%s\n", lnutil.Green("Remote Peers' Invoices"))
+	// these are invoices that we pay for
+	err = lc.Call("LitRPC.ListAllRequestedInvoices", args, replydup)
+	if err != nil {
+		return err
+	}
+	if len(replydup.Invoices) > 0 {
+		fmt.Fprintf(color.Output, "%s\n", lnutil.Header("Requested"))
+		for _, invoice := range replydup.Invoices {
+			// its is an InvoiceReplyMsg
+			fmt.Fprintf(color.Output, "%s: %d, %s: %s\n\n",
+				lnutil.OutPoint("Peer"), invoice.PeerIdx, lnutil.OutPoint("InvoiceID"), invoice.Id)
+		}
+	}
+	err = lc.Call("LitRPC.ListAllPendingInvoices", args, reply)
+	if err != nil {
+		return err
+	}
+	if len(reply.Invoices) > 0 {
+		fmt.Fprintf(color.Output, "%s\n", lnutil.Header("Pending"))
+		for _, invoice := range reply.Invoices {
+			// its is an InvoiceReplyMsg
+			fmt.Fprintf(color.Output, "%s: %d, %s: %s, %s: %d, %s: %s\n\n",
+				lnutil.OutPoint("Peer"), invoice.PeerIdx, lnutil.OutPoint("InvoiceID"), invoice.Id,
+				lnutil.OutPoint("Amount"), invoice.Amount, lnutil.OutPoint("CoinType"), invoice.CoinType)
+		}
+	}
+	err = lc.Call("LitRPC.ListAllPaidInvoices", args, reply)
+	if err != nil {
+		return err
+	}
+	if len(reply.Invoices) > 0 {
+		fmt.Fprintf(color.Output, "%s\n", lnutil.Header("Paid"))
+		for _, invoice := range reply.Invoices {
+			// its is an InvoiceReplyMsg
+			fmt.Fprintf(color.Output, "%s: %d, %s: %s, %s: %d, %s: %s\n\n",
+				lnutil.OutPoint("Peer"), invoice.PeerIdx, lnutil.OutPoint("InvoiceID"), invoice.Id,
+				lnutil.OutPoint("Amount"), invoice.Amount, lnutil.OutPoint("CoinType"), invoice.CoinType)
+		}
+	}
 	return nil
 }
 
