@@ -39,7 +39,7 @@ type config struct { // define a struct for usage with go-flags
 	ReSync bool `short:"r" long:"reSync" description:"Resync from the given tip."`
 	Tower  bool `long:"tower" description:"Watchtower: Run a watching node"`
 	Hard   bool `short:"t" long:"hard" description:"Flag to set networks."`
-  
+
 	Verbose bool `short:"v" long:"verbose" description:"Set verbosity to true."`
 	// rpc server config
 	Rpcport uint16 `short:"p" long:"rpcport" description:"Set RPC port to connect to"`
@@ -59,7 +59,7 @@ var (
 	defaultHomeDir               = os.Getenv("HOME")
 	defaultRpcport               = uint16(8001)
 	defaultRpchost               = "localhost"
-	defaultAutoReconnect         = false
+	defaultAutoReconnect         = true
 	defaultAutoListenPort        = ":2448"
 	defaultAutoReconnectInterval = int64(60)
 	defaultUpnPFlag              = false
@@ -186,11 +186,18 @@ func main() {
 	rpcl.Node = node
 	rpcl.OffButton = make(chan bool, 1)
 
-	go litrpc.RPCListen(rpcl, conf.Rpchost, conf.Rpcport)
-
 	if conf.AutoReconnect {
 		node.AutoReconnect(conf.AutoListenPort, conf.AutoReconnectInterval)
 	}
+
+	node.RPC = rpcl
+
+	/** TODO: Reinstate normal RPC, configurable (default off)
+	rpcProxy, err := litrpc.NewLocalLndcRpcWebsocketProxy()
+	if err != nil {
+		log.Fatal(err)
+	}
+	go rpcProxy.Listen(conf.Rpchost, conf.Rpcport)*/
 
 	<-rpcl.OffButton
 	log.Printf("Got stop request\n")

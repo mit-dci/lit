@@ -2,15 +2,21 @@ package qln
 
 import (
 	"fmt"
-	"github.com/mit-dci/lit/btcutil/btcec"
-	"github.com/mit-dci/lit/lndc"
-	"github.com/mit-dci/lit/lnutil"
-	nat "github.com/mit-dci/lit/nat"
+	"log"
+	"net"
+	"strconv"
+	"time"
+
 	"log"
 	"net"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/mit-dci/lit/btcutil/btcec"
+	"github.com/mit-dci/lit/lndc"
+	"github.com/mit-dci/lit/lnutil"
+	nat "github.com/mit-dci/lit/nat"
 )
 
 // Gets the list of ports where LitNode is listening for incoming connections,
@@ -156,7 +162,7 @@ func (nd *LitNode) DialPeer(connectAdr string) (uint32, error) {
 	var err error
 
 	// parse address and get pkh / host / port
-	who, where := splitAdrString(connectAdr)
+	who, where := lnutil.ParseAdrString(connectAdr)
 
 	// If we couldn't deduce a URL, look it up on the tracker
 	if where == "" {
