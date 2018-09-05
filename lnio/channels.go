@@ -44,9 +44,10 @@ const (
 
 // ChannelInfo .
 type ChannelInfo struct {
-	PeerAddr string       `json:"peeraddr"`
-	CoinType int32        `json:"cointype"`
-	State    ChannelState `json:"state"`
-	OpenTx   []byte       `json:"opentx"` // should this be here?
+	PeerAddr   string       `json:"peeraddr"`
+	CoinType   int32        `json:"cointype"`
+	State      ChannelState `json:"state"`
+	OpenTx     []byte       `json:"opentx"`     // should this be here?
+	OpenHeight int32        `json:"openheight"` // -1 if unconfirmed
 	// TODO More.
 }

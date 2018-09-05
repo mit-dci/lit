@@ -1,5 +1,11 @@
 package lnio
 
+// CoinSpecific is a meta-interface for coin-specific types.
+type CoinSpecific interface {
+	GetCoinTypeId() int32
+	Bytes() []byte
+}
+
 // LitStorage is an abstract wrapper layer around an arbitrary database.
 type LitStorage interface {
 	Open(dbpath string) error
@@ -15,17 +21,23 @@ type LitStorage interface {
 
 // LitWalletStorage is storage for wallet data.
 type LitWalletStorage interface {
-	GetCoinType() uint32
+	CoinSpecific
 
-	GetAddresses() ([][]byte, error)
-	CreateNewAddress() ([]byte, error)
+	GetAddresses() ([]CoinAddress, error)
 
 	GetUtxos() ([]Utxo, error)
-
-	GetSyncHeight() (int32, error)
-
-	AddWatchOutpoint(TxOut) error
-	RemoveWatchOutput(TxOut) error
+	AddUtxo(Utxo) error
+	RemoveUtxo(Utxo) error
 
 	// TODO More
+}
+
+type CoinAddress struct {
+	cointype int32
+	addr     []byte
+}
+
+// AreCoinsCompatible checks to see if two coin-specific objects are for the same coin.
+func AreCoinsCompatible(a, b CoinSpecific) bool {
+	return a.GetCoinTypeId() == b.GetCoinTypeId()
 }
