@@ -1,6 +1,7 @@
 package litrpc
 
 import (
+	//"bufio"
 	"fmt"
 	"github.com/mit-dci/lit/bech32"
 	"github.com/mit-dci/lit/consts"
@@ -9,7 +10,9 @@ import (
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/wire"
 	"log"
-	"time"
+	//"os"
+	//"strings"
+	//"time"
 	invoice "github.com/mit-dci/lit/invoice"
 
 	qrcode "github.com/skip2/go-qrcode"
@@ -507,6 +510,9 @@ type PayInvoiceReply struct {
 	StateIdx uint64
 }
 
+type PayInvoiceHandlerReply struct {
+	Invoice lnutil.InvoiceReplyMsg
+}
 func (r *LitRPC) GenInvoice(args *GenInvoiceArgs, reply *GenInvoiceReply) error {
 	idPriv := r.Node.IdKey()
 	var idPub [33]byte
@@ -567,6 +573,118 @@ func (r *LitRPC) GenInvoice(args *GenInvoiceArgs, reply *GenInvoiceReply) error 
 	reply.Invoice = qrString
 	return nil
 }
+
+func (r *LitRPC) PayInvoiceHandler(args *NoArgs, reply *PayInvoiceHandlerReply) error {
+	// we need to go through all the endpoitns present in BKTRequestedInvoices and then
+	// see whether they are in BKTPendingInvoices. If tehy are in pending invoices,
+	// we need to send the user a message asking him if he wants to pay the particular
+	// invoice
+	reqInvoices, err := r.Node.InvoiceManager.GetAllRequestedInvoices()
+	if err != nil {
+		log.Println("Unable ot fetch all requested invoices")
+		return err
+	}
+	pendingInvoices, err := r.Node.InvoiceManager.GetAllPendingInvoices()
+	if err != nil {
+		log.Println("Unable ot fetch all pending invoices")
+		return err
+	}
+	// now we have both pending and requested invoices. N eed to get the common
+	// elements in them so that we can pay those paritcular invoices
+	// n^2 but no other option. Also n is low (max 36 elements), so tis okay
+	for _, rInvoice := range reqInvoices {
+		// check against each pendignInvoice
+		for _, pInvoice := range pendingInvoices {
+			// need to check each element since this is a struct
+			// rInvoice is an InvoiceMsg whereas pInvoice is an InvoiceReplyMsg
+			// PeerIdx  uint32
+			// Id       string
+			// CoinType string
+			// Amount   uint64
+			if rInvoice.Id == pInvoice.Id &&
+				rInvoice.PeerIdx == pInvoice.PeerIdx {
+				log.Println("This is an invoice we must pay", rInvoice)
+				reply.Invoice = pInvoice // since pinvoice is an InvoiceReplyMsg
+				break // break for now, return many invoices later
+			}
+		}
+	}
+	return nil
+	/*
+		// gotInvoice is an InvoiceReplyMsg
+		// compare peeridx and chan idx with what we sent to the peer
+
+		// PeerIdx  uint32
+		// Id       string
+		// CoinType string
+		// Amount   uint64
+		// at this point, if the invoice matches, this means that this is the invoice that we requested
+		if gotInvoice.PeerIdx == sentInvoice.PeerIdx && gotInvoice.Id == sentInvoice.Id {
+			stateIdx, err := r.Node.PayInvoice(gotInvoice, destAdr, args.Invoice)
+			if err != nil {
+				return err
+			}
+			reply.StateIdx = stateIdx
+		}
+		// if everything goes well until  here, means we paid the invoice. Add the invoice
+		// to the paidInvoice bucket and delete it from the generated address bucket
+		// to make the invoiceId free for other invoices to take up
+		err = r.Node.InvoiceManager.SavePaidInvoice(&gotInvoice)
+		// maybe need to store timestamp as well
+		if err != nil {
+			log.Println("Paid invoice, couldn't store it in the database")
+			return fmt.Errorf("Paid invoice, couldn't store it in the database")
+		}
+		err = r.Node.CleanupDbValsPayer(gotInvoice)
+		if err != nil {
+			log.Println("Couldn't clear up the database after paying the peer, flush manually!")
+			return fmt.Errorf("Couldn't clear up the database after paying the peer, flush manually!")
+		}
+		// now we saved this to the list of invoices that we've paid. We should delete the
+		// invoice from pending, requested
+		return nil
+	*/
+}
+
+type PayInvoiceConfirmArgs struct {
+	// smae as lnutil.InvoiceReplyMsg
+	Invoice lnutil.InvoiceReplyMsg
+}
+
+type PayInvoiceConfirmReply struct {
+	success bool
+}
+func (r *LitRPC) PayInvoiceConfirm(args *PayInvoiceConfirmArgs, reply *PayInvoiceConfirmReply) error {
+	// got confirmation from the user to pay the invoice, so pay
+	// where do we get destAdr from?
+	// we need destAdr i ncase we aren't connected to the peer, get it from lndb somehow
+	// and then pass it on to PayInvoice where it should check for a connection
+	// and if one doesn't exist, it s hould create a connection.
+
+	// so I know the peerIdx, how can I get the remote node's address from here?
+	_, err := r.Node.PayInvoice(args.Invoice)
+	if err != nil {
+		return err
+	}
+	// if everything goes well until  here, means we paid the invoice. Add the invoice
+	// to the paidInvoice bucket and delete it from the generated address bucket
+	// to make the invoiceId free for other invoices to take up
+	err = r.Node.InvoiceManager.SavePaidInvoice(&args.Invoice)
+	// maybe need to store timestamp as well
+	if err != nil {
+		log.Println("Paid invoice, couldn't store it in the database")
+		return fmt.Errorf("Paid invoice, couldn't store it in the database")
+	}
+	err = r.Node.CleanupDbValsPayer(args.Invoice)
+	if err != nil {
+		log.Println("Couldn't clear up the database after paying the peer, flush manually!")
+		return fmt.Errorf("Couldn't clear up the database after paying the peer, flush manually!")
+	}
+	// now we saved this to the list of invoices that we've paid. We should delete the
+	// invoice from pending, requested
+	return nil
+}
+
 func (r *LitRPC) PayInvoice(args *PayInvoiceArgs, reply *PayInvoiceReply) error {
 	var err error
 	// send a message out to the peer asking for details
@@ -601,51 +719,19 @@ func (r *LitRPC) PayInvoice(args *PayInvoiceArgs, reply *PayInvoiceReply) error 
 
 	err = r.Node.InvoiceManager.SaveRequestedInvoice(&sentInvoice)
 	if err != nil {
-		log.Println("Error while sasving to requested invocies. returning")
-		return fmt.Errorf("Error while sasving to requested invocies. returning")
+		log.Println("Error while saving to requested invocies. returning")
+		return fmt.Errorf("Error while saving to requested invocies. returning")
 	}
 
-	time.Sleep(3 * time.Second) // wait for the peer to reply
-	// I guess this is ugly, but it works for now, maybe refactor later.
+	// BUT I may have changed my mind on whether to pay this invoice (eg the messages
+	// took more than 10 minutes and I paid cofee by cash instead.)
+	// An additional concern here is that this is run by the node and not by the clietnt, so
+	// the ndoe needs to ask the alient whether he wants to pay x amount
+	// how do we do this?
 
-	gotInvoice, err := r.Node.InvoiceManager.LoadPendingInvoice(rpx.Idx, invoiceId)
-	// check whether the invoice actualyl made it inside requested invoices
-	// this alreyad looks through all key vlaue pairs in the db so that we don't have to
-	if err != nil {
-		// no invoice found
-		return err
-	}
-	// gotInvoice is an InvoiceReplyMsg
-	// compare peeridx and chan idx with what we sent to the peer
-
-	// PeerIdx  uint32
-	// Id       string
-	// CoinType string
-	// Amount   uint64
-
-	if gotInvoice.PeerIdx == sentInvoice.PeerIdx && gotInvoice.Id == sentInvoice.Id {
-		stateIdx, err := r.Node.PayInvoice(gotInvoice, destAdr, args.Invoice)
-		if err != nil {
-			return err
-		}
-		reply.StateIdx = stateIdx
-	}
-	// if everything goes well until  here, means we paid the invoice. Add the invoice
-	// to the paidInvoice bucket and delete it from the generated address bucket
-	// to make the invoiceId free for other invoices to take up
-	err = r.Node.InvoiceManager.SavePaidInvoice(&gotInvoice)
-	// maybe need to store timestamp as well
-	if err != nil {
-		log.Println("Paid invoice, couldn't store it in the database")
-		return fmt.Errorf("Paid invoice, couldn't store it in the database")
-	}
-	err = r.Node.CleanupDbValsPayer(gotInvoice)
-	if err != nil {
-		log.Println("Couldn't clear up the database after paying the peer, flush manually!")
-		return fmt.Errorf("Couldn't clear up the database after paying the peer, flush manually!")
-	}
-	// now we saved this to the list of invoices that we've paid. We should delete the
-	// invoice from pending, requested
+	// simple way is we return here and then fire up an async handler on lit-af
+	// which would then alert us if we have stuff to pay
+	log.Println("RETURNING FROM PAY INVOICE")
 	return nil
 }
 
@@ -660,6 +746,7 @@ type LsInvoiceMsg struct {
 type LsPaidInvoiceStorageMsg struct {
 	Invoices []invoice.PaidInvoiceStorage
 }
+
 /*
 func (mgr *InvoiceManager) GetAllRepliedInvoices() ([]lnutil.InvoiceReplyMsg, error) {
 	return mgr.displayAllKeyValsDup(BKTRepliedInvoices)
@@ -705,7 +792,6 @@ func (r *LitRPC) ListAllPaidInvoices(args *NoArgs, reply *LsPaidInvoiceStorageMs
 	if err != nil {
 		return err
 	}
-	log.Println("RPELIED INVOICE", temp)
 	reply.Invoices = temp
 	return nil
 }

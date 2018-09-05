@@ -111,6 +111,8 @@ func main() {
 	}
 	defer rl.Close()
 	go lc.RequestAsync()
+	go lc.AsyncInvoiceReplier()
+
 	// main shell loop
 	for {
 		// setup reader with max 4K input chars

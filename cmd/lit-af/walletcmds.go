@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bufio"
+	"os"
 	"fmt"
 	"strconv"
 
@@ -83,7 +85,52 @@ func (lc *litAfClient) Invoice(textArgs []string) error {
 	if cmd == "ls" {
 		return lc.ListInvoices()
 	}
+	// at this point, we can only have the pay command falling through
+	// so we requested an invoice succesfully. Now if the remote peer replies, we
+	// need to have an async handler which would alert us  that the remote peer
+	// replied.
 	return fmt.Errorf("Invalid command passed along with invoice")
+}
+
+func (lc *litAfClient) AsyncInvoiceReplier() {
+	for {
+		args := new(litrpc.NoArgs)
+		reply := new(litrpc.PayInvoiceHandlerReply)
+
+		err := lc.rpccon.Call("LitRPC.PayInvoiceHandler", args, reply)
+		if err != nil {
+			fmt.Fprintf(color.Output, "RequestAsync error %s\n", lnutil.Red(err.Error()))
+			break
+		}
+		// fmt.Fprintf(color.Output, "%s\n", lnutil.Red(reply))
+		if len(reply.Invoice.Id) != 0 {
+			fmt.Fprintf(color.Output, "%s\n", lnutil.Red("WORKS"))
+
+			fmt.Print("\nHold Y/y to continue the payment, hold N/n to stop the payment")
+
+			reader := bufio.NewReader(os.Stdin)
+			c, err := reader.ReadByte()
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+			fmt.Printf("\nhello:%d", c)
+			if c == []byte("Y")[0] || c == []byte("y")[0] {
+				fmt.Println("Paying invoice:", reply.Invoice)
+				args := new(litrpc.PayInvoiceConfirmArgs)
+				args.Invoice = reply.Invoice
+				replydup := new(litrpc.PayInvoiceConfirmReply)
+				err = lc.Call("LitRPC.PayInvoiceConfirm", args, replydup)
+				if err != nil {
+					return
+				}
+			} else {
+				fmt.Println("No? Ok, we'll exit.")
+			}
+			break
+		}
+	}
+	return
 }
 
 func (lc *litAfClient) GenInvoice(textArgs []string) error {

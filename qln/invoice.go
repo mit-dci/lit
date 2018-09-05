@@ -301,8 +301,7 @@ type FundArgs struct {
 	Data        [32]byte
 }
 
-func (nd *LitNode) PayInvoice(req lnutil.InvoiceReplyMsg,
-	destAdr string, invoice string) (uint64, error) {
+func (nd *LitNode) PayInvoice(req lnutil.InvoiceReplyMsg) (uint64, error) {
 
 	// Two ways we can pay this invoice
 	// 1. Pay through an existing channel ie push funds through an existing channel
@@ -390,26 +389,26 @@ func (nd *LitNode) PayInvoice(req lnutil.InvoiceReplyMsg,
 	nd.RemoteMtx.Lock()
 	_, connected := nd.RemoteCons[req.PeerIdx]
 	// see if the peer is connected. Don't store the remote peer here.
+	// skip checking rmeote addresses
+	if connected {
+		conExists = true
+	}
 	nd.RemoteMtx.Unlock()
 
-	idHash := fastsha256.Sum256(pubKey[:])
-	adr := bech32.Encode("ln", idHash[:20])
-	if adr == destAdr { // sanity check regarding addresses
-		log.Println("Addresses match")
-		if connected {
-			log.Println("We are connected to this peer")
-			conExists = true
-			rpx = *nd.RemoteCons[req.PeerIdx] // store the remote peer here
-		}
-	} else {
-		// the remote PKH doesn't match what we have, some weird case. exit
-		log.Println("remote address doesn't match. quitting!")
-		return 0, fmt.Errorf("remote address doesn't match. quitting!")
-	}
 	if !conExists {
-		// per disconnected in the 3s that we waited. No money for them.
-		log.Println("Not connected to peer, not paying invoice!")
-		return 0, fmt.Errorf("Not connected to peer, not paying invoice!")
+		// we have to connect to them because we want to pay them
+		// this case occrus when you sened out an invoice request, receive it but then
+		// exit before you get to complete the payment. IN this canse, the payment is
+		// still pending but with no connection
+		idHash := fastsha256.Sum256(pubKey[:])
+		adr := bech32.Encode("ln", idHash[:20])
+		err := nd.DialPeer(adr + "@:2448") // localhost for now
+
+		if err != nil {
+			log.Printf("Could not connect to remote peerIDx %d", req.PeerIdx)
+			log.Println(err)
+			return 0, err
+		}
 	}
 	chanExists := false
 	qcs, err := nd.GetAllQchans()
@@ -421,6 +420,7 @@ func (nd *LitNode) PayInvoice(req lnutil.InvoiceReplyMsg,
 			q.State.MyAmt > int64(req.Amount) && q.Value > int64(req.Amount) {
 			// get an open channel with required capacity
 			// do we check for confirmation height as well?
+			log.Println("CHAN EXTS", q)
 			chanExists = true
 			qChannel = q
 		}
@@ -487,17 +487,23 @@ func (nd *LitNode) PayInvoice(req lnutil.InvoiceReplyMsg,
 		// sleep a bit
 		return uint64(idx), nil
 	}
-	log.Println("Pushinf funds in existing / created channel")
-	var data [32]byte
 
+	nd.RemoteMtx.Lock()
+	rpx = *nd.RemoteCons[req.PeerIdx] // store the remote peer here
+	nd.RemoteMtx.Unlock()
+	log.Println("TPX", rpx)
+
+	log.Println("Pushing funds in existing / created channel")
+	var data [32]byte
 	qc, ok := rpx.QCs[qChannel.Idx()]
 	if !ok {
+		log.Println("RETUREND HERE? ")
 		return 0, fmt.Errorf("peer %d doesn't have channel %d",
 			qChannel.Peer(), qChannel.Idx())
 	}
 	qc.Height = qChannel.Height
 
-	log.Println("Paying %d towards invoice %s", req.Amount, invoice)
+	log.Println("Paying %d towards previously confirmed invoice", req.Amount)
 	err = nd.PushChannel(qc, uint32(req.Amount), data)
 	if err != nil {
 		log.Println("ERROR WHILE PUSHING FUNDS!!", err)
@@ -562,6 +568,8 @@ func (nd *LitNode) MonitorInvoice(invoice lnutil.InvoiceReplyMsg) error {
 	// we mark the payment as failed and don't delete the invoice. If the payment is
 	// more or equal we mark the payment as completed and delete the invoice.
 
+	// this won't work if the remote peer disconnects after we reply to him
+	// how do we solve this?
 	// convenience handlers
 	peerIdx := invoice.PeerIdx
 	invoiceAmount := invoice.Amount
@@ -595,10 +603,10 @@ func (nd *LitNode) MonitorInvoice(invoice lnutil.InvoiceReplyMsg) error {
 	// var paid bool
 	// paid = false
 	currBalance = oldBalance
-	log.Println("OLD BALANCE: %d", oldBalance)
 	for currBalance < oldBalance+invoiceAmount {
-		// we need to get a lsit of all channels again because the peer may create
+		// we need to get a list of all channels again because the peer may create
 		// a new channel
+		log.Println("OLD BALANCE: %d", oldBalance)
 		currBalance = 0
 		// reset currentBalance because we calculate that again in each run
 		qcs, err = nd.GetAllQchans()
