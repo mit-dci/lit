@@ -21,7 +21,12 @@ type messagehandler struct {
 type MessageProcessor struct {
 	handlers [256]*messagehandler
 
-	active bool // this is so we don't break things but can stay fastish.
+	// This is for keeping track of if we're making changes to the message
+	// processor.  Locking and unlocking is slow and shouldn't be necessary when
+	// handling messages, but we don't want to be handling messages while making
+	// changes to the handlerset.
+	// TODO Evaluate if this mutex is even necessary?
+	active bool
 	actmtx *sync.Mutex
 }
 
@@ -55,6 +60,11 @@ func (mp *MessageProcessor) DefineMessage(mtype uint8, pfunc ParseFuncType, hfun
 // Activate sets the MessageProcessor to be "active"
 func (mp *MessageProcessor) Activate() {
 	mp.active = true
+}
+
+// IsActive returns the activiation state for the MessageProcessor.
+func (mp *MessageProcessor) IsActive() bool {
+	return mp.active
 }
 
 // HandleMessage runs through the normal handling procedure for the message, returning any errors.

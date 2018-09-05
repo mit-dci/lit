@@ -65,6 +65,9 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 		return nil, err
 	}
 
+	// Actually start the thread to send messages.
+	nd.PeerMan.StartSending()
+
 	// Register adapter event handlers.  These are for hooking in the new peer management with the old one.
 	h1 := makeTmpNewPeerHandler(nd)
 	nd.Events.RegisterHandler("lnp2p.peer.new", h1)

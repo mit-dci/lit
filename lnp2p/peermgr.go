@@ -64,7 +64,7 @@ func NewPeerManager(rootkey *hdkeychain.ExtendedKey, pdb lnio.LitPeerStorage, bu
 		peers:          make([]lnio.LnAddr, 1),
 		peerMap:        map[lnio.LnAddr]*Peer{},
 		listeningPorts: map[string]*listeningthread{},
-		sending:        true,
+		sending:        false,
 		outqueue:       make(chan outgoingmsg, outgoingbuf),
 		mtx:            &sync.Mutex{},
 	}
@@ -293,8 +293,14 @@ func (pm *PeerManager) ListenOnPort(addr string) error {
 	pm.listeningPorts[addr] = threadobj
 	pm.mtx.Unlock()
 
+	// Activate the MessageProcessor if we haven't yet.
+	if !pm.mproc.IsActive() {
+		pm.mproc.Activate()
+	}
+
 	// Actually start it
 	go acceptConnections(listener, addr, pm)
+
 	return nil
 
 }
@@ -377,15 +383,19 @@ func (pm *PeerManager) StopSending() error {
 	if !pm.sending {
 		return fmt.Errorf("not sending")
 	}
-	pm.outqueue <- outgoingmsg{nil, nil} // stops the sending goroutine
+	fc := make(chan error)
+	pm.outqueue <- outgoingmsg{nil, nil, &fc} // sends a message to stop the goroutine
+
+	<-fc // wait for the queue to flush
 	pm.sending = false
+
 	return nil
 }
 
-func (pm *PeerManager) queueMessageToPeer(peer *Peer, msg Message) error {
+func (pm *PeerManager) queueMessageToPeer(peer *Peer, msg Message, ec *chan error) error {
 	if !pm.sending {
 		return fmt.Errorf("sending is disabled on this peer manager, need to start it?")
 	}
-	pm.outqueue <- outgoingmsg{peer, &msg}
+	pm.outqueue <- outgoingmsg{peer, &msg, ec}
 	return nil
 }

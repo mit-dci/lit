@@ -18,8 +18,9 @@ type Message interface {
 }
 
 type outgoingmsg struct {
-	peer    *Peer
-	message *Message
+	peer       *Peer
+	message    *Message
+	finishchan *chan error
 }
 
 func sendMessages(queue chan outgoingmsg) {
@@ -32,12 +33,18 @@ func sendMessages(queue chan outgoingmsg) {
 
 		// Sending a message with a nil peer is how we signal to "stop sending things".
 		if recv.peer == nil {
+			if recv.finishchan != nil {
+				*recv.finishchan <- nil
+			}
 			break
 		}
 
 		// Sanity check.
 		if recv.message == nil {
 			log.Printf("peermgr: Directed to send nil message, somehow\n")
+			if recv.finishchan != nil {
+				*recv.finishchan <- nil
+			}
 			continue
 		}
 
@@ -51,6 +58,9 @@ func sendMessages(queue chan outgoingmsg) {
 		conn := recv.peer.conn
 		if conn == nil {
 			log.Printf("peermgr: Tried to send message to disconnected peer %s\n", recv.peer.GetPrettyName())
+			if recv.finishchan != nil {
+				*recv.finishchan <- nil
+			}
 			continue
 		}
 
@@ -58,6 +68,11 @@ func sendMessages(queue chan outgoingmsg) {
 		_, err := conn.Write(buf)
 		if err != nil {
 			log.Printf("peermgr: Error sending message to peer: %s\n", err.Error())
+		}
+
+		// Responses, if applicable.
+		if recv.finishchan != nil {
+			*recv.finishchan <- err
 		}
 
 	}

@@ -9,21 +9,27 @@ import (
 
 // LitMsgWrapperMessage is a wrapper type for adapting things to other things.
 type LitMsgWrapperMessage struct {
+	mtype  uint8
 	rawbuf []byte
 }
 
 // Type .
 func (wm LitMsgWrapperMessage) Type() uint8 {
-	return wm.rawbuf[0]
+	return wm.mtype
 }
 
 // Bytes .
 func (wm LitMsgWrapperMessage) Bytes() []byte {
-	return wm.rawbuf[1:] // Have to take off the type byte at the beginning.
+	return wm.rawbuf
 }
 
-func neoOmniParser(buf []byte) (lnp2p.Message, error) {
-	return LitMsgWrapperMessage{buf}, nil
+func makeNeoOmniParser(mtype uint8) lnp2p.ParseFuncType {
+	return func(buf []byte) (lnp2p.Message, error) {
+		fullbuf := make([]byte, len(buf)+1)
+		fullbuf[0] = mtype
+		copy(fullbuf[1:], buf)
+		return LitMsgWrapperMessage{mtype, fullbuf}, nil
+	}
 }
 
 // Mostly taken from LNDCReader in msghandler.go, then horribly changed.

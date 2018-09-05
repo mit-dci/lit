@@ -95,15 +95,19 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 func (nd *LitNode) OutMessager() {
 	for {
 		msg := <-nd.OmniOut
+
 		if !nd.ConnectedToPeer(msg.Peer()) {
 			logging.Errorf("message type %x to peer %d but not connected\n",
 				msg.MsgType(), msg.Peer())
 			continue
 		}
 
+		buf := msg.Bytes()
+
 		// Just wrap it and forward it off to the underlying infrastructure.
+		// There's some byte fenagling that we have to do to get all this to work right.
 		np := nd.PeerMan.GetPeerByIdx(int32(msg.Peer()))
-		np.SendQueuedMessage(LitMsgWrapperMessage{msg.Bytes()})
+		np.SendImmediateMessage(LitMsgWrapperMessage{buf[0], buf[1:]}) // being blocking might not be a huge issue here possibly?
 	}
 }
 

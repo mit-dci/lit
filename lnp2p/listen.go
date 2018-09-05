@@ -132,7 +132,10 @@ func processConnectionInboundTraffic(peer *Peer, pm *PeerManager) {
 		log.Printf("Got message of len %d from peer %s\n", n, peer.GetLnAddr())
 
 		// Send to the message processor.
-		pm.mproc.HandleMessage(peer, buf)
+		err = pm.mproc.HandleMessage(peer, buf[:n])
+		if err != nil {
+			log.Printf("Error proccessing message: %s\n", err.Error())
+		}
 
 	}
 

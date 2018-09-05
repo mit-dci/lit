@@ -48,6 +48,8 @@ func (p *Peer) GetPubkey() btcec.PublicKey {
 	return *p.idpubkey
 }
 
+const prettyLnAddrPrefixLen = 10
+
 // GetPrettyName returns a more human-readable name, such as the nickname if
 // available or a trucated version of the LN address otherwise.
 func (p *Peer) GetPrettyName() string {
@@ -55,11 +57,33 @@ func (p *Peer) GetPrettyName() string {
 		return *p.nickname
 	}
 
-	return string(p.GetLnAddr()[:10]) + "~"
+	return string(p.GetLnAddr()[:prettyLnAddrPrefixLen]) + "~"
 }
 
 // SendQueuedMessage adds the message to the queue to be sent to this peer.
 // This queue is shared across all peers.
 func (p *Peer) SendQueuedMessage(msg Message) error {
-	return p.pmgr.queueMessageToPeer(p, msg)
+	return p.pmgr.queueMessageToPeer(p, msg, nil)
+}
+
+// SendImmediateMessage adds a message to the queue but waits for the message to
+// be sent before returning, also returning errors that might have occurred when
+// sending the message, like the peer disconnecting.
+func (p *Peer) SendImmediateMessage(msg Message) error {
+	var err error
+	errchan := make(chan error)
+
+	// Send it to the queue, as above.
+	err = p.pmgr.queueMessageToPeer(p, msg, &errchan)
+	if err != nil {
+		return err
+	}
+
+	// Catches errors if there are any.
+	err = <-errchan
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
