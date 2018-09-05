@@ -55,7 +55,11 @@ func NewLndcRpcWebsocketProxyWithLndc(lndcRpcClient *LndcRpcClient) *LndcRpcWebs
 func (p *LndcRpcWebsocketProxy) Listen(host string, port uint16) {
 
 	listenString := fmt.Sprintf("%s:%d", host, port)
-	http.Handle("/ws", websocket.Handler(p.proxyServeWS))
+	http.HandleFunc("/ws",
+		func(w http.ResponseWriter, req *http.Request) {
+			s := websocket.Server{Handler: websocket.Handler(p.proxyServeWS)}
+			s.ServeHTTP(w, req)
+		})
 	/*http.HandleFunc("/static/", WebUIHandler)
 	http.HandleFunc("/", WebUIHandler)
 	http.HandleFunc("/oneoff", serveOneoffs)*/
@@ -72,7 +76,6 @@ func (p *LndcRpcWebsocketProxy) proxyServeWS(ws *websocket.Conn) {
 	go func() {
 		for {
 			statusUpdate := <-p.lndcRpcClient.StatusUpdates
-			log.Printf("Received statusUpdate: %s/%s\n", statusUpdate.Topic, statusUpdate.Event)
 			err := websocket.JSON.Send(ws, statusUpdate)
 			if err != nil {
 				log.Printf("Error sending status update to websocket: %s", err.Error())

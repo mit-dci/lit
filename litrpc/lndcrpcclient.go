@@ -168,20 +168,16 @@ func (cli *LndcRpcClient) Call(serviceMethod string, args interface{}, reply int
 }
 
 func (cli *LndcRpcClient) ReceiveLoop() {
-	fmt.Printf("Started receive loop\n")
 	for {
 		msg := make([]byte, 1<<24)
 		//	log.Printf("read message from %x\n", l.RemoteLNId)
-		fmt.Printf("before read\n")
 		n, err := cli.lnconn.Read(msg)
-		fmt.Printf("after read. N: %d\n", n)
 		if err != nil {
-			fmt.Printf("Error reading message from LNDC: %s\n", err.Error())
+			log.Printf("Error reading message from LNDC: %s\n", err.Error())
 			cli.lnconn.Close()
 			return
 		}
 		msg = msg[:n]
-		fmt.Printf("Received new message in ReceiveLoop: %x\n", msg)
 		// We only care about RPC responses
 		if msg[0] == lnutil.MSGID_REMOTE_RPCRESPONSE {
 			response, err := lnutil.NewRemoteControlRpcResponseMsgFromBytes(msg, 0)
@@ -193,7 +189,6 @@ func (cli *LndcRpcClient) ReceiveLoop() {
 
 			responseChan, ok := cli.responseChannels[response.Idx]
 			if ok {
-				log.Printf("Sending response to channel for nonce %d\n", response.Idx)
 				select {
 				case responseChan <- response:
 				default:
