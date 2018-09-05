@@ -2,9 +2,10 @@ package main
 
 import (
 	"bufio"
-	"os"
 	"fmt"
+	"os"
 	"strconv"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/mit-dci/lit/litrpc"
@@ -102,33 +103,55 @@ func (lc *litAfClient) AsyncInvoiceReplier() {
 			fmt.Fprintf(color.Output, "RequestAsync error %s\n", lnutil.Red(err.Error()))
 			break
 		}
-		// fmt.Fprintf(color.Output, "%s\n", lnutil.Red(reply))
-		if len(reply.Invoice.Id) != 0 {
-			fmt.Fprintf(color.Output, "%s\n", lnutil.Red("WORKS"))
+		// now loop through all the invoice in reply.Invoices and ask the user
+		for _, lInvoice := range reply.Invoices {
+			if len(lInvoice.Id) != 0 {
+				fmt.Fprintf(color.Output, "%s %s %s %s %s %s\n",
+					// received invoice 1 requesting payment of 1000 bcrt
+					lnutil.Header("Received Invoice"), lnutil.Header(lInvoice.Id),
+					lnutil.Header("requesting payment of"), lnutil.Header(lInvoice.Amount),
+					lnutil.Header(lInvoice.CoinType), lnutil.Header("satoshi"))
 
-			fmt.Print("\nHold Y/y to continue the payment, hold N/n to stop the payment")
-
-			reader := bufio.NewReader(os.Stdin)
-			c, err := reader.ReadByte()
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
-			fmt.Printf("\nhello:%d", c)
-			if c == []byte("Y")[0] || c == []byte("y")[0] {
-				fmt.Println("Paying invoice:", reply.Invoice)
-				args := new(litrpc.PayInvoiceConfirmArgs)
-				args.Invoice = reply.Invoice
-				replydup := new(litrpc.PayInvoiceConfirmReply)
-				err = lc.Call("LitRPC.PayInvoiceConfirm", args, replydup)
+				fmt.Print("\nDo you want to pay? Hold Y/N to pay/cancel\n")
+				// ugly, should be a single character really, but works only when we hold
+				// y or n, needs some stuff in order to change this
+				reader := bufio.NewReader(os.Stdin)
+				c, err := reader.ReadByte()
 				if err != nil {
-					return
+					fmt.Println(err)
+					continue // don't return since this is an async handler
 				}
-			} else {
-				fmt.Println("No? Ok, we'll exit.")
+				fmt.Printf("\nhello:%d", c)
+				if c == []byte("Y")[0] || c == []byte("y")[0] {
+					fmt.Println("Paying invoice:", lInvoice)
+					args := new(litrpc.PayInvoiceConfirmArgs)
+					args.Invoice = lInvoice
+					confirmReply := new(litrpc.PayInvoiceConfirmReply)
+					err = lc.Call("LitRPC.PayInvoiceConfirm", args, confirmReply)
+					if err != nil {
+						return
+					}
+				} else {
+					// do we delete teh invoice from the list of pendingInvoices here?
+					// there's also the possibility that the user may change his mind
+					// after he declines the first time, second time and so on. When do we
+					// to stop?
+					// right now, lets delete after the first try
+					args := new(litrpc.PayInvoiceConfirmArgs)
+					deleteReply := new(litrpc.PayInvoiceConfirmReply)
+					args.Invoice = lInvoice
+					err = lc.Call("LitRPC.CleanInvoiceAsyncHandler", args, deleteReply)
+					if err != nil {
+						fmt.Println("Couldn't delete invoice from the database, try again")
+						// don't quit the handler because this isn't an error
+					}
+					fmt.Println("Cleaned up successfully!!")
+					fmt.Println("No? Ok, doing nothing. Deleting invoice from Pending Invoices")
+
+				}
 			}
-			break
 		}
+		time.Sleep(3 * time.Second) // 3s polling interval for checking pending invocies
 	}
 	return
 }
@@ -197,7 +220,7 @@ func (lc *litAfClient) ListInvoices() error {
 			// its is an InvoiceReplyMsg
 			fmt.Fprintf(color.Output, "%s: %s, %s: %d %s: %s\n",
 				lnutil.OutPoint("InvoiceID"), invoice.Id, lnutil.OutPoint("Amount"),
-					invoice.Amount, lnutil.OutPoint("CoinType"), invoice.CoinType)
+				invoice.Amount, lnutil.OutPoint("CoinType"), invoice.CoinType)
 		}
 	}
 	err = lc.Call("LitRPC.ListAllRepliedInvoices", args, replydup)

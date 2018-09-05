@@ -511,8 +511,9 @@ type PayInvoiceReply struct {
 }
 
 type PayInvoiceHandlerReply struct {
-	Invoice lnutil.InvoiceReplyMsg
+	Invoices []lnutil.InvoiceReplyMsg
 }
+
 func (r *LitRPC) GenInvoice(args *GenInvoiceArgs, reply *GenInvoiceReply) error {
 	idPriv := r.Node.IdKey()
 	var idPub [33]byte
@@ -579,6 +580,11 @@ func (r *LitRPC) PayInvoiceHandler(args *NoArgs, reply *PayInvoiceHandlerReply) 
 	// see whether they are in BKTPendingInvoices. If tehy are in pending invoices,
 	// we need to send the user a message asking him if he wants to pay the particular
 	// invoice
+	// the problem with this endpoitn right now is that it r eturns a single invoice
+	// we need to return a list of invocies and then the handler on the client side
+	// should make sure that it iterates over all the invoices in this list
+	// but that's a bit ugly and not all clients may follow the same rules, etc,
+	// so whwt's a good move?
 	reqInvoices, err := r.Node.InvoiceManager.GetAllRequestedInvoices()
 	if err != nil {
 		log.Println("Unable ot fetch all requested invoices")
@@ -604,8 +610,18 @@ func (r *LitRPC) PayInvoiceHandler(args *NoArgs, reply *PayInvoiceHandlerReply) 
 			if rInvoice.Id == pInvoice.Id &&
 				rInvoice.PeerIdx == pInvoice.PeerIdx {
 				log.Println("This is an invoice we must pay", rInvoice)
-				reply.Invoice = pInvoice // since pinvoice is an InvoiceReplyMsg
-				break // break for now, return many invoices later
+				// before adding, we must check if this invoice is already in reply.Invoices
+				// but how do we do this?
+				found := false
+				for _, dInvoice := range reply.Invoices {
+					if dInvoice.Id == pInvoice.Id && dInvoice.PeerIdx == pInvoice.PeerIdx {
+						// invoie alreayd exists, do nothing
+						found = true
+					}
+				}
+				if !found {
+					reply.Invoices = append(reply.Invoices, pInvoice) // since pinvoice is an InvoiceReplyMsg
+				}
 			}
 		}
 	}
@@ -654,6 +670,21 @@ type PayInvoiceConfirmArgs struct {
 type PayInvoiceConfirmReply struct {
 	success bool
 }
+
+// CleanInvoiceAsyncHandler cleans the invocei from the relevant databases since
+// the user didn't want to make the payment
+func (r *LitRPC) CleanInvoiceAsyncHandler(args *PayInvoiceConfirmArgs,
+	reply *PayInvoiceConfirmReply) error {
+	err := r.Node.CleanupDbValsPayer(args.Invoice)
+	if err != nil {
+		log.Println("Couldn't clear up the database after paying the peer, flush manually!")
+		return fmt.Errorf("Couldn't clear up the database after paying the peer, flush manually!")
+	}
+	// now we saved this to the list of invoices that we've paid. We should delete the
+	// invoice from pending, requested
+	return nil
+}
+
 func (r *LitRPC) PayInvoiceConfirm(args *PayInvoiceConfirmArgs, reply *PayInvoiceConfirmReply) error {
 	// got confirmation from the user to pay the invoice, so pay
 	// where do we get destAdr from?
