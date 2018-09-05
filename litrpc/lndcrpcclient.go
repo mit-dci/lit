@@ -25,6 +25,8 @@ type LndcRpcClient struct {
 	requestNonceMtx  sync.Mutex
 	responseChannels map[uint64]chan lnutil.RemoteControlRpcResponseMsg
 	key              *btcec.PrivateKey
+	StatusUpdates    chan lnutil.UIEventMsg
+	conMtx           sync.Mutex
 }
 
 func LndcRpcCanConnectLocally() bool {
@@ -91,7 +93,7 @@ func NewLndcRpcClient(address string, key *btcec.PrivateKey) (*LndcRpcClient, er
 
 	cli := new(LndcRpcClient)
 	cli.responseChannels = make(map[uint64]chan lnutil.RemoteControlRpcResponseMsg)
-
+	cli.StatusUpdates = make(chan lnutil.UIEventMsg)
 	who, where := lnutil.ParseAdrString(address)
 
 	// If we couldn't deduce a URL, look it up on the tracker
@@ -107,6 +109,9 @@ func NewLndcRpcClient(address string, key *btcec.PrivateKey) (*LndcRpcClient, er
 		return nil, err
 	}
 
+	// Subscribe to status updates
+	args := map[string]interface{}{"Subscribe": true}
+	cli.Call("RemoteControl.SubscribeToUIEvents", args, nil)
 	go cli.ReceiveLoop()
 	return cli, nil
 }
@@ -131,7 +136,9 @@ func (cli *LndcRpcClient) Call(serviceMethod string, args interface{}, reply int
 		}
 
 		rawMsg := msg.Bytes()
+		cli.conMtx.Lock()
 		n, err := cli.lnconn.Write(rawMsg)
+		cli.conMtx.Unlock()
 		if err != nil {
 			panic(err)
 		}
@@ -140,49 +147,73 @@ func (cli *LndcRpcClient) Call(serviceMethod string, args interface{}, reply int
 			panic(fmt.Errorf("Did not write entire message to peer"))
 		}
 	}()
-	select {
-	case receivedReply := <-cli.responseChannels[nonce]:
-		{
-			if receivedReply.Error {
-				return errors.New(string(receivedReply.Result))
-			}
 
-			err = json.Unmarshal(receivedReply.Result, &reply)
-			return err
+	// If reply is nil the caller apparently doesn't care about the results. So we shouldn't wait for it
+	if reply != nil {
+		select {
+		case receivedReply := <-cli.responseChannels[nonce]:
+			{
+				if receivedReply.Error {
+					return errors.New(string(receivedReply.Result))
+				}
+
+				err = json.Unmarshal(receivedReply.Result, &reply)
+				return err
+			}
+		case <-time.After(time.Second * 10):
+			return errors.New("RPC call timed out")
 		}
-	case <-time.After(time.Second * 10):
-		return errors.New("RPC call timed out")
 	}
 	return nil
 }
 
 func (cli *LndcRpcClient) ReceiveLoop() {
+	fmt.Printf("Started receive loop\n")
 	for {
 		msg := make([]byte, 1<<24)
 		//	log.Printf("read message from %x\n", l.RemoteLNId)
+		fmt.Printf("before read\n")
 		n, err := cli.lnconn.Read(msg)
+		fmt.Printf("after read. N: %d\n", n)
 		if err != nil {
+			fmt.Printf("Error reading message from LNDC: %s\n", err.Error())
 			cli.lnconn.Close()
 			return
 		}
 		msg = msg[:n]
+		fmt.Printf("Received new message in ReceiveLoop: %x\n", msg)
 		// We only care about RPC responses
 		if msg[0] == lnutil.MSGID_REMOTE_RPCRESPONSE {
 			response, err := lnutil.NewRemoteControlRpcResponseMsgFromBytes(msg, 0)
 			if err != nil {
+				log.Printf("Error while receiving RPC response: %s\n", err.Error())
 				cli.lnconn.Close()
 				return
 			}
 
 			responseChan, ok := cli.responseChannels[response.Idx]
 			if ok {
+				log.Printf("Sending response to channel for nonce %d\n", response.Idx)
 				select {
 				case responseChan <- response:
 				default:
 				}
 				delete(cli.responseChannels, response.Idx)
+			} else {
+				log.Printf("Could not find response channel for index %d\n", response.Idx)
+			}
+		} else if msg[0] == lnutil.MSGID_UIEVENT_EVENT {
+			response, err := lnutil.NewUIEventMsgFromBytes(msg, 0)
+			if err != nil {
+				log.Printf("Error receiving UI Event: %s", err.Error())
+				cli.lnconn.Close()
+				return
 			}
 
+			select {
+			case cli.StatusUpdates <- response:
+			default:
+			}
 		}
 	}
 

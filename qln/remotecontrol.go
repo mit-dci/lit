@@ -51,6 +51,16 @@ func (nd *LitNode) RemoteControlRequestHandler(msg lnutil.RemoteControlRpcReques
 		}
 	}
 
+	if msg.Method == "RemoteControl.CheckAuthorizationStatus" {
+		resp, err := json.Marshal(map[string]interface{}{"Authorized": auth.Allowed})
+		if err != nil {
+			return err
+		}
+		outMsg := lnutil.NewRemoteControlRpcResponseMsg(msg.Peer(), msg.Idx, false, resp)
+		nd.OmniOut <- outMsg
+		return nil
+	}
+
 	if !auth.Allowed && !whitelisted {
 		err = fmt.Errorf("Received remote control request from unauthorized peer: %x", pubKey)
 		log.Println(err.Error())
@@ -105,6 +115,16 @@ func (nd *LitNode) RemoteControlRequestHandler(msg lnutil.RemoteControlRpcReques
 	if err != nil {
 		log.Printf("Could not parse JSON: %s", err.Error())
 		return err
+	}
+
+	if msg.Method == "RemoteControl.SubscribeToUIEvents" && auth.Allowed {
+		subscribe := obj["Subscribe"].(bool)
+		if subscribe {
+			nd.SubscribePeerToUIEvents(msg.PeerIdx)
+		} else {
+			nd.UnsubscribePeerToUIEvents(msg.PeerIdx)
+		}
+		return nil
 	}
 
 	go func() {

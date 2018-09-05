@@ -163,7 +163,6 @@ func main() {
 	}
 
 	key := litSetup(&conf)
-
 	if conf.ProxyURL != "" {
 		conf.LitProxyURL = conf.ProxyURL
 		conf.ChainProxyURL = conf.ProxyURL
@@ -182,21 +181,25 @@ func main() {
 		log.Fatal(err)
 	}
 
-	rpcl := new(litrpc.LitRPC)
-	rpcl.Node = node
-	rpcl.OffButton = make(chan bool, 1)
-
 	if conf.AutoReconnect {
 		node.AutoReconnect(conf.AutoListenPort, conf.AutoReconnectInterval)
 	}
 
+	rpcl := new(litrpc.LitRPC)
+	rpcl.Node = node
+	rpcl.OffButton = make(chan bool, 1)
 	node.RPC = rpcl
 
-	/** TODO: Reinstate normal RPC, configurable (default off)
-	rpcProxy, err := litrpc.NewLocalLndcRpcWebsocketProxy()
+	//TODO: Reinstate normal RPC, configurable (default off)
+	/*listenPort, err := strconv.Atoi(conf.AutoListenPort[1:])
 	if err != nil {
 		log.Fatal(err)
 	}
+	rpcProxy, err := litrpc.NewLocalLndcRpcWebsocketProxyWithHomeDirAndPort(conf.LitHomeDir, uint32(listenPort))
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("Launching the RPC proxy...")
 	go rpcProxy.Listen(conf.Rpchost, conf.Rpcport)*/
 
 	<-rpcl.OffButton

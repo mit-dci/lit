@@ -842,6 +842,9 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 		log.Printf("SigRevHandler BuildJusticeSig err %s", err.Error())
 	}
 
+	uiEvent := lnutil.NewUIEventMsg(0, "channels", "channelBalanceUpdated", map[string]interface{}{"channelId": qc.Idx(), "state": qc.State})
+	nd.PublishUIEvent(&uiEvent)
+
 	// done updating channel, no new messages expected.  Set clear to send
 	qc.ClearToSend <- true
 

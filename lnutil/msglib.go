@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
@@ -67,6 +68,9 @@ const (
 	//Remote control messages
 	MSGID_REMOTE_RPCREQUEST  = 0xB0 // Contains an RPC request from a remote peer
 	MSGID_REMOTE_RPCRESPONSE = 0xB1 // Contains an RPC response to send to a remote peer
+
+	//UI Event messages
+	MSGID_UIEVENT_EVENT = 0xB5 // Sends an event happening on this node to another peer
 
 	DIGEST_TYPE_SHA256    = 0x00
 	DIGEST_TYPE_RIPEMD160 = 0x01
@@ -2103,4 +2107,71 @@ func (msg RemoteControlRpcResponseMsg) Peer() uint32 {
 // MsgType returns the type of this message
 func (msg RemoteControlRpcResponseMsg) MsgType() uint8 {
 	return MSGID_REMOTE_RPCRESPONSE
+}
+
+type UIEventMsg struct {
+	PeerIdx uint32
+	Topic   string
+	Event   string
+	Details interface{}
+}
+
+func NewUIEventMsg(peerIdx uint32, topic, event string, details interface{}) UIEventMsg {
+
+	msg := new(UIEventMsg)
+	msg.PeerIdx = peerIdx
+	msg.Topic = topic
+	msg.Event = event
+	msg.Details = details
+	return *msg
+}
+
+func NewUIEventMsgFromBytes(b []byte,
+	peerIdx uint32) (UIEventMsg, error) {
+
+	buf := bytes.NewBuffer(b[1:])
+	msg := new(UIEventMsg)
+	msg.PeerIdx = peerIdx
+	var err error
+
+	msg.Topic, err = wire.ReadVarString(buf, 0)
+	if err != nil {
+		return *msg, err
+	}
+	msg.Event, err = wire.ReadVarString(buf, 0)
+	if err != nil {
+		return *msg, err
+	}
+
+	detailsBytes, err := wire.ReadVarBytes(buf, 0, ^uint32(0), "details")
+	if err != nil {
+		return *msg, err
+	}
+
+	json.Unmarshal(detailsBytes, &msg.Details)
+
+	return *msg, nil
+}
+
+// Bytes serializes a UIEventMsg into a byte array
+func (msg UIEventMsg) Bytes() []byte {
+	var buf bytes.Buffer
+	buf.WriteByte(msg.MsgType())
+	detailsBytes, _ := json.Marshal(msg.Details)
+
+	wire.WriteVarString(&buf, 0, msg.Topic)
+	wire.WriteVarString(&buf, 0, msg.Event)
+	wire.WriteVarBytes(&buf, 0, detailsBytes)
+
+	return buf.Bytes()
+}
+
+// Peer returns the peer index this message was received from/sent to
+func (msg UIEventMsg) Peer() uint32 {
+	return msg.PeerIdx
+}
+
+// MsgType returns the type of this message
+func (msg UIEventMsg) MsgType() uint8 {
+	return MSGID_UIEVENT_EVENT
 }

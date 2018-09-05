@@ -19,7 +19,7 @@ func NewLocalLndcRpcWebsocketProxy() (*LndcRpcWebsocketProxy, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newLndcRpcWebsocketProxyWithLndc(client), nil
+	return NewLndcRpcWebsocketProxyWithLndc(client), nil
 }
 
 func NewLocalLndcRpcWebsocketProxyWithPort(port uint32) (*LndcRpcWebsocketProxy, error) {
@@ -27,7 +27,7 @@ func NewLocalLndcRpcWebsocketProxyWithPort(port uint32) (*LndcRpcWebsocketProxy,
 	if err != nil {
 		return nil, err
 	}
-	return newLndcRpcWebsocketProxyWithLndc(client), nil
+	return NewLndcRpcWebsocketProxyWithLndc(client), nil
 }
 
 func NewLocalLndcRpcWebsocketProxyWithHomeDirAndPort(litHomeDir string, port uint32) (*LndcRpcWebsocketProxy, error) {
@@ -35,7 +35,7 @@ func NewLocalLndcRpcWebsocketProxyWithHomeDirAndPort(litHomeDir string, port uin
 	if err != nil {
 		return nil, err
 	}
-	return newLndcRpcWebsocketProxyWithLndc(client), nil
+	return NewLndcRpcWebsocketProxyWithLndc(client), nil
 }
 
 func NewLndcRpcWebsocketProxy(litAdr string, key *btcec.PrivateKey) (*LndcRpcWebsocketProxy, error) {
@@ -43,10 +43,10 @@ func NewLndcRpcWebsocketProxy(litAdr string, key *btcec.PrivateKey) (*LndcRpcWeb
 	if err != nil {
 		return nil, err
 	}
-	return newLndcRpcWebsocketProxyWithLndc(client), nil
+	return NewLndcRpcWebsocketProxyWithLndc(client), nil
 }
 
-func newLndcRpcWebsocketProxyWithLndc(lndcRpcClient *LndcRpcClient) *LndcRpcWebsocketProxy {
+func NewLndcRpcWebsocketProxyWithLndc(lndcRpcClient *LndcRpcClient) *LndcRpcWebsocketProxy {
 	proxy := new(LndcRpcWebsocketProxy)
 	proxy.lndcRpcClient = lndcRpcClient
 	return proxy
@@ -59,12 +59,27 @@ func (p *LndcRpcWebsocketProxy) Listen(host string, port uint16) {
 	/*http.HandleFunc("/static/", WebUIHandler)
 	http.HandleFunc("/", WebUIHandler)
 	http.HandleFunc("/oneoff", serveOneoffs)*/
-	log.Fatal(http.ListenAndServe(listenString, nil))
+
+	log.Printf("Listening regular Websocket RPC on %s", listenString)
+
+	err := http.ListenAndServe(listenString, nil)
+	log.Fatal("Error on websocket server: %s", err.Error())
 }
 
 func (p *LndcRpcWebsocketProxy) proxyServeWS(ws *websocket.Conn) {
 
 	defer ws.Close()
+	go func() {
+		for {
+			statusUpdate := <-p.lndcRpcClient.StatusUpdates
+			log.Printf("Received statusUpdate: %s/%s\n", statusUpdate.Topic, statusUpdate.Event)
+			err := websocket.JSON.Send(ws, statusUpdate)
+			if err != nil {
+				log.Printf("Error sending status update to websocket: %s", err.Error())
+				return
+			}
+		}
+	}()
 	for {
 		var data interface{}
 		err := websocket.JSON.Receive(ws, &data)
