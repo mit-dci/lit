@@ -1,6 +1,6 @@
 package lnp2p
 
-//"crypto/ecdsa" // TODO Use ecdsa not btcec
+//"crypto/ecdsa" // TODO Use ecdsa not koblitz
 import (
 	"crypto/ecdsa"
 	"fmt"
@@ -15,8 +15,8 @@ import (
 	"sync"
 )
 
-type privkey *btcec.PrivateKey
-type pubkey *btcec.PublicKey
+type privkey *koblitz.PrivateKey
+type pubkey *koblitz.PublicKey
 
 // PeerManager .
 type PeerManager struct {
@@ -80,7 +80,7 @@ func (pm *PeerManager) GetMessageProcessor() *MessageProcessor {
 // GetExternalAddress returns the human-readable LN address
 func (pm *PeerManager) GetExternalAddress() string {
 	idk := pm.idkey // lol
-	c := btcec.PublicKey(ecdsa.PublicKey(idk.PublicKey))
+	c := koblitz.PublicKey(ecdsa.PublicKey(idk.PublicKey))
 	addr := convertPubkeyToLitAddr(pubkey(&c))
 	return string(addr)
 }

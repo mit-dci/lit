@@ -44,9 +44,9 @@ const (
 
 // ecdh performs an ECDH operation between pub and priv. The returned value is
 // the sha256 of the compressed shared point.
-func ecdh(pub *btcec.PublicKey, priv *btcec.PrivateKey) []byte {
-	s := &btcec.PublicKey{}
-	x, y := btcec.S256().ScalarMult(pub.X, pub.Y, priv.D.Bytes())
+func ecdh(pub *koblitz.PublicKey, priv *koblitz.PrivateKey) []byte {
+	s := &koblitz.PublicKey{}
+	x, y := koblitz.S256().ScalarMult(pub.X, pub.Y, priv.D.Bytes())
 	s.X = x
 	s.Y = y
 
@@ -255,18 +255,18 @@ type handshakeState struct {
 
 	initiator bool
 
-	localStatic    *btcec.PrivateKey
-	localEphemeral *btcec.PrivateKey
+	localStatic    *koblitz.PrivateKey
+	localEphemeral *koblitz.PrivateKey
 
-	remoteStatic    *btcec.PublicKey
-	remoteEphemeral *btcec.PublicKey
+	remoteStatic    *koblitz.PublicKey
+	remoteEphemeral *koblitz.PublicKey
 }
 
 // newHandshakeState returns a new instance of the handshake state initialized
 // with the prologue and protocol name. If this is the responder's handshake
 // state, then the remotePub can be nil.
 func newHandshakeState(initiator bool, prologue []byte,
-	localStatic *btcec.PrivateKey) handshakeState {
+	localStatic *koblitz.PrivateKey) handshakeState {
 
 	h := handshakeState{
 		initiator:   initiator,
@@ -286,7 +286,7 @@ func newHandshakeState(initiator bool, prologue []byte,
 // a custom function for use when generating ephemeral keys for ActOne or
 // ActTwo.  The function closure return by this function can be passed into
 // NewNoiseMachine as a function option parameter.
-func EphemeralGenerator(gen func() (*btcec.PrivateKey, error)) func(*Machine) {
+func EphemeralGenerator(gen func() (*koblitz.PrivateKey, error)) func(*Machine) {
 	return func(m *Machine) {
 		m.ephemeralGen = gen
 	}
@@ -325,7 +325,7 @@ type Machine struct {
 	sendCipher cipherState
 	recvCipher cipherState
 
-	ephemeralGen func() (*btcec.PrivateKey, error)
+	ephemeralGen func() (*koblitz.PrivateKey, error)
 
 	handshakeState
 
@@ -350,7 +350,7 @@ type Machine struct {
 // string "lightning" as the prologue. The last parameter is a set of variadic
 // arguments for adding additional options to the lndc Machine
 // initialization.
-func NewNoiseMachine(initiator bool, localStatic *btcec.PrivateKey,
+func NewNoiseMachine(initiator bool, localStatic *koblitz.PrivateKey,
 	options ...func(*Machine)) *Machine {
 
 	handshake := newHandshakeState(initiator, []byte("lit"), localStatic)
@@ -361,8 +361,8 @@ func NewNoiseMachine(initiator bool, localStatic *btcec.PrivateKey,
 
 	// With the initial base machine created, we'll assign our default
 	// version of the ephemeral key generator.
-	m.ephemeralGen = func() (*btcec.PrivateKey, error) {
-		return btcec.NewPrivateKey(btcec.S256())
+	m.ephemeralGen = func() (*koblitz.PrivateKey, error) {
+		return koblitz.NewPrivateKey(koblitz.S256())
 	}
 	// With the default options established, we'll now process all the
 	// options passed in as parameters.
@@ -456,7 +456,7 @@ func (b *Machine) RecvActOne(actOne [ActOneSize]byte) error {
 	copy(p[:], actOne[34:])
 
 	// e
-	b.remoteEphemeral, err = btcec.ParsePubKey(e[:], btcec.S256())
+	b.remoteEphemeral, err = koblitz.ParsePubKey(e[:], koblitz.S256())
 	if err != nil {
 		return err
 	}
@@ -529,7 +529,7 @@ func (b *Machine) RecvActTwo(actTwo [ActTwoSize]byte) ([33]byte, error) {
 	copy(p[:], actTwo[67:])
 
 	// e
-	b.remoteEphemeral, err = btcec.ParsePubKey(e[:], btcec.S256())
+	b.remoteEphemeral, err = koblitz.ParsePubKey(e[:], koblitz.S256())
 	if err != nil {
 		return empty, err
 	}
@@ -540,7 +540,7 @@ func (b *Machine) RecvActTwo(actTwo [ActTwoSize]byte) ([33]byte, error) {
 	b.mixKey(ee)
 
 	// s
-	b.remoteStatic, err = btcec.ParsePubKey(s[:], btcec.S256())
+	b.remoteStatic, err = koblitz.ParsePubKey(s[:], koblitz.S256())
 	if err != nil {
 		return empty, err
 	}
@@ -611,7 +611,7 @@ func (b *Machine) RecvActThree(actThree [ActThreeSize]byte) error {
 		return err
 	}
 
-	b.remoteStatic, err = btcec.ParsePubKey(remotePub, btcec.S256())
+	b.remoteStatic, err = koblitz.ParsePubKey(remotePub, koblitz.S256())
 	if err != nil {
 		return err
 	}

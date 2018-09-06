@@ -291,7 +291,7 @@ const (
 // AddressPubKey is an Address for a pay-to-pubkey transaction.
 type AddressPubKey struct {
 	pubKeyFormat PubKeyFormat
-	pubKey       *btcec.PublicKey
+	pubKey       *koblitz.PublicKey
 	pubKeyHashID byte
 }
 
@@ -299,13 +299,13 @@ type AddressPubKey struct {
 // address.  The serializedPubKey parameter must be a valid pubkey and can be
 // uncompressed, compressed, or hybrid.
 func NewAddressPubKey(serializedPubKey []byte, net *chaincfg.Params) (*AddressPubKey, error) {
-	pubKey, err := btcec.ParsePubKey(serializedPubKey, btcec.S256())
+	pubKey, err := koblitz.ParsePubKey(serializedPubKey, koblitz.S256())
 	if err != nil {
 		return nil, err
 	}
 
 	// Set the format of the pubkey.  This probably should be returned
-	// from btcec, but do it here to avoid API churn.  We already know the
+	// from koblitz, but do it here to avoid API churn.  We already know the
 	// pubkey is valid since it parsed above, so it's safe to simply examine
 	// the leading byte to get the format.
 	pkFormat := PKFUncompressed
@@ -396,6 +396,6 @@ func (a *AddressPubKey) AddressPubKeyHash() *AddressPubKeyHash {
 }
 
 // PubKey returns the underlying public key for the address.
-func (a *AddressPubKey) PubKey() *btcec.PublicKey {
+func (a *AddressPubKey) PubKey() *koblitz.PublicKey {
 	return a.pubKey
 }

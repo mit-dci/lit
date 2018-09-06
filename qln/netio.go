@@ -139,7 +139,7 @@ func (nd *LitNode) ConnectedToPeer(peer uint32) bool {
 }
 
 // IdKey returns the identity private key
-func (nd *LitNode) IdKey() *btcec.PrivateKey {
+func (nd *LitNode) IdKey() *koblitz.PrivateKey {
 	return nd.IdentityKey
 }
 

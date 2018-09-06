@@ -396,14 +396,14 @@ func computePubKey(pubA, pubR [33]byte, msg []byte) ([33]byte, error) {
 	var returnValue [33]byte
 
 	// Hardcode curve
-	curve := btcec.S256()
+	curve := koblitz.S256()
 
-	A, err := btcec.ParsePubKey(pubA[:], curve)
+	A, err := koblitz.ParsePubKey(pubA[:], curve)
 	if err != nil {
 		return returnValue, err
 	}
 
-	R, err := btcec.ParsePubKey(pubR[:], curve)
+	R, err := koblitz.ParsePubKey(pubR[:], curve)
 	if err != nil {
 		return returnValue, err
 	}
@@ -426,7 +426,7 @@ func computePubKey(pubA, pubR [33]byte, msg []byte) ([33]byte, error) {
 
 	A.Y.Mod(A.Y, curve.P)
 
-	P := new(btcec.PublicKey)
+	P := new(koblitz.PublicKey)
 
 	// add to R
 	P.X, P.Y = curve.Add(A.X, A.Y, R.X, R.Y)

@@ -44,7 +44,7 @@ func (p *Peer) GetRemoteAddr() string {
 }
 
 // GetPubkey gets the public key for the user.
-func (p *Peer) GetPubkey() btcec.PublicKey {
+func (p *Peer) GetPubkey() koblitz.PublicKey {
 	return *p.idpubkey
 }
 

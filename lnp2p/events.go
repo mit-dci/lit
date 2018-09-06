@@ -14,7 +14,7 @@ type NewPeerEvent struct {
 	RemoteInitiated bool
 
 	// TODO REFACTORING: Remove these
-	RemotePub *btcec.PublicKey
+	RemotePub *koblitz.PublicKey
 	Conn      *lndc.Conn
 }
 

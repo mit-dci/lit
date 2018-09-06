@@ -623,7 +623,7 @@ func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oracleSig [32]
 	privSpend, _ := wal.GetPriv(kg)
 
 	pubSpend := wal.GetPub(kg)
-	privOracle, pubOracle := btcec.PrivKeyFromBytes(btcec.S256(), oracleSig[:])
+	privOracle, pubOracle := koblitz.PrivKeyFromBytes(koblitz.S256(), oracleSig[:])
 	privContractOutput := lnutil.CombinePrivateKeys(privSpend, privOracle)
 
 	var pubOracleBytes [33]byte

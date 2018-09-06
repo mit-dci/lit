@@ -387,32 +387,32 @@ func (nd *LitNode) DualFundingAcceptHandler(msg lnutil.DualFundingAcceptMsg) {
 	copy(q.TheirHAKDBase[:], nd.InProgDual.TheirHAKDBase[:])
 
 	// make sure their pubkeys are real pubkeys
-	_, err := btcec.ParsePubKey(q.TheirPub[:], btcec.S256())
+	_, err := koblitz.ParsePubKey(q.TheirPub[:], koblitz.S256())
 	if err != nil {
 		nd.InProgDual.mtx.Unlock()
 		logging.Errorf("PubRespHandler TheirPub err %s", err.Error())
 		return
 	}
-	_, err = btcec.ParsePubKey(q.TheirRefundPub[:], btcec.S256())
+	_, err = koblitz.ParsePubKey(q.TheirRefundPub[:], koblitz.S256())
 	if err != nil {
 		nd.InProgDual.mtx.Unlock()
 		logging.Errorf("PubRespHandler TheirRefundPub err %s", err.Error())
 		return
 	}
-	_, err = btcec.ParsePubKey(q.TheirHAKDBase[:], btcec.S256())
+	_, err = koblitz.ParsePubKey(q.TheirHAKDBase[:], koblitz.S256())
 	if err != nil {
 		nd.InProgDual.mtx.Unlock()
 		logging.Errorf("PubRespHandler TheirHAKDBase err %s", err.Error())
 		return
 	}
 
-	_, err = btcec.ParsePubKey(msg.OurNextHTLCBase[:], btcec.S256())
+	_, err = koblitz.ParsePubKey(msg.OurNextHTLCBase[:], koblitz.S256())
 	if err != nil {
 		nd.InProgDual.mtx.Unlock()
 		logging.Errorf("PubRespHandler NextHTLCBase err %s", err.Error())
 		return
 	}
-	_, err = btcec.ParsePubKey(msg.OurN2HTLCBase[:], btcec.S256())
+	_, err = koblitz.ParsePubKey(msg.OurN2HTLCBase[:], koblitz.S256())
 	if err != nil {
 		nd.InProgDual.mtx.Unlock()
 		logging.Errorf("PubRespHandler N2HTLCBase err %s", err.Error())
@@ -601,11 +601,11 @@ func (nd *LitNode) DualFundChanDescHandler(msg lnutil.ChanDescMsg) error {
 	qc.MyRefundPub, _ = nd.GetUsePub(qc.KeyGen, UseChannelRefund)
 	qc.MyHAKDBase, _ = nd.GetUsePub(qc.KeyGen, UseChannelHAKDBase)
 
-	_, err = btcec.ParsePubKey(msg.NextHTLCBase[:], btcec.S256())
+	_, err = koblitz.ParsePubKey(msg.NextHTLCBase[:], koblitz.S256())
 	if err != nil {
 		return fmt.Errorf("QChanDescHandler NextHTLCBase err %s", err.Error())
 	}
-	_, err = btcec.ParsePubKey(msg.N2HTLCBase[:], btcec.S256())
+	_, err = koblitz.ParsePubKey(msg.N2HTLCBase[:], koblitz.S256())
 	if err != nil {
 		return fmt.Errorf("QChanDescHandler N2HTLCBase err %s", err.Error())
 	}

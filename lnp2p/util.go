@@ -28,7 +28,7 @@ func splitAdrString(adr string) (string, string) {
 
 // Given a raw pubkey, returns the lit addr.  Stolen from `lnutil/litadr.go`.
 func convertPubkeyToLitAddr(pk pubkey) lncore.LnAddr {
-	b := (*btcec.PublicKey)(pk).SerializeCompressed()
+	b := (*koblitz.PublicKey)(pk).SerializeCompressed()
 	doubleSha := fastsha256.Sum256(b[:])
 	return lncore.LnAddr(bech32.Encode("ln", doubleSha[:20]))
 }

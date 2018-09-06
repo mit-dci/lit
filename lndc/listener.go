@@ -19,7 +19,7 @@ const defaultHandshakes = 1000
 // details w.r.t the handshake and encryption scheme used within the
 // connection.
 type Listener struct {
-	localStatic *btcec.PrivateKey
+	localStatic *koblitz.PrivateKey
 
 	tcp *net.TCPListener
 
@@ -33,7 +33,7 @@ var _ net.Listener = (*Listener)(nil)
 
 // NewListener returns a new net.Listener which enforces the lndc scheme
 // during both initial connection establishment and data transfer.
-func NewListener(localStatic *btcec.PrivateKey, listenAddr string) (*Listener,
+func NewListener(localStatic *koblitz.PrivateKey, listenAddr string) (*Listener,
 	error) {
 	addr, err := net.ResolveTCPAddr("tcp", listenAddr)
 	if err != nil {

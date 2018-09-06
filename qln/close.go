@@ -143,12 +143,12 @@ func (nd *LitNode) CloseReqHandler(msg lnutil.CloseReqMsg) {
 	theirBigSig := sig64.SigDecompress(msg.Signature)
 
 	// sig is pre-truncated; last byte for sighashtype is always sighashAll
-	pSig, err := btcec.ParseDERSignature(theirBigSig, btcec.S256())
+	pSig, err := koblitz.ParseDERSignature(theirBigSig, koblitz.S256())
 	if err != nil {
 		logging.Errorf("CloseReqHandler Sig err %s", err.Error())
 		return
 	}
-	theirPubKey, err := btcec.ParsePubKey(q.TheirPub[:], btcec.S256())
+	theirPubKey, err := koblitz.ParsePubKey(q.TheirPub[:], koblitz.S256())
 	if err != nil {
 		logging.Errorf("CloseReqHandler Sig err %s", err.Error())
 		return

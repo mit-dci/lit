@@ -95,7 +95,7 @@ const (
 )
 
 // halforder is used to tame ECDSA malleability (see BIP0062).
-var halfOrder = new(big.Int).Rsh(btcec.S256().N, 1)
+var halfOrder = new(big.Int).Rsh(koblitz.S256().N, 1)
 
 // Engine is the virtual machine that executes scripts.
 type Engine struct {

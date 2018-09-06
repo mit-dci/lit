@@ -97,7 +97,7 @@ type LitNode struct {
 
 	LitFolder string // path to save stuff
 
-	IdentityKey *btcec.PrivateKey
+	IdentityKey *koblitz.PrivateKey
 
 	// p2p remote control key
 	DefaultRemoteControlKey *btcec.PublicKey

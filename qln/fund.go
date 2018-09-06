@@ -303,15 +303,15 @@ func (nd *LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 	copy(q.TheirHAKDBase[:], msg.HAKDbase[:])
 
 	// make sure their pubkeys are real pubkeys
-	_, err = btcec.ParsePubKey(q.TheirPub[:], btcec.S256())
+	_, err = koblitz.ParsePubKey(q.TheirPub[:], koblitz.S256())
 	if err != nil {
 		return fmt.Errorf("PubRespHandler TheirPub err %s", err.Error())
 	}
-	_, err = btcec.ParsePubKey(q.TheirRefundPub[:], btcec.S256())
+	_, err = koblitz.ParsePubKey(q.TheirRefundPub[:], koblitz.S256())
 	if err != nil {
 		return fmt.Errorf("PubRespHandler TheirRefundPub err %s", err.Error())
 	}
-	_, err = btcec.ParsePubKey(q.TheirHAKDBase[:], btcec.S256())
+	_, err = koblitz.ParsePubKey(q.TheirHAKDBase[:], koblitz.S256())
 	if err != nil {
 		return fmt.Errorf("PubRespHandler TheirHAKDBase err %s", err.Error())
 	}
@@ -356,11 +356,11 @@ func (nd *LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 
 	q.State.Data = nd.InProg.Data
 
-	_, err = btcec.ParsePubKey(msg.NextHTLCBase[:], btcec.S256())
+	_, err = koblitz.ParsePubKey(msg.NextHTLCBase[:], koblitz.S256())
 	if err != nil {
 		return fmt.Errorf("PubRespHandler NextHTLCBase err %s", err.Error())
 	}
-	_, err = btcec.ParsePubKey(msg.N2HTLCBase[:], btcec.S256())
+	_, err = koblitz.ParsePubKey(msg.N2HTLCBase[:], koblitz.S256())
 	if err != nil {
 		return fmt.Errorf("PubRespHandler N2HTLCBase err %s", err.Error())
 	}
@@ -493,11 +493,11 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) error {
 	qc.State.NextElkPoint = msg.ElkOne
 	qc.State.N2ElkPoint = msg.ElkTwo
 
-	_, err = btcec.ParsePubKey(msg.NextHTLCBase[:], btcec.S256())
+	_, err = koblitz.ParsePubKey(msg.NextHTLCBase[:], koblitz.S256())
 	if err != nil {
 		return fmt.Errorf("QChanDescHandler NextHTLCBase err %s", err.Error())
 	}
-	_, err = btcec.ParsePubKey(msg.N2HTLCBase[:], btcec.S256())
+	_, err = koblitz.ParsePubKey(msg.N2HTLCBase[:], koblitz.S256())
 	if err != nil {
 		return fmt.Errorf("QChanDescHandler N2HTLCBase err %s", err.Error())
 	}

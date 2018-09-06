@@ -34,7 +34,7 @@ var _ net.Conn = (*Conn)(nil)
 // remote peer located at address which has remotePub as its long-term static
 // public key. In the case of a handshake failure, the connection is closed and
 // a non-nil error is returned.
-func Dial(localPriv *btcec.PrivateKey, ipAddr string, remotePKH string,
+func Dial(localPriv *koblitz.PrivateKey, ipAddr string, remotePKH string,
 	dialer func(string, string) (net.Conn, error)) (*Conn, error) {
 	var conn net.Conn
 	var err error
@@ -224,11 +224,11 @@ func (c *Conn) SetWriteDeadline(t time.Time) error {
 }
 
 // RemotePub returns the remote peer's static public key.
-func (c *Conn) RemotePub() *btcec.PublicKey {
+func (c *Conn) RemotePub() *koblitz.PublicKey {
 	return c.noise.remoteStatic
 }
 
 // LocalPub returns the local peer's static public key.
-func (c *Conn) LocalPub() *btcec.PublicKey {
+func (c *Conn) LocalPub() *koblitz.PublicKey {
 	return c.noise.localStatic.PubKey()
 }

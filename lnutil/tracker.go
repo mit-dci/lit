@@ -32,7 +32,7 @@ type nodeinfo struct {
 	}
 }
 
-func Announce(priv *btcec.PrivateKey, litport string, litadr string, trackerURL string) error {
+func Announce(priv *koblitz.PrivateKey, litport string, litadr string, trackerURL string) error {
 	client := &http.Client{
 		Timeout: time.Second * 4, // 4+4 to accomodate the 10s RPC timeout
 	}

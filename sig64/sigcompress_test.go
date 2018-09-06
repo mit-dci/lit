@@ -20,7 +20,7 @@ var (
 // TestRandom makes random signatures and compresses / decompresses them
 func TestRandom(t *testing.T) {
 	for i := 0; i < 8; i++ {
-		priv, _ := btcec.NewPrivateKey(btcec.S256())
+		priv, _ := koblitz.NewPrivateKey(koblitz.S256())
 		sig, err := priv.Sign(chainhash.DoubleHashB([]byte{byte(i)}))
 		if err != nil {
 			t.Fatal(err)
@@ -86,7 +86,7 @@ func TestShortSignature(t *testing.T) {
 	subScript := []byte{0x14, 0x98, 0x97, 0xfd, 0x2b, 0x98, 0x0f, 0xec, 0xca, 0xeb, 0x9c, 0x63, 0xc2, 0x74, 0x9b, 0x38, 0x9c, 0x77, 0x2a, 0x9d, 0x75}
 	amt := int64(100001000)
 	hashType := txscript.SigHashAll
-	key, _ := btcec.PrivKeyFromBytes(btcec.S256(), []byte("privatekey"))
+	key, _ := koblitz.PrivKeyFromBytes(koblitz.S256(), []byte("privatekey"))
 	sign, err := txscript.RawTxInWitnessSignature(tx, sigHashes, idx, amt, subScript, hashType, key)
 	if err != nil {
 		t.Fatal(err)

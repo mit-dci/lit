@@ -99,7 +99,7 @@ func (nd *LitNode) SignSimpleClose(q *Qchan, tx *wire.MsgTx) ([64]byte, error) {
 // SignSettlementTx signs the given settlement tx based on the passed contract
 // using the passed private key. Tx is modified in place.
 func (nd *LitNode) SignSettlementTx(c *lnutil.DlcContract, tx *wire.MsgTx,
-	priv *btcec.PrivateKey) ([64]byte, error) {
+	priv *koblitz.PrivateKey) ([64]byte, error) {
 
 	var sig [64]byte
 	// make hash cache
@@ -131,7 +131,7 @@ func (nd *LitNode) SignSettlementTx(c *lnutil.DlcContract, tx *wire.MsgTx,
 // expired (for instance if someone) published the wrong settlement TX, we can
 // claim this output back to our wallet after the timelock expired.
 func (nd *LitNode) SignClaimTx(claimTx *wire.MsgTx, value int64, pre []byte,
-	priv *btcec.PrivateKey, timeout bool) error {
+	priv *koblitz.PrivateKey, timeout bool) error {
 
 	// make hash cache
 	hCache := txscript.NewTxSigHashes(claimTx)
@@ -237,7 +237,7 @@ func (nd *LitNode) SignState(q *Qchan) ([64]byte, [][64]byte, error) {
 			}
 		}
 
-		var HTLCPrivBase *btcec.PrivateKey
+		var HTLCPrivBase *koblitz.PrivateKey
 		if idx == len(q.State.HTLCs) {
 			HTLCPrivBase, err = nd.SubWallet[q.Coin()].GetPriv(q.State.InProgHTLC.KeyGen)
 		} else if idx == len(q.State.HTLCs)+1 {
@@ -346,11 +346,11 @@ func (q *Qchan) VerifySigs(sig [64]byte, HTLCSigs [][64]byte) error {
 		parsed, hCache, txscript.SigHashAll, commitmentTx, 0, q.Value)
 
 	// sig is pre-truncated; last byte for sighashtype is always sighashAll
-	pSig, err := btcec.ParseDERSignature(bigSig, btcec.S256())
+	pSig, err := koblitz.ParseDERSignature(bigSig, koblitz.S256())
 	if err != nil {
 		return err
 	}
-	theirPubKey, err := btcec.ParsePubKey(q.TheirPub[:], btcec.S256())
+	theirPubKey, err := koblitz.ParsePubKey(q.TheirPub[:], koblitz.S256())
 	if err != nil {
 		return err
 	}
@@ -426,7 +426,7 @@ func (q *Qchan) VerifySigs(sig [64]byte, HTLCSigs [][64]byte) error {
 			HTLCparsed, hc, txscript.SigHashAll, spendTx, 0, h.Value)
 
 		// sig is pre-truncated; last byte for sighashtype is always sighashAll
-		HTLCSig, err := btcec.ParseDERSignature(sig64.SigDecompress(HTLCSigs[which]), btcec.S256())
+		HTLCSig, err := koblitz.ParseDERSignature(sig64.SigDecompress(HTLCSigs[which]), koblitz.S256())
 		if err != nil {
 			return err
 		}
@@ -440,7 +440,7 @@ func (q *Qchan) VerifySigs(sig [64]byte, HTLCSigs [][64]byte) error {
 			theirHTLCPub = lnutil.CombinePubs(q.State.HTLCs[idx].TheirHTLCBase, q.State.NextElkPoint)
 		}
 
-		theirHTLCPubKey, err := btcec.ParsePubKey(theirHTLCPub[:], btcec.S256())
+		theirHTLCPubKey, err := koblitz.ParsePubKey(theirHTLCPub[:], koblitz.S256())
 		if err != nil {
 			return err
 		}
