@@ -67,85 +67,11 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 		return nil, err
 	}
 
-	// Create a new manager for the discreet log contracts
+	// Create a new manager for invoices similar to dlcs
 	nd.InvoiceManager, err = invoice.NewManager(filepath.Join(nd.LitFolder, "invoice.db"))
 	if err != nil {
 		return nil, err
 	}
-
-	// test stuff for invoices, delete this once done
-	/*
-	var test lnutil.InvoiceReplyMsg
-	test.PeerIdx = uint32(60000)
-	test.Id = "3"
-	test.CoinType = "bcrt"
-	test.Amount = 90000
-	err = nd.InvoiceManager.SaveGeneratedInvoice(&test)
-	if err != nil {
-		log.Println("ERROR WHILE TRYING TO SAVE INVOICE", err)
-		return nd, fmt.Errorf("ERROR WHILE TRYING TO SAVE INVOICE")
-	}
-	x, err := nd.InvoiceManager.LoadGeneratedInvoice("3")
-	if err != nil {
-		return nd, fmt.Errorf("ERROR WHILE TRYING OT READ INVOICE")
-	}
-	log.Println("X0",  x.PeerIdx, x.Id, x.CoinType, x.Amount,)
-
-	// 	PeerIdx uint32
-	// 	Id      string
-	var test2 lnutil.InvoiceMsg
-	test2.PeerIdx = uint32(2)
-	test2.Id = "q"
-	err = nd.InvoiceManager.SaveRepliedInvoice(&test2) // we replied to someone else's request
-	if err != nil {
-		log.Println("ERROR WHILE TRYING TO LOAD INVOICEMSG")
-		return nd, fmt.Errorf("ERROR WHILE TRYING TO LOAD INVOICEMSG")
-	}
-	x1, err := nd.InvoiceManager.LoadRepliedInvoice("2")
-	// search for all invoices belonging to this peer
-	// might have to execute multiple times?
-	if err != nil {
-		log.Println("ERROR WHILE TRYING TO LOAD REPLIED INVOICES")
-		return nd, fmt.Errorf("ERROR WHILE TRYING TO LOAD REPLIED INVOICES")
-	}
-	log.Println("X1", x1.PeerIdx, x1.Id)
-
-	err = nd.InvoiceManager.SaveRequestedInvoice(&test2)
-	if err != nil {
-		log.Println("FAILED WHILE STORING AN INVOICE SENT OUT TO ANOTHER PEER")
-		return nd, fmt.Errorf("FAILED WHILE STORING AN INVOICE SENT OUT TO ANOTHER PEER")
-	}
-	x1, err = nd.InvoiceManager.LoadRequestedInvoice(2, "q") //pass peerIdx, invoiceId
-	if err != nil {
-		log.Println("FAILED WHILE STORING AN INVOICE SENT OUT TO ANOTHER PEER")
-		return nd, err
-	}
-	log.Println("X2", x1)
-
-	err = nd.InvoiceManager.SavePendingInvoice(&test)
-	if err != nil {
-		log.Println("FAILED TO STORE PENDING INVOICES")
-		return nd, fmt.Errorf("FAILED TO STORE PENDING INVOICES")
-	}
-	x2, err := nd.InvoiceManager.LoadPendingInvoice(60000, "3") //pass peerIdx, invoiceId
-	if err != nil {
-		log.Println("FAILED WHILE RETRIEVING A PENDING INVOICE")
-		return nd, fmt.Errorf("FAILED WHILE RETRIEVING A PENDING INVOICE")
-	}
-	log.Println("X3", x2)
-
-	err = nd.InvoiceManager.SavePaidInvoice(&test)
-	if err != nil {
-		log.Println("FAILED TO STORE PAID INVOICE IN DB")
-		return nd, fmt.Errorf("FAILED TO STORE PAID INVOICE IN DB")
-	}
-	x2, err = nd.InvoiceManager.LoadPaidInvoice(60000, "3") //pass peerIdx, invoiceId
-	if err != nil {
-		log.Println("FAILED WHILE RETRIEVING A PENDING INVOICE")
-		return nd, fmt.Errorf("FAILED WHILE RETRIEVING A PENDING INVOICE")
-	}
-	log.Println("X4", x2)
-	*/
 	// make maps and channels
 	nd.UserMessageBox = make(chan string, 32)
 

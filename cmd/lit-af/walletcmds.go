@@ -242,6 +242,7 @@ func (lc *litAfClient) ListInvoices() error {
 	}
 	if len(replyPaid.Invoices) > 0 {
 		fmt.Fprintf(color.Output, "%s\n", lnutil.Header("Got Paid"))
+		fmt.Println("LENGTH IS", len(replyPaid.Invoices))
 		for _, invoice := range replyPaid.Invoices {
 			// its is an InvoiceReplyMsg
 			fmt.Fprintf(color.Output, "%s: %d %s: %s %s: %d %s: %s %s: %s\n",

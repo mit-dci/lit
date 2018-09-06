@@ -138,32 +138,16 @@ func (nd *LitNode) SplitInvoiceId(invoice string) (string, string, error) {
 	// send it the currency ticker and the amoutn in satoshi along with the
 	// invoice identifier, the currency ticker as defined by SLIP0173 and the
 	// amount in satoshis that the invoice is responsible for
-	// eg invoice:
-	// ln1jad29zj4lq43klxyvs5eyx7cp656pnegjfamsg_1tb100000
-	// address: 1
-	// incoice identifier: 1
-	// currency: tb
-	// amount (in satoshi): 100000
 	// Maximum amount will be fixed the same as lit (1G sat)
-	// Length limits
-	// Address length range: 21-41 (short addresses included)
-	// Invoice number range: 1 (0-35)
-	// Currently suppor only 35 simultaneous payments - highly doubt if we need
-	// more than this concurrently.
-	// Currency identifier range: 2-4 (tb, vtc, bcrt, etc)
+	// Currently supports only 35 simultaneous payments due to the single character
+	// invoiceId- highly doubt if we need more than this.
 	// note: currency identifiers are defined in accordance with SLIP0173
 	// Amount Length Range: 5-9 (10000 - 100000000)
 	// invoice
 
 	// Max Invoice Length: 41+ 1 = 42
-	// Next step after verifying ids: 1+4+9=14
-	// (id + curr ticker + amount)
-	// 9 = (int)(math.Log10(float64(consts.MaxChanCapacity))+1)
 	maxInvoiceLength := 43 // 1 extra for the separator + 1 for the invoice
 	// Min invoice Length: 21+1
-	// Next step after verifying ids: 1+2+5=8
-	// (id + currency ticker + min sat amount)
-	// 5 = (int)(math.Log10(float64(consts.MinSendAmt))+1)
 	minInvoicelength := 23 // 1 extra for the separator + 1 for the invoice
 
 	invoiceLength := len(invoice)
@@ -301,7 +285,13 @@ type FundArgs struct {
 	Data        [32]byte
 }
 
-func (nd *LitNode) PayInvoice(req lnutil.InvoiceReplyMsg) (uint64, error) {
+func (nd *LitNode) GetCoinBalances() (error) {
+	// get coin balances of all running peers
+	// is there a way to get the balances of coins whose daemons aren't running as well?
+	// TODOX
+	return nil
+}
+func (nd *LitNode) PayInvoice(req lnutil.InvoiceReplyMsg) (error) {
 
 	// Two ways we can pay this invoice
 	// 1. Pay through an existing channel ie push funds through an existing channel
@@ -309,7 +299,7 @@ func (nd *LitNode) PayInvoice(req lnutil.InvoiceReplyMsg) (uint64, error) {
 	// 		a. Open a channel directly with the peer and push the amount
 	// 		b. Find a route to the peer using multi hop and then pay that user.
 	//				i. But this is only if the guy who wants to pay has some channel open
-	// 			 ii. If he doesn't, then we're better off opening a new channel with him?
+	// 			 ii. If he doesn't, then we're better off opening a new channel with the remote peer directly
 
 	// First, lets do 1.
 	// Lets check balances before falling throguh to the channel code. It helps
@@ -344,15 +334,24 @@ func (nd *LitNode) PayInvoice(req lnutil.InvoiceReplyMsg) (uint64, error) {
 	// if there is a channel and we aren't connected, connect.
 	// else do nothing, proceed to open a new channel
 
-	log.Println("paying for the invoice now")
-	// check if I have sufficient  money to pay for this invoice
+	// check if I have sufficient money to pay for this invoice
 
 	var coinType uint32
 	switch req.CoinType {
+		// maybe we could have a map and then parse this stufff from there
+		// but for now, this seems easiest
 	case "tb":
 		coinType = uint32(1) // the numbers are what we define, not SLIP stuff
 	case "bcrt":
 		coinType = uint32(257)
+	case "tltc": // test litecoin
+		coinType = uint32(65537)
+	case "rltc": // regtest litecoin
+		coinType = uint32(258)
+	case "tvtc":
+		coinType = uint32(65536)
+	case "vtc":
+		coinType = uint32(28)
 	default:
 		coinType = uint32(257)
 	}
@@ -362,14 +361,14 @@ func (nd *LitNode) PayInvoice(req lnutil.InvoiceReplyMsg) (uint64, error) {
 	// Need it for multi hop anyway?
 	if err != nil {
 		// either the daemon isn't running or some other weird error.
-		return 0, nil
+		return err
 	}
 
 	if balance.MatureWitty < int64(req.Amount) {
 		// only witness balance since the cheapest option is to push funds through
 		// an existing channel
 		log.Println("Insufficient balance to pay this invoice")
-		return 0, fmt.Errorf("Insufficient balance to pay this invoice")
+		return fmt.Errorf("Insufficient balance to pay this invoice")
 	}
 	log.Printf("We have %d, paying %d from that", balance, req.Amount)
 
@@ -383,7 +382,7 @@ func (nd *LitNode) PayInvoice(req lnutil.InvoiceReplyMsg) (uint64, error) {
 		// we've reached the end of our list of peers which we ahve connected to
 		// in the past. break.
 		log.Println("no pubkey found. quitting!")
-		return 0, fmt.Errorf("no pubkey found. quitting!")
+		return fmt.Errorf("no pubkey found. quitting!")
 	}
 
 	nd.RemoteMtx.Lock()
@@ -402,25 +401,24 @@ func (nd *LitNode) PayInvoice(req lnutil.InvoiceReplyMsg) (uint64, error) {
 		// still pending but with no connection
 		idHash := fastsha256.Sum256(pubKey[:])
 		adr := bech32.Encode("ln", idHash[:20])
-		err := nd.DialPeer(adr + "@:2448") // localhost for now
+		err := nd.DialPeer(adr + "@:2448") // TODOXX: Change this to a tracker absed lookup
 
 		if err != nil {
-			log.Printf("Could not connect to remote peerIDx %d", req.PeerIdx)
+			log.Printf("Could not connect to remote peerIdx %d", req.PeerIdx)
 			log.Println(err)
-			return 0, err
+			return err
 		}
 	}
 	chanExists := false
 	qcs, err := nd.GetAllQchans()
 	if err != nil {
-		return 0, err
+		return err
 	}
 	for _, q := range qcs {
 		if q.KeyGen.Step[3]&0x7fffffff == req.PeerIdx && !q.CloseData.Closed &&
 			q.State.MyAmt > int64(req.Amount) && q.Value > int64(req.Amount) {
 			// get an open channel with required capacity
 			// do we check for confirmation height as well?
-			log.Println("CHAN EXTS", q)
 			chanExists = true
 			qChannel = q
 		}
@@ -463,16 +461,16 @@ func (nd *LitNode) PayInvoice(req lnutil.InvoiceReplyMsg) (uint64, error) {
 		}
 		fundParams.Data = data
 		if fundParams.Capacity > int64(balHave) {
-			return 0, fmt.Errorf("Insufficient funds to start a new channel")
+			return fmt.Errorf("Insufficient funds to start a new channel")
 		}
 
 		var err error
 		if nd.InProg != nil && nd.InProg.PeerIdx != 0 {
-			return 0, fmt.Errorf("channel with peer %d not done yet", nd.InProg.PeerIdx)
+			return fmt.Errorf("channel with peer %d not done yet", nd.InProg.PeerIdx)
 		}
 
 		if fundParams.Capacity > balance.MatureWitty-consts.SafeFee {
-			return 0, fmt.Errorf("Wanted %d but %d available for channel creation",
+			return fmt.Errorf("Wanted %d but %d available for channel creation",
 				fundParams.Capacity, balance.MatureWitty-consts.SafeFee)
 		}
 
@@ -480,25 +478,25 @@ func (nd *LitNode) PayInvoice(req lnutil.InvoiceReplyMsg) (uint64, error) {
 		idx, err := nd.FundChannel(
 			fundParams.Peer, fundParams.CoinType, fundParams.Capacity, fundParams.InitialSend, fundParams.Data)
 		if err != nil {
-			return 0, err
+			return err
 		}
 		log.Printf("Opened channel %d with peer %d", idx, req.PeerIdx)
 		// Now we have a channel to push funds into, fall through to the case below
 		// sleep a bit
-		return uint64(idx), nil
+		return nil
 	}
 
 	nd.RemoteMtx.Lock()
 	rpx = *nd.RemoteCons[req.PeerIdx] // store the remote peer here
 	nd.RemoteMtx.Unlock()
-	log.Println("TPX", rpx)
 
 	log.Println("Pushing funds in existing / created channel")
 	var data [32]byte
 	qc, ok := rpx.QCs[qChannel.Idx()]
 	if !ok {
-		log.Println("RETUREND HERE? ")
-		return 0, fmt.Errorf("peer %d doesn't have channel %d",
+		fmt.Printf("peer %d doesn't have channel %d",
+			qChannel.Peer(), qChannel.Idx())
+		return fmt.Errorf("peer %d doesn't have channel %d",
 			qChannel.Peer(), qChannel.Idx())
 	}
 	qc.Height = qChannel.Height
@@ -507,23 +505,23 @@ func (nd *LitNode) PayInvoice(req lnutil.InvoiceReplyMsg) (uint64, error) {
 	err = nd.PushChannel(qc, uint32(req.Amount), data)
 	if err != nil {
 		log.Println("ERROR WHILE PUSHING FUNDS!!", err)
-		return 0, fmt.Errorf("ERROR WHILE PUSHING FUNDS!!")
+		return err
 	}
 	// at this point, we've paid this peer and can store it in the lsit of paid invoices
-	return qc.State.StateIdx, nil
+	return nil
 }
 
-func (nd *LitNode) CleanupDbValsPayer(invoice lnutil.InvoiceReplyMsg) error {
+func (nd *LitNode) DeleteInvoicePayer(invoice lnutil.InvoiceReplyMsg) error {
 	var err error
 	BKTRequestedInvoices := []byte("RequestedInvoices")
 	BKTPendingInvoices := []byte("PendingInvoices")
-	err = nd.InvoiceManager.DeleteInt(BKTRequestedInvoices, invoice.PeerIdx)
+	err = nd.InvoiceManager.DeletePeerIdx(BKTRequestedInvoices, invoice.PeerIdx)
 	// requested invoices are indexed by peeridx and not invoiceId
 	if err != nil {
 		log.Println("Couldn't delete val from Requested invocies db")
 		return fmt.Errorf("Couldn't delete val from Requested invocies db")
 	}
-	err = nd.InvoiceManager.DeleteString(BKTPendingInvoices, invoice.Id)
+	err = nd.InvoiceManager.DeleteInvoiceId(BKTPendingInvoices, invoice.Id)
 	// pending invoices are indexed by their invoiceIds rather than peerid's
 	if err != nil {
 		log.Println("Couldn't delete val from Pending invocies db")
@@ -535,21 +533,20 @@ func (nd *LitNode) CleanupDbValsPayer(invoice lnutil.InvoiceReplyMsg) error {
 	return nil
 }
 
-func (nd *LitNode) CleanupDbValsReceiver(invoice lnutil.InvoiceReplyMsg) error {
+func (nd *LitNode) DeleteInvoiceReceiver(invoice lnutil.InvoiceReplyMsg) error {
 	// delete the invoice from GeneratedInvoices and RepliedInvoices and add it to
-	// GotPaidInvoices so that we can  keep a track of all invoices that we got paid
-	// for
+	// GotPaidInvoices so that we can keep a track of all invoices we got paid for
 	var err error
 	BKTGeneratedInvoices := []byte("GeneratedInvoices")
 	BKTRepliedInvoices := []byte("RepliedInvoices")
 
-	err = nd.InvoiceManager.DeleteString(BKTGeneratedInvoices, invoice.Id)
+	err = nd.InvoiceManager.DeleteInvoiceId(BKTGeneratedInvoices, invoice.Id)
 	// generated invoices are indexed by invoiceId
 	if err != nil {
 		log.Println("Couldn't delete val from Generated invocies db")
 		return fmt.Errorf("Couldn't delete val from Generated invocies db")
 	}
-	err = nd.InvoiceManager.DeleteInt(BKTRepliedInvoices, invoice.PeerIdx)
+	err = nd.InvoiceManager.DeletePeerIdx(BKTRepliedInvoices, invoice.PeerIdx)
 	// replied invoices are indexed by their PeerIdx
 	if err != nil {
 		log.Println("Couldn't delete val from Replied invocies db")
@@ -580,10 +577,18 @@ func (nd *LitNode) MonitorInvoice(invoice lnutil.InvoiceReplyMsg) error {
 	var currBalance, oldBalance uint64
 	var coinTypeInt uint32
 	switch coinType {
+	case "tn3": // should be tb, check and fix
+		coinTypeInt = uint32(1) // the numbers are what we define, not SLIP stuff
 	case "bcrt":
-		coinTypeInt = 257
-	case "tn3":
-		coinTypeInt = 1
+		coinTypeInt = uint32(257)
+	case "tltc": // test litecoin
+		coinTypeInt = uint32(65537)
+	case "rltc": // regtest litecoin
+		coinTypeInt = uint32(258)
+	case "tvtc":
+		coinTypeInt = uint32(65536)
+	case "vtc":
+		coinTypeInt = uint32(28)
 	default:
 		coinTypeInt = 1 // tn3
 	}
@@ -600,13 +605,11 @@ func (nd *LitNode) MonitorInvoice(invoice lnutil.InvoiceReplyMsg) error {
 		}
 	}
 
-	// var paid bool
-	// paid = false
 	currBalance = oldBalance
 	for currBalance < oldBalance+invoiceAmount {
 		// we need to get a list of all channels again because the peer may create
 		// a new channel
-		log.Println("OLD BALANCE: %d", oldBalance)
+		log.Println("Old Balance: %d", oldBalance)
 		currBalance = 0
 		// reset currentBalance because we calculate that again in each run
 		qcs, err = nd.GetAllQchans()
@@ -623,7 +626,7 @@ func (nd *LitNode) MonitorInvoice(invoice lnutil.InvoiceReplyMsg) error {
 	log.Printf("We got paid for invoice: %s", invoice.Id)
 	// if we do come here, it means that we got paid, so delete the invoice from
 	// generated invoices to free up the invoiceId for future use.
-	err = nd.CleanupDbValsReceiver(invoice)
+	err = nd.DeleteInvoiceReceiver(invoice)
 	if err != nil {
 		log.Println("Couldn't delete invoice from db, manually flush")
 		// don't exit here since we already got paid
