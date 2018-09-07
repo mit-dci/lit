@@ -143,7 +143,7 @@ func (nd *LitNode) DualFundChannel(
 
 	ourInputs := make([]lnutil.DualFundingInput, len(utxos))
 	for i := 0; i < len(utxos); i++ {
-		ourInputs[i] = lnutil.DualFundingInput{utxos[i].Op, utxos[i].Value}
+		ourInputs[i] = lnutil.DualFundingInput{Outpoint: utxos[i].Op, Value: utxos[i].Value}
 	}
 
 	var kg portxo.KeyGen
@@ -216,7 +216,7 @@ func (nd *LitNode) DualFundAccept() *DualFundingResult {
 
 	ourInputs := make([]lnutil.DualFundingInput, len(utxos))
 	for i := 0; i < len(utxos); i++ {
-		ourInputs[i] = lnutil.DualFundingInput{utxos[i].Op, utxos[i].Value}
+		ourInputs[i] = lnutil.DualFundingInput{Outpoint: utxos[i].Op, Value: utxos[i].Value}
 	}
 
 	var kg portxo.KeyGen
@@ -429,7 +429,7 @@ func (nd *LitNode) DualFundingAcceptHandler(msg lnutil.DualFundingAcceptMsg) {
 	// Build the funding transaction
 	tx, _ := nd.BuildDualFundingTransaction()
 
-	outPoint := wire.OutPoint{tx.TxHash(), 0}
+	outPoint := wire.OutPoint{Hash: tx.TxHash(), Index: 0}
 	nd.InProgDual.OutPoint = &outPoint
 	q.Op = *nd.InProgDual.OutPoint
 
@@ -562,14 +562,13 @@ func (nd *LitNode) BuildDualFundingTransaction() (*wire.MsgTx, error) {
 // RECIPIENT
 // QChanDescHandler takes in a description of a channel output.  It then
 // saves it to the local db, and returns a channel acknowledgement
-func (nd *LitNode) DualFundChanDescHandler(msg lnutil.ChanDescMsg) {
+func (nd *LitNode) DualFundChanDescHandler(msg lnutil.ChanDescMsg) error {
 
 	log.Printf("DualFundChanDescHandler\n")
 
 	wal, ok := nd.SubWallet[msg.CoinType]
 	if !ok {
-		log.Printf("DualFundChanDescHandler err no wallet for type %d", msg.CoinType)
-		return
+		return fmt.Errorf("DualFundChanDescHandler err no wallet for type %d", msg.CoinType)
 	}
 
 	// deserialize desc
@@ -579,8 +578,7 @@ func (nd *LitNode) DualFundChanDescHandler(msg lnutil.ChanDescMsg) {
 
 	cIdx, err := nd.NextChannelIdx()
 	if err != nil {
-		log.Printf("DualFundChanDescHandler err %s", err.Error())
-		return
+		return fmt.Errorf("DualFundChanDescHandler err %s", err.Error())
 	}
 
 	qc := new(Qchan)
@@ -605,13 +603,11 @@ func (nd *LitNode) DualFundChanDescHandler(msg lnutil.ChanDescMsg) {
 
 	_, err = btcec.ParsePubKey(msg.NextHTLCBase[:], btcec.S256())
 	if err != nil {
-		fmt.Errorf("QChanDescHandler NextHTLCBase err %s", err.Error())
-		return
+		return fmt.Errorf("QChanDescHandler NextHTLCBase err %s", err.Error())
 	}
 	_, err = btcec.ParsePubKey(msg.N2HTLCBase[:], btcec.S256())
 	if err != nil {
-		fmt.Errorf("QChanDescHandler N2HTLCBase err %s", err.Error())
-		return
+		return fmt.Errorf("QChanDescHandler N2HTLCBase err %s", err.Error())
 	}
 
 	// it should go into the next bucket and get the right key index.
@@ -649,47 +645,40 @@ func (nd *LitNode) DualFundChanDescHandler(msg lnutil.ChanDescMsg) {
 	// save new channel to db
 	err = nd.SaveQChan(qc)
 	if err != nil {
-		log.Printf("DualFundChanDescHandler err %s", err.Error())
-		return
+		return fmt.Errorf("DualFundChanDescHandler err %s", err.Error())
 	}
 
 	// load ... the thing I just saved.  why?
 	qc, err = nd.GetQchan(opArr)
 	if err != nil {
-		log.Printf("DualFundChanDescHandler GetQchan err %s", err.Error())
-		return
+		return fmt.Errorf("DualFundChanDescHandler GetQchan err %s", err.Error())
 	}
 
 	// when funding a channel, give them the first *2* elkpoints.
 	theirElkPointZero, err := qc.ElkPoint(false, 0)
 	if err != nil {
-		log.Printf("DualFundChanDescHandler err %s", err.Error())
-		return
+		return fmt.Errorf("DualFundChanDescHandler err %s", err.Error())
 	}
 	theirElkPointOne, err := qc.ElkPoint(false, 1)
 	if err != nil {
-		log.Printf("DualFundChanDescHandler err %s", err.Error())
-		return
+		return fmt.Errorf("DualFundChanDescHandler err %s", err.Error())
 	}
 
 	theirElkPointTwo, err := qc.N2ElkPointForThem()
 	if err != nil {
-		log.Printf("DualFundChanDescHandler err %s", err.Error())
-		return
+		return fmt.Errorf("DualFundChanDescHandler err %s", err.Error())
 	}
 
 	sig, _, err := nd.SignState(qc)
 	if err != nil {
-		log.Printf("DualFundChanDescHandler SignState err %s", err.Error())
-		return
+		return fmt.Errorf("DualFundChanDescHandler SignState err %s", err.Error())
 	}
 
 	log.Printf("Acking channel...\n")
 
 	fundingTx, err := nd.BuildDualFundingTransaction()
 	if err != nil {
-		log.Printf("DualFundChanDescHandler BuildDualFundingTransaction err %s", err.Error())
-		return
+		return fmt.Errorf("DualFundChanDescHandler BuildDualFundingTransaction err %s", err.Error())
 	}
 
 	wal.SignMyInputs(fundingTx)
@@ -701,7 +690,7 @@ func (nd *LitNode) DualFundChanDescHandler(msg lnutil.ChanDescMsg) {
 
 	nd.OmniOut <- outMsg
 
-	return
+	return nil
 }
 
 // FUNDER

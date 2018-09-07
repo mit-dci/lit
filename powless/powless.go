@@ -235,8 +235,6 @@ func (a *APILink) DirtyCheckLoop() {
 			<-a.dirtyChan
 		}
 	}
-
-	return
 }
 
 // VBlocksResponse is a list of Vblocks, which comes back from the /blocks
@@ -284,8 +282,6 @@ func (a *APILink) TipRefreshLoop() error {
 
 		time.Sleep(time.Second * 60)
 	}
-
-	return nil
 }
 
 // do you even need a struct here..?

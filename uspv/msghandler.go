@@ -193,7 +193,7 @@ func (s *SPVCon) TxHandler(tx *wire.MsgTx) {
 
 	// send txs up to wallit
 	if s.MatchTx(tx) {
-		s.TxUpToWallit <- lnutil.TxAndHeight{tx, height}
+		s.TxUpToWallit <- lnutil.TxAndHeight{Tx: tx, Height: height}
 	}
 }
 
