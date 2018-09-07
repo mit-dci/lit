@@ -11,11 +11,6 @@ import (
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
 	nat "github.com/mit-dci/lit/nat"
-	"log"
-	"net"
-	"strconv"
-	"strings"
-	"time"
 )
 
 // Gets the list of ports where LitNode is listening for incoming connections,

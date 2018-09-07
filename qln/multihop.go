@@ -32,7 +32,7 @@ func (nd *LitNode) PayMultihop(dstLNAdr string, originCoinType uint32, destCoinT
 
 	//Connect to the node
 	if _, err := nd.FindPeerIndexByAddress(dstLNAdr); err != nil {
-		err = nd.DialPeer(dstLNAdr)
+		_, err = nd.DialPeer(dstLNAdr)
 		if err != nil {
 			return false, fmt.Errorf("error connected to destination node for multihop: %s", err.Error())
 		}
@@ -292,7 +292,7 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 
 	//Connect to the node
 	if _, err := nd.FindPeerIndexByAddress(lnAdr); err != nil {
-		err = nd.DialPeer(lnAdr)
+		_, err = nd.DialPeer(lnAdr)
 		if err != nil {
 			return fmt.Errorf("error connecting to node for multihop: %s", err.Error())
 		}
