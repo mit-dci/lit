@@ -25,7 +25,6 @@ type LndcRpcClient struct {
 	requestNonceMtx  sync.Mutex
 	responseChannels map[uint64]chan lnutil.RemoteControlRpcResponseMsg
 	key              *btcec.PrivateKey
-	StatusUpdates    chan lnutil.UIEventMsg
 	conMtx           sync.Mutex
 }
 
@@ -93,7 +92,6 @@ func NewLndcRpcClient(address string, key *btcec.PrivateKey) (*LndcRpcClient, er
 
 	cli := new(LndcRpcClient)
 	cli.responseChannels = make(map[uint64]chan lnutil.RemoteControlRpcResponseMsg)
-	cli.StatusUpdates = make(chan lnutil.UIEventMsg)
 	who, where := lnutil.ParseAdrString(address)
 
 	// If we couldn't deduce a URL, look it up on the tracker
@@ -108,10 +106,6 @@ func NewLndcRpcClient(address string, key *btcec.PrivateKey) (*LndcRpcClient, er
 	if err != nil {
 		return nil, err
 	}
-
-	// Subscribe to status updates
-	args := map[string]interface{}{"Subscribe": true}
-	cli.Call("RemoteControl.SubscribeToUIEvents", args, nil)
 	go cli.ReceiveLoop()
 	return cli, nil
 }
@@ -196,18 +190,6 @@ func (cli *LndcRpcClient) ReceiveLoop() {
 				delete(cli.responseChannels, response.Idx)
 			} else {
 				log.Printf("Could not find response channel for index %d\n", response.Idx)
-			}
-		} else if msg[0] == lnutil.MSGID_UIEVENT_EVENT {
-			response, err := lnutil.NewUIEventMsgFromBytes(msg, 0)
-			if err != nil {
-				log.Printf("Error receiving UI Event: %s", err.Error())
-				cli.lnconn.Close()
-				return
-			}
-
-			select {
-			case cli.StatusUpdates <- response:
-			default:
 			}
 		}
 	}

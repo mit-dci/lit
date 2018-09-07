@@ -113,17 +113,6 @@ func (nd *LitNode) RemoteControlRequestHandler(msg lnutil.RemoteControlRpcReques
 		log.Printf("Could not parse JSON: %s", err.Error())
 		return err
 	}
-
-	if msg.Method == "RemoteControl.SubscribeToUIEvents" && auth.Allowed {
-		subscribe := obj["Subscribe"].(bool)
-		if subscribe {
-			nd.SubscribePeerToUIEvents(msg.PeerIdx)
-		} else {
-			nd.UnsubscribePeerToUIEvents(msg.PeerIdx)
-		}
-		return nil
-	}
-
 	go func() {
 		if !strings.HasPrefix(msg.Method, "LitRPC.") {
 			log.Printf("Remote control method does not start with `LitRPC.`. We don't know any better. Yet.")

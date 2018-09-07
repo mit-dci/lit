@@ -73,16 +73,6 @@ func (p *LndcRpcWebsocketProxy) Listen(host string, port uint16) {
 func (p *LndcRpcWebsocketProxy) proxyServeWS(ws *websocket.Conn) {
 
 	defer ws.Close()
-	go func() {
-		for {
-			statusUpdate := <-p.lndcRpcClient.StatusUpdates
-			err := websocket.JSON.Send(ws, statusUpdate)
-			if err != nil {
-				log.Printf("Error sending status update to websocket: %s", err.Error())
-				return
-			}
-		}
-	}()
 	for {
 		var data interface{}
 		err := websocket.JSON.Receive(ws, &data)
