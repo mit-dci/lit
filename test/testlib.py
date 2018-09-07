@@ -73,6 +73,7 @@ class LitNode():
             "--reg", "127.0.0.1:" + str(bcnode.p2p_port),
             "--tn3", "", # disable autoconnect
             "--dir", self.data_dir,
+            "--unauthrpc=true"
             "--rpcport=" + str(self.rpc_port),
             "--autoReconnect",
             "--autoListenPort=" + str(self.p2p_port)
