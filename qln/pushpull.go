@@ -109,7 +109,7 @@ func (nd *LitNode) ReSendMsg(qc *Qchan) error {
 // PushChannel initiates a state update by sending a DeltaSig
 func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	// sanity checks
-	if amt >= 1<<30 {
+	if amt >= consts.MaxSendAmt {
 		return fmt.Errorf("max send 1G sat (1073741823)")
 	}
 	if amt == 0 {
@@ -172,7 +172,7 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 		qc.ClearToSend <- true
 		qc.ChanMtx.Unlock()
 		return fmt.Errorf(
-			"pushing %s insufficient; counterparty bal %s fee %s consts.MinOutput %s",
+			"pushing %s insufficient; counterparty bal %s fee %s MinOutput %s",
 			lnutil.SatoshiColor(int64(amt)),
 			lnutil.SatoshiColor(theirAmt),
 			lnutil.SatoshiColor(qc.State.Fee),
