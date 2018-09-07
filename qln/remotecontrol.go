@@ -74,19 +74,16 @@ func (nd *LitNode) RemoteControlRequestHandler(msg lnutil.RemoteControlRpcReques
 	if !transportAuthenticated {
 		// If the message specifies a pubkey, then we haven't authenticated this message via the
 		// lndc transport already. So we need to check the signature embedded in the message.
-
-		var hashBuf bytes.Buffer
-		hashBuf.Write(msg.Args)
-		hashBuf.Write([]byte(msg.Method))
-		binary.Write(&hashBuf, binary.BigEndian, msg.Idx)
+		msgSig := msg.Sig
+		msg.Sig = [64]byte{}
 
 		var digest []byte
 		if msg.DigestType == lnutil.DIGEST_TYPE_SHA256 {
-			hash := fastsha256.Sum256(hashBuf.Bytes())
+			hash := fastsha256.Sum256(msg.Bytes())
 			digest = make([]byte, len(hash))
 			copy(digest[:], hash[:])
 		} else if msg.DigestType == lnutil.DIGEST_TYPE_RIPEMD160 {
-			hash := btcutil.Hash160(hashBuf.Bytes())
+			hash := btcutil.Hash160(msg.Bytes())
 			digest = make([]byte, len(hash))
 			copy(digest[:], hash[:])
 		}
@@ -96,7 +93,7 @@ func (nd *LitNode) RemoteControlRequestHandler(msg lnutil.RemoteControlRpcReques
 			log.Printf("Error parsing public key for remote control: %s", err.Error())
 			return err
 		}
-		sig := sig64.SigDecompress(msg.Sig)
+		sig := sig64.SigDecompress(msgSig)
 		signature, err := btcec.ParseDERSignature(sig, btcec.S256())
 		if err != nil {
 			log.Printf("Error parsing signature for remote control: %s", err.Error())
