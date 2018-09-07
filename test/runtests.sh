@@ -24,6 +24,8 @@ ign=0
 export EXIT_REQED=0
 export TEST_PID=-1
 
+sleep 1
+
 function killcurrentandexit () {
 	echo 'testpid!' $TEST_PID
 	export EXIT_REQED=1
@@ -40,6 +42,8 @@ for t in $tests; do
 		continue
 	fi
 
+	sleep 1
+
 	echo "Running test: $t"
 	echo '===='
 
@@ -52,6 +56,8 @@ for t in $tests; do
 		continue
 	fi
 
+	sleep 1
+
 	ls -l . $datadir
 	mkdir -p $tdata
 	env LIT_ITEST_ROOT=$(realpath $tdata) ./itest_$t.py & export TEST_PID=$!
@@ -63,6 +69,8 @@ for t in $tests; do
 		fail=$(($fail + 1))
 		continue
 	fi
+
+	sleep 1
 
 	echo -e "\n===="
 	echo "Compeleted: $t"
