@@ -52,7 +52,7 @@ for t in $tests; do
 		continue
 	fi
 
-	ls -l . $tdata
+	ls -l . $datadir
 	mkdir -p $tdata
 	env LIT_ITEST_ROOT=$(realpath $tdata) ./itest_$t.py & export TEST_PID=$!
 	wait $TEST_PID
