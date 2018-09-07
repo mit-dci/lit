@@ -194,7 +194,7 @@ func (nd *LitNode) SignState(q *Qchan) ([64]byte, [][64]byte, error) {
 	bigSig, err := txscript.RawTxInWitnessSignature(
 		commitmentTx, hCache, 0, q.Value, pre, txscript.SigHashAll, priv)
 	if err != nil {
-		return sig, err
+		return sig, nil, err
 	}
 
 	// truncate sig (last byte is sighash type, always sighashAll)
