@@ -31,6 +31,8 @@ function killcurrentandexit () {
 
 trap killcurrentandexit INT
 
+echo 'Umask:' $(umask -S)
+
 for t in $tests; do
 
 	if [ "$EXIT_REQED" == "1" ]; then
@@ -50,6 +52,7 @@ for t in $tests; do
 		continue
 	fi
 
+	ls -l . $tdata
 	mkdir -p $tdata
 	env LIT_ITEST_ROOT=$(realpath $tdata) ./itest_$t.py & export TEST_PID=$!
 	wait $TEST_PID
