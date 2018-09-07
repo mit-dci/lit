@@ -67,7 +67,7 @@ func (p *LndcRpcWebsocketProxy) Listen(host string, port uint16) {
 	log.Printf("Listening regular Websocket RPC on %s", listenString)
 
 	err := http.ListenAndServe(listenString, nil)
-	log.Fatal("Error on websocket server: %s", err.Error())
+	log.Fatalf("Error on websocket server: %s", err.Error())
 }
 
 func (p *LndcRpcWebsocketProxy) proxyServeWS(ws *websocket.Conn) {
