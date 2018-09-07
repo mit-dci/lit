@@ -58,7 +58,7 @@ type Command struct {
 }
 
 func setConfig(lc *litAfClient) {
-	conptr := flag.String("con", "@:2448", "host to connect to in the form of [<lnadr>@][<host>][:<port>]")
+	conptr := flag.String("con", "2448", "host to connect to in the form of [<lnadr>@][<host>][:<port>]")
 	dirptr := flag.String("dir", filepath.Join(os.Getenv("HOME"), litHomeDirName), "directory to save settings")
 
 	flag.Parse()
