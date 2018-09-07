@@ -128,7 +128,7 @@ func (nd *LitNode) TCPListener(
 }
 
 func GoAnnounce(priv *btcec.PrivateKey, litport string, litadr string, trackerURL string) {
-	err := Announce(priv, litport, litadr, trackerURL)
+	err := lnutil.Announce(priv, litport, litadr, trackerURL)
 	if err != nil {
 		log.Printf("Announcement error %s", err.Error())
 	}
@@ -161,7 +161,7 @@ func (nd *LitNode) DialPeer(connectAdr string) (uint32, error) {
 
 	// If we couldn't deduce a URL, look it up on the tracker
 	if where == "" {
-		where, _, err = Lookup(who, nd.TrackerURL, nd.ProxyURL)
+		where, _, err = lnutil.Lookup(who, nd.TrackerURL, nd.ProxyURL)
 		if err != nil {
 			return 0, err
 		}
