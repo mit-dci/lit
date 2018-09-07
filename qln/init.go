@@ -123,8 +123,8 @@ func (nd *LitNode) LinkBaseWallet(
 		rootpriv, birthHeight, resync, host, nd.LitFolder, proxy, param)
 
 	if err != nil {
-		 log.Println(err)
-		 return nil
+		log.Println(err)
+		return nil
 	}
 
 	if nd.ConnectedCoinTypes == nil {
@@ -150,6 +150,7 @@ func (nd *LitNode) LinkBaseWallet(
 	}
 
 	go nd.OPEventHandler(nd.SubWallet[WallitIdx].LetMeKnow())
+	go nd.HeightEventHandler(nd.SubWallet[WallitIdx].LetMeKnowHeight())
 
 	if !nd.MultiWallet {
 		nd.DefaultCoin = param.HDCoinType
@@ -199,6 +200,11 @@ func (nd *LitNode) OpenDB(filename string) error {
 		}
 
 		_, err = btx.CreateBucketIfNotExists(BKTWatch)
+		if err != nil {
+			return err
+		}
+
+		_, err = btx.CreateBucketIfNotExists(BKTHTLCOPs)
 		if err != nil {
 			return err
 		}

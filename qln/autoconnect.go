@@ -1,7 +1,6 @@
 package qln
 
 import (
-	"fmt"
 	"log"
 	"time"
 
@@ -20,13 +19,13 @@ func (nd *LitNode) AutoReconnect(listenPort string, interval int64) {
 	ticker := time.NewTicker(time.Duration(interval) * time.Second)
 	go func() {
 		for {
-			fmt.Println("Reconnecting to known peers")
+			//log.Println("Reconnecting to known peers")
 			var empty [33]byte
 			i := uint32(1)
 			for {
 				pubKey, _ := nd.GetPubHostFromPeerIdx(i)
 				if pubKey == empty {
-					log.Printf("Done, tried %d hosts\n", i-1)
+					//log.Printf("Done, tried %d hosts\n", i-1)
 					break
 				}
 
@@ -42,7 +41,7 @@ func (nd *LitNode) AutoReconnect(listenPort string, interval int64) {
 				idHash := fastsha256.Sum256(pubKey[:])
 				adr := bech32.Encode("ln", idHash[:20])
 
-				err := nd.DialPeer(adr)
+				_, err := nd.DialPeer(adr)
 
 				if err != nil {
 					log.Printf("Could not restore connection to %s: %s\n", adr, err.Error())

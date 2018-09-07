@@ -3,9 +3,9 @@ package uspv
 import (
 	"log"
 
-	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/btcutil/bloom"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/wire"
 )
 
 func (s *SPVCon) incomingMessageHandler() {
@@ -59,10 +59,13 @@ func (s *SPVCon) incomingMessageHandler() {
 			s.GetDataHandler(m)
 
 		default:
-			log.Printf("Got unknown message type %s\n", m.Command())
+			if m != nil {
+				log.Printf("Got unknown message type %s\n", m.Command())
+			} else {
+				log.Printf("Got nil message")
+			}
 		}
 	}
-	return
 }
 
 // this one seems kindof pointless?  could get ridf of it and let
@@ -82,7 +85,6 @@ func (s *SPVCon) outgoingMessageHandler() {
 		}
 		s.WBytes += uint64(n)
 	}
-	return
 }
 
 // fPositiveHandler monitors false positives and when it gets enough of them,
@@ -121,6 +123,7 @@ func (s *SPVCon) fPositiveHandler() {
 
 // REORG TODO: how to detect reorgs and send them up to wallet layer
 
+// HeaderHandler ...
 func (s *SPVCon) HeaderHandler(m *wire.MsgHeaders) {
 	moar, err := s.IngestHeaders(m)
 	if err != nil {
@@ -137,9 +140,9 @@ func (s *SPVCon) HeaderHandler(m *wire.MsgHeaders) {
 	}
 	// no moar, done w/ headers, send filter and get blocks
 	if !s.HardMode { // don't send this in hardmode! that's the whole point
-		filt, err := s.GimmeFilter()
-		if err != nil {
-			log.Printf("AskForBlocks error: %s", err.Error())
+		filt, err2 := s.GimmeFilter()
+		if err2 != nil {
+			log.Printf("AskForBlocks error: %s", err2.Error())
 			return
 		}
 		// send filter
@@ -168,7 +171,6 @@ func (s *SPVCon) TxHandler(tx *wire.MsgTx) {
 	if !ok {
 		log.Printf("Tx %s unknown, will not ingest\n", tx.TxHash().String())
 		panic("unknown tx")
-		return
 	}
 
 	// check for double spends ...?
@@ -223,6 +225,7 @@ func (s *SPVCon) GetDataHandler(m *wire.MsgGetData) {
 	log.Printf("sent %d of %d requested items", sent, len(m.InvList))
 }
 
+// InvHandler ...
 func (s *SPVCon) InvHandler(m *wire.MsgInv) {
 	log.Printf("got inv.  Contains:\n")
 	for i, thing := range m.InvList {
@@ -255,6 +258,7 @@ func (s *SPVCon) InvHandler(m *wire.MsgInv) {
 	}
 }
 
+// PongBack ...
 func (s *SPVCon) PongBack(nonce uint64) {
 	mpong := wire.NewMsgPong(nonce)
 
@@ -262,6 +266,7 @@ func (s *SPVCon) PongBack(nonce uint64) {
 	return
 }
 
+// SendFilter ...
 func (s *SPVCon) SendFilter(f *bloom.Filter) {
 	s.outMsgQueue <- f.MsgFilterLoad()
 

@@ -28,8 +28,7 @@ pipeline {
     }
     stage('Integration Tests') {
       steps {
-        sh 'python3 test/test_basic.py -c reg --dumplogs || exit 2'
-        sh 'python3 test/test_break.py -c reg --dumplogs || exit 2'
+        sh 'cd test && env LIT_OUTPUT_SHOW=1 ./runtests.sh'
       }
     }
     stage('Package') {

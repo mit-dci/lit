@@ -6,14 +6,14 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/boltdb/bolt"
+	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/blockchain"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
-	"github.com/mit-dci/lit/wire"
-	"github.com/mit-dci/lit/btcutil"
-	"github.com/boltdb/bolt"
+	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
-	"github.com/mit-dci/lit/consts"
+	"github.com/mit-dci/lit/wire"
 )
 
 // const strings for db usage
@@ -281,6 +281,20 @@ func (w *Wallit) RegisterWatchOP(op wire.OutPoint) error {
 			return fmt.Errorf("watch bucket not in db")
 		}
 		return dufb.Put(opArr[:], nil)
+	})
+}
+
+// UnregisterWatchOP unregisters an outpoint to watch. Used to remove watched HTLC OPs if we claim them ourselves.
+func (w *Wallit) UnregisterWatchOP(op wire.OutPoint) error {
+	opArr := lnutil.OutPointToBytes(op)
+	// open db
+	return w.StateDB.Update(func(btx *bolt.Tx) error {
+		// get the outpoint watch bucket
+		dufb := btx.Bucket(BKToutpoint)
+		if dufb == nil {
+			return fmt.Errorf("watch bucket not in db")
+		}
+		return dufb.Delete(opArr[:])
 	})
 }
 

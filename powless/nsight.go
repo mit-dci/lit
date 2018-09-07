@@ -3,6 +3,7 @@ package powless
 // GetAdrTxos
 import (
 	"bytes"
+	"time"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -55,7 +56,10 @@ func (a *APILink) NsightGetAdrTxos() error {
 	// chop off last comma, and add /utxo
 	adrlist = adrlist[:len(adrlist)-1] + "/utxo"
 
-	response, err := http.Get(apitxourl + "/addrs/" + adrlist)
+	client := &http.Client{
+		Timeout: time.Second * 5, // 5s to accomodate the 10s RPC timeout
+	}
+	response, err := client.Get(apitxourl + "/addrs/" + adrlist)
 	if err != nil {
 		return err
 	}
@@ -117,7 +121,10 @@ func (a *APILink) GetOPTxs() error {
 		log.Printf("asking for %s\n", op.String())
 		// get full tx info for the outpoint's tx
 		// (if we have 2 outpoints with the same txid we query twice...)
-		response, err := http.Get(apitxourl + "tx/" + op.Hash.String())
+		client := &http.Client{
+			Timeout: time.Second * 5, // 5s to accomodate the 10s RPC timeout
+		}
+		response, err := client.Get(apitxourl + "tx/" + op.Hash.String())
 		if err != nil {
 			return err
 		}
@@ -185,7 +192,10 @@ func (a *APILink) GetOPTxs() error {
 // GetRawTx is a helper function to get a tx from the insight api
 func GetRawTx(txid string) (*wire.MsgTx, error) {
 	rawTxURL := "https://test-insight.bitpay.com/api/rawtx/"
-	response, err := http.Get(rawTxURL + txid)
+	client := &http.Client{
+		Timeout: time.Second * 5, // 5s to accomodate the 10s RPC timeout
+	}
+	response, err := client.Get(rawTxURL + txid)
 	if err != nil {
 		return nil, err
 	}
