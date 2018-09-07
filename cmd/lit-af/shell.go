@@ -139,11 +139,6 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		return parseErr(err, "rcauth")
 	}
 
-	if cmd == "rcsend" {
-		err = lc.RemoteControlSend(args)
-		return parseErr(err, "rcsend")
-	}
-
 	if cmd == "rcreq" {
 		err = lc.RemoteControlRequest(args)
 		return parseErr(err, "rcreq")
@@ -504,7 +499,7 @@ func (lc *litAfClient) Help(textArgs []string) error {
 	if len(textArgs) == 0 {
 
 		fmt.Fprintf(color.Output, lnutil.Header("Commands:\n"))
-		listofCommands := []*Command{helpCommand, sayCommand, lsCommand, addressCommand, sendCommand, fanCommand, sweepCommand, lisCommand, conCommand, dlcCommand, fundCommand, dualFundCommand, watchCommand, pushCommand, closeCommand, breakCommand, addHTLCCommand, clearHTLCCommand, rcAuthCommand, rcSendCommand, rcRequestCommand, historyCommand, offCommand, exitCommand}
+		listofCommands := []*Command{helpCommand, sayCommand, lsCommand, addressCommand, sendCommand, fanCommand, sweepCommand, lisCommand, conCommand, dlcCommand, fundCommand, dualFundCommand, watchCommand, pushCommand, closeCommand, breakCommand, addHTLCCommand, clearHTLCCommand, rcAuthCommand, rcRequestCommand, historyCommand, offCommand, exitCommand}
 		printHelp(listofCommands)
 		fmt.Fprintf(color.Output, "\n\n")
 		fmt.Fprintf(color.Output, lnutil.Header("Coins:\n"))
