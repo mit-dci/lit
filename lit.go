@@ -24,9 +24,10 @@ type config struct { // define a struct for usage with go-flags
 	Tvtchost    string `long:"tvtc" description:"Connect to Vertcoin test node."`
 	Vtchost     string `long:"vtc" description:"Connect to Vertcoin."`
 	// system specific configs
-	LitHomeDir string `long:"dir" description:"Specify Home Directory of lit as an absolute path."`
-	TrackerURL string `long:"tracker" description:"LN address tracker URL http|https://host:port"`
-	ConfigFile string
+	LitHomeDir   string `long:"dir" description:"Specify Home Directory of lit as an absolute path."`
+	TrackerURL   string `long:"tracker" description:"LN address tracker URL http|https://host:port"`
+	ConfigFile   string
+	WebsocketRPC bool `long:"websocketRPC" description:"Enables unauthenticated Websocket RPC"`
 
 	// proxy
 	ProxyURL      string `long:"proxy" description:"SOCKS5 proxy to use for communicating with the network"`
@@ -63,6 +64,7 @@ var (
 	defaultAutoListenPort        = ":2448"
 	defaultAutoReconnectInterval = int64(60)
 	defaultUpnPFlag              = false
+	defaultWebsocketRPC          = false
 )
 
 func fileExists(name string) bool {
@@ -160,6 +162,7 @@ func main() {
 		AutoReconnect:         defaultAutoReconnect,
 		AutoListenPort:        defaultAutoListenPort,
 		AutoReconnectInterval: defaultAutoReconnectInterval,
+		WebsocketRPC:          defaultWebsocketRPC,
 	}
 
 	key := litSetup(&conf)
@@ -190,17 +193,9 @@ func main() {
 	rpcl.OffButton = make(chan bool, 1)
 	node.RPC = rpcl
 
-	//TODO: Reinstate normal RPC, configurable (default off)
-	/*listenPort, err := strconv.Atoi(conf.AutoListenPort[1:])
-	if err != nil {
-		log.Fatal(err)
+	if conf.WebsocketRPC {
+		go litrpc.RPCListen(rpcl, conf.Rpchost, conf.Rpcport)
 	}
-	rpcProxy, err := litrpc.NewLocalLndcRpcWebsocketProxyWithHomeDirAndPort(conf.LitHomeDir, uint32(listenPort))
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println("Launching the RPC proxy...")
-	go rpcProxy.Listen(conf.Rpchost, conf.Rpcport)*/
 
 	<-rpcl.OffButton
 	log.Printf("Got stop request\n")
