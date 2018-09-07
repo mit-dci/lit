@@ -282,7 +282,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		}
   }
 
-	err = lc.Call("LitRPC.Balance", nil, bReply)
+	err := lc.Call("LitRPC.Balance", nil, bReply)
 	if err != nil {
 		return err
 	}
