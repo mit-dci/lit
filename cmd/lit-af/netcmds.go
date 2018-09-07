@@ -46,13 +46,6 @@ var rcAuthCommand = &Command{
 	ShortDescription: "Manages authorization for remote control",
 }
 
-// Temporary command for testing. Remove when there's an actual remote control library.
-var rcSendCommand = &Command{
-	Format:           fmt.Sprintf("%s %s\n", lnutil.White("rcsend"), lnutil.ReqColor("peer", "msg")),
-	Description:      "Sends a remote control message to peer [peer]. [msg] is hex encoded\n",
-	ShortDescription: "Sends a remote control message",
-}
-
 // Request remote control access
 var rcRequestCommand = &Command{
 	Format:           fmt.Sprintf("%s\n", lnutil.White("rcreq")),
@@ -186,31 +179,6 @@ func (lc *litAfClient) RemoteControlAuth(textArgs []string) error {
 	args.Authorization.Allowed = lnutil.YupString(textArgs[1])
 
 	err = lc.Call("LitRPC.RemoteControlAuth", args, reply)
-	fmt.Fprintf(color.Output, "%s\n", reply.Status)
-	return nil
-}
-
-func (lc *litAfClient) RemoteControlSend(textArgs []string) error {
-	stopEx, err := CheckHelpCommand(rcAuthCommand, textArgs, 2)
-	if err != nil || stopEx {
-		return err
-	}
-	args := new(litrpc.RCSendArgs)
-	reply := new(litrpc.StatusReply)
-
-	peerIdx, err := strconv.Atoi(textArgs[0])
-	if err != nil {
-		return err
-	}
-
-	args.PeerIdx = uint32(peerIdx)
-
-	args.Msg, err = hex.DecodeString(textArgs[1])
-	if err != nil {
-		return fmt.Errorf("Could not decode message: %s", err.Error())
-	}
-
-	err = lc.Call("LitRPC.RemoteControlSend", args, reply)
 	fmt.Fprintf(color.Output, "%s\n", reply.Status)
 	return nil
 }

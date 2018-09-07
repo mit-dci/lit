@@ -194,22 +194,6 @@ func (r *LitRPC) RemoteControlAuth(args RCAuthArgs, reply *StatusReply) error {
 	return nil
 }
 
-type RCSendArgs struct {
-	PeerIdx uint32
-	Msg     []byte
-}
-
-func (r *LitRPC) RemoteControlSend(args RCSendArgs, reply *StatusReply) error {
-	msg, err := lnutil.NewRemoteControlRpcRequestMsgFromBytes(args.Msg, args.PeerIdx)
-	if err != nil {
-		log.Printf("Error making message from bytes: %s\n", err.Error())
-		return err
-	}
-	log.Printf("Sending RC message to peer [%d]\n", args.PeerIdx)
-	r.Node.OmniOut <- msg
-	return nil
-}
-
 type RCRequestAuthArgs struct {
 	PubKey [33]byte
 }
