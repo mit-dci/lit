@@ -47,6 +47,7 @@ const (
 
 type litAfClient struct {
 	con           string
+	tracker       string
 	litHomeDir    string
 	lndcRpcClient *litrpc.LndcRpcClient
 }
@@ -60,10 +61,12 @@ type Command struct {
 func setConfig(lc *litAfClient) {
 	conptr := flag.String("con", "2448", "host to connect to in the form of [<lnadr>@][<host>][:<port>]")
 	dirptr := flag.String("dir", filepath.Join(os.Getenv("HOME"), litHomeDirName), "directory to save settings")
+	trackerptr := flag.String("tracker", "http://hubris.media.mit.edu:46580", "service to use for looking up node addresses")
 
 	flag.Parse()
 
 	lc.con = *conptr
+	lc.tracker = *trackerptr
 	lc.litHomeDir = *dirptr
 }
 
@@ -99,7 +102,20 @@ func main() {
 			log.Fatal(err.Error())
 		}
 		key, _ := btcec.PrivKeyFromBytes(btcec.S256(), privKey[:])
-		adr := fmt.Sprintf("%s@%s:%d", adr, host, port)
+
+		if adr != "" && strings.HasPrefix(adr, "ln1") && host == "" {
+			ipv4, _, err := lnutil.Lookup(adr, lc.tracker, "")
+			if err != nil {
+				log.Fatalf("Error looking up address on the tracker: %s", err)
+			} else {
+				adr = fmt.Sprintf("%s@%s", adr, ipv4)
+			}
+		} else {
+			adr = fmt.Sprintf("%s@%s:%d", adr, host, port)
+		}
+
+		log.Printf("Connecting to %s\n", adr)
+
 		lc.lndcRpcClient, err = litrpc.NewLndcRpcClient(adr, key)
 		if err != nil {
 			log.Fatal(err.Error())
