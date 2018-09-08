@@ -525,7 +525,7 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) error {
 	if err != nil {
 		nd.FailChannel(qc)
 		log.Printf("QChanDescHandler err %s", err.Error())
-		return
+		return err
 	}
 
 	// load ... the thing I just saved.  why?
@@ -533,7 +533,7 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) error {
 	if err != nil {
 		nd.FailChannel(qc)
 		log.Printf("QChanDescHandler GetQchan err %s", err.Error())
-		return
+		return err
 	}
 
 	// when funding a channel, give them the first *2* elkpoints.
@@ -541,27 +541,27 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) error {
 	if err != nil {
 		nd.FailChannel(qc)
 		log.Printf("QChanDescHandler err %s", err.Error())
-		return
+		return err
 	}
 	theirElkPointOne, err := qc.ElkPoint(false, 1)
 	if err != nil {
 		nd.FailChannel(qc)
 		log.Printf("QChanDescHandler err %s", err.Error())
-		return
+		return err
 	}
 
 	theirElkPointTwo, err := qc.N2ElkPointForThem()
 	if err != nil {
 		nd.FailChannel(qc)
 		log.Printf("QChanDescHandler err %s", err.Error())
-		return
+		return err
 	}
 
 	sig, _, err := nd.SignState(qc)
 	if err != nil {
 		nd.FailChannel(qc)
 		log.Printf("QChanDescHandler SignState err %s", err.Error())
-		return
+		return err
 	}
 
 	outMsg := lnutil.NewChanAckMsg(
