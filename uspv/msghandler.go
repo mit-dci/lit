@@ -13,6 +13,7 @@ func (s *SPVCon) incomingMessageHandler() {
 		n, xm, _, err := wire.ReadMessageWithEncodingN(s.con, s.localVersion,
 			wire.BitcoinNet(s.Param.NetMagicBytes), wire.LatestEncoding)
 		if err != nil {
+			s.con.Close() // close the connection to prevent spam messages from crashing lit.
 			log.Printf("ReadMessageWithEncodingN error.  Disconnecting from given peer. %s\n", err.Error())
 			if s.randomNodesOK { // if user wants to connect to localhost, let him do so
 				s.Connect("yes") // really any YupString here
@@ -193,7 +194,7 @@ func (s *SPVCon) TxHandler(tx *wire.MsgTx) {
 
 	// send txs up to wallit
 	if s.MatchTx(tx) {
-		s.TxUpToWallit <- lnutil.TxAndHeight{tx, height}
+		s.TxUpToWallit <- lnutil.TxAndHeight{Tx: tx, Height: height}
 	}
 }
 

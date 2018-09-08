@@ -426,12 +426,11 @@ func (nd *LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 // RECIPIENT
 // QChanDescHandler takes in a description of a channel output.  It then
 // saves it to the local db, and returns a channel acknowledgement
-func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
+func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) error {
 
 	wal, ok := nd.SubWallet[msg.CoinType]
 	if !ok {
-		log.Printf("QChanDescHandler err no wallet for type %d", msg.CoinType)
-		return
+		return fmt.Errorf("QChanDescHandler err no wallet for type %d", msg.CoinType)
 	}
 
 	// deserialize desc
@@ -441,8 +440,7 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 
 	cIdx, err := nd.NextChannelIdx()
 	if err != nil {
-		log.Printf("QChanDescHandler err %s", err.Error())
-		return
+		return fmt.Errorf("QChanDescHandler err %s", err.Error())
 	}
 
 	qc := new(Qchan)
@@ -480,7 +478,7 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 	// similar to SIGREV in pushpull
 
 	// TODO assumes both parties use same fee
-	qc.State.Fee = wal.Fee() * 1000
+	qc.State.Fee = wal.Fee() * consts.QcStateFee
 	qc.State.MyAmt = msg.InitPayment
 
 	qc.State.Data = msg.Data
@@ -493,13 +491,11 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 
 	_, err = btcec.ParsePubKey(msg.NextHTLCBase[:], btcec.S256())
 	if err != nil {
-		fmt.Errorf("QChanDescHandler NextHTLCBase err %s", err.Error())
-		return
+		return fmt.Errorf("QChanDescHandler NextHTLCBase err %s", err.Error())
 	}
 	_, err = btcec.ParsePubKey(msg.N2HTLCBase[:], btcec.S256())
 	if err != nil {
-		fmt.Errorf("QChanDescHandler N2HTLCBase err %s", err.Error())
-		return
+		return fmt.Errorf("QChanDescHandler N2HTLCBase err %s", err.Error())
 	}
 
 	var keyGen portxo.KeyGen
@@ -512,15 +508,13 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 
 	qc.State.MyNextHTLCBase, err = nd.GetUsePub(keyGen, UseHTLCBase)
 	if err != nil {
-		fmt.Printf("error generating NextHTLCBase %v", err)
-		return
+		return fmt.Errorf("error generating NextHTLCBase %v", err)
 	}
 
 	keyGen.Step[3] = 1 | 1<<31
 	qc.State.MyN2HTLCBase, err = nd.GetUsePub(keyGen, UseHTLCBase)
 	if err != nil {
-		fmt.Printf("error generating N2HTLCBase %v", err)
-		return
+		return fmt.Errorf("error generating N2HTLCBase %v", err)
 	}
 
 	qc.State.NextHTLCBase = msg.NextHTLCBase
@@ -578,7 +572,7 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) {
 
 	nd.OmniOut <- outMsg
 
-	return
+	return nil
 }
 
 // FUNDER

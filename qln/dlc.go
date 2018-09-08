@@ -444,7 +444,7 @@ func (nd *LitNode) SignSettlementDivisions(c *lnutil.DlcContract) ([]lnutil.DlcC
 		return nil, err
 	}
 
-	c.FundingOutpoint = wire.OutPoint{fundingTx.TxHash(), 0}
+	c.FundingOutpoint = wire.OutPoint{Hash: fundingTx.TxHash(), Index: 0}
 
 	returnValue := make([]lnutil.DlcContractSettlementSignature, len(c.Division))
 	for i, d := range c.Division {
@@ -518,7 +518,7 @@ func (nd *LitNode) FundContract(c *lnutil.DlcContract) error {
 
 	c.OurFundingInputs = make([]lnutil.DlcContractFundingInput, len(utxos))
 	for i := 0; i < len(utxos); i++ {
-		c.OurFundingInputs[i] = lnutil.DlcContractFundingInput{utxos[i].Op, utxos[i].Value}
+		c.OurFundingInputs[i] = lnutil.DlcContractFundingInput{Outpoint: utxos[i].Op, Value: utxos[i].Value}
 	}
 
 	c.OurChangePKH, err = wal.NewAdr()
@@ -613,7 +613,7 @@ func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oracleSig [32]
 	txClaim := wire.NewMsgTx()
 	txClaim.Version = 2
 
-	settleOutpoint := wire.OutPoint{settleTx.TxHash(), 0}
+	settleOutpoint := wire.OutPoint{Hash: settleTx.TxHash(), Index: 0}
 	txClaim.AddTxIn(wire.NewTxIn(&settleOutpoint, nil, nil))
 
 	addr, err := wal.NewAdr()

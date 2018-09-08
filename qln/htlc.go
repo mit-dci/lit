@@ -23,7 +23,7 @@ func (nd *LitNode) OfferHTLC(qc *Qchan, amt uint32, RHash [32]byte, locktime uin
 		return fmt.Errorf("cannot offer HTLC, channel failed")
 	}
 
-	if amt >= 1<<30 {
+	if amt >= consts.MaxSendAmt {
 		return fmt.Errorf("max send 1G sat (1073741823)")
 	}
 	if amt == 0 {

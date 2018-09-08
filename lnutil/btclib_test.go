@@ -42,32 +42,32 @@ func TestOutPointsEqual(t *testing.T) {
 		// hash of inA is not the same as hash of inB
 		// index of inA is not the same as index of inB
 		{
-			wire.OutPoint{hash1, u2}, // inA
-			wire.OutPoint{hash2, u1}, // inB
+			wire.OutPoint{Hash: hash1, Index:u2}, // inA
+			wire.OutPoint{Hash: hash2, Index:u1}, // inB
 			false,
 		},
 
 		// hash of inA is not the same as hash of inB
 		// index of inA is the same as index of inB
 		{
-			wire.OutPoint{hash1, u1}, // inA
-			wire.OutPoint{hash2, u1}, // inB
+			wire.OutPoint{Hash: hash1, Index:u1}, // inA
+			wire.OutPoint{Hash: hash2, Index:u1}, // inB
 			false,
 		},
 
 		// hash of inA is the same as hash of inB
 		// index of inA is not the same as index of inB
 		{
-			wire.OutPoint{hash1, u1}, // inA
-			wire.OutPoint{hash1, u2}, // inB
+			wire.OutPoint{Hash: hash1, Index:u1}, // inA
+			wire.OutPoint{Hash: hash1, Index:u2}, // inB
 			false,
 		},
 
 		// hash of inA is the same as hash of inB
 		// index of inA is the same as index of inB
 		{
-			wire.OutPoint{hash1, u1}, // inA
-			wire.OutPoint{hash1, u1}, // inB
+			wire.OutPoint{Hash: hash1, Index:u1}, // inA
+			wire.OutPoint{Hash: hash1, Index:u1}, // inB
 			true,
 		},
 
@@ -80,23 +80,23 @@ func TestOutPointsEqual(t *testing.T) {
 
 		// hash of inA is just initialized
 		{
-			wire.OutPoint{[32]byte{}, u1}, // inA
-			wire.OutPoint{hash1, u1},      // inB
+			wire.OutPoint{Hash: [32]byte{}, Index: u1}, // inA
+			wire.OutPoint{Hash: hash1, Index:u1},      // inB
 			false,
 		},
 
 		// hash of inB is just initialized
 		{
-			wire.OutPoint{hash1, u1},      // inA
-			wire.OutPoint{[32]byte{}, u1}, // inB
+			wire.OutPoint{Hash: hash1, Index:u1},      // inA
+			wire.OutPoint{Hash: [32]byte{}, Index: u1}, // inB
 			false,
 		},
 
 		// hash of inA is just initialized
 		// hash of inB is just initialized
 		{
-			wire.OutPoint{[32]byte{}, u1}, // inA
-			wire.OutPoint{[32]byte{}, u1}, // inB
+			wire.OutPoint{Hash: [32]byte{}, Index: u1}, // inA
+			wire.OutPoint{Hash: [32]byte{}, Index: u1}, // inB
 			true,
 		},
 	}
@@ -130,7 +130,7 @@ func TestOutPointToBytes(t *testing.T) {
 		0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x01}
 	var u uint32 = 1
-	op := wire.OutPoint{hash32, u}
+	op := wire.OutPoint{Hash: hash32, Index: u}
 
 	// a bytes array to be compared
 	b36 := [36]byte{0x00, 0x00, 0x00, 0x00,
