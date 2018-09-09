@@ -39,15 +39,7 @@ for t in $tests; do
 	echo "Running test: $t"
 	echo '===='
 
-	tdata=$datadir/$t
-	echo "STEP1"
-	echo $tdata
-	echo "PWD"
-	echo $PWD
-	mkdir -p $tdata
 	python3 $PWD/itest_$t.py & export TEST_PID=$!
-	echo "STEP 2"
-	echo $TEST_PID
 	wait $TEST_PID
 	if [ $? != 0 ]; then
 		echo -e "\n====\n"
