@@ -36,12 +36,12 @@ for t in $tests; do
 		continue
 	fi
 
-	echo "Running test: $t\n===="
+	echo "Running test: $t"
+	echo "\n===="
 	ls
-	python3 $PWD/itest_$t.py & export TEST_PID=$!
-	wait $TEST_PID
+	python3 $PWD/itest_$t.py
 	if [ $? != 0 ]; then
-		echo -e "\n====\n"
+		echo -e "\n===="
 		echo "Failed: $t"
 		echo '---'
 		fail=$(($fail + 1))
