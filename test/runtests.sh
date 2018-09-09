@@ -36,8 +36,6 @@ for t in $tests; do
 
 	echo "BEFORE THE TEST"
 	./itest_$t.py
-	pid=$!
-	sleep 10
 	if [ $? != 0 ]; then
 		echo "XXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 		echo "Failed: $t"
@@ -45,7 +43,6 @@ for t in $tests; do
 		fail=$(($fail + 1))
 		continue
 	fi
-	kill $pid
 	echo "*******************************"
 	echo "Completed: $t"
 	echo "*******************************"
