@@ -36,9 +36,8 @@ for t in $tests; do
 		continue
 	fi
 
-	echo "Running test: $t"
-	echo '===='
-
+	echo "Running test: $t\n===="
+	ls
 	python3 $PWD/itest_$t.py & export TEST_PID=$!
 	wait $TEST_PID
 	if [ $? != 0 ]; then
