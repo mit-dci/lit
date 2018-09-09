@@ -18,28 +18,7 @@ rm -rf $datadir
 export EXIT_REQED=0
 export TEST_PID=-1
 
-for t in $tests; do
-	echo "==============================="
-	echo "Running test: $t"
-	echo "==============================="
-	ls
-
-	echo "BEFORE THE TEST"
-	{
-		./itest_$t.py
-	} || {
-		echo "XXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-		echo "Failed: $t"
-		echo "XXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-		break
-	}
-	echo "*******************************"
-	echo "Completed: $t"
-	echo "*******************************"
-	echo "COOL, SOMETHING WORKS"
-	exec ls
-	exec rm -rf _data/
-done
+./test_connect.py
 
 if [ "$EXIT_REQED" == "1" ]; then
 	kill -2 $TEST_PID
