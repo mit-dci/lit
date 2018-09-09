@@ -37,7 +37,7 @@ for t in $tests; do
 	echo "BEFORE THE TEST"
 	set +e itest_$t.py
 	python3 ./itest_$t.py
-	pid = $!
+	pid=$!
 	sleep 10
 	if [ $? != 0 ]; then
 		echo "XXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
