@@ -16,7 +16,7 @@ import (
 )
 
 var lsCommand = &Command{
-	Format:           lnutil.White("ls\n"),
+	Format:           fmt.Sprintf("%s%s%s%s%s%s%s%s\n", lnutil.White("ls"), lnutil.OptColor("addrs"), lnutil.OptColor("bals"), lnutil.OptColor("chans"), lnutil.OptColor("conns"), lnutil.OptColor("dualfunds"),lnutil.OptColor("ports"),lnutil.OptColor("txos")),
 	Description:      "Show various information about our current state, such as connections, addresses, UTXO's, balances, etc.\n",
 	ShortDescription: "Show various information about our current state\n",
 }
@@ -229,6 +229,15 @@ func (lc *litAfClient) Ls2(textArgs []string) error {
 	return nil
 }
 
+func isExists(array []string, elem string) bool {
+	for _, x := range array {
+		if x == elem {
+			return true
+		}
+	}
+	return false
+}
+
 func (lc *litAfClient) Ls(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
 		fmt.Fprintf(color.Output, lsCommand.Format)
@@ -237,8 +246,15 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	}
 
 	if len(textArgs) == 0 {
-		fmt.Printf("pick one: conns, chans, dualfunds, txos, ports, addrs, bals")
+		fmt.Fprintf(color.Output, lsCommand.Format)
 		return nil
+	}
+
+	listofCommands := []string{"conns", "chans", "dualfunds", "txos", "ports", "addrs", "bals", "-a"}
+	cmd := textArgs[0]
+
+	if !isExists(listofCommands, cmd) {
+		return fmt.Errorf("Invalid Argument passed. Use ls -h for help")
 	}
 
 	// TODO Move these to their respective places?  Perhaps this gets optimized out anyways.
@@ -250,20 +266,19 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	lReply := new(litrpc.ListeningPortsReply)
 	dfReply := new(litrpc.PendingDualFundReply)
 
-	cmd := textArgs[0]
-	argDashA := false
+	displayAllCommands := false
 	if cmd == "-a" {
-		argDashA = true
+		displayAllCommands = true
 	}
 
-	if cmd == "conns" || argDashA {
+	if cmd == "conns" || displayAllCommands {
 		err := lc.Call("LitRPC.ListConnections", nil, pReply)
 		if err != nil {
 			return err
 		}
 
 		if len(pReply.Connections) > 0 {
-			if argDashA {
+			if displayAllCommands {
 				fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Peers:"))
 			}
 			for _, peer := range pReply.Connections {
@@ -273,14 +288,14 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		}
 	}
 
-	if cmd == "chans" || argDashA {
+	if cmd == "chans" || displayAllCommands {
 		err := lc.Call("LitRPC.ChannelList", nil, cReply)
 		if err != nil {
 			return err
 		}
 
 		if len(cReply.Channels) > 0 {
-			if argDashA {
+			if displayAllCommands {
 				fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Channels:"))
 			}
 
@@ -329,14 +344,14 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		}
 	}
 
-	if cmd == "dualfunds" || argDashA {
+	if cmd == "dualfunds" || displayAllCommands {
 		err := lc.Call("LitRPC.PendingDualFund", nil, dfReply)
 		if err != nil {
 			return err
 		}
 
 		if dfReply.Pending {
-			if argDashA {
+			if displayAllCommands {
 				fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Pending Dualfunds:"))
 			}
 			fmt.Fprintf(
@@ -350,7 +365,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 
 	}
 
-	if cmd == "txos" || argDashA {
+	if cmd == "txos" || displayAllCommands {
 		err := lc.Call("LitRPC.TxoList", nil, tReply)
 
 		if err != nil {
@@ -358,7 +373,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		}
 
 		if len(tReply.Txos) > 0 {
-			if argDashA {
+			if displayAllCommands {
 				fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Txos:"))
 			}
 			for i, t := range tReply.Txos {
@@ -376,14 +391,14 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		}
 	}
 
-	if cmd == "ports" || argDashA {
+	if cmd == "ports" || displayAllCommands {
 		err := lc.Call("LitRPC.GetListeningPorts", nil, lReply)
 		if err != nil {
 			return err
 		}
 
 		if len(lReply.LisIpPorts) > 0 {
-			if argDashA {
+			if displayAllCommands {
 				fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Listening Ports:"))
 			}
 			fmt.Fprintf(color.Output,
@@ -392,14 +407,14 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		}
 	}
 
-	if cmd == "addrs" || argDashA {
+	if cmd == "addrs" || displayAllCommands {
 		err := lc.Call("LitRPC.Address", nil, aReply)
 		if err != nil {
 			return err
 		}
 
 		if len(aReply.WitAddresses) > 0 {
-			if argDashA {
+			if displayAllCommands {
 				fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Addresses:"))
 			}
 			for i, a := range aReply.WitAddresses {
@@ -410,14 +425,14 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 
 	}
 
-	if cmd == "bals" || argDashA {
+	if cmd == "bals" || displayAllCommands {
 		err := lc.Call("LitRPC.Balance", nil, bReply)
 		if err != nil {
 			return err
 		}
 
 		if len(bReply.Balances) > 0 {
-			if argDashA {
+			if displayAllCommands {
 				fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Balances:"))
 			}
 			for _, walBal := range bReply.Balances {
