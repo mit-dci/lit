@@ -49,6 +49,7 @@ for t in $tests; do
 	echo "Compeleted: $t"
 	echo "*******************************"
 	n=$(($n + 1))
+	rm -rf _data/
 done
 
 if [ "$EXIT_REQED" == "1" ]; then
