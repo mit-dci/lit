@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import testlib
+import sys
 
 create = 2
 
@@ -16,6 +17,7 @@ def run_test(env):
     print('Alice said hello to Bob.')
     bob.rpc.Say(Peer=bob.get_peer_id(alice), Message="world!")
     print('Bob said hello to Alice.')
+    sys.exit(0)
 
 if __name__ == '__main__':
     env = None
