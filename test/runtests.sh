@@ -36,21 +36,24 @@ for t in $tests; do
 		continue
 	fi
 
+	echo "==============================="
 	echo "Running test: $t"
-	echo "\n===="
+	echo "==============================="
 	ls
+
+	echo "BEFORE THE TEST"
 	python3 $PWD/itest_$t.py
 	if [ $? != 0 ]; then
-		echo -e "\n===="
+		echo "XXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 		echo "Failed: $t"
-		echo '---'
+		echo "XXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 		fail=$(($fail + 1))
 		continue
 	fi
 
-	echo -e "\n===="
+	echo "*******************************"
 	echo "Compeleted: $t"
-	echo '----'
+	echo "*******************************"
 	n=$(($n + 1))
 done
 
