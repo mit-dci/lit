@@ -46,7 +46,7 @@ for t in $tests; do
 		fail=$(($fail + 1))
 		continue
 	fi
-	kill pid
+	kill $pid
 	echo "*******************************"
 	echo "Compeleted: $t"
 	echo "*******************************"
