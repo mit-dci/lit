@@ -40,14 +40,14 @@ for t in $tests; do
 	echo '===='
 
 	tdata=$datadir/$t
-
+	echo "STEP1"
 	if [ -e "$tdata" ]; then
 		echo 'Directory found, was this test already run?'
 		echo '----'
 		ign=$(($ign + 1))
 		continue
 	fi
-
+	echo "STEP2"
 	mkdir -p $tdata
 	env LIT_ITEST_ROOT=$(realpath $tdata) ./itest_$t.py & export TEST_PID=$!
 	echo "ITEST_ROOT"
