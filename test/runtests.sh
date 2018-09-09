@@ -50,6 +50,9 @@ for t in $tests; do
 
 	mkdir -p $tdata
 	env LIT_ITEST_ROOT=$(realpath $tdata) ./itest_$t.py & export TEST_PID=$!
+	echo "ITEST_ROOT"
+	echo LIT_ITEST_ROOT
+	echo $tdata
 	wait $TEST_PID
 	if [ $? != 0 ]; then
 		echo -e "\n====\n"
