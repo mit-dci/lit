@@ -2,7 +2,7 @@
 
 import testlib
 
-create = 1
+create = 2
 
 def run_test(env):
     litcnt = len(env.lits)
