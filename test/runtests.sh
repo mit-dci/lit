@@ -61,9 +61,6 @@ for t in $tests; do
 	echo "Compeleted: $t"
 	echo '----'
 	n=$(($n + 1))
-	echo "PWD"
-	echo $PWD
-	cd ../..
 done
 
 if [ "$EXIT_REQED" == "1" ]; then
