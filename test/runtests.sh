@@ -35,14 +35,15 @@ for t in $tests; do
 	ls
 
 	echo "BEFORE THE TEST"
-	./itest_$t.py
-	if [ $? != 0 ]; then
+	{
+		./itest_$t.py
+	} || {
 		echo "XXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 		echo "Failed: $t"
 		echo "XXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 		fail=$(($fail + 1))
-		continue
-	fi
+		break
+	}
 	echo "*******************************"
 	echo "Completed: $t"
 	echo "*******************************"
