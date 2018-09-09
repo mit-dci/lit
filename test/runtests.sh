@@ -46,11 +46,10 @@ for t in $tests; do
 	echo $PWD
 	mkdir -p $tdata
 	export LIT_ITEST_ROOT=$(realpath $tdata)
-	$LIT_ITEST_ROOT ./itest_$t.py & export TEST_PID=$!
+	./$LIT_ITEST_ROOT/itest_$t.py & export TEST_PID=$!
 	echo "STEP 2"
 	echo $TEST_PID
 	wait $TEST_PID
-	echo $?
 	if [ $? != 0 ]; then
 		echo -e "\n====\n"
 		echo "Failed: $t"
