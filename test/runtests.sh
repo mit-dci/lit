@@ -18,9 +18,7 @@ rm -rf $datadir
 export EXIT_REQED=0
 export TEST_PID=-1
 
-./itest_connect.py
-sleep 10
-./itest_break.py
+./itest_connect.py && ./itest_break.py
 
 if [ "$EXIT_REQED" == "1" ]; then
 	kill -2 $TEST_PID
