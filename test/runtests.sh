@@ -19,6 +19,7 @@ n=0
 fail=0
 ign=0
 
+set +e
 export EXIT_REQED=0
 export TEST_PID=-1
 
@@ -42,7 +43,7 @@ for t in $tests; do
 	ls
 
 	echo "BEFORE THE TEST"
-	python3 $PWD/itest_$t.py
+	python3 ./itest_$t.py
 	if [ $? != 0 ]; then
 		echo "XXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 		echo "Failed: $t"
