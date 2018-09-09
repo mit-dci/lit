@@ -67,8 +67,6 @@ def run_pushclose_test(env, initiator, target, closer):
     print('Target:', tt0, '->', tt1, '( expected:', initialsend + pushsend - 20000, ')')
     assert tt1 == tt0 + initialsend + pushsend - 20000, "final balance doesn't match"
 
-    # Idk where the 20000 gets removed from, fees probably but I'm not sure exactly where.
-
 def run_pushbreak_test(env, initiator, target, breaker):
     bc = env.bitcoind
 
