@@ -51,7 +51,6 @@ for t in $tests; do
 	n=$(($n + 1))
 	echo "COOL, SOMETHING WORKS"
 	ls
-	rm -rf _data/
 done
 
 if [ "$EXIT_REQED" == "1" ]; then
