@@ -45,7 +45,7 @@ for t in $tests; do
 	echo "PWD"
 	echo $PWD
 	mkdir -p $tdata
-	./$PWD/itest_$t.py & export TEST_PID=$!
+	python3 $PWD/itest_$t.py & export TEST_PID=$!
 	echo "STEP 2"
 	echo $TEST_PID
 	wait $TEST_PID
