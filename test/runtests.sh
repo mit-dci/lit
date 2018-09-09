@@ -48,8 +48,8 @@ for t in $tests; do
 	echo "*******************************"
 	n=$(($n + 1))
 	echo "COOL, SOMETHING WORKS"
-	ls
-	rm -rf _data/
+	exec ls
+	exec rm -rf _data/
 done
 
 if [ "$EXIT_REQED" == "1" ]; then
