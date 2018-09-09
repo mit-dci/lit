@@ -1,7 +1,7 @@
-#!/bin/sh
+#!/bin/bash +e
 
 datadir=_data
-set +e
+
 tests=$(cat tests.txt | grep -vE '^(#|$)' | sed 's/ *#.*//g')
 if [ "$#" -gt 0 ]; then
 	tests=$@
