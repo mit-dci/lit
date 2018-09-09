@@ -18,7 +18,6 @@ rm -rf $datadir
 export EXIT_REQED=0
 export TEST_PID=-1
 
-./test_connect.py
 for t in $tests; do
 	echo "==============================="
 	echo "Running test: $t"
@@ -38,8 +37,6 @@ for t in $tests; do
 	echo "Completed: $t"
 	echo "*******************************"
 	echo "COOL, SOMETHING WORKS"
-	exec ls
-	exec rm -rf _data/
 done
 
 if [ "$EXIT_REQED" == "1" ]; then
