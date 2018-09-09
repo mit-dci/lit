@@ -42,6 +42,8 @@ for t in $tests; do
 	tdata=$datadir/$t
 	echo "STEP1"
 	echo $tdata
+	echo "PWD"
+	echo $PWD
 	mkdir -p $tdata
 	env LIT_ITEST_ROOT=$(realpath $tdata) ./itest_$t.py & export TEST_PID=$!
 	echo "STEP 2"
@@ -59,6 +61,8 @@ for t in $tests; do
 	echo "Compeleted: $t"
 	echo '----'
 	n=$(($n + 1))
+	echo "PWD"
+	echo $PWD
 	cd ../..
 done
 
