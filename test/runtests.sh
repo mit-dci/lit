@@ -41,11 +41,11 @@ for t in $tests; do
 
 	tdata=$datadir/$t
 	echo "STEP1"
+	echo $tdata
 	mkdir -p $tdata
 	env LIT_ITEST_ROOT=$(realpath $tdata) ./itest_$t.py & export TEST_PID=$!
-	echo "ITEST_ROOT"
-	echo $LIT_ITEST_ROOT
-	echo $tdata
+	echo "STEP 2"
+	echo $TEST_PID
 	wait $TEST_PID
 	if [ $? != 0 ]; then
 		echo -e "\n====\n"
@@ -59,7 +59,7 @@ for t in $tests; do
 	echo "Compeleted: $t"
 	echo '----'
 	n=$(($n + 1))
-	cd ..
+	cd ../..
 done
 
 if [ "$EXIT_REQED" == "1" ]; then
