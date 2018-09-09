@@ -35,8 +35,7 @@ for t in $tests; do
 	ls
 
 	echo "BEFORE THE TEST"
-	set +e itest_$t.py
-	python3 ./itest_$t.py
+	./itest_$t.py
 	pid=$!
 	sleep 10
 	if [ $? != 0 ]; then
@@ -48,7 +47,7 @@ for t in $tests; do
 	fi
 	kill $pid
 	echo "*******************************"
-	echo "Compeleted: $t"
+	echo "Completed: $t"
 	echo "*******************************"
 	n=$(($n + 1))
 	echo "COOL, SOMETHING WORKS"
