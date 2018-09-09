@@ -181,10 +181,12 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 
 	// if we got here, but channel is not in rest state, try to fix it.
 	if qc.State.Delta != 0 {
+		log.Println("RESENDING MERSSAGE")
 		err = nd.ReSendMsg(qc)
 		if err != nil {
 			qc.ClearToSend <- true
 			qc.ChanMtx.Unlock()
+			log.Println("WATCHHITS", err)
 			return err
 		}
 		qc.ChanMtx.Unlock()

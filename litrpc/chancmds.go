@@ -278,6 +278,7 @@ type PushReply struct {
 // Will change to .. tries to send, but may not complete.
 
 func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
+	fmt.Println("ARGS", args)
 	if args.Amt > consts.MaxChanCapacity || args.Amt < 1 {
 		return fmt.Errorf(
 			"can't push %d max is 1 coin (100000000), min is 1", args.Amt)
@@ -308,6 +309,7 @@ func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 			dummyqc.Peer(), dummyqc.Idx())
 	}
 	qc, ok := peer.QCs[dummyqc.Idx()]
+
 	if !ok {
 		return fmt.Errorf("peer %d doesn't have channel %d",
 			dummyqc.Peer(), dummyqc.Idx())

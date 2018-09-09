@@ -1,13 +1,37 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"os"
 	"strconv"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/lnutil"
 )
+
+var invoiceCommand = &Command{
+	Format: fmt.Sprintf(
+		"%s%s%s%s\n", lnutil.White("invoice"), lnutil.OptColor("pay"), lnutil.OptColor("gen"), lnutil.OptColor("ls")),
+	Description:      "Pay, Generate or view invoices\n",
+	ShortDescription: "Pay, Generate or view invoices\n",
+}
+
+var payCommand = &Command{
+	Format: fmt.Sprintf(
+		"%s%s\n", lnutil.White("pay"), lnutil.ReqColor("invoice")),
+	Description:      "Pay the given amount in satoshis to the given address defined by the invoice.\n",
+	ShortDescription: "Pay invoice for the given amount.\n",
+}
+
+var genCommand = &Command{
+	Format: fmt.Sprintf(
+		"%s%s%s\n", lnutil.White("gen"), lnutil.ReqColor("cointype"), lnutil.ReqColor("amount")),
+	Description:      "Request the passed amount in satoshis / equivalent units as an invoice.\n",
+	ShortDescription: "Generate invoice for the given amount and cointype\n",
+}
 
 var sendCommand = &Command{
 	Format: fmt.Sprintf(
@@ -38,6 +62,237 @@ var sweepCommand = &Command{
 	Description: "Move UTXOs with many 1-in-1-out txs.\n",
 	// TODO: Make this more clear.
 	ShortDescription: "Move UTXOs with many 1-in-1-out txs.\n",
+}
+
+func (lc *litAfClient) Invoice(textArgs []string) error {
+	if len(textArgs) > 0 && textArgs[0] == "-h" {
+		fmt.Fprintf(color.Output, invoiceCommand.Format)
+		fmt.Fprintf(color.Output, invoiceCommand.Description)
+		return nil
+	}
+
+	if len(textArgs) == 0 {
+		fmt.Println("pick a command: pay, gen, ls")
+		return nil
+	}
+
+	cmd := textArgs[0]
+	if cmd == "gen" {
+		return lc.GenInvoice(textArgs[1:])
+	}
+	if cmd == "pay" {
+		return lc.PayInvoice(textArgs[1:])
+	}
+	if cmd == "ls" {
+		return lc.ListInvoices()
+	}
+	// at this point, we can only have the pay command falling through
+	// so we requested an invoice succesfully. Now if the remote peer replies, we
+	// need to have an async handler which would alert us  that the remote peer
+	// replied.
+	return fmt.Errorf("Invalid command passed along with invoice")
+}
+
+func (lc *litAfClient) AsyncInvoiceReplier() {
+	for {
+		args := new(litrpc.NoArgs)
+		reply := new(litrpc.PayInvoiceHandlerReply)
+
+		err := lc.rpccon.Call("LitRPC.PayInvoiceHandler", args, reply)
+		if err != nil {
+			fmt.Fprintf(color.Output, "RequestAsync error %s\n", lnutil.Red(err.Error()))
+			break
+		}
+		// now loop through all the invoice in reply.Invoices and ask the user
+		for _, lInvoice := range reply.Invoices {
+			if len(lInvoice.Id) != 0 {
+				fmt.Fprintf(color.Output, "%s %s %s %s %s %s\n",
+					// received invoice 1 requesting payment of 1000 bcrt
+					lnutil.Header("Received Invoice"), lnutil.Header(lInvoice.Id),
+					lnutil.Header("requesting payment of"), lnutil.Header(lInvoice.Amount),
+					lnutil.Header(lInvoice.CoinType), lnutil.Header("satoshi"))
+
+				fmt.Print("\nDo you want to pay? Hold Y/N to pay/cancel\n")
+				// ugly, should be a single character really, but works only when we hold
+				// y or n, needs some stuff in order to change this
+				reader := bufio.NewReader(os.Stdin)
+				c, err := reader.ReadByte()
+				if err != nil {
+					fmt.Println(err)
+					continue // don't return since this is an async handler
+				}
+				fmt.Printf("\nhello:%d", c)
+				if c == []byte("Y")[0] || c == []byte("y")[0] {
+					fmt.Println("Paying invoice:", lInvoice)
+					args := new(litrpc.PayInvoiceConfirmArgs)
+					args.Invoice = lInvoice
+					confirmReply := new(litrpc.PayInvoiceConfirmReply)
+					err = lc.Call("LitRPC.PayInvoiceConfirm", args, confirmReply)
+					if err != nil {
+						return
+					}
+				} else {
+					// do we delete teh invoice from the list of pendingInvoices here?
+					// there's also the possibility that the user may change his mind
+					// after he declines the first time, second time and so on. When do we
+					// to stop?
+					// right now, lets delete after the first try
+					args := new(litrpc.PayInvoiceConfirmArgs)
+					deleteReply := new(litrpc.PayInvoiceConfirmReply)
+					args.Invoice = lInvoice
+					err = lc.Call("LitRPC.CleanInvoiceAsyncHandler", args, deleteReply)
+					if err != nil {
+						fmt.Println("Couldn't delete invoice from the database, try again")
+						// don't quit the handler because this isn't an error
+					}
+					fmt.Println("Cleaned up successfully!!")
+					fmt.Println("No? Ok, doing nothing. Deleting invoice from Pending Invoices")
+
+				}
+			}
+		}
+		time.Sleep(3 * time.Second) // 3s polling interval for checking pending invocies
+	}
+	return
+}
+
+func (lc *litAfClient) GenInvoice(textArgs []string) error {
+	stopEx, err := CheckHelpCommand(genCommand, textArgs, 2)
+	if err != nil || stopEx {
+		return err
+	}
+
+	args := new(litrpc.GenInvoiceArgs)
+	reply := new(litrpc.GenInvoiceReply)
+
+	args.CoinType = textArgs[0]
+	amount, err := strconv.Atoi(textArgs[1])
+	if err != nil {
+		return err
+	}
+	args.Amount = uint64(amount)
+
+	err = lc.Call("LitRPC.GenInvoice", args, reply)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(color.Output, "generated invoice %s worth %d %s coins", reply.Invoice, amount, args.CoinType)
+	return nil
+}
+
+func (lc *litAfClient) PayInvoice(textArgs []string) error {
+	stopEx, err := CheckHelpCommand(payCommand, textArgs, 1)
+	if err != nil || stopEx {
+		return err
+	}
+
+	args := new(litrpc.PayInvoiceArgs)
+	reply := new(litrpc.PayInvoiceReply)
+
+	args.Invoice = textArgs[0]
+	err = lc.Call("LitRPC.PayInvoice", args, reply)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(color.Output, "Paid invoice: %s", args.Invoice)
+	return nil
+}
+
+func (lc *litAfClient) ListInvoices() error {
+	// so we need to pritn a list of all invoices here. For this, we need
+	// to receive all the invoices from all the databases and parse them in a nice format
+	// so that we can view stuff clearly. Somewhat similar to channel stuff, but
+	// less dense
+	reply := new(litrpc.LsInvoiceReplyMsg)
+	replydup := new(litrpc.LsInvoiceMsg)
+	args := new(litrpc.NoArgs)
+
+	fmt.Fprintf(color.Output, "%s\n", lnutil.Green("Our Invoices"))
+	err := lc.Call("LitRPC.ListAllGeneratedInvoices", args, reply)
+	if err != nil {
+		return err
+	}
+	if len(reply.Invoices) > 0 {
+		fmt.Fprintf(color.Output, "%s\n", lnutil.Header("Active"))
+		for _, invoice := range reply.Invoices {
+			// its is an InvoiceReplyMsg
+			fmt.Fprintf(color.Output, "%s: %s, %s: %d %s: %s\n",
+				lnutil.OutPoint("InvoiceID"), invoice.Id, lnutil.OutPoint("Amount"),
+				invoice.Amount, lnutil.OutPoint("CoinType"), invoice.CoinType)
+		}
+	}
+	err = lc.Call("LitRPC.ListAllRepliedInvoices", args, replydup)
+	if err != nil {
+		return err
+	}
+	if len(replydup.Invoices) > 0 {
+		fmt.Fprintf(color.Output, "%s\n", lnutil.Header("Replied"))
+		for _, invoice := range replydup.Invoices {
+			// its is an InvoiceReplyMsg
+			fmt.Fprintf(color.Output, "%s: %d %s: %s\n",
+				lnutil.OutPoint("Peer"), invoice.PeerIdx, lnutil.OutPoint("InvoiceID"), invoice.Id)
+		}
+	}
+	replyPaid := new(litrpc.LsPaidInvoiceStorageMsg)
+	err = lc.Call("LitRPC.ListAllGotPaidInvoices", args, replyPaid)
+	if err != nil {
+		return err
+	}
+	if len(replyPaid.Invoices) > 0 {
+		fmt.Fprintf(color.Output, "%s\n", lnutil.Header("Got Paid"))
+		fmt.Println("LENGTH IS", len(replyPaid.Invoices))
+		for _, invoice := range replyPaid.Invoices {
+			// its is an InvoiceReplyMsg
+			fmt.Fprintf(color.Output, "%s: %d %s: %s %s: %d %s: %s %s: %s\n",
+				lnutil.OutPoint("Peer"), invoice.PeerIdx, lnutil.OutPoint("InvoiceID"), invoice.Id,
+				lnutil.OutPoint("Amount"), invoice.Amount, lnutil.OutPoint("CoinType"), invoice.CoinType,
+				lnutil.OutPoint("Timestamp"), invoice.Timestamp)
+		}
+	}
+	fmt.Fprintf(color.Output, "%s\n", lnutil.Green("Remote Peers' Invoices"))
+	// these are invoices that we paid for
+	err = lc.Call("LitRPC.ListAllRequestedInvoices", args, replydup)
+	if err != nil {
+		return err
+	}
+	if len(replydup.Invoices) > 0 {
+		fmt.Fprintf(color.Output, "%s\n", lnutil.Header("Requested"))
+		for _, invoice := range replydup.Invoices {
+			// its is an InvoiceReplyMsg
+			fmt.Fprintf(color.Output, "%s: %d %s: %s\n",
+				lnutil.OutPoint("Peer"), invoice.PeerIdx, lnutil.OutPoint("InvoiceID"), invoice.Id)
+		}
+	}
+	err = lc.Call("LitRPC.ListAllPendingInvoices", args, reply)
+	if err != nil {
+		return err
+	}
+	if len(reply.Invoices) > 0 {
+		fmt.Fprintf(color.Output, "%s\n", lnutil.Header("Pending"))
+		for _, invoice := range reply.Invoices {
+			// its is an InvoiceReplyMsg
+			fmt.Fprintf(color.Output, "%s: %d %s: %s %s: %d %s: %s\n",
+				lnutil.OutPoint("Peer"), invoice.PeerIdx, lnutil.OutPoint("InvoiceID"), invoice.Id,
+				lnutil.OutPoint("Amount"), invoice.Amount, lnutil.OutPoint("CoinType"), invoice.CoinType)
+		}
+	}
+	err = lc.Call("LitRPC.ListAllPaidInvoices", args, replyPaid)
+	if err != nil {
+		return err
+	}
+	if len(replyPaid.Invoices) > 0 {
+		fmt.Fprintf(color.Output, "%s\n", lnutil.Header("Paid"))
+		for _, invoice := range replyPaid.Invoices {
+			// its is an InvoiceReplyMsg
+			fmt.Fprintf(color.Output, "%s: %d %s: %s %s: %d %s: %s %s: %s\n",
+				lnutil.OutPoint("Peer"), invoice.PeerIdx, lnutil.OutPoint("InvoiceID"), invoice.Id,
+				lnutil.OutPoint("Amount"), invoice.Amount, lnutil.OutPoint("CoinType"), invoice.CoinType,
+				lnutil.OutPoint("Timestamp"), invoice.Timestamp)
+		}
+	}
+	return nil
 }
 
 // Send sends coins somewhere

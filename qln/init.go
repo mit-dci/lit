@@ -10,6 +10,7 @@ import (
 	"github.com/mit-dci/lit/btcutil/hdkeychain"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/dlc"
+	"github.com/mit-dci/lit/invoice"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/wallit"
@@ -66,6 +67,11 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 		return nil, err
 	}
 
+	// Create a new manager for invoices similar to dlcs
+	nd.InvoiceManager, err = invoice.NewManager(filepath.Join(nd.LitFolder, "invoice.db"))
+	if err != nil {
+		return nil, err
+	}
 	// make maps and channels
 	nd.UserMessageBox = make(chan string, 32)
 

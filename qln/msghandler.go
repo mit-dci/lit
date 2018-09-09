@@ -14,6 +14,7 @@ import (
 // handles stuff that comes in over the wire.  Not user-initiated.
 func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) error {
 	log.Printf("Message from %d type %x", msg.Peer(), msg.MsgType())
+
 	switch msg.MsgType() & 0xf0 {
 	case 0x00: // TEXT MESSAGE.  SIMPLE
 		chat, ok := msg.(lnutil.ChatMsg)
@@ -83,6 +84,16 @@ func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) er
 		}
 		if msg.MsgType() == lnutil.MSGID_DLC_SIGPROOF {
 			nd.DlcSigProofHandler(msg.(lnutil.DlcContractSigProofMsg), peer)
+		}
+	case 0x40: //0x31 & 0xf0
+		if msg.MsgType() == lnutil.MSGID_LITINVOICE {
+			// if some random peers sends us []byte("I1"), send
+			// them the details of that invocie
+			nd.GetInvoiceInfo(msg.(lnutil.InvoiceMsg), peer)
+		}
+		if msg.MsgType() == lnutil.MSGID_LITINVOICEREPLY {
+			// someone just sent me their invoice details
+			nd.GetInvoiceReplyInfo(msg.(lnutil.InvoiceReplyMsg), peer)
 		}
 	default:
 		return fmt.Errorf("Unknown message id byte %x &f0", msg.MsgType())

@@ -39,6 +39,10 @@ const (
 	MSGID_FWDMSG     = 0x40
 	MSGID_FWDAUTHREQ = 0x41
 
+	// invoice identifier
+	MSGID_LITINVOICEREPLY = 0x48 // H?
+	MSGID_LITINVOICE      = 0x49 // I = 0x49
+
 	//not implemented
 	MSGID_SELFPUSH = 0x50
 
@@ -159,6 +163,10 @@ func LitMsgFromBytes(b []byte, peerid uint32) (LitMsg, error) {
 		return NewDlcContractFundingSigsMsgFromBytes(b, peerid)
 	case MSGID_DLC_SIGPROOF:
 		return NewDlcContractSigProofMsgFromBytes(b, peerid)
+	case MSGID_LITINVOICE:
+		return InvoiceMsgFromBytes(b, peerid)
+	case MSGID_LITINVOICEREPLY:
+		return IRMsgFromBytes(b)
 
 	default:
 		return nil, fmt.Errorf("Unknown message of type %d ", msgType)
@@ -1976,4 +1984,77 @@ func (msg DlcContractSigProofMsg) Peer() uint32 {
 // MsgType returns the type of this message
 func (msg DlcContractSigProofMsg) MsgType() uint8 {
 	return MSGID_DLC_SIGPROOF
+}
+
+// for InvoiceReplyMsgFromBytes, we treat the cointype as the last parameter
+// from the slice and not amount. We could do amount as well, but coinType is simpler
+// Length limits
+// Address length range: 21-41 (short addresses included)
+// Invoice number range: 1 (0-35)
+// Currency identifier length range: 2-4 (tb, vtc, bcrt, etc)
+func IRMsgFromBytes(in []byte) (InvoiceReplyMsg, error) {
+	// same as InvoiceReplyMsgFromBytes, can't improt due to import cycles
+	in = in[1:] // cut off the H at the beginning now that we don't need it
+	fmt.Println("Decrypting Invoice:", in)
+	peerIdx := BtU32((in[0:4]))
+	invoiceId := in[4]
+	in = in[5:]                            // cut the invoice and peeridx off
+	rsLength := len(in)                    // remaining slice Length
+	amount := in[rsLength-8:]              // cutoff the last 8 bytes for the amount
+	coinType := string(in[0 : rsLength-8]) // now we have the counter at which to slice
+	constructedMessage := InvoiceReplyMsg{
+		PeerIdx:  peerIdx,
+		Id:       string(invoiceId), // byestring to string
+		CoinType: coinType,
+		Amount:   BtU64(amount), // convert slice to uint64
+	}
+	fmt.Println("Decrypted message from bytes:", constructedMessage)
+	return constructedMessage, nil
+}
+
+type GenInvoiceParams struct {
+	CoinType string
+	Amount   uint64
+}
+
+type InvoiceMsg struct {
+	PeerIdx uint32
+	Id      string
+}
+
+func (self InvoiceMsg) Bytes() []byte {
+	var msg []byte
+	msg = append(msg, self.Id...)
+	return msg
+}
+
+func (self InvoiceMsg) Peer() uint32   { return self.PeerIdx }
+func (self InvoiceMsg) MsgType() uint8 { return MSGID_LITINVOICE }
+
+type InvoiceReplyMsg struct {
+	PeerIdx  uint32
+	Id       string
+	CoinType string
+	Amount   uint64
+}
+
+func (self InvoiceReplyMsg) Bytes() []byte {
+	var msg []byte
+	msg = append(msg, U32tB(self.PeerIdx)...)
+	msg = append(msg, self.Id...)
+	msg = append(msg, self.CoinType...)
+	msg = append(msg, U64tB(self.Amount)...)
+	return msg
+}
+
+func (self InvoiceReplyMsg) Peer() uint32   { return self.PeerIdx }
+func (self InvoiceReplyMsg) MsgType() uint8 { return MSGID_LITINVOICEREPLY }
+
+
+func InvoiceMsgFromBytes(b []byte, peerid uint32) (InvoiceMsg, error) {
+	msg := new(InvoiceMsg)
+	msg.Id = string(b[1:])
+	msg.PeerIdx = peerid
+	fmt.Printf("Decrypting invoice request, invoice id: %s and peerid: %d", msg.Id, msg.PeerIdx)
+	return *msg, nil
 }

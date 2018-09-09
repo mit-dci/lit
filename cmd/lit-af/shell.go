@@ -64,6 +64,21 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		return parseErr(err, "help")
 	}
 
+	if cmd == "invoice" {
+		err = lc.Invoice(args)
+		return parseErr(err, "invoice")
+	}
+/*
+	if cmd == "pay" {
+		err = lc.PayInvoice(args)
+		return parseErr(err, "pay")
+	}
+
+	if cmd == "gen" {
+		err = lc.GenInvoice(args)
+		return parseErr(err, "gen")
+	}
+	*/
 	if cmd == "watch" {
 		err = lc.Watch(args)
 		return parseErr(err, "watch")
