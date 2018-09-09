@@ -22,13 +22,6 @@ ign=0
 export EXIT_REQED=0
 export TEST_PID=-1
 
-function killcurrentandexit () {
-	echo 'testpid!' $TEST_PID
-	export EXIT_REQED=1
-}
-
-trap killcurrentandexit INT
-
 for t in $tests; do
 
 	if [ "$EXIT_REQED" == "1" ]; then
