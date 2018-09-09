@@ -11,8 +11,6 @@ for t in $tests; do
 done
 echo '========'
 
-export EXIT_REQED=0
-export TEST_PID=-1
 
 ./itest_connect.py
 ./itest_receive.py
@@ -29,12 +27,3 @@ export TEST_PID=-1
 ./itest_pushclose_reverse.py
 ./itest_pushbreak.py
 ./itest_pushbreak_reverse.py
-
-if [ "$EXIT_REQED" == "1" ]; then
-	kill -2 $TEST_PID
-	echo 'Waiting for tests to exit... (This may take several seconds)'
-	wait $TEST_PID
-fi
-
-echo 'All tests completed.'
-echo "Passed: $n"
