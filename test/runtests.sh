@@ -30,11 +30,30 @@ for t in $tests; do
 	fi
 
 	echo "==============================="
-	echo "Starting test: $t"
+	echo "Running test: $t"
 	echo "==============================="
+	ls
 
 	echo "BEFORE THE TEST"
-	python3 ./itest_$t.py &
+	set +e itest_$t.py
+	python3 ./itest_$t.py
+	pid = $!
+	sleep 10
+	if [ $? != 0 ]; then
+		echo "XXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+		echo "Failed: $t"
+		echo "XXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+		fail=$(($fail + 1))
+		continue
+	fi
+	kill pid
+	echo "*******************************"
+	echo "Compeleted: $t"
+	echo "*******************************"
+	n=$(($n + 1))
+	echo "COOL, SOMETHING WORKS"
+	ls
+	rm -rf _data/
 done
 
 if [ "$EXIT_REQED" == "1" ]; then
