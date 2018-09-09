@@ -16,7 +16,7 @@ REGTEST_COINTYPE = 257
 
 logger = logging.getLogger("testframework")
 
-next_unused_port = 11000
+next_unused_port = 8335 # after 8333 and 8334 used by bitcoind
 def new_port():
     global next_unused_port
     port = next_unused_port
@@ -48,6 +48,7 @@ class LitNode():
     def __init__(self, bcnode):
         self.p2p_port = new_port()
         self.rpc_port = new_port()
+        print("Allocated port", self.rpc_port)
         self.data_dir = new_data_dir("lit")
         self.peer_mapping = {}
 
@@ -56,7 +57,6 @@ class LitNode():
             s = ''
             for _ in range(64):
                 s += hexchars[random.randint(0, len(hexchars) - 1)]
-            print('Using key:', s)
             f.write(s + "\n")
 
         # See if we should print stdout
@@ -102,7 +102,7 @@ class LitNode():
         res = self.rpc.Connect(LNAddr=addr)
         self.update_peers()
         if 'PeerIdx' in res and self.peer_mapping[other.lnid] != res['PeerIdx']:
-            raise AssertError("new peer ID doesn't match reported ID")
+            raise AssertError("peer ID doesn't match remote peer ID")
         other.update_peers()
 
     def get_peer_id(self, other):
