@@ -19,6 +19,7 @@ export EXIT_REQED=0
 export TEST_PID=-1
 
 ./itest_connect.py
+sleep 10
 ./itest_break.py
 
 if [ "$EXIT_REQED" == "1" ]; then
