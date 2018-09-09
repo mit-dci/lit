@@ -49,6 +49,7 @@ for t in $tests; do
 	echo "Compeleted: $t"
 	echo "*******************************"
 	n=$(($n + 1))
+	echo "COOL, SOMETHING WORKS"
 	ls
 	rm -rf _data/
 done
