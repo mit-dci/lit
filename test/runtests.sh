@@ -45,8 +45,7 @@ for t in $tests; do
 	echo "PWD"
 	echo $PWD
 	mkdir -p $tdata
-	export LIT_ITEST_ROOT=$(realpath $tdata)
-	./$LIT_ITEST_ROOT/itest_$t.py & export TEST_PID=$!
+	./$PWD/itest_$t.py & export TEST_PID=$!
 	echo "STEP 2"
 	echo $TEST_PID
 	wait $TEST_PID
