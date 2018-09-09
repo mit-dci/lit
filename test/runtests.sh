@@ -1,7 +1,7 @@
 #!/bin/sh
 
 datadir=_data
-
+set +e
 tests=$(cat tests.txt | grep -vE '^(#|$)' | sed 's/ *#.*//g')
 if [ "$#" -gt 0 ]; then
 	tests=$@
@@ -15,20 +15,10 @@ echo '========'
 
 rm -rf $datadir
 
-n=0
-fail=0
-ign=0
-
 export EXIT_REQED=0
 export TEST_PID=-1
 
 for t in $tests; do
-
-	if [ "$EXIT_REQED" == "1" ]; then
-		ign=$(($ign + 1))
-		continue
-	fi
-
 	echo "==============================="
 	echo "Running test: $t"
 	echo "==============================="
@@ -41,13 +31,11 @@ for t in $tests; do
 		echo "XXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 		echo "Failed: $t"
 		echo "XXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-		fail=$(($fail + 1))
 		break
 	}
 	echo "*******************************"
 	echo "Completed: $t"
 	echo "*******************************"
-	n=$(($n + 1))
 	echo "COOL, SOMETHING WORKS"
 	exec ls
 	exec rm -rf _data/
@@ -61,9 +49,3 @@ fi
 
 echo 'All tests completed.'
 echo "Passed: $n"
-echo "Failed: $fail"
-echo "Ignored: $ign"
-
-if [ "$fail" -ne "0" ]; then
-	exit 1
-fi
