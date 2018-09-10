@@ -281,8 +281,15 @@ func (a *APILink) PushTxSmartBit(tx *wire.MsgTx) error {
 	apiurl := "https://testnet-api.smartbit.com.au/v1/blockchain/pushtx"
 	response, err := http.Post(
 		apiurl, "application/json", bytes.NewBuffer([]byte(txHexString)))
-	logging.Infof("respo	nse: %s", response.Status)
+	if err != nil {
+		return err
+	}
+
+	logging.Infof("response: %s", response.Status)
 	_, err = io.Copy(os.Stdout, response.Body)
+	if err != nil {
+		return err
+	}
 
 	return err
 }

@@ -418,6 +418,9 @@ func (w *Wallit) SignMyInputs(tx *wire.MsgTx) error {
 
 	var allUtxos portxo.TxoSliceByAmt
 	allUtxos, err := w.GetAllUtxos()
+	if err != nil {
+		return err
+	}
 
 	for i := range tx.TxIn {
 		var utxo *portxo.PorTxo

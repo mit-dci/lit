@@ -446,7 +446,7 @@ func (nd *LitNode) SaveQChan(q *Qchan) error {
 		// make bucket for this channel
 
 		qcBucket, err := cbk.CreateBucket(qOPArr[:])
-		if qcBucket == nil {
+		if qcBucket == nil || err != nil {
 			return fmt.Errorf("SaveQChan: can't make channel bucket")
 		}
 

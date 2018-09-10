@@ -38,6 +38,9 @@ func (nd *LitNode) SignBreakTx(q *Qchan) (*wire.MsgTx, error) {
 	// generate sig.
 	mySig, err := txscript.RawTxInWitnessSignature(
 		tx, hCache, 0, q.Value, pre, txscript.SigHashAll, priv)
+	if err != nil {
+		return nil, err
+	}
 
 	theirSig := sig64.SigDecompress(q.State.sig)
 	// put the sighash all byte on the end of their signature
@@ -190,6 +193,10 @@ func (nd *LitNode) SignState(q *Qchan) ([64]byte, [][64]byte, error) {
 	// generate sig.
 	bigSig, err := txscript.RawTxInWitnessSignature(
 		commitmentTx, hCache, 0, q.Value, pre, txscript.SigHashAll, priv)
+	if err != nil {
+		return sig, nil, err
+	}
+
 	// truncate sig (last byte is sighash type, always sighashAll)
 	bigSig = bigSig[:len(bigSig)-1]
 
