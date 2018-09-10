@@ -46,25 +46,27 @@ type config struct { // define a struct for usage with go-flags
 	Rpcport uint16 `short:"p" long:"rpcport" description:"Set RPC port to connect to"`
 	Rpchost string `long:"rpchost" description:"Set RPC host to listen to"`
 	// auto config
-	AutoReconnect         bool   `long:"autoReconnect" description:"Attempts to automatically reconnect to known peers periodically."`
-	AutoReconnectInterval int64  `long:"autoReconnectInterval" description:"The interval (in seconds) the reconnect logic should be executed"`
-	AutoListenPort        string `long:"autoListenPort" description:"When auto reconnect enabled, starts listening on this port"`
-	Params                *coinparam.Params
+	AutoReconnect                   bool   `long:"autoReconnect" description:"Attempts to automatically reconnect to known peers periodically."`
+	AutoReconnectInterval           int64  `long:"autoReconnectInterval" description:"The interval (in seconds) the reconnect logic should be executed"`
+	AutoReconnectOnlyConnectedCoins bool   `long:"autoReconnectOnlyConnectedCoins" description:"Only reconnect to peers that we have channels with in a coin whose coin daemon is available"`
+	AutoListenPort                  string `long:"autoListenPort" description:"When auto reconnect enabled, starts listening on this port"`
+	Params                          *coinparam.Params
 }
 
 var (
-	defaultLitHomeDirName        = os.Getenv("HOME") + "/.lit"
-	defaultTrackerURL            = "http://hubris.media.mit.edu:46580"
-	defaultKeyFileName           = "privkey.hex"
-	defaultConfigFilename        = "lit.conf"
-	defaultHomeDir               = os.Getenv("HOME")
-	defaultRpcport               = uint16(8001)
-	defaultRpchost               = "localhost"
-	defaultAutoReconnect         = false
-	defaultAutoListenPort        = ":2448"
-	defaultAutoReconnectInterval = int64(60)
-	defaultUpnPFlag              = false
-	defaultLogLevel              = 3
+	defaultLitHomeDirName                  = os.Getenv("HOME") + "/.lit"
+	defaultTrackerURL                      = "http://hubris.media.mit.edu:46580"
+	defaultKeyFileName                     = "privkey.hex"
+	defaultConfigFilename                  = "lit.conf"
+	defaultHomeDir                         = os.Getenv("HOME")
+	defaultRpcport                         = uint16(8001)
+	defaultRpchost                         = "localhost"
+	defaultAutoReconnect                   = false
+	defaultAutoListenPort                  = ":2448"
+	defaultAutoReconnectInterval           = int64(60)
+	defaultUpnPFlag                        = false
+	defaultLogLevel                        = 3
+	defaultAutoReconnectOnlyConnectedCoins = false
 )
 
 func fileExists(name string) bool {
@@ -155,14 +157,15 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 func main() {
 
 	conf := config{
-		LitHomeDir:            defaultLitHomeDirName,
-		Rpcport:               defaultRpcport,
-		Rpchost:               defaultRpchost,
-		TrackerURL:            defaultTrackerURL,
-		AutoReconnect:         defaultAutoReconnect,
-		AutoListenPort:        defaultAutoListenPort,
-		AutoReconnectInterval: defaultAutoReconnectInterval,
-		LogLevel:              defaultLogLevel,
+		LitHomeDir:                      defaultLitHomeDirName,
+		Rpcport:                         defaultRpcport,
+		Rpchost:                         defaultRpchost,
+		TrackerURL:                      defaultTrackerURL,
+		AutoReconnect:                   defaultAutoReconnect,
+		AutoListenPort:                  defaultAutoListenPort,
+		AutoReconnectInterval:           defaultAutoReconnectInterval,
+		AutoReconnectOnlyConnectedCoins: defaultAutoReconnectOnlyConnectedCoins,
+		LogLevel:                        defaultLogLevel,
 	}
 
 	key := litSetup(&conf)
@@ -192,7 +195,7 @@ func main() {
 	go litrpc.RPCListen(rpcl, conf.Rpchost, conf.Rpcport)
 
 	if conf.AutoReconnect {
-		node.AutoReconnect(conf.AutoListenPort, conf.AutoReconnectInterval)
+		node.AutoReconnect(conf.AutoListenPort, conf.AutoReconnectInterval, conf.AutoReconnectOnlyConnectedCoins)
 	}
 
 	<-rpcl.OffButton
