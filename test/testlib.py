@@ -11,8 +11,19 @@ import btcrpc
 import litrpc
 
 LIT_BIN = "%s/../lit" % paths.abspath(paths.dirname(__file__))
+
 REGTEST_COINTYPE = 257
+
 logger = logging.getLogger("testframework")
+
+next_unused_port = 8335
+def new_port():
+    # This gives us a enw port for each test run BUT this doesn't
+    # carry across program runs.
+    global next_unused_port
+    port = next_unused_port
+    next_unused_port += 1
+    return port
 
 def get_root_data_dir():
     if 'LIT_ITEST_ROOT' in os.environ:
@@ -37,8 +48,8 @@ hexchars = "0123456789abcdef"
 
 class LitNode():
     def __init__(self, bcnode):
-        self.p2p_port = 0
-        self.rpc_port = 0
+        self.p2p_port = new_port()
+        self.rpc_port = new_port()
         print("Allocated port", self.rpc_port)
         self.data_dir = new_data_dir("lit")
         self.peer_mapping = {}
@@ -140,8 +151,8 @@ class LitNode():
 
 class BitcoinNode():
     def __init__(self):
-        self.p2p_port = 0
-        self.rpc_port = 0
+        self.p2p_port = new_port()
+        self.rpc_port = new_port()
         self.data_dir = new_data_dir("bitcoind")
 
         # Actually start the bitcoind
