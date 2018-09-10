@@ -1,5 +1,5 @@
 #!/bin/bash +e
-
+set +e
 tests=$(cat tests.txt | grep -vE '^(#|$)' | sed 's/ *#.*//g')
 if [ "$#" -gt 0 ]; then
 	tests=$@
