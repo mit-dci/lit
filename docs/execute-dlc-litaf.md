@@ -21,10 +21,10 @@ The pubkey parameter is the public key of the oracle you'd like to use. If you'r
 dlc oracle add 03c0d496ef6656fe102a689abc162ceeae166832d826f8750c94d797c92eedd465 Tutorial
 ```
 
-When succesful, you'll see an output something like this:
+When successful, you'll see an output something like this:
 
 ```
-Oracle succesfully registered under ID 1
+Oracle successfully registered under ID 1
 ```
 
 If the ID is different, because you've experimented with oracles before, make sure you substitute with the correct ID in the commands we use hereafter.
@@ -121,7 +121,7 @@ Oracle value         | Our payout           | Their payout
 
 ## Step 4: Sending the contract to the other peer
 
-Now that the contract is ready, we can send it to the other peer. We do this by issueing the `dlc contract offer` command, followed by the contract ID and the index of the peer we want to send it to.
+Now that the contract is ready, we can send it to the other peer. We do this by issuing the `dlc contract offer` command, followed by the contract ID and the index of the peer we want to send it to.
 
 ```
 dlc contract offer 1 1
@@ -237,4 +237,3 @@ You can see that Peer 1 has 10.032185 BTC and peer 2 has 9.96778500 BTC. Both ha
 ## Conclusion
 
 We executed a discreet log contract using LIT's command line client. If you want to integrate this technology into your own application, or you have a use case that you think could leverage this technology - we also have an RPC client for LIT in [Go](https://github.com/mit-dci/lit-rpc-client-go), [.NET Core](https://github.com/mit-dci/lit-rpc-client-dotnet) and [NodeJS](https://github.com/mit-dci/lit-rpc-client-nodejs) that you can use to issue these commands programmatically. A tutorial on how to do that will follow.
-

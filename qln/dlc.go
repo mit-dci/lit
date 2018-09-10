@@ -145,55 +145,68 @@ func (nd *LitNode) AcceptDlc(cIdx uint64) error {
 		return fmt.Errorf("You are not connected to peer %d, do that first", c.PeerIdx)
 	}
 
-	// Fund the contract
-	err = nd.FundContract(c)
-	if err != nil {
-		return err
-	}
+	// Preconditions checked - Go execute the acceptance in a separate go routine
+	// while returning the status back to the client
+	go func(nd *LitNode, c *lnutil.DlcContract) {
+		c.Status = lnutil.ContractStatusAccepting
+		nd.DlcManager.SaveContract(c)
 
-	var kg portxo.KeyGen
-	kg.Depth = 5
-	kg.Step[0] = 44 | 1<<31
-	kg.Step[1] = c.CoinType | 1<<31
-	kg.Step[2] = UseContractFundMultisig
-	kg.Step[3] = c.PeerIdx | 1<<31
-	kg.Step[4] = uint32(c.Idx) | 1<<31
+		// Fund the contract
+		err = nd.FundContract(c)
+		if err != nil {
+			c.Status = lnutil.ContractStatusError
+			nd.DlcManager.SaveContract(c)
+			return
+		}
 
-	c.OurFundMultisigPub, err = nd.GetUsePub(kg, UseContractFundMultisig)
-	if err != nil {
-		return err
-	}
+		var kg portxo.KeyGen
+		kg.Depth = 5
+		kg.Step[0] = 44 | 1<<31
+		kg.Step[1] = c.CoinType | 1<<31
+		kg.Step[2] = UseContractFundMultisig
+		kg.Step[3] = c.PeerIdx | 1<<31
+		kg.Step[4] = uint32(c.Idx) | 1<<31
 
-	c.OurPayoutBase, err = nd.GetUsePub(kg, UseContractPayoutBase)
-	if err != nil {
-		return err
-	}
+		c.OurFundMultisigPub, err = nd.GetUsePub(kg, UseContractFundMultisig)
+		if err != nil {
+			log.Printf("Error while getting multisig pubkey: %s", err.Error())
+			c.Status = lnutil.ContractStatusError
+			nd.DlcManager.SaveContract(c)
+			return
+		}
 
-	ourPayoutPKHKey, err := nd.GetUsePub(kg, UseContractPayoutPKH)
-	if err != nil {
-		return err
-	}
-	copy(c.OurPayoutPKH[:], btcutil.Hash160(ourPayoutPKHKey[:]))
-	if err != nil {
-		return err
-	}
+		c.OurPayoutBase, err = nd.GetUsePub(kg, UseContractPayoutBase)
+		if err != nil {
+			log.Printf("Error while getting payoutbase: %s", err.Error())
+			c.Status = lnutil.ContractStatusError
+			nd.DlcManager.SaveContract(c)
+			return
+		}
 
-	// Now we can sign the division
-	sigs, err := nd.SignSettlementDivisions(c)
-	if err != nil {
-		return err
-	}
+		ourPayoutPKHKey, err := nd.GetUsePub(kg, UseContractPayoutPKH)
+		if err != nil {
+			log.Printf("Error while getting our payout pubkey: %s", err.Error())
+			c.Status = lnutil.ContractStatusError
+			nd.DlcManager.SaveContract(c)
+			return
+		}
+		copy(c.OurPayoutPKH[:], btcutil.Hash160(ourPayoutPKHKey[:]))
 
-	msg := lnutil.NewDlcOfferAcceptMsg(c, sigs)
-	c.Status = lnutil.ContractStatusAccepted
+		// Now we can sign the division
+		sigs, err := nd.SignSettlementDivisions(c)
+		if err != nil {
+			log.Printf("Error signing settlement divisions: %s", err.Error())
+			c.Status = lnutil.ContractStatusError
+			nd.DlcManager.SaveContract(c)
+			return
+		}
 
-	err = nd.DlcManager.SaveContract(c)
-	if err != nil {
-		return err
-	}
+		msg := lnutil.NewDlcOfferAcceptMsg(c, sigs)
+		c.Status = lnutil.ContractStatusAccepted
 
-	nd.OmniOut <- msg
-
+		nd.DlcManager.SaveContract(c)
+		nd.OmniOut <- msg
+	}(nd, c)
 	return nil
 }
 
@@ -430,12 +443,15 @@ func (nd *LitNode) SignSettlementDivisions(c *lnutil.DlcContract) ([]lnutil.DlcC
 	if err != nil {
 		return nil, err
 	}
-	c.FundingOutpoint = wire.OutPoint{fundingTx.TxHash(), 0}
+
+	c.FundingOutpoint = wire.OutPoint{Hash: fundingTx.TxHash(), Index: 0}
 
 	returnValue := make([]lnutil.DlcContractSettlementSignature, len(c.Division))
 	for i, d := range c.Division {
 		tx, err := lnutil.SettlementTx(c, d, true)
-
+		if err != nil {
+			return nil, err
+		}
 		sig, err := nd.SignSettlementTx(c, tx, priv)
 		if err != nil {
 			return nil, err
@@ -502,7 +518,7 @@ func (nd *LitNode) FundContract(c *lnutil.DlcContract) error {
 
 	c.OurFundingInputs = make([]lnutil.DlcContractFundingInput, len(utxos))
 	for i := 0; i < len(utxos); i++ {
-		c.OurFundingInputs[i] = lnutil.DlcContractFundingInput{utxos[i].Op, utxos[i].Value}
+		c.OurFundingInputs[i] = lnutil.DlcContractFundingInput{Outpoint: utxos[i].Op, Value: utxos[i].Value}
 	}
 
 	c.OurChangePKH, err = wal.NewAdr()
@@ -597,7 +613,7 @@ func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oracleSig [32]
 	txClaim := wire.NewMsgTx()
 	txClaim.Version = 2
 
-	settleOutpoint := wire.OutPoint{settleTx.TxHash(), 0}
+	settleOutpoint := wire.OutPoint{Hash: settleTx.TxHash(), Index: 0}
 	txClaim.AddTxIn(wire.NewTxIn(&settleOutpoint, nil, nil))
 
 	addr, err := wal.NewAdr()

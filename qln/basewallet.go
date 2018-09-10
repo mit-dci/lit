@@ -77,9 +77,16 @@ type UWallet interface {
 	// WatchThis tells the basewallet to watch an outpoint
 	WatchThis(wire.OutPoint) error
 
+	// StopWatchingThis tells the basewallet to stop watching an outpoint
+	StopWatchingThis(wire.OutPoint) error
+
 	// LetMeKnow opens the chan where OutPointEvent flows from the underlying
 	// wallet up to the LN module.
 	LetMeKnow() chan lnutil.OutPointEvent
+
+	// LetMeKnowHeight opens the chan where the blockheight flows from the underlying
+	// wallet up to the LN module. Used for monitoring HTLC timeouts
+	LetMeKnowHeight() chan lnutil.HeightEvent
 
 	// Ask for network parameters
 	Params() *coinparam.Params

@@ -333,7 +333,10 @@ type AddressArgs struct {
 	NumToMake uint32
 	CoinType  uint32
 }
+
+// TODO Make this contain an array of structures not a structure of arrays.
 type AddressReply struct {
+	CoinTypes       []uint32
 	WitAddresses    []string
 	LegacyAddresses []string
 }
@@ -383,12 +386,16 @@ func (r *LitRPC) Address(args *AddressArgs, reply *AddressReply) error {
 		}
 	}
 
+	reply.CoinTypes = make([]uint32, len(allAdr))
 	reply.WitAddresses = make([]string, len(allAdr))
 	reply.LegacyAddresses = make([]string, len(allAdr))
 
 	for i, a := range allAdr {
-		// convert 20 byte array to old address
 
+		// Store the cointype
+		reply.CoinTypes[i] = ctypesPerAdr[i]
+
+		// convert 20 byte array to old address
 		param := r.Node.SubWallet[ctypesPerAdr[i]].Params()
 
 		oldadr := lnutil.OldAddressFromPKH(a, param.PubKeyHashAddrID)
@@ -406,6 +413,48 @@ func (r *LitRPC) Address(args *AddressArgs, reply *AddressReply) error {
 	return nil
 }
 
+// More human-readable replies
+func (r *LitRPC) GetAddresses(args *NoArgs, reply *AddressReply) error {
+
+	// return index
+	ri := 0
+
+	cts := make([]uint32, 0)
+	was := make([]string, 0)
+	las := make([]string, 0)
+
+	for cointype, wal := range r.Node.SubWallet {
+
+		walAdr, err := wal.AdrDump()
+		if err != nil {
+			panic("this should never happen, I don't think")
+		}
+
+		for _, pubkey := range walAdr {
+
+			param := r.Node.SubWallet[cointype].Params()
+			cts = append(cts, cointype)
+
+			b32, err := bech32.SegWitV0Encode(param.Bech32Prefix, pubkey[:])
+			if err != nil {
+				panic("error encoding bech32 address")
+			}
+
+			was = append(was, b32)
+			las = append(las, lnutil.OldAddressFromPKH(pubkey, param.PubKeyHashAddrID))
+
+			ri++
+		}
+
+	}
+
+	reply.CoinTypes = cts
+	reply.WitAddresses = was
+	reply.LegacyAddresses = las
+
+	return nil
+}
+
 //func oldAddressPubKeyHash(pkHash []byte, netID byte) (string, error) {
 //	// Check for a valid pubkey hash length.
 //	if len(pkHash) != ripemd160.Size {
@@ -413,3 +462,21 @@ func (r *LitRPC) Address(args *AddressArgs, reply *AddressReply) error {
 //	}
 //	return base58.CheckEncode(pkHash, netID), nil
 //}
+
+type ClaimHTLCArgs struct {
+	R [16]byte
+}
+
+func (r *LitRPC) ClaimHTLC(args *ClaimHTLCArgs, reply *TxidsReply) error {
+	txids, err := r.Node.ClaimHTLC(args.R)
+	if err != nil {
+		return err
+	}
+
+	reply.Txids = make([]string, 0)
+	for _, txid := range txids {
+		reply.Txids = append(reply.Txids, fmt.Sprintf("%x", txid))
+	}
+
+	return nil
+}

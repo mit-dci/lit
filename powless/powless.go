@@ -196,6 +196,18 @@ func (a *APILink) RegisterOutPoint(op wire.OutPoint) error {
 	return nil
 }
 
+// UnregisterOutPoint stops watching an outpoint for spends.
+func (a *APILink) UnregisterOutPoint(op wire.OutPoint) error {
+	log.Printf("unregister %s\n", op.String())
+	a.TrackingOPsMtx.Lock()
+	delete(a.TrackingOPs, op)
+	a.TrackingOPsMtx.Unlock()
+
+	a.dirtyChan <- nil
+	log.Printf("Unregister %s complete\n", op.String())
+	return nil
+}
+
 // DirtyCheckLoop checks with the server once things have changed on the client end.
 // this is actually a bit ugly because it checks *everything* when *anything* has
 // changed.  It could be much more efficient if, eg it checks for a newly created
@@ -223,8 +235,6 @@ func (a *APILink) DirtyCheckLoop() {
 			<-a.dirtyChan
 		}
 	}
-
-	return
 }
 
 // VBlocksResponse is a list of Vblocks, which comes back from the /blocks
@@ -272,8 +282,6 @@ func (a *APILink) TipRefreshLoop() error {
 
 		time.Sleep(time.Second * 60)
 	}
-
-	return nil
 }
 
 // do you even need a struct here..?

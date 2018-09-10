@@ -103,7 +103,7 @@ func (nd *LitNode) advertiseLinks(seq uint32) {
 				copy(idPub[:], nd.IdKey().PubKey().SerializeCompressed())
 
 				var theirIdPub [33]byte
-				copy(theirIdPub[:], peer.Con.RemotePub.SerializeCompressed())
+				copy(theirIdPub[:], peer.Con.RemotePub().SerializeCompressed())
 
 				outHash := fastsha256.Sum256(idPub[:])
 				copy(outmsg.APKH[:], outHash[:20])
@@ -168,7 +168,10 @@ func (nd *LitNode) LinkMsgHandler(msg lnutil.LinkMsg) {
 	for peerIdx, _ := range nd.RemoteCons {
 		if peerIdx != origIdx {
 			msg.PeerIdx = peerIdx
-			nd.OmniOut <- msg
+
+			go func(msg lnutil.LinkMsg) {
+				nd.OmniOut <- msg
+			}(msg)
 		}
 	}
 }

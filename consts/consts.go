@@ -16,4 +16,10 @@ const (
 	BitcoinTestnet3BHeight = 1256000          // height at which testnet3 sync starts
 	VertcoinTestnetBHeight = 25000            // height at which vertcoin testnet sync starts
 	DualFundFee            = 50
+	MaxSendAmt             = 1 << 30 // maximum amount that can be sent through a chan
+	MaxKeyLimit            = 1 << 30 // maximum number of keys that lit can store
+	JusticeTxBump          = 100     // fix justicetx fee 10 times the normal fee
+	QcStateFee             = 10      // fixqcstatefee
+	DefaultLockTime        = 500     //default lock time
+	DlcSettlementTxFee     = 1000
 )

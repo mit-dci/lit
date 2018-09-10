@@ -9,6 +9,14 @@ import (
 	"github.com/mit-dci/lit/qln"
 )
 
+// ------------------------- testlog
+
+func (r *LitRPC) TestLog(arg string, reply *string) error {
+	log.Print(arg)
+	*reply = arg
+	return nil
+}
+
 // ------------------------- listen
 
 type ListenArgs struct {
@@ -39,7 +47,12 @@ type ConnectArgs struct {
 	LNAddr string
 }
 
-func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
+type ConnectReply struct {
+	Status  string
+	PeerIdx uint32
+}
+
+func (r *LitRPC) Connect(args ConnectArgs, reply *ConnectReply) error {
 
 	// first, see if the peer to connect to is referenced by peer index.
 	var connectAdr string
@@ -61,12 +74,13 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
 		connectAdr = args.LNAddr
 	}
 
-	err = r.Node.DialPeer(connectAdr)
+	idx, err := r.Node.DialPeer(connectAdr)
 	if err != nil {
 		return err
 	}
 
 	reply.Status = fmt.Sprintf("connected to peer %s", connectAdr)
+	reply.PeerIdx = idx
 	return nil
 }
 

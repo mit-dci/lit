@@ -3,6 +3,7 @@ package lnutil
 import (
 	"bytes"
 	"fmt"
+	"log"
 
 	"github.com/mit-dci/lit/btcutil/txscript"
 	"github.com/mit-dci/lit/wire"
@@ -13,13 +14,13 @@ func CommitScript(RKey, TKey [33]byte, delay uint16) []byte {
 	builder := txscript.NewScriptBuilder()
 
 	// 1 for penalty / revoked, 0 for timeout
-	// 1, so timeout
+	// 1, so revoked
 	builder.AddOp(txscript.OP_IF)
 
 	// Just push revokable key
 	builder.AddData(RKey[:])
 
-	// 0, so revoked
+	// 0, so timeout
 	builder.AddOp(txscript.OP_ELSE)
 
 	// CSV delay
@@ -80,4 +81,77 @@ func FundTxOut(pubA, pubB [33]byte, amt int64) (*wire.TxOut, error) {
 	scriptBytes = P2WSHify(scriptBytes)
 
 	return wire.NewTxOut(amt, scriptBytes), nil
+}
+
+func ReceiveHTLCScript(revPKH [20]byte, remotePub [33]byte, RHash [32]byte, localPub [33]byte, locktime uint32) []byte {
+	log.Printf("Generating receive HTLC with localPub [%x] and remotePub [%x]", localPub, remotePub)
+	b := txscript.NewScriptBuilder()
+
+	b.AddOp(txscript.OP_DUP)
+	b.AddOp(txscript.OP_HASH160)
+	b.AddData(revPKH[:])
+	b.AddOp(txscript.OP_EQUAL)
+	b.AddOp(txscript.OP_IF)
+	b.AddOp(txscript.OP_CHECKSIG)
+	b.AddOp(txscript.OP_ELSE)
+	b.AddData(remotePub[:])
+	b.AddOp(txscript.OP_SWAP)
+	b.AddOp(txscript.OP_SIZE)
+	b.AddInt64(16)
+	b.AddOp(txscript.OP_EQUAL)
+	b.AddOp(txscript.OP_IF)
+	b.AddOp(txscript.OP_SHA256)
+	b.AddData(RHash[:])
+	b.AddOp(txscript.OP_EQUALVERIFY)
+	b.AddInt64(2)
+	b.AddOp(txscript.OP_SWAP)
+	b.AddData(localPub[:])
+	b.AddInt64(2)
+	b.AddOp(txscript.OP_CHECKMULTISIG)
+	b.AddOp(txscript.OP_ELSE)
+	b.AddOp(txscript.OP_DROP)
+	b.AddInt64(int64(locktime))
+	b.AddOp(txscript.OP_CHECKLOCKTIMEVERIFY)
+	b.AddOp(txscript.OP_DROP)
+	b.AddOp(txscript.OP_CHECKSIG)
+	b.AddOp(txscript.OP_ENDIF)
+	b.AddOp(txscript.OP_ENDIF)
+
+	s, _ := b.Script()
+	return s
+}
+
+func OfferHTLCScript(revPKH [20]byte, remotePub [33]byte, RHash [32]byte, localPub [33]byte) []byte {
+	log.Printf("Generating offer HTLC with localPub [%x] and remotePub [%x]", localPub, remotePub)
+	b := txscript.NewScriptBuilder()
+
+	b.AddOp(txscript.OP_DUP)
+	b.AddOp(txscript.OP_HASH160)
+	b.AddData(revPKH[:])
+	b.AddOp(txscript.OP_EQUAL)
+	b.AddOp(txscript.OP_IF)
+	b.AddOp(txscript.OP_CHECKSIG)
+	b.AddOp(txscript.OP_ELSE)
+	b.AddData(remotePub[:])
+	b.AddOp(txscript.OP_SWAP)
+	b.AddOp(txscript.OP_SIZE)
+	b.AddInt64(16)
+	b.AddOp(txscript.OP_EQUAL)
+	b.AddOp(txscript.OP_NOTIF)
+	b.AddOp(txscript.OP_DROP)
+	b.AddInt64(2)
+	b.AddOp(txscript.OP_SWAP)
+	b.AddData(localPub[:])
+	b.AddInt64(2)
+	b.AddOp(txscript.OP_CHECKMULTISIG)
+	b.AddOp(txscript.OP_ELSE)
+	b.AddOp(txscript.OP_SHA256)
+	b.AddData(RHash[:])
+	b.AddOp(txscript.OP_EQUALVERIFY)
+	b.AddOp(txscript.OP_CHECKSIG)
+	b.AddOp(txscript.OP_ENDIF)
+	b.AddOp(txscript.OP_ENDIF)
+
+	s, _ := b.Script()
+	return s
 }

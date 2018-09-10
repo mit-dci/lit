@@ -140,6 +140,7 @@ var LiteRegNetParams = Params{
 	// BIP44 coin type used in the hierarchical deterministic path for
 	// address generation.
 	HDCoinType: 258, // i dunno
+	TestCoin: true,
 }
 
 // liteCoinTestNet4GenesisHash is the first hash in litecoin testnet4

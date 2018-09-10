@@ -1,0 +1,12 @@
+shadow = false
+borders = "simple"
+
+[colors]
+background = "black"
+shadow = "black"
+view = "black"
+primary = "white"
+secondary = "gray"
+tertiary = "blue"
+title_primary = "white"
+title_secondary = "gray"

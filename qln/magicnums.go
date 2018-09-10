@@ -22,6 +22,9 @@ const (
 	// pays TO)
 	UseContractPayoutPKH = 52 | hdkeychain.HardenedKeyStart
 
+	// key derivation path for HTLC pubkeys
+	UseHTLCBase = 60 | hdkeychain.HardenedKeyStart
+
 	// links Id and channel. replaces UseChannelFund
 	UseIdKey = 111 | hdkeychain.HardenedKeyStart
 
@@ -36,6 +39,7 @@ var (
 	BKTPeerMap = []byte("pmp") // map of peer index to pubkey
 	BKTChanMap = []byte("cmp") // map of channel index to outpoint
 	BKTWatch   = []byte("wch") // txids & signatures for export to watchtowers
+	BKTHTLCOPs = []byte("hlo") // htlc outpoints to watch
 
 	KEYIdx      = []byte("idx")  // index for key derivation
 	KEYhost     = []byte("hst")  // hostname where peer lives

@@ -33,6 +33,10 @@ type Wallit struct {
 	// Gets initialized and activates when called by qln
 	OPEventChan chan lnutil.OutPointEvent
 
+	// HeightEventChan sends block height changes to the LN wallet.
+	// Gets initialized and activates when called by qln
+	HeightEventChan chan lnutil.HeightEvent
+
 	// Params live here...
 	Param *coinparam.Params // network parameters (testnet3, segnet, etc)
 

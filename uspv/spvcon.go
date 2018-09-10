@@ -11,6 +11,7 @@ import (
 	"github.com/mit-dci/lit/wire"
 )
 
+// SPVCon is a SPV connection to a coin daemon.
 type SPVCon struct {
 	con net.Conn // the (probably tcp) connection to the node
 

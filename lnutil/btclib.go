@@ -29,6 +29,13 @@ type OutPointEvent struct {
 	Tx     *wire.MsgTx   // the tx spending the outpoint
 }
 
+// HeightEvent is to inform the LN node of a new blockheight on a particular
+// coin type. Used to detect and enforce HTLC timeouts
+type HeightEvent struct {
+	Height   int32
+	CoinType uint32
+}
+
 // need this because before I was comparing pointers maybe?
 // so they were the same outpoint but stored in 2 places so false negative?
 func OutPointsEqual(a, b wire.OutPoint) bool {

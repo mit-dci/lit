@@ -124,7 +124,7 @@ func (w *Wallit) NewAdr160() ([20]byte, error) {
 		// update the db with number of created keys
 		return nil
 	})
-	if n > 1<<30 {
+	if n > consts.MaxKeyLimit {
 		return empty160, fmt.Errorf("Got %d keys stored, expect something reasonable", n)
 	}
 
@@ -281,6 +281,20 @@ func (w *Wallit) RegisterWatchOP(op wire.OutPoint) error {
 			return fmt.Errorf("watch bucket not in db")
 		}
 		return dufb.Put(opArr[:], nil)
+	})
+}
+
+// UnregisterWatchOP unregisters an outpoint to watch. Used to remove watched HTLC OPs if we claim them ourselves.
+func (w *Wallit) UnregisterWatchOP(op wire.OutPoint) error {
+	opArr := lnutil.OutPointToBytes(op)
+	// open db
+	return w.StateDB.Update(func(btx *bolt.Tx) error {
+		// get the outpoint watch bucket
+		dufb := btx.Bucket(BKToutpoint)
+		if dufb == nil {
+			return fmt.Errorf("watch bucket not in db")
+		}
+		return dufb.Delete(opArr[:])
 	})
 }
 
@@ -504,7 +518,7 @@ func (w *Wallit) IngestMany(txs []*wire.MsgTx, height int32) (uint32, error) {
 					// confirmed now) we don't need to re-register.
 					existing := dufb.Get(txob[:36])
 					if existing == nil {
-						err = w.Hook.RegisterOutPoint(wire.OutPoint{tx.TxHash(), uint32(j)})
+						err = w.Hook.RegisterOutPoint(wire.OutPoint{Hash: tx.TxHash(), Index: uint32(j)})
 						if err != nil {
 							return err
 						}

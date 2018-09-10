@@ -18,6 +18,8 @@ Under development, not for use with real money.
 
 * (Optional, Windows) a [Cygwin](https://cygwin.com/install.html) environment might make things easier for you.
 
+* (Optional, for full test suite) Python 3 + `requests` library from PyPI
+
 ### Downloading
 
 Just use Git to download the repo and then cd into it.

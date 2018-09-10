@@ -86,7 +86,7 @@ func (nd *LitNode) BuildJusticeSig(q *Qchan) error {
 	// in this function, "bad" refers to the hypothetical transaction spending the
 	// com tx.  "justice" is the tx spending the bad tx
 
-	fee := consts.JusticeFee
+	fee := int64(consts.JusticeTxBump * nd.SubWallet[q.Coin()].Fee())
 
 	// first we need the keys in the bad script.  Start by getting the elk-scalar
 	// we should have it at the "current" state number
@@ -108,8 +108,13 @@ func (nd *LitNode) BuildJusticeSig(q *Qchan) error {
 	script := lnutil.CommitScript(badRevokePub, badTimeoutPub, q.Delay)
 	scriptHashOutScript := lnutil.P2WSHify(script)
 
+	// TODO: we have to build justics txs for each of the HTLCs too
+
 	// build the bad tx (redundant as we just build most of it...
-	badTx, err := q.BuildStateTx(false)
+	badTx, _, _, err := q.BuildStateTxs(false)
+	if err != nil {
+		return err
+	}
 
 	var badAmt int64
 	badIdx := uint32(len(badTx.TxOut) + 1)
