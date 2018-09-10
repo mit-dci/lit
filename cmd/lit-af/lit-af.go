@@ -128,7 +128,7 @@ func main() {
 		AutoComplete: lc.NewAutoCompleter(),
 	})
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 	defer rl.Close()
 
@@ -150,13 +150,13 @@ func main() {
 
 		err = lc.Shellparse(cmdslice)
 		if err != nil { // only error should be user exit
-			log.Fatal(err)
+			panic(err)
 		}
 	}
 
 	//	err = c.Call("LitRPC.Bal", nil, &br)
 	//	if err != nil {
-	//		log.Fatal("rpc call error:", err)
+	//		Log.Fatal("rpc call error:", err)
 	//	}
 	//	fmt.Printf("Sent bal req, response: txototal %d\n", br.TxoTotal)
 }

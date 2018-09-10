@@ -2,8 +2,9 @@ package qln
 
 import (
 	"fmt"
-	"log"
 	"path/filepath"
+
+	"github.com/mit-dci/lit/logging"
 
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/btcutil"
@@ -80,7 +81,9 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 	nd.InProgDual = new(InFlightDualFund)
 	nd.InProgDual.done = make(chan *DualFundingResult, 1)
 
+	nd.RemoteMtx.Lock()
 	nd.RemoteCons = make(map[uint32]*RemotePeer)
+	nd.RemoteMtx.Unlock()
 
 	nd.SubWallet = make(map[uint32]UWallet)
 
@@ -128,7 +131,7 @@ func (nd *LitNode) LinkBaseWallet(
 		rootpriv, birthHeight, resync, host, nd.LitFolder, proxy, param)
 
 	if err != nil {
-		log.Println(err)
+		logging.Error(err)
 		return nil
 	}
 
@@ -149,7 +152,7 @@ func (nd *LitNode) LinkBaseWallet(
 		copy(pkh[:], pkhSlice)
 		nd.SubWallet[WallitIdx].ExportHook().RegisterAddress(pkh)
 
-		log.Printf("Registering outpoint %v", qChan.PorTxo.Op)
+		logging.Infof("Registering outpoint %v", qChan.PorTxo.Op)
 
 		nd.SubWallet[WallitIdx].WatchThis(qChan.PorTxo.Op)
 	}

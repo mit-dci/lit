@@ -6,6 +6,8 @@ import (
 	"strconv"
 
 	"github.com/mit-dci/lit/btcutil/btcec"
+	"github.com/mit-dci/lit/logging"
+
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/qln"
 )
@@ -13,7 +15,7 @@ import (
 // ------------------------- testlog
 
 func (r *LitRPC) TestLog(arg string, reply *string) error {
-	log.Print(arg)
+	logging.Info(arg)
 	*reply = arg
 	return nil
 }
@@ -68,7 +70,7 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *ConnectReply) error {
 		if host != "" {
 			connectAdr += "@" + host
 		}
-		log.Printf("try string %s\n", connectAdr)
+		logging.Infof("try string %s\n", connectAdr)
 
 	} else {
 		// use string as is, try to convert to ln address

@@ -8,10 +8,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/btcutil/chaincfg"
 	"github.com/mit-dci/lit/wire"
-	"github.com/mit-dci/lit/btcutil"
 )
 
 // RawTxInWitnessSignature returns the serialized ECDA signature for the input
@@ -292,6 +292,9 @@ func mergeScripts(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
 		// We already know this information somewhere up the stack.
 		class, addresses, nrequired, err :=
 			ExtractPkScriptAddrs(script, chainParams)
+		if err != nil {
+			return prevScript
+		}
 
 		// regenerate scripts.
 		sigScript, _ := unparseScript(sigPops)
