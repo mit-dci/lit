@@ -14,7 +14,7 @@ def run_test(env):
     bal0 = bc.rpc.getbalance()
 
     # Send a bitcoin.
-    tx1 = bc.rpc.sendtoaddress(addr, 1)
+    tx1 = bc.rpc.sendtoaddress(addr, 1, comment="bech32")
     env.generate_block(count=1)
     print('Sent and mined... (tx: %s)' % tx1)
 
