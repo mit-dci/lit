@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import testlib
-import sys
 
 create = 2
 
