@@ -54,21 +54,24 @@ func (nd *LitNode) AutoReconnect(listenPort string, interval int64, connectedCoi
 	}
 
 	var empty [33]byte
-	i := uint32(0)
+	i := uint32(1)
 	for {
-
-		// If we're only reconnecting to peers we have channels with
-		// in a connected coin type (daemon is available), then skip
-		// peers that are not in that list
-		if connectedCoinOnly && !isConnectedCoin(i) {
-			continue
-		}
 
 		pubKey, _ := nd.GetPubHostFromPeerIdx(i)
 		if pubKey == empty {
 			log.Printf("Done, tried %d hosts\n", i-1)
 			break
 		}
+
+		// If we're only reconnecting to peers we have channels with
+		// in a connected coin type (daemon is available), then skip
+		// peers that are not in that list
+		if connectedCoinOnly && !isConnectedCoin(i) {
+			log.Printf("Skipping peer %d due to onlyConnectedCoins=true\n", i)
+			i++
+			continue
+		}
+
 		nd.RemoteMtx.Lock()
 		_, alreadyConnected := nd.RemoteCons[i]
 		nd.RemoteMtx.Unlock()
@@ -84,6 +87,8 @@ func (nd *LitNode) AutoReconnect(listenPort string, interval int64, connectedCoi
 			}
 			<-ticker.C
 		}()
+
+		i++
 	}
 
 }
