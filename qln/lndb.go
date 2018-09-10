@@ -594,7 +594,9 @@ func (nd *LitNode) ReloadQchanState(q *Qchan) error {
 		if stBytes == nil {
 			return fmt.Errorf("state value empty")
 		}
+		nd.RemoteMtx.Lock()
 		q.State, err = StatComFromBytes(stBytes)
+		nd.RemoteMtx.Unlock()
 		if err != nil {
 			return err
 		}
