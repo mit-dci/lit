@@ -117,9 +117,9 @@ func (r *LitRPC) FundChannel(args FundArgs, reply *FundReply) error {
 
 	spendable := allPorTxos.SumWitness(nowHeight)
 
-	if args.Capacity > spendable-consts.SafeFee {
+	if args.Capacity > spendable-wal.Fee()*consts.JusticeTxBump {
 		return fmt.Errorf("Wanted %d but %d available for channel creation",
-			args.Capacity, spendable-consts.SafeFee)
+			args.Capacity, spendable-wal.Fee()*consts.JusticeTxBump)
 	}
 
 	idx, err := r.Node.FundChannel(
@@ -412,7 +412,7 @@ func (r *LitRPC) DumpPrivs(args NoArgs, reply *DumpReply) error {
 		if err != nil {
 			return err
 		}
-		wif := btcutil.WIF{priv, true, wal.Params().PrivateKeyID}
+		wif := btcutil.WIF{PrivKey: priv, CompressPubKey: true, NetID: wal.Params().PrivateKeyID}
 		thisTxo.WIF = wif.String()
 
 		reply.Privs = append(reply.Privs, thisTxo)
@@ -442,7 +442,7 @@ func (r *LitRPC) DumpPrivs(args NoArgs, reply *DumpReply) error {
 			if err != nil {
 				return err
 			}
-			wif := btcutil.WIF{priv, true, wal.Params().PrivateKeyID}
+			wif := btcutil.WIF{PrivKey: priv, CompressPubKey: true, NetID: wal.Params().PrivateKeyID}
 
 			theseTxos[i].WIF = wif.String()
 		}

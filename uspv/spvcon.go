@@ -12,6 +12,7 @@ import (
 	"github.com/mit-dci/lit/wire"
 )
 
+// SPVCon is a SPV connection to a coin daemon.
 type SPVCon struct {
 	// store all open tcp connections to bitcoin nodes
 	// can just drop the connection if it misbehaves

@@ -66,7 +66,6 @@ func (s *SPVCon) incomingMessageHandler(peerIdx int) {
 			}
 		}
 	}
-	return
 }
 
 // outgoingMessageHandler initializes an outgoing message stream for each
@@ -86,7 +85,6 @@ func (s *SPVCon) outgoingMessageHandler(peerIdx int) {
 		}
 		s.WBytes += uint64(n)
 	}
-	return
 }
 
 // fPositiveHandler monitors false positives and when it gets enough of them,
@@ -144,9 +142,9 @@ func (s *SPVCon) HeaderHandler(m *wire.MsgHeaders, peerIdx int) {
 	}
 	// no moar, done w/ headers, send filter and get blocks
 	if !s.HardMode { // don't send this in hardmode! that's the whole point
-		filt, err := s.GimmeFilter()
-		if err != nil {
-			log.Printf("AskForBlocks error: %s", err.Error())
+		filt, err2 := s.GimmeFilter()
+		if err2 != nil {
+			log.Printf("AskForBlocks error: %s", err2.Error())
 			return
 		}
 		// send filter
@@ -175,7 +173,6 @@ func (s *SPVCon) TxHandler(tx *wire.MsgTx) {
 	if !ok {
 		log.Printf("Tx %s unknown, will not ingest\n", tx.TxHash().String())
 		panic("unknown tx")
-		return
 	}
 
 	// check for double spends ...?
@@ -198,7 +195,7 @@ func (s *SPVCon) TxHandler(tx *wire.MsgTx) {
 
 	// send txs up to wallit
 	if s.MatchTx(tx) {
-		s.TxUpToWallit <- lnutil.TxAndHeight{tx, height}
+		s.TxUpToWallit <- lnutil.TxAndHeight{Tx: tx, Height: height}
 	}
 }
 

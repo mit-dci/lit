@@ -18,9 +18,10 @@ import (
 	"golang.org/x/net/proxy"
 )
 
+// IP4 ...
 func IP4(ipAddress string) bool {
-	parseIp := net.ParseIP(ipAddress)
-	if parseIp.To4() == nil {
+	parseIP := net.ParseIP(ipAddress)
+	if parseIP.To4() == nil {
 		return false
 	}
 	return true
@@ -64,7 +65,7 @@ func (s *SPVCon) GetListOfNodes() ([]string, error) {
 		// need this temp in order to capture the error from net.LookupHost
 		// also need this to report the number of IPs we get from a seed
 		if err != nil {
-			log.Printf("Have difficulty trying to conenct to %s. Going to the next seed", seed)
+			log.Printf("Have difficulty trying to connect to %s. Going to the next seed", seed)
 			continue
 		}
 		listOfNodes = append(listOfNodes, temp...)
@@ -95,6 +96,10 @@ func (s *SPVCon) DialNode(listOfNodesParent []string) error {
 		var conString, conMode string
 		// need to check whether conString is ipv4 or ipv6
 		conString, conMode, err = s.parseRemoteNode(ip)
+		if err != nil {
+			log.Printf("parse error for node (skipped): %s", err)
+			continue
+		}
 		log.Printf("Attempting connection to node at %s\n",
 			conString)
 
@@ -170,6 +175,7 @@ func (s *SPVCon) Handshake(peerIdx int) error {
 		s.conns[peerIdx], s.localVersion,
 		wire.BitcoinNet(s.Param.NetMagicBytes), wire.LatestEncoding)
 	if err != nil {
+		log.Println(err)
 		return err
 	}
 	s.RBytes += uint64(n)

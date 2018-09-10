@@ -23,6 +23,7 @@ is internal and not exported out to the wallit (eg a fullnode keeps track
 of a lot, and SPV node, somewhat less, and a block explorer shim basically nothing)
 */
 
+// ChainHook is a thing that lets you interact with the actual blockchains
 type ChainHook interface {
 
 	// Start turns on the ChainHook.  Later on, pass more parameters here.
@@ -88,6 +89,7 @@ type ChainHook interface {
 
 // --- implementation of ChainHook interface ----
 
+// Start ...
 func (s *SPVCon) Start(
 	startHeight int32, host, path string, proxyURL string,
 	maxConnections int, params *coinparam.Params) (
@@ -148,6 +150,7 @@ func (s *SPVCon) Start(
 	return s.TxUpToWallit, s.CurrentHeightChan, nil
 }
 
+// RegisterAddress ...
 func (s *SPVCon) RegisterAddress(adr160 [20]byte) error {
 	s.TrackingAdrsMtx.Lock()
 	s.TrackingAdrs[adr160] = true
@@ -155,6 +158,7 @@ func (s *SPVCon) RegisterAddress(adr160 [20]byte) error {
 	return nil
 }
 
+// RegisterOutPoint ...
 func (s *SPVCon) RegisterOutPoint(op wire.OutPoint) error {
 	s.TrackingOPsMtx.Lock()
 	s.TrackingOPs[op] = true

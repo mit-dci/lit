@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"log"
 
-	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
-	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/btcutil/bloom"
+	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/wire"
 )
 
 var (
+	// WitMagicBytes ...
 	WitMagicBytes = []byte{0x6a, 0x24, 0xaa, 0x21, 0xa9, 0xed}
 )
 
@@ -176,7 +177,7 @@ func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
 	for _, tx := range m.Transactions {
 		if s.MatchTx(tx) {
 			log.Printf("found matching tx %s\n", tx.TxHash().String())
-			s.TxUpToWallit <- lnutil.TxAndHeight{tx, hah.height}
+			s.TxUpToWallit <- lnutil.TxAndHeight{Tx: tx, Height: hah.height}
 		}
 	}
 
@@ -195,7 +196,7 @@ func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
 		// that way you are pretty sure you're synced up.
 
 		// ask all nodes for headers
-		for k := 0 ; k < len(s.conns) ; k ++ {
+		for k := 0; k < len(s.conns); k++ {
 			err = s.AskForHeaders(k)
 			if err != nil {
 				log.Printf("Merkle block error: %s\n", err.Error())

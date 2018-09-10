@@ -14,4 +14,9 @@ const (
 	DefaultLockTime      = 500              // default lock time for timeouts
 	MaxConns             = 120              // maximum number of connections that a given lit node can make with other peers, 120 by default according to bitcoind
 	LastSupportedVersion = 70014            //70014 -> core v0.13.1, so we should be fine
+	MaxSendAmt           = 1 << 30          // maximum amount that can be sent through a chan
+	MaxKeyLimit          = 1 << 30          // maximum number of keys that lit can store
+	JusticeTxBump        = 100              // fix justicetx fee 10 times the normal fee
+	QcStateFee           = 10               // fixqcstatefee
+	DlcSettlementTxFee   = 1000
 )

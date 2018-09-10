@@ -878,6 +878,7 @@ func (lc *litAfClient) dlcContractRespond(textArgs []string, aor bool) error {
 	}
 
 	args.CIdx = cIdx
+	args.AcceptOrDecline = aor
 
 	err = lc.Call("LitRPC.ContractRespond", args, reply)
 	if err != nil {

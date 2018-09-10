@@ -10,6 +10,7 @@ import (
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/sig64"
+	"github.com/mit-dci/lit/consts"
 )
 
 /*
@@ -85,7 +86,7 @@ func (nd *LitNode) BuildJusticeSig(q *Qchan) error {
 	// in this function, "bad" refers to the hypothetical transaction spending the
 	// com tx.  "justice" is the tx spending the bad tx
 
-	fee := int64(5000) // fixed fee for now
+	fee := int64(consts.JusticeTxBump*nd.SubWallet[q.Coin()].Fee())
 
 	// first we need the keys in the bad script.  Start by getting the elk-scalar
 	// we should have it at the "current" state number
