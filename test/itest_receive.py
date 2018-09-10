@@ -3,6 +3,7 @@
 import testlib
 
 def run_test(env):
+    print("RUNNING RECEIVE")
     bc = env.bitcoind
     lit = env.lits[0]
 
