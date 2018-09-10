@@ -190,10 +190,6 @@ func main() {
 		logging.Fatal(err)
 	}
 
-	if conf.AutoReconnect {
-		node.AutoReconnect(conf.AutoListenPort, conf.AutoReconnectInterval)
-	}
-
 	rpcl := new(litrpc.LitRPC)
 	rpcl.Node = node
 	rpcl.OffButton = make(chan bool, 1)
