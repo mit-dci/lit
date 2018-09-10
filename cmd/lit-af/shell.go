@@ -297,6 +297,14 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		displayAllCommands = true
 	}
 
+	// Balance reply needed for bals and chans
+	if cmd == "chans" || cmd == "bals" || displayAllCommands {
+		err := lc.Call("LitRPC.Balance", nil, bReply)
+		if err != nil {
+			return err
+		}
+	}
+
 	if cmd == "conns" || displayAllCommands {
 		err := lc.Call("LitRPC.ListConnections", nil, pReply)
 		if err != nil {
@@ -325,48 +333,54 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 				fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Channels:"))
 			}
 
+			coinDaemonConnected := map[uint32]bool{}
+			for _, walBal := range bReply.Balances {
+				coinDaemonConnected[walBal.CoinType] = true
+			}
+
 			sort.Slice(cReply.Channels, func(i, j int) bool {
 				return cReply.Channels[i].Height < cReply.Channels[j].Height
 			})
 
 			var closedChannels []litrpc.ChannelInfo
 			var openChannels []litrpc.ChannelInfo
+			var disabledChannels []litrpc.ChannelInfo
+			var unconfirmedChannels []litrpc.ChannelInfo
 			for _, c := range cReply.Channels {
-				if c.Closed {
+				_, ok := coinDaemonConnected[c.CoinType]
+				if !ok {
+					disabledChannels = append(disabledChannels, c)
+				} else if c.Closed {
 					closedChannels = append(closedChannels, c)
+				} else if c.Height == -1 {
+					unconfirmedChannels = append(unconfirmedChannels, c)
 				} else {
 					openChannels = append(openChannels, c)
 				}
 			}
 
-			for _, c := range closedChannels {
-				fmt.Fprintf(color.Output, lnutil.Red("Closed:       \n"))
+			printChannel := func(c litrpc.ChannelInfo) {
 				fmt.Fprintf(
 					color.Output,
-					"%s (peer %d) type %d %s\n\t cap: %s bal: %s h: %d state: %d data: %x pkh: %x\n",
-					lnutil.White(c.CIdx), c.PeerIdx, c.CoinType,
+					"\t\t%s (peer %d) type %d cap: %s bal: %s\n\t\t\t%s\n\t\t\th: %d state: %d\n\t\t\tdata: %x\n\t\t\tpkh: %x\n",
+					lnutil.White(c.CIdx), c.PeerIdx, c.CoinType, lnutil.SatoshiColor(c.Capacity), lnutil.SatoshiColor(c.MyBalance),
 					lnutil.OutPoint(c.OutPoint),
-					lnutil.SatoshiColor(c.Capacity), lnutil.SatoshiColor(c.MyBalance),
 					c.Height, c.StateNum, c.Data, c.Pkh)
 			}
 
-			for _, c := range openChannels {
-				if c.Height == -1 {
-					c := color.New(color.FgGreen).Add(color.Underline)
-					c.Printf("Unconfirmed:")
-					fmt.Fprintf(color.Output, lnutil.Green("  "))
-					//needed for preventing the underline from extending
-				} else {
-					fmt.Fprintf(color.Output, lnutil.Green("Open:         \n"))
+			printChannels := func(cs []litrpc.ChannelInfo, title string) {
+				if len(cs) > 0 {
+					fmt.Fprintf(color.Output, "\t\t%s\n", title)
+					for _, c := range cs {
+						printChannel(c)
+					}
 				}
-				fmt.Fprintf(
-					color.Output,
-					"%s (peer %d) type %d %s\n\t cap: %s bal: %s h: %d state: %d data: %x pkh: %x\n",
-					lnutil.White(c.CIdx), c.PeerIdx, c.CoinType,
-					lnutil.OutPoint(c.OutPoint),
-					lnutil.SatoshiColor(c.Capacity), lnutil.SatoshiColor(c.MyBalance),
-					c.Height, c.StateNum, c.Data, c.Pkh)
 			}
+
+			printChannels(openChannels, lnutil.Green("Open:"))
+			printChannels(unconfirmedChannels, lnutil.Yellow("Unconfirmed:"))
+			printChannels(closedChannels, lnutil.Red("Closed:"))
+			printChannels(disabledChannels, lnutil.Red("Disabled (coin daemon unavailable):"))
 		}
 	}
 
@@ -452,11 +466,6 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	}
 
 	if cmd == "bals" || displayAllCommands {
-		err := lc.Call("LitRPC.Balance", nil, bReply)
-		if err != nil {
-			return err
-		}
-
 		if len(bReply.Balances) > 0 {
 			if displayAllCommands {
 				fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Balances:"))

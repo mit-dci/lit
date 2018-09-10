@@ -7,9 +7,10 @@ import (
 )
 
 var (
-	White = color.New(color.FgHiWhite).SprintFunc()
-	Green = color.New(color.FgHiGreen).SprintFunc()
-	Red   = color.New(color.FgHiRed).SprintFunc()
+	White  = color.New(color.FgHiWhite).SprintFunc()
+	Green  = color.New(color.FgHiGreen).SprintFunc()
+	Red    = color.New(color.FgHiRed).SprintFunc()
+	Yellow = color.New(color.FgHiYellow).SprintFunc()
 
 	Header   = color.New(color.FgHiCyan).SprintFunc()
 	Prompt   = color.New(color.FgHiYellow).SprintFunc()
