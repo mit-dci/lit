@@ -5,9 +5,10 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"strings"
+
+	. "github.com/mit-dci/lit/logs"
 
 	"github.com/howeyc/gopass"
 	"golang.org/x/crypto/nacl/secretbox"
@@ -35,12 +36,12 @@ func LoadKeyFromFileInteractive(filename string) (*[32]byte, error) {
 	if a.Size() < 80 { // there can't be a password...
 		return LoadKeyFromFileArg(filename, nil)
 	}
-	log.Printf("passphrase: ")
+	fmt.Printf("passphrase: ")
 	pass, err := gopass.GetPasswd()
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("\n")
+	fmt.Printf("\n")
 	return LoadKeyFromFileArg(filename, pass)
 }
 
@@ -59,9 +60,9 @@ func LoadKeyFromFileArg(filename string, pass []byte) (*[32]byte, error) {
 	}
 
 	if len(enckey) == 32 { // UNencrypted key, length 32
-		log.Printf("WARNING!! Key file not encrypted!!\n")
-		log.Printf("Anyone who can read the key file can take everything!\n")
-		log.Printf("You should start over and use a good passphrase!\n")
+		Log.Warnf("WARNING!! Key file not encrypted!!\n")
+		Log.Warnf("Anyone who can read the key file can take everything!\n")
+		Log.Warnf("You should start over and use a good passphrase!\n")
 		copy(priv32[:], enckey[:])
 		return priv32, nil
 	}
@@ -101,12 +102,12 @@ func SaveKeyToFileInteractive(filename string, priv32 *[32]byte) error {
 	var err error
 	var pass1, pass2 []byte
 	for match != true {
-		log.Printf("passphrase: ")
+		fmt.Printf("passphrase: ")
 		pass1, err = gopass.GetPasswd()
 		if err != nil {
 			return err
 		}
-		log.Printf("repeat passphrase: ")
+		fmt.Printf("repeat passphrase: ")
 		pass2, err = gopass.GetPasswd()
 		if err != nil {
 			return err
@@ -114,10 +115,10 @@ func SaveKeyToFileInteractive(filename string, priv32 *[32]byte) error {
 		if string(pass1) == string(pass2) {
 			match = true
 		} else {
-			log.Printf("user input error.  Try again gl hf dd.\n")
+			fmt.Printf("user input error.  Try again gl hf dd.\n")
 		}
 	}
-	log.Printf("\n")
+	fmt.Printf("\n")
 	return SaveKeyToFileArg(filename, priv32, pass1)
 }
 
@@ -130,10 +131,10 @@ func SaveKeyToFileArg(filename string, priv32 *[32]byte, pass []byte) error {
 		if err != nil {
 			return err
 		}
-		log.Printf("WARNING!! Key file not encrypted!!\n")
-		log.Printf("Anyone who can read the key file can take everything!\n")
-		log.Printf("You should start over and use a good passphrase!\n")
-		log.Printf("Saved unencrypted key at %s\n", filename)
+		Log.Warnf("WARNING!! Key file not encrypted!!\n")
+		Log.Warnf("Anyone who can read the key file can take everything!\n")
+		Log.Warnf("You should start over and use a good passphrase!\n")
+		Log.Warnf("Saved unencrypted key at %s\n", filename)
 		return nil
 	}
 
@@ -160,7 +161,7 @@ func SaveKeyToFileArg(filename string, priv32 *[32]byte, pass []byte) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("Wrote encrypted key to %s\n", filename)
+	Log.Infof("Wrote encrypted key to %s\n", filename)
 	return nil
 }
 
@@ -173,7 +174,7 @@ func ReadKeyFile(filename string) (*[32]byte, error) {
 	if err != nil {
 		if os.IsNotExist(err) {
 			// no key found, generate and save one
-			log.Printf("No file %s, generating.\n", filename)
+			Log.Infof("No file %s, generating.\n", filename)
 
 			_, err := rand.Read(key32[:])
 			if err != nil {
@@ -186,7 +187,7 @@ func ReadKeyFile(filename string) (*[32]byte, error) {
 			}
 		} else {
 			// unknown error, crash
-			log.Printf("unknown\n")
+			Log.Errorf("unknown error reading keyfile\n")
 			return nil, err
 		}
 	}

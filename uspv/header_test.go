@@ -6,7 +6,7 @@ import (
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/coinparam"
-	"log"
+	."github.com/mit-dci/lit/logs"
 	"testing"
 	"time"
 )
@@ -87,9 +87,9 @@ func TestMoreWork(t *testing.T) {
 	// WOrk of B: 1167945961455
 
 	if moreWork(a, b, p) {
-		log.Println("Test failed!!")
+		Log.Error("Test failed!!")
 		t.Fatal()
 	} else {
-		log.Println("Test Passed!")
+		Log.Info("Test Passed!")
 	}
 }

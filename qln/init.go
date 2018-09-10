@@ -2,8 +2,9 @@ package qln
 
 import (
 	"fmt"
-	"log"
 	"path/filepath"
+
+	. "github.com/mit-dci/lit/logs"
 
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/btcutil"
@@ -123,7 +124,7 @@ func (nd *LitNode) LinkBaseWallet(
 		rootpriv, birthHeight, resync, host, nd.LitFolder, proxy, param)
 
 	if err != nil {
-		log.Println(err)
+		Log.Error(err)
 		return nil
 	}
 
@@ -144,7 +145,7 @@ func (nd *LitNode) LinkBaseWallet(
 		copy(pkh[:], pkhSlice)
 		nd.SubWallet[WallitIdx].ExportHook().RegisterAddress(pkh)
 
-		log.Printf("Registering outpoint %v", qChan.PorTxo.Op)
+		Log.Infof("Registering outpoint %v", qChan.PorTxo.Op)
 
 		nd.SubWallet[WallitIdx].WatchThis(qChan.PorTxo.Op)
 	}

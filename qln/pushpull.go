@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"log"
 	"time"
+
+	. "github.com/mit-dci/lit/logs"
 
 	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
@@ -92,13 +93,13 @@ func (nd *LitNode) ReSendMsg(qc *Qchan) error {
 
 	// DeltaSig
 	if qc.State.Delta < 0 {
-		log.Printf("Sending previously sent DeltaSig\n")
+		Log.Infof("Sending previously sent DeltaSig\n")
 		return nd.SendDeltaSig(qc)
 	}
 
 	// SigRev
 	if qc.State.Delta > 0 {
-		log.Printf("Sending previously sent SigRev\n")
+		Log.Infof("Sending previously sent SigRev\n")
 		return nd.SendSigRev(qc)
 	}
 
@@ -192,7 +193,7 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	}
 
 	qc.State.Data = data
-	log.Printf("Sending message %x", data)
+	Log.Infof("Sending message %x", data)
 
 	qc.State.Delta = int32(-amt)
 
@@ -210,7 +211,7 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	}
 	// move unlock to here so that delta is saved before
 
-	log.Printf("PushChannel: Sending DeltaSig")
+	Log.Infof("PushChannel: Sending DeltaSig")
 
 	err = nd.SendDeltaSig(qc)
 	if err != nil {
@@ -220,9 +221,9 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 		return err
 	}
 
-	log.Printf("PushChannel: Done: sent DeltaSig")
+	Log.Infof("PushChannel: Done: sent DeltaSig")
 
-	log.Printf("got pre CTS... \n")
+	Log.Infof("got pre CTS... \n")
 	// block until clear to send is full again
 	qc.ChanMtx.Unlock()
 
@@ -237,7 +238,7 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 		}
 	}
 
-	log.Printf("got post CTS... \n")
+	Log.Infof("got post CTS... \n")
 	// since we cleared with that statement, fill it again before returning
 	qc.ClearToSend <- true
 	qc.ChanMtx.Unlock()
@@ -268,7 +269,7 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 
 	outMsg := lnutil.NewDeltaSigMsg(q.Peer(), q.Op, -q.State.Delta, sig, HTLCSigs, q.State.Data)
 
-	log.Printf("Sending DeltaSig: %v", outMsg)
+	Log.Infof("Sending DeltaSig: %v", outMsg)
 
 	nd.OmniOut <- outMsg
 
@@ -279,7 +280,7 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 // or a GapSigRev (if there's a collision)
 // Leaves the channel either expecting a Rev (normally) or a GapSigRev (collision)
 func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
-	log.Printf("Got DeltaSig: %v", msg)
+	Log.Infof("Got DeltaSig: %v", msg)
 
 	var collision bool
 	//incomingDelta := uint32(math.Abs(float64(msg.Delta))) //int32 (may be negative, but should not be)
@@ -294,7 +295,7 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 		collision = true
 	}
 
-	log.Printf("COLLISION is (%t)\n", collision)
+	Log.Infof("COLLISION is (%t)\n", collision)
 
 	// load state from disk
 	err := nd.ReloadQchanState(qc)
@@ -356,7 +357,7 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 			// incoming delta saved as collision value,
 			// existing (negative) delta value retained.
 			qc.State.Collision = int32(incomingDelta)
-			log.Printf("delta sig COLLISION (%d)\n", qc.State.Collision)
+			Log.Infof("delta sig COLLISION (%d)\n", qc.State.Collision)
 		}
 	}
 	// detect if channel is already locked, and lock if not
@@ -374,7 +375,7 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 	//	}
 
 	if qc.State.Delta > 0 {
-		log.Printf(
+		Log.Infof(
 			"DeltaSigHandler err: chan %d delta %d, expect rev, send empty rev",
 			qc.Idx(), qc.State.Delta)
 
@@ -423,7 +424,7 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 	// regardless of collision, raise amt
 	qc.State.MyAmt += int64(incomingDelta)
 
-	log.Printf("Got message %x", msg.Data)
+	Log.Infof("Got message %x", msg.Data)
 	qc.State.Data = msg.Data
 
 	// verify sig for the next state. only save if this works
@@ -521,7 +522,7 @@ func (nd *LitNode) SendGapSigRev(q *Qchan) error {
 
 	outMsg := lnutil.NewGapSigRev(q.KeyGen.Step[3]&0x7fffffff, q.Op, sig, *elk, n2ElkPoint, HTLCSigs, q.State.MyN2HTLCBase)
 
-	log.Printf("Sending GapSigRev: %v", outMsg)
+	Log.Infof("Sending GapSigRev: %v", outMsg)
 
 	nd.OmniOut <- outMsg
 
@@ -558,7 +559,7 @@ func (nd *LitNode) SendSigRev(q *Qchan) error {
 
 	outMsg := lnutil.NewSigRev(q.KeyGen.Step[3]&0x7fffffff, q.Op, sig, *elk, n2ElkPoint, HTLCSigs, q.State.MyN2HTLCBase)
 
-	log.Printf("Sending SigRev: %v", outMsg)
+	Log.Infof("Sending SigRev: %v", outMsg)
 
 	nd.OmniOut <- outMsg
 	return nil
@@ -567,7 +568,7 @@ func (nd *LitNode) SendSigRev(q *Qchan) error {
 // GapSigRevHandler takes in a GapSigRev, responds with a Rev, and
 // leaves the channel in a state expecting a Rev.
 func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
-	log.Printf("Got GapSigRev: %v", msg)
+	Log.Infof("Got GapSigRev: %v", msg)
 
 	// load qchan & state from DB
 	err := nd.ReloadQchanState(q)
@@ -671,7 +672,7 @@ func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
 
 	err = nd.BuildJusticeSig(q)
 	if err != nil {
-		log.Printf("GapSigRevHandler BuildJusticeSig err %s", err.Error())
+		Log.Infof("GapSigRevHandler BuildJusticeSig err %s", err.Error())
 	}
 
 	return nil
@@ -680,7 +681,7 @@ func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
 // SIGREVHandler takes in a SIGREV and responds with a REV (if everything goes OK)
 // Leaves the channel in a clear / rest state.
 func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
-	log.Printf("Got SigRev: %v", msg)
+	Log.Infof("Got SigRev: %v", msg)
 
 	// load qchan & state from DB
 	err := nd.ReloadQchanState(qc)
@@ -813,7 +814,7 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 		return fmt.Errorf("SIGREVHandler err %s", err.Error())
 	}
 
-	log.Printf("SIGREV OK, state %d, will send REV\n", qc.State.StateIdx)
+	Log.Infof("SIGREV OK, state %d, will send REV\n", qc.State.StateIdx)
 	err = nd.SendREV(qc)
 	if err != nil {
 		return fmt.Errorf("SIGREVHandler err %s", err.Error())
@@ -839,7 +840,7 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 
 	err = nd.BuildJusticeSig(qc)
 	if err != nil {
-		log.Printf("SigRevHandler BuildJusticeSig err %s", err.Error())
+		Log.Infof("SigRevHandler BuildJusticeSig err %s", err.Error())
 	}
 
 	// done updating channel, no new messages expected.  Set clear to send
@@ -863,7 +864,7 @@ func (nd *LitNode) SendREV(q *Qchan) error {
 
 	outMsg := lnutil.NewRevMsg(q.Peer(), q.Op, *elk, n2ElkPoint, q.State.MyN2HTLCBase)
 
-	log.Printf("Sending Rev: %v", outMsg)
+	Log.Infof("Sending Rev: %v", outMsg)
 
 	nd.OmniOut <- outMsg
 
@@ -874,7 +875,7 @@ func (nd *LitNode) SendREV(q *Qchan) error {
 // final message in the state update process and there is no response.
 // Leaves the channel in a clear / rest state.
 func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {
-	log.Printf("Got Rev: %v", msg)
+	Log.Infof("Got Rev: %v", msg)
 
 	// load qchan & state from DB
 	err := nd.ReloadQchanState(qc)
@@ -896,14 +897,14 @@ func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {
 	}
 	// maybe this is an unexpected rev, asking us for a rev repeat
 	if qc.State.Delta < 0 {
-		log.Printf("got Rev, expected SigRev.  Re-sending last REV.\n")
+		Log.Infof("got Rev, expected SigRev.  Re-sending last REV.\n")
 		return nd.SendREV(qc)
 	}
 
 	// verify elkrem
 	err = qc.AdvanceElkrem(&msg.Elk, msg.N2ElkPoint)
 	if err != nil {
-		log.Printf(" ! non-recoverable error, need to close the channel here.\n")
+		Log.Errorf(" ! non-recoverable error, need to close the channel here.\n")
 		return fmt.Errorf("REVHandler err %s", err.Error())
 	}
 	prevAmt := qc.State.MyAmt - int64(qc.State.Delta)
@@ -962,12 +963,12 @@ func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {
 	qc.State.MyAmt = prevAmt // use stashed previous state amount
 	err = nd.BuildJusticeSig(qc)
 	if err != nil {
-		log.Printf("RevHandler BuildJusticeSig err %s", err.Error())
+		Log.Errorf("RevHandler BuildJusticeSig err %s", err.Error())
 	}
 
 	// got rev, assert clear to send
 	qc.ClearToSend <- true
 
-	log.Printf("REV OK, state %d all clear.\n", qc.State.StateIdx)
+	Log.Infof("REV OK, state %d all clear.\n", qc.State.StateIdx)
 	return nil
 }

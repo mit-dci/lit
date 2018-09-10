@@ -3,7 +3,7 @@ package portxo
 import (
 	"bytes"
 	"fmt"
-	"log"
+	."github.com/mit-dci/lit/logs"
 
 	"github.com/mit-dci/lit/btcutil/chaincfg"
 	"github.com/mit-dci/lit/btcutil"
@@ -59,7 +59,7 @@ func (u *PorTxo) AddWIF(w btcutil.WIF) error {
 			return fmt.Errorf("pkh utxo script %d bytes (not 25)", len(u.PkScript))
 		}
 		if !bytes.Equal(adr.ScriptAddress(), u.PkScript[3:23]) {
-			log.Printf("utxopk:\t%x\nwifpk:\t%x\n",
+			Log.Errorf("utxopk:\t%x\nwifpk:\t%x\n",
 				u.PkScript[3:23], adr.ScriptAddress())
 			return fmt.Errorf("utxo and wif addresses don't match")
 		}
