@@ -26,6 +26,5 @@ if __name__ == '__main__':
         run_test(env)
     finally:
         if env is not None:
-            sys.exit(0)
             env.shutdown()
             print("LENGTH of open lits", len(env.lits))
