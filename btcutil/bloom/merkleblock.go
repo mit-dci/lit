@@ -5,10 +5,10 @@
 package bloom
 
 import (
-	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/blockchain"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/wire"
+	"github.com/mit-dci/lit/btcutil"
 )
 
 // merkleBlock is used to house intermediate information needed to generate a

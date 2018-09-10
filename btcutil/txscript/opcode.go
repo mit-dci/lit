@@ -14,9 +14,9 @@ import (
 
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
+	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/crypto/fastsha256"
 	"github.com/mit-dci/lit/crypto/ripemd160"
-	"github.com/mit-dci/lit/wire"
 )
 
 // An opcode defines the information related to a txscript opcode.  opfunc, if

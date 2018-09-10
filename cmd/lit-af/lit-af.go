@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	. "github.com/mit-dci/lit/logs"
+
 	"golang.org/x/net/websocket"
 
 	"github.com/chzyer/readline"
@@ -94,7 +96,7 @@ func main() {
 	//	url := "ws://127.0.0.1:8000/ws"
 	wsConn, err := websocket.Dial(urlString, "", origin)
 	if err != nil {
-		panic(err)
+		Log.Fatal(err)
 	}
 	defer wsConn.Close()
 
@@ -106,7 +108,7 @@ func main() {
 		AutoComplete: lc.NewAutoCompleter(),
 	})
 	if err != nil {
-		panic(err)
+		Log.Fatal(err)
 	}
 	defer rl.Close()
 	go lc.RequestAsync()
@@ -128,7 +130,7 @@ func main() {
 
 		err = lc.Shellparse(cmdslice)
 		if err != nil { // only error should be user exit
-			panic(err)
+			Log.Fatal(err)
 		}
 	}
 

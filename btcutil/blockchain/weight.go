@@ -7,8 +7,8 @@ package blockchain
 import (
 	"fmt"
 
-	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/txscript"
+	"github.com/mit-dci/lit/btcutil"
 )
 
 const (

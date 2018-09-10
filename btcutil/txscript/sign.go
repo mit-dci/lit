@@ -8,10 +8,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/btcutil/chaincfg"
 	"github.com/mit-dci/lit/wire"
+	"github.com/mit-dci/lit/btcutil"
 )
 
 // RawTxInWitnessSignature returns the serialized ECDA signature for the input
