@@ -13,4 +13,3 @@ echo '************************************************'
 
 chmod +x run_itests.py
 ./run_itests.py
-python3 run_itests.py
