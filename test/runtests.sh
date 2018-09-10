@@ -2,6 +2,8 @@
 
 datadir=_data
 
+set -x
+
 tests=$(cat tests.txt | grep -vE '^(#|$)' | sed 's/ *#.*//g')
 if [ "$#" -gt 0 ]; then
 	tests=$@
@@ -22,6 +24,8 @@ ign=0
 export EXIT_REQED=0
 export TEST_PID=-1
 
+sleep 1
+
 function killcurrentandexit () {
 	echo 'testpid!' $TEST_PID
 	export EXIT_REQED=1
@@ -29,12 +33,16 @@ function killcurrentandexit () {
 
 trap killcurrentandexit INT
 
+echo 'Umask:' $(umask -S)
+
 for t in $tests; do
 
 	if [ "$EXIT_REQED" == "1" ]; then
 		ign=$(($ign + 1))
 		continue
 	fi
+
+	sleep 1
 
 	echo "Running test: $t"
 	echo '===='
@@ -48,6 +56,9 @@ for t in $tests; do
 		continue
 	fi
 
+	sleep 1
+
+	ls -l . $datadir
 	mkdir -p $tdata
 	env LIT_ITEST_ROOT=$(realpath $tdata) ./itest_$t.py & export TEST_PID=$!
 	wait $TEST_PID
@@ -58,6 +69,8 @@ for t in $tests; do
 		fail=$(($fail + 1))
 		continue
 	fi
+
+	sleep 1
 
 	echo -e "\n===="
 	echo "Compeleted: $t"
