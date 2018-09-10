@@ -202,13 +202,13 @@ class BitcoinNode():
 
 class TestEnv():
     def __init__(self, litcnt):
-        logger.info("starting nodes...")
+        print("starting nodes...")
         self.bitcoind = BitcoinNode()
         self.lits = []
         for i in range(litcnt):
             node = LitNode(self.bitcoind)
             self.lits.append(node)
-        logger.info("started nodes!  syncing...")
+        print("started nodes!  syncing...")
 
         time.sleep(0.1)
 
@@ -218,7 +218,7 @@ class TestEnv():
         except Exception as e:
             logger.warning("probem syncing nodes, exiting (" + str(e) + ")")
             self.shutdown()
-        logger.info("nodes synced!")
+        print("nodes synced!")
 
     def get_height(self):
         return self.bitcoind.rpc.getblockchaininfo()['blocks']

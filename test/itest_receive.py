@@ -3,7 +3,6 @@
 import testlib
 
 def run_test(env):
-    print("RUNNING RECEIVE")
     bc = env.bitcoind
     lit = env.lits[0]
 
@@ -11,6 +10,7 @@ def run_test(env):
     addr = lit.make_new_addr()
     print('Got address:', addr)
 
+    print(bc.rpc.getblockchaininfo())
     # Send a bitcoin.
     bc.rpc.sendtoaddress(addr, 1)
     env.generate_block()
