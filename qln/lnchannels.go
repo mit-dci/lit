@@ -3,11 +3,11 @@ package qln
 import (
 	"bytes"
 	"fmt"
-	."github.com/mit-dci/lit/logs"
 	"sync"
 
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/portxo"
 
 	"github.com/mit-dci/lit/btcutil/btcec"
@@ -141,30 +141,30 @@ type QCloseData struct {
 // ChannelInfo prints info about a channel.
 func (nd *LitNode) QchanInfo(q *Qchan) error {
 	// display txid instead of outpoint because easier to copy/paste
-	Log.Infof("CHANNEL %s h:%d %s cap: %d\n",
+	logging.Infof("CHANNEL %s h:%d %s cap: %d\n",
 		q.Op.String(), q.Height, q.KeyGen.String(), q.Value)
-	Log.Infof("\tPUB mine:%x them:%x REFBASE mine:%x them:%x BASE mine:%x them:%x\n",
+	logging.Infof("\tPUB mine:%x them:%x REFBASE mine:%x them:%x BASE mine:%x them:%x\n",
 		q.MyPub[:4], q.TheirPub[:4], q.MyRefundPub[:4], q.TheirRefundPub[:4],
 		q.MyHAKDBase[:4], q.TheirHAKDBase[:4])
 	if q.State == nil || q.ElkRcv == nil {
-		Log.Errorf("\t no valid state or elkrem\n")
+		logging.Errorf("\t no valid state or elkrem\n")
 	} else {
-		Log.Infof("\ta %d (them %d) state index %d\n",
+		logging.Infof("\ta %d (them %d) state index %d\n",
 			q.State.MyAmt, q.Value-q.State.MyAmt, q.State.StateIdx)
 
-		Log.Infof("\tdelta:%d HAKD:%x elk@ %d\n",
+		logging.Infof("\tdelta:%d HAKD:%x elk@ %d\n",
 			q.State.Delta, q.State.ElkPoint[:4], q.ElkRcv.UpTo())
 		elkp, _ := q.ElkPoint(false, q.State.StateIdx)
 		myRefPub := lnutil.AddPubsEZ(q.MyRefundPub, elkp)
 		theirRefPub := lnutil.AddPubsEZ(q.TheirRefundPub, q.State.ElkPoint)
-		Log.Infof("\tMy Refund: %x Their Refund %x\n", myRefPub[:4], theirRefPub[:4])
+		logging.Infof("\tMy Refund: %x Their Refund %x\n", myRefPub[:4], theirRefPub[:4])
 	}
 
 	if !q.CloseData.Closed { // still open, finish here
 		return nil
 	}
 
-	Log.Infof("\tCLOSED at height %d by tx: %s\n",
+	logging.Infof("\tCLOSED at height %d by tx: %s\n",
 		q.CloseData.CloseHeight, q.CloseData.CloseTxid.String())
 	//	clTx, err := t.GetTx(&q.CloseData.CloseTxid)
 	//	if err != nil {
@@ -176,16 +176,16 @@ func (nd *LitNode) QchanInfo(q *Qchan) error {
 	//	}
 
 	//	if len(ctxos) == 0 {
-	//		Log.Infof("\tcooperative close.\n")
+	//		logging.Infof("\tcooperative close.\n")
 	//		return nil
 	//	}
 
-	//	Log.Infof("\tClose resulted in %d spendable txos\n", len(ctxos))
+	//	logging.Infof("\tClose resulted in %d spendable txos\n", len(ctxos))
 	//	if len(ctxos) == 2 {
-	//		Log.Infof("\t\tINVALID CLOSE!!!11\n")
+	//		logging.Infof("\t\tINVALID CLOSE!!!11\n")
 	//	}
 	//	for i, u := range ctxos {
-	//		Log.Infof("\t\t%d) amt: %d spendable: %d\n", i, u.Value, u.Seq)
+	//		logging.Infof("\t\t%d) amt: %d spendable: %d\n", i, u.Value, u.Seq)
 	//	}
 	return nil
 }

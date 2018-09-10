@@ -23,7 +23,7 @@
 //  import (
 //          "flag"
 //          "fmt"
-//          ."github.com/mit-dci/lit/logs"
+//          "github.com/mit-dci/lit/logging"
 //
 //          "github.com/mit-dci/lit/btcutil"
 //          "github.com/mit-dci/lit/btcutil/chaincfg"
@@ -48,7 +48,7 @@
 //          pubKeyHash := make([]byte, 20)
 //          addr, err := btcutil.NewAddressPubKeyHash(pubKeyHash, chainParams)
 //          if err != nil {
-//                  Log.Fatal(err)
+//                  logging.Fatal(err)
 //          }
 //          fmt.Println(addr)
 //  }

@@ -95,11 +95,11 @@ type IdxSig struct {
 
 /*
 func (w *WatchTower) HandleMessage(msg lnutil.LitMsg) error {
-	Log.Infof("got message from %x\n", msg.Peer())
+	logging.Infof("got message from %x\n", msg.Peer())
 
 	switch msg.MsgType() {
 	case lnutil.MSGID_WATCH_DESC:
-		Log.Infof("new channel to watch\n")
+		logging.Infof("new channel to watch\n")
 		message, ok := msg.(lnutil.WatchDescMsg)
 		if !ok {
 			return fmt.Errorf("didn't work")
@@ -108,7 +108,7 @@ func (w *WatchTower) HandleMessage(msg lnutil.LitMsg) error {
 		}
 
 	case lnutil.MSGID_WATCH_STATEMSG:
-		Log.Infof("new commsg\n")
+		logging.Infof("new commsg\n")
 		message, ok := msg.(lnutil.WatchStateMsg)
 		if !ok {
 			return fmt.Errorf("didn't work")
@@ -117,10 +117,10 @@ func (w *WatchTower) HandleMessage(msg lnutil.LitMsg) error {
 		}
 
 	case lnutil.MSGID_WATCH_DELETE:
-		Log.Infof("delete message\n")
+		logging.Infof("delete message\n")
 		// delete not yet implemented
 	default:
-		Log.Infof("unknown message type %x\n", msg.MsgType())
+		logging.Infof("unknown message type %x\n", msg.MsgType())
 	}
 	return nil
 }

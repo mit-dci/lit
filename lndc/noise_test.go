@@ -4,13 +4,12 @@ import (
 	"bytes"
 	"encoding/hex"
 	"io"
-	"log"
 	"math"
 	"net"
 	"sync"
 	"testing"
 
-	. "github.com/mit-dci/lit/logs"
+	"github.com/mit-dci/lit/logging"
 
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/lnutil"
@@ -61,13 +60,13 @@ func establishTestConnection(wrong bool) (net.Conn, net.Conn, func(), error) {
 	// successful.
 	if wrong {
 		pkh = "ln1p7lhcxmlfgd5mltv6pc335aulv443tkw49q6er"
-		Log.Error("Trying to connect to wrong pk hash:", pkh)
+		logging.Error("Trying to connect to wrong pk hash:", pkh)
 	}
 	remoteConnChan := make(chan maybeNetConn, 1)
 	go func() {
 		remoteConn, err := Dial(remotePriv, netAddr, pkh, net.Dial)
 		if err != nil {
-			Log.Error(err)
+			logging.Error(err)
 		}
 		remoteConnChan <- maybeNetConn{remoteConn, err}
 	}()

@@ -5,7 +5,7 @@ import (
 	"os"
 	"time"
 
-	. "github.com/mit-dci/lit/logs"
+	"github.com/mit-dci/lit/logging"
 
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/litrpc"
@@ -64,7 +64,7 @@ var (
 	defaultAutoListenPort        = ":2448"
 	defaultAutoReconnectInterval = int64(60)
 	defaultUpnPFlag              = false
-	defaultLogLevel              = 4
+	defaultLogLevel              = 3
 )
 
 func fileExists(name string) bool {
@@ -176,13 +176,13 @@ func main() {
 	// give node and below file pathof lit home directory
 	node, err := qln.NewLitNode(key, conf.LitHomeDir, conf.TrackerURL, conf.LitProxyURL, conf.Nat)
 	if err != nil {
-		Log.Fatal(err)
+		logging.Fatal(err)
 	}
 
 	// node is up; link wallets based on args
 	err = linkWallets(node, key, &conf)
 	if err != nil {
-		Log.Fatal(err)
+		logging.Fatal(err)
 	}
 
 	rpcl := new(litrpc.LitRPC)
@@ -196,7 +196,7 @@ func main() {
 	}
 
 	<-rpcl.OffButton
-	Log.Infof("Got stop request\n")
+	logging.Infof("Got stop request\n")
 	time.Sleep(time.Second)
 
 	return

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	. "github.com/mit-dci/lit/logs"
+	"github.com/mit-dci/lit/logging"
 
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/btcutil"
@@ -124,7 +124,7 @@ func (nd *LitNode) LinkBaseWallet(
 		rootpriv, birthHeight, resync, host, nd.LitFolder, proxy, param)
 
 	if err != nil {
-		Log.Error(err)
+		logging.Error(err)
 		return nil
 	}
 
@@ -145,7 +145,7 @@ func (nd *LitNode) LinkBaseWallet(
 		copy(pkh[:], pkhSlice)
 		nd.SubWallet[WallitIdx].ExportHook().RegisterAddress(pkh)
 
-		Log.Infof("Registering outpoint %v", qChan.PorTxo.Op)
+		logging.Infof("Registering outpoint %v", qChan.PorTxo.Op)
 
 		nd.SubWallet[WallitIdx].WatchThis(qChan.PorTxo.Op)
 	}

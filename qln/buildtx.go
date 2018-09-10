@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
-	. "github.com/mit-dci/lit/logs"
+	"github.com/mit-dci/lit/logging"
 
 	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/consts"
@@ -32,7 +32,7 @@ func GetStateIdxFromTx(tx *wire.MsgTx, x uint64) uint64 {
 	}
 	// check that indicating high bytes are correct.  If not, return 0
 	if tx.TxIn[0].Sequence>>24 != 0xff || tx.LockTime>>24 != 0x21 {
-		//		Log.Infof("sequence byte %x, locktime byte %x\n",
+		//		logging.Infof("sequence byte %x, locktime byte %x\n",
 		//			tx.TxIn[0].Sequence>>24, tx.LockTime>>24 != 0x21)
 		return 0
 	}
@@ -153,7 +153,7 @@ func (q *Qchan) BuildStateTxs(mine bool) (*wire.MsgTx, []*wire.MsgTx, []*wire.Tx
 
 	theirAmt = value - s.MyAmt
 
-	Log.Infof("Value: %d, MyAmt: %d, TheirAmt: %d", value, s.MyAmt, theirAmt)
+	logging.Infof("Value: %d, MyAmt: %d, TheirAmt: %d", value, s.MyAmt, theirAmt)
 
 	// the PKH clear refund also has elkrem points added to mask the PKH.
 	// this changes the txouts at each state to blind sorcerer better.
@@ -188,13 +188,13 @@ func (q *Qchan) BuildStateTxs(mine bool) (*wire.MsgTx, []*wire.MsgTx, []*wire.Tx
 	fancyScript := lnutil.CommitScript(revPub, timePub, q.Delay)
 	pkhScript := lnutil.DirectWPKHScript(pkhPub) // p2wpkh-ify
 
-	Log.Infof("> made SH script, state %d\n", s.StateIdx)
-	Log.Infof("\t revPub %x timeout pub %x \n", revPub, timePub)
-	Log.Infof("\t script %x ", fancyScript)
+	logging.Infof("> made SH script, state %d\n", s.StateIdx)
+	logging.Infof("\t revPub %x timeout pub %x \n", revPub, timePub)
+	logging.Infof("\t script %x ", fancyScript)
 
 	fancyScript = lnutil.P2WSHify(fancyScript) // p2wsh-ify
 
-	Log.Infof("\t scripthash %x\n", fancyScript)
+	logging.Infof("\t scripthash %x\n", fancyScript)
 
 	// create txouts by assigning amounts
 	outFancy := wire.NewTxOut(fancyAmt, fancyScript)
@@ -372,7 +372,7 @@ func (q *Qchan) GenHTLCScriptWithElkPointsAndRevPub(h HTLC, mine bool, theirElkP
 			remotePub, h.RHash, localPub, h.Locktime)
 	}
 
-	Log.Infof("HTLC %d, script: %x, myBase: %x, theirBase: %x, Incoming: %t, Amt: %d, RHash: %x",
+	logging.Infof("HTLC %d, script: %x, myBase: %x, theirBase: %x, Incoming: %t, Amt: %d, RHash: %x",
 		h.Idx, HTLCScript, h.MyHTLCBase, h.TheirHTLCBase, h.Incoming, h.Amt, h.RHash)
 
 	return HTLCScript, nil
@@ -442,7 +442,7 @@ func (q *Qchan) GetKeysFromState(mine bool) (revPub, timePub, pkhPub [33]byte, e
 
 	} else { // build THEIR tx (to sign)
 		// Their tx that they store.  I get funds PKH.  SH is theirs eventually.
-		Log.Infof("using elkpoint %x\n", q.State.ElkPoint)
+		logging.Infof("using elkpoint %x\n", q.State.ElkPoint)
 		// SH pubkeys are our base points plus the received elk point
 		revPub = lnutil.CombinePubs(q.MyHAKDBase, q.State.ElkPoint)
 		timePub = lnutil.AddPubsEZ(q.TheirHAKDBase, q.State.ElkPoint)

@@ -12,7 +12,7 @@ import (
 	"math/big"
 	"os"
 
-	. "github.com/mit-dci/lit/logs"
+	"github.com/mit-dci/lit/logging"
 
 	"github.com/mit-dci/lit/btcutil/blockchain"
 
@@ -54,11 +54,11 @@ func moreWork(a, b []*wire.BlockHeader, p *coinparam.Params) bool {
 			workA.Add(blockchain.CalcWork(a1[0].Bits), workA)
 		}
 		for i := 0; i < len(b1); i++ {
-			//Log.Info(i)
+			//logging.Info(i)
 			workB.Add(blockchain.CalcWork(b1[i].Bits), workB)
 		}
-		Log.Info("Work done by alt chains A and B are: ")
-		Log.Info(workA, workB)
+		logging.Info("Work done by alt chains A and B are: ")
+		logging.Info(workA, workB)
 		// due to cmp's stquirks in big, we can't return directly
 		if workA.Cmp(workB) > 0 { // if chain A does more work than B return true
 			return isMoreWork // true
@@ -75,12 +75,12 @@ func checkProofOfWork(header wire.BlockHeader, p *coinparam.Params, height int32
 
 	// The target must more than 0.  Why can you even encode negative...
 	if target.Sign() <= 0 {
-		Log.Errorf("block target %064x is neagtive(??)\n", target.Bytes())
+		logging.Errorf("block target %064x is neagtive(??)\n", target.Bytes())
 		return false
 	}
 	// The target must be less than the maximum allowed (difficulty 1)
 	if target.Cmp(p.PowLimit) > 0 {
-		Log.Errorf("block target %064x is "+
+		logging.Errorf("block target %064x is "+
 			"higher than max of %064x", target, p.PowLimit.Bytes())
 		return false
 	}
@@ -95,7 +95,7 @@ func checkProofOfWork(header wire.BlockHeader, p *coinparam.Params, height int32
 
 	hashNum = blockchain.HashToBig(&blockHash)
 	if hashNum.Cmp(target) > 0 {
-		Log.Errorf("block hash %064x is higher than "+
+		logging.Errorf("block hash %064x is higher than "+
 			"required target of %064x", hashNum, target)
 		return false
 	}
@@ -113,14 +113,14 @@ func (s *SPVCon) GetHeaderAtHeight(h int32) (*wire.BlockHeader, error) {
 	// seek to that header
 	_, err := s.headerFile.Seek(int64(80*h), os.SEEK_SET)
 	if err != nil {
-		Log.Error(err)
+		logging.Error(err)
 		return nil, err
 	}
 
 	hdr := new(wire.BlockHeader)
 	err = hdr.Deserialize(s.headerFile)
 	if err != nil {
-		Log.Error(err)
+		logging.Error(err)
 		return nil, err
 	}
 	return hdr, nil
@@ -132,14 +132,14 @@ func (s *SPVCon) GetHeaderTipHeight() int32 {
 	defer s.headerMutex.Unlock()
 	info, err := s.headerFile.Stat()
 	if err != nil {
-		Log.Errorf("Header file error: %s", err.Error())
+		logging.Errorf("Header file error: %s", err.Error())
 		return 0
 	}
 	headerFileSize := info.Size()
 	if headerFileSize == 0 || headerFileSize%80 != 0 { // header file broken
 		// try to fix it!
 		s.headerFile.Truncate(headerFileSize - (headerFileSize % 80))
-		Log.Errorf("ERROR: Header file not a multiple of 80 bytes. Truncating")
+		logging.Errorf("ERROR: Header file not a multiple of 80 bytes. Truncating")
 	}
 	// subtract 1 as we want the start of the tip offset, not the end
 	return int32(headerFileSize/80) + s.Param.StartHeight - 1
@@ -154,19 +154,19 @@ func FindHeader(r io.ReadSeeker, hdr wire.BlockHeader) (int32, error) {
 	for tries := 1; tries < 2200; tries++ {
 		offset, err := r.Seek(int64(-80*tries), os.SEEK_END)
 		if err != nil {
-			Log.Error(err)
+			logging.Error(err)
 			return -1, err
 		}
 
 		//	for blkhash.IsEqual(&target) {
 		err = cur.Deserialize(r)
 		if err != nil {
-			Log.Error(err)
+			logging.Error(err)
 			return -1, err
 		}
 		curhash := cur.BlockHash()
 
-		//		Log.Infof("try %d %s\n", tries, curhash.String())
+		//		logging.Infof("try %d %s\n", tries, curhash.String())
 
 		if hdr.PrevBlock.IsEqual(&curhash) {
 			return int32(offset / 80), nil
@@ -226,10 +226,10 @@ func CheckHeaderChain(
 	// seek to start of last header
 	pos, err := r.Seek(-80, os.SEEK_END)
 	if err != nil {
-		Log.Error(err)
+		logging.Error(err)
 		return 0, err
 	}
-	Log.Infof("header file position: %d\n", pos)
+	logging.Infof("header file position: %d\n", pos)
 	if pos%80 != 0 {
 		return 0, fmt.Errorf(
 			"CheckHeaderChain: Header file not a multiple of 80 bytes.")
@@ -255,14 +255,14 @@ func CheckHeaderChain(
 
 	// weird off-by-1 stuff here; makes numheaders, incluing the 0th
 	oldHeaders := make([]*wire.BlockHeader, numheaders)
-	Log.Infof("made %d header slice\n", len(oldHeaders))
+	logging.Infof("made %d header slice\n", len(oldHeaders))
 	// load a bunch of headers from disk into ram
 	for i := range oldHeaders {
 		// read from file at current offset
 		oldHeaders[i] = new(wire.BlockHeader)
 		err = oldHeaders[i].Deserialize(r)
 		if err != nil {
-			Log.Errorf("CheckHeaderChain ran out of file at oldheader %d\n", i)
+			logging.Errorf("CheckHeaderChain ran out of file at oldheader %d\n", i)
 			return 0, err
 		}
 	}
@@ -284,7 +284,7 @@ func CheckHeaderChain(
 		// adjust attachHeight by adding the startheight
 		attachHeight += p.StartHeight
 
-		Log.Infof("Header %s attaches at height %d\n",
+		logging.Infof("Header %s attaches at height %d\n",
 			inHeaders[0].BlockHash().String(), attachHeight)
 
 		// if we've been given insufficient headers, don't reorg, but
@@ -307,7 +307,7 @@ func CheckHeaderChain(
 				attachHeight+int32(len(inHeaders)), height-1)
 		}
 
-		Log.Infof("reorg from height %d to %d",
+		logging.Infof("reorg from height %d to %d",
 			height-1, attachHeight+int32(len(inHeaders)))
 
 		// reorg is go, snip to attach height
@@ -323,14 +323,14 @@ func CheckHeaderChain(
 		if height+int32(i) > p.AssumeDiffBefore {
 			// check if there's a valid proof of work.  That whole "Bitcoin" thing.
 			if !checkProofOfWork(*hdr, p, height+int32(i)) {
-				Log.Error("header in message has bad proof of work")
+				logging.Error("header in message has bad proof of work")
 				return 0, fmt.Errorf("header %d in message has bad proof of work", i)
 			}
 			// build slice of "previous" headers
 			prevHeaders = append(prevHeaders, inHeaders[i])
 			rightBits, err := p.DiffCalcFunction(prevHeaders, height+int32(i), p)
 			if err != nil {
-				Log.Error(err)
+				logging.Error(err)
 				return 0, fmt.Errorf("Error calculating Block %d %s difficulty. %s",
 					int(height)+i, hdr.BlockHash().String(), err.Error())
 			}

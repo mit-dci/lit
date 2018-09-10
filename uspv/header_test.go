@@ -3,12 +3,13 @@ package uspv
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
-	"github.com/mit-dci/lit/wire"
-	"github.com/mit-dci/lit/coinparam"
-	."github.com/mit-dci/lit/logs"
 	"testing"
 	"time"
+
+	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
+	"github.com/mit-dci/lit/coinparam"
+	"github.com/mit-dci/lit/logging"
+	"github.com/mit-dci/lit/wire"
 )
 
 func randomHex(n int) string {
@@ -87,9 +88,9 @@ func TestMoreWork(t *testing.T) {
 	// WOrk of B: 1167945961455
 
 	if moreWork(a, b, p) {
-		Log.Error("Test failed!!")
+		logging.Error("Test failed!!")
 		t.Fatal()
 	} else {
-		Log.Info("Test Passed!")
+		logging.Info("Test Passed!")
 	}
 }

@@ -3,10 +3,12 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"path/filepath"
 
-	. "github.com/mit-dci/lit/logs"
+	"github.com/mit-dci/lit/logging"
 
 	"github.com/jessevdk/go-flags"
 	"github.com/mit-dci/lit/lnutil"
@@ -49,7 +51,7 @@ func litSetup(conf *config) *[32]byte {
 	preParser := newConfigParser(&preconf, flags.HelpFlag)
 	_, err := preParser.ParseArgs(os.Args)
 	if err != nil {
-		Log.Fatal(err)
+		logging.Fatal(err)
 	}
 
 	// Load config from file and parse
@@ -103,13 +105,13 @@ func litSetup(conf *config) *[32]byte {
 	logFile, err := os.OpenFile(logFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 
 	// Log Levels:
-	// 6: DebugLevel prints Panics, Fatals, Errors, Warnings, Infos and Debugs
-	// 5: InfoLevel  prints Panics, Fatals, Errors, Warnings and Info
-	// 4: WarnLevel  prints Panics, Fatals, Errors and Warnings
-	// 3: ErrorLevel prints Panics, Fatals and Errors
-	// 2: FatalLevel prints Panics, Fatals
-	// 1: PanicLevel prints Panics
-	// Default is level 4
+	// 5: DebugLevel prints Panics, Fatals, Errors, Warnings, Infos and Debugs
+	// 4: InfoLevel  prints Panics, Fatals, Errors, Warnings and Info
+	// 3: WarnLevel  prints Panics, Fatals, Errors and Warnings
+	// 2: ErrorLevel prints Panics, Fatals and Errors
+	// 1: FatalLevel prints Panics, Fatals
+	// 0: PanicLevel prints Panics
+	// Default is level 3
 	// Code for tagging logs:
 	// Debug -> Useful debugging information
 	// Info  -> Something noteworthy happened
@@ -117,12 +119,19 @@ func litSetup(conf *config) *[32]byte {
 	// Error -> Something failed but I'm not quitting
 	// Fatal -> Bye
 
-	SetupLogs(logFile, logFilePath, conf.LogLevel)
+	// TODO ... what's this do?
+	defer logFile.Close()
+
+	logging.SetLogLevel(conf.LogLevel)
+
+	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
+	logOutput := io.MultiWriter(os.Stdout, logFile)
+	log.SetOutput(logOutput)
 
 	// Allow node with no linked wallets, for testing.
 	// TODO Should update tests and disallow nodes without wallets later.
 	//	if conf.Tn3host == "" && conf.Lt4host == "" && conf.Reghost == "" {
-	//		Log.Fatal("error: no network specified; use -tn3, -reg, -lt4")
+	//		logging.Fatal("error: no network specified; use -tn3, -reg, -lt4")
 	//	}
 
 	// Keys: the litNode, and wallits, all get 32 byte keys.
@@ -134,7 +143,7 @@ func litSetup(conf *config) *[32]byte {
 	// read key file (generate if not found)
 	key, err := lnutil.ReadKeyFile(keyFilePath)
 	if err != nil {
-		Log.Fatal(err)
+		logging.Fatal(err)
 	}
 
 	return key

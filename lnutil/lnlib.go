@@ -3,7 +3,8 @@ package lnutil
 import (
 	"bytes"
 	"fmt"
-	."github.com/mit-dci/lit/logs"
+
+	"github.com/mit-dci/lit/logging"
 
 	"github.com/mit-dci/lit/btcutil/txscript"
 	"github.com/mit-dci/lit/wire"
@@ -84,7 +85,7 @@ func FundTxOut(pubA, pubB [33]byte, amt int64) (*wire.TxOut, error) {
 }
 
 func ReceiveHTLCScript(revPKH [20]byte, remotePub [33]byte, RHash [32]byte, localPub [33]byte, locktime uint32) []byte {
-	Log.Infof("Generating receive HTLC with localPub [%x] and remotePub [%x]", localPub, remotePub)
+	logging.Infof("Generating receive HTLC with localPub [%x] and remotePub [%x]", localPub, remotePub)
 	b := txscript.NewScriptBuilder()
 
 	b.AddOp(txscript.OP_DUP)
@@ -122,7 +123,7 @@ func ReceiveHTLCScript(revPKH [20]byte, remotePub [33]byte, RHash [32]byte, loca
 }
 
 func OfferHTLCScript(revPKH [20]byte, remotePub [33]byte, RHash [32]byte, localPub [33]byte) []byte {
-	Log.Infof("Generating offer HTLC with localPub [%x] and remotePub [%x]", localPub, remotePub)
+	logging.Infof("Generating offer HTLC with localPub [%x] and remotePub [%x]", localPub, remotePub)
 	b := txscript.NewScriptBuilder()
 
 	b.AddOp(txscript.OP_DUP)

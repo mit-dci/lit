@@ -3,7 +3,7 @@ package uspv
 import (
 	"fmt"
 
-	. "github.com/mit-dci/lit/logs"
+	"github.com/mit-dci/lit/logging"
 
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/wire"
@@ -13,7 +13,7 @@ import (
 func MakeMerkleParent(left, right *chainhash.Hash) *chainhash.Hash {
 	// dupes can screw things up; CVE-2012-2459. check for them
 	if left != nil && right != nil && left.IsEqual(right) {
-		Log.Infof("DUP HASH CRASH")
+		logging.Infof("DUP HASH CRASH")
 		return nil
 	}
 	// if left child is nil, output nil.  Need this for hard mode.
@@ -57,7 +57,7 @@ func inDeadZone(pos, size uint32) bool {
 	msb := nextPowerOfTwo(size)
 	last := size - 1      // last valid position is 1 less than size
 	if pos > (msb<<1)-2 { // greater than root; not even in the tree
-		Log.Infof(" ?? greater than root ")
+		logging.Infof(" ?? greater than root ")
 		return true
 	}
 	h := msb
@@ -110,7 +110,7 @@ func checkMBlock(m *wire.MsgMerkleBlock) ([]*chainhash.Hash, error) {
 		}
 		// does stack have 3+ items? and are last 2 items filled?
 		if tip > 1 && s[tip-1].h != nil && s[tip].h != nil {
-			//Log.Infof("nodes %d and %d combine into %d\n",
+			//logging.Infof("nodes %d and %d combine into %d\n",
 			//	s[tip-1].p, s[tip].p, s[tip-2].p)
 			// combine two filled nodes into parent node
 			s[tip-2].h = MakeMerkleParent(s[tip-1].h, s[tip].h)

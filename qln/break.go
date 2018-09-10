@@ -3,7 +3,7 @@ package qln
 import (
 	"fmt"
 
-	. "github.com/mit-dci/lit/logs"
+	"github.com/mit-dci/lit/logging"
 
 	"github.com/mit-dci/lit/lnutil"
 )
@@ -27,17 +27,17 @@ func (nd *LitNode) BreakChannel(q *Qchan) error {
 		return fmt.Errorf("Can't break channel %d with peer %d, tx already broadcast, wait for confirmation.\n", q.Idx(), q.Peer())
 	}
 
-	Log.Infof("breaking (%d,%d)\n", q.Peer(), q.Idx())
+	logging.Infof("breaking (%d,%d)\n", q.Peer(), q.Idx())
 	z, err := q.ElkSnd.AtIndex(0)
 	if err != nil {
 		return err
 	}
-	Log.Infof("elk send 0: %s\n", z.String())
+	logging.Infof("elk send 0: %s\n", z.String())
 	z, err = q.ElkRcv.AtIndex(0)
 	if err != nil {
 		return err
 	}
-	Log.Infof("elk recv 0: %s\n", z.String())
+	logging.Infof("elk recv 0: %s\n", z.String())
 
 	// set delta to 0... needed for break
 	q.State.Delta = 0
@@ -64,7 +64,7 @@ func (nd *LitNode) BreakChannel(q *Qchan) error {
 }
 
 func (nd *LitNode) PrintBreakTxForDebugging(q *Qchan) error {
-	Log.Info("===== BUILDING Break TX for state [%d]:", q.State.StateIdx)
+	logging.Info("===== BUILDING Break TX for state [%d]:", q.State.StateIdx)
 	saveDelta := q.State.Delta
 	q.State.Delta = 0
 	tx, err := nd.SignBreakTx(q)
@@ -72,8 +72,8 @@ func (nd *LitNode) PrintBreakTxForDebugging(q *Qchan) error {
 	if err != nil {
 		return err
 	}
-	Log.Info("===== DONE BUILDING Break TX for state [%d]:", q.State.StateIdx)
-	Log.Info("Break TX for state [%d]:", q.State.StateIdx)
+	logging.Info("===== DONE BUILDING Break TX for state [%d]:", q.State.StateIdx)
+	logging.Info("Break TX for state [%d]:", q.State.StateIdx)
 	lnutil.PrintTx(tx)
 	return nil
 }

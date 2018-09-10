@@ -3,14 +3,14 @@ package qln
 import (
 	"bytes"
 	"fmt"
-	."github.com/mit-dci/lit/logs"
 
-	"github.com/mit-dci/lit/btcutil/txscript"
-	"github.com/mit-dci/lit/wire"
 	"github.com/boltdb/bolt"
-	"github.com/mit-dci/lit/lnutil"
-	"github.com/mit-dci/lit/sig64"
+	"github.com/mit-dci/lit/btcutil/txscript"
 	"github.com/mit-dci/lit/consts"
+	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
+	"github.com/mit-dci/lit/sig64"
+	"github.com/mit-dci/lit/wire"
 )
 
 /*
@@ -86,7 +86,7 @@ func (nd *LitNode) BuildJusticeSig(q *Qchan) error {
 	// in this function, "bad" refers to the hypothetical transaction spending the
 	// com tx.  "justice" is the tx spending the bad tx
 
-	fee := int64(consts.JusticeTxBump*nd.SubWallet[q.Coin()].Fee())
+	fee := int64(consts.JusticeTxBump * nd.SubWallet[q.Coin()].Fee())
 
 	// first we need the keys in the bad script.  Start by getting the elk-scalar
 	// we should have it at the "current" state number
@@ -119,11 +119,11 @@ func (nd *LitNode) BuildJusticeSig(q *Qchan) error {
 	var badAmt int64
 	badIdx := uint32(len(badTx.TxOut) + 1)
 
-	Log.Infof("made revpub %x timeout pub %x\nscript:%x\nhash %x\n",
+	logging.Infof("made revpub %x timeout pub %x\nscript:%x\nhash %x\n",
 		badRevokePub[:], badTimeoutPub[:], script, scriptHashOutScript)
 	// figure out which output to bring justice to
 	for i, out := range badTx.TxOut {
-		Log.Infof("txout %d pkscript %x\n", i, out.PkScript)
+		logging.Infof("txout %d pkscript %x\n", i, out.PkScript)
 		if bytes.Equal(out.PkScript, scriptHashOutScript) {
 			badIdx = uint32(i)
 			badAmt = out.Value
@@ -166,7 +166,7 @@ func (nd *LitNode) BuildJusticeSig(q *Qchan) error {
 	justiceTx.AddTxOut(justiceOut)
 
 	jtxid := justiceTx.TxHash()
-	Log.Infof("made justice tx %s\n", jtxid.String())
+	logging.Infof("made justice tx %s\n", jtxid.String())
 	// get hashcache for signing
 	hCache := txscript.NewTxSigHashes(justiceTx)
 

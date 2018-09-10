@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	. "github.com/mit-dci/lit/logs"
+	"github.com/mit-dci/lit/logging"
 
 	"github.com/howeyc/gopass"
 	"golang.org/x/crypto/nacl/secretbox"
@@ -60,9 +60,9 @@ func LoadKeyFromFileArg(filename string, pass []byte) (*[32]byte, error) {
 	}
 
 	if len(enckey) == 32 { // UNencrypted key, length 32
-		Log.Warnf("WARNING!! Key file not encrypted!!\n")
-		Log.Warnf("Anyone who can read the key file can take everything!\n")
-		Log.Warnf("You should start over and use a good passphrase!\n")
+		logging.Warnf("WARNING!! Key file not encrypted!!\n")
+		logging.Warnf("Anyone who can read the key file can take everything!\n")
+		logging.Warnf("You should start over and use a good passphrase!\n")
 		copy(priv32[:], enckey[:])
 		return priv32, nil
 	}
@@ -131,10 +131,10 @@ func SaveKeyToFileArg(filename string, priv32 *[32]byte, pass []byte) error {
 		if err != nil {
 			return err
 		}
-		Log.Warnf("WARNING!! Key file not encrypted!!\n")
-		Log.Warnf("Anyone who can read the key file can take everything!\n")
-		Log.Warnf("You should start over and use a good passphrase!\n")
-		Log.Warnf("Saved unencrypted key at %s\n", filename)
+		logging.Warnf("WARNING!! Key file not encrypted!!\n")
+		logging.Warnf("Anyone who can read the key file can take everything!\n")
+		logging.Warnf("You should start over and use a good passphrase!\n")
+		logging.Warnf("Saved unencrypted key at %s\n", filename)
 		return nil
 	}
 
@@ -161,7 +161,7 @@ func SaveKeyToFileArg(filename string, priv32 *[32]byte, pass []byte) error {
 	if err != nil {
 		return err
 	}
-	Log.Infof("Wrote encrypted key to %s\n", filename)
+	logging.Infof("Wrote encrypted key to %s\n", filename)
 	return nil
 }
 
@@ -174,7 +174,7 @@ func ReadKeyFile(filename string) (*[32]byte, error) {
 	if err != nil {
 		if os.IsNotExist(err) {
 			// no key found, generate and save one
-			Log.Infof("No file %s, generating.\n", filename)
+			logging.Infof("No file %s, generating.\n", filename)
 
 			_, err := rand.Read(key32[:])
 			if err != nil {
@@ -187,7 +187,7 @@ func ReadKeyFile(filename string) (*[32]byte, error) {
 			}
 		} else {
 			// unknown error, crash
-			Log.Errorf("unknown error reading keyfile\n")
+			logging.Errorf("unknown error reading keyfile\n")
 			return nil, err
 		}
 	}

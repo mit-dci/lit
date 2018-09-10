@@ -1,13 +1,14 @@
 package nat
 
 import (
-	."github.com/mit-dci/lit/logs"
+	"errors"
 	"fmt"
-	"github.com/jackpal/gateway"
-	natpmp "github.com/jackpal/go-nat-pmp"
 	"net"
 	"time"
-	"errors"
+
+	"github.com/jackpal/gateway"
+	natpmp "github.com/jackpal/go-nat-pmp"
+	"github.com/mit-dci/lit/logging"
 )
 
 var (
@@ -74,7 +75,7 @@ func SetupPmp(timeout time.Duration, port uint16) (*natpmp.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	Log.Infof("Your external IP is %s", ip)
+	logging.Infof("Your external IP is %s", ip)
 	_, err = pmp.AddPortMapping("tcp", int(port), int(port), 0)
 	if err != nil {
 		return nil, err
