@@ -10,20 +10,18 @@ import testutil
 import btcrpc
 import litrpc
 
+from random import randint
+
 LIT_BIN = "%s/../lit" % paths.abspath(paths.dirname(__file__))
 
 REGTEST_COINTYPE = 257
 
 logger = logging.getLogger("testframework")
 
-next_unused_port = 8335
 def new_port():
     # This gives us a enw port for each test run BUT this doesn't
     # carry across program runs.
-    global next_unused_port
-    port = next_unused_port
-    next_unused_port += 1
-    return port
+    return randint(2001,65536)
 
 def get_root_data_dir():
     if 'LIT_ITEST_ROOT' in os.environ:
