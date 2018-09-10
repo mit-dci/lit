@@ -24,8 +24,7 @@ def run_test(env):
 if __name__ == '__main__':
     env = None
     try:
-        env = testlib.TestEnv(1)
-        run_test(env)
+        run_test(env) # env has two lits already
     finally:
         if env is not None:
             env.shutdown()
