@@ -11,15 +11,12 @@ import btcrpc
 import litrpc
 
 LIT_BIN = "%s/../lit" % paths.abspath(paths.dirname(__file__))
-
 REGTEST_COINTYPE = 257
-
 logger = logging.getLogger("testframework")
-
 next_unused_port = 8335 # after 8333 and 8334 used by bitcoind
+
 def new_port():
     print("PORT IS", next_unused_port)
-    global next_unused_port
     port = next_unused_port
     next_unused_port += 1
     return port
