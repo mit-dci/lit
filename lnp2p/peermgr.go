@@ -4,15 +4,18 @@ package lnp2p
 import (
 	"crypto/ecdsa"
 	"fmt"
-	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/btcutil/hdkeychain"
+	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/eventbus"
-	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lncore"
+	"github.com/mit-dci/lit/lndc"
+	"github.com/mit-dci/lit/nat"
 	"github.com/mit-dci/lit/portxo"
 	"log"
 	"net"
+	"strconv"
 	"sync"
+	"time"
 )
 
 type privkey *koblitz.PrivateKey
@@ -44,9 +47,13 @@ type PeerManager struct {
 
 const outgoingbuf = 16
 
-// ProxySettings .
-type ProxySettings struct {
-	// TODO
+// NetSettings is a container struct for misc network settings like NAT
+// holepunching and proxies.
+type NetSettings struct {
+	NatMode *string `json:"natmode"`
+
+	ProxyAddr *string `json:"proxyserv"`
+	ProxyAuth *string `json:"proxyauth"`
 }
 
 // NewPeerManager creates a peer manager from a root key
@@ -128,7 +135,7 @@ func (pm *PeerManager) GetPeerByIdx(id int32) *Peer {
 }
 
 // TryConnectAddress attempts to connect to the specified LN address.
-func (pm *PeerManager) TryConnectAddress(addr string, proxy *ProxySettings) (*Peer, error) {
+func (pm *PeerManager) TryConnectAddress(addr string, settings *NetSettings) (*Peer, error) {
 
 	// Figure out who we're trying to connect to.
 	who, where := splitAdrString(addr)
@@ -137,20 +144,62 @@ func (pm *PeerManager) TryConnectAddress(addr string, proxy *ProxySettings) (*Pe
 	}
 
 	lnwho := lncore.LnAddr(who)
-	x, y := pm.tryConnectPeer(where, &lnwho, proxy)
+	x, y := pm.tryConnectPeer(where, &lnwho, settings)
 	return x, y
 
 }
 
-func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, proxy *ProxySettings) (*Peer, error) {
+func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, settings *NetSettings) (*Peer, error) {
 
 	// lnaddr check, to make sure that we do the right thing.
 	if lnaddr == nil {
 		return nil, fmt.Errorf("connection to a peer with unknown lnaddr not supported yet")
 	}
 
+	// Do NAT setup stuff.
+	if settings.NatMode != nil {
+
+		// Do some type juggling.
+		x, err := strconv.Atoi(netaddr[1:])
+		if err != nil {
+			return nil, err
+		}
+		lisPort := uint16(x) // if only Atoi could infer which type we wanted to parse as!
+
+		// Actually figure out what we're going to do.
+		if *settings.NatMode == "upnp" {
+			// Universal Plug-n-Play
+			log.Println("Attempting port forwarding via UPnP...")
+			err = nat.SetupUpnp(lisPort)
+			if err != nil {
+				return nil, err
+			}
+		} else if *settings.NatMode == "pmp" {
+			// NAT Port Mapping Protocol
+			timeout := time.Duration(10 * time.Second)
+			log.Println("Attempting port forwarding via PMP...")
+			_, err = nat.SetupPmp(timeout, lisPort)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, fmt.Errorf("invalid NAT type: %s", *settings.NatMode)
+		}
+	}
+
+	dialer := net.Dial
+
+	// Use a proxy server if applicable.
+	if settings.ProxyAddr != nil {
+		d, err := connectToTcpProxy(*settings.ProxyAddr, settings.ProxyAuth)
+		if err != nil {
+			return nil, err
+		}
+		dialer = d
+	}
+
 	// Set up the connection.
-	lndcconn, err := lndc.Dial(pm.idkey, netaddr, string(*lnaddr), net.Dial)
+	lndcconn, err := lndc.Dial(pm.idkey, netaddr, string(*lnaddr), dialer)
 	if err != nil {
 		return nil, err
 	}
@@ -315,41 +364,6 @@ func (pm *PeerManager) GetListeningAddrs() []string {
 	}
 	return ports
 }
-
-/*
-	TODO Implement this stuff again.
-
-	// do UPnP / pmp port forwarding
-	// fatal if we aren't able to port forward via upnp
-	if len(nd.Nat) > 0 {
-		listenPort, err := strconv.Atoi(lisIpPort[1:])
-		if err != nil {
-			log.Println("Invalid port number, returning")
-			return "", err
-		}
-		if nd.Nat == "upnp" {
-			log.Println("Port forwarding via UPnP on port", lisIpPort[1:])
-			err := nat.SetupUpnp(uint16(listenPort))
-			if err != nil {
-				fmt.Printf("Unable to setup Upnp %v\n", err)
-				log.Fatal(err) // error out if we can't connect via UPnP
-			}
-			log.Println("Forwarded port via UPnP")
-		} else if nd.Nat == "pmp" {
-			discoveryTimeout := time.Duration(10 * time.Second)
-			log.Println("Port forwarding via NAT Pmp on port", lisIpPort[1:])
-			_, err := nat.SetupPmp(discoveryTimeout, uint16(listenPort))
-			if err != nil {
-				err := fmt.Errorf("Unable to discover a "+
-					"NAT-PMP enabled device on the local "+
-					"network: %v", err)
-				log.Fatal(err) // error out if we can't connect via Pmp
-			} else {
-				log.Println("Invalid NAT punching option")
-			}
-		}
-	}
-*/
 
 // StopListening closes the socket listened on the given address, stopping the goroutine.
 func (pm *PeerManager) StopListening(addr string) error {
