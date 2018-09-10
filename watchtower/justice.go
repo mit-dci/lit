@@ -3,7 +3,8 @@ package watchtower
 import (
 	"bytes"
 	"fmt"
-	"log"
+
+	"github.com/mit-dci/lit/logging"
 
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/btcutil/txscript"
@@ -115,13 +116,13 @@ func (w *WatchTower) BuildJusticeTx(
 	// revocable key is the customer's base point combined with same elk-point
 	Revkey := lnutil.CombinePubs(wd.CustomerBasePoint, elkPoint)
 
-	log.Printf("tower build revpub %x \ntimeoutpub %x\n", Revkey, TimeoutKey)
+	logging.Infof("tower build revpub %x \ntimeoutpub %x\n", Revkey, TimeoutKey)
 	// build script from the two combined pubkeys and the channel delay
 	script := lnutil.CommitScript(Revkey, TimeoutKey, wd.Delay)
 
 	// get P2WSH output script
 	shOutputScript := lnutil.P2WSHify(script)
-	log.Printf("built script %x\npkscript %x\n", script, shOutputScript)
+	logging.Infof("built script %x\npkscript %x\n", script, shOutputScript)
 
 	// try to match WSH with output from tx
 	txoutNum := 999
