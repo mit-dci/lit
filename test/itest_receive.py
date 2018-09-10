@@ -10,9 +10,9 @@ def run_test(env):
     addr = lit.make_new_addr()
     print('Got address:', addr)
 
-    print(bc.rpc.getblockchaininfo())
     # Send a bitcoin.
-    bc.rpc.sendtoaddress(addr, 1)
+    env.generate_block()
+    bc.rpc.sendtoaddress(addr, 10)
     env.generate_block()
     print('Sent and mined...')
 
