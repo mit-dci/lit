@@ -16,6 +16,7 @@ if __name__ == '__main__':
             connect(env)
         except Exception as e:
             print(e)
+        print(env.bitcoind.rpc.getblockchaininfo())
         try:
             receive(env)
         except Exception as e:

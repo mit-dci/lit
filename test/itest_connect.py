@@ -6,7 +6,6 @@ create = 2
 
 def run_test(env):
     length = len(env.lits)
-    print("LENGTH IS", length)
     alice = env.lits[0]
     bob = env.lits[1]
     print('Connecting Alice', alice.lnid, 'to Bob', bob.lnid)
