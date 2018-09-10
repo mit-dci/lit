@@ -1,3 +1,4 @@
+# Lit stuff
 lit
 lit-af
 !cmd/lit-af
@@ -13,6 +14,9 @@ webui/node_modules
 webui/dist
 webui/build
 *.pyc
+
+# Cargo
+/target/
 
 # Editor temp files
 \#*
