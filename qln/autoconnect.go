@@ -1,8 +1,9 @@
 package qln
 
 import (
-	"log"
 	"time"
+
+	"github.com/mit-dci/lit/logging"
 
 	"github.com/mit-dci/lit/bech32"
 	"github.com/mit-dci/lit/crypto/fastsha256"
@@ -59,7 +60,7 @@ func (nd *LitNode) AutoReconnect(listenPort string, interval int64, connectedCoi
 
 		pubKey, _ := nd.GetPubHostFromPeerIdx(i)
 		if pubKey == empty {
-			log.Printf("Done, tried %d hosts\n", i-1)
+			logging.Infof("Done, tried %d hosts\n", i-1)
 			break
 		}
 
@@ -67,7 +68,7 @@ func (nd *LitNode) AutoReconnect(listenPort string, interval int64, connectedCoi
 		// in a connected coin type (daemon is available), then skip
 		// peers that are not in that list
 		if connectedCoinOnly && !isConnectedCoin(i) {
-			log.Printf("Skipping peer %d due to onlyConnectedCoins=true\n", i)
+			logging.Infof("Skipping peer %d due to onlyConnectedCoins=true\n", i)
 			i++
 			continue
 		}
@@ -83,7 +84,7 @@ func (nd *LitNode) AutoReconnect(listenPort string, interval int64, connectedCoi
 		go func() {
 			_, err := nd.DialPeer(adr)
 			if err != nil {
-				log.Printf("Could not restore connection to %s: %s\n", adr, err.Error())
+				logging.Errorf("Could not restore connection to %s: %s\n", adr, err.Error())
 			}
 			<-ticker.C
 		}()

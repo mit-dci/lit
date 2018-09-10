@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"time"
+
+	"github.com/mit-dci/lit/logging"
 
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/litrpc"
@@ -40,7 +41,7 @@ type config struct { // define a struct for usage with go-flags
 	Tower  bool `long:"tower" description:"Watchtower: Run a watching node"`
 	Hard   bool `short:"t" long:"hard" description:"Flag to set networks."`
 
-	Verbose bool `short:"v" long:"verbose" description:"Set verbosity to true."`
+	LogLevel int `short:"v" long:"verbose" description:"Set verbosity level from 0 to 5 (most to least)"`
 	// rpc server config
 	Rpcport uint16 `short:"p" long:"rpcport" description:"Set RPC port to connect to"`
 	Rpchost string `long:"rpchost" description:"Set RPC host to listen to"`
@@ -64,6 +65,7 @@ var (
 	defaultAutoListenPort                  = ":2448"
 	defaultAutoReconnectInterval           = int64(60)
 	defaultUpnPFlag                        = false
+	defaultLogLevel                        = 3
 	defaultAutoReconnectOnlyConnectedCoins = false
 )
 
@@ -163,6 +165,7 @@ func main() {
 		AutoListenPort:                  defaultAutoListenPort,
 		AutoReconnectInterval:           defaultAutoReconnectInterval,
 		AutoReconnectOnlyConnectedCoins: defaultAutoReconnectOnlyConnectedCoins,
+		LogLevel:                        defaultLogLevel,
 	}
 
 	key := litSetup(&conf)
@@ -176,13 +179,13 @@ func main() {
 	// give node and below file pathof lit home directory
 	node, err := qln.NewLitNode(key, conf.LitHomeDir, conf.TrackerURL, conf.LitProxyURL, conf.Nat)
 	if err != nil {
-		log.Fatal(err)
+		logging.Fatal(err)
 	}
 
 	// node is up; link wallets based on args
 	err = linkWallets(node, key, &conf)
 	if err != nil {
-		log.Fatal(err)
+		logging.Fatal(err)
 	}
 
 	rpcl := new(litrpc.LitRPC)
@@ -196,7 +199,7 @@ func main() {
 	}
 
 	<-rpcl.OffButton
-	log.Printf("Got stop request\n")
+	logging.Infof("Got stop request\n")
 	time.Sleep(time.Second)
 
 	return

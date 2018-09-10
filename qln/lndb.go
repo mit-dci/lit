@@ -2,16 +2,17 @@ package qln
 
 import (
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
+	"github.com/mit-dci/lit/logging"
+
 	"github.com/boltdb/bolt"
-	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/elkrem"
+	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/watchtower"
 	"github.com/mit-dci/lit/wire"
@@ -246,7 +247,7 @@ func (nd *LitNode) GetPubHostFromPeerIdx(idx uint32) ([33]byte, string) {
 		return nil
 	})
 	if err != nil {
-		log.Printf(err.Error())
+		logging.Errorf(err.Error())
 	}
 	return pub, host
 }
@@ -275,7 +276,7 @@ func (nd *LitNode) GetNicknameFromPeerIdx(idx uint32) string {
 		return nil
 	})
 	if err != nil {
-		log.Printf(err.Error())
+		logging.Errorf(err.Error())
 	}
 	return nickname
 }
@@ -434,7 +435,7 @@ func (nd *LitNode) SaveQChan(q *Qchan) error {
 		if err != nil {
 			return err
 		}
-		log.Printf("saved %d : %s mapping in db\n", q.Idx(), q.Op.String())
+		logging.Infof("saved %d : %s mapping in db\n", q.Idx(), q.Op.String())
 
 		cbk := btx.Bucket(BKTChannel) // go into bucket for all peers
 		if cbk == nil {
@@ -464,7 +465,7 @@ func (nd *LitNode) SaveQChan(q *Qchan) error {
 		// serialize elkrem receiver if it exists
 
 		if q.ElkRcv != nil {
-			log.Printf("--- elk rcv exists, saving\n")
+			logging.Infof("--- elk rcv exists, saving\n")
 
 			eb, err := q.ElkRcv.ToBytes()
 			if err != nil {
@@ -483,7 +484,7 @@ func (nd *LitNode) SaveQChan(q *Qchan) error {
 			return err
 		}
 		// save state
-		log.Printf("writing %d byte state to bucket\n", len(b))
+		logging.Infof("writing %d byte state to bucket\n", len(b))
 		return qcBucket.Put(KEYState, b)
 	})
 	if err != nil {
@@ -509,12 +510,12 @@ func (nd *LitNode) RestoreQchanFromBucket(bkt *bolt.Bucket) (*Qchan, error) {
 	// load the serialized channel base description
 	qc, err := QchanFromBytes(bkt.Get(KEYutxo))
 	if err != nil {
-		log.Printf("Error decoding Qchan: %s", err.Error())
+		logging.Errorf("Error decoding Qchan: %s", err.Error())
 		return nil, err
 	}
 	qc.CloseData, err = QCloseFromBytes(bkt.Get(KEYqclose))
 	if err != nil {
-		log.Printf("Error decoding QClose: %s", err.Error())
+		logging.Errorf("Error decoding QClose: %s", err.Error())
 		return nil, err
 	}
 
@@ -538,7 +539,7 @@ func (nd *LitNode) RestoreQchanFromBucket(bkt *bolt.Bucket) (*Qchan, error) {
 	if stBytes != nil {
 		qc.State, err = StatComFromBytes(stBytes)
 		if err != nil {
-			log.Printf("Error loading StatCom: %s", err.Error())
+			logging.Errorf("Error loading StatCom: %s", err.Error())
 			return nil, err
 		}
 	}
@@ -551,7 +552,7 @@ func (nd *LitNode) RestoreQchanFromBucket(bkt *bolt.Bucket) (*Qchan, error) {
 		return nil, err
 	}
 	if qc.ElkRcv != nil {
-		// log.Printf("loaded elkrem receiver at state %d\n", qc.ElkRcv.UpTo())
+		// logging.Infof("loaded elkrem receiver at state %d\n", qc.ElkRcv.UpTo())
 	}
 
 	// derive elkrem sender root from HD keychain
@@ -677,7 +678,7 @@ func (nd *LitNode) SaveQchanState(q *Qchan) error {
 			return err
 		}
 		// save state
-		log.Printf("writing %d byte state to bucket\n", len(b))
+		logging.Infof("writing %d byte state to bucket\n", len(b))
 		return qcBucket.Put(KEYState, b)
 	})
 }
@@ -770,7 +771,7 @@ func (nd *LitNode) GetQchanByIdx(cIdx uint32) (*Qchan, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("got op %x\n", op)
+	logging.Infof("got op %x\n", op)
 	qc, err := nd.GetQchan(op)
 	if err != nil {
 		return nil, err
