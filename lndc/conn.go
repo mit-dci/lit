@@ -2,12 +2,13 @@ package lndc
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"math"
 	"net"
-	"log"
 	"time"
-	"fmt"
+
+	"github.com/mit-dci/lit/logging"
 
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/lnutil"
@@ -39,7 +40,7 @@ func Dial(localPriv *btcec.PrivateKey, ipAddr string, remotePKH string,
 	var conn net.Conn
 	var err error
 	conn, err = dialer("tcp", ipAddr)
-	log.Println("ipAddr is", ipAddr)
+	logging.Info("ipAddr is", ipAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -80,11 +81,11 @@ func Dial(localPriv *btcec.PrivateKey, ipAddr string, remotePKH string,
 		return nil, err
 	}
 
-	log.Println("Received pubkey", s)
+	logging.Info("Received pubkey", s)
 	if lnutil.LitAdrFromPubkey(s) != remotePKH {
 		return nil, fmt.Errorf("Remote PKH doesn't match. Quitting!")
 	}
-	log.Printf("Received PKH %s matches", lnutil.LitAdrFromPubkey(s))
+	logging.Infof("Received PKH %s matches", lnutil.LitAdrFromPubkey(s))
 
 	// Finally, complete the handshake by sending over our encrypted static
 	// key and execute the final ECDH operation.

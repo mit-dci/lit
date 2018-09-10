@@ -2,12 +2,13 @@ package litrpc
 
 import (
 	"fmt"
+
 	"github.com/mit-dci/lit/bech32"
 	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/wire"
-	"log"
 )
 
 type TxidsReply struct {
@@ -213,7 +214,7 @@ func (r *LitRPC) Sweep(args SweepArgs, reply *TxidsReply) error {
 		return err
 	}
 
-	log.Printf("numtx: %d\n", args.NumTx)
+	logging.Infof("numtx: %d\n", args.NumTx)
 	if args.NumTx < 1 {
 		return fmt.Errorf("can't send %d txs", args.NumTx)
 	}

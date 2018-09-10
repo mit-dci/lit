@@ -6,11 +6,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/mit-dci/lit/logging"
 
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"golang.org/x/net/proxy"
@@ -55,7 +56,7 @@ func Announce(priv *btcec.PrivateKey, litport string, litadr string, trackerURL 
 	 */
 	resp, err = client.Get("http://ipv6.myexternalip.com/raw")
 	if err != nil {
-		log.Printf("%v", err)
+		logging.Infof("%v", err)
 	} else {
 		defer resp.Body.Close()
 		buf = new(bytes.Buffer)
