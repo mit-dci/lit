@@ -5,7 +5,7 @@ import sys
 
 noOfNodes = 2
 
-from itest_connect import run_test as connect()
+from itest_connect import run_test as connect
 
 if __name__ == '__main__':
     env = None
