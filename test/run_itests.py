@@ -14,11 +14,11 @@ if __name__ == '__main__':
         env = testlib.TestEnv(noOfNodes)
         try:
             connect(env)
-        except Error as e:
+        except e:
             print(e)
         try:
             receive(env)
-        except Error as e:
+        except e:
             print(e)
     finally:
         if env is not None:
