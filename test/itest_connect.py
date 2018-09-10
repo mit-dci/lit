@@ -28,3 +28,4 @@ if __name__ == '__main__':
         if env is not None:
             env.shutdown()
             print("LENGTH of open lits", len(env.lits))
+            sys.exit(0)
