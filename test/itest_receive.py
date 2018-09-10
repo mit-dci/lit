@@ -12,7 +12,7 @@ def run_test(env):
 
     # Send a bitcoin.
     env.generate_block()
-    bc.rpc.sendtoaddress(addr, 10)
+    bc.rpc.sendtoaddress(addr, 1, 'bech32')
     env.generate_block()
     print('Sent and mined...')
 
