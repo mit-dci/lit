@@ -23,7 +23,7 @@ func removeDuplicates(inputArr []uint32) []uint32 {
 // AutoReconnect will start listening for incoming connections
 // and attempt to automatically reconnect to all
 // previously known peers attached with the coin daemons running.
-func (nd *LitNode) AutoReconnect(listenPort string, interval int64) {
+func (nd *LitNode) AutoReconnect(listenPort string, interval int64, connectedCoinOnly bool) {
 	// Listen myself after a timeout
 	nd.TCPListener(listenPort)
 	// Reconnect to other nodes after an interval
@@ -40,31 +40,50 @@ func (nd *LitNode) AutoReconnect(listenPort string, interval int64) {
 			coinMap[i] = removeDuplicates(arr)
 		}
 	}
-	// now only connect to those peers in the array
-	for j, arr := range coinMap {
-		log.Printf("Trying to connect to %d Peers attached with coinType: %d", len(arr), j)
-		for _, i := range arr {
-			var empty [33]byte
-			pubKey, _ := nd.GetPubHostFromPeerIdx(i)
-			if pubKey == empty {
-				log.Printf("Done, tried %d hosts\n", i-1)
-				break
-			}
-			nd.RemoteMtx.Lock()
-			_, alreadyConnected := nd.RemoteCons[i]
-			nd.RemoteMtx.Unlock()
-			if alreadyConnected {
-				continue
-			}
-			idHash := fastsha256.Sum256(pubKey[:])
-			adr := bech32.Encode("ln", idHash[:20])
-			go func() {
-				_, err := nd.DialPeer(adr)
-				if err != nil {
-					log.Printf("Could not restore connection to %s: %s\n", adr, err.Error())
+
+	isConnectedCoin := func(peerIdx uint32) bool {
+		// now only connect to those peers in the array
+		for _, arr := range coinMap {
+			for _, i := range arr {
+				if peerIdx == i {
+					return true
 				}
-				<-ticker.C
-			}()
+			}
 		}
+		return false
 	}
+
+	var empty [33]byte
+	i := uint32(0)
+	for {
+
+		// If we're only reconnecting to peers we have channels with
+		// in a connected coin type (daemon is available), then skip
+		// peers that are not in that list
+		if connectedCoinOnly && !isConnectedCoin(i) {
+			continue
+		}
+
+		pubKey, _ := nd.GetPubHostFromPeerIdx(i)
+		if pubKey == empty {
+			log.Printf("Done, tried %d hosts\n", i-1)
+			break
+		}
+		nd.RemoteMtx.Lock()
+		_, alreadyConnected := nd.RemoteCons[i]
+		nd.RemoteMtx.Unlock()
+		if alreadyConnected {
+			continue
+		}
+		idHash := fastsha256.Sum256(pubKey[:])
+		adr := bech32.Encode("ln", idHash[:20])
+		go func() {
+			_, err := nd.DialPeer(adr)
+			if err != nil {
+				log.Printf("Could not restore connection to %s: %s\n", adr, err.Error())
+			}
+			<-ticker.C
+		}()
+	}
+
 }
