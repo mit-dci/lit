@@ -1,13 +1,13 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"time"
 
 	"github.com/mit-dci/lit/logging"
 
 	"github.com/mit-dci/lit/coinparam"
+	consts "github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/qln"
@@ -94,8 +94,8 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	// try regtest
 	if !lnutil.NopeString(conf.Reghost) {
 		p := &coinparam.RegressionNetParams
-		fmt.Printf("reg: %s\n", conf.Reghost)
-		err = node.LinkBaseWallet(key, 120, conf.ReSync,
+		logging.Infof("reg: %s\n", conf.Reghost)
+		err = node.LinkBaseWallet(key, consts.BitcoinRegtestBHeight, conf.ReSync,
 			conf.Tower, conf.Reghost, conf.ChainProxyURL, p)
 		if err != nil {
 			return err
@@ -105,7 +105,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	if !lnutil.NopeString(conf.Tn3host) {
 		p := &coinparam.TestNet3Params
 		err = node.LinkBaseWallet(
-			key, 1256000, conf.ReSync, conf.Tower,
+			key, consts.BitcoinTestnet3BHeight, conf.ReSync, conf.Tower,
 			conf.Tn3host, conf.ChainProxyURL, p)
 		if err != nil {
 			return err
@@ -134,7 +134,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	if !lnutil.NopeString(conf.Tvtchost) {
 		p := &coinparam.VertcoinTestNetParams
 		err = node.LinkBaseWallet(
-			key, 25000, conf.ReSync, conf.Tower,
+			key, consts.VertcoinTestnetBHeight, conf.ReSync, conf.Tower,
 			conf.Tvtchost, conf.ChainProxyURL, p)
 		if err != nil {
 			return err

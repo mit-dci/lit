@@ -7,10 +7,10 @@ package blockchain
 import (
 	"fmt"
 
+	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/btcutil/database"
 	"github.com/mit-dci/lit/btcutil/txscript"
-	"github.com/mit-dci/lit/btcutil"
 )
 
 // utxoOutput houses details about an individual unspent transaction output such
