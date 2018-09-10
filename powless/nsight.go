@@ -285,7 +285,7 @@ func (a *APILink) PushTxSmartBit(tx *wire.MsgTx) error {
 		return err
 	}
 
-	logging.Infof("respo	nse: %s", response.Status)
+	logging.Infof("response: %s", response.Status)
 	_, err = io.Copy(os.Stdout, response.Body)
 	if err != nil {
 		return err
