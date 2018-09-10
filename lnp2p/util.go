@@ -35,7 +35,7 @@ func convertPubkeyToLitAddr(pk pubkey) lncore.LnAddr {
 	return lncore.LnAddr(bech32.Encode("ln", doubleSha[:20]))
 }
 
-func connectToTcpProxy(addr string, auth *string) (func(string, string) (net.Conn, error), error) {
+func connectToProxyTCP(addr string, auth *string) (func(string, string) (net.Conn, error), error) {
 	// Authentication is good.  Use it if it's there.
 	var pAuth *proxy.Auth
 	if auth != nil {

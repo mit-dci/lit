@@ -191,7 +191,7 @@ func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, set
 
 	// Use a proxy server if applicable.
 	if settings.ProxyAddr != nil {
-		d, err := connectToTcpProxy(*settings.ProxyAddr, settings.ProxyAuth)
+		d, err := connectToProxyTCP(*settings.ProxyAddr, settings.ProxyAuth)
 		if err != nil {
 			return nil, err
 		}
