@@ -3,11 +3,11 @@ package qln
 import (
 	"bytes"
 	"fmt"
-	"log"
 
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/btcutil/txscript"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/sig64"
 	"github.com/mit-dci/lit/wire"
 )
@@ -46,7 +46,7 @@ func (nd *LitNode) SignBreakTx(q *Qchan) (*wire.MsgTx, error) {
 	// put the sighash all byte on the end of their signature
 	theirSig = append(theirSig, byte(txscript.SigHashAll))
 
-	log.Printf("made mysig: %x theirsig: %x\n", mySig, theirSig)
+	logging.Infof("made mysig: %x theirsig: %x\n", mySig, theirSig)
 	// add sigs to the witness stack
 	if swap {
 		tx.TxIn[0].Witness = SpendMultiSigWitStack(pre, theirSig, mySig)
@@ -173,7 +173,7 @@ func (nd *LitNode) SignState(q *Qchan) ([64]byte, [][64]byte, error) {
 		return sig, nil, err
 	}
 
-	log.Printf("Signing state with Elk [%x] NextElk [%x] N2Elk [%x]\n", q.State.ElkPoint, q.State.NextElkPoint, q.State.N2ElkPoint)
+	logging.Infof("Signing state with Elk [%x] NextElk [%x] N2Elk [%x]\n", q.State.ElkPoint, q.State.NextElkPoint, q.State.N2ElkPoint)
 
 	// make hash cache for this tx
 	hCache := txscript.NewTxSigHashes(commitmentTx)
@@ -211,7 +211,7 @@ func (nd *LitNode) SignState(q *Qchan) ([64]byte, [][64]byte, error) {
 		fmt.Printf("\toutput %d: %x %d\n", i, txout.PkScript, txout.Value)
 	}
 
-	log.Printf("\tstate %d myamt: %d theiramt: %d\n", q.State.StateIdx, q.State.MyAmt, q.Value-q.State.MyAmt)
+	logging.Infof("\tstate %d myamt: %d theiramt: %d\n", q.State.StateIdx, q.State.MyAmt, q.Value-q.State.MyAmt)
 
 	// Generate signatures for HTLC-success/failure transactions
 	spendHTLCSigs := map[int][64]byte{}
@@ -224,7 +224,7 @@ func (nd *LitNode) SignState(q *Qchan) ([64]byte, [][64]byte, error) {
 
 	ep := lnutil.ElkPointFromHash(curElk)
 
-	log.Printf("Using elkpoint %x to sign HTLC txs", ep)
+	logging.Infof("Using elkpoint %x to sign HTLC txs", ep)
 
 	for idx, h := range HTLCTxOuts {
 		// Find out which vout this HTLC is in the commitment tx since BIP69
@@ -286,7 +286,7 @@ func (nd *LitNode) SignState(q *Qchan) ([64]byte, [][64]byte, error) {
 		spendHTLCHash := txscript.CalcWitnessSignatureHash(
 			HTLCparsed, hc, txscript.SigHashAll, spendTx, 0, h.Value)
 
-		log.Printf("Signing HTLC hash: %x, with pubkey: %x", spendHTLCHash, HTLCPriv.PubKey().SerializeCompressed())
+		logging.Infof("Signing HTLC hash: %x, with pubkey: %x", spendHTLCHash, HTLCPriv.PubKey().SerializeCompressed())
 
 		mySig, err := HTLCPriv.Sign(spendHTLCHash)
 		if err != nil {
@@ -327,7 +327,7 @@ func (q *Qchan) VerifySigs(sig [64]byte, HTLCSigs [][64]byte) error {
 		return err
 	}
 
-	log.Printf("Verifying signatures with Elk [%x] NextElk [%x] N2Elk [%x]\n", q.State.ElkPoint, q.State.NextElkPoint, q.State.N2ElkPoint)
+	logging.Infof("Verifying signatures with Elk [%x] NextElk [%x] N2Elk [%x]\n", q.State.ElkPoint, q.State.NextElkPoint, q.State.N2ElkPoint)
 
 	// generate fund output script preimage (ignore key order)
 	pre, _, err := lnutil.FundTxScript(q.MyPub, q.TheirPub)
@@ -359,8 +359,8 @@ func (q *Qchan) VerifySigs(sig [64]byte, HTLCSigs [][64]byte) error {
 	for i, txout := range commitmentTx.TxOut {
 		fmt.Printf("\toutput %d: %x %d\n", i, txout.PkScript, txout.Value)
 	}
-	log.Printf("\tstate %d myamt: %d theiramt: %d\n", q.State.StateIdx, q.State.MyAmt, q.Value-q.State.MyAmt)
-	log.Printf("\tsig: %x\n", sig)
+	logging.Infof("\tstate %d myamt: %d theiramt: %d\n", q.State.StateIdx, q.State.MyAmt, q.Value-q.State.MyAmt)
+	logging.Infof("\tsig: %x\n", sig)
 
 	worked := pSig.Verify(hash, theirPubKey)
 	if !worked {
@@ -378,7 +378,7 @@ func (q *Qchan) VerifySigs(sig [64]byte, HTLCSigs [][64]byte) error {
 	// Map HTLC index to signature index
 	sigIndex := map[uint32]uint32{}
 
-	log.Printf("Using elkpoint %x to verify HTLC txs", q.State.NextElkPoint)
+	logging.Infof("Using elkpoint %x to verify HTLC txs", q.State.NextElkPoint)
 
 	for idx, h := range HTLCTxOuts {
 		// Find out which vout this HTLC is in the commitment tx since BIP69
@@ -445,7 +445,7 @@ func (q *Qchan) VerifySigs(sig [64]byte, HTLCSigs [][64]byte) error {
 			return err
 		}
 
-		log.Printf("Verifying HTLC hash: %x, with pubkey: %x", spendHTLCHash, theirHTLCPub)
+		logging.Infof("Verifying HTLC hash: %x, with pubkey: %x", spendHTLCHash, theirHTLCPub)
 
 		sigValid := HTLCSig.Verify(spendHTLCHash, theirHTLCPubKey)
 		if !sigValid {

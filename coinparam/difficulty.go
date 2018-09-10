@@ -2,10 +2,10 @@ package coinparam
 
 import (
 	"fmt"
-	"log"
 	"math"
 	"math/big"
 
+	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/wire"
 )
 
@@ -58,12 +58,12 @@ func diffBitcoin(
 		p.Name == "litecoin" || p.Name == "vtctest" || p.Name == "vtc"
 
 	//if p.Name == "regtest" {
-	//	log.Println("REKT")
+	//	logging.Error("REKT")
 	//	return 0x207fffff, nil
 	//}
 
 	if len(headers) < 2 {
-		log.Println("Less than 2 headers given to diffBitcoin")
+		logging.Error("Less than 2 headers given to diffBitcoin")
 		return 0, fmt.Errorf(
 			"%d headers given to diffBitcoin, expect >2", len(headers))
 	}
@@ -76,7 +76,7 @@ func diffBitcoin(
 		rightBits = prev.Bits
 	} else {
 		// invalid block, prev bits are zero, return min diff.
-		log.Println("Got blocks with diff 0. Returning error")
+		logging.Error("Got blocks with diff 0. Returning error")
 		return 0, fmt.Errorf("Got blocks with diff 0. Returning error")
 	}
 
@@ -118,7 +118,7 @@ func diffBitcoin(
 		// That whole "controlled supply" thing.
 		// calculate diff n based on n-2016 ... n-1
 		rightBits = calcDiffAdjustBitcoin(epochStart, prev, p)
-		// log.Printf("h %d diff adjust %x -> %x\n", height, prev.Bits, rightBits)
+		// logging.Infof("h %d diff adjust %x -> %x\n", height, prev.Bits, rightBits)
 	} else if p.ReduceMinDifficulty { // not a new epoch
 		// if on testnet, check for difficulty nerfing
 		if cur.Timestamp.After(
@@ -145,12 +145,12 @@ func diffBitcoin(
 				arrIndex -= 1
 				tempCur = headers[arrIndex]
 				tempHeight -= 1
-				i ++
+				i++
 			}
 			// Return the found difficulty or the minimum difficulty if no
 			// appropriate block was found.
 			rightBits = p.PowLimitBits
-			if tempCur != nil && tempCur.Bits!= 0 { //weird bug
+			if tempCur != nil && tempCur.Bits != 0 { //weird bug
 				rightBits = tempCur.Bits
 			}
 			// rightBits = epochStart.Bits // original line
