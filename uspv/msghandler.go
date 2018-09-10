@@ -8,19 +8,18 @@ import (
 	"github.com/mit-dci/lit/wire"
 )
 
-func (s *SPVCon) incomingMessageHandler() {
+// incomingMessageHandler sets up an incoming message stream on which
+// peerIdx's can listen on and decrypt messages that are received from the
+// remote peer
+func (s *SPVCon) incomingMessageHandler(peerIdx int) {
 	for {
-		n, xm, _, err := wire.ReadMessageWithEncodingN(s.con, s.localVersion,
+		log.Printf("Received message from peer %d", peerIdx+1)
+		n, xm, _, err := wire.ReadMessageWithEncodingN(s.conns[peerIdx], s.localVersion,
 			wire.BitcoinNet(s.Param.NetMagicBytes), wire.LatestEncoding)
 		if err != nil {
-			s.con.Close() // close the connection to prevent spam messages from crashing lit.
-			log.Printf("ReadMessageWithEncodingN error.  Disconnecting from given peer. %s\n", err.Error())
-			if s.randomNodesOK { // if user wants to connect to localhost, let him do so
-				s.Connect("yes") // really any YupString here
-			} else {
-				s.con.Close()
-				return
-			}
+			log.Printf("ReadMessageWithEncodingN error Disconnecting from given peer. %s\n", err.Error())
+			s.conns[peerIdx].Close()
+			return
 		}
 		s.RBytes += uint64(n)
 		//		log.Printf("Got %d byte %s message\n", n, xm.Command())
@@ -28,36 +27,36 @@ func (s *SPVCon) incomingMessageHandler() {
 		case *wire.MsgVersion:
 			log.Printf("Got version message.  Agent %s, version %d, at height %d\n",
 				m.UserAgent, m.ProtocolVersion, m.LastBlock)
-			s.remoteVersion = uint32(m.ProtocolVersion) // weird cast! bug?
+			s.remoteVersion = append(s.remoteVersion, uint32(m.ProtocolVersion))
 		case *wire.MsgVerAck:
 			log.Printf("Got verack.  Whatever.\n")
 		case *wire.MsgAddr:
 			log.Printf("got %d addresses.\n", len(m.AddrList))
 		case *wire.MsgPing:
 			// log.Printf("Got a ping message.  We should pong back or they will kick us off.")
-			go s.PongBack(m.Nonce)
+			go s.PongBack(m.Nonce, peerIdx)
 		case *wire.MsgPong:
 			log.Printf("Got a pong response. OK.\n")
 		case *wire.MsgBlock:
 			s.IngestBlock(m)
 		case *wire.MsgMerkleBlock:
-			s.IngestMerkleBlock(m)
+			s.IngestMerkleBlock(m, peerIdx)
 		case *wire.MsgHeaders: // concurrent because we keep asking for blocks
-			go s.HeaderHandler(m)
+			go s.HeaderHandler(m, peerIdx)
 		case *wire.MsgTx: // not concurrent! txs must be in order
 			s.TxHandler(m)
 		case *wire.MsgReject:
 			log.Printf("Rejected! cmd: %s code: %s tx: %s reason: %s",
 				m.Cmd, m.Code.String(), m.Hash.String(), m.Reason)
 		case *wire.MsgInv:
-			s.InvHandler(m)
+			s.InvHandler(m, peerIdx)
 		case *wire.MsgNotFound:
 			log.Printf("Got not found response from remote:")
 			for i, thing := range m.InvList {
 				log.Printf("\t%d) %s: %s", i, thing.Type, thing.Hash)
 			}
 		case *wire.MsgGetData:
-			s.GetDataHandler(m)
+			s.GetDataHandler(m, peerIdx)
 
 		default:
 			if m != nil {
@@ -69,18 +68,18 @@ func (s *SPVCon) incomingMessageHandler() {
 	}
 }
 
-// this one seems kindof pointless?  could get ridf of it and let
-// functions call WriteMessageWithEncodingN themselves...
-func (s *SPVCon) outgoingMessageHandler() {
+// outgoingMessageHandler initializes an outgoing message stream for each
+// peerIdx. each peerIdx can then listen and send messages on its own
+func (s *SPVCon) outgoingMessageHandler(peerIdx int) {
 	for {
-		msg := <-s.outMsgQueue
+		log.Printf("Sending message to peer %d", peerIdx)
+		msg := <-s.outMsgQueue[peerIdx]
 		if msg == nil {
 			log.Printf("ERROR: nil message to outgoingMessageHandler\n")
 			continue
 		}
-		n, err := wire.WriteMessageWithEncodingN(s.con, msg, s.localVersion,
+		n, err := wire.WriteMessageWithEncodingN(s.conns[peerIdx], msg, s.localVersion,
 			wire.BitcoinNet(s.Param.NetMagicBytes), wire.LatestEncoding)
-
 		if err != nil {
 			log.Printf("Write message error: %s", err.Error())
 		}
@@ -89,7 +88,7 @@ func (s *SPVCon) outgoingMessageHandler() {
 }
 
 // fPositiveHandler monitors false positives and when it gets enough of them,
-func (s *SPVCon) fPositiveHandler() {
+func (s *SPVCon) fPositiveHandler(peerIdx int) {
 	var fpAccumulator int32
 	for {
 		fpAccumulator += <-s.fPositives // blocks here
@@ -101,7 +100,7 @@ func (s *SPVCon) fPositiveHandler() {
 				return
 			}
 			// send filter
-			s.Refilter(filt)
+			s.Refilter(filt, peerIdx)
 			log.Printf("sent filter %x\n", filt.MsgFilterLoad().Filter)
 
 			// clear the channel
@@ -124,8 +123,10 @@ func (s *SPVCon) fPositiveHandler() {
 
 // REORG TODO: how to detect reorgs and send them up to wallet layer
 
-// HeaderHandler ...
-func (s *SPVCon) HeaderHandler(m *wire.MsgHeaders) {
+// Headerhandler ingests all headers, checks whether we need more headers
+// and if needed, asks the remote node for them. After asking for headers,
+// it also asks for blocks
+func (s *SPVCon) HeaderHandler(m *wire.MsgHeaders, peerIdx int) {
 	moar, err := s.IngestHeaders(m)
 	if err != nil {
 		log.Printf("Header error: %s\n", err.Error())
@@ -133,7 +134,7 @@ func (s *SPVCon) HeaderHandler(m *wire.MsgHeaders) {
 	}
 	// more to get? if so, ask for them and return
 	if moar {
-		err = s.AskForHeaders()
+		err = s.AskForHeaders(peerIdx)
 		if err != nil {
 			log.Printf("AskForHeaders error: %s", err.Error())
 		}
@@ -147,11 +148,11 @@ func (s *SPVCon) HeaderHandler(m *wire.MsgHeaders) {
 			return
 		}
 		// send filter
-		s.SendFilter(filt)
+		s.SendFilter(filt, peerIdx)
 		log.Printf("sent filter %x\n", filt.MsgFilterLoad().Filter)
 	}
 
-	err = s.AskForBlocks()
+	err = s.AskForBlocks(peerIdx)
 	if err != nil {
 		log.Printf("AskForBlocks error: %s", err.Error())
 		return
@@ -200,7 +201,7 @@ func (s *SPVCon) TxHandler(tx *wire.MsgTx) {
 
 // GetDataHandler responds to requests for tx data, which happen after
 // advertising our txs via an inv message
-func (s *SPVCon) GetDataHandler(m *wire.MsgGetData) {
+func (s *SPVCon) GetDataHandler(m *wire.MsgGetData, peerIdx int) {
 	log.Printf("got GetData.  Contains:\n")
 	var sent int32
 	for i, thing := range m.InvList {
@@ -216,7 +217,7 @@ func (s *SPVCon) GetDataHandler(m *wire.MsgGetData) {
 					thing.Hash.String())
 				continue
 			}
-			s.outMsgQueue <- tx
+			s.outMsgQueue[peerIdx] <- tx
 			sent++
 			continue
 		}
@@ -226,8 +227,7 @@ func (s *SPVCon) GetDataHandler(m *wire.MsgGetData) {
 	log.Printf("sent %d of %d requested items", sent, len(m.InvList))
 }
 
-// InvHandler ...
-func (s *SPVCon) InvHandler(m *wire.MsgInv) {
+func (s *SPVCon) InvHandler(m *wire.MsgInv, peerIdx int) {
 	log.Printf("got inv.  Contains:\n")
 	for i, thing := range m.InvList {
 		log.Printf("\t%d)%s : %s",
@@ -239,7 +239,7 @@ func (s *SPVCon) InvHandler(m *wire.MsgInv) {
 				// also request if we already have it; might have new witness?
 				// needed for confirmed channels...
 				s.OKTxid(&thing.Hash, 0) // unconfirmed
-				s.AskForTx(thing.Hash)
+				s.AskForTx(thing.Hash, peerIdx)
 			}
 		}
 		if thing.Type == wire.InvTypeBlock { // new block what to do?
@@ -247,7 +247,7 @@ func (s *SPVCon) InvHandler(m *wire.MsgInv) {
 			case <-s.inWaitState:
 				// start getting headers
 				log.Printf("asking for headers due to inv block\n")
-				err := s.AskForHeaders()
+				err := s.AskForHeaders(peerIdx)
 				if err != nil {
 					log.Printf("AskForHeaders error: %s", err.Error())
 				}
@@ -259,17 +259,14 @@ func (s *SPVCon) InvHandler(m *wire.MsgInv) {
 	}
 }
 
-// PongBack ...
-func (s *SPVCon) PongBack(nonce uint64) {
+func (s *SPVCon) PongBack(nonce uint64, peerIdx int) {
 	mpong := wire.NewMsgPong(nonce)
 
-	s.outMsgQueue <- mpong
+	s.outMsgQueue[peerIdx] <- mpong
 	return
 }
 
-// SendFilter ...
-func (s *SPVCon) SendFilter(f *bloom.Filter) {
-	s.outMsgQueue <- f.MsgFilterLoad()
-
+func (s *SPVCon) SendFilter(f *bloom.Filter, peerIdx int) {
+	s.outMsgQueue[peerIdx] <- f.MsgFilterLoad()
 	return
 }

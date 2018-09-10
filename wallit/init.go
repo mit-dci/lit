@@ -18,7 +18,7 @@ import (
 
 func NewWallit(
 	rootkey *hdkeychain.ExtendedKey, birthHeight int32, resync bool,
-	spvhost, path string, proxyURL string, p *coinparam.Params) (*Wallit, int, error) {
+	spvhost, path string, proxyURL string, maxConnections int, p *coinparam.Params) (*Wallit, int, error) {
 
 	var w Wallit
 	w.rootPrivKey = rootkey
@@ -65,7 +65,7 @@ func NewWallit(
 	}
 	hookFail := false
 	log.Printf("DB corrected height %d\n", height)
-	incomingTx, incomingBlockheight, err := w.Hook.Start(height, spvhost, wallitpath, proxyURL, p)
+	incomingTx, incomingBlockheight, err := w.Hook.Start(height, spvhost, wallitpath, proxyURL, maxConnections, p)
 	if err != nil {
 		hookFail = true
 		log.Printf("NewWallit Hook.Start crash  %s ", err.Error())

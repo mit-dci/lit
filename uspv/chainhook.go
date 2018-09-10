@@ -6,6 +6,7 @@ import (
 
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/coinparam"
+	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/wire"
 )
@@ -35,8 +36,8 @@ type ChainHook interface {
 
 	// Note that for reorgs, the height chan just sends a lower height than you
 	// already have, and that means "reorg back!"
-	Start(height int32, host, path string, proxyURL string, params *coinparam.Params) (
-		chan lnutil.TxAndHeight, chan int32, error)
+	Start(height int32, host, path string, proxyURL string, maxConnections int,
+		params *coinparam.Params) (chan lnutil.TxAndHeight, chan int32, error)
 
 	// The Register functions send information to the ChainHook about what txs to
 	// return.  Txs matching either the addresses or outpoints will be returned
@@ -90,7 +91,8 @@ type ChainHook interface {
 
 // Start ...
 func (s *SPVCon) Start(
-	startHeight int32, host, path string, proxyURL string, params *coinparam.Params) (
+	startHeight int32, host, path string, proxyURL string,
+	maxConnections int, params *coinparam.Params) (
 	chan lnutil.TxAndHeight, chan int32, error) {
 
 	// These can be set before calling Start()
@@ -99,7 +101,7 @@ func (s *SPVCon) Start(
 	s.ProxyURL = proxyURL
 
 	s.Param = params
-
+	s.maxConnections = maxConnections
 	s.TrackingAdrs = make(map[[20]byte]bool)
 	s.TrackingOPs = make(map[wire.OutPoint]bool)
 
@@ -125,13 +127,26 @@ func (s *SPVCon) Start(
 		log.Println(err)
 		return nil, nil, err
 	}
-
-	err = s.AskForHeaders()
-	if err != nil {
-		log.Printf("AskForHeaders error\n")
-		return nil, nil, err
+	for i := 0; i < consts.MaxConns; i++ {
+		s.outMsgQueue[i] = make(chan wire.Message)
 	}
-
+	// ask for headers from maxConnection Peers
+	// in case the number of connections is less than maxConnections, no need to worry
+	// since outMsgQueue is an array stores stuff that we don't use as well
+	k := 0
+	for {
+		if k == len(s.conns)-1 {
+			break
+		}
+		err = s.AskForHeaders(k) // when starting, assume that alteast
+		// one connection is active, else just error out
+		if err != nil {
+			log.Printf("AskForHeaders error from peer %d\n", k+1)
+			//ignore error sicne we're asking from a lot of guys
+			//return err
+		}
+		k ++
+	}
 	return s.TxUpToWallit, s.CurrentHeightChan, nil
 }
 
@@ -175,7 +190,11 @@ func (s *SPVCon) PushTx(tx *wire.MsgTx) error {
 		return err
 	}
 	// broadcast inv message
-	s.outMsgQueue <- invMsg
+	for k := 0; k < len(s.conns); k++ {
+		// spam all nodes with our tx
+		// maybe could have a pref order for nodes or something in the future
+		s.outMsgQueue[k] <- invMsg
+	}
 
 	// TODO wait a few seconds here for a reject message and return it
 	return nil

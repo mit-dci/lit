@@ -108,7 +108,6 @@ func (s *SPVCon) GetHeaderAtHeight(h int32) (*wire.BlockHeader, error) {
 
 	// height is reduced by startHeight
 	h = h - s.Param.StartHeight
-
 	// seek to that header
 	_, err := s.headerFile.Seek(int64(80*h), os.SEEK_SET)
 	if err != nil {

@@ -39,7 +39,7 @@ type config struct { // define a struct for usage with go-flags
 	ReSync bool `short:"r" long:"reSync" description:"Resync from the given tip."`
 	Tower  bool `long:"tower" description:"Watchtower: Run a watching node"`
 	Hard   bool `short:"t" long:"hard" description:"Flag to set networks."`
-  
+
 	Verbose bool `short:"v" long:"verbose" description:"Set verbosity to true."`
 	// rpc server config
 	Rpcport uint16 `short:"p" long:"rpcport" description:"Set RPC port to connect to"`
@@ -48,7 +48,9 @@ type config struct { // define a struct for usage with go-flags
 	AutoReconnect         bool   `long:"autoReconnect" description:"Attempts to automatically reconnect to known peers periodically."`
 	AutoReconnectInterval int64  `long:"autoReconnectInterval" description:"The interval (in seconds) the reconnect logic should be executed"`
 	AutoListenPort        string `long:"autoListenPort" description:"When auto reconnect enabled, starts listening on this port"`
-	Params                *coinparam.Params
+
+	MaxConnections int `short:"m" long:"maxConnections" description:"Define the maximum number of nodes to connect to"`
+	Params         *coinparam.Params
 }
 
 var (
@@ -63,6 +65,7 @@ var (
 	defaultAutoListenPort        = ":2448"
 	defaultAutoReconnectInterval = int64(60)
 	defaultUpnPFlag              = false
+	defaultMaxConnections        = 5
 )
 
 func fileExists(name string) bool {
@@ -92,7 +95,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 		p := &coinparam.RegressionNetParams
 		fmt.Printf("reg: %s\n", conf.Reghost)
 		err = node.LinkBaseWallet(key, 120, conf.ReSync,
-			conf.Tower, conf.Reghost, conf.ChainProxyURL, p)
+			conf.Tower, conf.Reghost, conf.ChainProxyURL, conf.MaxConnections, p)
 		if err != nil {
 			return err
 		}
@@ -102,7 +105,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 		p := &coinparam.TestNet3Params
 		err = node.LinkBaseWallet(
 			key, 1256000, conf.ReSync, conf.Tower,
-			conf.Tn3host, conf.ChainProxyURL, p)
+			conf.Tn3host, conf.ChainProxyURL, conf.MaxConnections, p)
 		if err != nil {
 			return err
 		}
@@ -111,7 +114,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	if !lnutil.NopeString(conf.Litereghost) {
 		p := &coinparam.LiteRegNetParams
 		err = node.LinkBaseWallet(key, 120, conf.ReSync,
-			conf.Tower, conf.Litereghost, conf.ChainProxyURL, p)
+			conf.Tower, conf.Litereghost, conf.ChainProxyURL, conf.MaxConnections, p)
 		if err != nil {
 			return err
 		}
@@ -121,7 +124,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 		p := &coinparam.LiteCoinTestNet4Params
 		err = node.LinkBaseWallet(
 			key, p.StartHeight, conf.ReSync, conf.Tower,
-			conf.Lt4host, conf.ChainProxyURL, p)
+			conf.Lt4host, conf.ChainProxyURL, conf.MaxConnections, p)
 		if err != nil {
 			return err
 		}
@@ -131,7 +134,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 		p := &coinparam.VertcoinTestNetParams
 		err = node.LinkBaseWallet(
 			key, 25000, conf.ReSync, conf.Tower,
-			conf.Tvtchost, conf.ChainProxyURL, p)
+			conf.Tvtchost, conf.ChainProxyURL, conf.MaxConnections, p)
 		if err != nil {
 			return err
 		}
@@ -141,7 +144,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 		p := &coinparam.VertcoinParams
 		err = node.LinkBaseWallet(
 			key, p.StartHeight, conf.ReSync, conf.Tower,
-			conf.Vtchost, conf.ChainProxyURL, p)
+			conf.Vtchost, conf.ChainProxyURL, conf.MaxConnections, p)
 		if err != nil {
 			return err
 		}
@@ -160,6 +163,7 @@ func main() {
 		AutoReconnect:         defaultAutoReconnect,
 		AutoListenPort:        defaultAutoListenPort,
 		AutoReconnectInterval: defaultAutoReconnectInterval,
+		MaxConnections:        defaultMaxConnections,
 	}
 
 	key := litSetup(&conf)

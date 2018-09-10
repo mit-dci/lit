@@ -7,14 +7,17 @@ import (
 
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/coinparam"
+	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/wire"
 )
 
 // SPVCon is a SPV connection to a coin daemon.
 type SPVCon struct {
-	con net.Conn // the (probably tcp) connection to the node
-
+	// store all open tcp connections to bitcoin nodes
+	// can just drop the connection if it misbehaves
+	conns          []net.Conn
+	maxConnections int
 	// Enhanced SPV modes for users who have outgrown easy mode SPV
 	// but have not yet graduated to full nodes.
 	HardMode bool   // hard mode doesn't use filters.
@@ -43,13 +46,17 @@ type SPVCon struct {
 
 	//[doesn't work without fancy mutexes, nevermind, just use header file]
 	// localHeight   int32  // block height we're on
-	remoteHeight  int32  // block height they're on
-	localVersion  uint32 // version we report
-	remoteVersion uint32 // version remote node
+	remoteHeight  []int32  // block height they're on
+	localVersion  uint32   // version we report
+	remoteVersion []uint32 // version remote node
 
 	// what's the point of the input queue? remove? leave for now...
-	inMsgQueue  chan wire.Message // Messages coming in from remote node
-	outMsgQueue chan wire.Message // Messages going out to remote node
+	//inMsgQueue  []chan wire.Message // Messages coming in from remote node
+	// doesn't seem to be used anywhere, so retiring for now
+
+	// outMsgQueue is an array that will hold all outoging channel messages
+	// currently set to consts.MaxConns as per bitcoind config
+	outMsgQueue [consts.MaxConns]chan wire.Message // Messages going out to remote node
 
 	WBytes uint64 // total bytes written
 	RBytes uint64 // total bytes read

@@ -127,7 +127,7 @@ func (s *SPVCon) OKTxid(txid *chainhash.Hash, height int32) error {
 // AskForTx requests a tx we heard about from an inv message.
 // It's one at a time but should be fast enough.
 // I don't like this function because SPV shouldn't even ask...
-func (s *SPVCon) AskForTx(txid chainhash.Hash) {
+func (s *SPVCon) AskForTx(txid chainhash.Hash, peerIdx int) {
 	gdata := wire.NewMsgGetData()
 	inv := wire.NewInvVect(wire.InvTypeTx, &txid)
 	// no longer get wit txs if in hardmode... don't need to, right?
@@ -135,8 +135,8 @@ func (s *SPVCon) AskForTx(txid chainhash.Hash) {
 	//		inv.Type = wire.InvTypeWitnessTx
 	//	}
 	gdata.AddInvVect(inv)
-	log.Printf("asking for tx %s\n", txid.String())
-	s.outMsgQueue <- gdata
+	log.Printf("asking for tx %s from peer %d\n", txid.String(), peerIdx)
+	s.outMsgQueue[peerIdx] <- gdata
 }
 
 // HashAndHeight is needed instead of just height in case a fullnode
@@ -158,8 +158,7 @@ func NewRootAndHeight(b chainhash.Hash, h int32) (hah HashAndHeight) {
 	return
 }
 
-// IngestMerkleBlock ...
-func (s *SPVCon) IngestMerkleBlock(m *wire.MsgMerkleBlock) {
+func (s *SPVCon) IngestMerkleBlock(m *wire.MsgMerkleBlock, peerIdx int) {
 
 	txids, err := checkMBlock(m) // check self-consistency
 	if err != nil {
@@ -201,7 +200,7 @@ func (s *SPVCon) IngestMerkleBlock(m *wire.MsgMerkleBlock) {
 		// this way the only thing that triggers waitstate is asking for headers,
 		// getting 0, calling AskForMerkBlocks(), and seeing you don't need any.
 		// that way you are pretty sure you're synced up.
-		err = s.AskForHeaders()
+		err = s.AskForHeaders(peerIdx)
 		if err != nil {
 			log.Printf("Merkle block error: %s\n", err.Error())
 			return
@@ -277,8 +276,7 @@ func (s *SPVCon) IngestHeaders(m *wire.MsgHeaders) (bool, error) {
 	return true, nil
 }
 
-// AskForHeaders ...
-func (s *SPVCon) AskForHeaders() error {
+func (s *SPVCon) AskForHeaders(peerIdx int) error {
 	ghdr := wire.NewMsgGetHeaders()
 	ghdr.ProtocolVersion = s.localVersion
 
@@ -292,7 +290,6 @@ func (s *SPVCon) AskForHeaders() error {
 		log.Printf("AskForHeaders GetHeaderAtHeight error\n")
 		return err
 	}
-
 	tHash := tipheader.BlockHash()
 	err = ghdr.AddBlockLocatorHash(&tHash)
 	if err != nil {
@@ -324,15 +321,14 @@ func (s *SPVCon) AskForHeaders() error {
 
 	log.Printf("get headers message has %d header hashes, first one is %s\n",
 		len(ghdr.BlockLocatorHashes), ghdr.BlockLocatorHashes[0].String())
-
-	s.outMsgQueue <- ghdr
+	s.outMsgQueue[peerIdx] <- ghdr
 	return nil
 }
 
 // AskForBlocks requests blocks from current to last
 // right now this asks for 1 block per getData message.
 // Maybe it's faster to ask for many in each message?
-func (s *SPVCon) AskForBlocks() error {
+func (s *SPVCon) AskForBlocks(peerIdx int) error {
 	var hdr wire.BlockHeader
 
 	s.headerMutex.Lock() // lock just to check filesize
@@ -417,7 +413,7 @@ func (s *SPVCon) AskForBlocks() error {
 		}
 		// waits here most of the time for the queue to empty out
 		s.blockQueue <- hah // push height and mroot of requested block on queue
-		s.outMsgQueue <- gdataMsg
+		s.outMsgQueue[peerIdx] <- gdataMsg
 	}
 	return nil
 }
