@@ -46,6 +46,11 @@ if __name__ == '__main__':
             setgetfee(env)
         except Exception as e:
             print(e)
+        try:
+            fund(env)
+            close(env)
+        except Exception as e:
+            print(e)
     finally:
         if env is not None:
             #env.shutdown()
