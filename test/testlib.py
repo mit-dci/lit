@@ -129,8 +129,9 @@ class LitNode():
         ct = REGTEST_COINTYPE
         if cointype is not None: # I had to do thi because of reasons.
             ct = cointype
-        peerid=1
+        peerid=2
         print("LNID", peer.lnid, ct, capacity, initialsend, self.peer_mapping)
+        print("BAL", self.rpc.balance())
         try:
             res = self.rpc.FundChannel(
             Peer=peerid,
