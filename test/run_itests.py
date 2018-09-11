@@ -8,7 +8,7 @@ noOfNodes = 2
 from itest_connect import run_test as connect
 from itest_receive import run_test as receive
 from itest_send import run_test as send
-# from itest_send2 import run_test as send2
+from itest_send2 import run_test as send2
 # from itest_setgetfee import run_test as setgetfee
 # from itest_fund import run_test as fund
 # from itest_close import run_test as close
@@ -36,6 +36,10 @@ if __name__ == '__main__':
             print(e)
         try:
             send(env)
+        except Exception as e:
+            print(e)
+        try:
+            send2(env)
         except Exception as e:
             print(e)
     finally:
