@@ -135,7 +135,7 @@ class LitNode():
             ct = cointype
         res = self.rpc.FundChannel(
             print("LNID", peer.lnid)
-            Peer=self.get_peer_id(peer),
+            Peer=2,
             CoinType=ct,
             Capacity=capacity,
             InitialSend=initialsend,
