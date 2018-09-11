@@ -23,6 +23,7 @@ Channel refund keys are use 3, peer and index per peer / channel.
 func (w *Wallit) PathPrivkey(kg portxo.KeyGen) *btcec.PrivateKey {
 	// in uspv, we require path depth of 5
 	if kg.Depth != 5 {
+		logging.Errorf("bad keygen %s\n", kg.String())
 		return nil
 	}
 	priv, err := kg.DerivePrivateKey(w.rootPrivKey)

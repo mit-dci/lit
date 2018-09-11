@@ -85,28 +85,47 @@ func (w *Wallit) ExportHook() uspv.ChainHook {
 }
 
 // ExportUtxo is really *IM*port utxo on this side.
-// Not implemented yet.  Fix "ingest many" at the same time eh?
 func (w *Wallit) ExportUtxo(u *portxo.PorTxo) {
 
-	// zero value utxo counts as an address exort, not utxo export.
+	// zero value utxo counts as an address export, not utxo export.
 	if u.Value == 0 {
 		err := w.AddPorTxoAdr(u.KeyGen)
 		if err != nil {
 			logging.Errorf(err.Error())
 		}
 	} else {
+		// if derivation path is 0, that means it's an import triggerd by
+		// the user, with a portxo with private key included that does
+		// not match up with the wallet derivation tree.  In this
+		// case we assign a fixed derivation path and subtract
+		if u.KeyGen.Depth == 0 {
+			impGen := portxo.KeyGenForImports
+			impGen.Step[1] = w.Param.HDCoinType
+
+			var privMaskArr [32]byte
+			privMask, err := w.GetPriv(impGen)
+			if err != nil {
+				logging.Errorf(err.Error())
+				return
+			}
+			copy(privMaskArr[:], privMask.D.Bytes())
+
+			mixedKey := lnutil.SubtractPrivKeys(u.KeyGen.PrivKey, privMaskArr)
+
+			u.KeyGen = impGen
+			u.KeyGen.PrivKey = mixedKey
+		}
+		// either way, gain the utxo
 		err := w.GainUtxo(*u)
 		if err != nil {
 			logging.Errorf(err.Error())
 		}
 	}
 
-	// Register new address with chainhook
-	adr160 := w.PathPubHash160(u.KeyGen)
-	err := w.Hook.RegisterAddress(adr160)
-	if err != nil {
-		logging.Errorf(err.Error())
-	}
+	return
+	// don't register an address; utxo import does not imply we
+	// have control over that address and can accept new payments there
+	// (even though we probably could...)
 }
 
 // WatchThis registers an outpoint to watch.  Register as watched OP, and

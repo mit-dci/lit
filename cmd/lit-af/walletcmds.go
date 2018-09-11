@@ -40,6 +40,27 @@ var sweepCommand = &Command{
 	ShortDescription: "Move UTXOs with many 1-in-1-out txs.\n",
 }
 
+var rawTxCommand = &Command{
+	Format: fmt.Sprintf(
+		"%s%s\n", lnutil.White("rawtx"), lnutil.ReqColor("tx hash")),
+	Description:      "Send a raw transaction\n",
+	ShortDescription: "Send a raw transaction\n",
+}
+
+var importTxoCommand = &Command{
+	Format: fmt.Sprintf(
+		"%s%s\n", lnutil.White("import"), lnutil.ReqColor("utxo")),
+	Description:      "Imports a raw utxo into wallit\n",
+	ShortDescription: "Imports a raw utxo into wallit\n",
+}
+
+var dumpCommand = &Command{
+	Format: fmt.Sprintf(
+		"%s%s%s%s\n", lnutil.White("dump"), lnutil.OptColor("utxos"), lnutil.OptColor("chans"), lnutil.OptColor("all")),
+	Description:      "Dump all wallet private keys\n",
+	ShortDescription: "Dump all wallet private keys\n",
+}
+
 // Send sends coins somewhere
 func (lc *litAfClient) Send(textArgs []string) error {
 	stopEx, err := CheckHelpCommand(sendCommand, textArgs, 2)
@@ -277,4 +298,105 @@ func (lc *litAfClient) Address(textArgs []string) error {
 		lnutil.Address(reply.WitAddresses), lnutil.Address(reply.LegacyAddresses))
 	return nil
 
+}
+
+// ------------------ send raw tx
+func (lc *litAfClient) RawTx(textArgs []string) error {
+
+	stopEx, err := CheckHelpCommand(rawTxCommand, textArgs, 1)
+	if err != nil || stopEx {
+		return err
+	}
+
+	args := new(litrpc.RawArgs)
+	reply := new(litrpc.TxidsReply)
+
+	args.TxHex = textArgs[0]
+
+	err = lc.rpccon.Call("LitRPC.PushRawTx", args, reply)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(color.Output, "sent txid(s):\n")
+	for i, t := range reply.Txids {
+		fmt.Fprintf(color.Output, "\t%d %s\n", i, t)
+	}
+	return nil
+}
+
+// ------------------ imporTxo
+func (lc *litAfClient) ImporTxo(textArgs []string) error {
+
+	stopEx, err := CheckHelpCommand(importTxoCommand, textArgs, 1)
+	if err != nil || stopEx {
+		return err
+	}
+
+	args := new(litrpc.RawArgs)
+	reply := new(litrpc.StatusReply)
+
+	args.TxHex = textArgs[0]
+
+	err = lc.rpccon.Call("LitRPC.ImporTxo", args, reply)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(color.Output, "imported utxo:\n\t%s\n", reply.Status)
+	return nil
+}
+
+func (lc *litAfClient) Dump(textArgs []string) error {
+	stopEx, err := CheckHelpCommand(dumpCommand, textArgs, 1)
+	if err != nil || stopEx {
+		return err
+	}
+	fmt.Println("ARG IS", textArgs[0])
+	if len(textArgs) > 1 {
+		return fmt.Errorf("Dump takes only one argument - utxos, chans, all")
+	}
+	args := new(litrpc.NoArgs)
+	// not actually txids, just a slice of strings...
+	reply := new(litrpc.TxidsReply)
+	if (textArgs[0] == "utxos") || textArgs[0] == "all" {
+		err = lc.rpccon.Call("LitRPC.DumpPriv", args, reply)
+		if err != nil {
+			return err
+		}
+
+		for i, txoString := range reply.Txids {
+			fmt.Printf("\tutxo %d: %s\n", i, txoString)
+		}
+	}
+
+	if (textArgs[0] == "chans") || textArgs[0] == "all" {
+		pReply := new(litrpc.DumpReply)
+		pArgs := new(litrpc.NoArgs)
+		err = lc.rpccon.Call("LitRPC.DumpPrivs", pArgs, pReply)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(color.Output, "Private keys for all channels and utxos:\n")
+
+		// Display DumpPriv info
+		for i, t := range pReply.Privs {
+			fmt.Fprintf(color.Output, "%d %s h:%d amt:%s %s ",
+				i, lnutil.OutPoint(t.OutPoint), t.Height,
+				lnutil.SatoshiColor(t.Amt), t.CoinType)
+			if t.Delay != 0 {
+				fmt.Fprintf(color.Output, " delay: %d", t.Delay)
+			}
+			if !t.Witty {
+				fmt.Fprintf(color.Output, " non-witness")
+			}
+			if len(t.PairKey) > 1 {
+				fmt.Fprintf(
+					color.Output, "\nPair Pubkey: %s", lnutil.Green(t.PairKey))
+			}
+			fmt.Fprintf(color.Output, "\n\tprivkey: %s", lnutil.Red(t.WIF))
+			fmt.Fprintf(color.Output, "\n")
+		}
+	}
+	return nil
 }
