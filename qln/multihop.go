@@ -30,9 +30,9 @@ func (nd *LitNode) PayMultihop(dstLNAdr string, originCoinType uint32, destCoinT
 		return false, fmt.Errorf("cannot send %d because it's less than minOutput + fee: %d", amount, consts.MinOutput+fee)
 	}
 
-	//Connect to the node
+	// Connect to the node
 	if _, err := nd.FindPeerIndexByAddress(dstLNAdr); err != nil {
-		_, err = nd.DialPeer(dstLNAdr)
+		err = nd.DialPeer(dstLNAdr)
 		if err != nil {
 			return false, fmt.Errorf("error connected to destination node for multihop: %s", err.Error())
 		}
@@ -290,9 +290,9 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 
 	lnAdr := bech32.Encode("ln", nextHop.Node[:])
 
-	//Connect to the node
+	// Connect to the node
 	if _, err := nd.FindPeerIndexByAddress(lnAdr); err != nil {
-		_, err = nd.DialPeer(lnAdr)
+		err = nd.DialPeer(lnAdr)
 		if err != nil {
 			return fmt.Errorf("error connecting to node for multihop: %s", err.Error())
 		}

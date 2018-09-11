@@ -82,7 +82,7 @@ func (nd *LitNode) AutoReconnect(listenPort string, interval int64, connectedCoi
 		idHash := fastsha256.Sum256(pubKey[:])
 		adr := bech32.Encode("ln", idHash[:20])
 		go func() {
-			_, err := nd.DialPeer(adr)
+			err := nd.DialPeer(adr)
 			if err != nil {
 				logging.Errorf("Could not restore connection to %s: %s\n", adr, err.Error())
 			}

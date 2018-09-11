@@ -2,15 +2,15 @@ package litrpc
 
 import (
 	"fmt"
-	"log"
-	"strconv"
-
 	"github.com/mit-dci/lit/bech32"
 	"github.com/mit-dci/lit/btcutil/btcec"
-	"github.com/mit-dci/lit/logging"
-
+	"github.com/mit-dci/lit/lnio"
+	"github.com/mit-dci/lit/lnp2p"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/qln"
+	"log"
+	"strconv"
 )
 
 // ------------------------- testlog
@@ -78,14 +78,19 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *ConnectReply) error {
 		connectAdr = args.LNAddr
 	}
 
-	idx, err := r.Node.DialPeer(connectAdr)
+	err = r.Node.DialPeer(connectAdr)
 	if err != nil {
 		return err
 	}
 
-	reply.Status = fmt.Sprintf("connected to peer %s", connectAdr)
-	reply.PeerIdx = idx
-	return nil
+	var pm lnp2p.PeerManager = r.Node.PeerMan
+	p := pm.GetPeer(lnio.LnAddr(connectAdr))
+
+	if p != nil {
+		reply.Status = fmt.Sprintf("connected to peer %s", connectAdr)
+		reply.PeerIdx = p.GetIdx()
+	}
+	return fmt.Errorf("couldn't find peer in manager after connecting")
 }
 
 // ------------------------- name a connection

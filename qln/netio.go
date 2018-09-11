@@ -2,144 +2,53 @@ package qln
 
 import (
 	"fmt"
-	"net"
-	"strconv"
-	"strings"
-	"time"
-
 	"github.com/mit-dci/lit/btcutil/btcec"
-	"github.com/mit-dci/lit/lndc"
+	"github.com/mit-dci/lit/lnio"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/logging"
-	nat "github.com/mit-dci/lit/nat"
+	"log"
+	"strings"
 )
 
+// GetLisAddressAndPorts .
 // Gets the list of ports where LitNode is listening for incoming connections,
 // & the connection key
-func (nd *LitNode) GetLisAddressAndPorts() (
-	string, []string) {
-
-	idPriv := nd.IdKey()
-	var idPub [33]byte
-	copy(idPub[:], idPriv.PubKey().SerializeCompressed())
-
-	lisAdr := lnutil.LitAdrFromPubkey(idPub)
-	nd.RemoteMtx.Lock()
-	ports := nd.LisIpPorts
-	nd.RemoteMtx.Unlock()
-
-	return lisAdr, ports
+func (nd *LitNode) GetLisAddressAndPorts() (string, []string) {
+	return nd.PeerMan.GetExternalAddress(), nd.PeerMan.GetListeningAddrs()
 }
 
+// FindPeerIndexByAddress finds the peer index by address.
+// TODO Remove this function.
 func (nd *LitNode) FindPeerIndexByAddress(lnAdr string) (uint32, error) {
-	nd.RemoteMtx.Lock()
-	defer nd.RemoteMtx.Unlock()
-	for idx, peer := range nd.RemoteCons {
-		var pubKey [33]byte
-		copy(pubKey[:], peer.Con.RemotePub().SerializeCompressed())
-		adr := lnutil.LitAdrFromPubkey(pubKey)
-		if adr == lnAdr {
-			return idx, nil
-		}
+	pm := nd.PeerMan
+	p := pm.GetPeer(lnio.LnAddr(lnAdr))
+	if p != nil {
+		return p.GetIdx(), nil
 	}
 
 	return 0, fmt.Errorf("Node %s not found", lnAdr)
 }
 
-// TCPListener starts a litNode listening for incoming LNDC connections
-func (nd *LitNode) TCPListener(
-	lisIpPort string) (string, error) {
-	idPriv := nd.IdKey()
+// TCPListener starts a litNode listening for incoming LNDC connections.
+func (nd *LitNode) TCPListener(lisIpPort string) (string, error) {
 
-	// do UPnP / pmp port forwarding
-	// fatal if we aren't able to port forward via upnp
-	if len(nd.Nat) > 0 {
-		listenPort, err := strconv.Atoi(lisIpPort[1:])
-		if err != nil {
-			logging.Error("Invalid port number, returning")
-			return "", err
-		}
-		if nd.Nat == "upnp" {
-			logging.Info("Port forwarding via UPnP on port", lisIpPort[1:])
-			err := nat.SetupUpnp(uint16(listenPort))
-			if err != nil {
-				fmt.Printf("Unable to setup Upnp %v\n", err)
-				logging.Fatal(err) // error out if we can't connect via UPnP
-			}
-			logging.Info("Forwarded port via UPnP")
-		} else if nd.Nat == "pmp" {
-			discoveryTimeout := time.Duration(10 * time.Second)
-			logging.Info("Port forwarding via NAT Pmp on port", lisIpPort[1:])
-			_, err := nat.SetupPmp(discoveryTimeout, uint16(listenPort))
-			if err != nil {
-				err := fmt.Errorf("Unable to discover a "+
-					"NAT-PMP enabled device on the local "+
-					"network: %v", err)
-				logging.Fatal(err) // error out if we can't connect via Pmp
-			} else {
-				logging.Error("Invalid NAT punching option")
-			}
-		}
-	}
-	listener, err := lndc.NewListener(nd.IdKey(), lisIpPort)
+	err := nd.PeerMan.ListenOnPort(lisIpPort)
 	if err != nil {
 		return "", err
 	}
 
-	var idPub [33]byte
-	copy(idPub[:], idPriv.PubKey().SerializeCompressed())
+	lnaddr := nd.PeerMan.GetExternalAddress()
 
-	adr := lnutil.LitAdrFromPubkey(idPub)
+	log.Printf("Listening on %s\n", lisIpPort)
+	log.Printf("Listening with ln address: %s \n", lnaddr)
 
 	// Don't announce on the tracker if we are communicating via SOCKS proxy
 	if nd.ProxyURL == "" {
-		// this should happen asynchronously
-		go GoAnnounce(idPriv, lisIpPort, adr, nd.TrackerURL)
+		go GoAnnounce(nd.IdKey(), lisIpPort, lnaddr, nd.TrackerURL)
 	}
 
-	logging.Infof("Listening on %s\n", listener.Addr().String())
-	logging.Infof("Listening with ln address: %s \n", adr)
+	return lnaddr, nil
 
-	go func() {
-		for {
-			netConn, err := listener.Accept() // this blocks
-			if err != nil {
-				logging.Errorf("Listener error: %s\n", err.Error())
-				continue
-			}
-			newConn, ok := netConn.(*lndc.Conn)
-			if !ok {
-				logging.Errorf("Got something that wasn't a LNDC")
-				continue
-			}
-			logging.Infof("Incoming connection from %x on %s\n",
-				newConn.RemotePub().SerializeCompressed(), newConn.RemoteAddr().String())
-
-			// don't save host/port for incoming connections
-			peerIdx, err := nd.GetPeerIdx(newConn.RemotePub(), "")
-			if err != nil {
-				logging.Errorf("Listener error: %s\n", err.Error())
-				continue
-			}
-
-			nickname := nd.GetNicknameFromPeerIdx(peerIdx)
-
-			nd.RemoteMtx.Lock()
-			var peer RemotePeer
-			peer.Idx = peerIdx
-			peer.Con = newConn
-			peer.Nickname = nickname
-			nd.RemoteCons[peerIdx] = &peer
-			nd.RemoteMtx.Unlock()
-
-			// each connection to a peer gets its own LNDCReader
-			go nd.LNDCReader(&peer)
-		}
-	}()
-	nd.RemoteMtx.Lock()
-	nd.LisIpPorts = append(nd.LisIpPorts, lisIpPort)
-	nd.RemoteMtx.Unlock()
-	return adr, nil
 }
 
 func GoAnnounce(priv *btcec.PrivateKey, litport string, litadr string, trackerURL string) {
@@ -150,7 +59,7 @@ func GoAnnounce(priv *btcec.PrivateKey, litport string, litadr string, trackerUR
 }
 
 // ParseAdrString splits a string like
-// "ln1yrvw48uc3atg8e2lzs43mh74m39vl785g4ehem@myhost.co:8191 into a separate
+// "ln1yrvw48uc3atg8e2lzs43mh74m39vl785g4ehem@myhost.co:8191" into a separate
 // pkh part and network part, adding the network part if needed
 func splitAdrString(adr string) (string, string) {
 
@@ -168,54 +77,17 @@ func splitAdrString(adr string) (string, string) {
 }
 
 // DialPeer makes an outgoing connection to another node.
-func (nd *LitNode) DialPeer(connectAdr string) (uint32, error) {
-	var err error
+// TODO Remove this.
+func (nd *LitNode) DialPeer(connectAdr string) error {
 
-	// parse address and get pkh / host / port
-	who, where := lnutil.ParseAdrString(connectAdr)
-
-	// If we couldn't deduce a URL, look it up on the tracker
-	if where == "" {
-		where, _, err = lnutil.Lookup(who, nd.TrackerURL, nd.ProxyURL)
-		if err != nil {
-			return 0, err
-		}
-	}
-
-	// get my private ID key
-	idPriv := nd.IdKey()
-
-	// Assign remote connection
-	newConn, err := lndc.Dial(idPriv, where, who, net.Dial)
+	_, err := nd.PeerMan.TryConnectAddress(connectAdr, nil)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
-	// if connect is successful, either query for already existing peer index, or
-	// if the peer is new, make a new index, and save the hostname&port
+	// TEMP The event handler handles actually setting up the peer in the LitNode
 
-	// figure out peer index, or assign new one for new peer.  Since
-	// we're connecting out, also specify the hostname&port
-	peerIdx, err := nd.GetPeerIdx(newConn.RemotePub(), newConn.RemoteAddr().String())
-	if err != nil {
-		return 0, err
-	}
-
-	// also retrieve their nickname, if they have one
-	nickname := nd.GetNicknameFromPeerIdx(uint32(peerIdx))
-
-	nd.RemoteMtx.Lock()
-	var p RemotePeer
-	p.Con = newConn
-	p.Idx = peerIdx
-	p.Nickname = nickname
-	nd.RemoteCons[peerIdx] = &p
-	nd.RemoteMtx.Unlock()
-
-	// each connection to a peer gets its own LNDCReader
-	go nd.LNDCReader(&p)
-
-	return peerIdx, nil
+	return nil
 }
 
 // OutMessager takes messages from the outbox and sends them to the ether. net.

@@ -102,6 +102,9 @@ type LitNode struct {
 	// event bus
 	Events eventbus.EventBus
 
+	// Networking
+	PeerMan lnp2p.PeerManager
+
 	// all nodes have a watchtower.  but could have a tower without a node
 	Tower watchtower.Watcher
 

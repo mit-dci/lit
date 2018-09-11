@@ -2,6 +2,7 @@ package lnp2p
 
 //"crypto/ecdsa" // TODO Use ecdsa not btcec
 import (
+	"crypto/ecdsa"
 	"fmt"
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/btcutil/hdkeychain"
@@ -55,6 +56,14 @@ func NewPeerManager(rootkey *hdkeychain.ExtendedKey, pdb lnio.LitPeerStorage, bu
 	return pm, nil
 }
 
+// GetExternalAddress returns the human-readable LN address
+func (pm *PeerManager) GetExternalAddress() string {
+	idk := pm.idkey // lol
+	c := btcec.PublicKey(ecdsa.PublicKey(idk.PublicKey))
+	addr := convertPubkeyToLitAddr(pubkey(&c))
+	return string(addr)
+}
+
 func computeIdentKeyFromRoot(rootkey *hdkeychain.ExtendedKey) (privkey, error) {
 	var kg portxo.KeyGen
 	kg.Depth = 5
@@ -97,7 +106,8 @@ func (pm *PeerManager) GetPeerByIdx(id int32) *Peer {
 	return pm.peerMap[pm.peers[id]]
 }
 
-func (pm *PeerManager) tryConnectAddress(addr string, proxy *ProxySettings) (*Peer, error) {
+// TryConnectAddress attempts to connect to the specified LN address.
+func (pm *PeerManager) TryConnectAddress(addr string, proxy *ProxySettings) (*Peer, error) {
 
 	// Figure out who we're trying to connect to.
 	who, where := splitAdrString(addr)
@@ -204,6 +214,52 @@ func (pm *PeerManager) ListenOnPort(addr string) error {
 	return nil
 
 }
+
+// GetListeningAddrs returns the listening addresses.
+func (pm *PeerManager) GetListeningAddrs() []string {
+	pm.mtx.Lock()
+	defer pm.mtx.Unlock()
+	ports := make([]string, 0)
+	for _, t := range pm.listeningPorts {
+		ports = append(ports, t.listener.Addr().String())
+	}
+	return ports
+}
+
+/*
+	TODO Implement this stuff again.
+
+	// do UPnP / pmp port forwarding
+	// fatal if we aren't able to port forward via upnp
+	if len(nd.Nat) > 0 {
+		listenPort, err := strconv.Atoi(lisIpPort[1:])
+		if err != nil {
+			log.Println("Invalid port number, returning")
+			return "", err
+		}
+		if nd.Nat == "upnp" {
+			log.Println("Port forwarding via UPnP on port", lisIpPort[1:])
+			err := nat.SetupUpnp(uint16(listenPort))
+			if err != nil {
+				fmt.Printf("Unable to setup Upnp %v\n", err)
+				log.Fatal(err) // error out if we can't connect via UPnP
+			}
+			log.Println("Forwarded port via UPnP")
+		} else if nd.Nat == "pmp" {
+			discoveryTimeout := time.Duration(10 * time.Second)
+			log.Println("Port forwarding via NAT Pmp on port", lisIpPort[1:])
+			_, err := nat.SetupPmp(discoveryTimeout, uint16(listenPort))
+			if err != nil {
+				err := fmt.Errorf("Unable to discover a "+
+					"NAT-PMP enabled device on the local "+
+					"network: %v", err)
+				log.Fatal(err) // error out if we can't connect via Pmp
+			} else {
+				log.Println("Invalid NAT punching option")
+			}
+		}
+	}
+*/
 
 // StopListening closes the socket listened on the given address, stopping the goroutine.
 func (pm *PeerManager) StopListening(addr string) error {
