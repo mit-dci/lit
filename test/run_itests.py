@@ -48,7 +48,6 @@ if __name__ == '__main__':
             print(e)
         try:
             fund(env)
-            close(env)
         except Exception as e:
             print(e)
     finally:
