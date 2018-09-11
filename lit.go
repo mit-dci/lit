@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"os"
 	"time"
 
@@ -51,6 +52,7 @@ type config struct { // define a struct for usage with go-flags
 	AutoReconnectInterval           int64  `long:"autoReconnectInterval" description:"The interval (in seconds) the reconnect logic should be executed"`
 	AutoReconnectOnlyConnectedCoins bool   `long:"autoReconnectOnlyConnectedCoins" description:"Only reconnect to peers that we have channels with in a coin whose coin daemon is available"`
 	AutoListenPort                  string `long:"autoListenPort" description:"When auto reconnect enabled, starts listening on this port"`
+	MaxThreads                      int    `long:"maxThreads" description:"Set the maximum number of threads that you would like lit to run on. Run shortadr-benchmark for measuring the performance of your system"`
 	Params                          *coinparam.Params
 }
 
@@ -68,6 +70,7 @@ var (
 	defaultUpnPFlag                        = false
 	defaultLogLevel                        = 3
 	defaultAutoReconnectOnlyConnectedCoins = false
+	defaultMaxThreads                      = 10
 	defaultUnauthRPC                       = false
 )
 
@@ -168,6 +171,7 @@ func main() {
 		AutoReconnectInterval:           defaultAutoReconnectInterval,
 		AutoReconnectOnlyConnectedCoins: defaultAutoReconnectOnlyConnectedCoins,
 		LogLevel:                        defaultLogLevel,
+		MaxThreads:                      defaultMaxThreads,
 		UnauthRPC:                       defaultUnauthRPC,
 	}
 
@@ -176,10 +180,13 @@ func main() {
 		conf.LitProxyURL = conf.ProxyURL
 		conf.ChainProxyURL = conf.ProxyURL
 	}
-
+	if conf.MaxThreads < 0 {
+		log.Fatal("Number of threads can't be negative. Quitting!")
+		conf.MaxThreads = defaultMaxThreads
+	}
 	// Setup LN node.  Activate Tower if in hard mode.
 	// give node and below file pathof lit home directory
-	node, err := qln.NewLitNode(key, conf.LitHomeDir, conf.TrackerURL, conf.LitProxyURL, conf.Nat)
+	node, err := qln.NewLitNode(key, conf.LitHomeDir, conf.TrackerURL, conf.LitProxyURL, conf.Nat, conf.MaxThreads)
 	if err != nil {
 		logging.Fatal(err)
 	}

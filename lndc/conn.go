@@ -12,6 +12,7 @@ import (
 
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/shortadr"
 )
 
 // Conn is an implementation of net.Conn which enforces an authenticated key
@@ -36,13 +37,14 @@ var _ net.Conn = (*Conn)(nil)
 // public key. In the case of a handshake failure, the connection is closed and
 // a non-nil error is returned.
 func Dial(localPriv *btcec.PrivateKey, ipAddr string, remotePKH string,
-	dialer func(string, string) (net.Conn, error)) (*Conn, error) {
+	dialer func(string, string) (net.Conn, error)) (*Conn, uint64, error) {
 	var conn net.Conn
 	var err error
+	zero := uint64(0)
 	conn, err = dialer("tcp", ipAddr)
 	logging.Info("ipAddr is", ipAddr)
 	if err != nil {
-		return nil, err
+		return nil, zero, err
 	}
 
 	b := &Conn{
@@ -54,11 +56,11 @@ func Dial(localPriv *btcec.PrivateKey, ipAddr string, remotePKH string,
 	actOne, err := b.noise.GenActOne()
 	if err != nil {
 		b.conn.Close()
-		return nil, err
+		return nil, zero, err
 	}
 	if _, err := conn.Write(actOne[:]); err != nil {
 		b.conn.Close()
-		return nil, err
+		return nil, zero, err
 	}
 
 	// We'll ensure that we get ActTwo from the remote peer in a timely
@@ -73,37 +75,46 @@ func Dial(localPriv *btcec.PrivateKey, ipAddr string, remotePKH string,
 	var actTwo [ActTwoSize]byte
 	if _, err := io.ReadFull(conn, actTwo[:]); err != nil {
 		b.conn.Close()
-		return nil, err
+		return nil, zero, err
 	}
-	s, err := b.noise.RecvActTwo(actTwo)
+	s, nonce, err := b.noise.RecvActTwo(actTwo)
 	if err != nil {
 		b.conn.Close()
-		return nil, err
+		return nil, zero, err
 	}
 
-	logging.Info("Received pubkey", s)
-	if lnutil.LitAdrFromPubkey(s) != remotePKH {
-		return nil, fmt.Errorf("Remote PKH doesn't match. Quitting!")
+	logging.Infoln("Received pubkey, nonce", s, nonce)
+	if len(remotePKH) < 41 {
+		// it is a short address, so hash and get back the address
+		adr := shortadr.GetShortPKH(s, nonce)
+		if adr != remotePKH {
+			return nil, zero, fmt.Errorf("Short Remote PKH doesn't match. Quitting!")
+		}
+		logging.Infof("Received short PKH %s matches", adr)
+	} else {
+		if lnutil.LitAdrFromPubkey(s) != remotePKH {
+			return nil, zero, fmt.Errorf("Remote PKH doesn't match. Quitting!")
+		}
+		logging.Infof("Received PKH %s matches", lnutil.LitAdrFromPubkey(s))
 	}
-	logging.Infof("Received PKH %s matches", lnutil.LitAdrFromPubkey(s))
 
 	// Finally, complete the handshake by sending over our encrypted static
 	// key and execute the final ECDH operation.
 	actThree, err := b.noise.GenActThree()
 	if err != nil {
 		b.conn.Close()
-		return nil, err
+		return nil, zero, err
 	}
 	if _, err := conn.Write(actThree[:]); err != nil {
 		b.conn.Close()
-		return nil, err
+		return nil, zero, err
 	}
 
 	// We'll reset the deadline as it's no longer critical beyond the
 	// initial handshake.
 	conn.SetReadDeadline(time.Time{})
 
-	return b, nil
+	return b, nonce, nil
 }
 
 // ReadNextMessage uses the connection in a message-oriented instructing it to

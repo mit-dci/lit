@@ -4,8 +4,8 @@ import (
 	"crypto/cipher"
 	"crypto/sha256"
 	"encoding/binary"
-	"fmt"
 	"errors"
+	"fmt"
 	"io"
 	"math"
 	"time"
@@ -390,9 +390,9 @@ const (
 	// in ActTwo. The packet consists of a handshake version, an ephemeral
 	// key in compressed format, a public key in compressed format
 	// and a 16-byte poly1305 tag.
-	// <- e, ee, s, es
-	// 1 + 33 + 33 + 16
-	ActTwoSize = 83
+	// <- e, ee, s, es, nonce(optional)
+	// 1 + 33 + 33 + + 8 + 16
+	ActTwoSize = 91
 
 	// ActThreeSize is the size of the packet sent from initiator to
 	// responder in ActThree. The packet consists of a handshake version,
@@ -469,7 +469,7 @@ func (b *Machine) RecvActOne(actOne [ActOneSize]byte) error {
 // GenActTwo generates the second packet (act two) to be sent from the
 // responder to the initiator
 // <- e, ee, s, es
-func (b *Machine) GenActTwo() ([ActTwoSize]byte, error) {
+func (b *Machine) GenActTwo(nonce uint64) ([ActTwoSize]byte, error) {
 	var (
 		err    error
 		actTwo [ActTwoSize]byte
@@ -496,11 +496,17 @@ func (b *Machine) GenActTwo() ([ActTwoSize]byte, error) {
 	es := ecdh(b.remoteEphemeral, b.localStatic)
 	b.mixKey(es)
 
+	// nonce
+	nonceBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(nonceBytes, nonce)
+	b.mixHash(nonceBytes)
+	fmt.Println("PRINTING NONCE IN ACT TWO", nonce, nonceBytes)
 	authPayload := b.EncryptAndHash([]byte{})
 	actTwo[0] = HandshakeVersion
 	copy(actTwo[1:34], e)
 	copy(actTwo[34:67], s)
-	copy(actTwo[67:], authPayload)
+	copy(actTwo[67:75], nonceBytes)
+	copy(actTwo[75:], authPayload)
 	// add additional stuff based on what we need
 	return actTwo, nil
 }
@@ -508,30 +514,33 @@ func (b *Machine) GenActTwo() ([ActTwoSize]byte, error) {
 // RecvActTwo processes the second packet (act two) sent from the responder to
 // the initiator. A successful processing of this packet authenticates the
 // initiator to the responder.
-func (b *Machine) RecvActTwo(actTwo [ActTwoSize]byte) ([33]byte, error) {
+func (b *Machine) RecvActTwo(actTwo [ActTwoSize]byte) ([33]byte, uint64, error) {
 	var (
-		err error
-		e   [33]byte
-		s   [33]byte
-		p   [16]byte
+		err   error
+		e     [33]byte
+		s     [33]byte
+		nonceBytes [8]byte
+		p     [16]byte
 	)
 	var empty [33]byte
 	// If the handshake version is unknown, then the handshake fails
 	// immediately.
 	if actTwo[0] != HandshakeVersion {
-		return empty, fmt.Errorf("Act Two: invalid handshake version: %v, "+
+		return empty, uint64(0), fmt.Errorf("Act Two: invalid handshake version: %v, "+
 			"only %v is valid, msg=%x", actTwo[0], HandshakeVersion,
 			actTwo[:])
 	}
 
 	copy(e[:], actTwo[1:34])
 	copy(s[:], actTwo[34:67])
-	copy(p[:], actTwo[67:])
+	copy(nonceBytes[:], actTwo[67:75])
+	fmt.Println("Received nonce:", nonceBytes)
+	copy(p[:], actTwo[75:])
 
 	// e
 	b.remoteEphemeral, err = btcec.ParsePubKey(e[:], btcec.S256())
 	if err != nil {
-		return empty, err
+		return empty, uint64(0), err
 	}
 	b.mixHash(b.remoteEphemeral.SerializeCompressed())
 
@@ -542,7 +551,7 @@ func (b *Machine) RecvActTwo(actTwo [ActTwoSize]byte) ([33]byte, error) {
 	// s
 	b.remoteStatic, err = btcec.ParsePubKey(s[:], btcec.S256())
 	if err != nil {
-		return empty, err
+		return empty, uint64(0), err
 	}
 	b.mixHash(b.remoteStatic.SerializeCompressed())
 
@@ -550,8 +559,13 @@ func (b *Machine) RecvActTwo(actTwo [ActTwoSize]byte) ([33]byte, error) {
 	es := ecdh(b.remoteStatic, b.localEphemeral)
 	b.mixKey(es)
 
+	//nonce
+ 	nonce := binary.BigEndian.Uint64(nonceBytes[:])
+	fmt.Println("Decrypted nonce:", nonce)
+	b.mixHash(nonceBytes[:])
+
 	_, err = b.DecryptAndHash(p[:])
-	return s, err
+	return s, nonce, err
 }
 
 // GenActThree creates the final (act three) packet of the handshake. Act three

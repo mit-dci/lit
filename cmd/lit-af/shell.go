@@ -528,9 +528,6 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 			if displayAllCommands {
 				fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Listening Ports:"))
 			}
-			fmt.Fprintf(color.Output,
-				"Listening for connections on port(s) %v with key %s\n",
-				lnutil.White(lReply.LisIpPorts), lReply.Adr)
 		}
 	}
 

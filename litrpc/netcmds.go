@@ -24,7 +24,9 @@ func (r *LitRPC) TestLog(arg string, reply *string) error {
 // ------------------------- listen
 
 type ListenArgs struct {
-	Port string
+	Port       string
+	Short      bool
+	ShortZeros uint8
 }
 
 type ListeningPortsReply struct {
@@ -36,12 +38,13 @@ func (r *LitRPC) Listen(args ListenArgs, reply *ListeningPortsReply) error {
 	if args.Port == "" {
 		args.Port = ":2448"
 	}
-	_, err := r.Node.TCPListener(args.Port)
+	adr, err := r.Node.TCPListener(args.Port, args.Short, args.ShortZeros)
+
 	if err != nil {
 		return err
 	}
 
-	reply.Adr, reply.LisIpPorts = r.Node.GetLisAddressAndPorts()
+	reply.Adr = adr
 
 	return nil
 }
@@ -130,7 +133,7 @@ func (r *LitRPC) ListConnections(args NoArgs, reply *ListConnectionsReply) error
 }
 
 func (r *LitRPC) GetListeningPorts(args NoArgs, reply *ListeningPortsReply) error {
-	reply.Adr, reply.LisIpPorts = r.Node.GetLisAddressAndPorts()
+	reply.LisIpPorts = r.Node.GetLisPorts()
 	return nil
 }
 

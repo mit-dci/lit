@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/mit-dci/lit/qln"
 
@@ -20,8 +19,12 @@ var sayCommand = &Command{
 }
 
 var lisCommand = &Command{
-	Format:           fmt.Sprintf("%s%s\n", lnutil.White("lis"), lnutil.OptColor("port")),
-	Description:      fmt.Sprintf("Start listening for incoming connections. The port number, if omitted, defaults to 2448.\n"),
+	Format:           fmt.Sprintf("%s%s%s%s\n", lnutil.White("lis"), lnutil.OptColor("port"), lnutil.OptColor("short"), lnutil.OptColor("powBytes")),
+	Description:      fmt.Sprintf("%s\n%s\n%s%s\n",
+		"Start listening for incoming connections",
+		"The port number, if omitted, defaults to 2448",
+		"Short addresses requires an argument (powbytes) and does sufficient ",
+		"computation to achieve a lower difficulty than the target specified"),
 	ShortDescription: "Start listening for incoming connections.\n",
 }
 
@@ -86,11 +89,47 @@ func (lc *litAfClient) Lis(textArgs []string) error {
 	reply := new(litrpc.ListeningPortsReply)
 
 	args.Port = ":2448"
-	if len(textArgs) > 0 {
-		if strings.Contains(textArgs[0], ":") {
-			args.Port = textArgs[0]
+	if len(textArgs) >= 1 {
+		// check whether the argument is a port
+		_, err := strconv.Atoi(textArgs[0])
+		if err != nil {
+			// assume this error is due to the arg is not an int
+			if len(textArgs) > 1 {
+				if textArgs[0] == "short" {
+					args.Short = true
+					if len(textArgs) == 2 {
+						shortzeros, err := strconv.Atoi(textArgs[1])
+						if err != nil {
+							fmt.Println("failed to activate short listen address mode")
+							return fmt.Errorf("%s", err)
+						}
+						args.ShortZeros = uint8(shortzeros)
+						fmt.Printf("generating short listen address with %d pow bytes\n", args.ShortZeros)
+					} else {
+						return fmt.Errorf("please specify how much work in bytes you want to perform")
+					}
+				}
+			}
 		} else {
+			// user input: lis <portNumber> blah
+			// check whether blah refers to short addresses with / without port number
 			args.Port = ":" + textArgs[0]
+			if len(textArgs) > 1 {
+				if textArgs[1] == "short" {
+					args.Short = true
+					if len(textArgs) == 3 {
+						shortzeros, err := strconv.Atoi(textArgs[2])
+						if err != nil {
+							fmt.Println("failed to activate short listen address mode")
+							return fmt.Errorf("%s", err)
+						}
+						args.ShortZeros = uint8(shortzeros)
+						fmt.Printf("generating short listen address with %d pow bytes", args.ShortZeros)
+					} else {
+						return fmt.Errorf("please specify how much work in bytes you want to perform")
+					}
+				}
+			}
 		}
 	}
 
@@ -98,11 +137,8 @@ func (lc *litAfClient) Lis(textArgs []string) error {
 	if err != nil {
 		return err
 	}
-	if len(reply.LisIpPorts) == 0 {
-		return fmt.Errorf("no listening port returned")
-	}
 
-	fmt.Fprintf(color.Output, "listening on %s@%s\n", reply.Adr, reply.LisIpPorts[0])
+	fmt.Fprintf(color.Output, "listening on %s@%s\n", reply.Adr, args.Port)
 
 	return nil
 }

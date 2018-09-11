@@ -102,7 +102,7 @@ func NewLndcRpcClient(address string, key *btcec.PrivateKey) (*LndcRpcClient, er
 		}
 	}
 
-	cli.lnconn, err = lndc.Dial(key, where, who, net.Dial)
+	cli.lnconn, _, err = lndc.Dial(key, where, who, net.Dial)
 	if err != nil {
 		return nil, err
 	}

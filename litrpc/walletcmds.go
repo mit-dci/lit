@@ -410,7 +410,6 @@ func (r *LitRPC) Address(args *AddressArgs, reply *AddressReply) error {
 		}
 		reply.WitAddresses[i] = bech32adr
 	}
-
 	return nil
 }
 

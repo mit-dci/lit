@@ -26,7 +26,8 @@ func removeDuplicates(inputArr []uint32) []uint32 {
 // previously known peers attached with the coin daemons running.
 func (nd *LitNode) AutoReconnect(listenPort string, interval int64, connectedCoinOnly bool) {
 	// Listen myself after a timeout
-	nd.TCPListener(listenPort)
+	nd.TCPListener(listenPort, false, 0)
+
 	// Reconnect to other nodes after an interval
 	ticker := time.NewTicker(time.Duration(interval) * time.Second)
 	qcs, _ := nd.GetAllQchans() // get all chan data

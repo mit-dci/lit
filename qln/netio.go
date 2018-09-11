@@ -12,23 +12,16 @@ import (
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/logging"
 	nat "github.com/mit-dci/lit/nat"
+	shortadr "github.com/mit-dci/lit/shortadr"
 )
 
 // Gets the list of ports where LitNode is listening for incoming connections,
 // & the connection key
-func (nd *LitNode) GetLisAddressAndPorts() (
-	string, []string) {
-
-	idPriv := nd.IdKey()
-	var idPub [33]byte
-	copy(idPub[:], idPriv.PubKey().SerializeCompressed())
-
-	lisAdr := lnutil.LitAdrFromPubkey(idPub)
+func (nd *LitNode) GetLisPorts() []string {
 	nd.RemoteMtx.Lock()
 	ports := nd.LisIpPorts
 	nd.RemoteMtx.Unlock()
-
-	return lisAdr, ports
+	return ports
 }
 
 func (nd *LitNode) FindPeerIndexByAddress(lnAdr string) (uint32, error) {
@@ -47,8 +40,8 @@ func (nd *LitNode) FindPeerIndexByAddress(lnAdr string) (uint32, error) {
 }
 
 // TCPListener starts a litNode listening for incoming LNDC connections
-func (nd *LitNode) TCPListener(
-	lisIpPort string) (string, error) {
+func (nd *LitNode) TCPListener(lisIpPort string,
+	shortArg bool, shortZeros uint8) (string, error) {
 	idPriv := nd.IdKey()
 
 	// do UPnP / pmp port forwarding
@@ -81,15 +74,55 @@ func (nd *LitNode) TCPListener(
 			}
 		}
 	}
-	listener, err := lndc.NewListener(nd.IdKey(), lisIpPort)
-	if err != nil {
-		return "", err
-	}
 
 	var idPub [33]byte
 	copy(idPub[:], idPriv.PubKey().SerializeCompressed())
 
-	adr := lnutil.LitAdrFromPubkey(idPub)
+	stop := make([]chan bool, nd.MaxThreads) // open 10 channels, maybe receive this from the user as well?
+	MaxUint64 := uint64(1<<64 - 1)           // nonce range to iterate over
+	NoOfWorkers := uint64(nd.MaxThreads)     // 10 for testing, get from user, max 1 million
+	Start := MaxUint64 / NoOfWorkers         // split each routine to look at a specific range
+
+	logging.Infof("Spinning up %d threads for generatign short address", nd.MaxThreads)
+	// used to assign ids to the channels
+	i := uint64(0)
+	// default nonce value, if zero, we proceed with the normal listening address case
+	bestNonce := uint64(0)
+	// the firstHash with higher difficulty than specified powbytes
+	var bestHash [20]byte
+	// target powbytes that we must aim at
+	powbytes := 8 * shortZeros
+
+	if shortArg {
+		shortAddressReply := make(chan shortadr.ShortReply)
+		for ; i < NoOfWorkers; i++ {
+			go shortadr.ShortAdrWorker(idPub, i, Start*i, powbytes, shortAddressReply, stop[i])
+		}
+		for reply := range shortAddressReply {
+			if shortadr.CheckWork(reply.BestHash)/8 >= shortZeros {
+				bestNonce = reply.BestNonce
+				bestHash = reply.BestHash
+				break // break since we got a nocne with lower difficulty
+			}
+		}
+		go func() {
+			for ; i < NoOfWorkers; i++ {
+				stop[i] <- true // TODO: this still runs the chans till one nonce each is found.
+			}
+		}()
+	}
+	listener, err := lndc.NewListener(nd.IdKey(), lisIpPort, bestNonce)
+	if err != nil {
+		return "", err
+	}
+	//pub, id, nonce uint64, bestBits uint8, bestNonce chan uint64, stop chan bool
+	//adr := lnutil.LitAdrFromPubkey(idPub)
+	var adr string
+	if bestNonce != 0 {
+		adr = lnutil.LitShortAdrFromPubkey(bestHash[:]) // shorter adr if nonce is non zero
+	} else {
+		adr = lnutil.LitAdrFromPubkey(idPub) // default scenario
+	}
 
 	// Don't announce on the tracker if we are communicating via SOCKS proxy
 	if nd.ProxyURL == "" {
@@ -98,8 +131,7 @@ func (nd *LitNode) TCPListener(
 	}
 
 	logging.Infof("Listening on %s\n", listener.Addr().String())
-	logging.Infof("Listening with ln address: %s \n", adr)
-
+	logging.Infof("Listening with ln address: %s and nonce: %d\n", adr, bestNonce)
 	go func() {
 		for {
 			netConn, err := listener.Accept() // this blocks
@@ -186,7 +218,7 @@ func (nd *LitNode) DialPeer(connectAdr string) (uint32, error) {
 	idPriv := nd.IdKey()
 
 	// Assign remote connection
-	newConn, err := lndc.Dial(idPriv, where, who, net.Dial)
+	newConn, nonce, err := lndc.Dial(idPriv, where, who, net.Dial)
 	if err != nil {
 		return 0, err
 	}
@@ -208,6 +240,7 @@ func (nd *LitNode) DialPeer(connectAdr string) (uint32, error) {
 	var p RemotePeer
 	p.Con = newConn
 	p.Idx = peerIdx
+	p.Nonce = nonce
 	p.Nickname = nickname
 	nd.RemoteCons[peerIdx] = &p
 	nd.RemoteMtx.Unlock()
@@ -259,7 +292,13 @@ func (nd *LitNode) GetConnectedPeerList() []PeerInfo {
 		newPeer.PeerNumber = k
 		newPeer.RemoteHost = v.Con.RemoteAddr().String()
 		newPeer.Nickname = v.Nickname
+
 		newPeer.LitAdr = lnutil.LitAdrFromPubkey(pubArr)
+		if v.Nonce != 0 {
+			// Nonce is non zero, means we're connecting to a short address
+			hash := shortadr.HashOnce(pubArr, 0, v.Nonce) // get the hash with zeros
+			newPeer.LitAdr = lnutil.LitShortAdrFromPubkey(hash[:])
+		}
 		peers = append(peers, newPeer)
 	}
 	return peers
