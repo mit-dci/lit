@@ -250,7 +250,6 @@ type InFlightFund struct {
 
 func (inff *InFlightFund) Clear() {
 	inff.PeerIdx = 0
-	log.Printf("HAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
 	inff.ChanIdx = 0
 
 	inff.Amt = 0

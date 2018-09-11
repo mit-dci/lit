@@ -205,6 +205,7 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 
 	// save to db with ONLY delta changed
 	err = nd.SaveQchanState(qc)
+	qc.LastUpdate = uint64(time.Now().UnixNano() / 1000)
 	if err != nil {
 		// don't clear to send here; something is wrong with the channel
 		nd.FailChannel(qc)
@@ -217,9 +218,8 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 
 	err = nd.SendDeltaSig(qc)
 	if err != nil {
-		qc.LastUpdate = uint64(time.Now().UnixNano() / 1000)
-		qc.ChanMtx.Unlock()
 		// don't clear; something is wrong with the network
+		qc.ChanMtx.Unlock()
 		return err
 	}
 

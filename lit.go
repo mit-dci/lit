@@ -2,6 +2,9 @@ package main
 
 import (
 	"os"
+	"os/signal"
+	"runtime"
+	"syscall"
 	"time"
 
 	"github.com/mit-dci/lit/logging"
@@ -35,14 +38,16 @@ type config struct { // define a struct for usage with go-flags
 	LitProxyURL   string `long:"litproxy" description:"SOCKS5 proxy to use for Lit's network communications. Overridden by the proxy flag."`
 	ChainProxyURL string `long:"chainproxy" description:"SOCKS5 proxy to use for Wallit's network communications. Overridden by the proxy flag."`
 
-	//UPnP port forwarding and NAT Traversal
+	// UPnP port forwarding and NAT Traversal
 	Nat string `long:"nat" description:"Toggle upnp or pmp NAT Traversal NAT Punching"`
-	//resync and tower config
+	// resync and tower config
 	ReSync bool `short:"r" long:"reSync" description:"Resync from the given tip."`
 	Tower  bool `long:"tower" description:"Watchtower: Run a watching node"`
 	Hard   bool `short:"t" long:"hard" description:"Flag to set networks."`
 
+	// logging
 	LogLevel int `short:"v" long:"verbose" description:"Set verbosity level from 0 to 5 (most to least)"`
+
 	// rpc server config
 	Rpcport uint16 `short:"p" long:"rpcport" description:"Set RPC port to connect to"`
 	Rpchost string `long:"rpchost" description:"Set RPC host to listen to"`
@@ -176,6 +181,18 @@ func main() {
 		conf.LitProxyURL = conf.ProxyURL
 		conf.ChainProxyURL = conf.ProxyURL
 	}
+
+	// SIGQUIT hander for debugging
+	go func() {
+		sigs := make(chan os.Signal, 1)
+		signal.Notify(sigs, syscall.SIGQUIT)
+		buf := make([]byte, 1<<20)
+		for {
+			<-sigs
+			stacklen := runtime.Stack(buf, true)
+			logging.Warnf("=== received SIGQUIT ===\n*** goroutine dump...\n%s\n*** end\n", buf[:stacklen])
+		}
+	}()
 
 	// Setup LN node.  Activate Tower if in hard mode.
 	// give node and below file pathof lit home directory

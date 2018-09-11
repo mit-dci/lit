@@ -18,7 +18,7 @@ type Peer struct {
 // GetIdx is a compatibility function.
 func (p *Peer) GetIdx() uint32 {
 	if p.idx == nil {
-		return 0xffffffff
+		return 0
 	}
 	return *p.idx
 }
