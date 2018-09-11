@@ -10,6 +10,7 @@ import (
 	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/qln"
 	"strconv"
+	"strings"
 )
 
 // ------------------------- testlog
@@ -82,14 +83,22 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *ConnectReply) error {
 		return err
 	}
 
-	var pm *lnp2p.PeerManager = r.Node.PeerMan
-	p := pm.GetPeer(lncore.LnAddr(connectAdr))
-
-	if p != nil {
-		reply.Status = fmt.Sprintf("connected to peer %s", connectAdr)
-		reply.PeerIdx = p.GetIdx()
+	// Extract the plain lit addr since we don't always have it.
+	// TODO Make this more "correct" since it's using the old system a lot.
+	paddr := connectAdr
+	if strings.Contains(paddr, "@") {
+		paddr = strings.SplitN(paddr, "@", 2)[0]
 	}
-	return fmt.Errorf("couldn't find peer in manager after connecting")
+
+	var pm *lnp2p.PeerManager = r.Node.PeerMan
+	p := pm.GetPeer(lncore.LnAddr(paddr))
+	if p == nil {
+		return fmt.Errorf("couldn't find peer in manager after connecting")
+	}
+
+	reply.Status = fmt.Sprintf("connected to peer %s", connectAdr)
+	reply.PeerIdx = p.GetIdx()
+	return nil
 }
 
 // ------------------------- name a connection

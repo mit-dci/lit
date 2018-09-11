@@ -120,6 +120,7 @@ func (pm *PeerManager) GetPeerIdx(peer *Peer) int32 {
 // GetPeer returns the peer with the given lnaddr.
 func (pm *PeerManager) GetPeer(lnaddr lncore.LnAddr) *Peer {
 	p, ok := pm.peerMap[lnaddr]
+	logging.Errorf("%v -> %v (%t)\n", lnaddr, p, ok)
 	if !ok {
 		return nil
 	}
@@ -157,7 +158,7 @@ func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, set
 	}
 
 	// Do NAT setup stuff.
-	if settings.NatMode != nil {
+	if settings != nil && settings.NatMode != nil {
 
 		// Do some type juggling.
 		x, err := strconv.Atoi(netaddr[1:])
@@ -190,7 +191,7 @@ func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, set
 	dialer := net.Dial
 
 	// Use a proxy server if applicable.
-	if settings.ProxyAddr != nil {
+	if settings != nil && settings.ProxyAddr != nil {
 		d, err := connectToProxyTCP(*settings.ProxyAddr, settings.ProxyAuth)
 		if err != nil {
 			return nil, err
