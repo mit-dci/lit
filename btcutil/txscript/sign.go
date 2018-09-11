@@ -7,10 +7,9 @@ package txscript
 import (
 	"errors"
 	"fmt"
-
 	"github.com/mit-dci/lit/btcutil"
-	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/btcutil/chaincfg"
+	"github.com/mit-dci/lit/btcutil/koblitz"
 	"github.com/mit-dci/lit/wire"
 )
 

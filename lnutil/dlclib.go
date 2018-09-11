@@ -5,14 +5,12 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"math/big"
-
-	"github.com/mit-dci/lit/logging"
-
-	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
+	"github.com/mit-dci/lit/btcutil/koblitz"
 	"github.com/mit-dci/lit/consts"
+	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/wire"
+	"math/big"
 )
 
 // DlcContractStatus is an enumeration containing the various statuses a

@@ -16,14 +16,13 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"math/big"
-
 	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/base58"
-	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/btcutil/chaincfg"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
+	"github.com/mit-dci/lit/btcutil/koblitz"
 	"github.com/mit-dci/lit/coinparam"
+	"math/big"
 )
 
 const (

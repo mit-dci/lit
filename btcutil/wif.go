@@ -7,11 +7,10 @@ package btcutil
 import (
 	"bytes"
 	"errors"
-
 	"github.com/mit-dci/lit/btcutil/base58"
-	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/btcutil/chaincfg"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
+	"github.com/mit-dci/lit/btcutil/koblitz"
 )
 
 // ErrMalformedPrivateKey describes an error where a WIF-encoded private

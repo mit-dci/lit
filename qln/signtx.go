@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/mit-dci/lit/btcutil/btcec"
+	"github.com/mit-dci/lit/btcutil/koblitz"
 	"github.com/mit-dci/lit/btcutil/txscript"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/logging"

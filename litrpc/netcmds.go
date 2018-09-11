@@ -3,7 +3,7 @@ package litrpc
 import (
 	"fmt"
 	"github.com/mit-dci/lit/bech32"
-	"github.com/mit-dci/lit/btcutil/btcec"
+	"github.com/mit-dci/lit/btcutil/koblitz"
 	"github.com/mit-dci/lit/lnio"
 	"github.com/mit-dci/lit/lnp2p"
 	"github.com/mit-dci/lit/lnutil"

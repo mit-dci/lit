@@ -1,7 +1,7 @@
 package lnp2p
 
 import (
-	"github.com/mit-dci/lit/btcutil/btcec"
+	"github.com/mit-dci/lit/btcutil/koblitz"
 	"github.com/mit-dci/lit/eventbus"
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnio"

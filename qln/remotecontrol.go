@@ -5,16 +5,15 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"log"
-	"reflect"
-	"strings"
-
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/btcutil"
-	"github.com/mit-dci/lit/btcutil/btcec"
+	"github.com/mit-dci/lit/btcutil/koblitz"
 	"github.com/mit-dci/lit/crypto/fastsha256"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/sig64"
+	"log"
+	"reflect"
+	"strings"
 )
 
 type RCRequestAuthArgs struct {

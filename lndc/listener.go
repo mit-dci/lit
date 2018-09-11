@@ -6,7 +6,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/mit-dci/lit/btcutil/btcec"
+	"github.com/mit-dci/lit/btcutil/koblitz"
 )
 
 // defaultHandshakes is the maximum number of handshakes that can be done in

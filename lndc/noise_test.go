@@ -3,16 +3,14 @@ package lndc
 import (
 	"bytes"
 	"encoding/hex"
+	"github.com/mit-dci/lit/btcutil/koblitz"
+	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
 	"io"
 	"math"
 	"net"
 	"sync"
 	"testing"
-
-	"github.com/mit-dci/lit/logging"
-
-	"github.com/mit-dci/lit/btcutil/btcec"
-	"github.com/mit-dci/lit/lnutil"
 )
 
 type maybeNetConn struct {

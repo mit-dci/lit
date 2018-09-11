@@ -4,19 +4,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/mit-dci/lit/btcutil/hdkeychain"
+	"github.com/mit-dci/lit/btcutil/koblitz"
+	"github.com/mit-dci/lit/coinparam"
+	"github.com/mit-dci/lit/lndc"
+	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/portxo"
 	"log"
 	"net"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
-
-	"github.com/mit-dci/lit/btcutil/btcec"
-	"github.com/mit-dci/lit/btcutil/hdkeychain"
-	"github.com/mit-dci/lit/coinparam"
-	"github.com/mit-dci/lit/lndc"
-	"github.com/mit-dci/lit/lnutil"
-	"github.com/mit-dci/lit/portxo"
 )
 
 type LndcRpcClient struct {

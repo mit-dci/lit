@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/mit-dci/lit/btcutil"
-	"github.com/mit-dci/lit/btcutil/btcec"
+	"github.com/mit-dci/lit/btcutil/koblitz"
 	"github.com/mit-dci/lit/btcutil/txscript"
 	"github.com/mit-dci/lit/btcutil/txsort"
 	"github.com/mit-dci/lit/dlc"

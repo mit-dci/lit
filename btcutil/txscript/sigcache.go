@@ -7,7 +7,7 @@ package txscript
 import (
 	"sync"
 
-	"github.com/mit-dci/lit/btcutil/btcec"
+	"github.com/mit-dci/lit/btcutil/koblitz"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 )
 
