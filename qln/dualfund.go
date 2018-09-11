@@ -441,7 +441,7 @@ func (nd *LitNode) DualFundingAcceptHandler(msg lnutil.DualFundingAcceptMsg) {
 	q.State.MyAmt = nd.InProgDual.OurAmount
 	// get fee from sub wallet.  Later should make fee per channel and update state
 	// based on size
-	q.State.Fee = nd.SubWallet[q.Coin()].Fee() * 1000
+	q.State.Fee = nd.SubWallet[q.Coin()].Fee() * consts.QcStateFee
 	q.Value = nd.InProgDual.OurAmount + nd.InProgDual.TheirAmount
 
 	q.State.NextHTLCBase = msg.OurNextHTLCBase
