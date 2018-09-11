@@ -118,7 +118,13 @@ func litSetup(conf *config) *[32]byte {
 	// TODO ... what's this do?
 	defer logFile.Close()
 
-	logging.SetLogLevel(conf.LogLevel)
+	// special handling for this one.
+	ll := len(conf.LogLevel)
+	if ll > 0 {
+		logging.SetLogLevel(len(conf.LogLevel))
+	} else {
+		logging.SetLogLevel(defaultLogLevel)
+	}
 
 	// Allow node with no linked wallets, for testing.
 	// TODO Should update tests and disallow nodes without wallets later.
