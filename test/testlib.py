@@ -51,7 +51,7 @@ class LitNode():
         print("Allocated port", self.rpc_port)
         self.data_dir = new_data_dir("lit")
         self.peer_mapping = {}
-
+        print("CHKP0")
         # Write a hexkey to the privkey file
         with open(paths.join(self.data_dir, "privkey.hex"), 'w+') as f:
             s = ''
@@ -59,6 +59,7 @@ class LitNode():
                 s += hexchars[random.randint(0, len(hexchars) - 1)]
             f.write(s + "\n")
 
+        print("CHKP1")
         # See if we should print stdout
         outputredir = subprocess.DEVNULL
         ev_output_show = os.getenv("LIT_OUTPUT_SHOW", default="0")
@@ -77,15 +78,17 @@ class LitNode():
             "--autoReconnect",
             "--autoListenPort=" + str(self.p2p_port)
         ]
+        print("CHKP2")
         self.proc = subprocess.Popen(args,
             stdin=subprocess.DEVNULL,
             stdout=outputredir,
             stderr=outputredir)
 
+        print("CHKP3")
         # Make the RPC client for future use, too.
         testutil.wait_until_port("localhost", self.rpc_port)
         self.rpc = litrpc.LitClient("localhost", str(self.rpc_port))
-
+        print("CHKP4")
         # Make it listen to P2P connections!
         lres = self.rpc.Listen(Port=":" + str(self.p2p_port))
         testutil.wait_until_port("localhost", self.p2p_port)
@@ -208,10 +211,10 @@ class TestEnv():
         for i in range(litcnt):
             try:
                 node = LitNode(self.bitcoind)
+                self.lits.append(node)
             except Exception as e:
                 print("Error while starting bitcoind")
                 print(e)
-            self.lits.append(node)
         print("started nodes!  syncing...")
 
         time.sleep(0.1)
