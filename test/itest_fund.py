@@ -32,6 +32,11 @@ def run_test(env):
     lit2.rpc.SetFee(Fee=fee, CoinType=testlib.REGTEST_COINTYPE)
     print('fees set to', fee, '(per byte)')
 
+    # Now actually do the funding.
+    cid = lit1.open_channel(lit2, capacity, initialsend)
+    print('Created channel:', cid)
+
+
 if __name__ == '__main__':
     env = None
     try:
