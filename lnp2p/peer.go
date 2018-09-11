@@ -1,6 +1,7 @@
 package lnp2p
 
 import (
+	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnio"
 )
@@ -39,4 +40,9 @@ func (p *Peer) GetLnAddr() lnio.LnAddr {
 // GetRemoteAddr does something.
 func (p *Peer) GetRemoteAddr() string {
 	return p.conn.RemoteAddr().String()
+}
+
+// GetPubkey gets the public key for the user.
+func (p *Peer) GetPubkey() btcec.PublicKey {
+	return *p.idpubkey
 }

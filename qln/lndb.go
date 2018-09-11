@@ -314,59 +314,26 @@ func (nd *LitNode) GetLnAddr() string {
 func (nd *LitNode) GetPubHostFromPeerIdx(idx uint32) ([33]byte, string) {
 	var pub [33]byte
 	var host string
-	// look up peer in db
-	err := nd.LitDB.View(func(btx *bolt.Tx) error {
-		mp := btx.Bucket(BKTPeerMap)
-		if mp == nil {
-			return nil
-		}
-		pubBytes := mp.Get(lnutil.U32tB(idx))
-		if pubBytes != nil && len(pubBytes) > 0 {
-			copy(pub[:], pubBytes)
-		}
-		peerBkt := btx.Bucket(BKTPeers)
-		if peerBkt == nil {
-			return fmt.Errorf("no Peers")
-		}
-		prBkt := peerBkt.Bucket(pubBytes)
-		if prBkt == nil {
-			return fmt.Errorf("no peer %x", pubBytes)
-		}
-		host = string(prBkt.Get(KEYhost))
-		return nil
-	})
-	if err != nil {
-		logging.Errorf(err.Error())
+
+	p := nd.PeerMan.GetPeerByIdx(int32(idx))
+	if p != nil {
+		pk := p.GetPubkey()
+		copy(pub[:], pk.SerializeCompressed())
+		host = p.GetRemoteAddr()
 	}
+
 	return pub, host
 }
 
 // GetNicknameFromPeerIdx gets the nickname for a peer
 func (nd *LitNode) GetNicknameFromPeerIdx(idx uint32) string {
 	var nickname string
-	// look up peer in db
-	err := nd.LitDB.View(func(btx *bolt.Tx) error {
-		mp := btx.Bucket(BKTPeerMap)
-		if mp == nil {
-			return nil
-		}
-		pubBytes := mp.Get(lnutil.U32tB(idx))
-		peerBkt := btx.Bucket(BKTPeers)
-		if peerBkt == nil {
-			return fmt.Errorf("no Peers")
-		}
-		prBkt := peerBkt.Bucket(pubBytes)
-		if prBkt == nil {
-			return fmt.Errorf("no peer %x", pubBytes)
-		}
 
-		nickname = string(prBkt.Get(KEYnickname))
-
-		return nil
-	})
-	if err != nil {
-		logging.Errorf(err.Error())
+	p := nd.PeerMan.GetPeerByIdx(int32(idx))
+	if p != nil {
+		nickname = p.GetNickname()
 	}
+
 	return nickname
 }
 
