@@ -346,7 +346,7 @@ func (nd *LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 	q.State.MyAmt = nd.InProg.Amt - nd.InProg.InitSend
 	// get fee from sub wallet.  Later should make fee per channel and update state
 	// based on size
-	q.State.Fee = nd.SubWallet[q.Coin()].Fee() * 1000
+	q.State.Fee = nd.SubWallet[q.Coin()].Fee() * consts.QcStateFee
 
 	q.State.Data = nd.InProg.Data
 
