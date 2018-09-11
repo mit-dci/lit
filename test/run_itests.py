@@ -6,7 +6,7 @@ import sys
 noOfNodes = 2
 
 from itest_connect import run_test as connect
-#from itest_receive import run_test as receive
+##from itest_receive import run_test as receive
 from itest_send import run_test as send
 # from itest_send2 import run_test as send2
 # from itest_setgetfee import run_test as setgetfee
