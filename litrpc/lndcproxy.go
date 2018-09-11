@@ -3,7 +3,7 @@ package litrpc
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/mit-dci/lit/btcutil/koblitz"
+	"github.com/mit-dci/lit/crypto/koblitz"
 	"golang.org/x/net/websocket"
 	"log"
 	"net/http"

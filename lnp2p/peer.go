@@ -1,7 +1,7 @@
 package lnp2p
 
 import (
-	"github.com/mit-dci/lit/btcutil/koblitz"
+	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnio"
 )

@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/chaincfg"
-	"github.com/mit-dci/lit/btcutil/koblitz"
+	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/wire"
 )
 

@@ -2,7 +2,7 @@ package wallit
 
 import (
 	"github.com/mit-dci/lit/btcutil"
-	"github.com/mit-dci/lit/btcutil/koblitz"
+	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/portxo"
 )

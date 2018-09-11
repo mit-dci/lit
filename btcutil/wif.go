@@ -10,7 +10,7 @@ import (
 	"github.com/mit-dci/lit/btcutil/base58"
 	"github.com/mit-dci/lit/btcutil/chaincfg"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
-	"github.com/mit-dci/lit/btcutil/koblitz"
+	"github.com/mit-dci/lit/crypto/koblitz"
 )
 
 // ErrMalformedPrivateKey describes an error where a WIF-encoded private
