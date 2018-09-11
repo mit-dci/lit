@@ -3,16 +3,18 @@ package qln
 import (
 	"bytes"
 	"fmt"
-	"log"
+
+	"github.com/mit-dci/lit/logging"
 
 	"github.com/mit-dci/lit/btcutil/txscript"
-	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
+	"github.com/mit-dci/lit/wire"
 )
 
 // handles stuff that comes in over the wire.  Not user-initiated.
 func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) error {
+	logging.Infof("Message from %d type %x", msg.Peer(), msg.MsgType())
 	switch msg.MsgType() & 0xf0 {
 	case 0x00: // TEXT MESSAGE.  SIMPLE
 		chat, ok := msg.(lnutil.ChatMsg)
@@ -45,10 +47,6 @@ func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) er
 	*/
 
 	case 0x60: //Tower Messages
-		//if !nd.Tower.Accepting {
-		//	return fmt.Errorf("Error: Got tower msg from %x but tower disabled\n",
-		//		msg.Peer())
-		//}
 		if msg.MsgType() == lnutil.MSGID_WATCH_DESC {
 			nd.Tower.NewChannel(msg.(lnutil.WatchDescMsg))
 		}
@@ -117,10 +115,10 @@ func (nd *LitNode) LNDCReader(peer *RemotePeer) error {
 
 	for {
 		msg := make([]byte, 1<<24)
-		//	log.Printf("read message from %x\n", l.RemoteLNId)
+		//	logging.Infof("read message from %x\n", l.RemoteLNId)
 		n, err := peer.Con.Read(msg)
 		if err != nil {
-			log.Printf("read error with %d: %s\n", peer.Idx, err.Error())
+			logging.Errorf("read error with %d: %s\n", peer.Idx, err.Error())
 			nd.RemoteMtx.Lock()
 			delete(nd.RemoteCons, peer.Idx)
 			nd.RemoteMtx.Unlock()
@@ -128,7 +126,7 @@ func (nd *LitNode) LNDCReader(peer *RemotePeer) error {
 		}
 		msg = msg[:n]
 
-		log.Printf("decrypted message is %x\n", msg)
+		logging.Infof("decrypted message is %x\n", msg)
 
 		var routedMsg lnutil.LitMsg
 		routedMsg, err = lnutil.LitMsgFromBytes(msg, peer.Idx)
@@ -137,10 +135,10 @@ func (nd *LitNode) LNDCReader(peer *RemotePeer) error {
 			return err
 		}
 
-		log.Printf("peerIdx is %d\n", routedMsg.Peer())
-		log.Printf("routed bytes %x\n", routedMsg.Bytes())
+		logging.Infof("peerIdx is %d\n", routedMsg.Peer())
+		logging.Infof("routed bytes %x\n", routedMsg.Bytes())
 
-		log.Printf("message type %x\n", routedMsg.MsgType())
+		logging.Infof("message type %x\n", routedMsg.MsgType())
 
 		var chanIdx uint32
 		chanIdx = 0
@@ -152,7 +150,7 @@ func (nd *LitNode) LNDCReader(peer *RemotePeer) error {
 			}
 		}
 
-		log.Printf("chanIdx is %x\n", chanIdx)
+		logging.Infof("chanIdx is %x\n", chanIdx)
 
 		if chanIdx != 0 {
 			err = nd.PeerHandler(routedMsg, peer.QCs[chanIdx], peer)
@@ -161,7 +159,7 @@ func (nd *LitNode) LNDCReader(peer *RemotePeer) error {
 		}
 
 		if err != nil {
-			log.Printf("PeerHandler error with %d: %s\n", peer.Idx, err.Error())
+			logging.Errorf("PeerHandler error with %d: %s\n", peer.Idx, err.Error())
 		}
 	}
 }
@@ -172,6 +170,7 @@ func (nd *LitNode) PopulateQchanMap(peer *RemotePeer) error {
 		return err
 	}
 	// initialize map
+	nd.RemoteMtx.Lock()
 	peer.QCs = make(map[uint32]*Qchan)
 	// populate from all channels (inefficient)
 	for i, q := range allQs {
@@ -179,6 +178,7 @@ func (nd *LitNode) PopulateQchanMap(peer *RemotePeer) error {
 			peer.QCs[q.Idx()] = allQs[i]
 		}
 	}
+	nd.RemoteMtx.Unlock()
 	return nil
 }
 
@@ -190,28 +190,27 @@ func (nd *LitNode) ChannelHandler(msg lnutil.LitMsg, peer *RemotePeer) error {
 
 	switch message := msg.(type) {
 	case lnutil.PointReqMsg: // POINT REQUEST
-		log.Printf("Got point request from %x\n", message.Peer())
+		logging.Infof("Got point request from %x\n", message.Peer())
 		nd.PointReqHandler(message)
 		return nil
 
 	case lnutil.PointRespMsg: // POINT RESPONSE
-		log.Printf("Got point response from %x\n", msg.Peer())
+		logging.Infof("Got point response from %x\n", msg.Peer())
 		return nd.PointRespHandler(message)
 
 	case lnutil.ChanDescMsg: // CHANNEL DESCRIPTION
-		log.Printf("Got channel description from %x\n", msg.Peer())
+		logging.Infof("Got channel description from %x\n", msg.Peer())
 
-		nd.QChanDescHandler(message)
-		return nil
+		return nd.QChanDescHandler(message)
 
 	case lnutil.ChanAckMsg: // CHANNEL ACKNOWLEDGE
-		log.Printf("Got channel acknowledgement from %x\n", msg.Peer())
+		logging.Infof("Got channel acknowledgement from %x\n", msg.Peer())
 
 		nd.QChanAckHandler(message, peer)
 		return nil
 
 	case lnutil.SigProofMsg: // HERE'S YOUR CHANNEL
-		log.Printf("Got channel proof from %x\n", msg.Peer())
+		logging.Infof("Got channel proof from %x\n", msg.Peer())
 		nd.SigProofHandler(message, peer)
 		return nil
 
@@ -264,13 +263,13 @@ func (nd *LitNode) CloseHandler(msg lnutil.LitMsg) error {
 	switch message := msg.(type) { // CLOSE REQ
 
 	case lnutil.CloseReqMsg:
-		log.Printf("Got close request from %x\n", msg.Peer())
+		logging.Infof("Got close request from %x\n", msg.Peer())
 		nd.CloseReqHandler(message)
 		return nil
 
 	/* - not yet implemented
 	case lnutil.MSGID_CLOSERESP: // CLOSE RESP
-		log.Printf("Got close response from %x\n", from)
+		logging.Infof("Got close response from %x\n", from)
 		nd.CloseRespHandler(from, msg[1:])
 		continue
 		return nil
@@ -288,20 +287,28 @@ func (nd *LitNode) PushPullHandler(routedMsg lnutil.LitMsg, q *Qchan) error {
 	defer q.ChanMtx.Unlock()
 	switch message := routedMsg.(type) {
 	case lnutil.DeltaSigMsg:
-		log.Printf("Got DELTASIG from %x\n", routedMsg.Peer())
+		logging.Infof("Got DELTASIG from %x\n", routedMsg.Peer())
 		return nd.DeltaSigHandler(message, q)
 
 	case lnutil.SigRevMsg: // SIGNATURE AND REVOCATION
-		log.Printf("Got SIGREV from %x\n", routedMsg.Peer())
+		logging.Infof("Got SIGREV from %x\n", routedMsg.Peer())
 		return nd.SigRevHandler(message, q)
 
 	case lnutil.GapSigRevMsg: // GAP SIGNATURE AND REVOCATION
-		log.Printf("Got GapSigRev from %x\n", routedMsg.Peer())
+		logging.Infof("Got GapSigRev from %x\n", routedMsg.Peer())
 		return nd.GapSigRevHandler(message, q)
 
 	case lnutil.RevMsg: // REVOCATION
-		log.Printf("Got REV from %x\n", routedMsg.Peer())
+		logging.Infof("Got REV from %x\n", routedMsg.Peer())
 		return nd.RevHandler(message, q)
+
+	case lnutil.HashSigMsg: // Offer HTLC
+		logging.Infof("Got HashSig from %d", routedMsg.Peer())
+		return nd.HashSigHandler(message, q)
+
+	case lnutil.PreimageSigMsg: // Clear HTLC
+		logging.Infof("Got PreimageSig from %d", routedMsg.Peer())
+		return nd.PreimageSigHandler(message, q)
 
 	default:
 		return fmt.Errorf("Unknown message type %x", routedMsg.MsgType())
@@ -333,7 +340,7 @@ func (nd *LitNode) OPEventHandler(OPEventChan chan lnutil.OutPointEvent) {
 		// get all channels each time.  This is very inefficient!
 		qcs, err := nd.GetAllQchans()
 		if err != nil {
-			log.Printf("ln db error: %s", err.Error())
+			logging.Errorf("ln db error: %s", err.Error())
 			continue
 		}
 		var theQ *Qchan
@@ -349,7 +356,7 @@ func (nd *LitNode) OPEventHandler(OPEventChan chan lnutil.OutPointEvent) {
 			// Check if this is a contract output
 			contracts, err := nd.DlcManager.ListContracts()
 			if err != nil {
-				log.Printf("contract db error: %s\n", err.Error())
+				logging.Errorf("contract db error: %s\n", err.Error())
 				continue
 			}
 			for _, c := range contracts {
@@ -357,75 +364,149 @@ func (nd *LitNode) OPEventHandler(OPEventChan chan lnutil.OutPointEvent) {
 					theC = c
 				}
 			}
-
 		}
 
 		if theC != nil {
 			err := nd.HandleContractOPEvent(theC, &curOPEvent)
 			if err != nil {
-				log.Printf("HandleContractOPEvent error: %s\n", err.Error())
+				logging.Errorf("HandleContractOPEvent error: %s\n", err.Error())
 			}
+			continue
+		}
+
+		if theQ == nil && curOPEvent.Tx != nil {
+			// Check if this is a HTLC output we're watching
+			h, _, err := nd.GetHTLC(&curOPEvent.Op)
+			if err != nil {
+				logging.Errorf("Error Getting HTLC OPHash: %s\n", err.Error())
+			}
+			if h.Idx == 0 && h.Amt == 0 { // empty HTLC, so none found
+				continue
+			}
+
+			logging.Infof("Got OP event for HTLC output %s [Incoming: %t]\n", curOPEvent.Op.String(), h.Incoming)
+			// Check the witness stack for a preimage
+			for _, txi := range curOPEvent.Tx.TxIn {
+
+				var preimage [16]byte
+				preimageFound := false
+				if len(txi.Witness) == 5 && len(txi.Witness[0]) == 0 && len(txi.Witness[3]) == 16 {
+					// Success transaction from their break TX, multisig. Preimage is fourth on the witness stack.
+					copy(preimage[:], txi.Witness[3])
+					preimageFound = true
+				}
+				if len(txi.Witness) == 3 && len(txi.Witness[1]) == 16 {
+					// Success transaction from their break TX, multisig. Preimage is fourth on the witness stack.
+					copy(preimage[:], txi.Witness[1])
+					preimageFound = true
+				}
+
+				if preimageFound {
+					logging.Infof("Found preimage [%x] in this TX, looking for HTLCs i have that are claimable with that\n", preimage)
+					// try claiming it!
+					nd.ClaimHTLC(preimage)
+				}
+			}
+
 			continue
 		}
 
 		// end if no associated channel
 		if theQ == nil {
-			log.Printf("OPEvent %s doesn't match any channel\n",
+			logging.Infof("OPEvent %s doesn't match any channel\n",
 				curOPEvent.Op.String())
 			continue
 		}
 
 		// confirmation event
 		if curOPEvent.Tx == nil {
-			log.Printf("OP %s Confirmation event\n", curOPEvent.Op.String())
+			logging.Infof("OP %s Confirmation event\n", curOPEvent.Op.String())
 			theQ.Height = curOPEvent.Height
 			err = nd.SaveQchanUtxoData(theQ)
 			if err != nil {
-				log.Printf("SaveQchanUtxoData error: %s", err.Error())
+				logging.Errorf("SaveQchanUtxoData error: %s", err.Error())
 				continue
 			}
 			// spend event (note: happens twice!)
 		} else {
-			log.Printf("OP %s Spend event\n", curOPEvent.Op.String())
+			logging.Infof("OP %s Spend event\n", curOPEvent.Op.String())
 			// mark channel as closed
 			theQ.CloseData.Closed = true
 			theQ.CloseData.CloseTxid = curOPEvent.Tx.TxHash()
 			theQ.CloseData.CloseHeight = curOPEvent.Height
 			err = nd.SaveQchanUtxoData(theQ)
 			if err != nil {
-				log.Printf("SaveQchanUtxoData error: %s", err.Error())
+				logging.Errorf("SaveQchanUtxoData error: %s", err.Error())
 				continue
 			}
 
 			// detect close tx outs.
 			txos, err := theQ.GetCloseTxos(curOPEvent.Tx)
 			if err != nil {
-				log.Printf("GetCloseTxos error: %s", err.Error())
+				logging.Errorf("GetCloseTxos error: %s", err.Error())
 				continue
 			}
+
 			// if you have seq=1 txos, modify the privkey...
 			// pretty ugly as we need the private key to do that.
-			for _, portxo := range txos {
-				if portxo.Seq == 1 { // revoked key
+			for _, ptxo := range txos {
+				if ptxo.Seq == 1 { // revoked key
 					// GetCloseTxos returns a porTxo with the elk scalar in the
 					// privkey field.  It isn't just added though; it needs to
 					// be combined with the private key in a way porTxo isn't
 					// aware of, so derive and subtract that here.
 					var elkScalar [32]byte
 					// swap out elkscalar, leaving privkey empty
-					elkScalar, portxo.KeyGen.PrivKey =
-						portxo.KeyGen.PrivKey, elkScalar
+					elkScalar, ptxo.KeyGen.PrivKey =
+						ptxo.KeyGen.PrivKey, elkScalar
 
-					privBase, err := nd.SubWallet[theQ.Coin()].GetPriv(portxo.KeyGen)
+					privBase, err := nd.SubWallet[theQ.Coin()].GetPriv(ptxo.KeyGen)
 					if err != nil {
 						continue // or return?
 					}
 
-					portxo.PrivKey = lnutil.CombinePrivKeyAndSubtract(
+					ptxo.PrivKey = lnutil.CombinePrivKeyAndSubtract(
 						privBase, elkScalar[:])
 				}
 				// make this concurrent to avoid circular locking
-				go nd.SubWallet[theQ.Coin()].ExportUtxo(&portxo)
+				go func(porTxo portxo.PorTxo) {
+					nd.SubWallet[theQ.Coin()].ExportUtxo(&porTxo)
+				}(ptxo)
+			}
+
+			// Fetch the indexes of HTLC outputs, and then register them to be watched
+			// We can monitor this for spends from an HTLC output that contains a preimage
+			// and then use that preimage to claim any HTLCs we have outstanding.
+			_, htlcIdxes, err := theQ.GetHtlcTxos(curOPEvent.Tx, false)
+			if err != nil {
+				logging.Errorf("GetHtlcTxos error: %s", err.Error())
+				continue
+			}
+			_, htlcOurIdxes, err := theQ.GetHtlcTxos(curOPEvent.Tx, true)
+			if err != nil {
+				logging.Errorf("GetHtlcTxos error: %s", err.Error())
+				continue
+			}
+			htlcIdxes = append(htlcIdxes, htlcOurIdxes...)
+			txHash := curOPEvent.Tx.TxHash()
+			for _, i := range htlcIdxes {
+				op := wire.NewOutPoint(&txHash, i)
+				logging.Infof("Watching for spends from [%s] (HTLC)\n", op.String())
+				nd.SubWallet[theQ.Coin()].WatchThis(*op)
+			}
+		}
+	}
+}
+
+func (nd *LitNode) HeightEventHandler(HeightEventChan chan lnutil.HeightEvent) {
+	for {
+		event := <-HeightEventChan
+		txs, err := nd.ClaimHTLCTimeouts(event.CoinType, event.Height)
+		if err != nil {
+			logging.Errorf("Error while claiming HTLC timeouts for coin %d at height %d : %s\n", event.CoinType, event.Height, err.Error())
+		} else {
+			for _, tx := range txs {
+				logging.Infof("Claimed timeout HTLC using TXID %x\n", tx)
 			}
 		}
 	}
@@ -434,7 +515,7 @@ func (nd *LitNode) OPEventHandler(OPEventChan chan lnutil.OutPointEvent) {
 func (nd *LitNode) HandleContractOPEvent(c *lnutil.DlcContract,
 	opEvent *lnutil.OutPointEvent) error {
 
-	log.Printf("Received OPEvent for contract %d!\n", c.Idx)
+	logging.Infof("Received OPEvent for contract %d!\n", c.Idx)
 	if opEvent.Tx != nil {
 		wal, ok := nd.SubWallet[c.CoinType]
 		if !ok {
@@ -458,7 +539,7 @@ func (nd *LitNode) HandleContractOPEvent(c *lnutil.DlcContract,
 			c.Status = lnutil.ContractStatusSettling
 			err := nd.DlcManager.SaveContract(c)
 			if err != nil {
-				log.Printf("HandleContractOPEvent SaveContract err %s\n", err.Error())
+				logging.Errorf("HandleContractOPEvent SaveContract err %s\n", err.Error())
 				return err
 			}
 
@@ -466,7 +547,7 @@ func (nd *LitNode) HandleContractOPEvent(c *lnutil.DlcContract,
 			txClaim := wire.NewMsgTx()
 			txClaim.Version = 2
 
-			settleOutpoint := wire.OutPoint{opEvent.Tx.TxHash(), pkhIdx}
+			settleOutpoint := wire.OutPoint{Hash: opEvent.Tx.TxHash(), Index: pkhIdx}
 			txClaim.AddTxIn(wire.NewTxIn(&settleOutpoint, nil, nil))
 
 			addr, err := wal.NewAdr()

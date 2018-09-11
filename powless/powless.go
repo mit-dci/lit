@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -14,9 +13,11 @@ import (
 	"time"
 
 	"github.com/mit-dci/lit/bech32"
-	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
+	"github.com/mit-dci/lit/wire"
+	"golang.org/x/net/proxy"
 )
 
 // powless is a couple steps below uspv in that it doesn't check
@@ -73,7 +74,8 @@ ChainHook interface
 
 // APILink is a link to a web API that can tell you about blockchain data.
 type APILink struct {
-	apiUrl string
+	apiUrl   string
+	proxyURL string
 
 	// TrackingAdrs and OPs are slices of addresses and outpoints to watch for.
 	// Using struct{} saves a byte of RAM but is ugly so I'll use bool.
@@ -96,13 +98,28 @@ type APILink struct {
 	// time based polling
 	dirtyChan chan interface{}
 
+	client http.Client
+
 	p *coinparam.Params
 }
 
 // Start starts the APIlink
 func (a *APILink) Start(
-	startHeight int32, host, path string, params *coinparam.Params) (
+	startHeight int32, host, path string, proxyURL string, params *coinparam.Params) (
 	chan lnutil.TxAndHeight, chan int32, error) {
+
+	a.proxyURL = proxyURL
+
+	if proxyURL != "" {
+		dialer, err := proxy.SOCKS5("tcp", proxyURL, nil, proxy.Direct)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		a.client.Transport = &http.Transport{
+			Dial: dialer.Dial,
+		}
+	}
 
 	// later, use params to detect which api to connect to
 	a.p = params
@@ -143,11 +160,11 @@ func (a *APILink) PushTx(tx *wire.MsgTx) error {
 	apiurl := a.apiUrl + "sendRawTransaction"
 
 	response, err :=
-		http.Post(apiurl, "text/plain", bytes.NewBuffer([]byte(txHexString)))
+		a.client.Post(apiurl, "text/plain", bytes.NewBuffer([]byte(txHexString)))
 	if err != nil {
 		return err
 	}
-	log.Printf("respo	nse: %s", response.Status)
+	logging.Infof("respo	nse: %s", response.Status)
 	_, err = io.Copy(os.Stdout, response.Body)
 
 	return err
@@ -156,12 +173,12 @@ func (a *APILink) PushTx(tx *wire.MsgTx) error {
 // RegisterAddress gets a 20 byte address from the wallit and starts
 // watching for utxos at that address.
 func (a *APILink) RegisterAddress(adr160 [20]byte) error {
-	log.Printf("register %x\n", adr160)
+	logging.Infof("register %x\n", adr160)
 	a.TrackingAdrsMtx.Lock()
 	a.TrackingAdrs[adr160] = true
 	a.TrackingAdrsMtx.Unlock()
 	a.dirtyChan <- nil
-	log.Printf("Register %x complete\n", adr160)
+	logging.Infof("Register %x complete\n", adr160)
 
 	return nil
 }
@@ -169,13 +186,25 @@ func (a *APILink) RegisterAddress(adr160 [20]byte) error {
 // RegisterOutPoint gets an outpoint from the wallit and starts looking
 // for txins that spend it.
 func (a *APILink) RegisterOutPoint(op wire.OutPoint) error {
-	log.Printf("register %s\n", op.String())
+	logging.Infof("register %s\n", op.String())
 	a.TrackingOPsMtx.Lock()
 	a.TrackingOPs[op] = true
 	a.TrackingOPsMtx.Unlock()
 
 	a.dirtyChan <- nil
-	log.Printf("Register %s complete\n", op.String())
+	logging.Infof("Register %s complete\n", op.String())
+	return nil
+}
+
+// UnregisterOutPoint stops watching an outpoint for spends.
+func (a *APILink) UnregisterOutPoint(op wire.OutPoint) error {
+	logging.Infof("unregister %s\n", op.String())
+	a.TrackingOPsMtx.Lock()
+	delete(a.TrackingOPs, op)
+	a.TrackingOPsMtx.Unlock()
+
+	a.dirtyChan <- nil
+	logging.Infof("Unregister %s complete\n", op.String())
 	return nil
 }
 
@@ -187,18 +216,18 @@ func (a *APILink) DirtyCheckLoop() {
 
 	for {
 		// wait here until something marks the state as dirty
-		log.Printf("Waiting for dirt...\n")
+		logging.Infof("Waiting for dirt...\n")
 		<-a.dirtyChan
 
-		log.Printf("Dirt detected\n")
+		logging.Infof("Dirt detected\n")
 
 		err := a.GetVAdrTxos()
 		if err != nil {
-			log.Printf(err.Error())
+			logging.Errorf(err.Error())
 		}
 		err = a.GetVOPTxs()
 		if err != nil {
-			log.Printf(err.Error())
+			logging.Errorf(err.Error())
 		}
 
 		// probably clean, empty it out to prevent cascades
@@ -206,8 +235,6 @@ func (a *APILink) DirtyCheckLoop() {
 			<-a.dirtyChan
 		}
 	}
-
-	return
 }
 
 // VBlocksResponse is a list of Vblocks, which comes back from the /blocks
@@ -231,7 +258,7 @@ func (a *APILink) TipRefreshLoop() error {
 		// Fetch the current highest block
 		apiurl := a.apiUrl + "blocks?limit=1"
 
-		response, err := http.Get(apiurl)
+		response, err := a.client.Get(apiurl)
 		if err != nil {
 			return err
 		}
@@ -251,12 +278,10 @@ func (a *APILink) TipRefreshLoop() error {
 			a.dirtyChan <- nil
 		}
 
-		log.Printf("blockchain tip %v\n", a.tipBlockHash)
+		logging.Infof("blockchain tip %v\n", a.tipBlockHash)
 
 		time.Sleep(time.Second * 60)
 	}
-
-	return nil
 }
 
 // do you even need a struct here..?
@@ -296,13 +321,13 @@ func (a *APILink) GetVAdrTxos() error {
 	}
 	a.TrackingAdrsMtx.Unlock()
 
-	log.Printf("have %d adr urls to check\n", len(urls))
+	logging.Infof("have %d adr urls to check\n", len(urls))
 
 	// make an API call for every adr in adrs
 	// then grab the tx hex, decode and send up to the wallit
 	for _, url := range urls {
-		log.Printf("Requesting adr %s\n", url)
-		response, err := http.Get(url)
+		logging.Infof("Requesting adr %s\n", url)
+		response, err := a.client.Get(url)
 		if err != nil {
 			return err
 		}
@@ -312,7 +337,7 @@ func (a *APILink) GetVAdrTxos() error {
 		//			return err
 		//		}
 
-		//		log.Printf(string(bd))
+		//		logging.Infof(string(bd))
 
 		var txojsons VRawResponse
 
@@ -343,13 +368,13 @@ func (a *APILink) GetVAdrTxos() error {
 			txah.Height = int32(txjson.Height)
 			txah.Tx = tx
 
-			log.Printf("tx %s at height %d", txah.Tx.TxHash().String(), txah.Height)
+			logging.Infof("tx %s at height %d", txah.Tx.TxHash().String(), txah.Height)
 			// send the tx and height back up to the wallit
 			a.TxUpToWallit <- txah
-			log.Printf("sent\n")
+			logging.Infof("sent\n")
 		}
 	}
-	log.Printf("GetVAdrTxos complete\n")
+	logging.Infof("GetVAdrTxos complete\n")
 	return nil
 }
 
@@ -377,12 +402,12 @@ func (a *APILink) GetVOPTxs() error {
 
 	// need to query each txid with a different http request
 	for _, op := range oplist {
-		log.Printf("asking for %s\n", op.String())
+		logging.Infof("asking for %s\n", op.String())
 		// get full tx info for the outpoint's tx
 		// (if we have 2 outpoints with the same txid we query twice...)
 		opstring := op.String()
 		opstring = strings.Replace(opstring, ";", "/", 1)
-		response, err := http.Get(apitxourl + opstring + "?raw=1")
+		response, err := a.client.Get(apitxourl + opstring + "?raw=1")
 		if err != nil {
 			return err
 		}
@@ -391,7 +416,7 @@ func (a *APILink) GetVOPTxs() error {
 		// parse the response to get the spending txid
 		err = json.NewDecoder(response.Body).Decode(&txr)
 		if err != nil || txr.Error {
-			log.Printf("json decode error; op %s not found\n", op.String())
+			logging.Errorf("json decode error; op %s not found\n", op.String())
 			continue
 		}
 
@@ -434,7 +459,7 @@ func (a *APILink) GetVOPTxs() error {
 // VGetRawTx is a helper function to get a tx from the indexer
 func (a *APILink) VGetRawTx(txid string) (*wire.MsgTx, error) {
 	rawTxURL := a.apiUrl + "getTransaction/"
-	response, err := http.Get(rawTxURL + txid)
+	response, err := a.client.Get(rawTxURL + txid)
 	if err != nil {
 		return nil, err
 	}

@@ -1,23 +1,24 @@
 package wallit
 
 import (
-	"log"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/mit-dci/lit/wire"
-	"github.com/mit-dci/lit/btcutil/hdkeychain"
 	"github.com/boltdb/bolt"
+	"github.com/mit-dci/lit/btcutil/hdkeychain"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/powless"
 	"github.com/mit-dci/lit/uspv"
+	"github.com/mit-dci/lit/wire"
 )
 
 func NewWallit(
 	rootkey *hdkeychain.ExtendedKey, birthHeight int32, resync bool,
-	spvhost, path string, p *coinparam.Params) *Wallit {
+	spvhost, path string, proxyURL string, p *coinparam.Params) (*Wallit, int, error) {
 
 	var w Wallit
 	w.rootPrivKey = rootkey
@@ -51,34 +52,35 @@ func NewWallit(
 	wallitdbname := filepath.Join(wallitpath, "utxo.db")
 	err = w.OpenDB(wallitdbname)
 	if err != nil {
-		log.Printf("NewWallit crash  %s ", err.Error())
+		logging.Errorf("NewWallit crash  %s ", err.Error())
 	}
 	// get height
 	height := w.CurrentHeight()
-	log.Printf("DB current height %d\n", height)
+	logging.Infof("DB current height %d\n", height)
 
 	// bring height up to birthheight, or back down in case of resync
 	if height < birthHeight || resync {
 		height = birthHeight
 		w.SetDBSyncHeight(height)
 	}
-
-	log.Printf("DB corrected height %d\n", height)
-	incomingTx, incomingBlockheight, err := w.Hook.Start(height, spvhost, wallitpath, p)
+	hookFail := false
+	logging.Infof("DB corrected height %d\n", height)
+	incomingTx, incomingBlockheight, err := w.Hook.Start(height, spvhost, wallitpath, proxyURL, p)
 	if err != nil {
-		log.Printf("NewWallit Hook.Start crash  %s ", err.Error())
+		hookFail = true
+		logging.Errorf("NewWallit Hook.Start crash  %s ", err.Error())
 	}
 
 	// check if there are any addresses.  If there aren't (initial wallet setup)
 	// then make an address.
 	adrs, err := w.AdrDump()
 	if err != nil {
-		log.Printf("NewWallit crash  %s ", err.Error())
+		logging.Errorf("NewWallit crash  %s ", err.Error())
 	}
 	if len(adrs) == 0 {
 		_, err := w.NewAdr()
 		if err != nil {
-			log.Printf("NewWallit crash  %s ", err.Error())
+			logging.Errorf("NewWallit crash  %s ", err.Error())
 		}
 	}
 
@@ -86,19 +88,19 @@ func NewWallit(
 	for _, a := range adrs {
 		err = w.Hook.RegisterAddress(a)
 		if err != nil {
-			log.Printf("NewWallit RegisterAddress crash %s ", err.Error())
+			logging.Errorf("NewWallit RegisterAddress crash %s ", err.Error())
 		}
 	}
 
 	// send outpoints (if any) to the hook
 	utxos, err := w.UtxoDump()
 	if err != nil {
-		log.Printf("NewWallit crash  %s ", err.Error())
+		logging.Errorf("NewWallit crash  %s ", err.Error())
 	}
 	for _, utxo := range utxos {
 		err = w.Hook.RegisterOutPoint(utxo.Op)
 		if err != nil {
-			log.Printf("NewWallit crash  %s ", err.Error())
+			logging.Errorf("NewWallit crash  %s ", err.Error())
 		}
 	}
 
@@ -107,8 +109,10 @@ func NewWallit(
 
 	// deal with incoming height
 	go w.HeightHandler(incomingBlockheight)
-
-	return &w
+	if !hookFail {
+		return &w, int(p.HDCoinType), nil
+	}
+	return &w, 0, fmt.Errorf("Unsupported coin daemon or coin daemon not running")
 }
 
 // TxHandler is the goroutine that receives & ingests new txs for the wallit.
@@ -116,7 +120,7 @@ func (w *Wallit) TxHandler(incomingTxAndHeight chan lnutil.TxAndHeight) {
 	for {
 		txah := <-incomingTxAndHeight
 		w.Ingest(txah.Tx, txah.Height)
-		log.Printf("got tx %s at height %d\n",
+		logging.Infof("got tx %s at height %d\n",
 			txah.Tx.TxHash().String(), txah.Height)
 	}
 }
@@ -127,16 +131,21 @@ func (w *Wallit) HeightHandler(incomingHeight chan int32) {
 		h := <-incomingHeight
 		// detect reorg
 		if h < prevHeight {
-			log.Printf("HeightHandler: oh no, reorg!\n")
+			logging.Infof("HeightHandler: oh no, reorg!\n")
 			err := w.RollBack(h)
 			if err != nil {
-				log.Printf("Rollback crash  %s ", err.Error())
+				logging.Errorf("Rollback crash  %s ", err.Error())
 			}
+		}
+
+		if w.HeightEventChan != nil {
+			he := lnutil.HeightEvent{Height: h, CoinType: w.Param.HDCoinType}
+			w.HeightEventChan <- he
 		}
 
 		err := w.SetDBSyncHeight(h)
 		if err != nil {
-			log.Printf("HeightHandler crash  %s ", err.Error())
+			logging.Errorf("HeightHandler crash  %s ", err.Error())
 		}
 		prevHeight = h
 	}
@@ -177,9 +186,9 @@ func (w *Wallit) OpenDB(filename string) error {
 		numKeysBytes := sta.Get(KEYNumKeys)
 		if numKeysBytes != nil { // NumKeys exists, read into uint32
 			numKeys = lnutil.BtU32(numKeysBytes)
-			log.Printf("db says %d keys\n", numKeys)
+			logging.Infof("db says %d keys\n", numKeys)
 		} else { // no adrs yet, make it 0.  Then make an address.
-			log.Printf("NumKeys not in DB, must be new DB. 0 Keys\n")
+			logging.Infof("NumKeys not in DB, must be new DB. 0 Keys\n")
 			numKeys = 0
 			b0 := lnutil.U32tB(numKeys)
 			err = sta.Put(KEYNumKeys, b0)

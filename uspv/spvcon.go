@@ -6,18 +6,20 @@ import (
 	"sync"
 
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
-	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/wire"
 )
 
+// SPVCon is a SPV connection to a coin daemon.
 type SPVCon struct {
 	con net.Conn // the (probably tcp) connection to the node
 
 	// Enhanced SPV modes for users who have outgrown easy mode SPV
 	// but have not yet graduated to full nodes.
-	HardMode bool // hard mode doesn't use filters.
-	Ironman  bool // ironman only gets blocks, never requests txs.
+	HardMode bool   // hard mode doesn't use filters.
+	Ironman  bool   // ironman only gets blocks, never requests txs.
+	ProxyURL string // Optionally the URL of a SOCKS5 proxy to use
 
 	headerMutex       sync.Mutex
 	headerFile        *os.File // file for SPV headers
@@ -75,6 +77,6 @@ type SPVCon struct {
 
 	// waitState is a channel that is empty while in the header and block
 	// sync modes, but when in the idle state has a "true" in it.
-	inWaitState chan bool
+	inWaitState   chan bool
 	randomNodesOK bool
 }

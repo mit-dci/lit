@@ -2,12 +2,13 @@ package litrpc
 
 import (
 	"fmt"
-	"log"
+
+	"github.com/mit-dci/lit/logging"
 
 	"github.com/mit-dci/lit/btcutil"
+	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/qln"
-	"github.com/mit-dci/lit/consts"
 )
 
 type ChannelInfo struct {
@@ -22,6 +23,7 @@ type ChannelInfo struct {
 	PeerID        string
 	Data          [32]byte
 	Pkh           [20]byte
+	LastUpdate    uint64
 }
 type ChannelListReply struct {
 	Channels []ChannelInfo
@@ -60,6 +62,7 @@ func (r *LitRPC) ChannelList(args ChanArgs, reply *ChannelListReply) error {
 		reply.Channels[i].CIdx = q.KeyGen.Step[4] & 0x7fffffff
 		reply.Channels[i].Data = q.State.Data
 		reply.Channels[i].Pkh = q.WatchRefundAdr
+		reply.Channels[i].LastUpdate = q.LastUpdate
 	}
 	return nil
 }
@@ -74,7 +77,13 @@ type FundArgs struct {
 	Data        [32]byte
 }
 
-func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
+type FundReply struct {
+	Status     string
+	ChanIdx    uint32
+	FundHeight int32
+}
+
+func (r *LitRPC) FundChannel(args FundArgs, reply *FundReply) error {
 	var err error
 	if r.Node.InProg != nil && r.Node.InProg.PeerIdx != 0 {
 		return fmt.Errorf("channel with peer %d not done yet", r.Node.InProg.PeerIdx)
@@ -109,9 +118,9 @@ func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
 
 	spendable := allPorTxos.SumWitness(nowHeight)
 
-	if args.Capacity > spendable-consts.SafeFee {
+	if args.Capacity > spendable-wal.Fee()*consts.JusticeTxBump {
 		return fmt.Errorf("Wanted %d but %d available for channel creation",
-			args.Capacity, spendable-consts.SafeFee)
+			args.Capacity, spendable-wal.Fee()*consts.JusticeTxBump)
 	}
 
 	idx, err := r.Node.FundChannel(
@@ -121,6 +130,8 @@ func (r *LitRPC) FundChannel(args FundArgs, reply *StatusReply) error {
 	}
 
 	reply.Status = fmt.Sprintf("funded channel %d", idx)
+	reply.ChanIdx = idx
+	reply.FundHeight = nowHeight
 
 	return nil
 }
@@ -185,38 +196,25 @@ func (r *LitRPC) DualFundChannel(args DualFundArgs, reply *StatusReply) error {
 	return nil
 }
 
-type DualFundDeclineArgs struct {
-	// none
+type DualFundRespondArgs struct {
+	// True for accept, false for decline
+	AcceptOrDecline bool
 }
 
-func (r *LitRPC) DualFundDecline(args DualFundDeclineArgs, reply *StatusReply) error {
+func (r *LitRPC) DualFundRespond(args DualFundRespondArgs, reply *StatusReply) error {
 	peerIdx := r.Node.InProgDual.PeerIdx
 
 	if peerIdx == 0 || r.Node.InProgDual.InitiatedByUs {
 		return fmt.Errorf("There is no pending request to reject")
 	}
 
-	r.Node.DualFundDecline(0x01)
-
-	reply.Status = fmt.Sprintf("Succesfully declined funding request from peer %d", peerIdx)
-
-	return nil
-}
-
-type DualFundAcceptArgs struct {
-	// none
-}
-
-func (r *LitRPC) DualFundAccept(args DualFundAcceptArgs, reply *StatusReply) error {
-	peerIdx := r.Node.InProgDual.PeerIdx
-
-	if peerIdx == 0 || r.Node.InProgDual.InitiatedByUs {
-		return fmt.Errorf("There is no pending request to reject")
+	if args.AcceptOrDecline {
+		r.Node.DualFundAccept()
+		reply.Status = fmt.Sprintf("Successfully accepted funding request from peer %d", peerIdx)
+	} else {
+		r.Node.DualFundDecline(0x01)
+		reply.Status = fmt.Sprintf("Successfully declined funding request from peer %d", peerIdx)
 	}
-
-	r.Node.DualFundAccept()
-
-	reply.Status = fmt.Sprintf("Succesfully accepted funding request from peer %d", peerIdx)
 
 	return nil
 }
@@ -286,7 +284,7 @@ func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 			"can't push %d max is 1 coin (100000000), min is 1", args.Amt)
 	}
 
-	log.Printf("push %d to chan %d with data %x\n", args.Amt, args.ChanIdx, args.Data)
+	logging.Infof("push %d to chan %d with data %x\n", args.Amt, args.ChanIdx, args.Data)
 
 	// load the whole channel from disk just to see who the peer is
 	// (pretty inefficient)
@@ -316,7 +314,7 @@ func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 			dummyqc.Peer(), dummyqc.Idx())
 	}
 
-	log.Printf("channel %s\n", qc.Op.String())
+	logging.Infof("channel %s\n", qc.Op.String())
 
 	if qc.CloseData.Closed {
 		return fmt.Errorf("Channel %d already closed by tx %s",
@@ -397,7 +395,7 @@ func (r *LitRPC) DumpPrivs(args NoArgs, reply *DumpReply) error {
 	for _, qc := range qcs {
 		wal, ok := r.Node.SubWallet[qc.Coin()]
 		if !ok {
-			log.Printf(
+			logging.Errorf(
 				"Channel %s error - coin %d not connected; can't show keys",
 				qc.Op.String(), qc.Coin())
 			continue
@@ -415,7 +413,7 @@ func (r *LitRPC) DumpPrivs(args NoArgs, reply *DumpReply) error {
 		if err != nil {
 			return err
 		}
-		wif := btcutil.WIF{priv, true, wal.Params().PrivateKeyID}
+		wif := btcutil.WIF{PrivKey: priv, CompressPubKey: true, NetID: wal.Params().PrivateKeyID}
 		thisTxo.WIF = wif.String()
 
 		reply.Privs = append(reply.Privs, thisTxo)
@@ -445,7 +443,7 @@ func (r *LitRPC) DumpPrivs(args NoArgs, reply *DumpReply) error {
 			if err != nil {
 				return err
 			}
-			wif := btcutil.WIF{priv, true, wal.Params().PrivateKeyID}
+			wif := btcutil.WIF{PrivKey: priv, CompressPubKey: true, NetID: wal.Params().PrivateKeyID}
 
 			theseTxos[i].WIF = wif.String()
 		}
@@ -453,5 +451,138 @@ func (r *LitRPC) DumpPrivs(args NoArgs, reply *DumpReply) error {
 		reply.Privs = append(reply.Privs, theseTxos...)
 	}
 
+	return nil
+}
+
+// ------------------------- HTLCs
+type AddHTLCArgs struct {
+	ChanIdx  uint32
+	Amt      int64
+	LockTime uint32
+	RHash    [32]byte
+	Data     [32]byte
+}
+type AddHTLCReply struct {
+	StateIndex uint64
+	HTLCIndex  uint32
+}
+
+func (r *LitRPC) AddHTLC(args AddHTLCArgs, reply *AddHTLCReply) error {
+	if args.Amt > consts.MaxChanCapacity || args.Amt < consts.MinOutput {
+		return fmt.Errorf(
+			"can't add HTLC %d max is 1 coin (100000000), min is %d", args.Amt, consts.MinOutput)
+	}
+
+	logging.Infof("add HTLC %d to chan %d with data %x and RHash %x\n", args.Amt, args.ChanIdx, args.Data, args.RHash)
+
+	// load the whole channel from disk just to see who the peer is
+	// (pretty inefficient)
+	dummyqc, err := r.Node.GetQchanByIdx(args.ChanIdx)
+	if err != nil {
+		return err
+	}
+	// see if channel is closed and error early
+	if dummyqc.CloseData.Closed {
+		return fmt.Errorf("Can't push; channel %d closed", args.ChanIdx)
+	}
+
+	// but we want to reference the qc that's already in ram
+	// first see if we're connected to that peer
+
+	// map read, need mutex...?
+	r.Node.RemoteMtx.Lock()
+	peer, ok := r.Node.RemoteCons[dummyqc.Peer()]
+	r.Node.RemoteMtx.Unlock()
+	if !ok {
+		return fmt.Errorf("not connected to peer %d for channel %d",
+			dummyqc.Peer(), dummyqc.Idx())
+	}
+	qc, ok := peer.QCs[dummyqc.Idx()]
+	if !ok {
+		return fmt.Errorf("peer %d doesn't have channel %d",
+			dummyqc.Peer(), dummyqc.Idx())
+	}
+
+	logging.Infof("channel %s\n", qc.Op.String())
+
+	if qc.CloseData.Closed {
+		return fmt.Errorf("Channel %d already closed by tx %s",
+			args.ChanIdx, qc.CloseData.CloseTxid.String())
+	}
+
+	// TODO this is a bad place to put it -- litRPC should be a thin layer
+	// to the Node.Func() calls.  For now though, set the height here...
+	qc.Height = dummyqc.Height
+	curHeight := uint32(r.Node.SubWallet[qc.Coin()].CurrentHeight())
+	curHeight += args.LockTime
+
+	err = r.Node.OfferHTLC(qc, uint32(args.Amt), args.RHash, curHeight, args.Data)
+	if err != nil {
+		return err
+	}
+
+	reply.StateIndex = qc.State.StateIdx
+	reply.HTLCIndex = qc.State.HTLCIdx - 1
+	return nil
+}
+
+type ClearHTLCArgs struct {
+	ChanIdx uint32
+	HTLCIdx uint32
+	R       [16]byte
+	Data    [32]byte
+}
+type ClearHTLCReply struct {
+	StateIndex uint64
+}
+
+func (r *LitRPC) ClearHTLC(args ClearHTLCArgs, reply *ClearHTLCReply) error {
+	logging.Infof("clear HTLC %d from chan %d with data %x and preimage %x\n", args.HTLCIdx, args.ChanIdx, args.Data, args.R)
+
+	// load the whole channel from disk just to see who the peer is
+	// (pretty inefficient)
+	dummyqc, err := r.Node.GetQchanByIdx(args.ChanIdx)
+	if err != nil {
+		return err
+	}
+	// see if channel is closed and error early
+	if dummyqc.CloseData.Closed {
+		return fmt.Errorf("Can't clear; channel %d closed", args.ChanIdx)
+	}
+
+	// but we want to reference the qc that's already in ram
+	// first see if we're connected to that peer
+
+	// map read, need mutex...?
+	r.Node.RemoteMtx.Lock()
+	peer, ok := r.Node.RemoteCons[dummyqc.Peer()]
+	r.Node.RemoteMtx.Unlock()
+	if !ok {
+		return fmt.Errorf("not connected to peer %d for channel %d",
+			dummyqc.Peer(), dummyqc.Idx())
+	}
+	qc, ok := peer.QCs[dummyqc.Idx()]
+	if !ok {
+		return fmt.Errorf("peer %d doesn't have channel %d",
+			dummyqc.Peer(), dummyqc.Idx())
+	}
+
+	logging.Infof("channel %s\n", qc.Op.String())
+
+	if qc.CloseData.Closed {
+		return fmt.Errorf("Channel %d already closed by tx %s",
+			args.ChanIdx, qc.CloseData.CloseTxid.String())
+	}
+
+	// TODO this is a bad place to put it -- litRPC should be a thin layer
+	// to the Node.Func() calls.  For now though, set the height here...
+	qc.Height = dummyqc.Height
+
+	err = r.Node.ClearHTLC(qc, args.R, args.HTLCIdx, args.Data)
+	if err != nil {
+		return err
+	}
+
+	reply.StateIndex = qc.State.StateIdx
 	return nil
 }

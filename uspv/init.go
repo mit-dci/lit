@@ -4,18 +4,21 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net"
 	"os"
 	"strings"
 
+	"github.com/mit-dci/lit/logging"
+
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/wire"
+	"golang.org/x/net/proxy"
 )
 
+// IP4 ...
 func IP4(ipAddress string) bool {
-	parseIp := net.ParseIP(ipAddress)
-	if parseIp.To4() == nil {
+	parseIP := net.ParseIP(ipAddress)
+	if parseIP.To4() == nil {
 		return false
 	}
 	return true
@@ -52,53 +55,73 @@ func (s *SPVCon) parseRemoteNode(remoteNode string) (string, string, error) {
 // list
 func (s *SPVCon) GetListOfNodes() ([]string, error) {
 	var listOfNodes []string // slice of IP addrs returned from the DNS seed
-	log.Printf("Attempting to retrieve peers to connect to based on DNS Seed\n")
+	logging.Infof("Attempting to retrieve peers to connect to based on DNS Seed\n")
 
 	for _, seed := range s.Param.DNSSeeds {
 		temp, err := net.LookupHost(seed)
 		// need this temp in order to capture the error from net.LookupHost
 		// also need this to report the number of IPs we get from a seed
 		if err != nil {
-			log.Printf("Have difficulty trying to conenct to %s. Going to the next seed", seed)
+			logging.Infof("Have difficulty trying to connect to %s. Going to the next seed", seed)
 			continue
 		}
 		listOfNodes = append(listOfNodes, temp...)
-		log.Printf("Got %d IPs from DNS seed %s\n", len(temp), seed)
+		logging.Infof("Got %d IPs from DNS seed %s\n", len(temp), seed)
 	}
 	if len(listOfNodes) == 0 {
 		return nil, fmt.Errorf("No peers found connected to DNS Seeds. Please provide a host to connect to.")
 	}
-	log.Println(listOfNodes)
+	logging.Info(listOfNodes)
 	return listOfNodes, nil
 }
 
 // DialNode receives a list of node ips and then tries to connect to them one by one.
-func (s *SPVCon) DialNode(listOfNodes []string) error {
+func (s *SPVCon) DialNode(listOfNodes []string) (net.Conn, error) {
+
 	// now have some IPs, go through and try to connect to one.
 	var err error
+	var con net.Conn
 	for i, ip := range listOfNodes {
 		// try to connect to all nodes in this range
 		var conString, conMode string
 		// need to check whether conString is ipv4 or ipv6
 		conString, conMode, err = s.parseRemoteNode(ip)
-		log.Printf("Attempting connection to node at %s\n",
+		if err != nil {
+			logging.Infof("parse error for node (skipped): %s", err)
+			continue
+		}
+		logging.Infof("Attempting connection to node at %s\n",
 			conString)
-		s.con, err = net.Dial(conMode, conString)
+
+		if s.ProxyURL != "" {
+			logging.Infof("Attempting to connect via proxy %s", s.ProxyURL)
+			var d proxy.Dialer
+			d, err = proxy.SOCKS5("tcp", s.ProxyURL, nil, proxy.Direct)
+			if err != nil {
+				return nil, err
+			}
+
+			con, err = d.Dial(conMode, conString)
+		} else {
+			con, err = net.Dial(conMode, conString)
+		}
+
 		if err != nil {
 			if i != len(listOfNodes)-1 {
-				log.Println(err.Error())
+				logging.Warn(err.Error())
 				continue
 			} else if i == len(listOfNodes)-1 {
-				log.Println(err)
+				logging.Error(err)
 				// all nodes have been exhausted, we move on to the next one, if any.
-				return fmt.Errorf(" Tried to connect to all available node Addresses. Failed")
+				return nil, fmt.Errorf(" Tried to connect to all available node Addresses. Failed")
 			}
 		}
 		break
 	}
-	return nil
+	return con, nil
 }
 
+// Handshake ...
 func (s *SPVCon) Handshake(listOfNodes []string) error {
 	// assign version bits for local node
 	s.localVersion = VERSION
@@ -122,20 +145,21 @@ func (s *SPVCon) Handshake(listOfNodes []string) error {
 		return err
 	}
 	s.WBytes += uint64(n)
-	log.Printf("wrote %d byte version message to %s\n",
+	logging.Infof("wrote %d byte version message to %s\n",
 		n, s.con.RemoteAddr().String())
 	n, m, b, err := wire.ReadMessageWithEncodingN(
 		s.con, s.localVersion,
 		wire.BitcoinNet(s.Param.NetMagicBytes), wire.LatestEncoding)
 	if err != nil {
+		logging.Error(err)
 		return err
 	}
 	s.RBytes += uint64(n)
-	log.Printf("got %d byte response %x\n command: %s\n", n, b, m.Command())
+	logging.Infof("got %d byte response %x\n command: %s\n", n, b, m.Command())
 
 	mv, ok := m.(*wire.MsgVersion)
 	if ok {
-		log.Printf("connected to %s", mv.UserAgent)
+		logging.Infof("connected to %s", mv.UserAgent)
 	}
 
 	if mv.ProtocolVersion < 70013 {
@@ -148,7 +172,7 @@ func (s *SPVCon) Handshake(listOfNodes []string) error {
 		return fmt.Errorf("Couldn't connect to this node. Returning!")
 	}
 
-	log.Printf("remote reports version %x (dec %d)\n",
+	logging.Infof("remote reports version %x (dec %d)\n",
 		mv.ProtocolVersion, mv.ProtocolVersion)
 
 	// set remote height
@@ -169,43 +193,43 @@ func (s *SPVCon) Handshake(listOfNodes []string) error {
 
 // Connect dials out and connects to full nodes. Calls GetListOfNodes to get the
 // list of nodes if the user has specified a YupString. Else, moves on to dial
-// the node to see if its up and establishes a conneciton followed by Handshake()
+// the node to see if its up and establishes a connection followed by Handshake()
 // which sends out wire messages, checks for version string to prevent spam, etc.
 func (s *SPVCon) Connect(remoteNode string) error {
 	var err error
 	var listOfNodes []string
-	if lnutil.YupString(remoteNode) {
+	if lnutil.YupString(remoteNode) { // TODO Make this better.  Perhaps a "connection target"?
 		s.randomNodesOK = true
 		// if remoteNode is "yes" but no IP specified, use DNS seed
 		listOfNodes, err = s.GetListOfNodes()
 		if err != nil {
-			log.Println(err)
+			logging.Error(err)
 			return err
 			// automatically quit if there are no other hosts to connect to.
 		}
 	} else { // else connect to user-specified node
 		listOfNodes = []string{remoteNode}
 	}
-	handShakeFailed := false //need to be in this scope to access it here
+	handShakeFailed := false // need to be in this scope to access it here
 	connEstablished := false
 	for len(listOfNodes) != 0 {
-		err = s.DialNode(listOfNodes)
+		s.con, err = s.DialNode(listOfNodes)
 		if err != nil {
-			log.Println(err)
-			log.Printf("Couldn't dial node %s, Moving on", listOfNodes[0])
+			logging.Error(err)
+			logging.Infof("Couldn't dial node %s, Moving on", listOfNodes[0])
 			listOfNodes = listOfNodes[1:]
 			continue
 		}
 		err = s.Handshake(listOfNodes)
 		if err != nil {
 			handShakeFailed = true
-			log.Printf("Handshake with %s failed. Moving on. Error: %s", listOfNodes[0], err.Error())
+			logging.Infof("Handshake with %s failed. Moving on. Error: %s", listOfNodes[0], err.Error())
 			if len(listOfNodes) == 1 { // when the list is empty, error out
 				return fmt.Errorf("Couldn't establish connection with any remote node. Exiting.")
 			}
 			// means we either have a sapm node or didn't get a resonse. So we Try again
-			log.Println(err)
-			log.Println("Couldn't establish connection with node. Proceeding to the next one")
+			logging.Error(err)
+			logging.Error("Couldn't establish connection with node. Proceeding to the next one")
 			listOfNodes = listOfNodes[1:]
 			connEstablished = false
 		} else {
@@ -287,9 +311,9 @@ func (s *SPVCon) openHeaderFile(hfn string) error {
 			if err != nil {
 				return err
 			}
-			log.Printf("made genesis header %x\n", b.Bytes())
-			log.Printf("made genesis hash %s\n", s.Param.GenesisHash.String())
-			log.Printf("created hardcoded genesis header at %s\n", hfn)
+			logging.Infof("made genesis header %x\n", b.Bytes())
+			logging.Infof("made genesis hash %s\n", s.Param.GenesisHash.String())
+			logging.Infof("created hardcoded genesis header at %s\n", hfn)
 		}
 	}
 
@@ -301,6 +325,6 @@ func (s *SPVCon) openHeaderFile(hfn string) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("opened header file %s\n", s.headerFile.Name())
+	logging.Infof("opened header file %s\n", s.headerFile.Name())
 	return nil
 }

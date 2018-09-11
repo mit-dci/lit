@@ -3,15 +3,17 @@ package qln
 import (
 	"bytes"
 	"fmt"
-	"log"
+	"time"
 
+	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/btcutil/txscript"
-	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/crypto/fastsha256"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/sig64"
+	"github.com/mit-dci/lit/wire"
 )
 
 /* CloseChannel --- cooperative close
@@ -40,6 +42,13 @@ func (nd *LitNode) CoopClose(q *Qchan) error {
 			q.KeyGen.Step[3]&0x7fffffff, q.KeyGen.Step[4]&0x7fffffff)
 	}
 
+	for _, h := range q.State.HTLCs {
+		if !h.Cleared {
+			return fmt.Errorf("can't close (%d,%d): there are uncleared HTLCs",
+				q.KeyGen.Step[3]&0x7fffffff, q.KeyGen.Step[4]&0x7fffffff)
+		}
+	}
+
 	tx, err := q.SimpleCloseTx()
 	if err != nil {
 		return err
@@ -55,8 +64,11 @@ func (nd *LitNode) CoopClose(q *Qchan) error {
 
 	// save channel state as closed.  We know the txid... even though that
 	// txid may not actually happen.
+	nd.RemoteMtx.Lock()
+	q.LastUpdate = uint64(time.Now().UnixNano() / 1000)
 	q.CloseData.Closed = true
 	q.CloseData.CloseTxid = tx.TxHash()
+	nd.RemoteMtx.Unlock()
 	err = nd.SaveQchanUtxoData(q)
 	if err != nil {
 		return err
@@ -85,12 +97,20 @@ func (nd *LitNode) CloseReqHandler(msg lnutil.CloseReqMsg) {
 	// get channel
 	q, err := nd.GetQchan(opArr)
 	if err != nil {
-		log.Printf("CloseReqHandler GetQchan err %s", err.Error())
+		logging.Errorf("CloseReqHandler GetQchan err %s", err.Error())
 		return
 	}
 
 	if nd.SubWallet[q.Coin()] == nil {
-		log.Printf("Not connected to coin type %d\n", q.Coin())
+		logging.Errorf("Not connected to coin type %d\n", q.Coin())
+	}
+
+	for _, h := range q.State.HTLCs {
+		if !h.Cleared {
+			logging.Errorf("can't close (%d,%d): there are uncleared HTLCs",
+				q.KeyGen.Step[3]&0x7fffffff, q.KeyGen.Step[4]&0x7fffffff)
+			return
+		}
 	}
 
 	// verify their sig?  should do that before signing our side just to be safe
@@ -99,19 +119,55 @@ func (nd *LitNode) CloseReqHandler(msg lnutil.CloseReqMsg) {
 	// build close tx
 	tx, err := q.SimpleCloseTx()
 	if err != nil {
-		log.Printf("CloseReqHandler SimpleCloseTx err %s", err.Error())
+		logging.Errorf("CloseReqHandler SimpleCloseTx err %s", err.Error())
+		return
+	}
+
+	hCache := txscript.NewTxSigHashes(tx)
+
+	pre, _, err := lnutil.FundTxScript(q.MyPub, q.TheirPub)
+	if err != nil {
+		logging.Errorf("CloseReqHandler Sig err %s", err.Error())
+		return
+	}
+
+	parsed, err := txscript.ParseScript(pre)
+	if err != nil {
+		logging.Errorf("CloseReqHandler Sig err %s", err.Error())
+		return
+	}
+	// always sighash all
+	hash := txscript.CalcWitnessSignatureHash(
+		parsed, hCache, txscript.SigHashAll, tx, 0, q.Value)
+
+	theirBigSig := sig64.SigDecompress(msg.Signature)
+
+	// sig is pre-truncated; last byte for sighashtype is always sighashAll
+	pSig, err := btcec.ParseDERSignature(theirBigSig, btcec.S256())
+	if err != nil {
+		logging.Errorf("CloseReqHandler Sig err %s", err.Error())
+		return
+	}
+	theirPubKey, err := btcec.ParsePubKey(q.TheirPub[:], btcec.S256())
+	if err != nil {
+		logging.Errorf("CloseReqHandler Sig err %s", err.Error())
+		return
+	}
+
+	worked := pSig.Verify(hash, theirPubKey)
+	if !worked {
+		logging.Errorf("CloseReqHandler Sig err invalid signature on close tx %s", err.Error())
 		return
 	}
 
 	// sign close
 	mySig, err := nd.SignSimpleClose(q, tx)
 	if err != nil {
-		log.Printf("CloseReqHandler SignSimpleClose err %s", err.Error())
+		logging.Errorf("CloseReqHandler SignSimpleClose err %s", err.Error())
 		return
 	}
 
 	myBigSig := sig64.SigDecompress(mySig)
-	theirBigSig := sig64.SigDecompress(msg.Signature)
 
 	// put the sighash all byte on the end of both signatures
 	myBigSig = append(myBigSig, byte(txscript.SigHashAll))
@@ -119,7 +175,7 @@ func (nd *LitNode) CloseReqHandler(msg lnutil.CloseReqMsg) {
 
 	pre, swap, err := lnutil.FundTxScript(q.MyPub, q.TheirPub)
 	if err != nil {
-		log.Printf("CloseReqHandler FundTxScript err %s", err.Error())
+		logging.Errorf("CloseReqHandler FundTxScript err %s", err.Error())
 		return
 	}
 
@@ -129,25 +185,73 @@ func (nd *LitNode) CloseReqHandler(msg lnutil.CloseReqMsg) {
 	} else {
 		tx.TxIn[0].Witness = SpendMultiSigWitStack(pre, myBigSig, theirBigSig)
 	}
-	log.Printf(lnutil.TxToString(tx))
+	logging.Info(lnutil.TxToString(tx))
 
 	// save channel state to db as closed.
+	nd.RemoteMtx.Lock()
+	q.LastUpdate = uint64(time.Now().UnixNano() / 1000)
 	q.CloseData.Closed = true
 	q.CloseData.CloseTxid = tx.TxHash()
+	nd.RemoteMtx.Unlock()
 	err = nd.SaveQchanUtxoData(q)
 	if err != nil {
-		log.Printf("CloseReqHandler SaveQchanUtxoData err %s", err.Error())
+		logging.Errorf("CloseReqHandler SaveQchanUtxoData err %s", err.Error())
 		return
 	}
 
 	// broadcast
 	err = nd.SubWallet[q.Coin()].PushTx(tx)
 	if err != nil {
-		log.Printf("CloseReqHandler NewOutgoingTx err %s", err.Error())
+		logging.Errorf("CloseReqHandler NewOutgoingTx err %s", err.Error())
 		return
 	}
 
 	return
+}
+
+func (q *Qchan) GetHtlcTxosWithElkPointsAndRevPub(tx *wire.MsgTx, mine bool, theirElkPoint, myElkPoint, revPub [33]byte) ([]*wire.TxOut, []uint32, error) {
+	htlcOutsInTx := make([]*wire.TxOut, 0)
+	htlcOutIndexesInTx := make([]uint32, 0)
+	htlcOuts := make([]*wire.TxOut, 0)
+	for _, h := range q.State.HTLCs {
+		txOut, err := q.GenHTLCOutWithElkPointsAndRevPub(h, mine, theirElkPoint, myElkPoint, revPub)
+		if err != nil {
+			return nil, nil, err
+		}
+		htlcOuts = append(htlcOuts, txOut)
+	}
+
+	for i, out := range tx.TxOut {
+		htlcOut := false
+		for _, hOut := range htlcOuts {
+			if out.Value == hOut.Value && bytes.Equal(out.PkScript, hOut.PkScript) {
+				// This is an HTLC output
+				logging.Info("Found HTLC output at index %d", i)
+				htlcOut = true
+				break
+			}
+		}
+		if htlcOut {
+			htlcOutsInTx = append(htlcOutsInTx, out)
+			htlcOutIndexesInTx = append(htlcOutIndexesInTx, uint32(i))
+		}
+	}
+
+	return htlcOutsInTx, htlcOutIndexesInTx, nil
+}
+
+func (q *Qchan) GetHtlcTxos(tx *wire.MsgTx, mine bool) ([]*wire.TxOut, []uint32, error) {
+	revPub, _, _, err := q.GetKeysFromState(mine)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	curElk, err := q.ElkPoint(false, q.State.StateIdx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return q.GetHtlcTxosWithElkPointsAndRevPub(tx, mine, q.State.ElkPoint, curElk, revPub)
 }
 
 // GetCloseTxos takes in a tx and sets the QcloseTXO fields based on the tx.
@@ -168,13 +272,37 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 	var pkhIsMine bool
 	cTxos := make([]portxo.PorTxo, 1)
 	myPKHPkSript := lnutil.DirectWPKHScript(q.MyRefundPub)
+
+	htlcOutsInTx, htlcOutIndexesInTx, err := q.GetHtlcTxos(tx, false)
+	if err != nil {
+		return nil, err
+	}
+	htlcOutsInOurTx, htlcOutIndexesInOurTx, err := q.GetHtlcTxos(tx, true)
+	if err != nil {
+		return nil, err
+	}
+	htlcOutsInTx = append(htlcOutsInTx, htlcOutsInOurTx...)
+	htlcOutIndexesInTx = append(htlcOutIndexesInTx, htlcOutIndexesInOurTx...)
+
 	shIdx = 999 // set high here to detect if there's no SH output
-	// Classify outputs.  Assumes only 1 SH output.  Later recognize HTLC outputs
+	// Classify outputs. If output is an HTLC, do nothing, since there is a
+	// separate function for that
 	for i, out := range tx.TxOut {
 		if len(out.PkScript) == 34 {
-			shIdx = uint32(i)
-		}
-		if bytes.Equal(myPKHPkSript, out.PkScript) {
+			htlcOut := false
+			for _, idx := range htlcOutIndexesInTx {
+				if uint32(i) == idx {
+					htlcOut = true
+					break
+				}
+			}
+
+			// There should be only one other script output other than HTLCs which
+			// is the closing script with timelock
+			if !htlcOut {
+				shIdx = uint32(i)
+			}
+		} else if bytes.Equal(myPKHPkSript, out.PkScript) {
 			pkhIdx = uint32(i)
 			pkhIsMine = true
 		}
@@ -182,7 +310,7 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 
 	// if pkh is mine, grab it.
 	if pkhIsMine {
-		log.Printf("got PKH output from channel close")
+		logging.Info("got PKH output [%d] from channel close", pkhIdx)
 		var pkhTxo portxo.PorTxo // create new utxo and copy into it
 
 		pkhTxo.Op.Hash = txid
@@ -209,7 +337,7 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 		comNum = GetStateIdxFromTx(tx, q.GetChanHint(true))
 	}
 	if comNum > q.State.StateIdx { // future state, uhoh.  Crash for now.
-		log.Printf("indicated state %d but we know up to %d",
+		logging.Info("indicated state %d but we know up to %d",
 			comNum, q.State.StateIdx)
 		return cTxos, nil
 	}
@@ -230,10 +358,10 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 		// script check.  redundant / just in case
 		genSH := fastsha256.Sum256(script)
 		if !bytes.Equal(genSH[:], tx.TxOut[shIdx].PkScript[2:34]) {
-			log.Printf("got different observed and generated SH scripts.\n")
-			log.Printf("in %s:%d, see %x\n", txid, shIdx, tx.TxOut[shIdx].PkScript)
-			log.Printf("generated %x \n", genSH)
-			log.Printf("revokable pub %x\ntimeout pub %x\n", revokePub, timeoutPub)
+			logging.Warnf("got different observed and generated SH scripts.\n")
+			logging.Warnf("in %s:%d, see %x\n", txid, shIdx, tx.TxOut[shIdx].PkScript)
+			logging.Warnf("generated %x \n", genSH)
+			logging.Warnf("revokable pub %x\ntimeout pub %x\n", revokePub, timeoutPub)
 		}
 
 		// create the ScriptHash, timeout portxo.
@@ -269,6 +397,8 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 
 	// if we got the pkh, and the comNum is too old, we can get the SH.  Justice.
 	if pkhIsMine && comNum != 0 && comNum < q.State.StateIdx {
+		logging.Info("Executing Justice!")
+
 		// ---------- revoked SH is mine
 		// invalid previous state, can be grabbed!
 		// make MY elk points
@@ -277,17 +407,53 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 			return nil, err
 		}
 
+		theirElkPoint, err := q.ElkPoint(false, comNum)
+		if err != nil {
+			return nil, err
+		}
+
 		timeoutPub := lnutil.AddPubsEZ(q.TheirHAKDBase, myElkPoint)
 		revokePub := lnutil.CombinePubs(q.MyHAKDBase, myElkPoint)
 		script := lnutil.CommitScript(revokePub, timeoutPub, q.Delay)
 
+		htlcOutsInTx, htlcOutIndexesInTx, err := q.GetHtlcTxosWithElkPointsAndRevPub(tx, false, myElkPoint, theirElkPoint, revokePub)
+		if err != nil {
+			return nil, err
+		}
+
+		// Do this search again with the HTLC TXOs using the correct elkpoints
+		// There's probably a better solution for this.
+
+		shIdx = 999 // set high here to detect if there's no SH output
+		// Classify outputs. If output is an HTLC, do nothing, since there is a
+		// separate function for that
+		for i, out := range tx.TxOut {
+			if len(out.PkScript) == 34 {
+				htlcOut := false
+				for _, idx := range htlcOutIndexesInTx {
+					if uint32(i) == idx {
+						htlcOut = true
+						break
+					}
+				}
+
+				// There should be only one other script output other than HTLCs which
+				// is the closing script with timelock
+				if !htlcOut {
+					shIdx = uint32(i)
+				}
+			}
+		}
+
+		logging.Info("P2SH output from channel (non-HTLC output) is at %d", shIdx)
+
 		// script check
 		wshScript := lnutil.P2WSHify(script)
 		if !bytes.Equal(wshScript[:], tx.TxOut[shIdx].PkScript) {
-			log.Printf("got different observed and generated SH scripts.\n")
-			log.Printf("in %s:%d, see %x\n", txid, shIdx, tx.TxOut[shIdx].PkScript)
-			log.Printf("generated %x \n", wshScript)
-			log.Printf("revokable pub %x\ntimeout pub %x\n", revokePub, timeoutPub)
+			logging.Warnf("got different observed and generated SH scripts.\n")
+			logging.Warnf("in %s:%d, see %x\n", txid, shIdx, tx.TxOut[shIdx].PkScript)
+			logging.Warnf("generated %x \n", wshScript)
+			logging.Warnf("revokable pub %x\ntimeout pub %x\n", revokePub, timeoutPub)
 		}
 
 		// myElkHashR added to HAKD private key
@@ -316,7 +482,48 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 		shTxo.PreSigStack = make([][]byte, 1) // timeout SH has one presig item
 		shTxo.PreSigStack[0] = []byte{0x01}   // and that item is a 1 (justice)
 		cTxos = append(cTxos, shTxo)
-	}
 
+		logging.Info("There are %d HTLC Outs to do justice on in this transaction\n", len(htlcOutsInTx))
+		// Also grab HTLCs. They are mine now too :)
+		for i, txo := range htlcOutsInTx {
+			logging.Info("Executing Justice on HTLC TXO!")
+
+			// script check
+			htlcScript, err := q.GenHTLCScriptWithElkPointsAndRevPub(q.State.HTLCs[i], false, theirElkPoint, myElkPoint, revokePub)
+			if err != nil {
+				return nil, err
+			}
+			wshHTLCScript := lnutil.P2WSHify(htlcScript)
+
+			if !bytes.Equal(wshHTLCScript[:], txo.PkScript) {
+				logging.Warnf("got different observed and generated HTLC scripts.\n")
+				logging.Warnf("in %s:%d, see %x\n", txid, htlcOutIndexesInTx[i], txo.PkScript)
+				logging.Warnf("generated %x \n", wshHTLCScript)
+				logging.Warnf("revokable pub %x\ntimeout pub %x\n", revokePub, timeoutPub)
+			}
+
+			var htlcTxo portxo.PorTxo // create new utxo and copy into it
+			htlcTxo.KeyGen = q.KeyGen
+			htlcTxo.Op.Hash = txid
+			htlcTxo.Op.Index = htlcOutIndexesInTx[i]
+			htlcTxo.Height = q.CloseData.CloseHeight
+
+			htlcTxo.KeyGen.Step[2] = UseChannelHAKDBase
+
+			htlcTxo.PrivKey = lnutil.ElkScalar(elk)
+
+			// just return the elkScalar and let
+			// something modify it before export due to the seq=1 flag.
+
+			htlcTxo.PkScript = script
+			htlcTxo.Value = txo.Value
+			htlcTxo.Mode = portxo.TxoP2WSHComp
+			htlcTxo.Seq = 1                         // 1 means grab immediately
+			htlcTxo.PreSigStack = make([][]byte, 1) // timeout SH has one presig item
+			htlcTxo.PreSigStack[0] = []byte{0x01}   // and that item is a 1 (justice)
+			cTxos = append(cTxos, htlcTxo)
+		}
+	}
+	logging.Info("Returning [%d] cTxos", len(cTxos))
 	return cTxos, nil
 }

@@ -4,16 +4,17 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"log"
 
+	"github.com/mit-dci/lit/logging"
+
+	"github.com/boltdb/bolt"
+	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/blockchain"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
-	"github.com/mit-dci/lit/wire"
-	"github.com/mit-dci/lit/btcutil"
-	"github.com/boltdb/bolt"
+	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
-	"github.com/mit-dci/lit/consts"
+	"github.com/mit-dci/lit/wire"
 )
 
 // const strings for db usage
@@ -59,7 +60,7 @@ func (w *Wallit) AddPorTxoAdr(kg portxo.KeyGen) error {
 		}
 
 		adr160 := w.PathPubHash160(kg)
-		log.Printf("adding addr %x\n", adr160)
+		logging.Infof("adding addr %x\n", adr160)
 		// add the 20-byte key-hash into the db
 		return adrb.Put(adr160[:], kg.Bytes())
 	})
@@ -124,7 +125,7 @@ func (w *Wallit) NewAdr160() ([20]byte, error) {
 		// update the db with number of created keys
 		return nil
 	})
-	if n > 1<<30 {
+	if n > consts.MaxKeyLimit {
 		return empty160, fmt.Errorf("Got %d keys stored, expect something reasonable", n)
 	}
 
@@ -134,7 +135,7 @@ func (w *Wallit) NewAdr160() ([20]byte, error) {
 	if nAdr160 == empty160 {
 		return empty160, fmt.Errorf("NewAdr error: got nil h160")
 	}
-	log.Printf("adr %d hash is %x\n", n, nAdr160)
+	logging.Infof("adr %d hash is %x\n", n, nAdr160)
 
 	kgBytes := nKg.Bytes()
 
@@ -245,7 +246,7 @@ func (w *Wallit) GetAllUtxos() ([]*portxo.PorTxo, error) {
 
 			// 0 len v means it's a watch-only utxo, not spendable
 			if len(v) == 0 {
-				// log.Printf("not nil, 0 len slice\n")
+				// logging.Infof("not nil, 0 len slice\n")
 				return nil
 			}
 
@@ -284,10 +285,24 @@ func (w *Wallit) RegisterWatchOP(op wire.OutPoint) error {
 	})
 }
 
+// UnregisterWatchOP unregisters an outpoint to watch. Used to remove watched HTLC OPs if we claim them ourselves.
+func (w *Wallit) UnregisterWatchOP(op wire.OutPoint) error {
+	opArr := lnutil.OutPointToBytes(op)
+	// open db
+	return w.StateDB.Update(func(btx *bolt.Tx) error {
+		// get the outpoint watch bucket
+		dufb := btx.Bucket(BKToutpoint)
+		if dufb == nil {
+			return fmt.Errorf("watch bucket not in db")
+		}
+		return dufb.Delete(opArr[:])
+	})
+}
+
 // GainUtxo registers the utxo in the duffel bag
 // don't register address; they shouldn't be re-used ever anyway.
 func (w *Wallit) GainUtxo(u portxo.PorTxo) error {
-	log.Printf("gaining exported utxo %s at height %d\n",
+	logging.Infof("gaining exported utxo %s at height %d\n",
 		u.Op.String(), u.Height)
 	// serialize porTxo
 	utxoBytes, err := u.Bytes()
@@ -352,7 +367,7 @@ func (w *Wallit) RollBack(rollHeight int32) error {
 	// I still don't 100% get how these bolt tx things get encapsulated.
 	return w.StateDB.Update(func(btx *bolt.Tx) error {
 		// range through utxos and remove all above target height
-		log.Printf("Rollback height %d\n", rollHeight)
+		logging.Infof("Rollback height %d\n", rollHeight)
 
 		dufb := btx.Bucket(BKToutpoint)
 
@@ -382,7 +397,7 @@ func (w *Wallit) RollBack(rollHeight int32) error {
 				return err
 			}
 
-			log.Printf("tx height %d\n", txHeight)
+			logging.Infof("tx height %d\n", txHeight)
 			if txHeight > rollHeight {
 				// need to kill this TX.  we could save it somewhere else?
 				// just mark to get rid of it for now.
@@ -409,7 +424,7 @@ func (w *Wallit) RollBack(rollHeight int32) error {
 		// where if the stored txs above the reorg height aren't re-confirmed,
 		// then it will attempt to rebroadcast them.
 
-		log.Printf("Rollback db.  %d utxos lost\n", len(killOPs))
+		logging.Infof("Rollback db.  %d utxos lost\n", len(killOPs))
 
 		return nil
 	})
@@ -482,7 +497,7 @@ func (w *Wallit) IngestMany(txs []*wire.MsgTx, height int32) (uint32, error) {
 				keygenBytes := adrb.Get(lnutil.KeyHashFromPkScript(out.PkScript))
 				if keygenBytes != nil {
 					// address matches something we're watching, cool.
-					// log.Printf("txout script:%x matched kg: %x\n", out.PkScript, keygenBytes)
+					// logging.Infof("txout script:%x matched kg: %x\n", out.PkScript, keygenBytes)
 
 					// build new portxo
 					txob, err := NewPorTxoBytesFromKGBytes(
@@ -504,7 +519,7 @@ func (w *Wallit) IngestMany(txs []*wire.MsgTx, height int32) (uint32, error) {
 					// confirmed now) we don't need to re-register.
 					existing := dufb.Get(txob[:36])
 					if existing == nil {
-						err = w.Hook.RegisterOutPoint(wire.OutPoint{tx.TxHash(), uint32(j)})
+						err = w.Hook.RegisterOutPoint(wire.OutPoint{Hash: tx.TxHash(), Index: uint32(j)})
 						if err != nil {
 							return err
 						}
@@ -537,7 +552,7 @@ func (w *Wallit) IngestMany(txs []*wire.MsgTx, height int32) (uint32, error) {
 				if len(v) == 0 && cap(w.OPEventChan) != 0 {
 					// confirmation of unknown / watch only outpoint, send up to ln
 					// confirmation match detected; return OP event with nil tx
-					// log.Printf("|||| zomg match  ")
+					// logging.Infof("|||| zomg match  ")
 					hitTxs[i] = true // flag to save tx in db
 
 					var opArr [36]byte
@@ -560,7 +575,7 @@ func (w *Wallit) IngestMany(txs []*wire.MsgTx, height int32) (uint32, error) {
 		for i, curOP := range spentOPs {
 			v := dufb.Get(curOP[:])
 			if v != nil && len(v) == 0 && cap(w.OPEventChan) != 0 {
-				// log.Printf("|||watch only here zomg\n")
+				// logging.Infof("|||watch only here zomg\n")
 				hitTxs[spentTxIdx[i]] = true // just save everything
 				op := lnutil.OutPointFromBytes(curOP)
 				// build new outpoint event
@@ -581,7 +596,7 @@ func (w *Wallit) IngestMany(txs []*wire.MsgTx, height int32) (uint32, error) {
 					return err
 				}
 				// print lost portxo
-				log.Printf(lostTxo.String())
+				logging.Infof(lostTxo.String())
 
 				// after marking for deletion, save stxo to old bucket
 				var st Stxo                               // generate spent txo
@@ -619,6 +634,6 @@ func (w *Wallit) IngestMany(txs []*wire.MsgTx, height int32) (uint32, error) {
 		return nil
 	})
 
-	log.Printf("ingest %d txs, %d hits\n", len(txs), hits)
+	logging.Infof("ingest %d txs, %d hits\n", len(txs), hits)
 	return hits, err
 }

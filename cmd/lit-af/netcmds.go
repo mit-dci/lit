@@ -136,8 +136,8 @@ func (lc *litAfClient) Connect(textArgs []string) error {
 }
 
 func (lc *litAfClient) Say(textArgs []string) error {
-	err := CheckHelpCommand(sayCommand, textArgs, 2)
-	if err != nil {
+	stopEx, err := CheckHelpCommand(sayCommand, textArgs, 2)
+	if err != nil || stopEx {
 		return err
 	}
 

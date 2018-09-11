@@ -2,12 +2,13 @@ package watchtower
 
 import (
 	"fmt"
-	"log"
+
+	"github.com/mit-dci/lit/logging"
 
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
-	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/wire"
 
 	"github.com/boltdb/bolt"
 )
@@ -111,6 +112,12 @@ func (w *WatchTower) OpenDB(filepath string) error {
 // Probably need some way to prevent overwrites.
 func (w *WatchTower) NewChannel(m lnutil.WatchDescMsg) error {
 
+	// exit if we didn't enable watchtower.
+	if w.WatchDB == nil {
+		fmt.Println("Node sending info thinking we are a watchtower, when we aren't")
+		return fmt.Errorf("Not a watchtower, can't keep track.")
+	}
+
 	// quick check if we support the cointype
 	_, ok := w.Hooks[m.CoinType]
 	if !ok {
@@ -134,7 +141,7 @@ func (w *WatchTower) NewChannel(m lnutil.WatchDescMsg) error {
 		if k != nil {
 			newIdx = lnutil.BtU32(k) + 1 // and add 1
 		}
-		log.Printf("assigning new channel index %d\n", newIdx)
+		logging.Infof("assigning new channel index %d\n", newIdx)
 		newIdxBytes := lnutil.U32tB(newIdx)
 
 		allChanbkt := btx.Bucket(BUCKETChandata)
@@ -152,7 +159,7 @@ func (w *WatchTower) NewChannel(m lnutil.WatchDescMsg) error {
 			return fmt.Errorf("watchdescriptor %d bytes, expect 96", len(wdBytes))
 		}
 		chanBucket.Put(KEYStatic, wdBytes[:96])
-		log.Printf("saved new channel to pkh %x\n", m.DestPKHScript)
+		logging.Infof("saved new channel to pkh %x\n", m.DestPKHScript)
 		// save index
 		err = chanBucket.Put(KEYIdx, newIdxBytes)
 		if err != nil {
@@ -172,6 +179,11 @@ func (w *WatchTower) NewChannel(m lnutil.WatchDescMsg) error {
 // AddMsg adds a new message describing a penalty tx to the db.
 // optimization would be to add a bunch of messages at once.  Not a huge speedup though.
 func (w *WatchTower) UpdateChannel(m lnutil.WatchStateMsg) error {
+
+	if w.WatchDB == nil {
+		fmt.Println("Node sending info thinking we are a watchtower, when we aren't")
+		return fmt.Errorf("Not a watchtower, can't keep track.")
+	}
 
 	return w.WatchDB.Update(func(btx *bolt.Tx) error {
 
@@ -197,7 +209,7 @@ func (w *WatchTower) UpdateChannel(m lnutil.WatchStateMsg) error {
 		if err != nil {
 			return err
 		}
-		// log.Printf("added elkrem %x at index %d OK\n", cm.Elk[:], elkr.UpTo())
+		// logging.Infof("added elkrem %x at index %d OK\n", cm.Elk[:], elkr.UpTo())
 
 		// get state number, after elk insertion.  also convert to 8 bytes.
 		stateNumBytes := lnutil.U64tB(elkr.UpTo())
@@ -231,7 +243,7 @@ func (w *WatchTower) UpdateChannel(m lnutil.WatchStateMsg) error {
 		copy(sigIdxBytes[4:10], stateNumBytes[2:]) // next 6 is state number
 		copy(sigIdxBytes[10:], m.Sig[:])           // the rest is signature
 
-		log.Printf("chan %x (pkh %x) up to state %x\n",
+		logging.Infof("chan %x (pkh %x) up to state %x\n",
 			cIdxBytes, m.DestPKH, stateNumBytes)
 		// save sigIdx into the txid bucket.
 		// TODO truncate txid, and deal with collisions.
@@ -241,6 +253,11 @@ func (w *WatchTower) UpdateChannel(m lnutil.WatchStateMsg) error {
 
 // TODO implement DeleteChannel.  Would be nice to delete old channels.
 func (w *WatchTower) DeleteChannel(m lnutil.WatchDelMsg) error {
+
+	if w.WatchDB == nil {
+		fmt.Println("Node sending info thinking we are a watchtower, when we aren't")
+		return fmt.Errorf("Not a watchtower, can't keep track.")
+	}
 	return nil
 }
 
@@ -266,7 +283,7 @@ func (w *WatchTower) MatchTxids(
 			}
 			b := txidbkt.Get(txid[:16])
 			if b != nil {
-				log.Printf("zomg hit %s\n", txid.String())
+				logging.Infof("zomg hit %s\n", txid.String())
 				hits = append(hits, txid)
 			}
 		}
@@ -278,33 +295,33 @@ func (w *WatchTower) MatchTxids(
 func (w *WatchTower) BlockHandler(
 	cointype uint32, bchan chan *wire.MsgBlock) {
 
-	log.Printf("-- started BlockHandler type %d, block channel cap %d\n",
+	logging.Infof("-- started BlockHandler type %d, block channel cap %d\n",
 		cointype, cap(bchan))
 
 	for {
 		// block here, take in blocks
 		block := <-bchan
 
-		log.Printf("tower check block %s %d txs\n",
+		logging.Infof("tower check block %s %d txs\n",
 			block.BlockHash().String(), len(block.Transactions))
 
 		// get all txids from the blocks
 		txids, err := block.TxHashes()
 		if err != nil {
-			log.Printf("BlockHandler/TxHashes error: %s", err.Error())
+			logging.Errorf("BlockHandler/TxHashes error: %s", err.Error())
 		}
 
 		// see if there are any hits from all the txids
 		// usually there aren't any so we can finish here
 		hits, err := w.MatchTxids(cointype, txids)
 		if err != nil {
-			log.Printf("BlockHandler/MatchTxids error: %s", err.Error())
+			logging.Errorf("BlockHandler/MatchTxids error: %s", err.Error())
 		}
 
 		// if there were hits, need to build justice txs and send out
 		if len(hits) > 0 {
 			for _, hitTxid := range hits {
-				log.Printf("zomg tx %s matched db\n", hitTxid.String())
+				logging.Infof("zomg tx %s matched db\n", hitTxid.String())
 				for _, tx := range block.Transactions {
 					// inefficient here, iterating through whole block.
 					// probably OK because this rarely hapens
@@ -312,13 +329,13 @@ func (w *WatchTower) BlockHandler(
 					if curTxid.IsEqual(&hitTxid) {
 						justice, err := w.BuildJusticeTx(cointype, tx)
 						if err != nil {
-							log.Printf("BuildJusticeTx error: %s", err.Error())
+							logging.Errorf("BuildJusticeTx error: %s", err.Error())
 						}
-						log.Printf("made & sent out justice tx %s\n",
+						logging.Infof("made & sent out justice tx %s\n",
 							justice.TxHash().String())
 						err = w.Hooks[cointype].PushTx(justice)
 						if err != nil {
-							log.Printf("BuildJusticeTx error: %s", err.Error())
+							logging.Errorf("BuildJusticeTx error: %s", err.Error())
 						}
 					}
 				}

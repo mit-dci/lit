@@ -400,8 +400,8 @@ func (lc *litAfClient) DlcListOracles(textArgs []string) error {
 }
 
 func (lc *litAfClient) DlcImportOracle(textArgs []string) error {
-	err := CheckHelpCommand(importOracleCommand, textArgs, 2)
-	if err != nil {
+	stopEx, err := CheckHelpCommand(importOracleCommand, textArgs, 2)
+	if err != nil || stopEx {
 		return err
 	}
 
@@ -416,14 +416,14 @@ func (lc *litAfClient) DlcImportOracle(textArgs []string) error {
 		return err
 	}
 
-	fmt.Fprintf(color.Output, "Oracle succesfully registered under ID %d\n",
+	fmt.Fprintf(color.Output, "Oracle successfully registered under ID %d\n",
 		reply.Oracle.Idx)
 	return nil
 }
 
 func (lc *litAfClient) DlcAddOracle(textArgs []string) error {
-	err := CheckHelpCommand(addOracleCommand, textArgs, 2)
-	if err != nil {
+	stopEx, err := CheckHelpCommand(addOracleCommand, textArgs, 2)
+	if err != nil || stopEx {
 		return err
 	}
 
@@ -442,7 +442,7 @@ func (lc *litAfClient) DlcAddOracle(textArgs []string) error {
 		return err
 	}
 
-	fmt.Fprintf(color.Output, "Oracle succesfully registered under ID %d\n",
+	fmt.Fprintf(color.Output, "Oracle successfully registered under ID %d\n",
 		reply.Oracle.Idx)
 	return nil
 }
@@ -550,14 +550,14 @@ func (lc *litAfClient) DlcNewContract(textArgs []string) error {
 		return err
 	}
 
-	fmt.Fprint(color.Output, "Contract succesfully created\n\n")
+	fmt.Fprint(color.Output, "Contract successfully created\n\n")
 	PrintContract(reply.Contract)
 	return nil
 }
 
 func (lc *litAfClient) DlcViewContract(textArgs []string) error {
-	err := CheckHelpCommand(viewContractCommand, textArgs, 1)
-	if err != nil {
+	stopEx, err := CheckHelpCommand(viewContractCommand, textArgs, 1)
+	if err != nil || stopEx {
 		return err
 	}
 
@@ -580,8 +580,8 @@ func (lc *litAfClient) DlcViewContract(textArgs []string) error {
 }
 
 func (lc *litAfClient) DlcViewContractPayout(textArgs []string) error {
-	err := CheckHelpCommand(viewContractPayoutCommand, textArgs, 4)
-	if err != nil {
+	stopEx, err := CheckHelpCommand(viewContractPayoutCommand, textArgs, 4)
+	if err != nil || stopEx {
 		return err
 	}
 
@@ -617,8 +617,8 @@ func (lc *litAfClient) DlcViewContractPayout(textArgs []string) error {
 }
 
 func (lc *litAfClient) DlcSetContractOracle(textArgs []string) error {
-	err := CheckHelpCommand(setContractOracleCommand, textArgs, 2)
-	if err != nil {
+	stopEx, err := CheckHelpCommand(setContractOracleCommand, textArgs, 2)
+	if err != nil || stopEx {
 		return err
 	}
 
@@ -641,14 +641,14 @@ func (lc *litAfClient) DlcSetContractOracle(textArgs []string) error {
 		return err
 	}
 
-	fmt.Fprint(color.Output, "Oracle set succesfully\n")
+	fmt.Fprint(color.Output, "Oracle set successfully\n")
 
 	return nil
 }
 
 func (lc *litAfClient) DlcSetContractDatafeed(textArgs []string) error {
-	err := CheckHelpCommand(setContractDatafeedCommand, textArgs, 2)
-	if err != nil {
+	stopEx, err := CheckHelpCommand(setContractDatafeedCommand, textArgs, 2)
+	if err != nil || stopEx {
 		return err
 	}
 
@@ -671,14 +671,14 @@ func (lc *litAfClient) DlcSetContractDatafeed(textArgs []string) error {
 		return err
 	}
 
-	fmt.Fprint(color.Output, "Datafeed set succesfully\n")
+	fmt.Fprint(color.Output, "Datafeed set successfully\n")
 
 	return nil
 }
 
 func (lc *litAfClient) DlcSetContractRPoint(textArgs []string) error {
-	err := CheckHelpCommand(setContractRPointCommand, textArgs, 2)
-	if err != nil {
+	stopEx, err := CheckHelpCommand(setContractRPointCommand, textArgs, 2)
+	if err != nil || stopEx {
 		return err
 	}
 
@@ -701,14 +701,14 @@ func (lc *litAfClient) DlcSetContractRPoint(textArgs []string) error {
 		return err
 	}
 
-	fmt.Fprint(color.Output, "R-point set succesfully\n")
+	fmt.Fprint(color.Output, "R-point set successfully\n")
 
 	return nil
 }
 
 func (lc *litAfClient) DlcSetContractSettlementTime(textArgs []string) error {
-	err := CheckHelpCommand(setContractSettlementTimeCommand, textArgs, 2)
-	if err != nil {
+	stopEx, err := CheckHelpCommand(setContractSettlementTimeCommand, textArgs, 2)
+	if err != nil || stopEx {
 		return err
 	}
 
@@ -731,14 +731,14 @@ func (lc *litAfClient) DlcSetContractSettlementTime(textArgs []string) error {
 		return err
 	}
 
-	fmt.Fprint(color.Output, "Settlement time set succesfully\n")
+	fmt.Fprint(color.Output, "Settlement time set successfully\n")
 
 	return nil
 }
 
 func (lc *litAfClient) DlcSetContractFunding(textArgs []string) error {
-	err := CheckHelpCommand(setContractFundingCommand, textArgs, 3)
-	if err != nil {
+	stopEx, err := CheckHelpCommand(setContractFundingCommand, textArgs, 3)
+	if err != nil || stopEx {
 		return err
 	}
 
@@ -766,14 +766,14 @@ func (lc *litAfClient) DlcSetContractFunding(textArgs []string) error {
 		return err
 	}
 
-	fmt.Fprint(color.Output, "Funding set succesfully\n")
+	fmt.Fprint(color.Output, "Funding set successfully\n")
 
 	return nil
 }
 
 func (lc *litAfClient) DlcSetContractCoinType(textArgs []string) error {
-	err := CheckHelpCommand(setContractCoinTypeCommand, textArgs, 2)
-	if err != nil {
+	stopEx, err := CheckHelpCommand(setContractCoinTypeCommand, textArgs, 2)
+	if err != nil || stopEx {
 		return err
 	}
 
@@ -803,8 +803,8 @@ func (lc *litAfClient) DlcSetContractCoinType(textArgs []string) error {
 }
 
 func (lc *litAfClient) DlcSetContractDivision(textArgs []string) error {
-	err := CheckHelpCommand(setContractDivisionCommand, textArgs, 3)
-	if err != nil {
+	stopEx, err := CheckHelpCommand(setContractDivisionCommand, textArgs, 3)
+	if err != nil || stopEx {
 		return err
 	}
 
@@ -832,14 +832,14 @@ func (lc *litAfClient) DlcSetContractDivision(textArgs []string) error {
 		return err
 	}
 
-	fmt.Fprint(color.Output, "Funding set succesfully\n")
+	fmt.Fprint(color.Output, "Funding set successfully\n")
 
 	return nil
 }
 
 func (lc *litAfClient) DlcOfferContract(textArgs []string) error {
-	err := CheckHelpCommand(offerContractCommand, textArgs, 2)
-	if err != nil {
+	stopEx, err := CheckHelpCommand(offerContractCommand, textArgs, 2)
+	if err != nil || stopEx {
 		return err
 	}
 
@@ -863,66 +863,58 @@ func (lc *litAfClient) DlcOfferContract(textArgs []string) error {
 		return err
 	}
 
-	fmt.Fprint(color.Output, "Offer sent set succesfully\n")
+	fmt.Fprint(color.Output, "Offer sent set successfully\n")
+
+	return nil
+}
+
+func (lc *litAfClient) dlcContractRespond(textArgs []string, aor bool) error {
+	args := new(litrpc.ContractRespondArgs)
+	reply := new(litrpc.ContractRespondReply)
+
+	cIdx, err := strconv.ParseUint(textArgs[0], 10, 64)
+	if err != nil {
+		return err
+	}
+
+	args.CIdx = cIdx
+	args.AcceptOrDecline = aor
+
+	err = lc.Call("LitRPC.ContractRespond", args, reply)
+	if err != nil {
+		return err
+	}
+
+	if aor {
+		fmt.Fprintf(color.Output, "Offer acceptance initiated. Use [dlc contract view %d] to see the status.\n", cIdx)
+	} else {
+		fmt.Fprint(color.Output, "Offer declined successfully\n")
+	}
 
 	return nil
 }
 
 func (lc *litAfClient) DlcDeclineContract(textArgs []string) error {
-	err := CheckHelpCommand(declineContractCommand, textArgs, 1)
-	if err != nil {
+	stopEx, err := CheckHelpCommand(declineContractCommand, textArgs, 1)
+	if err != nil || stopEx {
 		return err
 	}
 
-	args := new(litrpc.DeclineContractArgs)
-	reply := new(litrpc.DeclineContractArgs)
-
-	cIdx, err := strconv.ParseUint(textArgs[0], 10, 64)
-	if err != nil {
-		return err
-	}
-
-	args.CIdx = cIdx
-
-	err = lc.Call("LitRPC.DeclineContract", args, reply)
-	if err != nil {
-		return err
-	}
-
-	fmt.Fprint(color.Output, "Offer declined succesfully\n")
-
-	return nil
+	return lc.dlcContractRespond(textArgs, false)
 }
 
 func (lc *litAfClient) DlcAcceptContract(textArgs []string) error {
-	err := CheckHelpCommand(acceptContractCommand, textArgs, 1)
-	if err != nil {
+	stopEx, err := CheckHelpCommand(acceptContractCommand, textArgs, 1)
+	if err != nil || stopEx {
 		return err
 	}
 
-	args := new(litrpc.AcceptContractArgs)
-	reply := new(litrpc.AcceptContractReply)
-
-	cIdx, err := strconv.ParseUint(textArgs[0], 10, 64)
-	if err != nil {
-		return err
-	}
-
-	args.CIdx = cIdx
-
-	err = lc.Call("LitRPC.AcceptContract", args, reply)
-	if err != nil {
-		return err
-	}
-
-	fmt.Fprint(color.Output, "Offer accepted succesfully\n")
-
-	return nil
+	return lc.dlcContractRespond(textArgs, true)
 }
 
 func (lc *litAfClient) DlcSettleContract(textArgs []string) error {
-	err := CheckHelpCommand(settleContractCommand, textArgs, 3)
-	if err != nil {
+	stopEx, err := CheckHelpCommand(settleContractCommand, textArgs, 3)
+	if err != nil || stopEx {
 		return err
 	}
 
@@ -954,7 +946,7 @@ func (lc *litAfClient) DlcSettleContract(textArgs []string) error {
 		return err
 	}
 
-	fmt.Fprint(color.Output, "Contract settled succesfully\n")
+	fmt.Fprint(color.Output, "Contract settled successfully\n")
 
 	return nil
 }
@@ -994,8 +986,14 @@ func PrintContract(c *lnutil.DlcContract) {
 		status = "Sent offer, awaiting reply"
 	case lnutil.ContractStatusOfferedToMe:
 		status = "Received offer, awaiting reply"
+	case lnutil.ContractStatusAccepting:
+		status = "Accepting"
 	case lnutil.ContractStatusAccepted:
 		status = "Accepted"
+	case lnutil.ContractStatusAcknowledged:
+		status = "Acknowledged"
+	case lnutil.ContractStatusError:
+		status = "Error"
 	case lnutil.ContractStatusDeclined:
 		status = "Declined"
 	}

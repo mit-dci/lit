@@ -7,12 +7,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
+	"time"
 
-	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
+	"github.com/mit-dci/lit/wire"
 )
 
 // ARGHGH all fields have to be exported (caps) or the json unmarshaller won't
@@ -55,7 +56,10 @@ func (a *APILink) NsightGetAdrTxos() error {
 	// chop off last comma, and add /utxo
 	adrlist = adrlist[:len(adrlist)-1] + "/utxo"
 
-	response, err := http.Get(apitxourl + "/addrs/" + adrlist)
+	client := &http.Client{
+		Timeout: time.Second * 5, // 5s to accomodate the 10s RPC timeout
+	}
+	response, err := client.Get(apitxourl + "/addrs/" + adrlist)
 	if err != nil {
 		return err
 	}
@@ -89,7 +93,7 @@ func (a *APILink) NsightGetAdrTxos() error {
 		txah.Height = int32(adrUtxo.Height)
 		txah.Tx = tx
 
-		log.Printf("tx %s at height %d\n", txah.Tx.TxHash().String(), txah.Height)
+		logging.Infof("tx %s at height %d\n", txah.Tx.TxHash().String(), txah.Height)
 		a.TxUpToWallit <- txah
 
 		// don't know what order we get these in, so update APILink height at the end
@@ -114,10 +118,13 @@ func (a *APILink) GetOPTxs() error {
 
 	// need to query each txid with a different http request
 	for _, op := range oplist {
-		log.Printf("asking for %s\n", op.String())
+		logging.Infof("asking for %s\n", op.String())
 		// get full tx info for the outpoint's tx
 		// (if we have 2 outpoints with the same txid we query twice...)
-		response, err := http.Get(apitxourl + "tx/" + op.Hash.String())
+		client := &http.Client{
+			Timeout: time.Second * 5, // 5s to accomodate the 10s RPC timeout
+		}
+		response, err := client.Get(apitxourl + "tx/" + op.Hash.String())
 		if err != nil {
 			return err
 		}
@@ -126,7 +133,7 @@ func (a *APILink) GetOPTxs() error {
 		// parse the response to get the spending txid
 		err = json.NewDecoder(response.Body).Decode(&txr)
 		if err != nil {
-			log.Printf("json decode error; op %s not found\n", op.String())
+			logging.Errorf("json decode error; op %s not found\n", op.String())
 			continue
 		}
 
@@ -135,7 +142,7 @@ func (a *APILink) GetOPTxs() error {
 			if op.Index == txout.N { // hit; request this outpoint's spend tx
 				// see if it's been spent
 				if txout.SpentTxId == "" {
-					log.Printf("%s has nil spenttxid\n", op.String())
+					logging.Errorf("%s has nil spenttxid\n", op.String())
 					// this outpoint is not yet spent, can't request
 					continue
 				}
@@ -185,7 +192,10 @@ func (a *APILink) GetOPTxs() error {
 // GetRawTx is a helper function to get a tx from the insight api
 func GetRawTx(txid string) (*wire.MsgTx, error) {
 	rawTxURL := "https://test-insight.bitpay.com/api/rawtx/"
-	response, err := http.Get(rawTxURL + txid)
+	client := &http.Client{
+		Timeout: time.Second * 5, // 5s to accomodate the 10s RPC timeout
+	}
+	response, err := client.Get(rawTxURL + txid)
 	if err != nil {
 		return nil, err
 	}
@@ -266,13 +276,20 @@ func (a *APILink) PushTxSmartBit(tx *wire.MsgTx) error {
 	// turn into hex
 	txHexString := fmt.Sprintf("{\"hex\": \"%x\"}", b.Bytes())
 
-	log.Printf("tx hex string is %s\n", txHexString)
+	logging.Infof("tx hex string is %s\n", txHexString)
 
 	apiurl := "https://testnet-api.smartbit.com.au/v1/blockchain/pushtx"
 	response, err := http.Post(
 		apiurl, "application/json", bytes.NewBuffer([]byte(txHexString)))
-	log.Printf("respo	nse: %s", response.Status)
+	if err != nil {
+		return err
+	}
+
+	logging.Infof("response: %s", response.Status)
 	_, err = io.Copy(os.Stdout, response.Body)
+	if err != nil {
+		return err
+	}
 
 	return err
 }

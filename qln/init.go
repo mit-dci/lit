@@ -2,12 +2,13 @@ package qln
 
 import (
 	"fmt"
-	"log"
 	"path/filepath"
 
+	"github.com/mit-dci/lit/logging"
+
+	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/hdkeychain"
-	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/lnutil"
@@ -18,7 +19,7 @@ import (
 
 // Init starts up a lit node.  Needs priv key, and a path.
 // Does not activate a subwallet; do that after init.
-func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL string) (*LitNode, error) {
+func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL string, nat string) (*LitNode, error) {
 
 	nd := new(LitNode)
 	nd.LitFolder = path
@@ -52,6 +53,8 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 
 	nd.ProxyURL = proxyURL
 
+	nd.Nat = nat
+
 	nd.InitRouting()
 
 	// optional tower activation
@@ -73,7 +76,9 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 	nd.InProgDual = new(InFlightDualFund)
 	nd.InProgDual.done = make(chan *DualFundingResult, 1)
 
+	nd.RemoteMtx.Lock()
 	nd.RemoteCons = make(map[uint32]*RemotePeer)
+	nd.RemoteMtx.Unlock()
 
 	nd.SubWallet = make(map[uint32]UWallet)
 
@@ -89,7 +94,7 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 // LinkBaseWallet activates a wallet and hooks it into the litnode.
 func (nd *LitNode) LinkBaseWallet(
 	privKey *[32]byte, birthHeight int32, resync bool, tower bool,
-	host string, param *coinparam.Params) error {
+	host string, proxy string, param *coinparam.Params) error {
 
 	rootpriv, err := hdkeychain.NewMaster(privKey[:], param)
 	if err != nil {
@@ -116,9 +121,20 @@ func (nd *LitNode) LinkBaseWallet(
 
 	// if there aren't, Multiwallet will still be false; set new wallit to
 	// be the first & default
-	nd.SubWallet[WallitIdx] = wallit.NewWallit(
-		rootpriv, birthHeight, resync, host, nd.LitFolder, param)
+	var cointype int
+	nd.SubWallet[WallitIdx], cointype, err = wallit.NewWallit(
+		rootpriv, birthHeight, resync, host, nd.LitFolder, proxy, param)
 
+	if err != nil {
+		logging.Error(err)
+		return nil
+	}
+
+	if nd.ConnectedCoinTypes == nil {
+		nd.ConnectedCoinTypes = make(map[uint32]bool)
+		nd.ConnectedCoinTypes[uint32(cointype)] = true
+	}
+	nd.ConnectedCoinTypes[uint32(cointype)] = true
 	// re-register channel addresses
 	qChans, err := nd.GetAllQchans()
 	if err != nil {
@@ -131,12 +147,13 @@ func (nd *LitNode) LinkBaseWallet(
 		copy(pkh[:], pkhSlice)
 		nd.SubWallet[WallitIdx].ExportHook().RegisterAddress(pkh)
 
-		log.Printf("Registering outpoint %v", qChan.PorTxo.Op)
+		logging.Infof("Registering outpoint %v", qChan.PorTxo.Op)
 
 		nd.SubWallet[WallitIdx].WatchThis(qChan.PorTxo.Op)
 	}
 
 	go nd.OPEventHandler(nd.SubWallet[WallitIdx].LetMeKnow())
+	go nd.HeightEventHandler(nd.SubWallet[WallitIdx].LetMeKnowHeight())
 
 	if !nd.MultiWallet {
 		nd.DefaultCoin = param.HDCoinType
@@ -186,6 +203,11 @@ func (nd *LitNode) OpenDB(filename string) error {
 		}
 
 		_, err = btx.CreateBucketIfNotExists(BKTWatch)
+		if err != nil {
+			return err
+		}
+
+		_, err = btx.CreateBucketIfNotExists(BKTHTLCOPs)
 		if err != nil {
 			return err
 		}

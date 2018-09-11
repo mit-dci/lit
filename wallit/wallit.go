@@ -4,19 +4,19 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"log"
 	"sync"
 
+	"github.com/boltdb/bolt"
+	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/blockchain"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
-	"github.com/mit-dci/lit/wire"
-	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/hdkeychain"
-	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/uspv"
+	"github.com/mit-dci/lit/wire"
 )
 
 // The Wallit is lit's main wallet struct.  It's got the root key, the dbs, and
@@ -32,6 +32,10 @@ type Wallit struct {
 	// OPEventChan sends events to the LN wallet.
 	// Gets initialized and activates when called by qln
 	OPEventChan chan lnutil.OutPointEvent
+
+	// HeightEventChan sends block height changes to the LN wallet.
+	// Gets initialized and activates when called by qln
+	HeightEventChan chan lnutil.HeightEvent
 
 	// Params live here...
 	Param *coinparam.Params // network parameters (testnet3, segnet, etc)
@@ -142,7 +146,7 @@ func StxoFromBytes(b []byte) (Stxo, error) {
 	// last 36 bytes are height & spend txid.
 	u, err := portxo.PorTxoFromBytes(b[:l-36])
 	if err != nil {
-		log.Printf(" eof? ")
+		logging.Errorf(" eof? ")
 		return s, err
 	}
 

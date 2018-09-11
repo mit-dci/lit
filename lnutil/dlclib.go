@@ -5,12 +5,13 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"log"
 	"math/big"
+
+	"github.com/mit-dci/lit/logging"
 
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
-
+	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/wire"
 )
 
@@ -28,6 +29,8 @@ const (
 	ContractStatusActive       DlcContractStatus = 6
 	ContractStatusSettling     DlcContractStatus = 7
 	ContractStatusClosed       DlcContractStatus = 8
+	ContractStatusError        DlcContractStatus = 9
+	ContractStatusAccepting    DlcContractStatus = 10
 )
 
 // scalarSize is the size of an encoded big endian scalar.
@@ -331,7 +334,7 @@ func PrintTx(tx *wire.MsgTx) {
 	w := bufio.NewWriter(&buf)
 	tx.Serialize(w)
 	w.Flush()
-	log.Printf("%x\n", buf.Bytes())
+	logging.Infof("%x\n", buf.Bytes())
 }
 
 // DlcOutput returns a Txo for a particular value that pays to
@@ -445,7 +448,7 @@ func SettlementTx(c *DlcContract, d DlcContractDivision,
 
 	tx.AddTxIn(wire.NewTxIn(&c.FundingOutpoint, nil, nil))
 
-	totalFee := int64(1000) // TODO: Calculate
+	totalFee := int64(consts.DlcSettlementTxFee) // TODO: Calculate
 	feeEach := int64(float64(totalFee) / float64(2))
 	feeOurs := feeEach
 	feeTheirs := feeEach
