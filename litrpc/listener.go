@@ -104,7 +104,6 @@ func serveOneoffs(rw http.ResponseWriter, req *http.Request) {
 func RPCListen(rpcl *LitRPC, host string, port uint16) {
 
 	rpc.Register(rpcl)
-
 	listenString := fmt.Sprintf("%s:%d", host, port)
 
 	http.Handle("/ws", websocket.Handler(serveWS))

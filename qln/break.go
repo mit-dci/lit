@@ -41,6 +41,16 @@ func (nd *LitNode) BreakChannel(q *Qchan) error {
 
 	// set delta to 0... needed for break
 	q.State.Delta = 0
+
+	for i, h := range q.State.HTLCs {
+		if !h.Cleared && h.Clearing {
+			q.State.HTLCs[i].Clearing = false
+		}
+	}
+
+	q.State.InProgHTLC = nil
+	q.State.CollidingHTLC = nil
+
 	tx, err := nd.SignBreakTx(q)
 	if err != nil {
 		return err

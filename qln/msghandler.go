@@ -48,18 +48,27 @@ func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) er
 
 	case 0x60: //Tower Messages
 		if msg.MsgType() == lnutil.MSGID_WATCH_DESC {
-			nd.Tower.NewChannel(msg.(lnutil.WatchDescMsg))
+			return nd.Tower.NewChannel(msg.(lnutil.WatchDescMsg))
 		}
 		if msg.MsgType() == lnutil.MSGID_WATCH_STATEMSG {
-			nd.Tower.UpdateChannel(msg.(lnutil.WatchStateMsg))
+			return nd.Tower.UpdateChannel(msg.(lnutil.WatchStateMsg))
 		}
 		if msg.MsgType() == lnutil.MSGID_WATCH_DELETE {
-			nd.Tower.DeleteChannel(msg.(lnutil.WatchDelMsg))
+			return nd.Tower.DeleteChannel(msg.(lnutil.WatchDelMsg))
 		}
 
 	case 0x70: // Routing messages
 		if msg.MsgType() == lnutil.MSGID_LINK_DESC {
 			nd.LinkMsgHandler(msg.(lnutil.LinkMsg))
+		}
+		if msg.MsgType() == lnutil.MSGID_PAY_REQ {
+			return nd.MultihopPaymentRequestHandler(msg.(lnutil.MultihopPaymentRequestMsg))
+		}
+		if msg.MsgType() == lnutil.MSGID_PAY_ACK {
+			return nd.MultihopPaymentAckHandler(msg.(lnutil.MultihopPaymentAckMsg))
+		}
+		if msg.MsgType() == lnutil.MSGID_PAY_SETUP {
+			return nd.MultihopPaymentSetupHandler(msg.(lnutil.MultihopPaymentSetupMsg))
 		}
 
 	case 0xA0: // Dual Funding messages
@@ -70,7 +79,7 @@ func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) er
 			nd.DlcOfferHandler(msg.(lnutil.DlcOfferMsg), peer)
 		}
 		if msg.MsgType() == lnutil.MSGID_DLC_ACCEPTOFFER {
-			nd.DlcAcceptHandler(msg.(lnutil.DlcOfferAcceptMsg), peer)
+			return nd.DlcAcceptHandler(msg.(lnutil.DlcOfferAcceptMsg), peer)
 		}
 		if msg.MsgType() == lnutil.MSGID_DLC_DECLINEOFFER {
 			nd.DlcDeclineHandler(msg.(lnutil.DlcOfferDeclineMsg), peer)
@@ -84,6 +93,14 @@ func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) er
 		}
 		if msg.MsgType() == lnutil.MSGID_DLC_SIGPROOF {
 			nd.DlcSigProofHandler(msg.(lnutil.DlcContractSigProofMsg), peer)
+		}
+
+	case 0xB0: // remote control
+		if msg.MsgType() == lnutil.MSGID_REMOTE_RPCREQUEST {
+			nd.RemoteControlRequestHandler(msg.(lnutil.RemoteControlRpcRequestMsg), peer)
+		}
+		if msg.MsgType() == lnutil.MSGID_REMOTE_RPCRESPONSE {
+			nd.RemoteControlResponseHandler(msg.(lnutil.RemoteControlRpcResponseMsg), peer)
 		}
 	default:
 		return fmt.Errorf("Unknown message id byte %x &f0", msg.MsgType())

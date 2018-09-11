@@ -15,6 +15,7 @@ type ChannelInfo struct {
 	OutPoint      string
 	CoinType      uint32
 	Closed        bool
+	Failed        bool
 	Capacity      int64
 	MyBalance     int64
 	Height        int32  // block height of channel fund confirmation
@@ -23,10 +24,23 @@ type ChannelInfo struct {
 	PeerID        string
 	Data          [32]byte
 	Pkh           [20]byte
+	HTLCs         []HTLCInfo
 	LastUpdate    uint64
 }
 type ChannelListReply struct {
 	Channels []ChannelInfo
+}
+type HTLCInfo struct {
+	Idx            uint32
+	Incoming       bool
+	Amt            int64
+	RHash          [32]byte
+	Locktime       uint32
+	R              [16]byte
+	Cleared        bool
+	Clearing       bool
+	ClearedOnChain bool
+	InProg         bool
 }
 
 // ChannelList sends back a list of every (open?) channel with some
@@ -54,6 +68,7 @@ func (r *LitRPC) ChannelList(args ChanArgs, reply *ChannelListReply) error {
 		reply.Channels[i].OutPoint = q.Op.String()
 		reply.Channels[i].CoinType = q.Coin()
 		reply.Channels[i].Closed = q.CloseData.Closed
+		reply.Channels[i].Failed = q.State.Failed
 		reply.Channels[i].Capacity = q.Value
 		reply.Channels[i].MyBalance = q.State.MyAmt
 		reply.Channels[i].Height = q.Height
@@ -62,6 +77,56 @@ func (r *LitRPC) ChannelList(args ChanArgs, reply *ChannelListReply) error {
 		reply.Channels[i].CIdx = q.KeyGen.Step[4] & 0x7fffffff
 		reply.Channels[i].Data = q.State.Data
 		reply.Channels[i].Pkh = q.WatchRefundAdr
+		for _, h := range q.State.HTLCs {
+			hi := HTLCInfo{
+				h.Idx,
+				h.Incoming,
+				h.Amt,
+				h.RHash,
+				h.Locktime,
+				h.R,
+				h.Cleared,
+				h.Clearing,
+				h.ClearedOnChain,
+				false,
+			}
+
+			reply.Channels[i].HTLCs = append(reply.Channels[i].HTLCs, hi)
+		}
+
+		if q.State.InProgHTLC != nil {
+			h := q.State.InProgHTLC
+			hi := HTLCInfo{
+				h.Idx,
+				h.Incoming,
+				h.Amt,
+				h.RHash,
+				h.Locktime,
+				h.R,
+				h.Cleared,
+				h.Clearing,
+				h.ClearedOnChain,
+				true,
+			}
+			reply.Channels[i].HTLCs = append(reply.Channels[i].HTLCs, hi)
+		}
+
+		if q.State.CollidingHTLC != nil {
+			h := q.State.CollidingHTLC
+			hi := HTLCInfo{
+				h.Idx,
+				h.Incoming,
+				h.Amt,
+				h.RHash,
+				h.Locktime,
+				h.R,
+				h.Cleared,
+				h.Clearing,
+				h.ClearedOnChain,
+				true,
+			}
+			reply.Channels[i].HTLCs = append(reply.Channels[i].HTLCs, hi)
+		}
 		reply.Channels[i].LastUpdate = q.LastUpdate
 	}
 	return nil
@@ -585,4 +650,17 @@ func (r *LitRPC) ClearHTLC(args ClearHTLCArgs, reply *ClearHTLCReply) error {
 
 	reply.StateIndex = qc.State.StateIdx
 	return nil
+}
+
+type PayMultihopArgs struct {
+	DestLNAdr      string
+	DestCoinType   uint32
+	OriginCoinType uint32
+	Amt            int64
+}
+
+// PayMultihop tries to find a multi-hop path to send the payment along
+func (r *LitRPC) PayMultihop(args PayMultihopArgs, reply *StatusReply) error {
+	_, err := r.Node.PayMultihop(args.DestLNAdr, args.OriginCoinType, args.DestCoinType, args.Amt)
+	return err
 }

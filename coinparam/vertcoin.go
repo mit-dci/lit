@@ -64,6 +64,7 @@ var VertcoinTestNetParams = Params{
 	// BIP44 coin type used in the hierarchical deterministic path for
 	// address generation.
 	HDCoinType: 65536,
+	TestCoin:   true,
 }
 
 var VertcoinParams = Params{

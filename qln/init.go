@@ -50,6 +50,11 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 		return nil, err
 	}
 
+	kg.Step[3] = 1 | 1<<31
+	rcPriv, err := kg.DerivePrivateKey(rootPrivKey)
+	nd.DefaultRemoteControlKey = rcPriv.PubKey()
+	rcPriv = nil
+
 	nd.TrackerURL = trackerURL
 
 	nd.ProxyURL = proxyURL
@@ -76,6 +81,11 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 
 	nd.InProgDual = new(InFlightDualFund)
 	nd.InProgDual.done = make(chan *DualFundingResult, 1)
+
+	nd.InProgMultihop, err = nd.GetAllMultihopPayments()
+	if err != nil {
+		return nil, err
+	}
 
 	nd.RemoteMtx.Lock()
 	nd.RemoteCons = make(map[uint32]*RemotePeer)
@@ -128,7 +138,7 @@ func (nd *LitNode) LinkBaseWallet(
 
 	if err != nil {
 		logging.Error(err)
-		return nil
+		return err
 	}
 
 	if nd.ConnectedCoinTypes == nil {
@@ -209,6 +219,16 @@ func (nd *LitNode) OpenDB(filename string) error {
 		}
 
 		_, err = btx.CreateBucketIfNotExists(BKTHTLCOPs)
+		if err != nil {
+			return err
+		}
+
+		_, err = btx.CreateBucketIfNotExists(BKTPayments)
+		if err != nil {
+			return err
+		}
+
+		_, err = btx.CreateBucketIfNotExists(BKTRCAuth)
 		if err != nil {
 			return err
 		}

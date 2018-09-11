@@ -24,6 +24,21 @@ func (nd *LitNode) GetLisPorts() []string {
 	return ports
 }
 
+func (nd *LitNode) FindPeerIndexByAddress(lnAdr string) (uint32, error) {
+	nd.RemoteMtx.Lock()
+	defer nd.RemoteMtx.Unlock()
+	for idx, peer := range nd.RemoteCons {
+		var pubKey [33]byte
+		copy(pubKey[:], peer.Con.RemotePub().SerializeCompressed())
+		adr := lnutil.LitAdrFromPubkey(pubKey)
+		if adr == lnAdr {
+			return idx, nil
+		}
+	}
+
+	return 0, fmt.Errorf("Node %s not found", lnAdr)
+}
+
 // TCPListener starts a litNode listening for incoming LNDC connections
 func (nd *LitNode) TCPListener(lisIpPort string,
 	shortArg bool, shortZeros uint8) (string, error) {
@@ -160,7 +175,7 @@ func (nd *LitNode) TCPListener(lisIpPort string,
 }
 
 func GoAnnounce(priv *btcec.PrivateKey, litport string, litadr string, trackerURL string) {
-	err := Announce(priv, litport, litadr, trackerURL)
+	err := lnutil.Announce(priv, litport, litadr, trackerURL)
 	if err != nil {
 		logging.Errorf("Announcement error %s", err.Error())
 	}
@@ -189,11 +204,11 @@ func (nd *LitNode) DialPeer(connectAdr string) (uint32, error) {
 	var err error
 
 	// parse address and get pkh / host / port
-	who, where := splitAdrString(connectAdr)
+	who, where := lnutil.ParseAdrString(connectAdr)
 
 	// If we couldn't deduce a URL, look it up on the tracker
 	if where == "" {
-		where, _, err = Lookup(who, nd.TrackerURL, nd.ProxyURL)
+		where, _, err = lnutil.Lookup(who, nd.TrackerURL, nd.ProxyURL)
 		if err != nil {
 			return 0, err
 		}
@@ -268,6 +283,8 @@ type PeerInfo struct {
 
 func (nd *LitNode) GetConnectedPeerList() []PeerInfo {
 	var peers []PeerInfo
+	nd.RemoteMtx.Lock()
+	defer nd.RemoteMtx.Unlock()
 	for k, v := range nd.RemoteCons {
 		var newPeer PeerInfo
 		var pubArr [33]byte
@@ -290,8 +307,8 @@ func (nd *LitNode) GetConnectedPeerList() []PeerInfo {
 // ConnectedToPeer checks whether you're connected to a specific peer
 func (nd *LitNode) ConnectedToPeer(peer uint32) bool {
 	nd.RemoteMtx.Lock()
+	defer nd.RemoteMtx.Unlock()
 	_, ok := nd.RemoteCons[peer]
-	nd.RemoteMtx.Unlock()
 	return ok
 }
 

@@ -2,8 +2,11 @@ package litrpc
 
 import (
 	"fmt"
+	"log"
 	"strconv"
 
+	"github.com/mit-dci/lit/bech32"
+	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/logging"
 
 	"github.com/mit-dci/lit/lnutil"
@@ -163,4 +166,115 @@ type ChannelGraphReply struct {
 func (r *LitRPC) GetChannelMap(args NoArgs, reply *ChannelGraphReply) error {
 	reply.Graph = r.Node.VisualiseGraph()
 	return nil
+}
+
+// ------------ Show multihop payments
+type MultihopPaymentInfo struct {
+	RHash     [32]byte
+	R         [16]byte
+	Amt       int64
+	Path      []string
+	Succeeded bool
+}
+
+type MultihopPaymentsReply struct {
+	Payments []MultihopPaymentInfo
+}
+
+func (r *LitRPC) ListMultihopPayments(args NoArgs, reply *MultihopPaymentsReply) error {
+	r.Node.MultihopMutex.Lock()
+	defer r.Node.MultihopMutex.Unlock()
+	for _, p := range r.Node.InProgMultihop {
+		var path []string
+		for _, hop := range p.Path {
+			path = append(path, fmt.Sprintf("%s:%d", bech32.Encode("ln", hop.Node[:]), hop.CoinType))
+		}
+
+		i := MultihopPaymentInfo{
+			p.HHash,
+			p.PreImage,
+			p.Amt,
+			path,
+			p.Succeeded,
+		}
+
+		reply.Payments = append(reply.Payments, i)
+	}
+
+	return nil
+}
+
+type RCAuthArgs struct {
+	PubKey        []byte
+	Authorization *qln.RemoteControlAuthorization
+}
+
+func (r *LitRPC) RemoteControlAuth(args RCAuthArgs, reply *StatusReply) error {
+
+	pub, err := btcec.ParsePubKey(args.PubKey, btcec.S256())
+	if err != nil {
+		reply.Status = fmt.Sprintf("Error deserializing pubkey: %s", err.Error())
+		return err
+	}
+	compressedPubKey := pub.SerializeCompressed()
+	var pubKey [33]byte
+	copy(pubKey[:], compressedPubKey[:])
+
+	args.Authorization.UnansweredRequest = false
+
+	err = r.Node.SaveRemoteControlAuthorization(pubKey, args.Authorization)
+	if err != nil {
+		log.Printf("Error saving auth: %s", err.Error())
+		return err
+	}
+
+	action := "Granted"
+	if !args.Authorization.Allowed {
+		action = "Denied / revoked"
+	}
+	reply.Status = fmt.Sprintf("%s remote control access for pubkey [%x]", action, pubKey)
+	return nil
+}
+
+type RCRequestAuthArgs struct {
+	PubKey [33]byte
+}
+
+func (r *LitRPC) RequestRemoteControlAuthorization(args RCRequestAuthArgs, reply *StatusReply) error {
+	auth := new(qln.RemoteControlAuthorization)
+	auth.Allowed = false
+	auth.UnansweredRequest = true
+
+	err := r.Node.SaveRemoteControlAuthorization(args.PubKey, auth)
+	if err != nil {
+		log.Printf("Error saving auth request: %s", err.Error())
+		return err
+	}
+
+	reply.Status = fmt.Sprintf("Access requested for pubkey [%x]", args.PubKey)
+	return nil
+}
+
+type RCPendingAuthRequestsReply struct {
+	PubKeys [][33]byte
+}
+
+func (r *LitRPC) ListPendingRemoteControlAuthRequests(args NoArgs, reply *RCPendingAuthRequestsReply) error {
+	auth := new(qln.RemoteControlAuthorization)
+	auth.Allowed = false
+	auth.UnansweredRequest = true
+
+	requests, err := r.Node.GetPendingRemoteControlRequests()
+	if err != nil {
+		log.Printf("Error saving auth request: %s", err.Error())
+		return err
+	}
+
+	reply.PubKeys = make([][33]byte, len(requests))
+	for i, r := range requests {
+		reply.PubKeys[i] = r.PubKey
+	}
+
+	return nil
+
 }

@@ -122,6 +122,9 @@ type StatCom struct {
 
 	// Any HTLCs associated with this channel state (can be nil)
 	HTLCs []HTLC
+
+	Failed bool // S there was a fatal error with the channel
+	// meaning it cannot be used safely
 }
 
 // QCloseData is the output resulting from an un-cooperative close

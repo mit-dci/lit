@@ -29,6 +29,7 @@ type config struct { // define a struct for usage with go-flags
 	LitHomeDir string `long:"dir" description:"Specify Home Directory of lit as an absolute path."`
 	TrackerURL string `long:"tracker" description:"LN address tracker URL http|https://host:port"`
 	ConfigFile string
+	UnauthRPC  bool `long:"unauthrpc" description:"Enables unauthenticated Websocket RPC"`
 
 	// proxy
 	ProxyURL      string `long:"proxy" description:"SOCKS5 proxy to use for communicating with the network"`
@@ -70,6 +71,7 @@ var (
 	defaultLogLevel                        = 3
 	defaultAutoReconnectOnlyConnectedCoins = false
 	defaultMaxThreads                      = 10
+	defaultUnauthRPC                       = false
 )
 
 func fileExists(name string) bool {
@@ -170,10 +172,10 @@ func main() {
 		AutoReconnectOnlyConnectedCoins: defaultAutoReconnectOnlyConnectedCoins,
 		LogLevel:                        defaultLogLevel,
 		MaxThreads:                      defaultMaxThreads,
+		UnauthRPC:                       defaultUnauthRPC,
 	}
 
 	key := litSetup(&conf)
-
 	if conf.ProxyURL != "" {
 		conf.LitProxyURL = conf.ProxyURL
 		conf.ChainProxyURL = conf.ProxyURL
@@ -198,8 +200,11 @@ func main() {
 	rpcl := new(litrpc.LitRPC)
 	rpcl.Node = node
 	rpcl.OffButton = make(chan bool, 1)
+	node.RPC = rpcl
 
-	go litrpc.RPCListen(rpcl, conf.Rpchost, conf.Rpcport)
+	if conf.UnauthRPC {
+		go litrpc.RPCListen(rpcl, conf.Rpchost, conf.Rpcport)
+	}
 
 	if conf.AutoReconnect {
 		node.AutoReconnect(conf.AutoListenPort, conf.AutoReconnectInterval, conf.AutoReconnectOnlyConnectedCoins)
