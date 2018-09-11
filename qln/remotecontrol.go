@@ -57,7 +57,7 @@ func (nd *LitNode) RemoteControlRequestHandler(msg lnutil.RemoteControlRpcReques
 			return err
 		}
 		outMsg := lnutil.NewRemoteControlRpcResponseMsg(msg.Peer(), msg.Idx, false, resp)
-		nd.OmniOut <- outMsg
+		nd.tmpSendLitMsg(outMsg)
 		return nil
 	}
 
@@ -66,7 +66,7 @@ func (nd *LitNode) RemoteControlRequestHandler(msg lnutil.RemoteControlRpcReques
 		log.Println(err.Error())
 
 		outMsg := lnutil.NewRemoteControlRpcResponseMsg(msg.Peer(), msg.Idx, true, []byte("Unauthorized"))
-		nd.OmniOut <- outMsg
+		nd.tmpSendLitMsg(outMsg)
 
 		return err
 	}
@@ -163,7 +163,7 @@ func (nd *LitNode) RemoteControlRequestHandler(msg lnutil.RemoteControlRpcReques
 				}
 
 				outMsg := lnutil.NewRemoteControlRpcResponseMsg(msg.Peer(), msg.Idx, replyIsError, reply)
-				nd.OmniOut <- outMsg
+				nd.tmpSendLitMsg(outMsg)
 			}
 		}
 	}()

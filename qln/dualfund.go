@@ -176,7 +176,7 @@ func (nd *LitNode) DualFundChannel(
 
 	outMsg := lnutil.NewDualFundingReqMsg(peerIdx, cointype, ourAmount, theirAmount, myChanPub, myRefundPub, myHAKDbase, changeAddr, ourInputs)
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 
 	// wait until it's done!
 	result := <-nd.InProgDual.done
@@ -187,7 +187,7 @@ func (nd *LitNode) DualFundChannel(
 // Declines the in progress (received) dual funding request
 func (nd *LitNode) DualFundDecline(reason uint8) {
 	outMsg := lnutil.NewDualFundingDeclMsg(nd.InProgDual.PeerIdx, reason)
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 	nd.InProgDual.mtx.Lock()
 	nd.InProgDual.Clear()
 	nd.InProgDual.mtx.Unlock()
@@ -268,7 +268,7 @@ func (nd *LitNode) DualFundAccept() *DualFundingResult {
 
 	outMsg := lnutil.NewDualFundingAcceptMsg(nd.InProgDual.PeerIdx, nd.InProgDual.CoinType, myChanPub, myRefundPub, myHAKDbase, changeAddr, ourInputs, MyNextHTLCBase, MyN2HTLCBase)
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 
 	// wait until it's done!
 	result := <-nd.InProgDual.done
@@ -479,7 +479,7 @@ func (nd *LitNode) DualFundingAcceptHandler(msg lnutil.DualFundingAcceptMsg) {
 		elkPointZero, elkPointOne, elkPointTwo, q.State.Data)
 
 	nd.InProgDual.mtx.Unlock()
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 
 	return
 }
@@ -688,7 +688,7 @@ func (nd *LitNode) DualFundChanDescHandler(msg lnutil.ChanDescMsg) error {
 		theirElkPointZero, theirElkPointOne, theirElkPointTwo,
 		sig, fundingTx)
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 
 	return nil
 }
@@ -799,7 +799,7 @@ func (nd *LitNode) DualFundChanAckHandler(msg lnutil.DualFundingChanAckMsg, peer
 
 	outMsg := lnutil.NewSigProofMsg(msg.Peer(), msg.Outpoint, sig)
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 
 	return
 }

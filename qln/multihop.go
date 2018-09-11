@@ -60,7 +60,7 @@ func (nd *LitNode) PayMultihop(dstLNAdr string, originCoinType uint32, destCoinT
 
 	log.Printf("Sending payment request to %s", dstLNAdr)
 	msg := lnutil.NewMultihopPaymentRequestMsg(idx, destCoinType)
-	nd.OmniOut <- msg
+	nd.tmpSendLitMsg(msg)
 	log.Printf("Done sending payment request to %s", dstLNAdr)
 	return true, nil
 }
@@ -91,7 +91,7 @@ func (nd *LitNode) MultihopPaymentRequestHandler(msg lnutil.MultihopPaymentReque
 	nd.MultihopMutex.Unlock()
 
 	outMsg := lnutil.NewMultihopPaymentAckMsg(msg.Peer(), hash)
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 	return nil
 }
 
@@ -175,7 +175,7 @@ func (nd *LitNode) MultihopPaymentAckHandler(msg lnutil.MultihopPaymentAckMsg) e
 					var data [32]byte
 					outMsg := lnutil.NewMultihopPaymentSetupMsg(firstHopIdx, msg.HHash, mh.Path, data)
 					fmt.Printf("Sending multihoppaymentsetup to peer %d\n", firstHopIdx)
-					nd.OmniOut <- outMsg
+					nd.tmpSendLitMsg(outMsg)
 				}()
 
 				break
@@ -389,7 +389,7 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 
 		msg.PeerIdx = sendToIdx
 		msg.NodeRoute = msg.NodeRoute[1:]
-		nd.OmniOut <- msg
+		nd.tmpSendLitMsg(msg)
 	}()
 
 	return nil

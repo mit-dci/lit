@@ -279,7 +279,7 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 
 	logging.Infof("Sending DeltaSig: %v", outMsg)
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 
 	return nil
 }
@@ -544,7 +544,7 @@ func (nd *LitNode) SendGapSigRev(q *Qchan) error {
 
 	logging.Infof("Sending GapSigRev: %v", outMsg)
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 
 	return nil
 }
@@ -581,7 +581,7 @@ func (nd *LitNode) SendSigRev(q *Qchan) error {
 
 	logging.Infof("Sending SigRev: %v", outMsg)
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 	return nil
 }
 
@@ -905,7 +905,7 @@ func (nd *LitNode) SendREV(q *Qchan) error {
 
 	logging.Infof("Sending Rev: %v", outMsg)
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 
 	return err
 }

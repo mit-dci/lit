@@ -9,9 +9,8 @@ import (
 	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/eventbus"
 	"github.com/mit-dci/lit/lnio"
-	"github.com/mit-dci/lit/lnio/backends/lnbolt" // TODO Abstract this more.
+	"github.com/mit-dci/lit/lnio/backends/lnbolt"
 	"github.com/mit-dci/lit/lnp2p"
-	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/wallit"
@@ -131,11 +130,6 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 	nd.RemoteMtx.Unlock()
 
 	nd.SubWallet = make(map[uint32]UWallet)
-
-	nd.OmniOut = make(chan lnutil.LitMsg, 10)
-
-	//	go nd.OmniHandler()
-	go nd.OutMessager()
 
 	// REFACTORING STUFF
 	nd.PeerMap = map[*lnp2p.Peer]*RemotePeer{}

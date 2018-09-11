@@ -565,8 +565,8 @@ func (nd *LitNode) LinkMsgHandler(msg lnutil.LinkMsg) {
 		if peerIdx != origIdx {
 			msg.PeerIdx = peerIdx
 
-			go func(msg lnutil.LinkMsg) {
-				nd.OmniOut <- msg
+			go func(omsg lnutil.LinkMsg) {
+				nd.tmpSendLitMsg(omsg)
 			}(msg)
 		}
 	}

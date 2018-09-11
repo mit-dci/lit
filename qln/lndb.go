@@ -127,9 +127,6 @@ type LitNode struct {
 	RemoteCons         map[uint32]*RemotePeer
 	RemoteMtx          sync.Mutex
 
-	// OmniChan is the channel for the OmniHandler
-	OmniOut chan lnutil.LitMsg
-
 	// the current channel that in the process of being created
 	// (1 at a time for now)
 	InProg *InFlightFund

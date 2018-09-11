@@ -83,7 +83,7 @@ func (nd *LitNode) CoopClose(q *Qchan) error {
 
 	outMsg := lnutil.NewCloseReqMsg(q.Peer(), q.Op, signature)
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 	return nil
 }
 

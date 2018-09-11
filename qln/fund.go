@@ -174,7 +174,7 @@ func (nd *LitNode) FundChannel(
 
 	outMsg := lnutil.NewPointReqMsg(peerIdx, cointype)
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 
 	// wait until it's done!
 	idx := <-nd.InProg.done
@@ -250,7 +250,7 @@ func (nd *LitNode) PointReqHandler(msg lnutil.PointReqMsg) {
 
 	outMsg := lnutil.NewPointRespMsg(msg.Peer(), myChanPub, myRefundPub, myHAKDbase,
 		myNextHTLCBase, myN2HTLCBase)
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 
 	return
 }
@@ -420,7 +420,7 @@ func (nd *LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 		nd.InProg.Coin, nd.InProg.Amt, nd.InProg.InitSend,
 		elkPointZero, elkPointOne, elkPointTwo, nd.InProg.Data)
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 
 	return nil
 }
@@ -572,7 +572,7 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) error {
 		sig)
 	outMsg.Bytes()
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 
 	return nil
 }
@@ -666,7 +666,7 @@ func (nd *LitNode) QChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePeer) {
 
 	outMsg := lnutil.NewSigProofMsg(msg.Peer(), msg.Outpoint, sig)
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 
 	return
 }

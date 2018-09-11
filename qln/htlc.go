@@ -178,7 +178,7 @@ func (nd *LitNode) SendHashSig(q *Qchan) error {
 
 	logging.Infof("Sending HashSig with %d HTLC sigs", len(HTLCSigs))
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 
 	return nil
 }
@@ -545,7 +545,7 @@ func (nd *LitNode) SendPreimageSig(q *Qchan, Idx uint32) error {
 
 	logging.Infof("Sending PreimageSig with %d HTLC sigs", len(HTLCSigs))
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 
 	return nil
 }

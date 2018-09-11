@@ -91,24 +91,21 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 	return nil
 }
 
-// OutMessager takes messages from the outbox and sends them to the ether. net.
-func (nd *LitNode) OutMessager() {
-	for {
-		msg := <-nd.OmniOut
+func (nd *LitNode) tmpSendLitMsg(msg lnutil.LitMsg) {
 
-		if !nd.ConnectedToPeer(msg.Peer()) {
-			logging.Errorf("message type %x to peer %d but not connected\n",
-				msg.MsgType(), msg.Peer())
-			continue
-		}
-
-		buf := msg.Bytes()
-
-		// Just wrap it and forward it off to the underlying infrastructure.
-		// There's some byte fenagling that we have to do to get all this to work right.
-		np := nd.PeerMan.GetPeerByIdx(int32(msg.Peer()))
-		np.SendImmediateMessage(LitMsgWrapperMessage{buf[0], buf[1:]}) // being blocking might not be a huge issue here possibly?
+	if !nd.ConnectedToPeer(msg.Peer()) {
+		log.Printf("message type %x to peer %d but not connected\n",
+			msg.MsgType(), msg.Peer())
+		return
 	}
+
+	buf := msg.Bytes()
+
+	// Just wrap it and forward it off to the underlying infrastructure.
+	// There's some byte fenagling that we have to do to get all this to work right.
+	np := nd.PeerMan.GetPeerByIdx(int32(msg.Peer()))
+	np.SendImmediateMessage(LitMsgWrapperMessage{buf[0], buf[1:]}) // being blocking might not be a huge issue here possibly?
+
 }
 
 type SimplePeerInfo struct {
@@ -154,7 +151,7 @@ func (nd *LitNode) SendChat(peer uint32, chat string) error {
 
 	outMsg := lnutil.NewChatMsg(peer, chat)
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 
 	return nil
 }
