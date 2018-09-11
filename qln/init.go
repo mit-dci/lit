@@ -2,29 +2,38 @@ package qln
 
 import (
 	"fmt"
-	"path/filepath"
-
-	"github.com/mit-dci/lit/logging"
-
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/hdkeychain"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/eventbus"
+	"github.com/mit-dci/lit/lnp2p"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/wallit"
 	"github.com/mit-dci/lit/watchtower"
+	"path/filepath"
+	"sync"
 )
 
-// Init starts up a lit node.  Needs priv key, and a path.
+// NewLitNode starts up a lit node.  Needs priv key, and a path.
 // Does not activate a subwallet; do that after init.
 func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL string, nat string) (*LitNode, error) {
 
 	nd := new(LitNode)
 	nd.LitFolder = path
-	nd.EventSystem = eventbus.NewEventBus()
+
+	// Event system setup.
+	nd.Events = eventbus.NewEventBus()
+
+	// Register adapter event handlers.  These are for hooking in the new peer management with the old one.
+	h1 := makeTmpNewPeerHandler(nd)
+	nd.Events.RegisterHandler("lnp2p.peer.new", h1)
+	h2 := makeTmpMsgHandler(nd)
+	nd.Events.RegisterHandler("TMP!lnp2p.msgrecv", h2)
+	// TODO removing peers, etc.
 
 	litdbpath := filepath.Join(nd.LitFolder, "ln.db")
 	err := nd.OpenDB(litdbpath)
@@ -99,6 +108,10 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 
 	//	go nd.OmniHandler()
 	go nd.OutMessager()
+
+	// REFACTORING STUFF
+	nd.PeerMap = map[*lnp2p.Peer]*RemotePeer{}
+	nd.PeerMapMtx = &sync.Mutex{}
 
 	return nd, nil
 }

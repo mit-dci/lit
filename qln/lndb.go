@@ -16,6 +16,7 @@ import (
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/eventbus"
 	"github.com/mit-dci/lit/lndc"
+	"github.com/mit-dci/lit/lnp2p"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/watchtower"
@@ -86,7 +87,7 @@ You can't remove wallets once they're attached; just restart instead.
 
 */
 
-// LnNode is the main struct for the node, keeping track of all channel state and
+// LitNode is the main struct for the node, keeping track of all channel state and
 // communicating with the underlying UWallet
 type LitNode struct {
 	LitDB *bolt.DB // place to write all this down
@@ -157,6 +158,10 @@ type LitNode struct {
 	MultihopMutex  sync.Mutex
 
 	ExchangeRates map[uint32][]lnutil.RateDesc
+
+	// REFACTORING FIELDS
+	PeerMap    map[*lnp2p.Peer]*RemotePeer // we never remove things from here, so this is a memory leak
+	PeerMapMtx *sync.Mutex
 }
 
 type LinkDesc struct {
