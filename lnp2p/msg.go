@@ -1,7 +1,6 @@
 package lnp2p
 
 import (
-	"github.com/mit-dci/lit/eventbus"
 	"github.com/mit-dci/lit/lnutil"
 	"log"
 )
@@ -10,6 +9,12 @@ import (
 func processMessage(b []byte, peer *Peer) (lnutil.LitMsg, error) {
 	m, err := lnutil.LitMsgFromBytes(b, peer.GetIdx())
 	return m, err
+}
+
+// Message is any kind of message that can go over the network.
+type Message interface {
+	Type() uint8
+	Bytes() []byte
 }
 
 type outgoingmsg struct {
@@ -58,28 +63,4 @@ func sendMessages(queue chan outgoingmsg) {
 	}
 
 	log.Printf("peermgr: send message queue terminating")
-}
-
-// ---------- TEMPORARY ---------- //
-/*
- * This is here to help interface with the rest of qln.  There's a handler for
- * these events that just passes them into the OmniHandler like the previous
- * implementation would.
- */
-
-// NetMessageRecvEvent is fired when a network message is recieved.
-type NetMessageRecvEvent struct {
-	Msg    *lnutil.LitMsg
-	Peer   *Peer
-	Rawbuf []byte
-}
-
-// Name .
-func (e NetMessageRecvEvent) Name() string {
-	return "TMP!lnp2p.msgrecv"
-}
-
-// Flags .
-func (e NetMessageRecvEvent) Flags() uint8 {
-	return eventbus.EFLAG_UNCANCELLABLE
 }

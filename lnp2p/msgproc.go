@@ -6,12 +6,6 @@ import (
 	"sync"
 )
 
-// Message is any kind of message that can go over the network.
-type Message interface {
-	Type() uint8
-	Bytes() []byte
-}
-
 // ParseFuncType is the type of a Message parser function.
 type ParseFuncType func([]byte) (Message, error)
 

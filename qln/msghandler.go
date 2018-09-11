@@ -12,6 +12,51 @@ import (
 	"github.com/mit-dci/lit/wire"
 )
 
+func (nd *LitNode) registerHandlers() {
+
+	mp := nd.PeerMan.GetMessageProcessor()
+	pf := neoOmniParser
+	hf := makeNeoOmniHandler(nd)
+
+	// I used the following command to generate these calls below:
+	// grep -E '^.MSGID_[A-Z_]+ += ' lnutil/msglib.go \
+	//     | awk '{ print $1 }' \
+	//     | while read m; do echo "mp.DefineMessage(lnutil.$m, pf, hf)" ; done
+
+	mp.DefineMessage(lnutil.MSGID_TEXTCHAT, pf, hf)
+	mp.DefineMessage(lnutil.MSGID_POINTREQ, pf, hf)
+	mp.DefineMessage(lnutil.MSGID_POINTRESP, pf, hf)
+	mp.DefineMessage(lnutil.MSGID_CHANDESC, pf, hf)
+	mp.DefineMessage(lnutil.MSGID_CHANACK, pf, hf)
+	mp.DefineMessage(lnutil.MSGID_SIGPROOF, pf, hf)
+	mp.DefineMessage(lnutil.MSGID_CLOSEREQ, pf, hf)
+	mp.DefineMessage(lnutil.MSGID_CLOSERESP, pf, hf)
+	mp.DefineMessage(lnutil.MSGID_DELTASIG, pf, hf)
+	mp.DefineMessage(lnutil.MSGID_SIGREV, pf, hf)
+	mp.DefineMessage(lnutil.MSGID_GAPSIGREV, pf, hf)
+	mp.DefineMessage(lnutil.MSGID_REV, pf, hf)
+	mp.DefineMessage(lnutil.MSGID_HASHSIG, pf, hf)
+	mp.DefineMessage(lnutil.MSGID_PREIMAGESIG, pf, hf)
+	mp.DefineMessage(lnutil.MSGID_FWDMSG, pf, hf)
+	mp.DefineMessage(lnutil.MSGID_FWDAUTHREQ, pf, hf)
+	mp.DefineMessage(lnutil.MSGID_SELFPUSH, pf, hf)
+	mp.DefineMessage(lnutil.MSGID_WATCH_DESC, pf, hf)
+	mp.DefineMessage(lnutil.MSGID_WATCH_STATEMSG, pf, hf)
+	mp.DefineMessage(lnutil.MSGID_WATCH_DELETE, pf, hf)
+	mp.DefineMessage(lnutil.MSGID_LINK_DESC, pf, hf)
+	mp.DefineMessage(lnutil.MSGID_DLC_OFFER, pf, hf)
+	mp.DefineMessage(lnutil.MSGID_DLC_ACCEPTOFFER, pf, hf)
+	mp.DefineMessage(lnutil.MSGID_DLC_DECLINEOFFER, pf, hf)
+	mp.DefineMessage(lnutil.MSGID_DLC_CONTRACTACK, pf, hf)
+	mp.DefineMessage(lnutil.MSGID_DLC_CONTRACTFUNDINGSIGS, pf, hf)
+	mp.DefineMessage(lnutil.MSGID_DLC_SIGPROOF, pf, hf)
+	mp.DefineMessage(lnutil.MSGID_DUALFUNDINGREQ, pf, hf)
+	mp.DefineMessage(lnutil.MSGID_DUALFUNDINGACCEPT, pf, hf)
+	mp.DefineMessage(lnutil.MSGID_DUALFUNDINGDECL, pf, hf)
+	mp.DefineMessage(lnutil.MSGID_DUALFUNDINGCHANACK, pf, hf)
+
+}
+
 // handles stuff that comes in over the wire.  Not user-initiated.
 func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) error {
 	logging.Infof("Message from %d type %x", msg.Peer(), msg.MsgType())

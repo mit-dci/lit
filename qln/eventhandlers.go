@@ -47,65 +47,14 @@ func makeTmpNewPeerHandler(nd *LitNode) func(eventbus.Event) eventbus.EventHandl
 	}
 }
 
-// Mostly taken from LNDCReader in msghandler.go, then horribly changed.
-func makeTmpMsgHandler(nd *LitNode) func(eventbus.Event) eventbus.EventHandleResult {
-
-	/*
-	 * Bless me father for I have sinned...
-	 */
-
-	inited := make(map[*RemotePeer]struct{})
-
+func makeTmpDisconnectPeerHandler(nd *LitNode) func(eventbus.Event) eventbus.EventHandleResult {
 	return func(e eventbus.Event) eventbus.EventHandleResult {
-		ev := e.(lnp2p.NetMessageRecvEvent)
+		ee := e.(lnp2p.PeerDisconnectEvent)
+		rpeer := nd.PeerMap[ee.Peer]
 
-		msg := ev.Msg
-		rawbuf := ev.Rawbuf
-		npeer := ev.Peer
-		peer := nd.PeerMap[npeer]
-
-		var err error
-
-		if _, ok := inited[peer]; !ok {
-
-			// init the qchan map thingy, this is quite inefficient
-			err = nd.PopulateQchanMap(peer)
-			if err != nil {
-				log.Printf("error initing peer: %s", err.Error())
-				return eventbus.EHANDLE_OK
-			}
-
-			inited[peer] = struct{}{} // :thinking:
-
-		}
-
-		// TODO Remove this.  Also it's quite inefficient the way it's written at the moment.
-		var chanIdx uint32
-		chanIdx = 0
-		if len(rawbuf) > 38 {
-			var opArr [36]byte
-			for _, q := range peer.QCs {
-				b := lnutil.OutPointToBytes(q.Op)
-				peer.OpMap[b] = q.Idx()
-			}
-			copy(opArr[:], rawbuf[1:37]) // yay for magic numbers /s
-			chanCheck, ok := peer.OpMap[opArr]
-			if ok {
-				chanIdx = chanCheck
-			}
-		}
-
-		log.Printf("chanIdx is %d, InProg is %d\n", chanIdx, nd.InProg.ChanIdx)
-
-		if chanIdx != 0 {
-			err = nd.PeerHandler(*msg, peer.QCs[chanIdx], peer)
-		} else {
-			err = nd.PeerHandler(*msg, nil, peer)
-		}
-
-		if err != nil {
-			log.Printf("PeerHandler error with %d: %s\n", npeer.GetIdx(), err.Error())
-		}
+		nd.RemoteMtx.Lock()
+		delete(nd.RemoteCons, rpeer.Idx)
+		nd.RemoteMtx.Unlock()
 
 		return eventbus.EHANDLE_OK
 	}

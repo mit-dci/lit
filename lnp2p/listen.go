@@ -131,21 +131,6 @@ func processConnectionInboundTraffic(peer *Peer, pm *PeerManager) {
 
 		log.Printf("Got message of len %d from peer %s\n", n, peer.GetLnAddr())
 
-		// Truncate it.
-		buf = buf[:n]
-
-		// Parse it into an actual message.
-		m, err := processMessage(buf, peer)
-		if err != nil {
-			log.Printf("Error handling message: %s\n", err.Error())
-			peer.conn.Close()
-			return
-		}
-
-		// Publish the event to the event bus so qln or something can pick it up.
-		// TODO Refactor this.
-		pm.ebus.Publish(NetMessageRecvEvent{&m, peer, buf})
-
 		// Send to the message processor.
 		pm.mproc.HandleMessage(peer, buf)
 

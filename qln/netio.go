@@ -101,17 +101,9 @@ func (nd *LitNode) OutMessager() {
 			continue
 		}
 
-		//rawmsg := append([]byte{msg.MsgType()}, msg.Data...)
-		rawmsg := msg.Bytes() // automatically includes messageType
-		nd.RemoteMtx.Lock()   // not sure this is needed...
-		con := nd.RemoteCons[msg.Peer()].Con
-		n, err := con.Write(rawmsg)
-		if err != nil {
-			logging.Errorf("error writing to peer %d: %s\n", msg.Peer(), err.Error())
-		} else {
-			logging.Infof("type %x %d bytes to peer %d\n", msg.MsgType(), n, msg.Peer())
-		}
-		nd.RemoteMtx.Unlock()
+		// Just wrap it and forward it off to the underlying infrastructure.
+		np := nd.PeerMan.GetPeerByIdx(int32(msg.Peer()))
+		np.SendQueuedMessage(LitMsgWrapperMessage{msg.Bytes()})
 	}
 }
 
@@ -138,6 +130,7 @@ func (nd *LitNode) GetConnectedPeerList() []SimplePeerInfo {
 
 // ConnectedToPeer checks whether you're connected to a specific peer
 func (nd *LitNode) ConnectedToPeer(peer uint32) bool {
+	// TODO Upgrade this to the new system.
 	nd.RemoteMtx.Lock()
 	defer nd.RemoteMtx.Unlock()
 	_, ok := nd.RemoteCons[peer]
