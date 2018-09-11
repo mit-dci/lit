@@ -135,8 +135,7 @@ class LitNode():
         if cointype is not None: # I had to do thi because of reasons.
             ct = cointype
         res = self.rpc.FundChannel(
-            print("LNID", peer.lnid)
-            Peer=self.get_peer_id(peer),
+            Peer=1,
             CoinType=ct,
             Capacity=capacity,
             InitialSend=initialsend,
