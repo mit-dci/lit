@@ -1,4 +1,4 @@
-package lnio
+package lncore
 
 // LnAddr is just a bech32-encoded pubkey.
 // TODO Move this to another package so it's more obviously not *just* IO-related.

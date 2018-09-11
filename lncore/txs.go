@@ -1,4 +1,4 @@
-package lnio
+package lncore
 
 // Txid represents a transaction on the blockchain.
 type Txid struct {

@@ -1,4 +1,4 @@
-package lnio
+package lncore
 
 // CoinSpecific is a meta-interface for coin-specific types.
 type CoinSpecific interface {

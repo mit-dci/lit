@@ -3,7 +3,7 @@ package lnp2p
 import (
 	"github.com/mit-dci/lit/eventbus"
 	"github.com/mit-dci/lit/lndc"
-	"github.com/mit-dci/lit/lnio"
+	"github.com/mit-dci/lit/lncore"
 	"log"
 )
 
@@ -60,7 +60,7 @@ func acceptConnections(listener *lndc.Listener, listenAddr string, pm *PeerManag
 
 		// Add the peer data to the DB if we don't have it.
 		if pi == nil {
-			pi = &lnio.PeerInfo{
+			pi = &lncore.PeerInfo{
 				LnAddr:   &rlitaddr,
 				Nickname: nil,
 				NetAddr:  rnetaddr.String(),

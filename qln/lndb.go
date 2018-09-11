@@ -16,7 +16,7 @@ import (
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/eventbus"
 	"github.com/mit-dci/lit/lndc"
-	"github.com/mit-dci/lit/lnio"
+	"github.com/mit-dci/lit/lncore"
 	"github.com/mit-dci/lit/lnp2p"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
@@ -93,7 +93,7 @@ You can't remove wallets once they're attached; just restart instead.
 type LitNode struct {
 	LitDB *bolt.DB // place to write all this down
 
-	NewLitDB lnio.LitStorage
+	NewLitDB lncore.LitStorage
 
 	LitFolder string // path to save stuff
 

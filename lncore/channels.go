@@ -1,4 +1,4 @@
-package lnio
+package lncore
 
 // LitChannelStorage .
 type LitChannelStorage interface {

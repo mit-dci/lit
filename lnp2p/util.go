@@ -4,7 +4,7 @@ import (
 	"github.com/mit-dci/lit/bech32"
 	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/crypto/fastsha256"
-	"github.com/mit-dci/lit/lnio"
+	"github.com/mit-dci/lit/lncore"
 	"strings"
 )
 
@@ -27,8 +27,8 @@ func splitAdrString(adr string) (string, string) {
 }
 
 // Given a raw pubkey, returns the lit addr.  Stolen from `lnutil/litadr.go`.
-func convertPubkeyToLitAddr(pk pubkey) lnio.LnAddr {
+func convertPubkeyToLitAddr(pk pubkey) lncore.LnAddr {
 	b := (*btcec.PublicKey)(pk).SerializeCompressed()
 	doubleSha := fastsha256.Sum256(b[:])
-	return lnio.LnAddr(bech32.Encode("ln", doubleSha[:20]))
+	return lncore.LnAddr(bech32.Encode("ln", doubleSha[:20]))
 }

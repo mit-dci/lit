@@ -3,12 +3,12 @@ package lnp2p
 import (
 	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/lndc"
-	"github.com/mit-dci/lit/lnio"
+	"github.com/mit-dci/lit/lncore"
 )
 
 // A Peer is a remote client that's somehow connected to us.
 type Peer struct {
-	lnaddr   lnio.LnAddr
+	lnaddr   lncore.LnAddr
 	nickname *string
 	conn     *lndc.Conn
 	idpubkey pubkey
@@ -34,7 +34,7 @@ func (p *Peer) GetNickname() string {
 }
 
 // GetLnAddr returns the lightning network address for this peer.
-func (p *Peer) GetLnAddr() lnio.LnAddr {
+func (p *Peer) GetLnAddr() lncore.LnAddr {
 	return p.lnaddr
 }
 

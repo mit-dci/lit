@@ -3,7 +3,7 @@ package qln
 import (
 	"fmt"
 	"github.com/mit-dci/lit/crypto/koblitz"
-	"github.com/mit-dci/lit/lnio"
+	"github.com/mit-dci/lit/lncore"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/logging"
 	"log"
@@ -21,7 +21,7 @@ func (nd *LitNode) GetLisAddressAndPorts() (string, []string) {
 // TODO Remove this function.
 func (nd *LitNode) FindPeerIndexByAddress(lnAdr string) (uint32, error) {
 	pm := nd.PeerMan
-	p := pm.GetPeer(lnio.LnAddr(lnAdr))
+	p := pm.GetPeer(lncore.LnAddr(lnAdr))
 	if p != nil {
 		return p.GetIdx(), nil
 	}

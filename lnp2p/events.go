@@ -4,12 +4,12 @@ import (
 	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/eventbus"
 	"github.com/mit-dci/lit/lndc"
-	"github.com/mit-dci/lit/lnio"
+	"github.com/mit-dci/lit/lncore"
 )
 
 // NewPeerEvent is fired when a new peer is registered.
 type NewPeerEvent struct {
-	Addr            lnio.LnAddr
+	Addr            lncore.LnAddr
 	Peer            *Peer
 	RemoteInitiated bool
 

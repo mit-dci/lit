@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/boltdb/bolt"
-	"github.com/mit-dci/lit/lnio"
+	"github.com/mit-dci/lit/lncore"
 	"log"
 )
 
@@ -35,22 +35,22 @@ func (pdb *peerboltdb) init() error {
 	return nil
 }
 
-func (pdb *peerboltdb) GetPeerAddrs() ([]lnio.LnAddr, error) {
+func (pdb *peerboltdb) GetPeerAddrs() ([]lncore.LnAddr, error) {
 
-	addrs := make([]lnio.LnAddr, 0)
+	addrs := make([]lncore.LnAddr, 0)
 
 	err := pdb.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(peersLabel)
 
 		// Iterate over all of the members of the bucket.
 		cur := b.Cursor()
-		atmp := make([]lnio.LnAddr, 0)
+		atmp := make([]lncore.LnAddr, 0)
 		for {
 			k, _ := cur.Next()
 			if k == nil {
 				break
 			}
-			atmp = append(atmp, lnio.LnAddr(string(k)))
+			atmp = append(atmp, lncore.LnAddr(string(k)))
 		}
 
 		// Now that we have the final array return it.
@@ -64,7 +64,7 @@ func (pdb *peerboltdb) GetPeerAddrs() ([]lnio.LnAddr, error) {
 	return addrs, nil
 }
 
-func (pdb *peerboltdb) GetPeerInfo(addr lnio.LnAddr) (*lnio.PeerInfo, error) {
+func (pdb *peerboltdb) GetPeerInfo(addr lncore.LnAddr) (*lncore.PeerInfo, error) {
 
 	var raw []byte
 	var err error
@@ -88,7 +88,7 @@ func (pdb *peerboltdb) GetPeerInfo(addr lnio.LnAddr) (*lnio.PeerInfo, error) {
 		return nil, nil
 	}
 
-	var pi lnio.PeerInfo
+	var pi lncore.PeerInfo
 	err = json.Unmarshal(raw, &pi)
 	if err != nil {
 		return nil, err
@@ -98,9 +98,9 @@ func (pdb *peerboltdb) GetPeerInfo(addr lnio.LnAddr) (*lnio.PeerInfo, error) {
 
 }
 
-func (pdb *peerboltdb) GetPeerInfos() (map[lnio.LnAddr]lnio.PeerInfo, error) {
+func (pdb *peerboltdb) GetPeerInfos() (map[lncore.LnAddr]lncore.PeerInfo, error) {
 
-	var out map[lnio.LnAddr]lnio.PeerInfo
+	var out map[lncore.LnAddr]lncore.PeerInfo
 	var err error
 
 	err = pdb.db.View(func(tx *bolt.Tx) error {
@@ -108,20 +108,20 @@ func (pdb *peerboltdb) GetPeerInfos() (map[lnio.LnAddr]lnio.PeerInfo, error) {
 
 		// Iterate over everything.
 		cur := b.Cursor()
-		mtmp := map[lnio.LnAddr]lnio.PeerInfo{}
+		mtmp := map[lncore.LnAddr]lncore.PeerInfo{}
 		for {
 			k, v := cur.Next()
 			if k == nil {
 				break
 			}
 
-			var pi lnio.PeerInfo
+			var pi lncore.PeerInfo
 			err2 := json.Unmarshal(v, &pi) // TODO Move outside tx block.
 			if err2 != nil {
 				return err2
 			}
 
-			ka := lnio.LnAddr(string(k))
+			ka := lncore.LnAddr(string(k))
 			mtmp[ka] = pi
 
 		}
@@ -137,7 +137,7 @@ func (pdb *peerboltdb) GetPeerInfos() (map[lnio.LnAddr]lnio.PeerInfo, error) {
 
 }
 
-func (pdb *peerboltdb) AddPeer(addr lnio.LnAddr, pi lnio.PeerInfo) error {
+func (pdb *peerboltdb) AddPeer(addr lncore.LnAddr, pi lncore.PeerInfo) error {
 
 	var err error
 
@@ -165,7 +165,7 @@ func (pdb *peerboltdb) AddPeer(addr lnio.LnAddr, pi lnio.PeerInfo) error {
 
 }
 
-func (pdb *peerboltdb) DeletePeer(addr lnio.LnAddr) error {
+func (pdb *peerboltdb) DeletePeer(addr lncore.LnAddr) error {
 
 	var err error
 

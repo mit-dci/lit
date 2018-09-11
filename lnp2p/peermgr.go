@@ -8,7 +8,7 @@ import (
 	"github.com/mit-dci/lit/btcutil/hdkeychain"
 	"github.com/mit-dci/lit/eventbus"
 	"github.com/mit-dci/lit/lndc"
-	"github.com/mit-dci/lit/lnio"
+	"github.com/mit-dci/lit/lncore"
 	"github.com/mit-dci/lit/portxo"
 	"log"
 	"net"
@@ -23,13 +23,13 @@ type PeerManager struct {
 
 	// Biographical.
 	idkey  privkey
-	peerdb lnio.LitPeerStorage
+	peerdb lncore.LitPeerStorage
 	ebus   *eventbus.EventBus
 	mproc  MessageProcessor
 
 	// Peer tracking.
-	peers   []lnio.LnAddr // compatibility
-	peerMap map[lnio.LnAddr]*Peer
+	peers   []lncore.LnAddr // compatibility
+	peerMap map[lncore.LnAddr]*Peer
 
 	// Accepting connections.
 	listeningPorts map[string]*listeningthread
@@ -50,7 +50,7 @@ type ProxySettings struct {
 }
 
 // NewPeerManager creates a peer manager from a root key
-func NewPeerManager(rootkey *hdkeychain.ExtendedKey, pdb lnio.LitPeerStorage, bus *eventbus.EventBus) (*PeerManager, error) {
+func NewPeerManager(rootkey *hdkeychain.ExtendedKey, pdb lncore.LitPeerStorage, bus *eventbus.EventBus) (*PeerManager, error) {
 	k, err := computeIdentKeyFromRoot(rootkey)
 	if err != nil {
 		return nil, err
@@ -61,8 +61,8 @@ func NewPeerManager(rootkey *hdkeychain.ExtendedKey, pdb lnio.LitPeerStorage, bu
 		peerdb:         pdb,
 		ebus:           bus,
 		mproc:          NewMessageProcessor(),
-		peers:          make([]lnio.LnAddr, 1),
-		peerMap:        map[lnio.LnAddr]*Peer{},
+		peers:          make([]lncore.LnAddr, 1),
+		peerMap:        map[lncore.LnAddr]*Peer{},
 		listeningPorts: map[string]*listeningthread{},
 		sending:        false,
 		outqueue:       make(chan outgoingmsg, outgoingbuf),
@@ -111,7 +111,7 @@ func (pm *PeerManager) GetPeerIdx(peer *Peer) int32 {
 }
 
 // GetPeer returns the peer with the given lnaddr.
-func (pm *PeerManager) GetPeer(lnaddr lnio.LnAddr) *Peer {
+func (pm *PeerManager) GetPeer(lnaddr lncore.LnAddr) *Peer {
 	p, ok := pm.peerMap[lnaddr]
 	if !ok {
 		return nil
@@ -136,13 +136,13 @@ func (pm *PeerManager) TryConnectAddress(addr string, proxy *ProxySettings) (*Pe
 		// TODO Do lookup.
 	}
 
-	lnwho := lnio.LnAddr(who)
+	lnwho := lncore.LnAddr(who)
 	x, y := pm.tryConnectPeer(where, &lnwho, proxy)
 	return x, y
 
 }
 
-func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lnio.LnAddr, proxy *ProxySettings) (*Peer, error) {
+func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, proxy *ProxySettings) (*Peer, error) {
 
 	// lnaddr check, to make sure that we do the right thing.
 	if lnaddr == nil {

@@ -6,10 +6,10 @@ import (
 	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/hdkeychain"
 	"github.com/mit-dci/lit/coinparam"
+	"github.com/mit-dci/lit/db/lnbolt" // TODO Abstract this more.
 	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/eventbus"
-	"github.com/mit-dci/lit/lnio"
-	"github.com/mit-dci/lit/lnio/backends/lnbolt"
+	"github.com/mit-dci/lit/lncore"
 	"github.com/mit-dci/lit/lnp2p"
 	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/portxo"
@@ -42,7 +42,7 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 	}
 
 	db2 := &lnbolt.LitBoltDB{}
-	var dbx lnio.LitStorage
+	var dbx lncore.LitStorage
 	dbx = db2
 	err = dbx.Open(filepath.Join(nd.LitFolder, "db2"))
 	if err != nil {

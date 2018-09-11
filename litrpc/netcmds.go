@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/mit-dci/lit/bech32"
 	"github.com/mit-dci/lit/crypto/koblitz"
-	"github.com/mit-dci/lit/lnio"
+	"github.com/mit-dci/lit/lncore"
 	"github.com/mit-dci/lit/lnp2p"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/logging"
@@ -84,7 +84,7 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *ConnectReply) error {
 	}
 
 	var pm *lnp2p.PeerManager = r.Node.PeerMan
-	p := pm.GetPeer(lnio.LnAddr(connectAdr))
+	p := pm.GetPeer(lncore.LnAddr(connectAdr))
 
 	if p != nil {
 		reply.Status = fmt.Sprintf("connected to peer %s", connectAdr)

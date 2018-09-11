@@ -3,7 +3,7 @@ package lnbolt
 import (
 	"fmt"
 	"github.com/boltdb/bolt"
-	"github.com/mit-dci/lit/lnio"
+	"github.com/mit-dci/lit/lncore"
 	"os"
 	"path"
 )
@@ -116,12 +116,12 @@ func (db *LitBoltDB) Check() error {
 }
 
 // GetWalletDB .
-func (db *LitBoltDB) GetWalletDB(cointype uint32) lnio.LitWalletStorage {
+func (db *LitBoltDB) GetWalletDB(cointype uint32) lncore.LitWalletStorage {
 	return nil
 }
 
 // GetPeerDB .
-func (db *LitBoltDB) GetPeerDB() lnio.LitPeerStorage {
+func (db *LitBoltDB) GetPeerDB() lncore.LitPeerStorage {
 	w := peerboltdb{}
 	w.db = db.peerdb
 
@@ -130,12 +130,12 @@ func (db *LitBoltDB) GetPeerDB() lnio.LitPeerStorage {
 		panic(err)
 	}
 
-	var w2 lnio.LitPeerStorage
+	var w2 lncore.LitPeerStorage
 	w2 = &w
 	return w2
 }
 
 // GetChannelDB .
-func (db *LitBoltDB) GetChannelDB() lnio.LitChannelStorage {
+func (db *LitBoltDB) GetChannelDB() lncore.LitChannelStorage {
 	return nil
 }
