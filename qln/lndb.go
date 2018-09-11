@@ -14,6 +14,7 @@ import (
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/elkrem"
+	"github.com/mit-dci/lit/eventbus"
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
@@ -94,7 +95,11 @@ type LitNode struct {
 
 	IdentityKey *btcec.PrivateKey
 
+	// p2p remote control key
 	DefaultRemoteControlKey *btcec.PublicKey
+
+	// event bus
+	Events eventbus.EventBus
 
 	// all nodes have a watchtower.  but could have a tower without a node
 	Tower watchtower.Watcher

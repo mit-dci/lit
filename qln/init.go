@@ -11,6 +11,7 @@ import (
 	"github.com/mit-dci/lit/btcutil/hdkeychain"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/dlc"
+	"github.com/mit-dci/lit/eventbus"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/wallit"
@@ -23,6 +24,7 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 
 	nd := new(LitNode)
 	nd.LitFolder = path
+	nd.EventSystem = eventbus.NewEventBus()
 
 	litdbpath := filepath.Join(nd.LitFolder, "ln.db")
 	err := nd.OpenDB(litdbpath)
