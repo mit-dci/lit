@@ -206,7 +206,11 @@ class TestEnv():
         self.bitcoind = BitcoinNode()
         self.lits = []
         for i in range(litcnt):
-            node = LitNode(self.bitcoind)
+            try:
+                node = LitNode(self.bitcoind)
+            except Exception as e:
+                print("Error while starting bitcoind")
+                print(e)
             self.lits.append(node)
         print("started nodes!  syncing...")
 
