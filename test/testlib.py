@@ -132,12 +132,7 @@ class LitNode():
             ct = cointype
         peerid=2
         print("LNID", peer.lnid, ct, capacity, initialsend, self.peer_mapping)
-        res = self.rpc.FundChannel(
-            Peer=peerid,
-            CoinType=ct,
-            Capacity=capacity,
-            InitialSend=initialsend,
-            Data=None) # maybe use [0 for _ in range(32)] or something?
+        res = self.rpc.FundChannel(1, 257, 1000000, 500000)
         return res['ChanIdx']
 
     def shutdown(self):
