@@ -130,9 +130,17 @@ class LitNode():
         ct = REGTEST_COINTYPE
         if cointype is not None: # I had to do thi because of reasons.
             ct = cointype
-        peerid=2
+        peerid=1
         print("LNID", peer.lnid, ct, capacity, initialsend, self.peer_mapping)
-        res = self.rpc.FundChannel(1, 257, 1000000, 500000)
+        try:
+            res = self.rpc.FundChannel(
+            Peer=peerid,
+            CoinType=ct,
+            Capacity=capacity,
+            InitialSend=initialsend,
+            Data=None) # maybe use [0 for _ in range(32)] or something?
+        except Exception as e:
+            print("EXC", e)
         return res['ChanIdx']
 
     def shutdown(self):
