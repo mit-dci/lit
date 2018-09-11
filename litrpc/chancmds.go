@@ -2,7 +2,8 @@ package litrpc
 
 import (
 	"fmt"
-	"log"
+
+	"github.com/mit-dci/lit/logging"
 
 	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/consts"
@@ -348,7 +349,7 @@ func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 			"can't push %d max is 1 coin (100000000), min is 1", args.Amt)
 	}
 
-	log.Printf("push %d to chan %d with data %x\n", args.Amt, args.ChanIdx, args.Data)
+	logging.Infof("push %d to chan %d with data %x\n", args.Amt, args.ChanIdx, args.Data)
 
 	// load the whole channel from disk just to see who the peer is
 	// (pretty inefficient)
@@ -378,7 +379,7 @@ func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 			dummyqc.Peer(), dummyqc.Idx())
 	}
 
-	log.Printf("channel %s\n", qc.Op.String())
+	logging.Infof("channel %s\n", qc.Op.String())
 
 	if qc.CloseData.Closed {
 		return fmt.Errorf("Channel %d already closed by tx %s",
@@ -459,7 +460,7 @@ func (r *LitRPC) DumpPrivs(args NoArgs, reply *DumpReply) error {
 	for _, qc := range qcs {
 		wal, ok := r.Node.SubWallet[qc.Coin()]
 		if !ok {
-			log.Printf(
+			logging.Errorf(
 				"Channel %s error - coin %d not connected; can't show keys",
 				qc.Op.String(), qc.Coin())
 			continue
@@ -537,7 +538,7 @@ func (r *LitRPC) AddHTLC(args AddHTLCArgs, reply *AddHTLCReply) error {
 			"can't add HTLC %d max is 1 coin (100000000), min is %d", args.Amt, consts.MinOutput)
 	}
 
-	log.Printf("add HTLC %d to chan %d with data %x and RHash %x\n", args.Amt, args.ChanIdx, args.Data, args.RHash)
+	logging.Infof("add HTLC %d to chan %d with data %x and RHash %x\n", args.Amt, args.ChanIdx, args.Data, args.RHash)
 
 	// load the whole channel from disk just to see who the peer is
 	// (pretty inefficient)
@@ -567,7 +568,7 @@ func (r *LitRPC) AddHTLC(args AddHTLCArgs, reply *AddHTLCReply) error {
 			dummyqc.Peer(), dummyqc.Idx())
 	}
 
-	log.Printf("channel %s\n", qc.Op.String())
+	logging.Infof("channel %s\n", qc.Op.String())
 
 	if qc.CloseData.Closed {
 		return fmt.Errorf("Channel %d already closed by tx %s",
@@ -601,7 +602,7 @@ type ClearHTLCReply struct {
 }
 
 func (r *LitRPC) ClearHTLC(args ClearHTLCArgs, reply *ClearHTLCReply) error {
-	log.Printf("clear HTLC %d from chan %d with data %x and preimage %x\n", args.HTLCIdx, args.ChanIdx, args.Data, args.R)
+	logging.Infof("clear HTLC %d from chan %d with data %x and preimage %x\n", args.HTLCIdx, args.ChanIdx, args.Data, args.R)
 
 	// load the whole channel from disk just to see who the peer is
 	// (pretty inefficient)
@@ -631,7 +632,7 @@ func (r *LitRPC) ClearHTLC(args ClearHTLCArgs, reply *ClearHTLCReply) error {
 			dummyqc.Peer(), dummyqc.Idx())
 	}
 
-	log.Printf("channel %s\n", qc.Op.String())
+	logging.Infof("channel %s\n", qc.Op.String())
 
 	if qc.CloseData.Closed {
 		return fmt.Errorf("Channel %d already closed by tx %s",

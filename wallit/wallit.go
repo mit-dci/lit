@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"log"
 	"sync"
 
 	"github.com/boltdb/bolt"
@@ -14,6 +13,7 @@ import (
 	"github.com/mit-dci/lit/btcutil/hdkeychain"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/uspv"
 	"github.com/mit-dci/lit/wire"
@@ -146,7 +146,7 @@ func StxoFromBytes(b []byte) (Stxo, error) {
 	// last 36 bytes are height & spend txid.
 	u, err := portxo.PorTxoFromBytes(b[:l-36])
 	if err != nil {
-		log.Printf(" eof? ")
+		logging.Errorf(" eof? ")
 		return s, err
 	}
 

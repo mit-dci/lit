@@ -259,7 +259,7 @@ func (lc *litAfClient) DualFundChannel(textArgs []string) error {
 	args.OurAmount = int64(ourAmt)
 	args.TheirAmount = int64(theirAmt)
 
-	err = lc.rpccon.Call("LitRPC.DualFundChannel", args, reply)
+	err = lc.Call("LitRPC.DualFundChannel", args, reply)
 	if err != nil {
 		return err
 	}
@@ -272,7 +272,7 @@ func (lc *litAfClient) dualFundRespond(aor bool) error {
 	reply := new(litrpc.StatusReply)
 	args := new(litrpc.DualFundRespondArgs)
 	args.AcceptOrDecline = aor
-	err := lc.rpccon.Call("LitRPC.DualFundRespond", args, reply)
+	err := lc.Call("LitRPC.DualFundRespond", args, reply)
 	if err != nil {
 		return err
 	}

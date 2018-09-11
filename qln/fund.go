@@ -9,6 +9,7 @@ import (
 	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/wire"
 )
@@ -188,7 +189,7 @@ func (nd *LitNode) PointReqHandler(msg lnutil.PointReqMsg) {
 
 	/* shouldn't be possible to get this error...
 	if nd.RemoteCon == nil || nd.RemoteCon.RemotePub == nil {
-		log.Printf("Not connected to anyone\n")
+		logging.Errorf("Not connected to anyone\n")
 		return
 	}*/
 
@@ -197,13 +198,13 @@ func (nd *LitNode) PointReqHandler(msg lnutil.PointReqMsg) {
 
 	cIdx, err := nd.NextChannelIdx()
 	if err != nil {
-		log.Printf("PointReqHandler err %s", err.Error())
+		logging.Errorf("PointReqHandler err %s", err.Error())
 		return
 	}
 
 	_, ok := nd.SubWallet[msg.Cointype]
 	if !ok {
-		log.Printf("PointReqHandler err no wallet for type %d", msg.Cointype)
+		logging.Errorf("PointReqHandler err no wallet for type %d", msg.Cointype)
 		return
 	}
 
@@ -219,11 +220,11 @@ func (nd *LitNode) PointReqHandler(msg lnutil.PointReqMsg) {
 	myRefundPub, _ := nd.GetUsePub(kg, UseChannelRefund)
 	myHAKDbase, err := nd.GetUsePub(kg, UseChannelHAKDBase)
 	if err != nil {
-		log.Printf("PointReqHandler err %s", err.Error())
+		logging.Errorf("PointReqHandler err %s", err.Error())
 		return
 	}
 
-	log.Printf("Generated channel pubkey %x\n", myChanPub)
+	logging.Infof("Generated channel pubkey %x\n", myChanPub)
 
 	var keyGen portxo.KeyGen
 	keyGen.Depth = 5
@@ -235,14 +236,14 @@ func (nd *LitNode) PointReqHandler(msg lnutil.PointReqMsg) {
 
 	myNextHTLCBase, err := nd.GetUsePub(keyGen, UseHTLCBase)
 	if err != nil {
-		log.Printf("error generating NextHTLCBase %v", err)
+		logging.Errorf("error generating NextHTLCBase %v", err)
 		return
 	}
 
 	keyGen.Step[3] = 1 | 1<<31
 	myN2HTLCBase, err := nd.GetUsePub(keyGen, UseHTLCBase)
 	if err != nil {
-		log.Printf("error generating N2HTLCBase %v", err)
+		logging.Errorf("error generating N2HTLCBase %v", err)
 		return
 	}
 
@@ -256,7 +257,7 @@ func (nd *LitNode) PointReqHandler(msg lnutil.PointReqMsg) {
 // FUNDER
 // PointRespHandler takes in a point response, and returns a channel description
 func (nd *LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
-	log.Printf("Got PointResponse")
+	logging.Infof("Got PointResponse")
 
 	nd.InProg.mtx.Lock()
 	defer nd.InProg.mtx.Unlock()
@@ -348,7 +349,7 @@ func (nd *LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 	q.State.MyAmt = nd.InProg.Amt - nd.InProg.InitSend
 	// get fee from sub wallet.  Later should make fee per channel and update state
 	// based on size
-	q.State.Fee = nd.SubWallet[q.Coin()].Fee() * 1000
+	q.State.Fee = nd.SubWallet[q.Coin()].Fee() * consts.QcStateFee
 
 	q.State.Data = nd.InProg.Data
 
@@ -468,10 +469,10 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) error {
 	//	qc, err := nd.SaveFundTx(
 	//		op, amt, peerArr, theirPub, theirRefundPub, theirHAKDbase)
 	//	if err != nil {
-	//		log.Printf("QChanDescHandler SaveFundTx err %s", err.Error())
+	//		logging.Errorf("QChanDescHandler SaveFundTx err %s", err.Error())
 	//		return
 	//	}
-	log.Printf("got multisig output %s amt %d\n", op.String(), amt)
+	logging.Infof("got multisig output %s amt %d\n", op.String(), amt)
 
 	// create initial state
 	qc.State = new(StatCom)
@@ -586,13 +587,13 @@ func (nd *LitNode) QChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePeer) {
 	qc, err := nd.GetQchan(opArr)
 	if err != nil {
 		nd.FailChannel(qc)
-		log.Printf("QChanAckHandler GetQchan err %s", err.Error())
+		logging.Errorf("QChanAckHandler GetQchan err %s", err.Error())
 		return
 	}
 
 	//	err = qc.IngestElkrem(revElk)
 	//	if err != nil { // this can't happen because it's the first elk... remove?
-	//		log.Printf("QChanAckHandler IngestElkrem err %s", err.Error())
+	//		logging.Errorf("QChanAckHandler IngestElkrem err %s", err.Error())
 	//		return
 	//	}
 	qc.State.ElkPoint = msg.ElkZero
@@ -602,7 +603,7 @@ func (nd *LitNode) QChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePeer) {
 	err = qc.VerifySigs(sig, nil)
 	if err != nil {
 		nd.FailChannel(qc)
-		log.Printf("QChanAckHandler VerifySig err %s", err.Error())
+		logging.Errorf("QChanAckHandler VerifySig err %s", err.Error())
 		return
 	}
 
@@ -610,7 +611,7 @@ func (nd *LitNode) QChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePeer) {
 	err = nd.SaveQchanState(qc)
 	if err != nil {
 		nd.FailChannel(qc)
-		log.Printf("QChanAckHandler SaveQchanState err %s", err.Error())
+		logging.Errorf("QChanAckHandler SaveQchanState err %s", err.Error())
 		return
 	}
 
@@ -620,7 +621,7 @@ func (nd *LitNode) QChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePeer) {
 	sig, _, err = nd.SignState(qc)
 	if err != nil {
 		nd.FailChannel(qc)
-		log.Printf("QChanAckHandler SignState err %s", err.Error())
+		logging.Errorf("QChanAckHandler SignState err %s", err.Error())
 		return
 	}
 
@@ -628,14 +629,14 @@ func (nd *LitNode) QChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePeer) {
 	err = nd.SubWallet[qc.Coin()].ReallySend(&qc.Op.Hash)
 	if err != nil {
 		nd.FailChannel(qc)
-		log.Printf("QChanAckHandler ReallySend err %s", err.Error())
+		logging.Errorf("QChanAckHandler ReallySend err %s", err.Error())
 		return
 	}
 
 	err = nd.SubWallet[qc.Coin()].WatchThis(qc.Op)
 	if err != nil {
 		nd.FailChannel(qc)
-		log.Printf("QChanAckHandler WatchThis err %s", err.Error())
+		logging.Errorf("QChanAckHandler WatchThis err %s", err.Error())
 		return
 	}
 
@@ -680,21 +681,21 @@ func (nd *LitNode) SigProofHandler(msg lnutil.SigProofMsg, peer *RemotePeer) {
 	qc, err := nd.GetQchan(opArr)
 	if err != nil {
 		nd.FailChannel(qc)
-		log.Printf("SigProofHandler err %s", err.Error())
+		logging.Errorf("SigProofHandler err %s", err.Error())
 		return
 	}
 
 	wal, ok := nd.SubWallet[qc.Coin()]
 	if !ok {
 		nd.FailChannel(qc)
-		log.Printf("Not connected to coin type %d\n", qc.Coin())
+		logging.Errorf("Not connected to coin type %d\n", qc.Coin())
 		return
 	}
 
 	err = qc.VerifySigs(msg.Signature, nil)
 	if err != nil {
 		nd.FailChannel(qc)
-		log.Printf("SigProofHandler err %s", err.Error())
+		logging.Errorf("SigProofHandler err %s", err.Error())
 		return
 	}
 
@@ -702,7 +703,7 @@ func (nd *LitNode) SigProofHandler(msg lnutil.SigProofMsg, peer *RemotePeer) {
 	err = nd.SaveQchanState(qc)
 	if err != nil {
 		nd.FailChannel(qc)
-		log.Printf("SigProofHandler err %s", err.Error())
+		logging.Errorf("SigProofHandler err %s", err.Error())
 		return
 	}
 
@@ -710,7 +711,7 @@ func (nd *LitNode) SigProofHandler(msg lnutil.SigProofMsg, peer *RemotePeer) {
 
 	if err != nil {
 		nd.FailChannel(qc)
-		log.Printf("SigProofHandler err %s", err.Error())
+		logging.Errorf("SigProofHandler err %s", err.Error())
 		return
 	}
 

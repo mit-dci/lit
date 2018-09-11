@@ -2,7 +2,8 @@ package uspv
 
 import (
 	"bytes"
-	"log"
+
+	"github.com/mit-dci/lit/logging"
 
 	"github.com/mit-dci/lit/btcutil/bloom"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
@@ -60,12 +61,12 @@ func BlockOK(blk wire.MsgBlock) bool {
 		// first find ways witMode can be disqualified
 		if len(commitBytes) != 32 {
 			// witness in block but didn't find a wintess commitment; fail
-			log.Printf("block %s has witness but no witcommit",
+			logging.Errorf("block %s has witness but no witcommit",
 				blk.BlockHash().String())
 			return false
 		}
 		if len(cb.TxIn) != 1 {
-			log.Printf("block %s coinbase tx has %d txins (must be 1)",
+			logging.Errorf("block %s coinbase tx has %d txins (must be 1)",
 				blk.BlockHash().String(), len(cb.TxIn))
 			return false
 		}
@@ -74,20 +75,20 @@ func BlockOK(blk wire.MsgBlock) bool {
 		// maybe because I'm not getting a witness block..?
 		/*
 			if len(cb.TxIn[0].Witness) != 1 {
-				log.Printf("block %s coinbase has %d witnesses (must be 1)",
+				logging.Errorf("block %s coinbase has %d witnesses (must be 1)",
 					blk.BlockHash().String(), len(cb.TxIn[0].Witness))
 				return false
 			}
 
 			if len(cb.TxIn[0].Witness[0]) != 32 {
-				log.Printf("block %s coinbase has %d byte witness nonce (not 32)",
+				logging.Errorf("block %s coinbase has %d byte witness nonce (not 32)",
 					blk.BlockHash().String(), len(cb.TxIn[0].Witness[0]))
 				return false
 			}
 			// witness nonce is the cb's witness, subject to above constraints
 			witNonce, err := chainhash.NewHash(cb.TxIn[0].Witness[0])
 			if err != nil {
-				log.Printf("Witness nonce error: %s", err.Error())
+				logging.Errorf("Witness nonce error: %s", err.Error())
 				return false // not sure why that'd happen but fail
 			}
 
@@ -103,12 +104,12 @@ func BlockOK(blk wire.MsgBlock) bool {
 			// witness root given in coinbase op_return
 			givenWitCommit, err := chainhash.NewHash(commitBytes)
 			if err != nil {
-				log.Printf("Witness root error: %s", err.Error())
+				logging.Errorf("Witness root error: %s", err.Error())
 				return false // not sure why that'd happen but fail
 			}
 			// they should be the same.  If not, fail.
 			if !calcWitCommit.IsEqual(givenWitCommit) {
-				log.Printf("Block %s witRoot error: calc %s given %s",
+				logging.Errorf("Block %s witRoot error: calc %s given %s",
 					blk.BlockHash().String(),
 					calcWitCommit.String(), givenWitCommit.String())
 				return false
@@ -154,7 +155,7 @@ func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
 
 	ok := BlockOK(*m) // check block self-consistency
 	if !ok {
-		log.Printf("block %s not OK!!11\n", m.BlockHash().String())
+		logging.Errorf("block %s not OK!!11\n", m.BlockHash().String())
 		return
 	}
 
@@ -163,20 +164,20 @@ func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
 	case hah = <-s.blockQueue: // pop height off mblock queue
 		break
 	default:
-		log.Printf("Unrequested full block")
+		logging.Errorf("Unrequested full block")
 		return
 	}
 
 	newBlockHash := m.Header.BlockHash()
 	if !hah.blockhash.IsEqual(&newBlockHash) {
-		log.Printf("full block out of order error")
+		logging.Errorf("full block out of order error")
 		return
 	}
 
 	// iterate through all txs in the block, looking for matches.
 	for _, tx := range m.Transactions {
 		if s.MatchTx(tx) {
-			log.Printf("found matching tx %s\n", tx.TxHash().String())
+			logging.Infof("found matching tx %s\n", tx.TxHash().String())
 			s.TxUpToWallit <- lnutil.TxAndHeight{Tx: tx, Height: hah.height}
 		}
 	}
@@ -186,7 +187,7 @@ func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
 	// track our internal height
 	s.syncHeight = hah.height
 
-	log.Printf("ingested full block %s height %d OK\n",
+	logging.Infof("ingested full block %s height %d OK\n",
 		m.Header.BlockHash().String(), hah.height)
 
 	if hah.final { // check sync end
@@ -196,7 +197,7 @@ func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
 		// that way you are pretty sure you're synced up.
 		err = s.AskForHeaders()
 		if err != nil {
-			log.Printf("Merkle block error: %s\n", err.Error())
+			logging.Errorf("Merkle block error: %s\n", err.Error())
 			return
 		}
 	}

@@ -11,6 +11,7 @@ import (
 	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/crypto/fastsha256"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/sig64"
 	"github.com/mit-dci/lit/wire"
@@ -118,7 +119,7 @@ func (nd *LitNode) OfferHTLC(qc *Qchan, amt uint32, RHash [32]byte, locktime uin
 		return err
 	}
 
-	log.Printf("OfferHTLC: Sending HashSig")
+	logging.Infof("OfferHTLC: Sending HashSig")
 
 	err = nd.SendHashSig(qc)
 	if err != nil {
@@ -127,9 +128,9 @@ func (nd *LitNode) OfferHTLC(qc *Qchan, amt uint32, RHash [32]byte, locktime uin
 		return err
 	}
 
-	log.Println("OfferHTLC: Done: sent HashSig")
+	logging.Info("OfferHTLC: Done: sent HashSig")
 
-	log.Println("got pre CTS...")
+	logging.Info("got pre CTS...")
 	qc.ChanMtx.Unlock()
 
 	timeout := time.NewTimer(time.Second * consts.ChannelTimeout)
@@ -149,7 +150,7 @@ func (nd *LitNode) OfferHTLC(qc *Qchan, amt uint32, RHash [32]byte, locktime uin
 		}
 	}
 
-	log.Println("got post CTS...")
+	logging.Info("got post CTS...")
 	// since we cleared with that statement, fill it again before returning
 	qc.ClearToSend <- true
 	qc.ChanMtx.Unlock()
@@ -175,7 +176,7 @@ func (nd *LitNode) SendHashSig(q *Qchan) error {
 
 	outMsg := lnutil.NewHashSigMsg(q.Peer(), q.Op, q.State.InProgHTLC.Amt, q.State.InProgHTLC.Locktime, q.State.InProgHTLC.RHash, commitmentSig, HTLCSigs, q.State.Data)
 
-	log.Printf("Sending HashSig with %d HTLC sigs", len(HTLCSigs))
+	logging.Infof("Sending HashSig with %d HTLC sigs", len(HTLCSigs))
 
 	nd.OmniOut <- outMsg
 
@@ -183,7 +184,7 @@ func (nd *LitNode) SendHashSig(q *Qchan) error {
 }
 
 func (nd *LitNode) HashSigHandler(msg lnutil.HashSigMsg, qc *Qchan) error {
-	log.Printf("Got HashSig: %v", msg)
+	logging.Infof("Got HashSig: %v", msg)
 
 	var collision bool
 
@@ -487,7 +488,7 @@ func (nd *LitNode) ClearHTLC(qc *Qchan, R [16]byte, HTLCIdx uint32, data [32]byt
 		return err
 	}
 
-	log.Println("ClearHTLC: Sending PreimageSig")
+	logging.Info("ClearHTLC: Sending PreimageSig")
 
 	err = nd.SendPreimageSig(qc, HTLCIdx)
 	if err != nil {
@@ -496,7 +497,7 @@ func (nd *LitNode) ClearHTLC(qc *Qchan, R [16]byte, HTLCIdx uint32, data [32]byt
 		return err
 	}
 
-	log.Println("got pre CTS...")
+	logging.Info("got pre CTS...")
 	qc.ChanMtx.Unlock()
 
 	timeoutTimer := time.NewTimer(time.Second * consts.ChannelTimeout)
@@ -516,7 +517,7 @@ func (nd *LitNode) ClearHTLC(qc *Qchan, R [16]byte, HTLCIdx uint32, data [32]byt
 		}
 	}
 
-	log.Println("got post CTS...")
+	logging.Info("got post CTS...")
 	// since we cleared with that statement, fill it again before returning
 	qc.ClearToSend <- true
 	qc.ChanMtx.Unlock()
@@ -542,7 +543,7 @@ func (nd *LitNode) SendPreimageSig(q *Qchan, Idx uint32) error {
 
 	outMsg := lnutil.NewPreimageSigMsg(q.Peer(), q.Op, Idx, q.State.HTLCs[Idx].R, commitmentSig, HTLCSigs, q.State.Data)
 
-	log.Printf("Sending PreimageSig with %d HTLC sigs", len(HTLCSigs))
+	logging.Infof("Sending PreimageSig with %d HTLC sigs", len(HTLCSigs))
 
 	nd.OmniOut <- outMsg
 
@@ -550,7 +551,7 @@ func (nd *LitNode) SendPreimageSig(q *Qchan, Idx uint32) error {
 }
 
 func (nd *LitNode) PreimageSigHandler(msg lnutil.PreimageSigMsg, qc *Qchan) error {
-	log.Printf("Got PreimageSig: %v", msg)
+	logging.Infof("Got PreimageSig: %v", msg)
 
 	var collision bool
 
@@ -630,15 +631,15 @@ func (nd *LitNode) PreimageSigHandler(msg lnutil.PreimageSigMsg, qc *Qchan) erro
 	go func() {
 		txids, err := nd.ClaimHTLC(msg.R)
 		if err != nil {
-			log.Printf("error claiming HTLCs: %s", err.Error())
+			logging.Errorf("error claiming HTLCs: %s", err.Error())
 		}
 
 		if len(txids) == 0 {
-			log.Printf("found no other HTLCs to claim with R: %x, RHash: %x", msg.R, RHash)
+			logging.Infof("found no other HTLCs to claim with R: %x, RHash: %x", msg.R, RHash)
 		}
 
 		for _, id := range txids {
-			log.Printf("claimed HTLC with txid: %x", id)
+			logging.Infof("claimed HTLC with txid: %x", id)
 		}
 	}()
 
@@ -750,7 +751,7 @@ func (nd *LitNode) SetHTLCClearedOnChain(q *Qchan, h HTLC) error {
 	q.ChanMtx.Lock()
 	err := nd.ReloadQchanState(q)
 	if err != nil {
-		log.Printf("Error reloading qchan state: %s", err.Error())
+		logging.Errorf("Error reloading qchan state: %s", err.Error())
 		q.ChanMtx.Unlock()
 		return err
 	}
@@ -758,7 +759,7 @@ func (nd *LitNode) SetHTLCClearedOnChain(q *Qchan, h HTLC) error {
 	qh.ClearedOnChain = true
 	err = nd.SaveQchanState(q)
 	if err != nil {
-		log.Printf("Error saving qchan state: %s", err.Error())
+		logging.Errorf("Error saving qchan state: %s", err.Error())
 		q.ChanMtx.Unlock()
 		return err
 	}
@@ -786,7 +787,7 @@ func (nd *LitNode) ClaimHTLC(R [16]byte) ([][32]byte, error) {
 				copy(h.R[:], R[:])
 				tx, err := nd.ClaimHTLCOnChain(q, h)
 				if err != nil {
-					log.Printf("Error claiming HTLC: %s", err.Error())
+					logging.Errorf("Error claiming HTLC: %s", err.Error())
 					continue
 				}
 				nd.SetHTLCClearedOnChain(q, h)
@@ -808,10 +809,10 @@ func (nd *LitNode) ClaimHTLC(R [16]byte) ([][32]byte, error) {
 					continue
 				}
 
-				log.Printf("Cleaing HTLC from channel [%d] idx [%d]\n", q.Idx(), h.Idx)
+				logging.Infof("Cleaing HTLC from channel [%d] idx [%d]\n", q.Idx(), h.Idx)
 				err = nd.ClearHTLC(qc, R, h.Idx, [32]byte{})
 				if err != nil {
-					log.Printf("failed to clear HTLC: %s", err.Error())
+					logging.Errorf("failed to clear HTLC: %s", err.Error())
 					continue
 				}
 			}
@@ -840,14 +841,14 @@ func (nd *LitNode) ClaimHTLCTimeouts(coinType uint32, height int32) ([][32]byte,
 		return nil, err
 	}
 	if len(htlcs) > 0 {
-		log.Printf("Found [%d] HTLC Outpoints that have timed out\n", len(htlcs))
+		logging.Infof("Found [%d] HTLC Outpoints that have timed out\n", len(htlcs))
 		for i, h := range htlcs {
 			if !h.Incoming { // only for timed out HTLCs!
 				q := channels[i]
 				if q.CloseData.Closed {
 					tx, err := nd.ClaimHTLCOnChain(q, h)
 					if err != nil {
-						log.Printf("Error claiming HTLC: %s", err.Error())
+						logging.Errorf("Error claiming HTLC: %s", err.Error())
 						continue
 					}
 					nd.SetHTLCClearedOnChain(q, h)
@@ -866,10 +867,10 @@ func (nd *LitNode) ClaimHTLCTimeouts(coinType uint32, height int32) ([][32]byte,
 					if !ok {
 						return nil, fmt.Errorf("Couldn't find channel %d in peer.QCs", q.Idx())
 					}
-					log.Printf("Timing out HTLC from channel [%d] idx [%d]\n", q.Idx(), h.Idx)
+					logging.Infof("Timing out HTLC from channel [%d] idx [%d]\n", q.Idx(), h.Idx)
 					err = nd.ClearHTLC(qc, [16]byte{}, h.Idx, [32]byte{})
 					if err != nil {
-						log.Printf("error clearing HTLC: %s", err.Error())
+						logging.Errorf("error clearing HTLC: %s", err.Error())
 						continue
 					}
 				}
@@ -898,7 +899,7 @@ func (nd *LitNode) FindHTLCsByTimeoutHeight(coinType uint32, height int32) ([]HT
 						htlcs = append(htlcs, h)
 						channels = append(channels, q)
 					} else {
-						log.Printf("Ignoring HTLC in chan [%d] idx [%d] - expires at block [%d] (now: %d)", q.Idx(), h.Idx, h.Locktime, height)
+						logging.Infof("Ignoring HTLC in chan [%d] idx [%d] - expires at block [%d] (now: %d)", q.Idx(), h.Idx, h.Locktime, height)
 					}
 				}
 			}
@@ -1008,7 +1009,7 @@ func (nd *LitNode) ClaimHTLCOnChain(q *Qchan, h HTLC) (*wire.MsgTx, error) {
 		unlockHeight := int32(h.Locktime)
 		if wal.CurrentHeight() < unlockHeight {
 			err := fmt.Errorf("Trying to claim timeout before timelock expires - wait until height %d", unlockHeight)
-			log.Println(err.Error())
+			logging.Error(err.Error())
 			return nil, err
 		}
 
@@ -1084,7 +1085,7 @@ func (nd *LitNode) ClaimHTLCOnChain(q *Qchan, h HTLC) (*wire.MsgTx, error) {
 	spendHTLCHash := txscript.CalcWitnessSignatureHash(
 		HTLCparsed, hc, txscript.SigHashAll, tx, 0, htlcTxo.Value)
 
-	log.Printf("Signing HTLC Hash [%x] with key [%x]\n", spendHTLCHash, HTLCPriv.PubKey().SerializeCompressed())
+	logging.Infof("Signing HTLC Hash [%x] with key [%x]\n", spendHTLCHash, HTLCPriv.PubKey().SerializeCompressed())
 	mySig, err := HTLCPriv.Sign(spendHTLCHash)
 	if err != nil {
 		return nil, err
@@ -1118,7 +1119,7 @@ func (nd *LitNode) ClaimHTLCOnChain(q *Qchan, h HTLC) (*wire.MsgTx, error) {
 		tx.TxIn[0].Witness[2] = HTLCScript
 	}
 
-	log.Println("Claiming HTLC on-chain. TX:")
+	logging.Debug("Claiming HTLC on-chain. TX:")
 	lnutil.PrintTx(tx)
 
 	wal.StopWatchingThis(*op)
@@ -1142,10 +1143,10 @@ func (nd *LitNode) ClaimHTLCOnChain(q *Qchan, h HTLC) (*wire.MsgTx, error) {
 		// script check.  redundant / just in case
 		genSH := fastsha256.Sum256(script)
 		if !bytes.Equal(genSH[:], tx.TxOut[0].PkScript[2:34]) {
-			log.Printf("got different observed and generated SH scripts.\n")
-			log.Printf("in %s:%d, see %x\n", tx.TxHash().String(), 0, tx.TxOut[0].PkScript)
-			log.Printf("generated %x \n", genSH)
-			log.Printf("revokable pub %x\ntimeout pub %x\n", revokePub, timeoutPub)
+			logging.Warnf("got different observed and generated SH scripts.\n")
+			logging.Warnf("in %s:%d, see %x\n", tx.TxHash().String(), 0, tx.TxOut[0].PkScript)
+			logging.Warnf("generated %x \n", genSH)
+			logging.Warnf("revokable pub %x\ntimeout pub %x\n", revokePub, timeoutPub)
 			return tx, nil
 		}
 

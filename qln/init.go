@@ -2,8 +2,9 @@ package qln
 
 import (
 	"fmt"
-	"log"
 	"path/filepath"
+
+	"github.com/mit-dci/lit/logging"
 
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/btcutil"
@@ -48,6 +49,11 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 		return nil, err
 	}
 
+	kg.Step[3] = 1 | 1<<31
+	rcPriv, err := kg.DerivePrivateKey(rootPrivKey)
+	nd.DefaultRemoteControlKey = rcPriv.PubKey()
+	rcPriv = nil
+
 	nd.TrackerURL = trackerURL
 
 	nd.ProxyURL = proxyURL
@@ -80,7 +86,9 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 		return nil, err
 	}
 
+	nd.RemoteMtx.Lock()
 	nd.RemoteCons = make(map[uint32]*RemotePeer)
+	nd.RemoteMtx.Unlock()
 
 	nd.SubWallet = make(map[uint32]UWallet)
 
@@ -128,6 +136,7 @@ func (nd *LitNode) LinkBaseWallet(
 		rootpriv, birthHeight, resync, host, nd.LitFolder, proxy, param)
 
 	if err != nil {
+		logging.Error(err)
 		return err
 	}
 
@@ -148,7 +157,7 @@ func (nd *LitNode) LinkBaseWallet(
 		copy(pkh[:], pkhSlice)
 		nd.SubWallet[WallitIdx].ExportHook().RegisterAddress(pkh)
 
-		log.Printf("Registering outpoint %v", qChan.PorTxo.Op)
+		logging.Infof("Registering outpoint %v", qChan.PorTxo.Op)
 
 		nd.SubWallet[WallitIdx].WatchThis(qChan.PorTxo.Op)
 	}
@@ -214,6 +223,11 @@ func (nd *LitNode) OpenDB(filename string) error {
 		}
 
 		_, err = btx.CreateBucketIfNotExists(BKTPayments)
+		if err != nil {
+			return err
+		}
+
+		_, err = btx.CreateBucketIfNotExists(BKTRCAuth)
 		if err != nil {
 			return err
 		}

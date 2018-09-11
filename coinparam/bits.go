@@ -1,7 +1,7 @@
 package coinparam
 
 import (
-  "math/big"
+	"math/big"
 )
 
 // CompactToBig converts a compact representation of a whole number N to an

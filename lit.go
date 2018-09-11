@@ -1,12 +1,13 @@
 package main
 
 import (
-	"fmt"
-	"log"
 	"os"
 	"time"
 
+	"github.com/mit-dci/lit/logging"
+
 	"github.com/mit-dci/lit/coinparam"
+	consts "github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/qln"
@@ -27,6 +28,7 @@ type config struct { // define a struct for usage with go-flags
 	LitHomeDir string `long:"dir" description:"Specify Home Directory of lit as an absolute path."`
 	TrackerURL string `long:"tracker" description:"LN address tracker URL http|https://host:port"`
 	ConfigFile string
+	UnauthRPC  bool `long:"unauthrpc" description:"Enables unauthenticated Websocket RPC"`
 
 	// proxy
 	ProxyURL      string `long:"proxy" description:"SOCKS5 proxy to use for communicating with the network"`
@@ -40,29 +42,33 @@ type config struct { // define a struct for usage with go-flags
 	Tower  bool `long:"tower" description:"Watchtower: Run a watching node"`
 	Hard   bool `short:"t" long:"hard" description:"Flag to set networks."`
 
-	Verbose bool `short:"v" long:"verbose" description:"Set verbosity to true."`
+	LogLevel int `short:"v" long:"verbose" description:"Set verbosity level from 0 to 5 (most to least)"`
 	// rpc server config
 	Rpcport uint16 `short:"p" long:"rpcport" description:"Set RPC port to connect to"`
 	Rpchost string `long:"rpchost" description:"Set RPC host to listen to"`
 	// auto config
-	AutoReconnect         bool   `long:"autoReconnect" description:"Attempts to automatically reconnect to known peers periodically."`
-	AutoReconnectInterval int64  `long:"autoReconnectInterval" description:"The interval (in seconds) the reconnect logic should be executed"`
-	AutoListenPort        string `long:"autoListenPort" description:"When auto reconnect enabled, starts listening on this port"`
-	Params                *coinparam.Params
+	AutoReconnect                   bool   `long:"autoReconnect" description:"Attempts to automatically reconnect to known peers periodically."`
+	AutoReconnectInterval           int64  `long:"autoReconnectInterval" description:"The interval (in seconds) the reconnect logic should be executed"`
+	AutoReconnectOnlyConnectedCoins bool   `long:"autoReconnectOnlyConnectedCoins" description:"Only reconnect to peers that we have channels with in a coin whose coin daemon is available"`
+	AutoListenPort                  string `long:"autoListenPort" description:"When auto reconnect enabled, starts listening on this port"`
+	Params                          *coinparam.Params
 }
 
 var (
-	defaultLitHomeDirName        = os.Getenv("HOME") + "/.lit"
-	defaultTrackerURL            = "http://hubris.media.mit.edu:46580"
-	defaultKeyFileName           = "privkey.hex"
-	defaultConfigFilename        = "lit.conf"
-	defaultHomeDir               = os.Getenv("HOME")
-	defaultRpcport               = uint16(8001)
-	defaultRpchost               = "localhost"
-	defaultAutoReconnect         = false
-	defaultAutoListenPort        = ":2448"
-	defaultAutoReconnectInterval = int64(60)
-	defaultUpnPFlag              = false
+	defaultLitHomeDirName                  = os.Getenv("HOME") + "/.lit"
+	defaultTrackerURL                      = "http://hubris.media.mit.edu:46580"
+	defaultKeyFileName                     = "privkey.hex"
+	defaultConfigFilename                  = "lit.conf"
+	defaultHomeDir                         = os.Getenv("HOME")
+	defaultRpcport                         = uint16(8001)
+	defaultRpchost                         = "localhost"
+	defaultAutoReconnect                   = false
+	defaultAutoListenPort                  = ":2448"
+	defaultAutoReconnectInterval           = int64(60)
+	defaultUpnPFlag                        = false
+	defaultLogLevel                        = 3
+	defaultAutoReconnectOnlyConnectedCoins = false
+	defaultUnauthRPC                       = false
 )
 
 func fileExists(name string) bool {
@@ -90,8 +96,8 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	// try regtest
 	if !lnutil.NopeString(conf.Reghost) {
 		p := &coinparam.RegressionNetParams
-		fmt.Printf("reg: %s\n", conf.Reghost)
-		err = node.LinkBaseWallet(key, 120, conf.ReSync,
+		logging.Infof("reg: %s\n", conf.Reghost)
+		err = node.LinkBaseWallet(key, consts.BitcoinRegtestBHeight, conf.ReSync,
 			conf.Tower, conf.Reghost, conf.ChainProxyURL, p)
 		if err != nil {
 			return err
@@ -101,7 +107,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	if !lnutil.NopeString(conf.Tn3host) {
 		p := &coinparam.TestNet3Params
 		err = node.LinkBaseWallet(
-			key, 1256000, conf.ReSync, conf.Tower,
+			key, consts.BitcoinTestnet3BHeight, conf.ReSync, conf.Tower,
 			conf.Tn3host, conf.ChainProxyURL, p)
 		if err != nil {
 			return err
@@ -130,7 +136,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 	if !lnutil.NopeString(conf.Tvtchost) {
 		p := &coinparam.VertcoinTestNetParams
 		err = node.LinkBaseWallet(
-			key, 25000, conf.ReSync, conf.Tower,
+			key, consts.VertcoinTestnetBHeight, conf.ReSync, conf.Tower,
 			conf.Tvtchost, conf.ChainProxyURL, p)
 		if err != nil {
 			return err
@@ -153,17 +159,19 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 func main() {
 
 	conf := config{
-		LitHomeDir:            defaultLitHomeDirName,
-		Rpcport:               defaultRpcport,
-		Rpchost:               defaultRpchost,
-		TrackerURL:            defaultTrackerURL,
-		AutoReconnect:         defaultAutoReconnect,
-		AutoListenPort:        defaultAutoListenPort,
-		AutoReconnectInterval: defaultAutoReconnectInterval,
+		LitHomeDir:                      defaultLitHomeDirName,
+		Rpcport:                         defaultRpcport,
+		Rpchost:                         defaultRpchost,
+		TrackerURL:                      defaultTrackerURL,
+		AutoReconnect:                   defaultAutoReconnect,
+		AutoListenPort:                  defaultAutoListenPort,
+		AutoReconnectInterval:           defaultAutoReconnectInterval,
+		AutoReconnectOnlyConnectedCoins: defaultAutoReconnectOnlyConnectedCoins,
+		LogLevel:                        defaultLogLevel,
+		UnauthRPC:                       defaultUnauthRPC,
 	}
 
 	key := litSetup(&conf)
-
 	if conf.ProxyURL != "" {
 		conf.LitProxyURL = conf.ProxyURL
 		conf.ChainProxyURL = conf.ProxyURL
@@ -173,27 +181,30 @@ func main() {
 	// give node and below file pathof lit home directory
 	node, err := qln.NewLitNode(key, conf.LitHomeDir, conf.TrackerURL, conf.LitProxyURL, conf.Nat)
 	if err != nil {
-		log.Fatal(err)
+		logging.Fatal(err)
 	}
 
 	// node is up; link wallets based on args
 	err = linkWallets(node, key, &conf)
 	if err != nil {
-		log.Fatal(err)
+		logging.Fatal(err)
 	}
 
 	rpcl := new(litrpc.LitRPC)
 	rpcl.Node = node
 	rpcl.OffButton = make(chan bool, 1)
+	node.RPC = rpcl
 
-	go litrpc.RPCListen(rpcl, conf.Rpchost, conf.Rpcport)
+	if conf.UnauthRPC {
+		go litrpc.RPCListen(rpcl, conf.Rpchost, conf.Rpcport)
+	}
 
 	if conf.AutoReconnect {
-		node.AutoReconnect(conf.AutoListenPort, conf.AutoReconnectInterval)
+		node.AutoReconnect(conf.AutoListenPort, conf.AutoReconnectInterval, conf.AutoReconnectOnlyConnectedCoins)
 	}
 
 	<-rpcl.OffButton
-	log.Printf("Got stop request\n")
+	logging.Infof("Got stop request\n")
 	time.Sleep(time.Second)
 
 	return

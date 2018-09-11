@@ -1,9 +1,12 @@
 package main
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/mit-dci/lit/qln"
 
 	"github.com/fatih/color"
 	"github.com/mit-dci/lit/litrpc"
@@ -37,6 +40,19 @@ var graphCommand = &Command{
 	ShortDescription: "Shows the channel map\n",
 }
 
+var rcAuthCommand = &Command{
+	Format:           fmt.Sprintf("%s %s\n", lnutil.White("rcauth"), lnutil.ReqColor("pub", "auth (true|false)")),
+	Description:      "Authorizes a remote peer by pubkey for sending remote control commands over LNDC\n",
+	ShortDescription: "Manages authorization for remote control",
+}
+
+// Request remote control access
+var rcRequestCommand = &Command{
+	Format:           fmt.Sprintf("%s\n", lnutil.White("rcreq")),
+	Description:      "If this lit-af key has not been authorized on the server, this command will let the server know you want access. Another client that is privileged can authorize you then.\n",
+	ShortDescription: "Requests remote control authorization",
+}
+
 // graph gets the channel map
 func (lc *litAfClient) Graph(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
@@ -56,25 +72,6 @@ func (lc *litAfClient) Graph(textArgs []string) error {
 	fmt.Fprintf(color.Output, "%s\n", reply.Graph)
 
 	return nil
-}
-
-// RequestAsync keeps requesting messages from the server.  The server blocks
-// and will send a response once it gets one.  Once the rpc client receives a
-// response, it will immediately request another.
-func (lc *litAfClient) RequestAsync() {
-	for {
-		args := new(litrpc.NoArgs)
-		reply := new(litrpc.StatusReply)
-
-		err := lc.rpccon.Call("LitRPC.GetMessages", args, reply)
-		if err != nil {
-			fmt.Fprintf(color.Output, "RequestAsync error %s\n", lnutil.Red(err.Error()))
-			break
-			// end loop on first error.  it's probably a connection error
-
-		}
-		fmt.Fprintf(color.Output, "%s\n", reply.Status)
-	}
 }
 
 // Lis starts listening.  Takes args of port to listen on.
@@ -161,6 +158,43 @@ func (lc *litAfClient) Say(textArgs []string) error {
 	if err != nil {
 		return err
 	}
+	fmt.Fprintf(color.Output, "%s\n", reply.Status)
+	return nil
+}
+
+func (lc *litAfClient) RemoteControlAuth(textArgs []string) error {
+	stopEx, err := CheckHelpCommand(rcAuthCommand, textArgs, 2)
+	if err != nil || stopEx {
+		return err
+	}
+	args := new(litrpc.RCAuthArgs)
+	reply := new(litrpc.StatusReply)
+
+	args.PubKey, err = hex.DecodeString(textArgs[0])
+	if err != nil {
+		return fmt.Errorf("Could not decode pubkey: %s", err.Error())
+	}
+
+	args.Authorization = new(qln.RemoteControlAuthorization)
+	args.Authorization.Allowed = lnutil.YupString(textArgs[1])
+
+	err = lc.Call("LitRPC.RemoteControlAuth", args, reply)
+	fmt.Fprintf(color.Output, "%s\n", reply.Status)
+	return nil
+}
+
+func (lc *litAfClient) RemoteControlRequest(textArgs []string) error {
+	stopEx, err := CheckHelpCommand(rcRequestCommand, textArgs, 0)
+	if err != nil || stopEx {
+		return err
+	}
+	args := new(litrpc.RCRequestAuthArgs)
+	reply := new(litrpc.StatusReply)
+
+	// No need to fill it in, since this will be handled
+	// by the RPC server (inserts the pubkey from the lndc connection)
+
+	err = lc.Call("LitRPC.RequestRemoteControlAuthorization", args, reply)
 	fmt.Fprintf(color.Output, "%s\n", reply.Status)
 	return nil
 }

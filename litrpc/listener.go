@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/rpc"
 	"net/rpc/jsonrpc"
 	"strings"
+
+	"github.com/mit-dci/lit/logging"
 
 	"golang.org/x/net/websocket"
 
@@ -35,11 +36,11 @@ type LitRPC struct {
 func serveWS(ws *websocket.Conn) {
 	body, err := ioutil.ReadAll(ws.Request().Body)
 	if err != nil {
-		log.Printf("Error reading body: %v", err)
+		logging.Errorf("Error reading body: %v", err)
 		return
 	}
 
-	log.Printf(string(body))
+	logging.Infof(string(body))
 	ws.Request().Body = ioutil.NopCloser(bytes.NewBuffer(body))
 
 	jsonrpc.ServeConn(ws)
@@ -52,7 +53,7 @@ func WebUIHandler(w http.ResponseWriter, r *http.Request) {
 
 	bytes, err := webui.Asset(r.URL.Path[1:])
 	if err != nil {
-		log.Printf("Error serving request [%s]: [%s]\n", r.URL.Path, err.Error())
+		logging.Errorf("Error serving request [%s]: [%s]\n", r.URL.Path, err.Error())
 		w.WriteHeader(404)
 		return
 	}
@@ -103,12 +104,11 @@ func serveOneoffs(rw http.ResponseWriter, req *http.Request) {
 func RPCListen(rpcl *LitRPC, host string, port uint16) {
 
 	rpc.Register(rpcl)
-
 	listenString := fmt.Sprintf("%s:%d", host, port)
 
 	http.Handle("/ws", websocket.Handler(serveWS))
 	http.HandleFunc("/static/", WebUIHandler)
 	http.HandleFunc("/", WebUIHandler)
 	http.HandleFunc("/oneoff", serveOneoffs)
-	log.Fatal(http.ListenAndServe(listenString, nil))
+	logging.Fatal(http.ListenAndServe(listenString, nil))
 }

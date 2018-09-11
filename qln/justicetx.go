@@ -3,14 +3,14 @@ package qln
 import (
 	"bytes"
 	"fmt"
-	"log"
 
-	"github.com/mit-dci/lit/btcutil/txscript"
-	"github.com/mit-dci/lit/wire"
 	"github.com/boltdb/bolt"
-	"github.com/mit-dci/lit/lnutil"
-	"github.com/mit-dci/lit/sig64"
+	"github.com/mit-dci/lit/btcutil/txscript"
 	"github.com/mit-dci/lit/consts"
+	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
+	"github.com/mit-dci/lit/sig64"
+	"github.com/mit-dci/lit/wire"
 )
 
 /*
@@ -86,7 +86,7 @@ func (nd *LitNode) BuildJusticeSig(q *Qchan) error {
 	// in this function, "bad" refers to the hypothetical transaction spending the
 	// com tx.  "justice" is the tx spending the bad tx
 
-	fee := int64(consts.JusticeTxBump*nd.SubWallet[q.Coin()].Fee())
+	fee := int64(consts.JusticeTxBump * nd.SubWallet[q.Coin()].Fee())
 
 	// first we need the keys in the bad script.  Start by getting the elk-scalar
 	// we should have it at the "current" state number
@@ -115,15 +115,14 @@ func (nd *LitNode) BuildJusticeSig(q *Qchan) error {
 	if err != nil {
 		return err
 	}
-
 	var badAmt int64
 	badIdx := uint32(len(badTx.TxOut) + 1)
 
-	log.Printf("made revpub %x timeout pub %x\nscript:%x\nhash %x\n",
+	logging.Infof("made revpub %x timeout pub %x\nscript:%x\nhash %x\n",
 		badRevokePub[:], badTimeoutPub[:], script, scriptHashOutScript)
 	// figure out which output to bring justice to
 	for i, out := range badTx.TxOut {
-		log.Printf("txout %d pkscript %x\n", i, out.PkScript)
+		logging.Infof("txout %d pkscript %x\n", i, out.PkScript)
 		if bytes.Equal(out.PkScript, scriptHashOutScript) {
 			badIdx = uint32(i)
 			badAmt = out.Value
@@ -166,13 +165,16 @@ func (nd *LitNode) BuildJusticeSig(q *Qchan) error {
 	justiceTx.AddTxOut(justiceOut)
 
 	jtxid := justiceTx.TxHash()
-	log.Printf("made justice tx %s\n", jtxid.String())
+	logging.Infof("made justice tx %s\n", jtxid.String())
 	// get hashcache for signing
 	hCache := txscript.NewTxSigHashes(justiceTx)
 
 	// sign with combined key.  Justice txs always have only 1 input, so txin is 0
 	bigSig, err := txscript.RawTxInWitnessSignature(
 		justiceTx, hCache, 0, badAmt, script, txscript.SigHashAll, combinedPrivKey)
+	if err != nil {
+		return err
+	}
 	// truncate sig (last byte is sighash type, always sighashAll)
 	bigSig = bigSig[:len(bigSig)-1]
 
@@ -321,7 +323,7 @@ func (nd *LitNode) SyncWatch(qc *Qchan, watchPeer uint32) error {
 	// send initial description if we haven't sent anything yet
 	if qc.State.WatchUpTo == 0 {
 		desc := lnutil.NewWatchDescMsg(watchPeer, qc.Coin(),
-			qc.WatchRefundAdr, qc.Delay, 5000, qc.TheirHAKDBase, qc.MyHAKDBase)
+			qc.WatchRefundAdr, qc.Delay, consts.JusticeFee, qc.TheirHAKDBase, qc.MyHAKDBase)
 
 		nd.OmniOut <- desc
 		// after sending description, must send at least states 0 and 1.

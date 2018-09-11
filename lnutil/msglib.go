@@ -69,6 +69,12 @@ const (
 	MSGID_DUALFUNDINGDECL    = 0xA2 // Declines the funding request
 	MSGID_DUALFUNDINGCHANACK = 0xA3 // Acknowledges channel and sends along signatures for funding
 
+	//Remote control messages
+	MSGID_REMOTE_RPCREQUEST  = 0xB0 // Contains an RPC request from a remote peer
+	MSGID_REMOTE_RPCRESPONSE = 0xB1 // Contains an RPC response to send to a remote peer
+
+	DIGEST_TYPE_SHA256    = 0x00
+	DIGEST_TYPE_RIPEMD160 = 0x01
 )
 
 //interface that all messages follow, for easy use
@@ -171,6 +177,11 @@ func LitMsgFromBytes(b []byte, peerid uint32) (LitMsg, error) {
 		return NewDlcContractFundingSigsMsgFromBytes(b, peerid)
 	case MSGID_DLC_SIGPROOF:
 		return NewDlcContractSigProofMsgFromBytes(b, peerid)
+
+	case MSGID_REMOTE_RPCREQUEST:
+		return NewRemoteControlRpcRequestMsgFromBytes(b, peerid)
+	case MSGID_REMOTE_RPCRESPONSE:
+		return NewRemoteControlRpcResponseMsgFromBytes(b, peerid)
 
 	default:
 		return nil, fmt.Errorf("Unknown message of type %d ", msgType)
@@ -2144,10 +2155,10 @@ func (msg MultihopPaymentAckMsg) Bytes() []byte {
 
 	buf.WriteByte(msg.MsgType())
 	buf.Write(msg.HHash[:])
+
 	return buf.Bytes()
 }
 
-// Peer returns the peer index this message was received from/sent to
 func (msg MultihopPaymentAckMsg) Peer() uint32 {
 	return msg.PeerIdx
 }
@@ -2155,6 +2166,65 @@ func (msg MultihopPaymentAckMsg) Peer() uint32 {
 // MsgType returns the type of this message
 func (msg MultihopPaymentAckMsg) MsgType() uint8 {
 	return MSGID_PAY_ACK
+}
+
+type RemoteControlRpcRequestMsg struct {
+	PeerIdx    uint32
+	PubKey     [33]byte
+	Method     string
+	Idx        uint64
+	Args       []byte
+	Sig        [64]byte
+	DigestType uint8
+}
+
+func NewRemoteControlRpcRequestMsgFromBytes(b []byte,
+	peerIdx uint32) (RemoteControlRpcRequestMsg, error) {
+
+	msg := new(RemoteControlRpcRequestMsg)
+	msg.PeerIdx = peerIdx
+
+	buf := bytes.NewBuffer(b[1:])
+	copy(msg.PubKey[:], buf.Next(33))
+	copy(msg.Sig[:], buf.Next(64))
+	binary.Read(buf, binary.BigEndian, &msg.DigestType)
+	binary.Read(buf, binary.BigEndian, &msg.Idx)
+
+	methodLength, _ := wire.ReadVarInt(buf, 0)
+	msg.Method = string(buf.Next(int(methodLength)))
+
+	argsLength, _ := wire.ReadVarInt(buf, 0)
+	msg.Args = buf.Next(int(argsLength))
+	return *msg, nil
+}
+
+// Bytes serializes a RemoteControlRpcRequestMsg into a byte array
+func (msg RemoteControlRpcRequestMsg) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.WriteByte(msg.MsgType())
+	buf.Write(msg.PubKey[:])
+	buf.Write(msg.Sig[:])
+	binary.Write(&buf, binary.BigEndian, msg.DigestType)
+	binary.Write(&buf, binary.BigEndian, msg.Idx)
+
+	methodBytes := []byte(msg.Method)
+	wire.WriteVarInt(&buf, 0, uint64(len(methodBytes)))
+	buf.Write(methodBytes)
+
+	wire.WriteVarInt(&buf, 0, uint64(len(msg.Args)))
+	buf.Write(msg.Args)
+
+	return buf.Bytes()
+}
+
+// Peer returns the peer index this message was received from/sent to
+func (msg RemoteControlRpcRequestMsg) Peer() uint32 {
+	return msg.PeerIdx
+}
+
+func (msg RemoteControlRpcRequestMsg) MsgType() uint8 {
+	return MSGID_REMOTE_RPCREQUEST
 }
 
 type RouteHop struct {
@@ -2204,6 +2274,7 @@ type MultihopPaymentSetupMsg struct {
 	Data [32]byte
 }
 
+// NewMultihopPaymentSetupMsg does...
 func NewMultihopPaymentSetupMsg(peerIdx uint32, hHash [32]byte, nodeRoute []RouteHop, data [32]byte) MultihopPaymentSetupMsg {
 	msg := new(MultihopPaymentSetupMsg)
 	msg.PeerIdx = peerIdx
@@ -2252,7 +2323,6 @@ func (msg MultihopPaymentSetupMsg) Bytes() []byte {
 	return buf.Bytes()
 }
 
-// Peer returns the peer index this message was received from/sent to
 func (msg MultihopPaymentSetupMsg) Peer() uint32 {
 	return msg.PeerIdx
 }
@@ -2260,4 +2330,60 @@ func (msg MultihopPaymentSetupMsg) Peer() uint32 {
 // MsgType returns the type of this message
 func (msg MultihopPaymentSetupMsg) MsgType() uint8 {
 	return MSGID_PAY_SETUP
+}
+
+type RemoteControlRpcResponseMsg struct {
+	PeerIdx uint32
+	Idx     uint64
+	Error   bool
+	Result  []byte
+}
+
+func NewRemoteControlRpcResponseMsg(peerIdx uint32, msgIdx uint64, isError bool, json []byte) RemoteControlRpcResponseMsg {
+
+	msg := new(RemoteControlRpcResponseMsg)
+	msg.PeerIdx = peerIdx
+	msg.Idx = msgIdx
+	msg.Error = isError
+	msg.Result = json
+	return *msg
+}
+
+func NewRemoteControlRpcResponseMsgFromBytes(b []byte,
+	peerIdx uint32) (RemoteControlRpcResponseMsg, error) {
+
+	msg := new(RemoteControlRpcResponseMsg)
+	buf := bytes.NewBuffer(b[1:])
+
+	msg.PeerIdx = peerIdx
+	binary.Read(buf, binary.BigEndian, &msg.Idx)
+	binary.Read(buf, binary.BigEndian, &msg.Error)
+
+	resultLength, _ := wire.ReadVarInt(buf, 0)
+	msg.Result = buf.Next(int(resultLength))
+
+	return *msg, nil
+}
+
+// Bytes serializes a RemoteControlRpcRequestMsg into a byte array
+func (msg RemoteControlRpcResponseMsg) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.WriteByte(msg.MsgType())
+	binary.Write(&buf, binary.BigEndian, msg.Idx)
+	binary.Write(&buf, binary.BigEndian, msg.Error)
+
+	wire.WriteVarInt(&buf, 0, uint64(len(msg.Result)))
+	buf.Write(msg.Result)
+	return buf.Bytes()
+}
+
+// Peer returns the peer index this message was received from/sent to
+func (msg RemoteControlRpcResponseMsg) Peer() uint32 {
+	return msg.PeerIdx
+}
+
+// MsgType returns the type of this message
+func (msg RemoteControlRpcResponseMsg) MsgType() uint8 {
+	return MSGID_REMOTE_RPCRESPONSE
 }
