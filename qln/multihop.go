@@ -4,12 +4,11 @@ import (
 	"bytes"
 	"crypto/rand"
 	"fmt"
-	"log"
-
 	"github.com/adiabat/bech32"
 	"github.com/btcsuite/fastsha256"
 	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
 )
 
 func (nd *LitNode) PayMultihop(dstLNAdr string, originCoinType uint32, destCoinType uint32, amount int64) (bool, error) {
@@ -39,12 +38,12 @@ func (nd *LitNode) PayMultihop(dstLNAdr string, originCoinType uint32, destCoinT
 	}
 
 	copy(targetAdr[:], adr)
-	log.Printf("Finding route to %s", dstLNAdr)
+	logging.Infof("Finding route to %s", dstLNAdr)
 	path, err := nd.FindPath(targetAdr, destCoinType, originCoinType, amount)
 	if err != nil {
 		return false, err
 	}
-	log.Printf("Done route to %s", dstLNAdr)
+	logging.Debugf("Done route to %s", dstLNAdr)
 
 	idx, err := nd.FindPeerIndexByAddress(dstLNAdr)
 	if err != nil {
@@ -58,16 +57,16 @@ func (nd *LitNode) PayMultihop(dstLNAdr string, originCoinType uint32, destCoinT
 	nd.InProgMultihop = append(nd.InProgMultihop, inFlight)
 	nd.MultihopMutex.Unlock()
 
-	log.Printf("Sending payment request to %s", dstLNAdr)
+	logging.Infof("Sending payment request to %s", dstLNAdr)
 	msg := lnutil.NewMultihopPaymentRequestMsg(idx, destCoinType)
 	nd.tmpSendLitMsg(msg)
-	log.Printf("Done sending payment request to %s", dstLNAdr)
+	logging.Debugf("Done sending payment request to %s", dstLNAdr)
 	return true, nil
 }
 
 func (nd *LitNode) MultihopPaymentRequestHandler(msg lnutil.MultihopPaymentRequestMsg) error {
 	// Generate private preimage and send ack with the hash
-	fmt.Printf("Received multihop payment request from peer %d\n", msg.Peer())
+	logging.Infof("Received multihop payment request from peer %d\n", msg.Peer())
 	inFlight := new(InFlightMultihop)
 	var pkh [20]byte
 
@@ -96,7 +95,7 @@ func (nd *LitNode) MultihopPaymentRequestHandler(msg lnutil.MultihopPaymentReque
 }
 
 func (nd *LitNode) MultihopPaymentAckHandler(msg lnutil.MultihopPaymentAckMsg) error {
-	fmt.Printf("Received multihop payment ack from peer %d, hash %x\n", msg.Peer(), msg.HHash)
+	logging.Infof("Received multihop payment ack from peer %d, hash %x\n", msg.Peer(), msg.HHash)
 
 	nd.MultihopMutex.Lock()
 	defer nd.MultihopMutex.Unlock()
@@ -109,7 +108,7 @@ func (nd *LitNode) MultihopPaymentAckHandler(msg lnutil.MultihopPaymentAckMsg) e
 				return fmt.Errorf("not connected to destination peer")
 			}
 			if msg.Peer() == targetIdx {
-				fmt.Printf("Found the right pending multihop. Sending setup msg to first hop\n")
+				logging.Debugf("Found the right pending multihop. Sending setup msg to first hop\n")
 				// found the right one. Set this up
 				firstHop := mh.Path[1]
 				ourHop := mh.Path[0]
@@ -153,10 +152,10 @@ func (nd *LitNode) MultihopPaymentAckHandler(msg lnutil.MultihopPaymentAckMsg) e
 
 				// This handler needs to return before OfferHTLC can work
 				go func() {
-					log.Printf("offering HTLC with RHash: %x", msg.HHash)
+					logging.Infof("offering HTLC with RHash: %x", msg.HHash)
 					err = nd.OfferHTLC(qc, uint32(mh.Amt), msg.HHash, uint32(locktime), [32]byte{})
 					if err != nil {
-						log.Printf("error offering HTLC: %s", err.Error())
+						logging.Errorf("error offering HTLC: %s", err.Error())
 						return
 					}
 
@@ -174,7 +173,7 @@ func (nd *LitNode) MultihopPaymentAckHandler(msg lnutil.MultihopPaymentAckMsg) e
 
 					var data [32]byte
 					outMsg := lnutil.NewMultihopPaymentSetupMsg(firstHopIdx, msg.HHash, mh.Path, data)
-					fmt.Printf("Sending multihoppaymentsetup to peer %d\n", firstHopIdx)
+					logging.Debugf("Sending multihoppaymentsetup to peer %d\n", firstHopIdx)
 					nd.tmpSendLitMsg(outMsg)
 				}()
 
@@ -186,7 +185,7 @@ func (nd *LitNode) MultihopPaymentAckHandler(msg lnutil.MultihopPaymentAckMsg) e
 }
 
 func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMsg) error {
-	fmt.Printf("Received multihop payment setup from peer %d, hash %x\n", msg.Peer(), msg.HHash)
+	logging.Infof("Received multihop payment setup from peer %d, hash %x\n", msg.Peer(), msg.HHash)
 
 	inFlight := new(InFlightMultihop)
 	inFlight.Path = msg.NodeRoute
@@ -250,7 +249,7 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 			go func() {
 				_, err := nd.ClaimHTLC(mh.PreImage)
 				if err != nil {
-					log.Printf("error claiming HTLC: %s", err.Error())
+					logging.Errorf("error claiming HTLC: %s", err.Error())
 				}
 			}()
 
@@ -365,10 +364,10 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 
 	// This handler needs to return so run this in a goroutine
 	go func() {
-		log.Printf("offering HTLC with RHash: %x", msg.HHash)
+		logging.Infof("offering HTLC with RHash: %x", msg.HHash)
 		err = nd.OfferHTLC(qc, uint32(amtRqd), msg.HHash, newLocktime, [32]byte{})
 		if err != nil {
-			log.Printf("error offering HTLC: %s", err.Error())
+			logging.Errorf("error offering HTLC: %s", err.Error())
 			return
 		}
 

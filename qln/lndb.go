@@ -15,8 +15,8 @@ import (
 	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/eventbus"
-	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lncore"
+	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnp2p"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
@@ -100,7 +100,7 @@ type LitNode struct {
 	IdentityKey *koblitz.PrivateKey
 
 	// p2p remote control key
-	DefaultRemoteControlKey *btcec.PublicKey
+	DefaultRemoteControlKey *koblitz.PublicKey
 
 	// event bus
 	Events *eventbus.EventBus

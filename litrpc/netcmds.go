@@ -9,7 +9,6 @@ import (
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/qln"
-	"log"
 	"strconv"
 )
 
@@ -214,7 +213,7 @@ type RCAuthArgs struct {
 
 func (r *LitRPC) RemoteControlAuth(args RCAuthArgs, reply *StatusReply) error {
 
-	pub, err := btcec.ParsePubKey(args.PubKey, btcec.S256())
+	pub, err := koblitz.ParsePubKey(args.PubKey, koblitz.S256())
 	if err != nil {
 		reply.Status = fmt.Sprintf("Error deserializing pubkey: %s", err.Error())
 		return err
@@ -227,7 +226,7 @@ func (r *LitRPC) RemoteControlAuth(args RCAuthArgs, reply *StatusReply) error {
 
 	err = r.Node.SaveRemoteControlAuthorization(pubKey, args.Authorization)
 	if err != nil {
-		log.Printf("Error saving auth: %s", err.Error())
+		logging.Errorf("Error saving auth: %s", err.Error())
 		return err
 	}
 
@@ -250,7 +249,7 @@ func (r *LitRPC) RequestRemoteControlAuthorization(args RCRequestAuthArgs, reply
 
 	err := r.Node.SaveRemoteControlAuthorization(args.PubKey, auth)
 	if err != nil {
-		log.Printf("Error saving auth request: %s", err.Error())
+		logging.Errorf("Error saving auth request: %s", err.Error())
 		return err
 	}
 
@@ -269,7 +268,7 @@ func (r *LitRPC) ListPendingRemoteControlAuthRequests(args NoArgs, reply *RCPend
 
 	requests, err := r.Node.GetPendingRemoteControlRequests()
 	if err != nil {
-		log.Printf("Error saving auth request: %s", err.Error())
+		logging.Errorf("Error saving auth request: %s", err.Error())
 		return err
 	}
 

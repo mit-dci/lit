@@ -6,7 +6,6 @@ import (
 	"github.com/mit-dci/lit/lncore"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/logging"
-	"log"
 	"strings"
 )
 
@@ -32,7 +31,7 @@ func (nd *LitNode) FindPeerIndexByAddress(lnAdr string) (uint32, error) {
 // TCPListener starts a litNode listening for incoming LNDC connections.
 func (nd *LitNode) TCPListener(lisIpPort string) (string, error) {
 
-	log.Printf("Trying to listen on %s\n", lisIpPort)
+	logging.Debugf("Trying to listen on %s\n", lisIpPort)
 
 	err := nd.PeerMan.ListenOnPort(lisIpPort)
 	if err != nil {
@@ -41,7 +40,7 @@ func (nd *LitNode) TCPListener(lisIpPort string) (string, error) {
 
 	lnaddr := nd.PeerMan.GetExternalAddress()
 
-	log.Printf("Listening with ln address: %s \n", lnaddr)
+	logging.Infof("Listening with ln address: %s \n", lnaddr)
 
 	// Don't announce on the tracker if we are communicating via SOCKS proxy
 	if nd.ProxyURL == "" {
@@ -52,7 +51,7 @@ func (nd *LitNode) TCPListener(lisIpPort string) (string, error) {
 
 }
 
-func GoAnnounce(priv *btcec.PrivateKey, litport string, litadr string, trackerURL string) {
+func GoAnnounce(priv *koblitz.PrivateKey, litport string, litadr string, trackerURL string) {
 	err := lnutil.Announce(priv, litport, litadr, trackerURL)
 	if err != nil {
 		logging.Errorf("Announcement error %s", err.Error())
@@ -94,7 +93,7 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 func (nd *LitNode) tmpSendLitMsg(msg lnutil.LitMsg) {
 
 	if !nd.ConnectedToPeer(msg.Peer()) {
-		log.Printf("message type %x to peer %d but not connected\n",
+		logging.Debugf("message type %x to peer %d but not connected\n",
 			msg.MsgType(), msg.Peer())
 		return
 	}

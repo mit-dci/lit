@@ -2,7 +2,7 @@ package lnp2p
 
 import (
 	"fmt"
-	"log"
+	"github.com/mit-dci/lit/logging"
 	"sync"
 )
 
@@ -51,7 +51,7 @@ func (mp *MessageProcessor) DefineMessage(mtype uint8, pfunc ParseFuncType, hfun
 		handleFunc: hfunc,
 	}
 
-	log.Printf("msgproc: Setup message type %x\n", mtype)
+	logging.Debugf("msgproc: Setup message type %x\n", mtype)
 
 	mp.active = act
 	mp.actmtx.Unlock()
@@ -85,7 +85,7 @@ func (mp *MessageProcessor) HandleMessage(peer *Peer, buf []byte) error {
 	// Parse the message.
 	parsed, err := h.parseFunc(buf[1:])
 	if err != nil {
-		log.Printf("msgproc: Malformed message of type %x from peer %s\n", mtype, peer.GetPrettyName())
+		logging.Warnf("msgproc: Malformed message of type %x from peer %s\n", mtype, peer.GetPrettyName())
 		return err
 	}
 

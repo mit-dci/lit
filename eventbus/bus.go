@@ -2,8 +2,7 @@ package eventbus
 
 import (
 	"fmt"
-	"log"
-	"os"
+	"github.com/mit-dci/lit/logging"
 	"sync"
 )
 
@@ -57,7 +56,7 @@ func (b *EventBus) RegisterHandler(eventName string, hFunc func(Event) EventHand
 	}
 
 	b.handlers[eventName] = append(b.handlers[eventName], h)
-	log.Printf("Registered handler for %s\n", eventName)
+	logging.Infof("Registered handler for %s\n", eventName)
 
 	b.mutex.Unlock()
 
@@ -74,9 +73,7 @@ func (b *EventBus) CountHandlers(name string) int {
 // Publish sends an event to the relevant event handlers.
 func (b *EventBus) Publish(event Event) (bool, error) {
 
-	if os.Getenv("LIT_EBUS_TRACE") == "1" {
-		log.Printf("eventbus: Published event: %s\n", event.Name())
-	}
+	logging.Debugf("eventbus: Published event: %s\n", event.Name())
 
 	ck := checkEventSanity(event)
 	if ck != nil {
@@ -117,7 +114,7 @@ func (b *EventBus) Publish(event Event) (bool, error) {
 			// Since it's not async we might cancel it.
 			res, err := callEventHandler(h, event)
 			if err != nil {
-				log.Printf("Error in event handler for %s: %s", name, err.Error())
+				logging.Warnf("Error in event handler for %s: %s", name, err.Error())
 			}
 
 			if res == EHANDLE_CANCEL && !uncan {

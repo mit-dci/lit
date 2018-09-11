@@ -9,9 +9,9 @@ import (
 	"github.com/mit-dci/lit/eventbus"
 	"github.com/mit-dci/lit/lncore"
 	"github.com/mit-dci/lit/lndc"
+	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/nat"
 	"github.com/mit-dci/lit/portxo"
-	"log"
 	"net"
 	"strconv"
 	"sync"
@@ -169,7 +169,7 @@ func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, set
 		// Actually figure out what we're going to do.
 		if *settings.NatMode == "upnp" {
 			// Universal Plug-n-Play
-			log.Println("Attempting port forwarding via UPnP...")
+			logging.Infof("Attempting port forwarding via UPnP...")
 			err = nat.SetupUpnp(lisPort)
 			if err != nil {
 				return nil, err
@@ -177,7 +177,7 @@ func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, set
 		} else if *settings.NatMode == "pmp" {
 			// NAT Port Mapping Protocol
 			timeout := time.Duration(10 * time.Second)
-			log.Println("Attempting port forwarding via PMP...")
+			logging.Infof("Attempting port forwarding via PMP...")
 			_, err = nat.SetupPmp(timeout, lisPort)
 			if err != nil {
 				return nil, err
@@ -206,7 +206,7 @@ func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, set
 
 	pi, err := pm.peerdb.GetPeerInfo(*lnaddr)
 	if err != nil {
-		log.Printf("Problem loading peer info from DB: %s\n", err.Error())
+		logging.Errorf("Problem loading peer info from DB: %s\n", err.Error())
 		// don't kill the connection?
 	}
 
@@ -245,7 +245,7 @@ func (pm *PeerManager) registerPeer(peer *Peer) {
 	pm.mtx.Lock()
 	defer pm.mtx.Unlock()
 
-	log.Printf("peermgr: New peer %s\n", peer.GetLnAddr())
+	logging.Infof("peermgr: New peer %s\n", peer.GetLnAddr())
 
 	// Append peer to peer list and add to peermap
 	pidx := uint32(len(pm.peers))
@@ -274,7 +274,7 @@ func (pm *PeerManager) unregisterPeer(peer *Peer) {
 	pm.mtx.Lock()
 	defer pm.mtx.Unlock()
 
-	log.Printf("peermgr: Unregistering peer: %s\n", peer.GetLnAddr())
+	logging.Infof("peermgr: Unregistering peer: %s\n", peer.GetLnAddr())
 
 	// Remove the peer idx entry.
 	idx := pm.GetPeerIdx(peer)
@@ -327,7 +327,7 @@ func (pm *PeerManager) ListenOnPort(addr string) error {
 	// Try to start listening.
 	listener, err := lndc.NewListener(pm.idkey, addr)
 	if err != nil {
-		log.Printf("listening failed: %s\n", err.Error())
+		logging.Errorf("listening failed: %s\n", err.Error())
 		pm.ebus.Publish(StopListeningPortEvent{
 			ListenAddr: addr,
 			Reason:     "initfail",

@@ -3,16 +3,15 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/chzyer/readline"
+	"github.com/fatih/color"
+	"github.com/mit-dci/lit/crypto/koblitz"
+	"github.com/mit-dci/lit/litrpc"
+	"github.com/mit-dci/lit/lnutil"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/chzyer/readline"
-	"github.com/fatih/color"
-	"github.com/mit-dci/lit/btcutil/btcec"
-	"github.com/mit-dci/lit/litrpc"
-	"github.com/mit-dci/lit/lnutil"
 )
 
 /*
@@ -101,7 +100,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err.Error())
 		}
-		key, _ := btcec.PrivKeyFromBytes(btcec.S256(), privKey[:])
+		key, _ := koblitz.PrivKeyFromBytes(koblitz.S256(), privKey[:])
 
 		if adr != "" && strings.HasPrefix(adr, "ln1") && host == "" {
 			ipv4, _, err := lnutil.Lookup(adr, lc.tracker, "")

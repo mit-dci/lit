@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/lncore"
-	"log"
+	"github.com/mit-dci/lit/logging"
 )
 
 var (
@@ -70,7 +70,7 @@ func (pdb *peerboltdb) GetPeerInfo(addr lncore.LnAddr) (*lncore.PeerInfo, error)
 	var err error
 
 	if pdb.db == nil {
-		log.Printf("PDB.db is nil!")
+		logging.Warnf("PDB.db is nil!")
 		return nil, fmt.Errorf("PDB.db is nil")
 	}
 

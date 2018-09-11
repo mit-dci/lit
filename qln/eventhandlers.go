@@ -4,7 +4,7 @@ import (
 	"github.com/mit-dci/lit/eventbus"
 	"github.com/mit-dci/lit/lnp2p"
 	"github.com/mit-dci/lit/lnutil"
-	"log"
+	"github.com/mit-dci/lit/logging"
 )
 
 func makeTmpNewPeerHandler(nd *LitNode) func(eventbus.Event) eventbus.EventHandleResult {
@@ -14,7 +14,7 @@ func makeTmpNewPeerHandler(nd *LitNode) func(eventbus.Event) eventbus.EventHandl
 
 		peerIdx := uint32(nd.PeerMan.GetPeerIdx(ee.Peer))
 
-		log.Printf("creating new fake RemotePeer %d\n", peerIdx)
+		logging.Debugf("creating new fake RemotePeer %d\n", peerIdx)
 
 		rpeer := &RemotePeer{
 			Idx:      peerIdx,

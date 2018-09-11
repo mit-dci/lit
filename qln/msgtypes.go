@@ -3,7 +3,7 @@ package qln
 import (
 	"github.com/mit-dci/lit/lnp2p"
 	"github.com/mit-dci/lit/lnutil"
-	"log"
+	"github.com/mit-dci/lit/logging"
 	"sync"
 )
 
@@ -61,7 +61,7 @@ func makeNeoOmniHandler(nd *LitNode) lnp2p.HandleFuncType {
 			// init the qchan map thingy, this is quite inefficient
 			err = nd.PopulateQchanMap(peer)
 			if err != nil {
-				log.Printf("error initing peer: %s", err.Error())
+				logging.Errorf("error initing peer: %s", err.Error())
 				return err
 			}
 
@@ -85,7 +85,7 @@ func makeNeoOmniHandler(nd *LitNode) lnp2p.HandleFuncType {
 			}
 		}
 
-		log.Printf("chanIdx is %d, InProg is %d\n", chanIdx, nd.InProg.ChanIdx)
+		logging.Infof("chanIdx is %d, InProg is %d\n", chanIdx, nd.InProg.ChanIdx)
 
 		if chanIdx != 0 {
 			err = nd.PeerHandler(msg, peer.QCs[chanIdx], peer)
@@ -94,7 +94,7 @@ func makeNeoOmniHandler(nd *LitNode) lnp2p.HandleFuncType {
 		}
 
 		if err != nil {
-			log.Printf("PeerHandler error with %d: %s\n", p.GetIdx(), err.Error())
+			logging.Errorf("PeerHandler error with %d: %s\n", p.GetIdx(), err.Error())
 		}
 
 		return nil

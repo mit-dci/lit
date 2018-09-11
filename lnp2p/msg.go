@@ -2,7 +2,7 @@ package lnp2p
 
 import (
 	"github.com/mit-dci/lit/lnutil"
-	"log"
+	"github.com/mit-dci/lit/logging"
 )
 
 // FIXME This is a stub function that just calls out to the lnutil lib for later.
@@ -41,7 +41,7 @@ func sendMessages(queue chan outgoingmsg) {
 
 		// Sanity check.
 		if recv.message == nil {
-			log.Printf("peermgr: Directed to send nil message, somehow\n")
+			logging.Warnf("peermgr: Directed to send nil message, somehow\n")
 			if recv.finishchan != nil {
 				*recv.finishchan <- nil
 			}
@@ -57,7 +57,7 @@ func sendMessages(queue chan outgoingmsg) {
 		// Make sure the connection isn't closed.  This can happen if the message was queued but then we disconnected from the peer before it was sent.
 		conn := recv.peer.conn
 		if conn == nil {
-			log.Printf("peermgr: Tried to send message to disconnected peer %s\n", recv.peer.GetPrettyName())
+			logging.Warnf("peermgr: Tried to send message to disconnected peer %s\n", recv.peer.GetPrettyName())
 			if recv.finishchan != nil {
 				*recv.finishchan <- nil
 			}
@@ -67,7 +67,7 @@ func sendMessages(queue chan outgoingmsg) {
 		// Actually write it.
 		_, err := conn.Write(buf)
 		if err != nil {
-			log.Printf("peermgr: Error sending message to peer: %s\n", err.Error())
+			logging.Warnf("peermgr: Error sending message to peer: %s\n", err.Error())
 		}
 
 		// Responses, if applicable.
@@ -77,5 +77,5 @@ func sendMessages(queue chan outgoingmsg) {
 
 	}
 
-	log.Printf("peermgr: send message queue terminating")
+	logging.Infof("peermgr: send message queue terminating")
 }
