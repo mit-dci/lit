@@ -258,6 +258,7 @@ func (nd *LitNode) PointReqHandler(msg lnutil.PointReqMsg) {
 // FUNDER
 // PointRespHandler takes in a point response, and returns a channel description
 func (nd *LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
+	var err error
 	logging.Infof("Got PointResponse")
 
 	nd.InProg.mtx.Lock()
@@ -294,6 +295,7 @@ func (nd *LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 	q.MyPub, _ = nd.GetUsePub(q.KeyGen, UseChannelFund)
 	q.MyRefundPub, _ = nd.GetUsePub(q.KeyGen, UseChannelRefund)
 	q.MyHAKDBase, _ = nd.GetUsePub(q.KeyGen, UseChannelHAKDBase)
+	q.ElkRcv = elkrem.NewElkremReceiver()
 
 	// chop up incoming message, save points to channel struct
 	copy(q.TheirPub[:], msg.ChannelPub[:])
@@ -301,7 +303,7 @@ func (nd *LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 	copy(q.TheirHAKDBase[:], msg.HAKDbase[:])
 
 	// make sure their pubkeys are real pubkeys
-	_, err := btcec.ParsePubKey(q.TheirPub[:], btcec.S256())
+	_, err = btcec.ParsePubKey(q.TheirPub[:], btcec.S256())
 	if err != nil {
 		return fmt.Errorf("PubRespHandler TheirPub err %s", err.Error())
 	}

@@ -79,11 +79,16 @@ func descend(w, i uint64, h uint8, sha chainhash.Hash) (chainhash.Hash, error) {
 	return sha, nil
 }
 
-// Creates an Elkrem Sender from a root hash.
+// NewElkremSender makes a new elkrem sender from a root hash.
 func NewElkremSender(r chainhash.Hash) *ElkremSender {
 	var e ElkremSender
 	e.root = &r
 	return &e
+}
+
+// NewElkremReceiver makes a new empty elkrem receiver.
+func NewElkremReceiver() *ElkremReceiver {
+	return &ElkremReceiver{make([]ElkremNode, 0)}
 }
 
 // AtIndex skips to the requested index
