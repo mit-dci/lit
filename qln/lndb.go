@@ -1,6 +1,8 @@
 package qln
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"sync"
 	"time"
@@ -14,6 +16,7 @@ import (
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/watchtower"
 	"github.com/mit-dci/lit/wire"
 )
@@ -135,7 +138,7 @@ type LitNode struct {
 	// The URL from which lit attempts to resolve the LN address
 	TrackerURL string
 
-	ChannelMap    map[[20]byte][]lnutil.LinkMsg
+	ChannelMap    map[[20]byte][]LinkDesc
 	ChannelMapMtx sync.Mutex
 	AdvTimeout    *time.Ticker
 
@@ -144,6 +147,70 @@ type LitNode struct {
 	// Contains the URL string to connect to a SOCKS5 proxy, if provided
 	ProxyURL string
 	Nat      string
+
+	InProgMultihop []*InFlightMultihop
+	MultihopMutex  sync.Mutex
+
+	ExchangeRates map[uint32][]lnutil.RateDesc
+}
+
+type LinkDesc struct {
+	Link  lnutil.LinkMsg
+	Dirty bool
+}
+
+type InFlightMultihop struct {
+	Path      []lnutil.RouteHop
+	Amt       int64
+	HHash     [32]byte
+	PreImage  [16]byte
+	Succeeded bool
+}
+
+func (p *InFlightMultihop) Bytes() []byte {
+	var buf bytes.Buffer
+
+	wire.WriteVarInt(&buf, 0, uint64(len(p.Path)))
+	for _, nd := range p.Path {
+		buf.Write(nd.Bytes())
+	}
+
+	wire.WriteVarInt(&buf, 0, uint64(p.Amt))
+
+	buf.Write(p.HHash[:])
+	buf.Write(p.PreImage[:])
+
+	binary.Write(&buf, binary.BigEndian, p.Succeeded)
+
+	return buf.Bytes()
+}
+
+func InFlightMultihopFromBytes(b []byte) (*InFlightMultihop, error) {
+	mh := new(InFlightMultihop)
+
+	buf := bytes.NewBuffer(b) // get rid of messageType
+
+	hops, _ := wire.ReadVarInt(buf, 0)
+	for i := uint64(0); i < hops; i++ {
+		hop, err := lnutil.NewRouteHopFromBytes(buf.Next(24))
+		if err != nil {
+			return nil, err
+		}
+
+		mh.Path = append(mh.Path, *hop)
+	}
+	amount, _ := wire.ReadVarInt(buf, 0)
+	mh.Amt = int64(amount)
+
+	copy(mh.HHash[:], buf.Next(32))
+	copy(mh.PreImage[:], buf.Next(16))
+
+	err := binary.Read(buf, binary.BigEndian, &mh.Succeeded)
+	if err != nil {
+		return mh, err
+	}
+
+	return mh, nil
 }
 
 type RemotePeer struct {
@@ -609,6 +676,17 @@ func (nd *LitNode) ReloadQchanState(q *Qchan) error {
 			return err
 		}
 
+		txoBytes := qcBucket.Get(KEYutxo)
+		if txoBytes == nil {
+			return fmt.Errorf("utxo value empty")
+		}
+		u, err := portxo.PorTxoFromBytes(txoBytes[99:])
+		if err != nil {
+			return err
+		}
+
+		q.PorTxo = *u // assign the utxo
+
 		// load elkrem from elkrem bucket.
 		q.ElkRcv, err = elkrem.ElkremReceiverFromBytes(qcBucket.Get(KEYElkRecv))
 		if err != nil {
@@ -783,4 +861,51 @@ func (nd *LitNode) GetQchanByIdx(cIdx uint32) (*Qchan, error) {
 		return nil, err
 	}
 	return qc, nil
+}
+
+// SaveMultihopPayment saves a new (or updates an existing) multihop payment in the database
+func (nd *LitNode) SaveMultihopPayment(p *InFlightMultihop) error {
+	err := nd.LitDB.Update(func(btx *bolt.Tx) error {
+		cmp := btx.Bucket(BKTPayments)
+		if cmp == nil {
+			return fmt.Errorf("SaveMultihopPayment: no payments bucket")
+		}
+
+		// save hash : payment
+		err := cmp.Put(p.HHash[:], p.Bytes())
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (nd *LitNode) GetAllMultihopPayments() ([]*InFlightMultihop, error) {
+	var payments []*InFlightMultihop
+
+	err := nd.LitDB.View(func(btx *bolt.Tx) error {
+		bkt := btx.Bucket(BKTPayments)
+		if bkt == nil {
+			return fmt.Errorf("no payments bucket")
+		}
+
+		return bkt.ForEach(func(RHash []byte, paymentBytes []byte) error {
+			payment, err := InFlightMultihopFromBytes(paymentBytes)
+			if err != nil {
+				return err
+			}
+
+			// add to slice
+			payments = append(payments, payment)
+			return nil
+		})
+	})
+
+	return payments, err
 }

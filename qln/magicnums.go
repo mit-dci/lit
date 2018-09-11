@@ -34,13 +34,14 @@ const (
 )
 
 var (
-	BKTChannel = []byte("chn") // all channel data is in this bucket.
-	BKTPeers   = []byte("pir") // all peer data is in this bucket.
-	BKTPeerMap = []byte("pmp") // map of peer index to pubkey
-	BKTChanMap = []byte("cmp") // map of channel index to outpoint
-	BKTWatch   = []byte("wch") // txids & signatures for export to watchtowers
-	BKTHTLCOPs = []byte("hlo") // htlc outpoints to watch
-	BKTRCAuth  = []byte("rca") // Remote control authorization
+	BKTChannel  = []byte("chn") // all channel data is in this bucket.
+	BKTPeers    = []byte("pir") // all peer data is in this bucket.
+	BKTPeerMap  = []byte("pmp") // map of peer index to pubkey
+	BKTChanMap  = []byte("cmp") // map of channel index to outpoint
+	BKTWatch    = []byte("wch") // txids & signatures for export to watchtowers
+	BKTHTLCOPs  = []byte("hlo") // htlc outpoints to watch
+	BKTPayments = []byte("pym") // array of multihop payments
+	BKTRCAuth   = []byte("rca") // Remote control authorization
 
 	KEYIdx      = []byte("idx")  // index for key derivation
 	KEYhost     = []byte("hst")  // hostname where peer lives

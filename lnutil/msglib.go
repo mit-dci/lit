@@ -50,6 +50,11 @@ const (
 	//Routing messages
 	MSGID_LINK_DESC = 0x70 // Describes a new channel for routing
 
+	//Multihop payment messages
+	MSGID_PAY_REQ   = 0x75 // Request payment
+	MSGID_PAY_ACK   = 0x76 // Acknowledge payment (share preimage hash)
+	MSGID_PAY_SETUP = 0x77 // Setup a payment route
+
 	//Discreet log contracts messages
 	MSGID_DLC_OFFER               = 0x90 // Offer a contract
 	MSGID_DLC_ACCEPTOFFER         = 0x91 // Accept the contract
@@ -143,6 +148,13 @@ func LitMsgFromBytes(b []byte, peerid uint32) (LitMsg, error) {
 
 	case MSGID_LINK_DESC:
 		return NewLinkMsgFromBytes(b, peerid)
+
+	case MSGID_PAY_REQ:
+		return NewMultihopPaymentRequestMsgFromBytes(b, peerid)
+	case MSGID_PAY_ACK:
+		return NewMultihopPaymentAckMsgFromBytes(b, peerid)
+	case MSGID_PAY_SETUP:
+		return NewMultihopPaymentSetupMsgFromBytes(b, peerid)
 
 	case MSGID_DUALFUNDINGREQ:
 		return NewDualFundingReqMsgFromBytes(b, peerid)
@@ -1179,33 +1191,99 @@ func (self WatchDelMsg) MsgType() uint8 { return MSGID_WATCH_DELETE }
 
 // Link message
 
+// To find how much 1 satoshi of coin type A will cost you in coin type B,
+// if Reciprocal is false, 1 satoshi of A will buy you `rate` satoshis of B.
+// Otherwise, 1 satoshi of B will buy you `rate` satoshis of A. This avoids the
+// use of floating point for deciding price.
+type RateDesc struct {
+	CoinType   uint32
+	Rate       int64
+	Reciprocal bool
+}
+
+func NewRateDescFromBytes(b []byte) (RateDesc, error) {
+	var rd RateDesc
+
+	buf := bytes.NewBuffer(b)
+
+	err := binary.Read(buf, binary.BigEndian, &rd.CoinType)
+	if err != nil {
+		return rd, err
+	}
+
+	err = binary.Read(buf, binary.BigEndian, &rd.Rate)
+	if err != nil {
+		return rd, err
+	}
+
+	err = binary.Read(buf, binary.BigEndian, &rd.Reciprocal)
+	if err != nil {
+		return rd, err
+	}
+
+	return rd, nil
+}
+
+func (rd *RateDesc) Bytes() []byte {
+	var buf bytes.Buffer
+
+	binary.Write(&buf, binary.BigEndian, rd.CoinType)
+	binary.Write(&buf, binary.BigEndian, rd.Rate)
+	binary.Write(&buf, binary.BigEndian, rd.Reciprocal)
+
+	return buf.Bytes()
+}
+
 type LinkMsg struct {
 	PeerIdx   uint32
-	PKHScript [20]byte // ChanPKH (channel ID)
 	APKH      [20]byte // APKH (A's LN address)
 	ACapacity int64    // ACapacity (A's channel balance)
 	BPKH      [20]byte // BPKH (B's LN address)
 	CoinType  uint32   // CoinType (Network of the channel)
 	Seq       uint32   // seq (Link state sequence #)
 	Timestamp int64
+	Rates     []RateDesc
 }
 
 func NewLinkMsgFromBytes(b []byte, peerIDX uint32) (LinkMsg, error) {
 	sm := new(LinkMsg)
 	sm.PeerIdx = peerIDX
 
-	if len(b) < 76 {
-		return *sm, fmt.Errorf("LinkMsg %d bytes, expect 76", len(b))
+	if len(b) < 61 {
+		return *sm, fmt.Errorf("LinkMsg %d bytes, expect at least 61", len(b))
 	}
 
 	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
 
-	copy(sm.PKHScript[:], buf.Next(20))
 	copy(sm.APKH[:], buf.Next(20))
-	_ = binary.Read(buf, binary.BigEndian, &sm.ACapacity)
+	err := binary.Read(buf, binary.BigEndian, &sm.ACapacity)
+	if err != nil {
+		return *sm, err
+	}
 	copy(sm.BPKH[:], buf.Next(20))
-	_ = binary.Read(buf, binary.BigEndian, &sm.CoinType)
-	_ = binary.Read(buf, binary.BigEndian, &sm.Seq)
+	err = binary.Read(buf, binary.BigEndian, &sm.CoinType)
+	if err != nil {
+		return *sm, err
+	}
+	err = binary.Read(buf, binary.BigEndian, &sm.Seq)
+	if err != nil {
+		return *sm, err
+	}
+
+	var nRates uint32
+	err = binary.Read(buf, binary.BigEndian, &nRates)
+	if err != nil {
+		return *sm, err
+	}
+
+	for i := uint32(0); i < nRates; i++ {
+		rd, err := NewRateDescFromBytes(buf.Next(13))
+		if err != nil {
+			return *sm, err
+		}
+
+		sm.Rates = append(sm.Rates, rd)
+	}
 
 	return *sm, nil
 }
@@ -1216,8 +1294,6 @@ func (self LinkMsg) Bytes() []byte {
 
 	buf.WriteByte(self.MsgType())
 
-	buf.Write(self.PKHScript[:])
-
 	buf.Write(self.APKH[:])
 	binary.Write(&buf, binary.BigEndian, self.ACapacity)
 
@@ -1225,6 +1301,13 @@ func (self LinkMsg) Bytes() []byte {
 
 	binary.Write(&buf, binary.BigEndian, self.CoinType)
 	binary.Write(&buf, binary.BigEndian, self.Seq)
+
+	nRates := uint32(len(self.Rates))
+	binary.Write(&buf, binary.BigEndian, nRates)
+
+	for _, rate := range self.Rates {
+		buf.Write(rate.Bytes())
+	}
 
 	return buf.Bytes()
 }
@@ -1989,6 +2072,102 @@ func (msg DlcContractSigProofMsg) MsgType() uint8 {
 	return MSGID_DLC_SIGPROOF
 }
 
+// MultihopPaymentRequestMsg initiates a new multihop payment. It is sent to
+// the peer that will ultimately receive the payment.
+type MultihopPaymentRequestMsg struct {
+	// The index of the peer we're communicating with
+	PeerIdx uint32
+	// The type of coin we're requesting to send
+	Cointype uint32
+}
+
+func NewMultihopPaymentRequestMsg(peerIdx uint32, cointype uint32) MultihopPaymentRequestMsg {
+	msg := new(MultihopPaymentRequestMsg)
+	msg.PeerIdx = peerIdx
+	msg.Cointype = cointype
+	return *msg
+}
+
+func NewMultihopPaymentRequestMsgFromBytes(b []byte,
+	peerIdx uint32) (MultihopPaymentRequestMsg, error) {
+
+	msg := new(MultihopPaymentRequestMsg)
+	msg.PeerIdx = peerIdx
+
+	buf := bytes.NewBuffer(b[1:])
+
+	err := binary.Read(buf, binary.BigEndian, &msg.Cointype)
+	if err != nil {
+		return *msg, err
+	}
+
+	return *msg, nil
+}
+
+// Bytes serializes a MultihopPaymentRequestMsg into a byte array
+func (msg MultihopPaymentRequestMsg) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.WriteByte(msg.MsgType())
+	binary.Write(&buf, binary.BigEndian, msg.Cointype)
+	return buf.Bytes()
+}
+
+// Peer returns the peer index this message was received from/sent to
+func (msg MultihopPaymentRequestMsg) Peer() uint32 {
+	return msg.PeerIdx
+}
+
+// MsgType returns the type of this message
+func (msg MultihopPaymentRequestMsg) MsgType() uint8 {
+	return MSGID_PAY_REQ
+}
+
+// MultihopPaymentRequestMsg initiates a new multihop payment. It is sent to
+// the peer that will ultimately send the payment.
+type MultihopPaymentAckMsg struct {
+	// The index of the peer we're communicating with
+	PeerIdx uint32
+	// The hash to the preimage we use to clear out the HTLCs
+	HHash [32]byte
+}
+
+func NewMultihopPaymentAckMsg(peerIdx uint32, hHash [32]byte) MultihopPaymentAckMsg {
+	msg := new(MultihopPaymentAckMsg)
+	msg.PeerIdx = peerIdx
+	msg.HHash = hHash
+	return *msg
+}
+
+func NewMultihopPaymentAckMsgFromBytes(b []byte,
+	peerIdx uint32) (MultihopPaymentAckMsg, error) {
+
+	msg := new(MultihopPaymentAckMsg)
+	msg.PeerIdx = peerIdx
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
+	copy(msg.HHash[:], buf.Next(32))
+	return *msg, nil
+}
+
+// Bytes serializes a MultihopPaymentAckMsg into a byte array
+func (msg MultihopPaymentAckMsg) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.WriteByte(msg.MsgType())
+	buf.Write(msg.HHash[:])
+
+	return buf.Bytes()
+}
+
+func (msg MultihopPaymentAckMsg) Peer() uint32 {
+	return msg.PeerIdx
+}
+
+// MsgType returns the type of this message
+func (msg MultihopPaymentAckMsg) MsgType() uint8 {
+	return MSGID_PAY_ACK
+}
+
 type RemoteControlRpcRequestMsg struct {
 	PeerIdx    uint32
 	PubKey     [33]byte
@@ -2044,9 +2223,113 @@ func (msg RemoteControlRpcRequestMsg) Peer() uint32 {
 	return msg.PeerIdx
 }
 
-// MsgType returns the type of this message
 func (msg RemoteControlRpcRequestMsg) MsgType() uint8 {
 	return MSGID_REMOTE_RPCREQUEST
+}
+
+type RouteHop struct {
+	Node     [20]byte
+	CoinType uint32
+}
+
+func (rh *RouteHop) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.Write(rh.Node[:])
+	binary.Write(&buf, binary.BigEndian, rh.CoinType)
+
+	return buf.Bytes()
+}
+
+func NewRouteHopFromBytes(b []byte) (*RouteHop, error) {
+	buf := bytes.NewBuffer(b)
+
+	if buf.Len() < 24 {
+		return nil, fmt.Errorf("not enough bytes for RouteHop")
+	}
+
+	rh := new(RouteHop)
+
+	copy(rh.Node[:], buf.Next(20))
+
+	err := binary.Read(buf, binary.BigEndian, &rh.CoinType)
+	if err != nil {
+		return nil, err
+	}
+
+	return rh, nil
+}
+
+// MultihopPaymentSetupMsg forms a new multihop payment. It is sent to
+// the next-in-line peer, which will forward it to the next hop until
+// the target is reached
+type MultihopPaymentSetupMsg struct {
+	// The index of the peer we're communicating with
+	PeerIdx uint32
+	// The hash to the preimage we use to clear out the HTLCs
+	HHash [32]byte
+	// The PKHs (in order) of the nodes we're using.
+	NodeRoute []RouteHop
+	// Data associated with the payment
+	Data [32]byte
+}
+
+// NewMultihopPaymentSetupMsg does...
+func NewMultihopPaymentSetupMsg(peerIdx uint32, hHash [32]byte, nodeRoute []RouteHop, data [32]byte) MultihopPaymentSetupMsg {
+	msg := new(MultihopPaymentSetupMsg)
+	msg.PeerIdx = peerIdx
+	msg.HHash = hHash
+	msg.NodeRoute = nodeRoute
+	msg.Data = data
+	return *msg
+}
+
+func NewMultihopPaymentSetupMsgFromBytes(b []byte,
+	peerIdx uint32) (MultihopPaymentSetupMsg, error) {
+
+	msg := new(MultihopPaymentSetupMsg)
+	msg.PeerIdx = peerIdx
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
+	copy(msg.HHash[:], buf.Next(32))
+
+	hops, _ := wire.ReadVarInt(buf, 0)
+	for i := uint64(0); i < hops; i++ {
+		rh, err := NewRouteHopFromBytes(buf.Next(24))
+		if err != nil {
+			return *msg, err
+		}
+
+		msg.NodeRoute = append(msg.NodeRoute, *rh)
+	}
+
+	copy(msg.Data[:], buf.Next(32))
+
+	return *msg, nil
+}
+
+// Bytes serializes a MultihopPaymentSetupMsg into a byte array
+func (msg MultihopPaymentSetupMsg) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.WriteByte(msg.MsgType())
+	buf.Write(msg.HHash[:])
+	wire.WriteVarInt(&buf, 0, uint64(len(msg.NodeRoute)))
+	for _, nd := range msg.NodeRoute {
+		buf.Write(nd.Bytes())
+	}
+
+	buf.Write(msg.Data[:])
+
+	return buf.Bytes()
+}
+
+func (msg MultihopPaymentSetupMsg) Peer() uint32 {
+	return msg.PeerIdx
+}
+
+// MsgType returns the type of this message
+func (msg MultihopPaymentSetupMsg) MsgType() uint8 {
+	return MSGID_PAY_SETUP
 }
 
 type RemoteControlRpcResponseMsg struct {

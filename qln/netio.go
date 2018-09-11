@@ -31,6 +31,21 @@ func (nd *LitNode) GetLisAddressAndPorts() (
 	return lisAdr, ports
 }
 
+func (nd *LitNode) FindPeerIndexByAddress(lnAdr string) (uint32, error) {
+	nd.RemoteMtx.Lock()
+	defer nd.RemoteMtx.Unlock()
+	for idx, peer := range nd.RemoteCons {
+		var pubKey [33]byte
+		copy(pubKey[:], peer.Con.RemotePub().SerializeCompressed())
+		adr := lnutil.LitAdrFromPubkey(pubKey)
+		if adr == lnAdr {
+			return idx, nil
+		}
+	}
+
+	return 0, fmt.Errorf("Node %s not found", lnAdr)
+}
+
 // TCPListener starts a litNode listening for incoming LNDC connections
 func (nd *LitNode) TCPListener(
 	lisIpPort string) (string, error) {
@@ -235,6 +250,8 @@ type PeerInfo struct {
 
 func (nd *LitNode) GetConnectedPeerList() []PeerInfo {
 	var peers []PeerInfo
+	nd.RemoteMtx.Lock()
+	defer nd.RemoteMtx.Unlock()
 	for k, v := range nd.RemoteCons {
 		var newPeer PeerInfo
 		var pubArr [33]byte
@@ -251,8 +268,8 @@ func (nd *LitNode) GetConnectedPeerList() []PeerInfo {
 // ConnectedToPeer checks whether you're connected to a specific peer
 func (nd *LitNode) ConnectedToPeer(peer uint32) bool {
 	nd.RemoteMtx.Lock()
+	defer nd.RemoteMtx.Unlock()
 	_, ok := nd.RemoteCons[peer]
-	nd.RemoteMtx.Unlock()
 	return ok
 }
 

@@ -119,6 +119,16 @@ var claimHTLCCommand = &Command{
 	ShortDescription: "Clear HTLC of the given index from the given channel.\n",
 }
 
+var paymultihopCommand = &Command{
+	Format: fmt.Sprintf("%s%s\n", lnutil.White("paymultihop"), lnutil.ReqColor("dest cointype amount")),
+	Description: fmt.Sprintf("%s\n%s%s\n%s%s\n%s%s\n",
+		"Tries to pay using a multi-hop payment. Will fail if no route available",
+		lnutil.White("dest"), ": Destination address",
+		lnutil.White("cointype"), ": Coin type to pay",
+		lnutil.White("amount"), ": Amount to pay"),
+	ShortDescription: "Pay via multi-hop.\n",
+}
+
 func (lc *litAfClient) History(textArgs []string) error {
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
 		fmt.Fprintf(color.Output, historyCommand.Format)
@@ -585,6 +595,49 @@ func (lc *litAfClient) ClaimHTLC(textArgs []string) error {
 	for _, txid := range reply.Txids {
 		fmt.Fprintf(color.Output, "Claimed HTLC with txid %s\n", lnutil.White(txid))
 	}
+
+	return nil
+}
+
+func (lc *litAfClient) PayMultihop(textArgs []string) error {
+	if len(textArgs) > 0 && textArgs[0] == "-h" {
+		fmt.Fprintf(color.Output, paymultihopCommand.Format)
+		fmt.Fprintf(color.Output, paymultihopCommand.Description)
+		return nil
+	}
+
+	args := new(litrpc.PayMultihopArgs)
+	reply := new(litrpc.StatusReply)
+
+	if len(textArgs) < 3 {
+		return fmt.Errorf("need args: paymultihop dest destCoinType originCoinType amount")
+	}
+
+	args.DestLNAdr = textArgs[0]
+	destcointype, err := strconv.Atoi(textArgs[1])
+	if err != nil {
+		return err
+	}
+	args.DestCoinType = uint32(destcointype)
+
+	origincointype, err := strconv.Atoi(textArgs[2])
+	if err != nil {
+		return err
+	}
+	args.OriginCoinType = uint32(origincointype)
+
+	amount, err := strconv.Atoi(textArgs[3])
+	if err != nil {
+		return err
+	}
+	args.Amt = int64(amount)
+
+	err = lc.Call("LitRPC.PayMultihop", args, reply)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(color.Output, "%s\n", reply.Status)
 
 	return nil
 }

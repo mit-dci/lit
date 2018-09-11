@@ -11,6 +11,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/mit-dci/lit/coinparam"
+	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/lnutil"
 )
@@ -233,6 +234,13 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		err = lc.Graph(args)
 		return parseErr(err, "grpah")
 	}
+	if cmd == "paymultihop" { // pay via multi-hop
+		err = lc.PayMultihop(args)
+		if err != nil {
+			fmt.Fprintf(color.Output, "paymultihop error: %s\n", err)
+		}
+		return nil
+	}
 
 	fmt.Fprintf(color.Output, "Command not recognized. type help for command list.\n")
 	return nil
@@ -283,7 +291,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		return err
 	}
 
-	listofCommands := []string{"conns", "chans", "dualfunds", "txos", "ports", "addrs", "bals", "-a"}
+	listofCommands := []string{"conns", "chans", "dualfunds", "txos", "ports", "addrs", "bals", "pays", "-a"}
 	cmd := textArgs[0]
 
 	if !isExists(listofCommands, cmd) {
@@ -303,6 +311,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	lReply := new(litrpc.ListeningPortsReply)
 	rcReply := new(litrpc.RCPendingAuthRequestsReply)
 	dfReply := new(litrpc.PendingDualFundReply)
+	mhReply := new(litrpc.MultihopPaymentsReply)
 
 	displayAllCommands := false
 	if cmd == "-a" {
@@ -332,6 +341,24 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 					lnutil.White(peer.PeerNumber), peer.RemoteHost, peer.LitAdr)
 			}
 		}
+	}
+
+	err = lc.Call("LitRPC.Balance", nil, bReply)
+	if err != nil {
+		return err
+	}
+
+	walHeights := map[uint32]int32{}
+	for _, b := range bReply.Balances {
+		walHeights[b.CoinType] = b.SyncHeight
+	}
+
+	err = lc.Call("LitRPC.ChannelList", nil, cReply)
+	if err != nil {
+		return err
+	}
+	if len(cReply.Channels) > 0 {
+		fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Channels:"))
 	}
 
 	if cmd == "chans" || displayAllCommands {
@@ -378,6 +405,42 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 					lnutil.White(c.CIdx), c.PeerIdx, c.CoinType, lnutil.SatoshiColor(c.Capacity), lnutil.SatoshiColor(c.MyBalance),
 					lnutil.OutPoint(c.OutPoint),
 					c.Height, c.StateNum, c.Data, c.Pkh)
+
+				var nHTLCs int
+				for _, h := range c.HTLCs {
+					if !h.Cleared && !h.ClearedOnChain {
+						nHTLCs++
+					}
+				}
+
+				if len(c.HTLCs) > 0 {
+					fmt.Fprintf(color.Output, "\t\t\t%s\n", lnutil.Header("HTLCs:"))
+				}
+
+				for _, h := range c.HTLCs {
+					walHeight := walHeights[c.CoinType]
+					locktime := int32(h.Locktime) - walHeight
+
+					if h.Cleared || h.ClearedOnChain {
+						// Don't bother showing cleared HTLCs that are > 2* the default lock time old
+						if locktime < -2*consts.DefaultLockTime {
+							continue
+						}
+
+						fmt.Fprintf(color.Output, lnutil.Red("\tCleared:      "))
+					} else if h.Clearing || h.InProg {
+						c := color.New(color.FgYellow)
+						c.Printf("\t\t\t\tIn progress:  ")
+					} else {
+						fmt.Fprintf(color.Output, lnutil.Green("\tUncleared:    "))
+					}
+
+					fmt.Fprintf(color.Output,
+						"%s incoming: %t amt: %s RHash: %x R: %x locktime: %d\n",
+						lnutil.White(h.Idx), h.Incoming, lnutil.SatoshiColor(h.Amt), h.RHash,
+						h.R,
+						locktime)
+				}
 			}
 
 			printChannels := func(cs []litrpc.ChannelInfo, title string) {
@@ -414,7 +477,6 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 				lnutil.Header("Req Amt:"), lnutil.SatoshiColor(dfReply.RequestedAmount),
 			)
 		}
-
 	}
 
 	if cmd == "txos" || displayAllCommands {
@@ -506,6 +568,37 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 					lnutil.Header("Channel:"), lnutil.SatoshiColor(walBal.ChanTotal),
 				)
 			}
+		}
+	}
+
+	if cmd == "pays" || displayAllCommands {
+		err = lc.Call("LitRPC.ListMultihopPayments", nil, mhReply)
+		if err != nil {
+			return err
+		}
+
+		if len(mhReply.Payments) > 0 {
+			fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Multihop Payments:"))
+		}
+
+		for _, p := range mhReply.Payments {
+			if p.Succeeded {
+				fmt.Fprintf(color.Output, lnutil.Green("Completed: "))
+			} else {
+				c := color.New(color.FgYellow)
+				c.Printf("Pending:   ")
+			}
+
+			path := p.Path[0]
+			for i := 1; i < len(p.Path); i++ {
+				path += " -> " + p.Path[i]
+			}
+
+			fmt.Fprintf(color.Output,
+				"amt: %s RHash: %x R: %x path: %s \n",
+				lnutil.SatoshiColor(p.Amt), p.RHash,
+				p.R,
+				path)
 		}
 	}
 
