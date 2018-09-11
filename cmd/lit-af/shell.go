@@ -161,6 +161,17 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		return parseErr(err, "dlc")
 	}
 
+	// remote control
+	if cmd == "rcauth" {
+		err = lc.RemoteControlAuth(args)
+		return parseErr(err, "rcauth")
+	}
+
+	if cmd == "rcreq" {
+		err = lc.RemoteControlRequest(args)
+		return parseErr(err, "rcreq")
+	}
+
 	// fund and create a new channel
 	if cmd == "fund" {
 		err = lc.FundChannel(args)
@@ -290,6 +301,7 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	tReply := new(litrpc.TxoListReply)
 	bReply := new(litrpc.BalanceReply)
 	lReply := new(litrpc.ListeningPortsReply)
+	rcReply := new(litrpc.RCPendingAuthRequestsReply)
 	dfReply := new(litrpc.PendingDualFundReply)
 
 	displayAllCommands := false
@@ -431,6 +443,19 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		}
 	}
 
+	if cmd == "rcauth" || displayAllCommands {
+		err := lc.Call("LitRPC.ListPendingRemoteControlAuthRequests", nil, rcReply)
+		if err != nil {
+			return err
+		}
+		if len(rcReply.PubKeys) > 0 {
+			fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Nodes requesting remote control authorization:"))
+			for _, pubKey := range rcReply.PubKeys {
+				fmt.Fprintf(color.Output, "%x\n", pubKey)
+			}
+		}
+	}
+
 	if cmd == "ports" || displayAllCommands {
 		err := lc.Call("LitRPC.GetListeningPorts", nil, lReply)
 		if err != nil {
@@ -503,7 +528,7 @@ func (lc *litAfClient) Stop(textArgs []string) error {
 
 	fmt.Fprintf(color.Output, "%s\n", reply.Status)
 
-	lc.rpccon.Close()
+	//lc.rpccon.Close()
 	return fmt.Errorf("stopped remote lit node")
 }
 
@@ -524,7 +549,7 @@ func (lc *litAfClient) Help(textArgs []string) error {
 	if len(textArgs) == 0 {
 
 		fmt.Fprintf(color.Output, lnutil.Header("Commands:\n"))
-		listofCommands := []*Command{helpCommand, sayCommand, lsCommand, addressCommand, sendCommand, fanCommand, sweepCommand, lisCommand, conCommand, dlcCommand, fundCommand, dualFundCommand, watchCommand, pushCommand, closeCommand, breakCommand, addHTLCCommand, clearHTLCCommand, historyCommand, offCommand, exitCommand}
+		listofCommands := []*Command{helpCommand, sayCommand, lsCommand, addressCommand, sendCommand, fanCommand, sweepCommand, lisCommand, conCommand, dlcCommand, fundCommand, dualFundCommand, watchCommand, pushCommand, closeCommand, breakCommand, addHTLCCommand, clearHTLCCommand, rcAuthCommand, rcRequestCommand, historyCommand, offCommand, exitCommand}
 		printHelp(listofCommands)
 		fmt.Fprintf(color.Output, "\n\n")
 		fmt.Fprintf(color.Output, lnutil.Header("Coins:\n"))

@@ -40,6 +40,7 @@ var (
 	BKTChanMap = []byte("cmp") // map of channel index to outpoint
 	BKTWatch   = []byte("wch") // txids & signatures for export to watchtowers
 	BKTHTLCOPs = []byte("hlo") // htlc outpoints to watch
+	BKTRCAuth  = []byte("rca") // Remote control authorization
 
 	KEYIdx      = []byte("idx")  // index for key derivation
 	KEYhost     = []byte("hst")  // hostname where peer lives

@@ -1,4 +1,4 @@
-package qln
+package lnutil
 
 import (
 	"bytes"

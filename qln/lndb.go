@@ -91,6 +91,8 @@ type LitNode struct {
 
 	IdentityKey *btcec.PrivateKey
 
+	DefaultRemoteControlKey *btcec.PublicKey
+
 	// all nodes have a watchtower.  but could have a tower without a node
 	Tower watchtower.Watcher
 
@@ -136,6 +138,8 @@ type LitNode struct {
 	ChannelMap    map[[20]byte][]lnutil.LinkMsg
 	ChannelMapMtx sync.Mutex
 	AdvTimeout    *time.Ticker
+
+	RPC interface{}
 
 	// Contains the URL string to connect to a SOCKS5 proxy, if provided
 	ProxyURL string
