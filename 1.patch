@@ -1,0 +1,162 @@
+From daab2a5b3b75e954620edd44ad93d68a1bae015d Mon Sep 17 00:00:00 2001
+From: Varunram <vrg2009@ymail.com>
+Date: Mon, 17 Sep 2018 13:06:03 +0530
+Subject: [PATCH] Don't work on a copy of the conf struct
+
+work directly on the conf struct in lit.go instead of working on a copy
+rename config strcut to litConfig to avoid namespace collisions
+add logging/log.go diff to previous commit
+---
+ lit.go         |  9 +++++----
+ litinit.go     | 34 +++++++++++++++-------------------
+ logging/log.go | 11 +++++------
+ 3 files changed, 25 insertions(+), 29 deletions(-)
+
+diff --git a/lit.go b/lit.go
+index ef0e9232..9ce4d973 100644
+--- a/lit.go
++++ b/lit.go
+@@ -18,7 +18,7 @@ import (
+ 	flags "github.com/jessevdk/go-flags"
+ )
+ 
+-type config struct { // define a struct for usage with go-flags
++type litConfig struct { // define a struct for usage with go-flags
+ 	// networks lit can try connecting to
+ 	Tn3host     string `long:"tn3" description:"Connect to bitcoin testnet3."`
+ 	Bc2host     string `long:"bc2" description:"bc2 full node."`
+@@ -87,11 +87,12 @@ func fileExists(name string) bool {
+ }
+ 
+ // newConfigParser returns a new command line flags parser.
+-func newConfigParser(conf *config, options flags.Options) *flags.Parser {
++func newConfigParser(conf *litConfig, options flags.Options) *flags.Parser {
+ 	parser := flags.NewParser(conf, options)
+ 	return parser
+ }
+-func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
++
++func linkWallets(node *qln.LitNode, key *[32]byte, conf *litConfig) error {
+ 	// for now, wallets are linked to the litnode on startup, and
+ 	// can't appear / disappear while it's running.  Later
+ 	// could support dynamically adding / removing wallets
+@@ -164,7 +165,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
+ 
+ func main() {
+ 
+-	conf := config{
++	conf := litConfig{
+ 		LitHomeDir:                      defaultLitHomeDirName,
+ 		Rpcport:                         defaultRpcport,
+ 		Rpchost:                         defaultRpchost,
+diff --git a/litinit.go b/litinit.go
+index 9fc89c42..28ddf5e3 100644
+--- a/litinit.go
++++ b/litinit.go
+@@ -36,7 +36,7 @@ func createDefaultConfigFile(destinationPath string) error {
+ // configuration variables, reading in key data, reading and creating files if
+ // they're not yet there.  It takes in a config, and returns a key.
+ // (maybe add the key to the config?
+-func litSetup(conf *config) *[32]byte {
++func litSetup(conf *litConfig) *[32]byte {
+ 	// Pre-parse the command line options to see if an alternative config
+ 	// file or the version flag was specified.  Any errors aside from the
+ 	// help message error can be ignored here since they will be caught by
+@@ -44,49 +44,48 @@ func litSetup(conf *config) *[32]byte {
+ 
+ 	//	usageMessage := fmt.Sprintf("Use %s -h to show usage", "./lit")
+ 
+-	preconf := *conf
+-	preParser := newConfigParser(&preconf, flags.HelpFlag)
+-	_, err := preParser.ParseArgs(os.Args)
++	temp := newConfigParser(conf, flags.HelpFlag)
++	_, err := temp.ParseArgs(os.Args)
+ 	if err != nil {
+ 		logging.Fatal(err)
+ 	}
+ 
+-	// Load config from file and parse
+-	parser := newConfigParser(conf, flags.Default)
+-
+-	// set default log level here
++	// set default log level (default) here, override if necessary
+ 	logging.SetLogLevel(defaultLogLevel)
+ 	// create home directory
+-	_, err = os.Stat(preconf.LitHomeDir)
++	_, err = os.Stat(conf.LitHomeDir)
+ 	if err != nil {
+ 		logging.Errorf("Error while creating a directory")
+ 	}
+ 	if os.IsNotExist(err) {
+ 		// first time the guy is running lit, lets set tn3 to true
+-		os.Mkdir(preconf.LitHomeDir, 0700)
++		os.Mkdir(conf.LitHomeDir, 0700)
+ 		logging.Infof("Creating a new config file")
+-		err := createDefaultConfigFile(preconf.LitHomeDir) // Source of error
++		err := createDefaultConfigFile(conf.LitHomeDir) // Source of error
+ 		if err != nil {
+-			fmt.Printf("Error creating a default config file: %v", preconf.LitHomeDir)
++			fmt.Printf("Error creating a default config file: %v", conf.LitHomeDir)
+ 			logging.Fatal(err)
+ 		}
+ 	}
+ 
+-	if _, err := os.Stat(filepath.Join(filepath.Join(preconf.LitHomeDir), "lit.conf")); os.IsNotExist(err) {
++	if _, err := os.Stat(filepath.Join(filepath.Join(conf.LitHomeDir), "lit.conf")); os.IsNotExist(err) {
+ 		// if there is no config file found over at the directory, create one
+ 		if err != nil {
+ 			fmt.Println(err)
+ 		}
+ 		logging.Infof("Creating a new config file")
+-		err := createDefaultConfigFile(filepath.Join(preconf.LitHomeDir)) // Source of error
++		err := createDefaultConfigFile(filepath.Join(conf.LitHomeDir)) // Source of error
+ 		if err != nil {
+ 			logging.Fatal(err)
+ 		}
+ 	}
+ 
+-	preconf.ConfigFile = filepath.Join(filepath.Join(preconf.LitHomeDir), "lit.conf")
++	// Have another parser for config file parsing, if any
++	parser := newConfigParser(conf, flags.Default)
++
++	conf.ConfigFile = filepath.Join(filepath.Join(conf.LitHomeDir), "lit.conf")
+ 	// lets parse the config file provided, if any
+-	err = flags.NewIniParser(parser).ParseFile(preconf.ConfigFile)
++	err = flags.NewIniParser(parser).ParseFile(conf.ConfigFile)
+ 	if err != nil {
+ 		_, ok := err.(*os.PathError)
+ 		if !ok {
+@@ -134,9 +133,6 @@ func litSetup(conf *config) *[32]byte {
+ 
+ 	// Allow node with no linked wallets, for testing.
+ 	// TODO Should update tests and disallow nodes without wallets later.
+-	//	if conf.Tn3host == "" && conf.Lt4host == "" && conf.Reghost == "" {
+-	//		logging.Fatal("error: no network specified; use -tn3, -reg, -lt4")
+-	//	}
+ 
+ 	// Keys: the litNode, and wallits, all get 32 byte keys.
+ 	// Right now though, they all get the *same* key.  For lit as a single binary
+diff --git a/logging/log.go b/logging/log.go
+index 3578f0d8..b8d4c0be 100644
+--- a/logging/log.go
++++ b/logging/log.go
+@@ -10,14 +10,13 @@ import (
+ type LogLevel int
+ 
+ const (
+-	LogLevelPanicOrFatal LogLevel = 0
+-	LogLevelError        LogLevel = 1
+-	LogLevelWarning      LogLevel = 2
+-	LogLevelInfo         LogLevel = 3
+-	LogLevelDebug        LogLevel = 4
++	LogLevelError        LogLevel = 0 // default
++	LogLevelWarning      LogLevel = 1 // -v
++	LogLevelInfo         LogLevel = 2 // -vv
++	LogLevelDebug        LogLevel = 3 // -d
+ )
+ 
+-var logLevel = LogLevelPanicOrFatal
++var logLevel = LogLevelError
+ 
+ func SetLogLevel(newLevel int) {
+ 	logLevel = LogLevel(newLevel)
