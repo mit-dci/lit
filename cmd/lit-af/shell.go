@@ -17,7 +17,7 @@ import (
 
 var lsCommand = &Command{
 	Format: fmt.Sprintf("%s%s\n", lnutil.White("ls"), lnutil.ReqColor(("topic"))),
-	Description: fmt.Sprintf("%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s",
+	Description: fmt.Sprintf("%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s",
 		"Show various information about our current state, such as connections, addresses, UTXO's, balances, etc.",
 		fmt.Sprintf("%s %s",
 			lnutil.White("topic"),
