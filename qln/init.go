@@ -22,24 +22,7 @@ import (
 // Does not activate a subwallet; do that after init.
 func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL string, nat string) (*LitNode, error) {
 
-	nd := new(LitNode)
-	nd.LitFolder = path
-
-	// Event system setup.
-	nd.Events = eventbus.NewEventBus()
-
-	// Register adapter event handlers.  These are for hooking in the new peer management with the old one.
-	h1 := makeTmpNewPeerHandler(nd)
-	nd.Events.RegisterHandler("lnp2p.peer.new", h1)
-	h2 := makeTmpMsgHandler(nd)
-	nd.Events.RegisterHandler("TMP!lnp2p.msgrecv", h2)
-	// TODO removing peers, etc.
-
-	litdbpath := filepath.Join(nd.LitFolder, "ln.db")
-	err := nd.OpenDB(litdbpath)
-	if err != nil {
-		return nil, err
-	}
+	var err error
 
 	// Maybe make a new parameter set for "LN".. meh
 	// TODO change this to a non-coin
@@ -47,6 +30,32 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 	if err != nil {
 		return nil, err
 	}
+
+	nd := new(LitNode)
+	nd.LitFolder = path
+
+	litdbpath := filepath.Join(nd.LitFolder, "ln.db")
+	err = nd.OpenDB(litdbpath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Event system setup.
+	ebus := eventbus.NewEventBus()
+	nd.Events = &ebus
+
+	// Peer manager
+	nd.PeerMan, err = lnp2p.NewPeerManager(rootPrivKey, nil, &ebus)
+	if err != nil {
+		return nil, err
+	}
+
+	// Register adapter event handlers.  These are for hooking in the new peer management with the old one.
+	h1 := makeTmpNewPeerHandler(nd)
+	nd.Events.RegisterHandler("lnp2p.peer.new", h1)
+	h2 := makeTmpMsgHandler(nd)
+	nd.Events.RegisterHandler("TMP!lnp2p.msgrecv", h2)
+	// TODO removing peers, etc.
 
 	var kg portxo.KeyGen
 	kg.Depth = 5

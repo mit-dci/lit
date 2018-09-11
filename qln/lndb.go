@@ -100,10 +100,10 @@ type LitNode struct {
 	DefaultRemoteControlKey *btcec.PublicKey
 
 	// event bus
-	Events eventbus.EventBus
+	Events *eventbus.EventBus
 
 	// Networking
-	PeerMan lnp2p.PeerManager
+	PeerMan *lnp2p.PeerManager
 
 	// all nodes have a watchtower.  but could have a tower without a node
 	Tower watchtower.Watcher

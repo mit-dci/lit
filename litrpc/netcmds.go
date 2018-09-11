@@ -83,7 +83,7 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *ConnectReply) error {
 		return err
 	}
 
-	var pm lnp2p.PeerManager = r.Node.PeerMan
+	var pm *lnp2p.PeerManager = r.Node.PeerMan
 	p := pm.GetPeer(lnio.LnAddr(connectAdr))
 
 	if p != nil {
