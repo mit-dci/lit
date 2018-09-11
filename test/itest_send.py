@@ -10,7 +10,7 @@ def run_test(env):
     addr = lit.make_new_addr()
     print('Got lit address:', addr)
 
-    # Get the starting balance.#
+    # Get the starting balance.
     bal0 = bc.rpc.getbalance()
 
     # Send a bitcoin.
