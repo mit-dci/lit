@@ -130,7 +130,7 @@ class LitNode():
         ct = REGTEST_COINTYPE
         if cointype is not None: # I had to do thi because of reasons.
             ct = cointype
-        peerid=1
+        peerid=1 #cool
         try:
             res = self.rpc.FundChannel(
             Peer=peerid,
