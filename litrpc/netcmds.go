@@ -121,7 +121,7 @@ func (r *LitRPC) AssignNickname(args AssignNicknameArgs, reply *StatusReply) err
 // ------------------------- ShowConnections
 
 type ListConnectionsReply struct {
-	Connections []qln.PeerInfo
+	Connections []qln.SimplePeerInfo
 	MyPKH       string
 }
 type ConInfo struct {
@@ -131,6 +131,7 @@ type ConInfo struct {
 
 func (r *LitRPC) ListConnections(args NoArgs, reply *ListConnectionsReply) error {
 	reply.Connections = r.Node.GetConnectedPeerList()
+	reply.MyPKH = r.Node.GetLnAddr()
 	return nil
 }
 

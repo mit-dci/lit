@@ -104,7 +104,8 @@ func (nd *LitNode) OutMessager() {
 		//rawmsg := append([]byte{msg.MsgType()}, msg.Data...)
 		rawmsg := msg.Bytes() // automatically includes messageType
 		nd.RemoteMtx.Lock()   // not sure this is needed...
-		n, err := nd.RemoteCons[msg.Peer()].Con.Write(rawmsg)
+		con := nd.RemoteCons[msg.Peer()].Con
+		n, err := con.Write(rawmsg)
 		if err != nil {
 			logging.Errorf("error writing to peer %d: %s\n", msg.Peer(), err.Error())
 		} else {
@@ -114,26 +115,23 @@ func (nd *LitNode) OutMessager() {
 	}
 }
 
-type PeerInfo struct {
-	PeerNumber uint32
+type SimplePeerInfo struct {
+	PeerNumber int32
 	RemoteHost string
-	LitAdr     string
 	Nickname   string
+	LitAdr     string
 }
 
-func (nd *LitNode) GetConnectedPeerList() []PeerInfo {
-	var peers []PeerInfo
-	nd.RemoteMtx.Lock()
-	defer nd.RemoteMtx.Unlock()
-	for k, v := range nd.RemoteCons {
-		var newPeer PeerInfo
-		var pubArr [33]byte
-		copy(pubArr[:], v.Con.RemotePub().SerializeCompressed())
-		newPeer.PeerNumber = k
-		newPeer.RemoteHost = v.Con.RemoteAddr().String()
-		newPeer.Nickname = v.Nickname
-		newPeer.LitAdr = lnutil.LitAdrFromPubkey(pubArr)
-		peers = append(peers, newPeer)
+func (nd *LitNode) GetConnectedPeerList() []SimplePeerInfo {
+	peers := make([]SimplePeerInfo, 0)
+	for k, _ := range nd.PeerMap {
+		spi := SimplePeerInfo{
+			PeerNumber: nd.PeerMan.GetPeerIdx(k),
+			RemoteHost: k.GetRemoteAddr(),
+			Nickname:   k.GetNickname(),
+			LitAdr:     string(k.GetLnAddr()),
+		}
+		peers = append(peers, spi)
 	}
 	return peers
 }

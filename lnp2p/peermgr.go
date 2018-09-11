@@ -137,8 +137,8 @@ func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lnio.LnAddr, proxy
 
 	pi, err := pm.peerdb.GetPeerInfo(*lnaddr)
 	if err != nil {
-		println(err.Error())
-		// TODO deal with this
+		log.Printf("Problem loading peer info from DB: %s\n", err.Error())
+		// don't kill the connection?
 	}
 
 	pnick := ""
@@ -147,10 +147,17 @@ func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lnio.LnAddr, proxy
 	}
 
 	// Now that we've got the connection, actually create the peer object.
+	pk := pubkey(lndcconn.RemotePub())
 	p := &Peer{
+		lnaddr:   convertPubkeyToLitAddr(pk),
 		nickname: &pnick,
 		conn:     lndcconn,
+		idpubkey: pk,
 	}
+
+	// Register the peer we just connected to!
+	// (it took me a while to realize I forgot this)
+	pm.registerPeer(p)
 
 	// Return
 	return p, nil
@@ -165,6 +172,8 @@ func (pm *PeerManager) registerPeer(peer *Peer) {
 	pm.mtx.Lock()
 	defer pm.mtx.Unlock()
 
+	log.Printf("peermgr: New peer %s\n", peer.GetLnAddr())
+
 	// Append peer to peer list and add to peermap
 	pidx := uint32(len(pm.peers))
 	pm.peers = append(pm.peers, lnaddr)
@@ -176,6 +185,10 @@ func (pm *PeerManager) registerPeer(peer *Peer) {
 		Addr:            lnaddr,
 		Peer:            peer,
 		RemoteInitiated: false,
+
+		// TODO Remove these.
+		RemotePub: peer.idpubkey,
+		Conn:      peer.conn,
 	}
 	pm.ebus.Publish(e)
 

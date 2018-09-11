@@ -15,6 +15,7 @@ type LitPeerStorage interface {
 
 // PeerInfo .
 type PeerInfo struct {
+	LnAddr   *LnAddr `json:"lnaddr"`
 	Nickname *string `json:"name"`
 	NetAddr  string  `json:"netaddr"` // ip address, port, I guess
 }

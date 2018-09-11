@@ -12,13 +12,7 @@ func makeTmpNewPeerHandler(nd *LitNode) func(eventbus.Event) eventbus.EventHandl
 
 		ee := e.(lnp2p.NewPeerEvent)
 
-		rpub := ee.RemotePub
-
-		peerIdx, err := nd.GetPeerIdx(rpub, "")
-		if err != nil {
-			log.Printf("Listener error: %s\n", err.Error())
-			return eventbus.EHANDLE_OK
-		}
+		peerIdx := uint32(nd.PeerMan.GetPeerIdx(ee.Peer))
 
 		rpeer := &RemotePeer{
 			Idx:      peerIdx,

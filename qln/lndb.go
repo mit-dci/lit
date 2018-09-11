@@ -308,6 +308,11 @@ func (inff *InFlightDualFund) Clear() {
 	inff.InitiatedByUs = false
 }
 
+// GetLnAddr gets the lightning address for this node.
+func (nd *LitNode) GetLnAddr() string {
+	return nd.PeerMan.GetExternalAddress()
+}
+
 // GetPubHostFromPeerIdx gets the pubkey and internet host name for a peer
 func (nd *LitNode) GetPubHostFromPeerIdx(idx uint32) ([33]byte, string) {
 	var pub [33]byte
@@ -387,78 +392,16 @@ func (nd *LitNode) NextChannelIdx() (uint32, error) {
 	return cIdx, nil
 }
 
-// GetPeerIdx returns the peer index given a pubkey.  Creates it if it's not there
-// yet!  Also return a bool for new..?  not needed?
-func (nd *LitNode) GetPeerIdx(pub *btcec.PublicKey, host string) (uint32, error) {
-	var idx uint32
-	err := nd.LitDB.Update(func(btx *bolt.Tx) error {
-		prs := btx.Bucket(BKTPeers) // only errs on name
-		thisPeerBkt := prs.Bucket(pub.SerializeCompressed())
-		// peer is already registered, return index without altering db.
-		if thisPeerBkt != nil {
-			idx = lnutil.BtU32(thisPeerBkt.Get(KEYIdx))
-			return nil
-		}
-
-		// this peer doesn't exist yet.  Add new peer
-		mp := btx.Bucket(BKTPeerMap)
-		idx = uint32(mp.Stats().KeyN + 1)
-
-		// add index : pubkey into mapping
-		err := mp.Put(lnutil.U32tB(idx), pub.SerializeCompressed())
-		if err != nil {
-			return err
-		}
-
-		thisPeerBkt, err = prs.CreateBucket(pub.SerializeCompressed())
-		if err != nil {
-			return err
-		}
-
-		// save peer index in peer bucket
-		err = thisPeerBkt.Put(KEYIdx, lnutil.U32tB(idx))
-		if err != nil {
-			return err
-		}
-
-		// save remote host name (if it's there)
-		if host != "" {
-			err = thisPeerBkt.Put(KEYhost, []byte(host))
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	return idx, err
-}
-
 // SaveNicknameForPeerIdx saves/overwrites a nickname for a given peer idx
 func (nd *LitNode) SaveNicknameForPeerIdx(nickname string, idx uint32) error {
 	var err error
 
-	// look up peer in db
-	err = nd.LitDB.Update(func(btx *bolt.Tx) error {
-		mp := btx.Bucket(BKTPeerMap)
-		if mp == nil {
-			return nil
-		}
-		pubBytes := mp.Get(lnutil.U32tB(idx))
-		peerBkt := btx.Bucket(BKTPeers)
-		if peerBkt == nil {
-			return fmt.Errorf("no Peers")
-		}
-		prBkt := peerBkt.Bucket(pubBytes)
-		if prBkt == nil {
-			return fmt.Errorf("no peer %x", pubBytes)
-		}
+	peer := nd.PeerMan.GetPeerByIdx(int32(idx))
+	if peer == nil {
+		return fmt.Errorf("invalid peer ID %d", idx)
+	}
 
-		err = prBkt.Put(KEYnickname, []byte(nickname))
-		if err != nil {
-			return err
-		}
-		return nil
-	})
+	// TODO Set nickname in PeerInfo in DB
 
 	return err
 }

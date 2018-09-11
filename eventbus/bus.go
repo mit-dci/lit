@@ -3,6 +3,7 @@ package eventbus
 import (
 	"fmt"
 	"log"
+	"os"
 	"sync"
 )
 
@@ -73,6 +74,10 @@ func (b *EventBus) CountHandlers(name string) int {
 // Publish sends an event to the relevant event handlers.
 func (b *EventBus) Publish(event Event) (bool, error) {
 
+	if os.Getenv("LIT_EBUS_TRACE") == "1" {
+		log.Printf("eventbus: Published event: %s\n", event.Name())
+	}
+
 	ck := checkEventSanity(event)
 	if ck != nil {
 		return true, ck
@@ -97,8 +102,6 @@ func (b *EventBus) Publish(event Event) (bool, error) {
 	f := event.Flags()
 	async := (f & EFLAG_ASYNC_UNSAFE) != 0
 	uncan := (f & EFLAG_UNCANCELLABLE) != 0
-
-	log.Printf("found %d handlers for %s\n", len(hs), name)
 
 	// Actually iterate over all the handlers and make them run.
 	ok := true

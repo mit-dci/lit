@@ -30,3 +30,13 @@ func (p *Peer) GetNickname() string {
 	}
 	return *p.nickname
 }
+
+// GetLnAddr returns the lightning network address for this peer.
+func (p *Peer) GetLnAddr() lnio.LnAddr {
+	return p.lnaddr
+}
+
+// GetRemoteAddr does something.
+func (p *Peer) GetRemoteAddr() string {
+	return p.conn.RemoteAddr().String()
+}
