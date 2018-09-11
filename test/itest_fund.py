@@ -3,8 +3,8 @@
 import testlib
 
 fee = 20
-initialsend = 200000
-capacity = 10000000
+initialsend = 500000
+capacity = 1000000
 
 def run_test(env):
     print("RUNNING FUND TEST")
