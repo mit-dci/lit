@@ -2,7 +2,6 @@ package qln
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"strconv"
 	"strings"
@@ -11,6 +10,7 @@ import (
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
 	nat "github.com/mit-dci/lit/nat"
 	shortadr "github.com/mit-dci/lit/shortadr"
 )
@@ -34,28 +34,28 @@ func (nd *LitNode) TCPListener(lisIpPort string,
 	if len(nd.Nat) > 0 {
 		listenPort, err := strconv.Atoi(lisIpPort[1:])
 		if err != nil {
-			log.Println("Invalid port number, returning")
+			logging.Error("Invalid port number, returning")
 			return "", err
 		}
 		if nd.Nat == "upnp" {
-			log.Println("Port forwarding via UPnP on port", lisIpPort[1:])
+			logging.Info("Port forwarding via UPnP on port", lisIpPort[1:])
 			err := nat.SetupUpnp(uint16(listenPort))
 			if err != nil {
 				fmt.Printf("Unable to setup Upnp %v\n", err)
-				log.Fatal(err) // error out if we can't connect via UPnP
+				logging.Fatal(err) // error out if we can't connect via UPnP
 			}
-			log.Println("Forwarded port via UPnP")
+			logging.Info("Forwarded port via UPnP")
 		} else if nd.Nat == "pmp" {
 			discoveryTimeout := time.Duration(10 * time.Second)
-			log.Println("Port forwarding via NAT Pmp on port", lisIpPort[1:])
+			logging.Info("Port forwarding via NAT Pmp on port", lisIpPort[1:])
 			_, err := nat.SetupPmp(discoveryTimeout, uint16(listenPort))
 			if err != nil {
 				err := fmt.Errorf("Unable to discover a "+
 					"NAT-PMP enabled device on the local "+
 					"network: %v", err)
-				log.Fatal(err) // error out if we can't connect via Pmp
+				logging.Fatal(err) // error out if we can't connect via Pmp
 			} else {
-				log.Println("Invalid NAT punching option")
+				logging.Error("Invalid NAT punching option")
 			}
 		}
 	}
@@ -68,7 +68,7 @@ func (nd *LitNode) TCPListener(lisIpPort string,
 	NoOfWorkers := uint64(nd.MaxThreads)     // 10 for testing, get from user, max 1 million
 	Start := MaxUint64 / NoOfWorkers         // split each routine to look at a specific range
 
-	log.Printf("Spinning up %d threads for generatign short address", nd.MaxThreads)
+	logging.Infof("Spinning up %d threads for generatign short address", nd.MaxThreads)
 	// used to assign ids to the channels
 	i := uint64(0)
 	// default nonce value, if zero, we proceed with the normal listening address case
@@ -111,33 +111,31 @@ func (nd *LitNode) TCPListener(lisIpPort string,
 
 	// Don't announce on the tracker if we are communicating via SOCKS proxy
 	if nd.ProxyURL == "" {
-		err = Announce(idPriv, lisIpPort, adr, nd.TrackerURL)
-		if err != nil {
-			log.Printf("Announcement error %s", err.Error())
-		}
+		// this should happen asynchronously
+		go GoAnnounce(idPriv, lisIpPort, adr, nd.TrackerURL)
 	}
 
-	log.Printf("Listening on %s\n", listener.Addr().String())
-	log.Printf("Listening with ln address: %s and nonce: %d\n", adr, bestNonce)
+	logging.Infof("Listening on %s\n", listener.Addr().String())
+	logging.Infof("Listening with ln address: %s and nonce: %d\n", adr, bestNonce)
 	go func() {
 		for {
 			netConn, err := listener.Accept() // this blocks
 			if err != nil {
-				log.Printf("Listener error: %s\n", err.Error())
+				logging.Errorf("Listener error: %s\n", err.Error())
 				continue
 			}
 			newConn, ok := netConn.(*lndc.Conn)
 			if !ok {
-				log.Printf("Got something that wasn't a LNDC")
+				logging.Errorf("Got something that wasn't a LNDC")
 				continue
 			}
-			log.Printf("Incoming connection from %x on %s\n",
+			logging.Infof("Incoming connection from %x on %s\n",
 				newConn.RemotePub().SerializeCompressed(), newConn.RemoteAddr().String())
 
 			// don't save host/port for incoming connections
 			peerIdx, err := nd.GetPeerIdx(newConn.RemotePub(), "")
 			if err != nil {
-				log.Printf("Listener error: %s\n", err.Error())
+				logging.Errorf("Listener error: %s\n", err.Error())
 				continue
 			}
 
@@ -161,6 +159,13 @@ func (nd *LitNode) TCPListener(lisIpPort string,
 	return adr, nil
 }
 
+func GoAnnounce(priv *btcec.PrivateKey, litport string, litadr string, trackerURL string) {
+	err := Announce(priv, litport, litadr, trackerURL)
+	if err != nil {
+		logging.Errorf("Announcement error %s", err.Error())
+	}
+}
+
 // ParseAdrString splits a string like
 // "ln1yrvw48uc3atg8e2lzs43mh74m39vl785g4ehem@myhost.co:8191 into a separate
 // pkh part and network part, adding the network part if needed
@@ -180,7 +185,7 @@ func splitAdrString(adr string) (string, string) {
 }
 
 // DialPeer makes an outgoing connection to another node.
-func (nd *LitNode) DialPeer(connectAdr string) error {
+func (nd *LitNode) DialPeer(connectAdr string) (uint32, error) {
 	var err error
 
 	// parse address and get pkh / host / port
@@ -190,7 +195,7 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 	if where == "" {
 		where, _, err = Lookup(who, nd.TrackerURL, nd.ProxyURL)
 		if err != nil {
-			return err
+			return 0, err
 		}
 	}
 
@@ -200,7 +205,7 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 	// Assign remote connection
 	newConn, nonce, err := lndc.Dial(idPriv, where, who, net.Dial)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	// if connect is successful, either query for already existing peer index, or
@@ -210,7 +215,7 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 	// we're connecting out, also specify the hostname&port
 	peerIdx, err := nd.GetPeerIdx(newConn.RemotePub(), newConn.RemoteAddr().String())
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	// also retrieve their nickname, if they have one
@@ -228,7 +233,7 @@ func (nd *LitNode) DialPeer(connectAdr string) error {
 	// each connection to a peer gets its own LNDCReader
 	go nd.LNDCReader(&p)
 
-	return nil
+	return peerIdx, nil
 }
 
 // OutMessager takes messages from the outbox and sends them to the ether. net.
@@ -236,7 +241,7 @@ func (nd *LitNode) OutMessager() {
 	for {
 		msg := <-nd.OmniOut
 		if !nd.ConnectedToPeer(msg.Peer()) {
-			log.Printf("message type %x to peer %d but not connected\n",
+			logging.Errorf("message type %x to peer %d but not connected\n",
 				msg.MsgType(), msg.Peer())
 			continue
 		}
@@ -246,9 +251,9 @@ func (nd *LitNode) OutMessager() {
 		nd.RemoteMtx.Lock()   // not sure this is needed...
 		n, err := nd.RemoteCons[msg.Peer()].Con.Write(rawmsg)
 		if err != nil {
-			log.Printf("error writing to peer %d: %s\n", msg.Peer(), err.Error())
+			logging.Errorf("error writing to peer %d: %s\n", msg.Peer(), err.Error())
 		} else {
-			log.Printf("type %x %d bytes to peer %d\n", msg.MsgType(), n, msg.Peer())
+			logging.Infof("type %x %d bytes to peer %d\n", msg.MsgType(), n, msg.Peer())
 		}
 		nd.RemoteMtx.Unlock()
 	}

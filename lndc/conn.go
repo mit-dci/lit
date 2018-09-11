@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log"
 	"math"
 	"net"
 	"time"
+
+	"github.com/mit-dci/lit/logging"
 
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/lnutil"
@@ -41,6 +42,7 @@ func Dial(localPriv *btcec.PrivateKey, ipAddr string, remotePKH string,
 	var err error
 	zero := uint64(0)
 	conn, err = dialer("tcp", ipAddr)
+	logging.Info("ipAddr is", ipAddr)
 	if err != nil {
 		return nil, zero, err
 	}
@@ -81,19 +83,19 @@ func Dial(localPriv *btcec.PrivateKey, ipAddr string, remotePKH string,
 		return nil, zero, err
 	}
 
-	log.Println("Received pubkey, nonce", s, nonce)
+	logging.Infoln("Received pubkey, nonce", s, nonce)
 	if len(remotePKH) < 41 {
 		// it is a short address, so hash and get back the address
 		adr := shortadr.GetShortPKH(s, nonce)
 		if adr != remotePKH {
 			return nil, zero, fmt.Errorf("Short Remote PKH doesn't match. Quitting!")
 		}
-		log.Printf("Received short PKH %s matches", adr)
+		logging.Infof("Received short PKH %s matches", adr)
 	} else {
 		if lnutil.LitAdrFromPubkey(s) != remotePKH {
 			return nil, zero, fmt.Errorf("Remote PKH doesn't match. Quitting!")
 		}
-		log.Printf("Received PKH %s matches", lnutil.LitAdrFromPubkey(s))
+		logging.Infof("Received PKH %s matches", lnutil.LitAdrFromPubkey(s))
 	}
 
 	// Finally, complete the handshake by sending over our encrypted static

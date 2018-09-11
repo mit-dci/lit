@@ -41,10 +41,10 @@ clean:
 	rm -rf build/_workspace/
 	rm -f cmd/lit-af/lit-af
 	rm -f cmd/glit/glit
+	cd test && ./clean.sh
 
 test: lit
 	build/env.sh ./gotests.sh
 ifeq ($(with-python), true)
-	python3 test/test_basic.py -c reg --dumplogs
-	python3 test/test_break.py -c reg --dumplogs
+	cd test && ./runtests.sh
 endif

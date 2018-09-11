@@ -369,6 +369,9 @@ func (u *PorTxo) Bytes() ([]byte, error) {
 	}
 	// write PkScript
 	_, err = buf.Write(u.PkScript)
+	if err != nil {
+		return nil, err
+	}
 
 	// check Pre-sig stack number of elements
 	if len(u.PreSigStack) > 255 {

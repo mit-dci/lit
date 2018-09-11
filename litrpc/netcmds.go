@@ -2,8 +2,9 @@ package litrpc
 
 import (
 	"fmt"
-	"log"
 	"strconv"
+
+	"github.com/mit-dci/lit/logging"
 
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/qln"
@@ -12,7 +13,7 @@ import (
 // ------------------------- testlog
 
 func (r *LitRPC) TestLog(arg string, reply *string) error {
-	log.Print(arg)
+	logging.Info(arg)
 	*reply = arg
 	return nil
 }
@@ -50,7 +51,12 @@ type ConnectArgs struct {
 	LNAddr string
 }
 
-func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
+type ConnectReply struct {
+	Status  string
+	PeerIdx uint32
+}
+
+func (r *LitRPC) Connect(args ConnectArgs, reply *ConnectReply) error {
 
 	// first, see if the peer to connect to is referenced by peer index.
 	var connectAdr string
@@ -65,19 +71,20 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *StatusReply) error {
 		if host != "" {
 			connectAdr += "@" + host
 		}
-		log.Printf("try string %s\n", connectAdr)
+		logging.Infof("try string %s\n", connectAdr)
 
 	} else {
 		// use string as is, try to convert to ln address
 		connectAdr = args.LNAddr
 	}
 
-	err = r.Node.DialPeer(connectAdr)
+	idx, err := r.Node.DialPeer(connectAdr)
 	if err != nil {
 		return err
 	}
 
 	reply.Status = fmt.Sprintf("connected to peer %s", connectAdr)
+	reply.PeerIdx = idx
 	return nil
 }
 

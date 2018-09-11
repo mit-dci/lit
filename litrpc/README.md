@@ -299,6 +299,7 @@ Args:
 Returns:
 
 * `Status (string)`
+* `PeerIdx (uint32)`
 
 ### AssignNickname
 
