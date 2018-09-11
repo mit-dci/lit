@@ -21,7 +21,7 @@ logger = logging.getLogger("testframework")
 def new_port():
     # This gives us a enw port for each test run BUT this doesn't
     # carry across program runs.
-    return randint(2001,65536)
+    return 3000 + randint(0,15000)
 
 def get_root_data_dir():
     if 'LIT_ITEST_ROOT' in os.environ:
@@ -87,12 +87,12 @@ class LitNode():
 
         print("CHKP3")
         # Make the RPC client for future use, too.
-        #testutil.wait_until_port("localhost", self.rpc_port)
+        testutil.wait_until_port("localhost", self.rpc_port)
         self.rpc = litrpc.LitClient("localhost", str(self.rpc_port))
         print("CHKP4")
         # Make it listen to P2P connections!
         lres = self.rpc.Listen(Port=":" + str(self.p2p_port))
-        #testutil.wait_until_port("localhost", self.p2p_port)
+        testutil.wait_until_port("localhost", self.p2p_port)
         self.lnid = lres["Adr"]
 
     def get_sync_height(self):
