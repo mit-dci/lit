@@ -91,7 +91,7 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 	for {
 		pubKey, _ := nd.GetPubHostFromPeerIdx(i)
 		if pubKey == empty {
-			log.Printf("Done, tried %d hosts, none matched\n", i-1)
+			logging.Infof("Done, tried %d hosts, none matched\n", i-1)
 			break
 		}
 		nd.KnownPubkeys[i] = pubKey
