@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"encoding/hex"
 	"io"
-	"log"
 	"math"
 	"net"
 	"sync"
 	"testing"
+
+	"github.com/mit-dci/lit/logging"
 
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/lnutil"
@@ -59,13 +60,13 @@ func establishTestConnection(wrong bool) (net.Conn, net.Conn, func(), error) {
 	// successful.
 	if wrong {
 		pkh = "ln1p7lhcxmlfgd5mltv6pc335aulv443tkw49q6er"
-		log.Println("Trying to connect to wrong pk hash:", pkh)
+		logging.Error("Trying to connect to wrong pk hash:", pkh)
 	}
 	remoteConnChan := make(chan maybeNetConn, 1)
 	go func() {
 		remoteConn, err := Dial(remotePriv, netAddr, pkh, net.Dial)
 		if err != nil {
-			log.Println(err)
+			logging.Error(err)
 		}
 		remoteConnChan <- maybeNetConn{remoteConn, err}
 	}()
@@ -92,7 +93,6 @@ func establishTestConnection(wrong bool) (net.Conn, net.Conn, func(), error) {
 	}
 	return local.conn, remote.conn, cleanUp, nil
 }
-
 
 func TestConnectionCorrectness(t *testing.T) {
 	// Create a test connection, grabbing either side of the connection
@@ -416,18 +416,18 @@ func TestBolt0008TestVectors(t *testing.T) {
 	// As a final assertion, we'll ensure that both sides have derived the
 	// proper symmetric encryption keys.
 	sendingKey, err := hex.DecodeString("6645a2f8c64cc44d0b95614cbe51c2c9c" +
-	"1bee9945bfee823120b5a0978424bdf")
+		"1bee9945bfee823120b5a0978424bdf")
 	if err != nil {
 		t.Fatalf("unable to parse sending key: %v", err)
 	}
 	recvKey, err := hex.DecodeString("43b4a250b7b71ec303fb28b702b85a634" +
-	"9fd9849662e8de3e5cee770f499e449")
+		"9fd9849662e8de3e5cee770f499e449")
 	if err != nil {
 		t.Fatalf("unable to parse receiving key: %v", err)
 	}
 
 	chainKey, err := hex.DecodeString("7e3044d33f4184f65c836133206576b49" +
-	"a9c1cde623321afdcbb39624af60a99")
+		"a9c1cde623321afdcbb39624af60a99")
 	if err != nil {
 		t.Fatalf("unable to parse chaining key: %v", err)
 	}

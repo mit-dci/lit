@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -16,6 +15,7 @@ import (
 	"github.com/mit-dci/lit/bech32"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/wire"
 	"golang.org/x/net/proxy"
 )
@@ -164,7 +164,7 @@ func (a *APILink) PushTx(tx *wire.MsgTx) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("respo	nse: %s", response.Status)
+	logging.Infof("respo	nse: %s", response.Status)
 	_, err = io.Copy(os.Stdout, response.Body)
 
 	return err
@@ -173,12 +173,12 @@ func (a *APILink) PushTx(tx *wire.MsgTx) error {
 // RegisterAddress gets a 20 byte address from the wallit and starts
 // watching for utxos at that address.
 func (a *APILink) RegisterAddress(adr160 [20]byte) error {
-	log.Printf("register %x\n", adr160)
+	logging.Infof("register %x\n", adr160)
 	a.TrackingAdrsMtx.Lock()
 	a.TrackingAdrs[adr160] = true
 	a.TrackingAdrsMtx.Unlock()
 	a.dirtyChan <- nil
-	log.Printf("Register %x complete\n", adr160)
+	logging.Infof("Register %x complete\n", adr160)
 
 	return nil
 }
@@ -186,25 +186,25 @@ func (a *APILink) RegisterAddress(adr160 [20]byte) error {
 // RegisterOutPoint gets an outpoint from the wallit and starts looking
 // for txins that spend it.
 func (a *APILink) RegisterOutPoint(op wire.OutPoint) error {
-	log.Printf("register %s\n", op.String())
+	logging.Infof("register %s\n", op.String())
 	a.TrackingOPsMtx.Lock()
 	a.TrackingOPs[op] = true
 	a.TrackingOPsMtx.Unlock()
 
 	a.dirtyChan <- nil
-	log.Printf("Register %s complete\n", op.String())
+	logging.Infof("Register %s complete\n", op.String())
 	return nil
 }
 
 // UnregisterOutPoint stops watching an outpoint for spends.
 func (a *APILink) UnregisterOutPoint(op wire.OutPoint) error {
-	log.Printf("unregister %s\n", op.String())
+	logging.Infof("unregister %s\n", op.String())
 	a.TrackingOPsMtx.Lock()
 	delete(a.TrackingOPs, op)
 	a.TrackingOPsMtx.Unlock()
 
 	a.dirtyChan <- nil
-	log.Printf("Unregister %s complete\n", op.String())
+	logging.Infof("Unregister %s complete\n", op.String())
 	return nil
 }
 
@@ -216,18 +216,18 @@ func (a *APILink) DirtyCheckLoop() {
 
 	for {
 		// wait here until something marks the state as dirty
-		log.Printf("Waiting for dirt...\n")
+		logging.Infof("Waiting for dirt...\n")
 		<-a.dirtyChan
 
-		log.Printf("Dirt detected\n")
+		logging.Infof("Dirt detected\n")
 
 		err := a.GetVAdrTxos()
 		if err != nil {
-			log.Printf(err.Error())
+			logging.Errorf(err.Error())
 		}
 		err = a.GetVOPTxs()
 		if err != nil {
-			log.Printf(err.Error())
+			logging.Errorf(err.Error())
 		}
 
 		// probably clean, empty it out to prevent cascades
@@ -235,8 +235,6 @@ func (a *APILink) DirtyCheckLoop() {
 			<-a.dirtyChan
 		}
 	}
-
-	return
 }
 
 // VBlocksResponse is a list of Vblocks, which comes back from the /blocks
@@ -280,12 +278,10 @@ func (a *APILink) TipRefreshLoop() error {
 			a.dirtyChan <- nil
 		}
 
-		log.Printf("blockchain tip %v\n", a.tipBlockHash)
+		logging.Infof("blockchain tip %v\n", a.tipBlockHash)
 
 		time.Sleep(time.Second * 60)
 	}
-
-	return nil
 }
 
 // do you even need a struct here..?
@@ -325,12 +321,12 @@ func (a *APILink) GetVAdrTxos() error {
 	}
 	a.TrackingAdrsMtx.Unlock()
 
-	log.Printf("have %d adr urls to check\n", len(urls))
+	logging.Infof("have %d adr urls to check\n", len(urls))
 
 	// make an API call for every adr in adrs
 	// then grab the tx hex, decode and send up to the wallit
 	for _, url := range urls {
-		log.Printf("Requesting adr %s\n", url)
+		logging.Infof("Requesting adr %s\n", url)
 		response, err := a.client.Get(url)
 		if err != nil {
 			return err
@@ -341,7 +337,7 @@ func (a *APILink) GetVAdrTxos() error {
 		//			return err
 		//		}
 
-		//		log.Printf(string(bd))
+		//		logging.Infof(string(bd))
 
 		var txojsons VRawResponse
 
@@ -372,13 +368,13 @@ func (a *APILink) GetVAdrTxos() error {
 			txah.Height = int32(txjson.Height)
 			txah.Tx = tx
 
-			log.Printf("tx %s at height %d", txah.Tx.TxHash().String(), txah.Height)
+			logging.Infof("tx %s at height %d", txah.Tx.TxHash().String(), txah.Height)
 			// send the tx and height back up to the wallit
 			a.TxUpToWallit <- txah
-			log.Printf("sent\n")
+			logging.Infof("sent\n")
 		}
 	}
-	log.Printf("GetVAdrTxos complete\n")
+	logging.Infof("GetVAdrTxos complete\n")
 	return nil
 }
 
@@ -406,7 +402,7 @@ func (a *APILink) GetVOPTxs() error {
 
 	// need to query each txid with a different http request
 	for _, op := range oplist {
-		log.Printf("asking for %s\n", op.String())
+		logging.Infof("asking for %s\n", op.String())
 		// get full tx info for the outpoint's tx
 		// (if we have 2 outpoints with the same txid we query twice...)
 		opstring := op.String()
@@ -420,7 +416,7 @@ func (a *APILink) GetVOPTxs() error {
 		// parse the response to get the spending txid
 		err = json.NewDecoder(response.Body).Decode(&txr)
 		if err != nil || txr.Error {
-			log.Printf("json decode error; op %s not found\n", op.String())
+			logging.Errorf("json decode error; op %s not found\n", op.String())
 			continue
 		}
 

@@ -9,6 +9,8 @@ import (
 	"net"
 	"time"
 
+	"github.com/mit-dci/lit/logging"
+
 	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/lnutil"
 )
@@ -30,6 +32,7 @@ type Conn struct {
 // A compile-time assertion to ensure that Conn meets the net.Conn interface.
 var _ net.Conn = (*Conn)(nil)
 var Noise_XK bool
+
 // Dial attempts to establish an encrypted+authenticated connection with the
 // remote peer located at address which has remotePub as its long-term static
 // public key. In the case of a handshake failure, the connection is closed and
@@ -54,6 +57,7 @@ func Dial(localPriv *btcec.PrivateKey, ipAddr string, remoteAddress string,
 		SetConsts()
 	}
 	conn, err = dialer("tcp", ipAddr)
+	logging.Info("ipAddr is", ipAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -99,13 +103,13 @@ func Dial(localPriv *btcec.PrivateKey, ipAddr string, remoteAddress string,
 			return nil, err
 		}
 	}
-	log.Println("Received pubkey", remotePK)
+	logging.Infoln("Received pubkey", remotePK)
 	if lnutil.LitAdrFromPubkey(remotePK) != remotePKH && !Noise_XK {
 		// for noise_XK dont check PKH and PK because we'd have already checked this
 		// the last time we connected to this guy
 		return nil, fmt.Errorf("Remote PKH doesn't match. Quitting!")
 	}
-	log.Printf("Received PKH %s matches", lnutil.LitAdrFromPubkey(remotePK))
+	logging.Infof("Received PKH %s matches", lnutil.LitAdrFromPubkey(remotePK))
 
 	// Finally, complete the handshake by sending over our encrypted static
 	// key and execute the final ECDH operation.

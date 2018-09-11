@@ -2,8 +2,9 @@ package uspv
 
 import (
 	"fmt"
-	"log"
 	"os"
+
+	"github.com/mit-dci/lit/logging"
 
 	"github.com/mit-dci/lit/btcutil/bloom"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
@@ -36,7 +37,7 @@ func (s *SPVCon) GimmeFilter() (*bloom.Filter, error) {
 	// note there could be false positives since we're just looking
 	// for the 20 byte PKH without the opcodes.
 	for a160 := range s.TrackingAdrs { // add 20-byte pubkeyhash
-		//		log.Printf("adding address hash %x\n", a160)
+		//		logging.Infof("adding address hash %x\n", a160)
 		f.Add(a160[:])
 	}
 	//	for _, u := range allUtxos {
@@ -53,7 +54,7 @@ func (s *SPVCon) GimmeFilter() (*bloom.Filter, error) {
 	// send any to us, sometimes we don't see it and think the channel is still open.
 	// so not monitoring the channel outpoint properly?  here or in ingest()
 
-	log.Printf("made %d element filter\n", filterElements)
+	logging.Infof("made %d element filter\n", filterElements)
 	return f, nil
 }
 
@@ -79,12 +80,12 @@ func (s *SPVCon) MatchTx(tx *wire.MsgTx) bool {
 		// when we gain utxo, set as gain so we can return a match, but
 		// also go through all gained utxos and register to track them
 
-		//		log.Printf("got output key %x ", adr20)
+		//		logging.Infof("got output key %x ", adr20)
 		if s.TrackingAdrs[adr20] {
 			gain = true
 			s.TrackingOPs[*op] = true
 		} else {
-			//			log.Printf(" no match\n")
+			//			logging.Infof(" no match\n")
 		}
 
 		// this outpoint may confirm an outpoint we're watching.  Check that here.
@@ -117,7 +118,7 @@ func (s *SPVCon) OKTxid(txid *chainhash.Hash, height int32) error {
 	if txid == nil {
 		return fmt.Errorf("tried to add nil txid")
 	}
-	log.Printf("added %s to OKTxids at height %d\n", txid.String(), height)
+	logging.Infof("added %s to OKTxids at height %d\n", txid.String(), height)
 	s.OKMutex.Lock()
 	s.OKTxids[*txid] = height
 	s.OKMutex.Unlock()
@@ -135,7 +136,7 @@ func (s *SPVCon) AskForTx(txid chainhash.Hash) {
 	//		inv.Type = wire.InvTypeWitnessTx
 	//	}
 	gdata.AddInvVect(inv)
-	log.Printf("asking for tx %s\n", txid.String())
+	logging.Infof("asking for tx %s\n", txid.String())
 	s.outMsgQueue <- gdata
 }
 
@@ -163,7 +164,7 @@ func (s *SPVCon) IngestMerkleBlock(m *wire.MsgMerkleBlock) {
 
 	txids, err := checkMBlock(m) // check self-consistency
 	if err != nil {
-		log.Printf("Merkle block error: %s\n", err.Error())
+		logging.Errorf("Merkle block error: %s\n", err.Error())
 		return
 	}
 	var hah HashAndHeight
@@ -171,7 +172,7 @@ func (s *SPVCon) IngestMerkleBlock(m *wire.MsgMerkleBlock) {
 	case hah = <-s.blockQueue: // pop height off mblock queue
 		break
 	default:
-		log.Printf("Unrequested merkle block")
+		logging.Errorf("Unrequested merkle block")
 		return
 	}
 
@@ -179,9 +180,9 @@ func (s *SPVCon) IngestMerkleBlock(m *wire.MsgMerkleBlock) {
 	// into our SPV header file
 	newMerkBlockSha := m.Header.BlockHash()
 	if !hah.blockhash.IsEqual(&newMerkBlockSha) {
-		log.Printf("merkle block out of order got %s expect %s",
+		logging.Errorf("merkle block out of order got %s expect %s",
 			m.Header.BlockHash().String(), hah.blockhash.String())
-		log.Printf("has %d hashes %d txs flags: %x",
+		logging.Errorf("has %d hashes %d txs flags: %x",
 			len(m.Hashes), m.Transactions, m.Flags)
 		return
 	}
@@ -189,7 +190,7 @@ func (s *SPVCon) IngestMerkleBlock(m *wire.MsgMerkleBlock) {
 	for _, txid := range txids {
 		err = s.OKTxid(txid, hah.height)
 		if err != nil {
-			log.Printf("Txid store error: %s\n", err.Error())
+			logging.Errorf("Txid store error: %s\n", err.Error())
 			return
 		}
 	}
@@ -203,7 +204,7 @@ func (s *SPVCon) IngestMerkleBlock(m *wire.MsgMerkleBlock) {
 		// that way you are pretty sure you're synced up.
 		err = s.AskForHeaders()
 		if err != nil {
-			log.Printf("Merkle block error: %s\n", err.Error())
+			logging.Errorf("Merkle block error: %s\n", err.Error())
 			return
 		}
 	}
@@ -224,11 +225,11 @@ func (s *SPVCon) IngestHeaders(m *wire.MsgHeaders) (bool, error) {
 
 	gotNum := int64(len(m.Headers))
 	if gotNum > 0 {
-		log.Printf("got %d headers. Range:\n%s - %s\n",
+		logging.Infof("got %d headers. Range:\n%s - %s\n",
 			gotNum, m.Headers[0].BlockHash().String(),
 			m.Headers[len(m.Headers)-1].BlockHash().String())
 	} else {
-		log.Printf("got 0 headers, we're probably synced up")
+		logging.Infof("got 0 headers, we're probably synced up")
 		return false, nil
 	}
 
@@ -244,7 +245,7 @@ func (s *SPVCon) IngestHeaders(m *wire.MsgHeaders) (bool, error) {
 		// really, the re-org hasn't been proven; if the remote node
 		// provides us with a new block we'll ask again.
 		if reorgHeight == -1 {
-			log.Printf("Header error: %s\n", err.Error())
+			logging.Errorf("Header error: %s\n", err.Error())
 			return false, nil
 		}
 		// some other error
@@ -273,7 +274,7 @@ func (s *SPVCon) IngestHeaders(m *wire.MsgHeaders) (bool, error) {
 			return false, err
 		}
 	}
-	log.Printf("Added %d headers OK.", len(m.Headers))
+	logging.Infof("Added %d headers OK.", len(m.Headers))
 	return true, nil
 }
 
@@ -283,13 +284,13 @@ func (s *SPVCon) AskForHeaders() error {
 	ghdr.ProtocolVersion = s.localVersion
 
 	tipheight := s.GetHeaderTipHeight()
-	log.Printf("got header tip height %d\n", tipheight)
+	logging.Infof("got header tip height %d\n", tipheight)
 	// get tip header, as well as a few older ones (inefficient...?)
 	// yes, inefficient; really we should use "getheaders" and skip some of this
 
 	tipheader, err := s.GetHeaderAtHeight(tipheight)
 	if err != nil {
-		log.Printf("AskForHeaders GetHeaderAtHeight error\n")
+		logging.Errorf("AskForHeaders GetHeaderAtHeight error\n")
 		return err
 	}
 
@@ -322,7 +323,7 @@ func (s *SPVCon) AskForHeaders() error {
 		}
 	}
 
-	log.Printf("get headers message has %d header hashes, first one is %s\n",
+	logging.Infof("get headers message has %d header hashes, first one is %s\n",
 		len(ghdr.BlockLocatorHashes), ghdr.BlockLocatorHashes[0].String())
 
 	s.outMsgQueue <- ghdr
@@ -346,14 +347,14 @@ func (s *SPVCon) AskForBlocks() error {
 	// move back 1 header length to read
 	headerTip := int32(endPos/80) + (s.headerStartHeight - 1)
 
-	log.Printf("blockTip to %d headerTip %d\n", s.syncHeight, headerTip)
+	logging.Infof("blockTip to %d headerTip %d\n", s.syncHeight, headerTip)
 	if s.syncHeight > headerTip {
 		return fmt.Errorf("error- db longer than headers! shouldn't happen.")
 	}
 	if s.syncHeight == headerTip {
 		// nothing to ask for; set wait state and return
-		log.Printf("no blocks to request, entering wait state\n")
-		log.Printf("%d bytes received\n", s.RBytes)
+		logging.Infof("no blocks to request, entering wait state\n")
+		logging.Infof("%d bytes received\n", s.RBytes)
 		s.inWaitState <- true
 
 		// check if we can grab outputs
@@ -372,7 +373,7 @@ func (s *SPVCon) AskForBlocks() error {
 		return nil
 	}
 
-	log.Printf("will request blocks %d to %d\n", s.syncHeight+1, headerTip)
+	logging.Errorf("will request blocks %d to %d\n", s.syncHeight+1, headerTip)
 	reqHeight := s.syncHeight
 
 	// loop through all heights where we want merkleblocks.
@@ -389,7 +390,7 @@ func (s *SPVCon) AskForBlocks() error {
 		err = hdr.Deserialize(s.headerFile) // read header, done w/ file for now
 		s.headerMutex.Unlock()              // unlock after reading 1 header
 		if err != nil {
-			log.Printf("header deserialize error!\n")
+			logging.Errorf("header deserialize error!\n")
 			return err
 		}
 
