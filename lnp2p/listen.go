@@ -60,10 +60,11 @@ func acceptConnections(listener *lndc.Listener, listenAddr string, pm *PeerManag
 
 		// Add the peer data to the DB if we don't have it.
 		if pi == nil {
+			raddr := rnetaddr.String()
 			pi = &lncore.PeerInfo{
 				LnAddr:   &rlitaddr,
 				Nickname: nil,
-				NetAddr:  rnetaddr.String(),
+				NetAddr:  &raddr,
 			}
 			err = pm.peerdb.AddPeer(rlitaddr, *pi)
 			if err != nil {
