@@ -13,13 +13,13 @@ from itest_setgetfee import run_test as setgetfee
 from itest_fund import run_test as fund
 from itest_close import run_test as close
 from itest_close_reverse import run_test as close_reverse
-# from itest_break import run_test as break
-# from itest_break_reverse import run_test as break_reverse
-# from itest_push import run_test as push
-# from itest_pushclose import run_test as pushclose
-# from itest_pushclose_reverse import run_test as pushclose_reverse
-# from itest_pushbreak import run_test as pushbreak
-# from itest_pushbreak_reverse import run_test as pushbreak_reverse
+from itest_break import run_test as breaktest
+from itest_break_reverse import run_test as break_reverse
+from itest_push import run_test as push
+from itest_pushclose import run_test as pushclose
+from itest_pushclose_reverse import run_test as pushclose_reverse
+from itest_pushbreak import run_test as pushbreak
+from itest_pushbreak_reverse import run_test as pushbreak_reverse
 
 
 if __name__ == '__main__':
@@ -48,10 +48,45 @@ if __name__ == '__main__':
             print(e)
         try:
             fund(env)
+        except Exception as e:
+            print(e)
+        try:
             close(env)
+        except Exception as e:
+            print(e)
+        try:
             close_reverse(env)
         except Exception as e:
             print(e)
+        try:
+            breaktest(env)
+        except Exception as e:
+            print(e)
+        try:
+            break_reverse(env)
+        except Exception as e:
+            print(e)
+        try:
+            push(env)
+        except Exception as e:
+            print(e)
+        try:
+            pushclose(env)
+        except Exception as e:
+            print(e)
+        try:
+            pushclose_reverse(env)
+        except Exception as e:
+            print(e)
+        try:
+            pushbreak(env)
+        except Exception as e:
+            print(e)
+        try:
+            pushbreak_reverse(env)
+        except Exception as e:
+            print(e)
+
     finally:
         if env is not None:
             #env.shutdown()
