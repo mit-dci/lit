@@ -55,7 +55,6 @@ def run_test(env):
 
     assert bals2['ChanTotal'] > 0, "channel balance isn't nonzero!"
 
-    test_combinators.run_close_test(env, lit1, lit2, lit1)
 
 if __name__ == '__main__':
     env = None
