@@ -172,6 +172,7 @@ func main() {
 	}
 
 	key := litSetup(&conf)
+	logging.SetLogLevel(conf.LogLevel)
 	if conf.ProxyURL != "" {
 		conf.LitProxyURL = conf.ProxyURL
 		conf.ChainProxyURL = conf.ProxyURL
@@ -187,7 +188,8 @@ func main() {
 	// node is up; link wallets based on args
 	err = linkWallets(node, key, &conf)
 	if err != nil {
-		logging.Fatal(err)
+		// don't fatal here
+		logging.Error(err)
 	}
 
 	rpcl := new(litrpc.LitRPC)
