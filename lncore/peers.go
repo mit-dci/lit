@@ -9,7 +9,7 @@ type LitPeerStorage interface {
 	GetPeerAddrs() ([]LnAddr, error)
 	GetPeerInfo(addr LnAddr) (*PeerInfo, error)
 	GetPeerInfos() (map[LnAddr]PeerInfo, error)
-	AddPeer(addr LnAddr, pi PeerInfo) error
+	AddPeer(addr LnAddr, pi PeerInfo) error // also updates
 	DeletePeer(addr LnAddr) error
 }
 
@@ -17,5 +17,5 @@ type LitPeerStorage interface {
 type PeerInfo struct {
 	LnAddr   *LnAddr `json:"lnaddr"`
 	Nickname *string `json:"name"`
-	NetAddr  string  `json:"netaddr"` // ip address, port, I guess
+	NetAddr  *string `json:"netaddr"` // ip address, port, I guess
 }

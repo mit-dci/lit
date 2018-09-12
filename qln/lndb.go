@@ -354,16 +354,17 @@ func (nd *LitNode) NextChannelIdx() (uint32, error) {
 
 // SaveNicknameForPeerIdx saves/overwrites a nickname for a given peer idx
 func (nd *LitNode) SaveNicknameForPeerIdx(nickname string, idx uint32) error {
-	var err error
 
 	peer := nd.PeerMan.GetPeerByIdx(int32(idx))
 	if peer == nil {
 		return fmt.Errorf("invalid peer ID %d", idx)
 	}
 
-	// TODO Set nickname in PeerInfo in DB
+	// Actually go and set it.
+	pi := peer.IntoPeerInfo()
+	err := nd.NewLitDB.GetPeerDB().AddPeer(peer.GetLnAddr(), pi)
 
-	return err
+	return err // same as if err != nil { return err } ; return nil
 }
 
 // SaveQchanUtxoData saves utxo data such as outpoint and close tx / status

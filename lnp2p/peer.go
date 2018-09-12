@@ -2,8 +2,8 @@ package lnp2p
 
 import (
 	"github.com/mit-dci/lit/crypto/koblitz"
-	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lncore"
+	"github.com/mit-dci/lit/lndc"
 )
 
 // A Peer is a remote client that's somehow connected to us.
@@ -31,6 +31,14 @@ func (p *Peer) GetNickname() string {
 		return ""
 	}
 	return *p.nickname
+}
+
+// SetNickname sets the peer's nickname.
+func (p *Peer) SetNickname(name string) {
+	p.nickname = &name
+	if name == "" {
+		p.nickname = nil
+	}
 }
 
 // GetLnAddr returns the lightning network address for this peer.
@@ -86,4 +94,17 @@ func (p *Peer) SendImmediateMessage(msg Message) error {
 	}
 
 	return nil
+}
+
+// IntoPeerInfo generates the PeerInfo DB struct for the Peer.
+func (p *Peer) IntoPeerInfo() lncore.PeerInfo {
+	var raddr string
+	if p.conn != nil {
+		raddr = p.conn.RemoteAddr().String()
+	}
+	return lncore.PeerInfo{
+		LnAddr:   &p.lnaddr,
+		Nickname: p.nickname,
+		NetAddr:  &raddr,
+	}
 }
