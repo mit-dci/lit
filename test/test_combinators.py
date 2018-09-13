@@ -1,7 +1,8 @@
 
 import testlib
 
-fee = 20
+fee = 20 # this multiplied by 10 would be the fees to check for (QcStateFee)
+qcStateFee = 10
 
 initialsend = 200000
 capacity = 1000000
@@ -65,10 +66,8 @@ def run_pushclose_test(env, initiator, target, closer):
 
     # Now report the difference in channel balance.
     # 200 is the fee amount, wish we could have some sort of constatns in the tests for that
-    print('Target:', tt0, '->', tt1, '( expected:', initialsend + pushsend - 200, ')')
-    print(tt1 -tt0)
-    print(initialsend + pushsend)
-    assert tt1 -tt0 == initialsend + pushsend - 200, "final balance doesn't match"
+    print('Target:', tt0, '->', tt1, '( expected:', initialsend + pushsend - fee*qcStateFee, ')')
+    assert tt1 -tt0 == initialsend + pushsend - fee*qcStateFee, "final balance doesn't match"
 
 def run_pushbreak_test(env, initiator, target, breaker):
     bc = env.bitcoind
@@ -124,8 +123,8 @@ def run_pushbreak_test(env, initiator, target, breaker):
     tt1 = target.get_balance_info()['TxoTotal']
 
     # Now report the difference in channel balance.
-    print('Target:', tt0, '->', tt1, '( expected:', initialsend + pushsend - 200, ')')
-    assert tt1 == tt0 + initialsend + pushsend - 200, "final balance doesn't match"
+    print('Target:', tt0, '->', tt1, '( expected:', initialsend + pushsend - fee*qcStateFee, ')')
+    assert tt1 == tt0 + initialsend + pushsend - fee*qcStateFee, "final balance doesn't match"
 
     # Idk where the 20000 gets removed from, fees probably but I'm not sure exactly where.
 
