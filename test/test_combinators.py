@@ -4,7 +4,7 @@ import testlib
 fee = 20 # this multiplied by 10 would be the fees to check for (QcStateFee)
 qcStateFee = 10
 
-initialsend = 200000
+initialsend = 400000
 capacity = 1000000
 
 pushsend = 250000
@@ -200,10 +200,7 @@ def run_break_test(env, initiator, target, breaker):
     print('Created channel:', cid)
 
     # Now we confirm the block.
-    env.generate_block()
-
-    # Now we confirm the block.
-    env.generate_block(count=5)
+    env.generate_block(count=6)
 
     # Now close the channel.
     print('Now breaking channel...')
