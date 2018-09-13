@@ -4,7 +4,7 @@ import testlib
 fee = 20 # this multiplied by 10 would be the fees to check for (QcStateFee)
 qcStateFee = 10
 
-initialsend = 400000
+initialsend = 200000
 capacity = 1000000
 
 pushsend = 250000
