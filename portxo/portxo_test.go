@@ -1,9 +1,10 @@
 package portxo
 
 import (
-	"testing"
-
+	"fmt"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
+	"github.com/mit-dci/lit/wire"
+	"testing"
 )
 
 // TestHardCoded tests serializing / deserializing a portxo
@@ -156,4 +157,55 @@ func TestWithStack(t *testing.T) {
 	if !u2.Equal(u3) {
 		t.Fatalf("u2, u3 should be the same")
 	}
+}
+
+func TestPortxoSerdes(t *testing.T) {
+
+	ptxo := PorTxo{
+		Op: wire.OutPoint{
+			Hash:  chainhash.Hash([32]byte{}),
+			Index: 42,
+		},
+		Value:  1337,
+		Height: 210000,
+		Seq:    65536123,
+		Mode:   11,
+		KeyGen: KeyGen{
+			Depth:   5,
+			Step:    [5]uint32{19195, 28285, 37375, 46465, 13579}, // random numbers
+			PrivKey: [32]byte{},                                   // 0
+		},
+		PkScript:    []byte{},
+		PreSigStack: [][]byte{},
+	}
+
+	pb, err := ptxo.Bytes()
+	if err != nil {
+		fmt.Printf("error serializing: %s\n", err.Error())
+		t.FailNow()
+	}
+
+	ptxo2, err := PorTxoFromBytes(pb)
+	if err != nil {
+		fmt.Printf("error deserializing: %s\n", err.Error())
+		t.FailNow()
+	}
+
+	if ptxo.Op != ptxo2.Op ||
+		ptxo.Value != ptxo2.Value ||
+		ptxo.Height != ptxo2.Height ||
+		ptxo.Seq != ptxo2.Seq ||
+		ptxo.Mode != ptxo2.Mode ||
+		ptxo.KeyGen != ptxo2.KeyGen {
+		t.Fail()
+	}
+
+	if len(ptxo2.PkScript) != 0 {
+		t.Fail()
+	}
+
+	if len(ptxo2.PreSigStack) != 0 {
+		t.Fail()
+	}
+
 }
