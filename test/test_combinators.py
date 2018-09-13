@@ -217,5 +217,6 @@ def run_break_test(env, initiator, target, breaker):
     print(str(bi2))
 
     print(str(initiator.rpc.ChannelList(ChanIdx=cid)['Channels']))
+    print("CHKTHIS", bi2['ChanTotal'])
     assert bi2['ChanTotal'] == 1, "balance doesn't match!"
     # TODO Make sure the channel actually gets broken.
