@@ -69,11 +69,11 @@ class LitNode():
         # Now figure out the args to use and then start Lit.
         args = [
             LIT_BIN,
-            "-v",
+            "-v", "6",
             "--reg", "127.0.0.1:" + str(bcnode.p2p_port),
             "--tn3", "", # disable autoconnect
             "--dir", self.data_dir,
-            "--unauthrpc=true",
+            "--unauthrpc",
             "--rpcport=" + str(self.rpc_port),
             "--autoReconnect",
             "--autoListenPort=" + str(self.p2p_port)
