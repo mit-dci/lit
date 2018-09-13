@@ -83,6 +83,7 @@ class LitNode():
 
         # Make the RPC client for future use, too.
         testutil.wait_until_port("localhost", self.rpc_port)
+        print("CHKP3")
         self.rpc = litrpc.LitClient("localhost", str(self.rpc_port))
         # Make it listen to P2P connections!
         lres = self.rpc.Listen(Port=":" + str(self.p2p_port))
@@ -213,7 +214,7 @@ class TestEnv():
                 node = LitNode(self.bitcoind)
                 self.lits.append(node)
             except Exception as e:
-                print("Error while starting bitcoind")
+                print("Error while starting lit node")
                 print(e)
         print("started nodes!  syncing...")
 
