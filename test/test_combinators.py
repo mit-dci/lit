@@ -4,7 +4,7 @@ import testlib
 fee = 20 # this multiplied by 10 would be the fees to check for (QcStateFee)
 qcStateFee = 10
 
-initialsend = 200000
+initialsend = 300000
 capacity = 1000000
 regTestChanBal = 500000
 
@@ -171,10 +171,9 @@ def run_close_test(env, initiator, target, closer):
     expected = bal1 - initialsend - 3560
     print('expected:', expected)
     print('diff:', expected - fbal)
-    print("CHKTHIS", bals['ChanTotal'])
+    print("CHANTOTAL", bals['ChanTotal'])
     assert bals['ChanTotal'] == regTestChanBal, "balance doesn't match!"
-    #ChanTotal for the regression tests is 500000 (from previous chans)
-    # diff would ha 200 in fees due to funding tx
+    # ChanTotal for the regression tests is 500000 (from previous chans)
 
 def run_break_test(env, initiator, target, breaker):
     bc = env.bitcoind
