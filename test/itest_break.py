@@ -13,7 +13,7 @@ def run_test(env):
     try:
         test_combinators.run_break_test(env, lit1, lit2, lit1)
     except Exception as e:
-        print(e)
+        raise e # riase this so that this can get caught
 
 if __name__ == '__main__':
     env = None
