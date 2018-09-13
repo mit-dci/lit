@@ -6,6 +6,7 @@ qcStateFee = 10
 
 initialsend = 200000
 capacity = 1000000
+regTestChanBal = 500000
 
 pushsend = 250000
 
@@ -161,7 +162,7 @@ def run_close_test(env, initiator, target, closer):
     print('Now closing...')
     res = closer.rpc.CloseChannel(ChanIdx=cid)
     print('Status:', res['Status'])
-    env.generate_block()
+    env.generate_block(count=6)
 
     # Check balances.
     bals = initiator.get_balance_info()
@@ -171,7 +172,8 @@ def run_close_test(env, initiator, target, closer):
     print('expected:', expected)
     print('diff:', expected - fbal)
     print("CHKTHIS", bals['ChanTotal'])
-    assert bals['ChanTotal'] == 200, "balance doesn't match!"
+    assert bals['ChanTotal'] == regTestChanBal, "balance doesn't match!"
+    #ChanTotal for the regression tests is 500000 (from previous chans)
     # diff would ha 200 in fees due to funding tx
 
 def run_break_test(env, initiator, target, breaker):
