@@ -170,8 +170,9 @@ def run_close_test(env, initiator, target, closer):
     expected = bal1 - initialsend - 3560
     print('expected:', expected)
     print('diff:', expected - fbal)
-
-    assert bals['ChanTotal'] == 0, "channel balance isn't zero!"
+    print("60000?")
+    assert bals['ChanTotal'] == 200, "balance doesn't match!"
+    # diff would ha 200 in fees due to funding tx
 
 def run_break_test(env, initiator, target, breaker):
     bc = env.bitcoind
@@ -215,5 +216,5 @@ def run_break_test(env, initiator, target, breaker):
     print(str(bi2))
 
     print(str(initiator.rpc.ChannelList(ChanIdx=cid)['Channels']))
-    assert bi2['ChanTotal'] == 0, "channel balance isn't zero!"
+    assert bi2['ChanTotal'] == 0, "balance doesn't match!"
     # TODO Make sure the channel actually gets broken.
