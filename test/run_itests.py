@@ -79,6 +79,8 @@ if __name__ == '__main__':
             breaktest(env)
         except Exception as e:
             print(e)
+            print("CAUGHT YOU!")
+            raise e
             sys.exit(1)
         print("Running Break_reverse Integration Test")
         try:
