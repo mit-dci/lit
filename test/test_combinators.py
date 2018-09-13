@@ -4,7 +4,7 @@ import testlib
 fee = 20 # this multiplied by 10 would be the fees to check for (QcStateFee)
 qcStateFee = 10
 
-initialsend = 200000
+initialsend = 500000
 capacity = 1000000
 
 pushsend = 250000
@@ -124,7 +124,7 @@ def run_pushbreak_test(env, initiator, target, breaker):
 
     # Now report the difference in channel balance.
     print('Target:', tt0, '->', tt1, '( expected:', initialsend + pushsend - fee*qcStateFee, ')')
-    assert tt1 == tt0 + initialsend + pushsend - fee*qcStateFee, "final balance doesn't match"
+    assert tt1 - tt0 == initialsend + pushsend - fee*qcStateFee, "final balance doesn't match"
 
     # Idk where the 20000 gets removed from, fees probably but I'm not sure exactly where.
 
