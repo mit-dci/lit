@@ -26,62 +26,77 @@ if __name__ == '__main__':
     env = None
     try:
         env = testlib.TestEnv(noOfNodes)
+        print("Running Connect Integration Test")
         try:
             connect(env)
         except Exception as e:
             print(e)
+        print("Running Receive Integration Test")
         try:
             receive(env)
         except Exception as e:
             print(e)
+        print("Running Send Integration Test")
         try:
             send(env)
         except Exception as e:
             print(e)
+        print("Running Send2 Integration Test")
         try:
             send2(env)
         except Exception as e:
             print(e)
+        print("Running SetGetFee Integration Test")
         try:
             setgetfee(env)
         except Exception as e:
             print(e)
+        print("Running Fund Integration Test")
         try:
             fund(env)
         except Exception as e:
             print(e)
+        print("Running Close Integration Test")
         try:
             close(env)
         except Exception as e:
             print(e)
+        print("Running Close_reverse Integration Test")
         try:
             close_reverse(env)
         except Exception as e:
             print(e)
+        print("Running Break_test Integration Test")
         try:
             breaktest(env)
         except Exception as e:
             print(e)
+        print("Running Break_reverse Integration Test")
         try:
             break_reverse(env)
         except Exception as e:
             print(e)
+        print("Running Push Integration Test")
         try:
             push(env)
         except Exception as e:
             print(e)
+        print("Running Pushclose Integration Test")
         try:
             pushclose(env)
         except Exception as e:
             print(e)
+        print("Running Pushclose_reverse Integration Test")
         try:
             pushclose_reverse(env)
         except Exception as e:
             print(e)
+        print("Running Pushbreak Integration Test")
         try:
             pushbreak(env)
         except Exception as e:
             print(e)
+        print("Running Pushbreak_reverse Integration Test")
         try:
             pushbreak_reverse(env)
         except Exception as e:
