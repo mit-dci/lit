@@ -1,9 +1,6 @@
 # Lit Integration Tests
 
-Lit's integration test suite was quite outdated, so as of 2018-08-03 we started
-rewriting them.  Now they're waaay cooler and easier to write.
-
-All of the tests are in Python and built on the the `testlib` library, which
+All the tests are in Python and built on the the `testlib` library, which
 manages creating instances of lit and and bitcoind and getting them to talk to
 each other without worrying about the details.
 

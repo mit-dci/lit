@@ -2,15 +2,21 @@
 
 import testlib
 
-create = 1
+create = 2
 
 def run_test(env):
-    litcnt = len(env.lits)
-    print('Found', len(env.lits), 'Lit nodes created.')
-    if litcnt == create:
-        print('OK')
-    else:
-        print('ERR')
+    length = len(env.lits)
+    print("LENGTH IS", length)
+    alice = env.lits[0]
+    bob = env.lits[1]
+    print('Connecting Alice', alice.lnid, 'to Bob', bob.lnid)
+    alice.connect_to_peer(bob)
+    print('Connected')
+    alice.rpc.Say(Peer=alice.get_peer_id(bob), Message="hello!")
+    print('Alice said hello to Bob.')
+    bob.rpc.Say(Peer=bob.get_peer_id(alice), Message="world!")
+    print('Bob said hello to Alice.')
+    env.shutdown()
 
 if __name__ == '__main__':
     env = None

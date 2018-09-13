@@ -11,7 +11,8 @@ def run_test(env):
     print('Got address:', addr)
 
     # Send a bitcoin.
-    bc.rpc.sendtoaddress(addr, 1)
+    env.generate_block()
+    bc.rpc.sendtoaddress(addr, 1, 'bech32')
     env.generate_block()
     print('Sent and mined...')
 
@@ -24,8 +25,7 @@ def run_test(env):
 if __name__ == '__main__':
     env = None
     try:
-        env = testlib.TestEnv(1)
-        run_test(env)
+        run_test(env) # env has two lits already
     finally:
         if env is not None:
             env.shutdown()

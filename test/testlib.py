@@ -10,18 +10,18 @@ import testutil
 import btcrpc
 import litrpc
 
+from random import randint
+
 LIT_BIN = "%s/../lit" % paths.abspath(paths.dirname(__file__))
 
 REGTEST_COINTYPE = 257
 
 logger = logging.getLogger("testframework")
 
-next_unused_port = 11000
 def new_port():
-    global next_unused_port
-    port = next_unused_port
-    next_unused_port += 1
-    return port
+    # This gives us a enw port for each test run BUT this doesn't
+    # carry across program runs.
+    return 3000 + randint(0,15000)
 
 def get_root_data_dir():
     if 'LIT_ITEST_ROOT' in os.environ:
@@ -48,15 +48,14 @@ class LitNode():
     def __init__(self, bcnode):
         self.p2p_port = new_port()
         self.rpc_port = new_port()
+        print("Allocated port", self.rpc_port)
         self.data_dir = new_data_dir("lit")
         self.peer_mapping = {}
-
         # Write a hexkey to the privkey file
         with open(paths.join(self.data_dir, "privkey.hex"), 'w+') as f:
             s = ''
             for _ in range(64):
                 s += hexchars[random.randint(0, len(hexchars) - 1)]
-            print('Using key:', s)
             f.write(s + "\n")
 
         # See if we should print stdout
@@ -71,13 +70,12 @@ class LitNode():
             LIT_BIN,
             "-v",
             "--reg", "127.0.0.1:" + str(bcnode.p2p_port),
-            "--tn3", "", # disable autoconnect
             "--dir", self.data_dir,
             "--unauthrpc=true",
             "--rpcport=" + str(self.rpc_port),
-            "--autoReconnect",
             "--autoListenPort=" + str(self.p2p_port)
         ]
+        print("CHKP2")
         self.proc = subprocess.Popen(args,
             stdin=subprocess.DEVNULL,
             stdout=outputredir,
@@ -85,8 +83,8 @@ class LitNode():
 
         # Make the RPC client for future use, too.
         testutil.wait_until_port("localhost", self.rpc_port)
+        print("CHKP3")
         self.rpc = litrpc.LitClient("localhost", str(self.rpc_port))
-
         # Make it listen to P2P connections!
         lres = self.rpc.Listen(Port=":" + str(self.p2p_port))
         testutil.wait_until_port("localhost", self.p2p_port)
@@ -103,7 +101,7 @@ class LitNode():
         res = self.rpc.Connect(LNAddr=addr)
         self.update_peers()
         if 'PeerIdx' in res and self.peer_mapping[other.lnid] != res['PeerIdx']:
-            raise AssertError("new peer ID doesn't match reported ID")
+            raise AssertError("peer ID doesn't match remote peer ID")
         other.update_peers()
 
     def get_peer_id(self, other):
@@ -133,12 +131,16 @@ class LitNode():
         ct = REGTEST_COINTYPE
         if cointype is not None: # I had to do thi because of reasons.
             ct = cointype
-        res = self.rpc.FundChannel(
-            Peer=self.get_peer_id(peer),
+        peerid=1 #cool
+        try:
+            res = self.rpc.FundChannel(
+            Peer=peerid,
             CoinType=ct,
             Capacity=capacity,
             InitialSend=initialsend,
             Data=None) # maybe use [0 for _ in range(32)] or something?
+        except Exception as e:
+            print("EXC", e)
         return res['ChanIdx']
 
     def shutdown(self):
@@ -203,13 +205,18 @@ class BitcoinNode():
 
 class TestEnv():
     def __init__(self, litcnt):
-        logger.info("starting nodes...")
+        print("starting nodes...")
         self.bitcoind = BitcoinNode()
         self.lits = []
         for i in range(litcnt):
-            node = LitNode(self.bitcoind)
-            self.lits.append(node)
-        logger.info("started nodes!  syncing...")
+            try:
+                print(self.bitcoind.rpc.getblockchaininfo())
+                node = LitNode(self.bitcoind)
+                self.lits.append(node)
+            except Exception as e:
+                print("Error while starting lit node")
+                print(e)
+        print("started nodes!  syncing...")
 
         time.sleep(0.1)
 
@@ -219,7 +226,7 @@ class TestEnv():
         except Exception as e:
             logger.warning("probem syncing nodes, exiting (" + str(e) + ")")
             self.shutdown()
-        logger.info("nodes synced!")
+        print("nodes synced!")
 
     def get_height(self):
         return self.bitcoind.rpc.getblockchaininfo()['blocks']

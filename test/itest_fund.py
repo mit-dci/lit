@@ -3,10 +3,11 @@
 import testlib
 
 fee = 20
-initialsend = 200000
+initialsend = 500000
 capacity = 1000000
 
 def run_test(env):
+    print("RUNNING FUND TEST")
     bc = env.bitcoind
     lit1 = env.lits[0]
     lit2 = env.lits[1]
@@ -53,6 +54,7 @@ def run_test(env):
     print(' -> fee ', bal1 - bal2sum - initialsend)
 
     assert bals2['ChanTotal'] > 0, "channel balance isn't nonzero!"
+
 
 if __name__ == '__main__':
     env = None
