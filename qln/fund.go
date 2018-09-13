@@ -2,7 +2,6 @@ package qln
 
 import (
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/mit-dci/lit/btcutil/btcec"
@@ -525,7 +524,7 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) error {
 	err = nd.SaveQChan(qc)
 	if err != nil {
 		nd.FailChannel(qc)
-		log.Printf("QChanDescHandler err %s", err.Error())
+		logging.Errorf("QChanDescHandler err %s", err.Error())
 		return err
 	}
 
@@ -533,7 +532,7 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) error {
 	qc, err = nd.GetQchan(opArr)
 	if err != nil {
 		nd.FailChannel(qc)
-		log.Printf("QChanDescHandler GetQchan err %s", err.Error())
+		logging.Errorf("QChanDescHandler GetQchan err %s", err.Error())
 		return err
 	}
 
@@ -541,27 +540,27 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) error {
 	theirElkPointZero, err := qc.ElkPoint(false, 0)
 	if err != nil {
 		nd.FailChannel(qc)
-		log.Printf("QChanDescHandler err %s", err.Error())
+		logging.Errorf("QChanDescHandler err %s", err.Error())
 		return err
 	}
 	theirElkPointOne, err := qc.ElkPoint(false, 1)
 	if err != nil {
 		nd.FailChannel(qc)
-		log.Printf("QChanDescHandler err %s", err.Error())
+		logging.Errorf("QChanDescHandler err %s", err.Error())
 		return err
 	}
 
 	theirElkPointTwo, err := qc.N2ElkPointForThem()
 	if err != nil {
 		nd.FailChannel(qc)
-		log.Printf("QChanDescHandler err %s", err.Error())
+		logging.Errorf("QChanDescHandler err %s", err.Error())
 		return err
 	}
 
 	sig, _, err := nd.SignState(qc)
 	if err != nil {
 		nd.FailChannel(qc)
-		log.Printf("QChanDescHandler SignState err %s", err.Error())
+		logging.Errorf("QChanDescHandler SignState err %s", err.Error())
 		return err
 	}
 

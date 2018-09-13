@@ -3,8 +3,6 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"io"
-	"log"
 	"os"
 	"path/filepath"
 
@@ -69,7 +67,7 @@ func litSetup(conf *config) *[32]byte {
 		err := createDefaultConfigFile(preconf.LitHomeDir) // Source of error
 		if err != nil {
 			fmt.Printf("Error creating a default config file: %v", preconf.LitHomeDir)
-			panic(err)
+			logging.Fatal(err)
 		}
 	}
 
@@ -81,7 +79,7 @@ func litSetup(conf *config) *[32]byte {
 		fmt.Println("Creating a new config file")
 		err := createDefaultConfigFile(filepath.Join(preconf.LitHomeDir)) // Source of error
 		if err != nil {
-			panic(err)
+			logging.Fatal(err)
 		}
 	}
 
@@ -91,18 +89,18 @@ func litSetup(conf *config) *[32]byte {
 	if err != nil {
 		_, ok := err.(*os.PathError)
 		if !ok {
-			panic(err)
+			logging.Fatal(err)
 		}
 	}
 	// Parse command line options again to ensure they take precedence.
 	_, err = parser.ParseArgs(os.Args) // returns invalid flags
 	if err != nil {
-		panic(err)
+		logging.Fatal(err)
 	}
 
 	logFilePath := filepath.Join(conf.LitHomeDir, "lit.log")
-
 	logFile, err := os.OpenFile(logFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	logging.SetLogFile(logFile)
 
 	// Log Levels:
 	// 5: DebugLevel prints Panics, Fatals, Errors, Warnings, Infos and Debugs
@@ -123,10 +121,6 @@ func litSetup(conf *config) *[32]byte {
 	defer logFile.Close()
 
 	logging.SetLogLevel(conf.LogLevel)
-
-	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
-	logOutput := io.MultiWriter(os.Stdout, logFile)
-	log.SetOutput(logOutput)
 
 	// Allow node with no linked wallets, for testing.
 	// TODO Should update tests and disallow nodes without wallets later.

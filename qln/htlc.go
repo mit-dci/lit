@@ -3,7 +3,6 @@ package qln
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
@@ -18,7 +17,7 @@ import (
 )
 
 func (nd *LitNode) OfferHTLC(qc *Qchan, amt uint32, RHash [32]byte, locktime uint32, data [32]byte) error {
-	log.Printf("starting HTLC offer")
+	logging.Infof("starting HTLC offer")
 
 	if qc.State.Failed {
 		return fmt.Errorf("cannot offer HTLC, channel failed")
@@ -800,12 +799,12 @@ func (nd *LitNode) ClaimHTLC(R [16]byte) ([][32]byte, error) {
 
 				nd.RemoteMtx.Unlock()
 				if !ok {
-					log.Printf("Couldn't find peer %d in RemoteCons", q.Peer())
+					logging.Warnf("Couldn't find peer %d in RemoteCons", q.Peer())
 					continue
 				}
 				qc, ok := peer.QCs[q.Idx()]
 				if !ok {
-					log.Printf("Couldn't find channel %d in peer.QCs", q.Idx())
+					logging.Warnf("Couldn't find channel %d in peer.QCs", q.Idx())
 					continue
 				}
 

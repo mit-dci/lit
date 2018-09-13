@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -16,6 +15,7 @@ import (
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/portxo"
 )
 
@@ -76,7 +76,7 @@ func NewLocalLndcRpcClientWithHomeDirAndPort(litHomeDir string, port uint32) (*L
 	kg.Step[3] = 0 | 1<<31
 	localIDPriv, err := kg.DerivePrivateKey(rootPrivKey)
 	if err != nil {
-		log.Fatal(err)
+		logging.Fatal(err)
 	}
 	var localIDPub [33]byte
 	copy(localIDPub[:], localIDPriv.PubKey().SerializeCompressed())
@@ -126,7 +126,7 @@ func (cli *LndcRpcClient) Call(serviceMethod string, args interface{}, reply int
 		msg.Method = serviceMethod
 
 		if err != nil {
-			panic(err)
+			logging.Fatal(err)
 		}
 
 		rawMsg := msg.Bytes()
@@ -134,11 +134,11 @@ func (cli *LndcRpcClient) Call(serviceMethod string, args interface{}, reply int
 		n, err := cli.lnconn.Write(rawMsg)
 		cli.conMtx.Unlock()
 		if err != nil {
-			panic(err)
+			logging.Fatal(err)
 		}
 
 		if n < len(rawMsg) {
-			panic(fmt.Errorf("Did not write entire message to peer"))
+			logging.Fatal(fmt.Errorf("Did not write entire message to peer"))
 		}
 	}()
 
@@ -167,7 +167,7 @@ func (cli *LndcRpcClient) ReceiveLoop() {
 		//	log.Printf("read message from %x\n", l.RemoteLNId)
 		n, err := cli.lnconn.Read(msg)
 		if err != nil {
-			log.Printf("Error reading message from LNDC: %s\n", err.Error())
+			logging.Errorf("Error reading message from LNDC: %s\n", err.Error())
 			cli.lnconn.Close()
 			return
 		}
@@ -176,7 +176,7 @@ func (cli *LndcRpcClient) ReceiveLoop() {
 		if msg[0] == lnutil.MSGID_REMOTE_RPCRESPONSE {
 			response, err := lnutil.NewRemoteControlRpcResponseMsgFromBytes(msg, 0)
 			if err != nil {
-				log.Printf("Error while receiving RPC response: %s\n", err.Error())
+				logging.Errorf("Error while receiving RPC response: %s\n", err.Error())
 				cli.lnconn.Close()
 				return
 			}
@@ -189,7 +189,7 @@ func (cli *LndcRpcClient) ReceiveLoop() {
 				}
 				delete(cli.responseChannels, response.Idx)
 			} else {
-				log.Printf("Could not find response channel for index %d\n", response.Idx)
+				logging.Warnf("Could not find response channel for index %d\n", response.Idx)
 			}
 		}
 	}

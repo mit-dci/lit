@@ -2,7 +2,6 @@ package litrpc
 
 import (
 	"fmt"
-	"log"
 	"strconv"
 
 	"github.com/mit-dci/lit/bech32"
@@ -221,7 +220,7 @@ func (r *LitRPC) RemoteControlAuth(args RCAuthArgs, reply *StatusReply) error {
 
 	err = r.Node.SaveRemoteControlAuthorization(pubKey, args.Authorization)
 	if err != nil {
-		log.Printf("Error saving auth: %s", err.Error())
+		logging.Errorf("Error saving auth: %s", err.Error())
 		return err
 	}
 
@@ -244,7 +243,7 @@ func (r *LitRPC) RequestRemoteControlAuthorization(args RCRequestAuthArgs, reply
 
 	err := r.Node.SaveRemoteControlAuthorization(args.PubKey, auth)
 	if err != nil {
-		log.Printf("Error saving auth request: %s", err.Error())
+		logging.Errorf("Error saving auth request: %s", err.Error())
 		return err
 	}
 
@@ -263,7 +262,7 @@ func (r *LitRPC) ListPendingRemoteControlAuthRequests(args NoArgs, reply *RCPend
 
 	requests, err := r.Node.GetPendingRemoteControlRequests()
 	if err != nil {
-		log.Printf("Error saving auth request: %s", err.Error())
+		logging.Errorf("Error saving auth request: %s", err.Error())
 		return err
 	}
 
