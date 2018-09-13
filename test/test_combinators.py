@@ -171,7 +171,6 @@ def run_close_test(env, initiator, target, closer):
     expected = bal1 - initialsend - 3560
     print('expected:', expected)
     print('diff:', expected - fbal)
-    print("CHANTOTAL", bals['ChanTotal'])
     assert bals['ChanTotal'] == regTestChanBal, "balance doesn't match!"
     # ChanTotal for the regression tests is 500000 (from previous chans)
 
@@ -203,7 +202,8 @@ def run_break_test(env, initiator, target, breaker):
 
     # Now we confirm the block.
     env.generate_block(count=6)
-
+    dummy = 1
+    initiator.rpc.Push(ChanIdx=cid, Amt=dummy, Data=None)
     # Now close the channel.
     print('Now breaking channel...')
     res = breaker.rpc.BreakChannel(ChanIdx=cid)
