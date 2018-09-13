@@ -62,7 +62,7 @@ var (
 	defaultHomeDir                         = os.Getenv("HOME")
 	defaultRpcport                         = uint16(8001)
 	defaultRpchost                         = "localhost"
-	defaultAutoReconnect                   = false
+	defaultAutoReconnect                   = true
 	defaultAutoListenPort                  = ":2448"
 	defaultAutoReconnectInterval           = int64(60)
 	defaultUpnPFlag                        = false
