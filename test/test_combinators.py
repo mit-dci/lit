@@ -66,7 +66,7 @@ def run_pushclose_test(env, initiator, target, closer):
     # Now report the difference in channel balance.
     # 200 is the fee amount, wish we could have some sort of constatns in the tests for that
     print('Target:', tt0, '->', tt1, '( expected:', initialsend + pushsend - 200, ')')
-    assert tt1 -tt0 == initialsend + pushsend - 20000, "final balance doesn't match"
+    assert tt1 -tt0 == initialsend + pushsend - 200, "final balance doesn't match"
 
 def run_pushbreak_test(env, initiator, target, breaker):
     bc = env.bitcoind
