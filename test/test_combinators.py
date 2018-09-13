@@ -4,7 +4,7 @@ import testlib
 fee = 20 # this multiplied by 10 would be the fees to check for (QcStateFee)
 qcStateFee = 10
 
-initialsend = 300000
+initialsend = 200000
 capacity = 1000000
 
 pushsend = 250000
@@ -170,7 +170,7 @@ def run_close_test(env, initiator, target, closer):
     expected = bal1 - initialsend - 3560
     print('expected:', expected)
     print('diff:', expected - fbal)
-    print("60000?")
+    print("CHKTHIS", bals['ChanTotal'])
     assert bals['ChanTotal'] == 200, "balance doesn't match!"
     # diff would ha 200 in fees due to funding tx
 
