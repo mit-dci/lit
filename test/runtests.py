@@ -1,72 +1,128 @@
 #!/usr/bin/env python3
 
-import testlib
+import os
 import sys
+import importlib.util as imu
 
-noOfNodes = 2
+import testlib
 
-from itest_testlib import run_test as test_lib
-from itest_connect import run_test as connect
-from itest_receive import run_test as receive
-from itest_send import run_test as send
-from itest_send2 import run_test as send2
-from itest_setgetfee import run_test as setgetfee
-from itest_fund import run_test as fund
-from itest_close import run_test as close
-from itest_close_reverse import run_test as close_reverse
-from itest_break import run_test as breaktest
-from itest_break_reverse import run_test as break_reverse
-from itest_push import run_test as push
-from itest_pushclose import run_test as pushclose
-from itest_pushclose_reverse import run_test as pushclose_reverse
-from itest_pushbreak import run_test as pushbreak
-from itest_pushbreak_reverse import run_test as pushbreak_reverse
+TEST_DECL_PREFIX = '#test'
 
-tests = [
-    {'func':test_lib, 'name': 'Test test_lib', 'nodes': 1}, 
-    {'func':connect, 'name': 'Test connect', 'nodes': 2},
-    {'func':receive, 'name': 'Test receive', 'nodes': 2}, 
-    {'func':send, 'name': 'Test send', 'nodes': 2}, 
-    {'func':send2, 'name': 'Test send2', 'nodes': 2}, 
-    {'func':setgetfee, 'name': 'Test setgetfee', 'nodes': 2}, 
-    {'func':fund, 'name': 'Test fund', 'nodes': 2},
-    {'func':close, 'name': 'Test close', 'nodes': 2},
-    {'func':close_reverse, 'name': 'Test close_reverse', 'nodes': 2},
-  
-  ## Disabled these for now since this is not supported (breaking after creation)
-  ## see github issue #331
-  #  {'func':breaktest, 'name': 'Test breaktest', 'nodes': 2},
-  #  {'func':break_reverse, 'name': 'Test break_reverse', 'nodes': 2},
+# Loads a python module from a path, giving it a particular name.
+def __load_mod_from_file(path, name):
+    spec = imu.spec_from_file_location(name, path)
+    mod = imu.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 
-    {'func':push, 'name': 'Test push', 'nodes': 2},
-    {'func':pushclose, 'name': 'Test pushclose', 'nodes': 2},
-    {'func':pushclose_reverse, 'name': 'Test pushclose_reverse', 'nodes': 2},
-    {'func':pushbreak, 'name': 'Test pushbreak', 'nodes': 2},
-    {'func':pushbreak_reverse, 'name': 'Test pushbreak_reverse', 'nodes': 2}
-]
+# Parses a line like this:
+#
+#   #test foobar 3 run_test_foo
+#
+# (The last argument is optional.)
+def __parse_test_def(line):
+    parts = line.split(' ')
+    if (len(parts) != 3 and len(parts) != 4) or parts[0] != TEST_DECL_PREFIX:
+        return None
+    name = parts[1]
+    nodes = parts[2]
+    func = 'run_test'
+    if len(parts) == 4:
+        func = parts[3]
+    return {
+        'test_name': name,
+        'func_name': func,
+        'node_cnt': int(nodes), # Raises if fails.
+    }
 
+def test_name_from_filename(name):
+    if name.startswith('itest_') and name.endswith('.py'):
+        return name[6:-3] # Should just cut off the ends.
+    else:
+        raise ValueError('')
 
+# Returns the list of tests in a file.
+def parse_test_file(path):
+    base = os.path.splitext(path)[0]
+    founddecls = []
+    with open(path, 'r') as f:
+        for l in f.readlines():
+            if l.startswith(TEST_DECL_PREFIX):
+                d = __parse_test_def(l)
+                if d is not None:
+                    founddecls.append(d)
+                else:
+                    raise ValueError('invalid test declaration: ' + l)
+    return founddecls
 
-for test in tests:
-    error = False
-    try:
-        print("==============================")
-        print("Running test " + test['name'])
-        print("==============================")
-        env = testlib.TestEnv(test['nodes'])
-        test['func'](env)
-        print("-------")
-        print("SUCCESS")
-        print("-------")
-    except Exception as e:
-        print("-------")
-        print("FAILURE:")
-        print(e)
-        print("-------")
-        error = True
-    
-    env.shutdown()
-    
-    if error:
-        sys.exit(1)
+# Given a dir path, returns a list of dicts describing which tests to run and how.
+def load_tests_in_dir(dirpath):
+    files = os.listdir(dirpath)
+    tests = []
+    for f in files:
+        if f.startswith('itest_') and f.endswith('.py'):
+            tmodname = test_name_from_filename(f)
+            fpath = os.path.join(dirpath, f)
+            ftests = parse_test_file(fpath)
+            if len(ftests) == 0:
+                continue
+            mod = __load_mod_from_file(f, tmodname)
+            for t in ftests:
+                tests.append({
+                    'name': t['test_name'],
+                    'test_func': getattr(mod, t['func_name']),
+                    'node_cnt': t['node_cnt']
+                })
+    return tests
 
+def run_test_list(tests):
+    ok = 0
+    fail = 0
+
+    # First, just run the tests.
+    for t in tests:
+        name = t['name']
+
+        print('==============================')
+        print('Running test:', name)
+
+        # Do this before the bottom frame so we have a clue how long startup
+        # took and where the fail was.
+        env = None
+        try:
+            testlib.clean_data_dir() # IMPORTANT!
+            print('------------------------------')
+            env = testlib.TestEnv(t['node_cnt'])
+        except Exception as e:
+            print('Error initing env, this is a test framework bug:', e)
+            break
+        print('==============================')
+
+        # This is where the test actually runs.
+        try:
+            print('invoking')
+            t['test_func'](env)
+            env.shutdown()
+            print('------------------------------')
+            print('Success:', name)
+            ok += 1
+        except BaseException as e:
+            env.shutdown()
+            print('------------------------------')
+            print('Failure:', name)
+            if type(e) is KeyboardInterrupt:
+                break
+            fail += 1
+            # TODO Report failures and why.
+
+    # Collect results.
+    res = {
+        'ok': ok,
+        'fail': fail,
+        'ignored': len(tests) - ok - fail
+    }
+    return res
+
+if __name__ == '__main__':
+    tests = load_tests_in_dir('.')
+    run_test_list(tests)
