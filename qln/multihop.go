@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"fmt"
+
 	"github.com/adiabat/bech32"
 	"github.com/btcsuite/fastsha256"
 	"github.com/mit-dci/lit/consts"

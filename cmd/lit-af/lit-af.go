@@ -3,15 +3,16 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/chzyer/readline"
 	"github.com/fatih/color"
 	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/lnutil"
-	"log"
-	"os"
-	"path/filepath"
-	"strings"
+	"github.com/mit-dci/lit/logging"
 )
 
 /*
@@ -46,6 +47,7 @@ const (
 
 type litAfClient struct {
 	con           string
+	verbosity     int
 	tracker       string
 	litHomeDir    string
 	lndcRpcClient *litrpc.LndcRpcClient
@@ -59,11 +61,12 @@ type Command struct {
 
 func setConfig(lc *litAfClient) {
 	conptr := flag.String("con", "2448", "host to connect to in the form of [<lnadr>@][<host>][:<port>]")
+	vptr := flag.Int("v", 2, "verbosity level")
 	dirptr := flag.String("dir", filepath.Join(os.Getenv("HOME"), litHomeDirName), "directory to save settings")
 	trackerptr := flag.String("tracker", "http://hubris.media.mit.edu:46580", "service to use for looking up node addresses")
 
 	flag.Parse()
-
+	lc.verbosity = *vptr
 	lc.con = *conptr
 	lc.tracker = *trackerptr
 	lc.litHomeDir = *dirptr
@@ -75,6 +78,8 @@ func main() {
 
 	lc := new(litAfClient)
 	setConfig(lc)
+
+	logging.SetLogLevel(lc.verbosity)
 
 	// create home directory if it does not exist
 	_, err = os.Stat(lc.litHomeDir)
@@ -88,24 +93,24 @@ func main() {
 
 		lc.lndcRpcClient, err = litrpc.NewLocalLndcRpcClientWithHomeDirAndPort(lc.litHomeDir, port)
 		if err != nil {
-			log.Fatal(err.Error())
+			logging.Fatal(err.Error())
 		}
 	} else {
 		if !lnutil.LitAdrOK(adr) {
-			log.Fatal("lit address passed in -con parameter is not valid")
+			logging.Fatal("lit address passed in -con parameter is not valid")
 		}
 
 		keyFilePath := filepath.Join(lc.litHomeDir, "lit-af-key.hex")
 		privKey, err := lnutil.ReadKeyFile(keyFilePath)
 		if err != nil {
-			log.Fatal(err.Error())
+			logging.Fatal(err.Error())
 		}
 		key, _ := koblitz.PrivKeyFromBytes(koblitz.S256(), privKey[:])
 
 		if adr != "" && strings.HasPrefix(adr, "ln1") && host == "" {
 			ipv4, _, err := lnutil.Lookup(adr, lc.tracker, "")
 			if err != nil {
-				log.Fatalf("Error looking up address on the tracker: %s", err)
+				logging.Fatalf("Error looking up address on the tracker: %s", err)
 			} else {
 				adr = fmt.Sprintf("%s@%s", adr, ipv4)
 			}
@@ -113,11 +118,11 @@ func main() {
 			adr = fmt.Sprintf("%s@%s:%d", adr, host, port)
 		}
 
-		log.Printf("Connecting to %s\n", adr)
+		logging.Infof("Connecting to %s\n", adr)
 
 		lc.lndcRpcClient, err = litrpc.NewLndcRpcClient(adr, key)
 		if err != nil {
-			log.Fatal(err.Error())
+			logging.Fatal(err.Error())
 		}
 	}
 
@@ -127,7 +132,7 @@ func main() {
 		AutoComplete: lc.NewAutoCompleter(),
 	})
 	if err != nil {
-		panic(err)
+		logging.Fatal(err)
 	}
 	defer rl.Close()
 
@@ -149,15 +154,9 @@ func main() {
 
 		err = lc.Shellparse(cmdslice)
 		if err != nil { // only error should be user exit
-			panic(err)
+			logging.Fatal(err)
 		}
 	}
-
-	//	err = c.Call("LitRPC.Bal", nil, &br)
-	//	if err != nil {
-	//		Log.Fatal("rpc call error:", err)
-	//	}
-	//	fmt.Printf("Sent bal req, response: txototal %d\n", br.TxoTotal)
 }
 
 func (lc *litAfClient) Call(serviceMethod string, args interface{}, reply interface{}) error {

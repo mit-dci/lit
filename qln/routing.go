@@ -5,6 +5,13 @@ import (
 	"container/heap"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"math"
+	"os"
+	"path/filepath"
+	"strconv"
+	"time"
+
 	"github.com/awalterschulze/gographviz"
 	"github.com/mit-dci/lit/bech32"
 	"github.com/mit-dci/lit/coinparam"
@@ -12,12 +19,6 @@ import (
 	"github.com/mit-dci/lit/crypto/fastsha256"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/logging"
-	"io/ioutil"
-	"math"
-	"os"
-	"path/filepath"
-	"strconv"
-	"time"
 )
 
 func (nd *LitNode) InitRouting() {

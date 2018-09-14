@@ -4,6 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
+	"os"
+	"path/filepath"
+	"sync"
+	"time"
+
 	"github.com/mit-dci/lit/btcutil/hdkeychain"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/crypto/koblitz"
@@ -11,11 +17,6 @@ import (
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/portxo"
-	"net"
-	"os"
-	"path/filepath"
-	"sync"
-	"time"
 )
 
 type LndcRpcClient struct {
@@ -125,7 +126,7 @@ func (cli *LndcRpcClient) Call(serviceMethod string, args interface{}, reply int
 		msg.Method = serviceMethod
 
 		if err != nil {
-			panic(err)
+			logging.Fatal(err)
 		}
 
 		rawMsg := msg.Bytes()
@@ -133,11 +134,11 @@ func (cli *LndcRpcClient) Call(serviceMethod string, args interface{}, reply int
 		n, err := cli.lnconn.Write(rawMsg)
 		cli.conMtx.Unlock()
 		if err != nil {
-			panic(err)
+			logging.Fatal(err)
 		}
 
 		if n < len(rawMsg) {
-			panic(fmt.Errorf("Did not write entire message to peer"))
+			logging.Fatal(fmt.Errorf("Did not write entire message to peer"))
 		}
 	}()
 

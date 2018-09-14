@@ -3,6 +3,8 @@ package qln
 import (
 	"bytes"
 	"fmt"
+	"time"
+
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/btcutil/txscript"
 	"github.com/mit-dci/lit/consts"
@@ -12,7 +14,6 @@ import (
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/sig64"
 	"github.com/mit-dci/lit/wire"
-	"time"
 )
 
 func (nd *LitNode) OfferHTLC(qc *Qchan, amt uint32, RHash [32]byte, locktime uint32, data [32]byte) error {

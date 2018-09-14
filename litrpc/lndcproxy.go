@@ -3,10 +3,11 @@ package litrpc
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
+
 	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/logging"
 	"golang.org/x/net/websocket"
-	"net/http"
 )
 
 type LndcRpcWebsocketProxy struct {

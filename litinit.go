@@ -3,11 +3,12 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"os"
+	"path/filepath"
+
 	"github.com/jessevdk/go-flags"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/logging"
-	"os"
-	"path/filepath"
 )
 
 // createDefaultConfigFile creates a config file  -- only call this if the
@@ -64,8 +65,8 @@ func litSetup(conf *config) *[32]byte {
 		logging.Infof("Creating a new config file")
 		err := createDefaultConfigFile(preconf.LitHomeDir) // Source of error
 		if err != nil {
-			logging.Errorf("Error creating a default config file: %v", preconf.LitHomeDir)
-			panic(err)
+			fmt.Printf("Error creating a default config file: %v", preconf.LitHomeDir)
+			logging.Fatal(err)
 		}
 	}
 
@@ -77,7 +78,7 @@ func litSetup(conf *config) *[32]byte {
 		logging.Infof("Creating a new config file")
 		err := createDefaultConfigFile(filepath.Join(preconf.LitHomeDir)) // Source of error
 		if err != nil {
-			panic(err)
+			logging.Fatal(err)
 		}
 	}
 
@@ -87,18 +88,18 @@ func litSetup(conf *config) *[32]byte {
 	if err != nil {
 		_, ok := err.(*os.PathError)
 		if !ok {
-			panic(err)
+			logging.Fatal(err)
 		}
 	}
 	// Parse command line options again to ensure they take precedence.
 	_, err = parser.ParseArgs(os.Args) // returns invalid flags
 	if err != nil {
-		panic(err)
+		logging.Fatal(err)
 	}
 
 	logFilePath := filepath.Join(conf.LitHomeDir, "lit.log")
-
 	logFile, err := os.OpenFile(logFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	logging.SetLogFile(logFile)
 
 	// Log Levels:
 	// 5: DebugLevel prints Panics, Fatals, Errors, Warnings, Infos and Debugs

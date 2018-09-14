@@ -2,6 +2,8 @@ package qln
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/elkrem"
@@ -9,7 +11,6 @@ import (
 	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/wire"
-	"time"
 )
 
 /*
