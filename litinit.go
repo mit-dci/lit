@@ -6,9 +6,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"os"
-	"path/filepath"
-
 	"github.com/jessevdk/go-flags"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/logging"
