@@ -10,12 +10,12 @@ send2 2
 
 # Simple channel operations
 fund 2
-close 2
-break 2
+close 2 run_test_forward
+close 2 run_test_reverse
+break 2 run_test_forward
+break 2 run_test_reverse
 push 2
-break_reverse 2
-close_reverse 2
-pushbreak 2
-pushbreak_reverse 2
-pushclose 2
-pushclose_reverse 2
+pushbreak 2 run_test_forward
+pushbreak 2 run_test_reverse
+pushclose 2 run_test_forward
+pushclose 2 run_test_reverse

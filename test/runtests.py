@@ -20,7 +20,7 @@ def __load_mod_from_file(path, name):
 # (The last argument is optional.)
 def __parse_test_def(line):
     parts = line.split(' ')
-    if len(parts) != 2 and len(parts) != 2:
+    if len(parts) != 2 and len(parts) != 3:
         return None
     name = parts[0]
     nodes = parts[1]
@@ -28,9 +28,9 @@ def __parse_test_def(line):
     if len(parts) == 3:
         func = parts[2]
     return {
-        'test_name': name,
-        'func_name': func,
-        'node_cnt': int(nodes), # Raises if fails.
+        'test_name': name.strip(),
+        'func_name': func.strip(),
+        'node_cnt': int(nodes.strip()), # Raises if fails.
     }
 
 def test_name_from_filename(name):
@@ -58,7 +58,7 @@ def load_tests_from_file(path):
         tname = t['test_name']
         mod = None
         if tname in mods:
-            mod = mods[modname]
+            mod = mods[tname]
         else:
             fname = 'itest_%s.py' % tname
             modname = 'testmod_' + tname
@@ -71,40 +71,6 @@ def load_tests_from_file(path):
         })
     return tests
 
-# Returns the list of tests in a file.
-def parse_test_file(path):
-    base = os.path.splitext(path)[0]
-    founddecls = []
-    with open(path, 'r') as f:
-        for l in f.readlines():
-            if l.startswith(TEST_DECL_PREFIX):
-                d = __parse_test_def(l)
-                if d is not None:
-                    founddecls.append(d)
-                else:
-                    raise ValueError('invalid test declaration: ' + l)
-    return founddecls
-
-# Given a dir path, returns a list of dicts describing which tests to run and how.
-def load_tests_in_dir(dirpath):
-    files = os.listdir(dirpath)
-    tests = []
-    for f in files:
-        if f.startswith('itest_') and f.endswith('.py'):
-            tmodname = test_name_from_filename(f)
-            fpath = os.path.join(dirpath, f)
-            ftests = parse_test_file(fpath)
-            if len(ftests) == 0:
-                continue
-            mod = __load_mod_from_file(f, tmodname)
-            for t in ftests:
-                tests.append({
-                    'name': t['test_name'],
-                    'test_func': getattr(mod, t['func_name']),
-                    'node_cnt': t['node_cnt']
-                })
-    return tests
-
 def run_test_list(tests):
     ok = 0
     fail = 0
@@ -114,7 +80,11 @@ def run_test_list(tests):
         name = t['name']
 
         print('==============================')
-        print('Running test:', name)
+        tfunc = t['test_func']
+        if tfunc.__name__ == 'run_test':
+            print('Running test:', name)
+        else:
+            print('Running test:', name + ':' + tfunc.__name__)
 
         # Do this before the bottom frame so we have a clue how long startup
         # took and where the fail was.
@@ -130,7 +100,7 @@ def run_test_list(tests):
 
         # This is where the test actually runs.
         try:
-            t['test_func'](env)
+            tfunc(env)
             env.shutdown()
             print('------------------------------')
             print('Success:', name)
