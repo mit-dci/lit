@@ -6,8 +6,6 @@ import importlib.util as imu
 
 import testlib
 
-TEST_DECL_PREFIX = '#test'
-
 # Loads a python module from a path, giving it a particular name.
 def __load_mod_from_file(path, name):
     spec = imu.spec_from_file_location(name, path)
@@ -17,18 +15,18 @@ def __load_mod_from_file(path, name):
 
 # Parses a line like this:
 #
-#   #test foobar 3 run_test_foo
+#   foobar 3 run_test_foo
 #
 # (The last argument is optional.)
 def __parse_test_def(line):
     parts = line.split(' ')
-    if (len(parts) != 3 and len(parts) != 4) or parts[0] != TEST_DECL_PREFIX:
+    if len(parts) != 2 and len(parts) != 2:
         return None
-    name = parts[1]
-    nodes = parts[2]
+    name = parts[0]
+    nodes = parts[1]
     func = 'run_test'
-    if len(parts) == 4:
-        func = parts[3]
+    if len(parts) == 3:
+        func = parts[2]
     return {
         'test_name': name,
         'func_name': func,
@@ -40,6 +38,38 @@ def test_name_from_filename(name):
         return name[6:-3] # Should just cut off the ends.
     else:
         raise ValueError('')
+
+def parse_tests_file(path):
+    tdefs = []
+    with open(path, 'r') as f:
+        for l in f.readlines():
+            if len(l) == 0 or l.startswith('#'):
+                continue
+            t = __parse_test_def(l)
+            if t is not None:
+                tdefs.append(t)
+    return tdefs
+
+def load_tests_from_file(path):
+    tests = []
+    pdir = os.path.dirname(path)
+    mods = {}
+    for t in parse_tests_file(path):
+        tname = t['test_name']
+        mod = None
+        if tname in mods:
+            mod = mods[modname]
+        else:
+            fname = 'itest_%s.py' % tname
+            modname = 'testmod_' + tname
+            mod = __load_mod_from_file(fname, modname)
+            mods[tname] = mod
+        tests.append({
+            'name': tname,
+            'test_func': getattr(mod, t['func_name']),
+            'node_cnt': t['node_cnt']
+        })
+    return tests
 
 # Returns the list of tests in a file.
 def parse_test_file(path):
@@ -100,7 +130,6 @@ def run_test_list(tests):
 
         # This is where the test actually runs.
         try:
-            print('invoking')
             t['test_func'](env)
             env.shutdown()
             print('------------------------------')
@@ -110,6 +139,7 @@ def run_test_list(tests):
             env.shutdown()
             print('------------------------------')
             print('Failure:', name)
+            print('\nError:', e)
             if type(e) is KeyboardInterrupt:
                 break
             fail += 1
@@ -124,5 +154,5 @@ def run_test_list(tests):
     return res
 
 if __name__ == '__main__':
-    tests = load_tests_in_dir('.')
+    tests = load_tests_from_file('tests.txt')
     run_test_list(tests)

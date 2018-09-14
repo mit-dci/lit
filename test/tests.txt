@@ -1,0 +1,21 @@
+# Basic tests
+testlib 1
+connect 2
+setgetfee 1
+
+# Tx operations
+receive 1
+send 1
+send2 2
+
+# Simple channel operations
+fund 2
+close 2
+break 2
+push 2
+break_reverse 2
+close_reverse 2
+pushbreak 2
+pushbreak_reverse 2
+pushclose 2
+pushclose_reverse 2

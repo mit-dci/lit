@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import testlib
 
 def run_test(env):
