@@ -115,6 +115,8 @@ def run_test_list(tests):
             fail += 1
             # TODO Report failures and why.
 
+    print('==============================')
+
     # Collect results.
     res = {
         'ok': ok,
@@ -125,4 +127,20 @@ def run_test_list(tests):
 
 if __name__ == '__main__':
     tests = load_tests_from_file('tests.txt')
-    run_test_list(tests)
+
+    # If given arguments, run these instead.  Doesn't do them in given order, sadly.
+    if len(sys.argv) > 1:
+        to_run = []
+        for t in tests:
+            if t['name'] in sys.argv[1:]:
+                to_run.append(t)
+        tests = to_run
+
+    res = run_test_list(tests)
+    print('Success:', res['ok'])
+    print('Failure:', res['fail'])
+    print('Ignored:', res['ignored'])
+    if res['fail'] > 0:
+        sys.exit(1)
+    else:
+        sys.exit(0)
