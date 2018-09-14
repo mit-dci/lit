@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/consts"
+	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/logging"
@@ -161,6 +161,8 @@ func (nd *LitNode) FundChannel(
 		return 0, err
 	}
 
+	logging.Infof("next channel idx: %d", cIdx)
+
 	nd.InProg.ChanIdx = cIdx
 	nd.InProg.PeerIdx = peerIdx
 	nd.InProg.Amt = ccap
@@ -172,7 +174,7 @@ func (nd *LitNode) FundChannel(
 
 	outMsg := lnutil.NewPointReqMsg(peerIdx, cointype)
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 
 	// wait until it's done!
 	idx := <-nd.InProg.done
@@ -248,7 +250,7 @@ func (nd *LitNode) PointReqHandler(msg lnutil.PointReqMsg) {
 
 	outMsg := lnutil.NewPointRespMsg(msg.Peer(), myChanPub, myRefundPub, myHAKDbase,
 		myNextHTLCBase, myN2HTLCBase)
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 
 	return
 }
@@ -256,6 +258,7 @@ func (nd *LitNode) PointReqHandler(msg lnutil.PointReqMsg) {
 // FUNDER
 // PointRespHandler takes in a point response, and returns a channel description
 func (nd *LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
+	var err error
 	logging.Infof("Got PointResponse")
 
 	nd.InProg.mtx.Lock()
@@ -292,6 +295,7 @@ func (nd *LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 	q.MyPub, _ = nd.GetUsePub(q.KeyGen, UseChannelFund)
 	q.MyRefundPub, _ = nd.GetUsePub(q.KeyGen, UseChannelRefund)
 	q.MyHAKDBase, _ = nd.GetUsePub(q.KeyGen, UseChannelHAKDBase)
+	q.ElkRcv = elkrem.NewElkremReceiver()
 
 	// chop up incoming message, save points to channel struct
 	copy(q.TheirPub[:], msg.ChannelPub[:])
@@ -299,15 +303,15 @@ func (nd *LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 	copy(q.TheirHAKDBase[:], msg.HAKDbase[:])
 
 	// make sure their pubkeys are real pubkeys
-	_, err := btcec.ParsePubKey(q.TheirPub[:], btcec.S256())
+	_, err = koblitz.ParsePubKey(q.TheirPub[:], koblitz.S256())
 	if err != nil {
 		return fmt.Errorf("PubRespHandler TheirPub err %s", err.Error())
 	}
-	_, err = btcec.ParsePubKey(q.TheirRefundPub[:], btcec.S256())
+	_, err = koblitz.ParsePubKey(q.TheirRefundPub[:], koblitz.S256())
 	if err != nil {
 		return fmt.Errorf("PubRespHandler TheirRefundPub err %s", err.Error())
 	}
-	_, err = btcec.ParsePubKey(q.TheirHAKDBase[:], btcec.S256())
+	_, err = koblitz.ParsePubKey(q.TheirHAKDBase[:], koblitz.S256())
 	if err != nil {
 		return fmt.Errorf("PubRespHandler TheirHAKDBase err %s", err.Error())
 	}
@@ -352,11 +356,11 @@ func (nd *LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 
 	q.State.Data = nd.InProg.Data
 
-	_, err = btcec.ParsePubKey(msg.NextHTLCBase[:], btcec.S256())
+	_, err = koblitz.ParsePubKey(msg.NextHTLCBase[:], koblitz.S256())
 	if err != nil {
 		return fmt.Errorf("PubRespHandler NextHTLCBase err %s", err.Error())
 	}
-	_, err = btcec.ParsePubKey(msg.N2HTLCBase[:], btcec.S256())
+	_, err = koblitz.ParsePubKey(msg.N2HTLCBase[:], koblitz.S256())
 	if err != nil {
 		return fmt.Errorf("PubRespHandler N2HTLCBase err %s", err.Error())
 	}
@@ -418,7 +422,7 @@ func (nd *LitNode) PointRespHandler(msg lnutil.PointRespMsg) error {
 		nd.InProg.Coin, nd.InProg.Amt, nd.InProg.InitSend,
 		elkPointZero, elkPointOne, elkPointTwo, nd.InProg.Data)
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 
 	return nil
 }
@@ -489,11 +493,11 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) error {
 	qc.State.NextElkPoint = msg.ElkOne
 	qc.State.N2ElkPoint = msg.ElkTwo
 
-	_, err = btcec.ParsePubKey(msg.NextHTLCBase[:], btcec.S256())
+	_, err = koblitz.ParsePubKey(msg.NextHTLCBase[:], koblitz.S256())
 	if err != nil {
 		return fmt.Errorf("QChanDescHandler NextHTLCBase err %s", err.Error())
 	}
-	_, err = btcec.ParsePubKey(msg.N2HTLCBase[:], btcec.S256())
+	_, err = koblitz.ParsePubKey(msg.N2HTLCBase[:], koblitz.S256())
 	if err != nil {
 		return fmt.Errorf("QChanDescHandler N2HTLCBase err %s", err.Error())
 	}
@@ -570,7 +574,7 @@ func (nd *LitNode) QChanDescHandler(msg lnutil.ChanDescMsg) error {
 		sig)
 	outMsg.Bytes()
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 
 	return nil
 }
@@ -664,7 +668,7 @@ func (nd *LitNode) QChanAckHandler(msg lnutil.ChanAckMsg, peer *RemotePeer) {
 
 	outMsg := lnutil.NewSigProofMsg(msg.Peer(), msg.Outpoint, sig)
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 
 	return
 }

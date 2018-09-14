@@ -11,10 +11,13 @@ import (
 
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/btcutil"
-	"github.com/mit-dci/lit/btcutil/btcec"
+	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/elkrem"
+	"github.com/mit-dci/lit/eventbus"
+	"github.com/mit-dci/lit/lncore"
 	"github.com/mit-dci/lit/lndc"
+	"github.com/mit-dci/lit/lnp2p"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/watchtower"
@@ -85,16 +88,25 @@ You can't remove wallets once they're attached; just restart instead.
 
 */
 
-// LnNode is the main struct for the node, keeping track of all channel state and
+// LitNode is the main struct for the node, keeping track of all channel state and
 // communicating with the underlying UWallet
 type LitNode struct {
 	LitDB *bolt.DB // place to write all this down
 
+	NewLitDB lncore.LitStorage
+
 	LitFolder string // path to save stuff
 
-	IdentityKey *btcec.PrivateKey
+	IdentityKey *koblitz.PrivateKey
 
-	DefaultRemoteControlKey *btcec.PublicKey
+	// p2p remote control key
+	DefaultRemoteControlKey *koblitz.PublicKey
+
+	// event bus
+	Events *eventbus.EventBus
+
+	// Networking
+	PeerMan *lnp2p.PeerManager
 
 	// all nodes have a watchtower.  but could have a tower without a node
 	Tower watchtower.Watcher
@@ -115,10 +127,6 @@ type LitNode struct {
 	RemoteCons         map[uint32]*RemotePeer
 	RemoteMtx          sync.Mutex
 
-	// OmniChan is the channel for the OmniHandler
-	OmniIn  chan lnutil.LitMsg
-	OmniOut chan lnutil.LitMsg
-
 	// the current channel that in the process of being created
 	// (1 at a time for now)
 	InProg *InFlightFund
@@ -131,9 +139,6 @@ type LitNode struct {
 
 	// queue for async messages to RPC user
 	UserMessageBox chan string
-
-	// The port(s) in which it listens for incoming connections
-	LisIpPorts []string
 
 	// The URL from which lit attempts to resolve the LN address
 	TrackerURL string
@@ -152,6 +157,10 @@ type LitNode struct {
 	MultihopMutex  sync.Mutex
 
 	ExchangeRates map[uint32][]lnutil.RateDesc
+
+	// REFACTORING FIELDS
+	PeerMap    map[*lnp2p.Peer]*RemotePeer // we never remove things from here, so this is a memory leak
+	PeerMapMtx *sync.Mutex
 }
 
 type LinkDesc struct {
@@ -292,63 +301,35 @@ func (inff *InFlightDualFund) Clear() {
 	inff.InitiatedByUs = false
 }
 
+// GetLnAddr gets the lightning address for this node.
+func (nd *LitNode) GetLnAddr() string {
+	return nd.PeerMan.GetExternalAddress()
+}
+
 // GetPubHostFromPeerIdx gets the pubkey and internet host name for a peer
 func (nd *LitNode) GetPubHostFromPeerIdx(idx uint32) ([33]byte, string) {
 	var pub [33]byte
 	var host string
-	// look up peer in db
-	err := nd.LitDB.View(func(btx *bolt.Tx) error {
-		mp := btx.Bucket(BKTPeerMap)
-		if mp == nil {
-			return nil
-		}
-		pubBytes := mp.Get(lnutil.U32tB(idx))
-		if pubBytes != nil && len(pubBytes) > 0 {
-			copy(pub[:], pubBytes)
-		}
-		peerBkt := btx.Bucket(BKTPeers)
-		if peerBkt == nil {
-			return fmt.Errorf("no Peers")
-		}
-		prBkt := peerBkt.Bucket(pubBytes)
-		if prBkt == nil {
-			return fmt.Errorf("no peer %x", pubBytes)
-		}
-		host = string(prBkt.Get(KEYhost))
-		return nil
-	})
-	if err != nil {
-		logging.Errorf(err.Error())
+
+	p := nd.PeerMan.GetPeerByIdx(int32(idx))
+	if p != nil {
+		pk := p.GetPubkey()
+		copy(pub[:], pk.SerializeCompressed())
+		host = p.GetRemoteAddr()
 	}
+
 	return pub, host
 }
 
 // GetNicknameFromPeerIdx gets the nickname for a peer
 func (nd *LitNode) GetNicknameFromPeerIdx(idx uint32) string {
 	var nickname string
-	// look up peer in db
-	err := nd.LitDB.View(func(btx *bolt.Tx) error {
-		mp := btx.Bucket(BKTPeerMap)
-		if mp == nil {
-			return nil
-		}
-		pubBytes := mp.Get(lnutil.U32tB(idx))
-		peerBkt := btx.Bucket(BKTPeers)
-		if peerBkt == nil {
-			return fmt.Errorf("no Peers")
-		}
-		prBkt := peerBkt.Bucket(pubBytes)
-		if prBkt == nil {
-			return fmt.Errorf("no peer %x", pubBytes)
-		}
 
-		nickname = string(prBkt.Get(KEYnickname))
-
-		return nil
-	})
-	if err != nil {
-		logging.Errorf(err.Error())
+	p := nd.PeerMan.GetPeerByIdx(int32(idx))
+	if p != nil {
+		nickname = p.GetNickname()
 	}
+
 	return nickname
 }
 
@@ -371,80 +352,19 @@ func (nd *LitNode) NextChannelIdx() (uint32, error) {
 	return cIdx, nil
 }
 
-// GetPeerIdx returns the peer index given a pubkey.  Creates it if it's not there
-// yet!  Also return a bool for new..?  not needed?
-func (nd *LitNode) GetPeerIdx(pub *btcec.PublicKey, host string) (uint32, error) {
-	var idx uint32
-	err := nd.LitDB.Update(func(btx *bolt.Tx) error {
-		prs := btx.Bucket(BKTPeers) // only errs on name
-		thisPeerBkt := prs.Bucket(pub.SerializeCompressed())
-		// peer is already registered, return index without altering db.
-		if thisPeerBkt != nil {
-			idx = lnutil.BtU32(thisPeerBkt.Get(KEYIdx))
-			return nil
-		}
-
-		// this peer doesn't exist yet.  Add new peer
-		mp := btx.Bucket(BKTPeerMap)
-		idx = uint32(mp.Stats().KeyN + 1)
-
-		// add index : pubkey into mapping
-		err := mp.Put(lnutil.U32tB(idx), pub.SerializeCompressed())
-		if err != nil {
-			return err
-		}
-
-		thisPeerBkt, err = prs.CreateBucket(pub.SerializeCompressed())
-		if err != nil {
-			return err
-		}
-
-		// save peer index in peer bucket
-		err = thisPeerBkt.Put(KEYIdx, lnutil.U32tB(idx))
-		if err != nil {
-			return err
-		}
-
-		// save remote host name (if it's there)
-		if host != "" {
-			err = thisPeerBkt.Put(KEYhost, []byte(host))
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	return idx, err
-}
-
 // SaveNicknameForPeerIdx saves/overwrites a nickname for a given peer idx
 func (nd *LitNode) SaveNicknameForPeerIdx(nickname string, idx uint32) error {
-	var err error
 
-	// look up peer in db
-	err = nd.LitDB.Update(func(btx *bolt.Tx) error {
-		mp := btx.Bucket(BKTPeerMap)
-		if mp == nil {
-			return nil
-		}
-		pubBytes := mp.Get(lnutil.U32tB(idx))
-		peerBkt := btx.Bucket(BKTPeers)
-		if peerBkt == nil {
-			return fmt.Errorf("no Peers")
-		}
-		prBkt := peerBkt.Bucket(pubBytes)
-		if prBkt == nil {
-			return fmt.Errorf("no peer %x", pubBytes)
-		}
+	peer := nd.PeerMan.GetPeerByIdx(int32(idx))
+	if peer == nil {
+		return fmt.Errorf("invalid peer ID %d", idx)
+	}
 
-		err = prBkt.Put(KEYnickname, []byte(nickname))
-		if err != nil {
-			return err
-		}
-		return nil
-	})
+	// Actually go and set it.
+	pi := peer.IntoPeerInfo()
+	err := nd.NewLitDB.GetPeerDB().AddPeer(peer.GetLnAddr(), pi)
 
-	return err
+	return err // same as if err != nil { return err } ; return nil
 }
 
 // SaveQchanUtxoData saves utxo data such as outpoint and close tx / status

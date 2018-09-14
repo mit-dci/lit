@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/mit-dci/lit/btcutil"
-	"github.com/mit-dci/lit/btcutil/btcec"
+	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/btcutil/txscript"
 	"github.com/mit-dci/lit/btcutil/txsort"
 	"github.com/mit-dci/lit/dlc"
@@ -99,7 +99,7 @@ func (nd *LitNode) OfferDlc(peerIdx uint32, cIdx uint64) error {
 		return err
 	}
 
-	nd.OmniOut <- msg
+	nd.tmpSendLitMsg(msg)
 
 	return nil
 }
@@ -126,7 +126,7 @@ func (nd *LitNode) DeclineDlc(cIdx uint64, reason uint8) error {
 		return err
 	}
 
-	nd.OmniOut <- msg
+	nd.tmpSendLitMsg(msg)
 
 	return nil
 }
@@ -205,7 +205,7 @@ func (nd *LitNode) AcceptDlc(cIdx uint64) error {
 		c.Status = lnutil.ContractStatusAccepted
 
 		nd.DlcManager.SaveContract(c)
-		nd.OmniOut <- msg
+		nd.tmpSendLitMsg(msg)
 	}(nd, c)
 	return nil
 }
@@ -307,7 +307,7 @@ func (nd *LitNode) DlcAcceptHandler(msg lnutil.DlcOfferAcceptMsg, peer *RemotePe
 		return err
 	}
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 
 	return nil
 
@@ -351,7 +351,7 @@ func (nd *LitNode) DlcContractAckHandler(msg lnutil.DlcContractAckMsg, peer *Rem
 
 	outMsg := lnutil.NewDlcContractFundingSigsMsg(c, &tx)
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 }
 
 func (nd *LitNode) DlcFundingSigsHandler(msg lnutil.DlcContractFundingSigsMsg, peer *RemotePeer) {
@@ -389,7 +389,7 @@ func (nd *LitNode) DlcFundingSigsHandler(msg lnutil.DlcContractFundingSigsMsg, p
 
 	outMsg := lnutil.NewDlcContractSigProofMsg(c, msg.SignedFundingTx)
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 }
 
 func (nd *LitNode) DlcSigProofHandler(msg lnutil.DlcContractSigProofMsg, peer *RemotePeer) {
@@ -623,7 +623,7 @@ func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oracleSig [32]
 	privSpend, _ := wal.GetPriv(kg)
 
 	pubSpend := wal.GetPub(kg)
-	privOracle, pubOracle := btcec.PrivKeyFromBytes(btcec.S256(), oracleSig[:])
+	privOracle, pubOracle := koblitz.PrivKeyFromBytes(koblitz.S256(), oracleSig[:])
 	privContractOutput := lnutil.CombinePrivateKeys(privSpend, privOracle)
 
 	var pubOracleBytes [33]byte

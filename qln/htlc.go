@@ -177,7 +177,7 @@ func (nd *LitNode) SendHashSig(q *Qchan) error {
 
 	logging.Infof("Sending HashSig with %d HTLC sigs", len(HTLCSigs))
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 
 	return nil
 }
@@ -544,7 +544,7 @@ func (nd *LitNode) SendPreimageSig(q *Qchan, Idx uint32) error {
 
 	logging.Infof("Sending PreimageSig with %d HTLC sigs", len(HTLCSigs))
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 
 	return nil
 }
@@ -799,12 +799,12 @@ func (nd *LitNode) ClaimHTLC(R [16]byte) ([][32]byte, error) {
 
 				nd.RemoteMtx.Unlock()
 				if !ok {
-					logging.Warnf("Couldn't find peer %d in RemoteCons", q.Peer())
+					logging.Errorf("Couldn't find peer %d in RemoteCons", q.Peer())
 					continue
 				}
 				qc, ok := peer.QCs[q.Idx()]
 				if !ok {
-					logging.Warnf("Couldn't find channel %d in peer.QCs", q.Idx())
+					logging.Errorf("Couldn't find channel %d in peer.QCs", q.Idx())
 					continue
 				}
 

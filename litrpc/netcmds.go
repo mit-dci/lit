@@ -3,12 +3,14 @@ package litrpc
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/mit-dci/lit/bech32"
-	"github.com/mit-dci/lit/btcutil/btcec"
-	"github.com/mit-dci/lit/logging"
-
+	"github.com/mit-dci/lit/crypto/koblitz"
+	"github.com/mit-dci/lit/lncore"
+	"github.com/mit-dci/lit/lnp2p"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/qln"
 )
 
@@ -77,13 +79,26 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *ConnectReply) error {
 		connectAdr = args.LNAddr
 	}
 
-	idx, err := r.Node.DialPeer(connectAdr)
+	err = r.Node.DialPeer(connectAdr)
 	if err != nil {
 		return err
 	}
 
+	// Extract the plain lit addr since we don't always have it.
+	// TODO Make this more "correct" since it's using the old system a lot.
+	paddr := connectAdr
+	if strings.Contains(paddr, "@") {
+		paddr = strings.SplitN(paddr, "@", 2)[0]
+	}
+
+	var pm *lnp2p.PeerManager = r.Node.PeerMan
+	p := pm.GetPeer(lncore.LnAddr(paddr))
+	if p == nil {
+		return fmt.Errorf("couldn't find peer in manager after connecting")
+	}
+
 	reply.Status = fmt.Sprintf("connected to peer %s", connectAdr)
-	reply.PeerIdx = idx
+	reply.PeerIdx = p.GetIdx()
 	return nil
 }
 
@@ -115,7 +130,7 @@ func (r *LitRPC) AssignNickname(args AssignNicknameArgs, reply *StatusReply) err
 // ------------------------- ShowConnections
 
 type ListConnectionsReply struct {
-	Connections []qln.PeerInfo
+	Connections []qln.SimplePeerInfo
 	MyPKH       string
 }
 type ConInfo struct {
@@ -125,6 +140,7 @@ type ConInfo struct {
 
 func (r *LitRPC) ListConnections(args NoArgs, reply *ListConnectionsReply) error {
 	reply.Connections = r.Node.GetConnectedPeerList()
+	reply.MyPKH = r.Node.GetLnAddr()
 	return nil
 }
 
@@ -207,7 +223,7 @@ type RCAuthArgs struct {
 
 func (r *LitRPC) RemoteControlAuth(args RCAuthArgs, reply *StatusReply) error {
 
-	pub, err := btcec.ParsePubKey(args.PubKey, btcec.S256())
+	pub, err := koblitz.ParsePubKey(args.PubKey, koblitz.S256())
 	if err != nil {
 		reply.Status = fmt.Sprintf("Error deserializing pubkey: %s", err.Error())
 		return err

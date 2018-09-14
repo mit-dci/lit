@@ -163,7 +163,7 @@ func SigDecompress(csig [64]byte) (sig []byte) {
 	sig[1] = fulllen - 2 // the 0x30, and this byte itself
 	sig[2] = 0x02
 	sig[3] = byte(len(padr))
-	// got this copy / offset trick from btcec/signature.go
+	// got this copy / offset trick from koblitz/signature.go
 	endr := copy(sig[4:], padr) + 4
 	sig[endr] = 0x02
 	sig[endr+1] = byte(len(pads))

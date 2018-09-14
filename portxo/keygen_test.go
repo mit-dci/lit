@@ -284,3 +284,23 @@ func TestStringForDepth6(t *testing.T) {
 		}
 	*/
 }
+
+func TestKeygenSerdes(t *testing.T) {
+
+	k := KeyGen{
+		Depth:   5,
+		Step:    [5]uint32{12345, 23456, 34567, 45678, 56789},
+		PrivKey: [32]byte{}, // should be al 0
+	}
+
+	kb := k.Bytes()
+	kb53 := [53]byte{}
+	copy(kb53[:], kb)
+
+	k2 := KeyGenFromBytes(kb53)
+
+	if k != k2 {
+		t.Fail()
+	}
+
+}

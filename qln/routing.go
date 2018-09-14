@@ -2,6 +2,7 @@ package qln
 
 import (
 	"bytes"
+	"container/heap"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -10,8 +11,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"time"
-
-	"container/heap"
 
 	"github.com/awalterschulze/gographviz"
 	"github.com/mit-dci/lit/bech32"
@@ -127,10 +126,10 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 	// APKH:channel_cointype to each BPKH:cointype pair in the graph.
 
 	for pkh, channels := range nd.ChannelMap {
-		logging.Infof("processing channels from %s", bech32.Encode("ln", pkh[:]))
+		logging.Debugf("processing channels from %s", bech32.Encode("ln", pkh[:]))
 
 		for _, channel := range channels {
-			logging.Infof("...processing channel %s:%d", bech32.Encode("ln", channel.Link.BPKH[:]), channel.Link.CoinType)
+			logging.Debugf("...processing channel %s:%d", bech32.Encode("ln", channel.Link.BPKH[:]), channel.Link.CoinType)
 			var newEdges []channelEdge
 			origin := routeHop{
 				channel.Link.APKH,
@@ -142,7 +141,7 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 			coinTypes := map[uint32]bool{}
 
 			for _, theirChannel := range nd.ChannelMap[channel.Link.BPKH] {
-				logging.Infof("......checking outbound connection %s:%d", bech32.Encode("ln", theirChannel.Link.BPKH[:]), theirChannel.Link.CoinType)
+				logging.Debugf("......checking outbound connection %s:%d", bech32.Encode("ln", theirChannel.Link.BPKH[:]), theirChannel.Link.CoinType)
 				if _, ok := coinTypes[theirChannel.Link.CoinType]; !ok {
 					var rd *lnutil.RateDesc
 					for _, rate := range theirChannel.Link.Rates {
@@ -154,7 +153,7 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 
 					if rd == nil {
 						// this trade is not possible
-						logging.Infof(".........ignoring channel because trade %d->%d is not possible", channel.Link.CoinType, theirChannel.Link.CoinType)
+						logging.Debugf(".........ignoring channel because trade %d->%d is not possible", channel.Link.CoinType, theirChannel.Link.CoinType)
 						continue
 					}
 
@@ -182,12 +181,12 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 						channel.Link.ACapacity,
 					}
 
-					logging.Infof(".........adding edge: %s:%d->%s:%d", bech32.Encode("ln", edge.U.Node[:]), edge.U.CoinType, bech32.Encode("ln", edge.V.Node[:]), edge.V.CoinType)
+					logging.Debugf(".........adding edge: %s:%d->%s:%d", bech32.Encode("ln", edge.U.Node[:]), edge.U.CoinType, bech32.Encode("ln", edge.V.Node[:]), edge.V.CoinType)
 
 					newEdges = append(newEdges, edge)
 					coinTypes[theirChannel.Link.CoinType] = true
 				} else {
-					logging.Infof(".........ignoring channel because its cointype has already been covered")
+					logging.Debugf(".........ignoring channel because its cointype has already been covered")
 				}
 			}
 
@@ -210,7 +209,7 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 				channel.Link.ACapacity,
 			}
 
-			logging.Infof("...adding sink: %s:%d->%s:%d", bech32.Encode("ln", edge.U.Node[:]), edge.U.CoinType, bech32.Encode("ln", edge.V.Node[:]), edge.V.CoinType)
+			logging.Debugf("...adding sink: %s:%d->%s:%d", bech32.Encode("ln", edge.U.Node[:]), edge.U.CoinType, bech32.Encode("ln", edge.V.Node[:]), edge.V.CoinType)
 
 			newEdges = append(newEdges, edge)
 
@@ -227,7 +226,7 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 		distance = append(distance, math.MaxFloat64)
 		predecessor = append(predecessor, -1)
 		verticesMap[k] = len(vertices) - 1
-		logging.Infof("vertex %x:%d: %d", k.Node, k.CoinType, len(vertices)-1)
+		logging.Debugf("vertex %x:%d: %d", k.Node, k.CoinType, len(vertices)-1)
 	}
 
 	for _, edge := range edges {
@@ -240,7 +239,7 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 		})
 		U := vertices[edgesLight[len(edgesLight)-1].U]
 		V := vertices[edgesLight[len(edgesLight)-1].V]
-		logging.Infof("adding edgeLight: %x:%d->%x:%d", U.Node, U.CoinType, V.Node, V.CoinType)
+		logging.Debugf("adding edgeLight: %x:%d->%x:%d", U.Node, U.CoinType, V.Node, V.CoinType)
 	}
 
 	graph := gographviz.NewGraph()
@@ -269,7 +268,7 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 		graph.AddEdge(U, V, true, attrs)
 	}
 
-	logging.Infof("bf-step graph: \n %s", "di"+graph.String())
+	logging.Debugf("bf-step graph: \n %s", "di"+graph.String())
 
 	// find my ID in map
 	myId, ok := verticesMap[routeHop{myIdPkh, originCoinType, false}]
@@ -361,30 +360,30 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 	for nodeHeap.Len() > 0 {
 		partialPath := heap.Pop(&nodeHeap).(nodeWithDist)
 
-		logging.Infof("popped %s:%d from heap", bech32.Encode("ln", vertices[partialPath.Node].Node[:]), vertices[partialPath.Node].CoinType)
+		logging.Debugf("popped %s:%d from heap", bech32.Encode("ln", vertices[partialPath.Node].Node[:]), vertices[partialPath.Node].CoinType)
 
 		p, ok := coinparam.RegisteredNets[vertices[partialPath.Node].CoinType]
 		if !ok {
-			logging.Warnf("ignoring %s:%d because cointype is unknown", bech32.Encode("ln", vertices[partialPath.Node].Node[:]), vertices[partialPath.Node].CoinType)
+			logging.Debugf("ignoring %s:%d because cointype is unknown", bech32.Encode("ln", vertices[partialPath.Node].Node[:]), vertices[partialPath.Node].CoinType)
 			continue
 		}
 
 		fee := p.FeePerByte * 1000
 
 		for _, edge := range dEdges[partialPath.Node] {
-			logging.Infof("considering edge %s:%d", bech32.Encode("ln", vertices[edge.V].Node[:]), vertices[edge.V].CoinType)
+			logging.Debugf("considering edge %s:%d", bech32.Encode("ln", vertices[edge.V].Node[:]), vertices[edge.V].CoinType)
 
 			amtRqd := partialPath.Amt
 
 			if amtRqd < consts.MinOutput+fee {
 				// this amount is too small to route
-				logging.Infof("ignoring %x:%d->%x:%d because amount rqd: %d less than minOutput+fee: %d", vertices[edge.U].Node, vertices[edge.U].CoinType, vertices[edge.V].Node, vertices[edge.V].CoinType, amtRqd, consts.MinOutput+fee)
+				logging.Debugf("ignoring %x:%d->%x:%d because amount rqd: %d less than minOutput+fee: %d", vertices[edge.U].Node, vertices[edge.U].CoinType, vertices[edge.V].Node, vertices[edge.V].CoinType, amtRqd, consts.MinOutput+fee)
 				continue
 			}
 
 			if amtRqd > edge.Capacity {
 				// this channel doesn't have enough capacity
-				logging.Infof("ignoring %x:%d->%x:%d because amount rqd: %d less than capacity: %d", vertices[edge.U].Node, vertices[edge.U].CoinType, vertices[edge.V].Node, vertices[edge.V].CoinType, amtRqd, edge.Capacity)
+				logging.Debugf("ignoring %x:%d->%x:%d because amount rqd: %d less than capacity: %d", vertices[edge.U].Node, vertices[edge.U].CoinType, vertices[edge.V].Node, vertices[edge.V].CoinType, amtRqd, edge.Capacity)
 				continue
 			}
 
@@ -413,7 +412,7 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 				continue
 			}
 
-			logging.Infof("could use edge %s:%d->%s:%d amt: %d capacity: %d", bech32.Encode("ln", vertices[edge.U].Node[:]), vertices[edge.U].CoinType, bech32.Encode("ln", vertices[edge.V].Node[:]), vertices[edge.V].CoinType, amtRqd, edge.Capacity)
+			logging.Debugf("could use edge %s:%d->%s:%d amt: %d capacity: %d", bech32.Encode("ln", vertices[edge.U].Node[:]), vertices[edge.U].CoinType, bech32.Encode("ln", vertices[edge.V].Node[:]), vertices[edge.V].CoinType, amtRqd, edge.Capacity)
 
 			predecessor[edge.V] = edge.U
 			heap.Push(&nodeHeap, *dDistance[edge.V])
@@ -423,7 +422,7 @@ func (nd *LitNode) FindPath(targetPkh [20]byte, destCoinType uint32, originCoinT
 	for target, dist := range dDistance {
 		if dist != nil && vertices[target].Terminus {
 			price := math.Exp(-dist.Dist)
-			logging.Infof("%s:%d: cap (recv): %d, price: %f64, cap (send): %d", bech32.Encode("ln", vertices[target].Node[:]), vertices[target].CoinType, dist.Amt, price, int(float64(dist.Amt)/price))
+			logging.Debugf("%s:%d: cap (recv): %d, price: %f64, cap (send): %d", bech32.Encode("ln", vertices[target].Node[:]), vertices[target].CoinType, dist.Amt, price, int(float64(dist.Amt)/price))
 		}
 	}
 
@@ -565,8 +564,8 @@ func (nd *LitNode) LinkMsgHandler(msg lnutil.LinkMsg) {
 		if peerIdx != origIdx {
 			msg.PeerIdx = peerIdx
 
-			go func(msg lnutil.LinkMsg) {
-				nd.OmniOut <- msg
+			go func(omsg lnutil.LinkMsg) {
+				nd.tmpSendLitMsg(omsg)
 			}(msg)
 		}
 	}

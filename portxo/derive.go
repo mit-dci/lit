@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/mit-dci/lit/btcutil/btcec"
+	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/btcutil/hdkeychain"
 )
 
 // DerivePrivateKey returns the private key for a utxo based on a master key
 func (kg *KeyGen) DerivePrivateKey(
-	m *hdkeychain.ExtendedKey) (*btcec.PrivateKey, error) {
+	m *hdkeychain.ExtendedKey) (*koblitz.PrivateKey, error) {
 
 	var err error
 	var empty [32]byte
@@ -54,7 +54,7 @@ func (kg *KeyGen) DerivePrivateKey(
 // PrivKeyAddBytes adds bytes to a private key.
 // NOTE that this modifies the key in place, overwriting it!!!!1
 // If k is nil, does nothing and doesn't error (k stays nil)
-func PrivKeyAddBytes(k *btcec.PrivateKey, b []byte) {
+func PrivKeyAddBytes(k *koblitz.PrivateKey, b []byte) {
 	if k == nil {
 		return
 	}
@@ -63,9 +63,9 @@ func PrivKeyAddBytes(k *btcec.PrivateKey, b []byte) {
 	// add private key to arg
 	k.D.Add(k.D, arg)
 	// mod 2^256ish
-	k.D.Mod(k.D, btcec.S256().N)
+	k.D.Mod(k.D, koblitz.S256().N)
 	// new key derived from this sum
 	// D is already modified, need to update the pubkey x and y
-	k.X, k.Y = btcec.S256().ScalarBaseMult(k.D.Bytes())
+	k.X, k.Y = koblitz.S256().ScalarBaseMult(k.D.Bytes())
 	return
 }

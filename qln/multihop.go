@@ -30,9 +30,9 @@ func (nd *LitNode) PayMultihop(dstLNAdr string, originCoinType uint32, destCoinT
 		return false, fmt.Errorf("cannot send %d because it's less than minOutput + fee: %d", amount, consts.MinOutput+fee)
 	}
 
-	//Connect to the node
+	// Connect to the node
 	if _, err := nd.FindPeerIndexByAddress(dstLNAdr); err != nil {
-		_, err = nd.DialPeer(dstLNAdr)
+		err = nd.DialPeer(dstLNAdr)
 		if err != nil {
 			return false, fmt.Errorf("error connected to destination node for multihop: %s", err.Error())
 		}
@@ -44,7 +44,7 @@ func (nd *LitNode) PayMultihop(dstLNAdr string, originCoinType uint32, destCoinT
 	if err != nil {
 		return false, err
 	}
-	logging.Infof("Done route to %s", dstLNAdr)
+	logging.Debugf("Done route to %s", dstLNAdr)
 
 	idx, err := nd.FindPeerIndexByAddress(dstLNAdr)
 	if err != nil {
@@ -60,14 +60,14 @@ func (nd *LitNode) PayMultihop(dstLNAdr string, originCoinType uint32, destCoinT
 
 	logging.Infof("Sending payment request to %s", dstLNAdr)
 	msg := lnutil.NewMultihopPaymentRequestMsg(idx, destCoinType)
-	nd.OmniOut <- msg
-	logging.Infof("Done sending payment request to %s", dstLNAdr)
+	nd.tmpSendLitMsg(msg)
+	logging.Debugf("Done sending payment request to %s", dstLNAdr)
 	return true, nil
 }
 
 func (nd *LitNode) MultihopPaymentRequestHandler(msg lnutil.MultihopPaymentRequestMsg) error {
 	// Generate private preimage and send ack with the hash
-	fmt.Printf("Received multihop payment request from peer %d\n", msg.Peer())
+	logging.Infof("Received multihop payment request from peer %d\n", msg.Peer())
 	inFlight := new(InFlightMultihop)
 	var pkh [20]byte
 
@@ -91,12 +91,12 @@ func (nd *LitNode) MultihopPaymentRequestHandler(msg lnutil.MultihopPaymentReque
 	nd.MultihopMutex.Unlock()
 
 	outMsg := lnutil.NewMultihopPaymentAckMsg(msg.Peer(), hash)
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 	return nil
 }
 
 func (nd *LitNode) MultihopPaymentAckHandler(msg lnutil.MultihopPaymentAckMsg) error {
-	fmt.Printf("Received multihop payment ack from peer %d, hash %x\n", msg.Peer(), msg.HHash)
+	logging.Infof("Received multihop payment ack from peer %d, hash %x\n", msg.Peer(), msg.HHash)
 
 	nd.MultihopMutex.Lock()
 	defer nd.MultihopMutex.Unlock()
@@ -109,7 +109,7 @@ func (nd *LitNode) MultihopPaymentAckHandler(msg lnutil.MultihopPaymentAckMsg) e
 				return fmt.Errorf("not connected to destination peer")
 			}
 			if msg.Peer() == targetIdx {
-				fmt.Printf("Found the right pending multihop. Sending setup msg to first hop\n")
+				logging.Debugf("Found the right pending multihop. Sending setup msg to first hop\n")
 				// found the right one. Set this up
 				firstHop := mh.Path[1]
 				ourHop := mh.Path[0]
@@ -174,8 +174,8 @@ func (nd *LitNode) MultihopPaymentAckHandler(msg lnutil.MultihopPaymentAckMsg) e
 
 					var data [32]byte
 					outMsg := lnutil.NewMultihopPaymentSetupMsg(firstHopIdx, msg.HHash, mh.Path, data)
-					logging.Infof("Sending multihoppaymentsetup to peer %d\n", firstHopIdx)
-					nd.OmniOut <- outMsg
+					logging.Debugf("Sending multihoppaymentsetup to peer %d\n", firstHopIdx)
+					nd.tmpSendLitMsg(outMsg)
 				}()
 
 				break
@@ -290,9 +290,9 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 
 	lnAdr := bech32.Encode("ln", nextHop.Node[:])
 
-	//Connect to the node
+	// Connect to the node
 	if _, err := nd.FindPeerIndexByAddress(lnAdr); err != nil {
-		_, err = nd.DialPeer(lnAdr)
+		err = nd.DialPeer(lnAdr)
 		if err != nil {
 			return fmt.Errorf("error connecting to node for multihop: %s", err.Error())
 		}
@@ -389,7 +389,7 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 
 		msg.PeerIdx = sendToIdx
 		msg.NodeRoute = msg.NodeRoute[1:]
-		nd.OmniOut <- msg
+		nd.tmpSendLitMsg(msg)
 	}()
 
 	return nil
