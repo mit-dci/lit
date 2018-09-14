@@ -10,7 +10,7 @@ import (
 	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/portxo"
 
-	"github.com/mit-dci/lit/btcutil/btcec"
+	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 )
 
@@ -257,7 +257,7 @@ func (nd *LitNode) GetDHSecret(q *Qchan) ([]byte, error) {
 		return nil, fmt.Errorf("GetDHPoint: nil node or channel")
 	}
 
-	theirPub, err := btcec.ParsePubKey(q.TheirPub[:], btcec.S256())
+	theirPub, err := koblitz.ParsePubKey(q.TheirPub[:], koblitz.S256())
 	if err != nil {
 		return nil, err
 	}
@@ -267,7 +267,7 @@ func (nd *LitNode) GetDHSecret(q *Qchan) ([]byte, error) {
 		return nil, err
 	}
 
-	return btcec.GenerateSharedSecret(priv, theirPub), nil
+	return koblitz.GenerateSharedSecret(priv, theirPub), nil
 }
 
 // GetChannelBalances returns myAmt and theirAmt in the channel

@@ -3,16 +3,15 @@ package lndc
 import (
 	"bytes"
 	"encoding/hex"
+	"github.com/mit-dci/lit/btcutil/koblitz"
+	"github.com/mit-dci/lit/crypto/koblitz"
+	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
 	"io"
 	"math"
 	"net"
 	"sync"
 	"testing"
-
-	"github.com/mit-dci/lit/logging"
-
-	"github.com/mit-dci/lit/btcutil/btcec"
-	"github.com/mit-dci/lit/lnutil"
 )
 
 type maybeNetConn struct {
@@ -22,7 +21,7 @@ type maybeNetConn struct {
 
 func makeListener() (*Listener, string, string, error) {
 	// First, generate the long-term private keys for the lndc listener.
-	localPriv, err := btcec.NewPrivateKey(btcec.S256())
+	localPriv, err := koblitz.NewPrivateKey(koblitz.S256())
 	if err != nil {
 		return nil, "", "", err
 	}
@@ -50,7 +49,7 @@ func establishTestConnection(wrong bool) (net.Conn, net.Conn, func(), error) {
 	defer listener.Close()
 	// Nos, generate the long-term private keys remote end of the connection
 	// within our test.
-	remotePriv, err := btcec.NewPrivateKey(btcec.S256())
+	remotePriv, err := koblitz.NewPrivateKey(koblitz.S256())
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -193,7 +192,7 @@ func TestConcurrentHandshakes(t *testing.T) {
 
 	// Now, construct a new private key and use the lndc dialer to
 	// connect to the listener.
-	remotePriv, err := btcec.NewPrivateKey(btcec.S256())
+	remotePriv, err := koblitz.NewPrivateKey(koblitz.S256())
 	if err != nil {
 		t.Fatalf("unable to generate private key: %v", err)
 	}
@@ -294,7 +293,7 @@ func TestBolt0008TestVectors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to decode hex: %v", err)
 	}
-	initiatorPriv, _ := btcec.PrivKeyFromBytes(btcec.S256(),
+	initiatorPriv, _ := koblitz.PrivKeyFromBytes(koblitz.S256(),
 		initiatorKeyBytes)
 
 	// We'll then do the same for the responder.
@@ -303,14 +302,14 @@ func TestBolt0008TestVectors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to decode hex: %v", err)
 	}
-	responderPriv, _ := btcec.PrivKeyFromBytes(btcec.S256(),
+	responderPriv, _ := koblitz.PrivKeyFromBytes(koblitz.S256(),
 		responderKeyBytes)
 
 	// With the initiator's key data parsed, we'll now define a custom
 	// EphemeralGenerator function for the state machine to ensure that the
 	// initiator and responder both generate the ephemeral public key
 	// defined within the test vectors.
-	initiatorEphemeral := EphemeralGenerator(func() (*btcec.PrivateKey, error) {
+	initiatorEphemeral := EphemeralGenerator(func() (*koblitz.PrivateKey, error) {
 		e := "121212121212121212121212121212121212121212121212121212" +
 			"1212121212"
 		eBytes, err := hex.DecodeString(e)
@@ -318,10 +317,10 @@ func TestBolt0008TestVectors(t *testing.T) {
 			return nil, err
 		}
 
-		priv, _ := btcec.PrivKeyFromBytes(btcec.S256(), eBytes)
+		priv, _ := koblitz.PrivKeyFromBytes(koblitz.S256(), eBytes)
 		return priv, nil
 	})
-	responderEphemeral := EphemeralGenerator(func() (*btcec.PrivateKey, error) {
+	responderEphemeral := EphemeralGenerator(func() (*koblitz.PrivateKey, error) {
 		e := "222222222222222222222222222222222222222222222222222" +
 			"2222222222222"
 		eBytes, err := hex.DecodeString(e)
@@ -329,7 +328,7 @@ func TestBolt0008TestVectors(t *testing.T) {
 			return nil, err
 		}
 
-		priv, _ := btcec.PrivKeyFromBytes(btcec.S256(), eBytes)
+		priv, _ := koblitz.PrivKeyFromBytes(koblitz.S256(), eBytes)
 		return priv, nil
 	})
 

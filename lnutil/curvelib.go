@@ -6,14 +6,14 @@ import (
 	"math/big"
 	"sort"
 
-	"github.com/mit-dci/lit/btcutil/btcec"
+	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 )
 
 // PrivKeyAddBytes adds bytes to a private key.
 // NOTE that this modifies the key in place, overwriting it!!!!!
 // If k is nil, does nothing and doesn't error (k stays nil)
-func PrivKeyAddBytes(k *btcec.PrivateKey, b []byte) {
+func PrivKeyAddBytes(k *koblitz.PrivateKey, b []byte) {
 	if k == nil {
 		return
 	}
@@ -22,20 +22,20 @@ func PrivKeyAddBytes(k *btcec.PrivateKey, b []byte) {
 	// add private key to arg
 	k.D.Add(k.D, arg)
 	// mod 2^256ish
-	k.D.Mod(k.D, btcec.S256().N)
+	k.D.Mod(k.D, koblitz.S256().N)
 	// new key derived from this sum
 	// D is already modified, need to update the pubkey x and y
-	k.X, k.Y = btcec.S256().ScalarBaseMult(k.D.Bytes())
+	k.X, k.Y = koblitz.S256().ScalarBaseMult(k.D.Bytes())
 	return
 }
 
 // PubKeyAddBytes adds bytes to a public key.
 // NOTE that this modifies the key in place, overwriting it!!!!!
-func PubKeyAddBytes(k *btcec.PublicKey, b []byte) {
+func PubKeyAddBytes(k *koblitz.PublicKey, b []byte) {
 	// turn b into a point on the curve
-	bx, by := btcec.S256().ScalarBaseMult(b)
+	bx, by := koblitz.S256().ScalarBaseMult(b)
 	// add arg point to pubkey point
-	k.X, k.Y = btcec.S256().Add(bx, by, k.X, k.Y)
+	k.X, k.Y = koblitz.S256().Add(bx, by, k.X, k.Y)
 	return
 }
 
@@ -43,22 +43,22 @@ func PubKeyAddBytes(k *btcec.PublicKey, b []byte) {
 // You can't add scalars to a point, so you turn the bytes into a point,
 // then add that point.
 func PubKeyArrAddBytes(p *[33]byte, b []byte) error {
-	pub, err := btcec.ParsePubKey(p[:], btcec.S256())
+	pub, err := koblitz.ParsePubKey(p[:], koblitz.S256())
 	if err != nil {
 		return err
 	}
 	// turn b into a point on the curve
 	bx, by := pub.ScalarBaseMult(b)
 	// add arg point to pubkey point
-	pub.X, pub.Y = btcec.S256().Add(bx, by, pub.X, pub.Y)
+	pub.X, pub.Y = koblitz.S256().Add(bx, by, pub.X, pub.Y)
 	copy(p[:], pub.SerializeCompressed())
 	return nil
 }
 
 // PubKeyMultiplyByHash multiplies a pubkey by a hash.
 // returns nothing, modifies in place.  Probably the slowest curve operation.
-func MultiplyPointByHash(k *btcec.PublicKey, h chainhash.Hash) {
-	k.X, k.Y = btcec.S256().ScalarMult(k.X, k.Y, h[:])
+func MultiplyPointByHash(k *koblitz.PublicKey, h chainhash.Hash) {
+	k.X, k.Y = koblitz.S256().ScalarMult(k.X, k.Y, h[:])
 }
 
 /* Key Aggregation
@@ -82,7 +82,7 @@ this works for lots of keys.  And is overkill for 2 but that's OK.
 */
 
 // PubKeySlice are slices of pubkeys, which can be combined (and sorted)
-type CombinablePubKeySlice []*btcec.PublicKey
+type CombinablePubKeySlice []*koblitz.PublicKey
 
 // Make PubKeySlices sortable
 func (p CombinablePubKeySlice) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
@@ -100,7 +100,7 @@ func PubsFromArrs(arrSlice ...[33]byte) (CombinablePubKeySlice, error) {
 	}
 	var p CombinablePubKeySlice
 	for _, arr := range arrSlice {
-		nextPub, err := btcec.ParsePubKey(arr[:], btcec.S256())
+		nextPub, err := koblitz.ParsePubKey(arr[:], koblitz.S256())
 		if err != nil {
 			return nil, err
 		}
@@ -126,7 +126,7 @@ func (p CombinablePubKeySlice) ComboCommit() chainhash.Hash {
 // Never errors; just returns empty pubkeys instead (which will trigger other errors
 // because those aren't valid pubkeys)
 // Careful to not modify the slice in place.
-func (p CombinablePubKeySlice) Combine() *btcec.PublicKey {
+func (p CombinablePubKeySlice) Combine() *koblitz.PublicKey {
 	// first, give up if the argument set is empty
 	if p == nil || len(p) == 0 {
 		return nil
@@ -144,7 +144,7 @@ func (p CombinablePubKeySlice) Combine() *btcec.PublicKey {
 	}
 
 	// final sum key is called q.
-	q := new(btcec.PublicKey)
+	q := new(koblitz.PublicKey)
 
 	// use index i to optimize a bit
 	for i, k := range p {
@@ -152,7 +152,7 @@ func (p CombinablePubKeySlice) Combine() *btcec.PublicKey {
 			q.X = k.X
 			q.Y = k.Y
 		} else {
-			q.X, q.Y = btcec.S256().Add(q.X, q.Y, k.X, k.Y)
+			q.X, q.Y = koblitz.S256().Add(q.X, q.Y, k.X, k.Y)
 		}
 	}
 	return q
@@ -162,7 +162,7 @@ func (p CombinablePubKeySlice) Combine() *btcec.PublicKey {
 // as done for public keys.  This only works if you know *all* of the private keys.
 // If you don't, we'll do something with returning a scalar coefficient...
 // I don't know how that's going to work.  Schnorr stuff isn't decided yet.
-func CombinePrivateKeys(keys ...*btcec.PrivateKey) *btcec.PrivateKey {
+func CombinePrivateKeys(keys ...*koblitz.PrivateKey) *koblitz.PrivateKey {
 
 	if keys == nil || len(keys) == 0 {
 		return nil
@@ -185,14 +185,14 @@ func CombinePrivateKeys(keys ...*btcec.PrivateKey) *btcec.PrivateKey {
 		// multiply the hash by the private scalar for this particular key
 		hashInt.Mul(hashInt, k.D)
 		// reduce mod curve N
-		hashInt.Mod(hashInt, btcec.S256().N)
+		hashInt.Mod(hashInt, koblitz.S256().N)
 		// add this scalar to the aggregate and reduce the sum mod N again
 		sum.Add(sum, hashInt)
-		sum.Mod(sum, btcec.S256().N)
+		sum.Mod(sum, koblitz.S256().N)
 	}
 
 	// kindof ugly that it's converting the bigint to bytes and back but whatever
-	priv, _ := btcec.PrivKeyFromBytes(btcec.S256(), sum.Bytes())
+	priv, _ := koblitz.PrivKeyFromBytes(koblitz.S256(), sum.Bytes())
 	return priv
 }
 
@@ -203,7 +203,7 @@ func CombinePrivateKeys(keys ...*btcec.PrivateKey) *btcec.PrivateKey {
 // in LN this is used for everything but the revocable pubkey
 // order matters.  the first key is the base, the second is the elkpoint.
 func AddPubsEZ(a, b [33]byte) [33]byte {
-	apoint, err := btcec.ParsePubKey(a[:], btcec.S256())
+	apoint, err := koblitz.ParsePubKey(a[:], koblitz.S256())
 	if err != nil {
 		return a
 	}
@@ -212,15 +212,15 @@ func AddPubsEZ(a, b [33]byte) [33]byte {
 	sha := chainhash.DoubleHashH(append(b[:], a[:]...))
 
 	// turn sha into a point on the curve
-	shax, shay := btcec.S256().ScalarBaseMult(sha[:])
+	shax, shay := koblitz.S256().ScalarBaseMult(sha[:])
 	// add arg point to pubkey point
-	apoint.X, apoint.Y = btcec.S256().Add(shax, shay, apoint.X, apoint.Y)
+	apoint.X, apoint.Y = koblitz.S256().Add(shax, shay, apoint.X, apoint.Y)
 	copy(a[:], apoint.SerializeCompressed())
 	return a
 }
 
 // AddPrivEZ adds the non-secret scalar to a private key
-func AddPrivEZ(k *btcec.PrivateKey, b []byte) {
+func AddPrivEZ(k *koblitz.PrivateKey, b []byte) {
 	// get hash of both pubkeys
 	sha := chainhash.DoubleHashH(append(k.PubKey().SerializeCompressed(), b...))
 	// convert to bigint
@@ -228,7 +228,7 @@ func AddPrivEZ(k *btcec.PrivateKey, b []byte) {
 	// add private key to hash bigint
 	k.D.Add(k.D, shaScalar)
 	// mod 2^256ish
-	k.D.Mod(k.D, btcec.S256().N)
+	k.D.Mod(k.D, koblitz.S256().N)
 	return
 }
 
@@ -236,11 +236,11 @@ func AddPrivEZ(k *btcec.PrivateKey, b []byte) {
 // the deliniearized combination process.  Returns empty array if there's an error.
 func CombinePubs(a, b [33]byte) [33]byte {
 	var c [33]byte
-	apoint, err := btcec.ParsePubKey(a[:], btcec.S256())
+	apoint, err := koblitz.ParsePubKey(a[:], koblitz.S256())
 	if err != nil {
 		return c
 	}
-	bpoint, err := btcec.ParsePubKey(b[:], btcec.S256())
+	bpoint, err := koblitz.ParsePubKey(b[:], koblitz.S256())
 	if err != nil {
 		return c
 	}
@@ -252,14 +252,14 @@ func CombinePubs(a, b [33]byte) [33]byte {
 
 // HashToPub turns a 32 byte hash into a 33 byte serialized pubkey
 func PubFromHash(h chainhash.Hash) (p [33]byte) {
-	_, pub := btcec.PrivKeyFromBytes(btcec.S256(), h[:])
+	_, pub := koblitz.PrivKeyFromBytes(koblitz.S256(), h[:])
 	copy(p[:], pub.SerializeCompressed())
 	return
 }
 
 // PrivKeyCombineBytes combines a private key with a byte slice
-func CombinePrivKeyWithBytes(k *btcec.PrivateKey, b []byte) *btcec.PrivateKey {
-	bytePriv, _ := btcec.PrivKeyFromBytes(btcec.S256(), b)
+func CombinePrivKeyWithBytes(k *koblitz.PrivateKey, b []byte) *koblitz.PrivateKey {
+	bytePriv, _ := koblitz.PrivKeyFromBytes(koblitz.S256(), b)
 	return CombinePrivateKeys(k, bytePriv)
 }
 
@@ -267,7 +267,7 @@ func CombinePrivKeyWithBytes(k *btcec.PrivateKey, b []byte) *btcec.PrivateKey {
 // CombinePrivateKeys, but once it gets the combined private key, it subtracts the
 // original base key.  It's weird, but it allows the porTxo standard to always add
 // private keys and not need to be aware of different derivation methods.
-func CombinePrivKeyAndSubtract(k *btcec.PrivateKey, b []byte) [32]byte {
+func CombinePrivKeyAndSubtract(k *koblitz.PrivateKey, b []byte) [32]byte {
 	// create empty array to copy into
 	var diffKey [32]byte
 	// delinearization step combining base private key with elk scalar
@@ -275,7 +275,7 @@ func CombinePrivKeyAndSubtract(k *btcec.PrivateKey, b []byte) [32]byte {
 	// subtract the original k base key from the combined key
 	combinedKey.D.Sub(combinedKey.D, k.D)
 	// not quite sure how this step works, but it indeed seems to.
-	combinedKey.D.Mod(combinedKey.D, btcec.S256().N)
+	combinedKey.D.Mod(combinedKey.D, koblitz.S256().N)
 	// copy this "difference key" and return it.
 	copy(diffKey[:], combinedKey.D.Bytes())
 	return diffKey

@@ -3,15 +3,11 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"io"
-	"log"
-	"os"
-	"path/filepath"
-
-	"github.com/mit-dci/lit/logging"
-
 	"github.com/jessevdk/go-flags"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
+	"os"
+	"path/filepath"
 )
 
 // createDefaultConfigFile creates a config file  -- only call this if the
@@ -60,15 +56,15 @@ func litSetup(conf *config) *[32]byte {
 	// create home directory
 	_, err = os.Stat(preconf.LitHomeDir)
 	if err != nil {
-		fmt.Println("Error while creating a directory")
+		logging.Errorf("Error while creating a directory")
 	}
 	if os.IsNotExist(err) {
 		// first time the guy is running lit, lets set tn3 to true
 		os.Mkdir(preconf.LitHomeDir, 0700)
-		fmt.Printf("Creating a new config file")
+		logging.Infof("Creating a new config file")
 		err := createDefaultConfigFile(preconf.LitHomeDir) // Source of error
 		if err != nil {
-			fmt.Printf("Error creating a default config file: %v", preconf.LitHomeDir)
+			logging.Errorf("Error creating a default config file: %v", preconf.LitHomeDir)
 			panic(err)
 		}
 	}
@@ -78,7 +74,7 @@ func litSetup(conf *config) *[32]byte {
 		if err != nil {
 			fmt.Println(err)
 		}
-		fmt.Println("Creating a new config file")
+		logging.Infof("Creating a new config file")
 		err := createDefaultConfigFile(filepath.Join(preconf.LitHomeDir)) // Source of error
 		if err != nil {
 			panic(err)
@@ -122,11 +118,13 @@ func litSetup(conf *config) *[32]byte {
 	// TODO ... what's this do?
 	defer logFile.Close()
 
-	logging.SetLogLevel(conf.LogLevel)
-
-	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
-	logOutput := io.MultiWriter(os.Stdout, logFile)
-	log.SetOutput(logOutput)
+	// special handling for this one.
+	ll := len(conf.LogLevel)
+	if ll > 0 {
+		logging.SetLogLevel(len(conf.LogLevel))
+	} else {
+		logging.SetLogLevel(defaultLogLevel)
+	}
 
 	// Allow node with no linked wallets, for testing.
 	// TODO Should update tests and disallow nodes without wallets later.

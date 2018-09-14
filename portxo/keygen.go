@@ -11,9 +11,9 @@ import (
 // Depth must be 0 to 5 inclusive.  Child indexes of 0 are OK, so we can't just
 // terminate at the first 0.
 type KeyGen struct {
-	Depth   uint8     // how many levels of the path to use. 0 means privkey as-is
-	Step    [5]uint32 // bip 32 / 44 path numbers
-	PrivKey [32]byte  // private key
+	Depth   uint8     `json:"depth"`   // how many levels of the path to use. 0 means privkey as-is
+	Step    [5]uint32 `json:"steps"`   // bip 32 / 44 path numbers
+	PrivKey [32]byte  `json:"privkey"` // private key
 }
 
 // Bytes returns the 53 byte serialized key derivation path.

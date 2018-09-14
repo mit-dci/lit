@@ -7,7 +7,7 @@ package txscript
 import (
 	"sync"
 
-	"github.com/mit-dci/lit/btcutil/btcec"
+	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 )
 
@@ -18,8 +18,8 @@ import (
 // match. In the occasion that two sigHashes collide, the newer sigHash will
 // simply overwrite the existing entry.
 type sigCacheEntry struct {
-	sig    *btcec.Signature
-	pubKey *btcec.PublicKey
+	sig    *koblitz.Signature
+	pubKey *koblitz.PublicKey
 }
 
 // SigCache implements an ECDSA signature verification cache with a randomized
@@ -55,7 +55,7 @@ func NewSigCache(maxEntries uint) *SigCache {
 //
 // NOTE: This function is safe for concurrent access. Readers won't be blocked
 // unless there exists a writer, adding an entry to the SigCache.
-func (s *SigCache) Exists(sigHash chainhash.Hash, sig *btcec.Signature, pubKey *btcec.PublicKey) bool {
+func (s *SigCache) Exists(sigHash chainhash.Hash, sig *koblitz.Signature, pubKey *koblitz.PublicKey) bool {
 	s.RLock()
 	defer s.RUnlock()
 
@@ -73,7 +73,7 @@ func (s *SigCache) Exists(sigHash chainhash.Hash, sig *btcec.Signature, pubKey *
 //
 // NOTE: This function is safe for concurrent access. Writers will block
 // simultaneous readers until function execution has concluded.
-func (s *SigCache) Add(sigHash chainhash.Hash, sig *btcec.Signature, pubKey *btcec.PublicKey) {
+func (s *SigCache) Add(sigHash chainhash.Hash, sig *koblitz.Signature, pubKey *koblitz.PublicKey) {
 	s.Lock()
 	defer s.Unlock()
 
