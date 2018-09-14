@@ -2,33 +2,28 @@ package qln
 
 import (
 	"fmt"
-	"path/filepath"
-
-	"github.com/mit-dci/lit/logging"
-
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/hdkeychain"
 	"github.com/mit-dci/lit/coinparam"
+	"github.com/mit-dci/lit/db/lnbolt" // TODO Abstract this more.
 	"github.com/mit-dci/lit/dlc"
-	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/eventbus"
+	"github.com/mit-dci/lit/lncore"
+	"github.com/mit-dci/lit/lnp2p"
+	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/wallit"
 	"github.com/mit-dci/lit/watchtower"
+	"path/filepath"
+	"sync"
 )
 
-// Init starts up a lit node.  Needs priv key, and a path.
+// NewLitNode starts up a lit node.  Needs priv key, and a path.
 // Does not activate a subwallet; do that after init.
 func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL string, nat string) (*LitNode, error) {
 
-	nd := new(LitNode)
-	nd.LitFolder = path
-
-	litdbpath := filepath.Join(nd.LitFolder, "ln.db")
-	err := nd.OpenDB(litdbpath)
-	if err != nil {
-		return nil, err
-	}
+	var err error
 
 	// Maybe make a new parameter set for "LN".. meh
 	// TODO change this to a non-coin
@@ -36,6 +31,50 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 	if err != nil {
 		return nil, err
 	}
+
+	nd := new(LitNode)
+	nd.LitFolder = path
+
+	litdbpath := filepath.Join(nd.LitFolder, "ln.db")
+	err = nd.OpenDB(litdbpath)
+	if err != nil {
+		return nil, err
+	}
+
+	db2 := &lnbolt.LitBoltDB{}
+	var dbx lncore.LitStorage
+	dbx = db2
+	err = dbx.Open(filepath.Join(nd.LitFolder, "db2"))
+	if err != nil {
+		return nil, err
+	}
+	nd.NewLitDB = dbx
+	err = nd.NewLitDB.Check()
+	if err != nil {
+		return nil, err
+	}
+
+	// Event system setup.
+	ebus := eventbus.NewEventBus()
+	nd.Events = &ebus
+
+	// Peer manager
+	nd.PeerMan, err = lnp2p.NewPeerManager(rootPrivKey, nd.NewLitDB.GetPeerDB(), &ebus)
+	if err != nil {
+		return nil, err
+	}
+
+	// Actually start the thread to send messages.
+	nd.PeerMan.StartSending()
+
+	// Register adapter event handlers.  These are for hooking in the new peer management with the old one.
+	h1 := makeTmpNewPeerHandler(nd)
+	nd.Events.RegisterHandler("lnp2p.peer.new", h1)
+	h2 := makeTmpDisconnectPeerHandler(nd)
+	nd.Events.RegisterHandler("lnp2p.peer.disconnect", h2)
+
+	// Sets up handlers for all the messages we need to handle.
+	nd.registerHandlers()
 
 	var kg portxo.KeyGen
 	kg.Depth = 5
@@ -92,11 +131,9 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 
 	nd.SubWallet = make(map[uint32]UWallet)
 
-	nd.OmniOut = make(chan lnutil.LitMsg, 10)
-	nd.OmniIn = make(chan lnutil.LitMsg, 10)
-
-	//	go nd.OmniHandler()
-	go nd.OutMessager()
+	// REFACTORING STUFF
+	nd.PeerMap = map[*lnp2p.Peer]*RemotePeer{}
+	nd.PeerMapMtx = &sync.Mutex{}
 
 	return nd, nil
 }

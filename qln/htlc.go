@@ -3,9 +3,6 @@ package qln
 import (
 	"bytes"
 	"fmt"
-	"log"
-	"time"
-
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/btcutil/txscript"
 	"github.com/mit-dci/lit/consts"
@@ -15,10 +12,11 @@ import (
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/sig64"
 	"github.com/mit-dci/lit/wire"
+	"time"
 )
 
 func (nd *LitNode) OfferHTLC(qc *Qchan, amt uint32, RHash [32]byte, locktime uint32, data [32]byte) error {
-	log.Printf("starting HTLC offer")
+	logging.Infof("starting HTLC offer")
 
 	if qc.State.Failed {
 		return fmt.Errorf("cannot offer HTLC, channel failed")
@@ -178,7 +176,7 @@ func (nd *LitNode) SendHashSig(q *Qchan) error {
 
 	logging.Infof("Sending HashSig with %d HTLC sigs", len(HTLCSigs))
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 
 	return nil
 }
@@ -545,7 +543,7 @@ func (nd *LitNode) SendPreimageSig(q *Qchan, Idx uint32) error {
 
 	logging.Infof("Sending PreimageSig with %d HTLC sigs", len(HTLCSigs))
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 
 	return nil
 }
@@ -800,12 +798,12 @@ func (nd *LitNode) ClaimHTLC(R [16]byte) ([][32]byte, error) {
 
 				nd.RemoteMtx.Unlock()
 				if !ok {
-					log.Printf("Couldn't find peer %d in RemoteCons", q.Peer())
+					logging.Errorf("Couldn't find peer %d in RemoteCons", q.Peer())
 					continue
 				}
 				qc, ok := peer.QCs[q.Idx()]
 				if !ok {
-					log.Printf("Couldn't find channel %d in peer.QCs", q.Idx())
+					logging.Errorf("Couldn't find channel %d in peer.QCs", q.Idx())
 					continue
 				}
 

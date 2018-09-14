@@ -3,7 +3,6 @@ package qln
 import (
 	"bytes"
 	"fmt"
-
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/btcutil/txscript"
 	"github.com/mit-dci/lit/consts"
@@ -325,7 +324,7 @@ func (nd *LitNode) SyncWatch(qc *Qchan, watchPeer uint32) error {
 		desc := lnutil.NewWatchDescMsg(watchPeer, qc.Coin(),
 			qc.WatchRefundAdr, qc.Delay, consts.JusticeFee, qc.TheirHAKDBase, qc.MyHAKDBase)
 
-		nd.OmniOut <- desc
+		nd.tmpSendLitMsg(desc)
 		// after sending description, must send at least states 0 and 1.
 		err := nd.SendWatchComMsg(qc, 0, watchPeer)
 		if err != nil {
@@ -366,6 +365,6 @@ func (nd *LitNode) SendWatchComMsg(qc *Qchan, idx uint64, watchPeer uint32) erro
 	comMsg := lnutil.NewComMsg(
 		watchPeer, qc.Coin(), qc.WatchRefundAdr, *elk, txidsig.Txid, txidsig.Sig)
 
-	nd.OmniOut <- comMsg
+	nd.tmpSendLitMsg(comMsg)
 	return err
 }

@@ -2,24 +2,22 @@ package wallit
 
 import (
 	"fmt"
-	"sort"
-
-	"github.com/mit-dci/lit/logging"
-
-	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/coinparam"
+	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/uspv"
 	"github.com/mit-dci/lit/wire"
+	"sort"
 )
 
 /*
 type UWallet interface {
-	GetPub(k portxo.KeyGen) *btcec.PublicKey
+	GetPub(k portxo.KeyGen) *koblitz.PublicKey
 
-	GetPriv(k portxo.KeyGen) *btcec.PrivateKey
+	GetPriv(k portxo.KeyGen) *koblitz.PrivateKey
 
 	PushTx(tx *wire.MsgTx) error
 	ExportUtxo(txo *portxo.PorTxo)
@@ -37,7 +35,7 @@ type UWallet interface {
 
 // --- implementation of BaseWallet interface ----
 
-func (w *Wallit) GetPriv(k portxo.KeyGen) (*btcec.PrivateKey, error) {
+func (w *Wallit) GetPriv(k portxo.KeyGen) (*koblitz.PrivateKey, error) {
 	if w.PathPrivkey(k) != nil {
 		return w.PathPrivkey(k), nil
 	} else {
@@ -45,7 +43,7 @@ func (w *Wallit) GetPriv(k portxo.KeyGen) (*btcec.PrivateKey, error) {
 	}
 }
 
-func (w *Wallit) GetPub(k portxo.KeyGen) *btcec.PublicKey {
+func (w *Wallit) GetPub(k portxo.KeyGen) *koblitz.PublicKey {
 	return w.PathPubkey(k)
 }
 

@@ -42,6 +42,7 @@ clean:
 	rm -f cmd/lit-af/lit-af
 	rm -f cmd/glit/glit
 	cd test && ./clean.sh
+	rm -f lit lit-af
 
 test: lit
 	build/env.sh ./gotests.sh

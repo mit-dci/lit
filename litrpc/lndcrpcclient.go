@@ -4,19 +4,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"github.com/mit-dci/lit/btcutil/hdkeychain"
+	"github.com/mit-dci/lit/coinparam"
+	"github.com/mit-dci/lit/crypto/koblitz"
+	"github.com/mit-dci/lit/lndc"
+	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
+	"github.com/mit-dci/lit/portxo"
 	"net"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
-
-	"github.com/mit-dci/lit/btcutil/btcec"
-	"github.com/mit-dci/lit/btcutil/hdkeychain"
-	"github.com/mit-dci/lit/coinparam"
-	"github.com/mit-dci/lit/lndc"
-	"github.com/mit-dci/lit/lnutil"
-	"github.com/mit-dci/lit/portxo"
 )
 
 type LndcRpcClient struct {
@@ -24,7 +23,7 @@ type LndcRpcClient struct {
 	requestNonce     uint64
 	requestNonceMtx  sync.Mutex
 	responseChannels map[uint64]chan lnutil.RemoteControlRpcResponseMsg
-	key              *btcec.PrivateKey
+	key              *koblitz.PrivateKey
 	conMtx           sync.Mutex
 }
 
@@ -76,7 +75,7 @@ func NewLocalLndcRpcClientWithHomeDirAndPort(litHomeDir string, port uint32) (*L
 	kg.Step[3] = 0 | 1<<31
 	localIDPriv, err := kg.DerivePrivateKey(rootPrivKey)
 	if err != nil {
-		log.Fatal(err)
+		logging.Errorf(err.Error())
 	}
 	var localIDPub [33]byte
 	copy(localIDPub[:], localIDPriv.PubKey().SerializeCompressed())
@@ -87,7 +86,7 @@ func NewLocalLndcRpcClientWithHomeDirAndPort(litHomeDir string, port uint32) (*L
 	return NewLndcRpcClient(adr, key)
 }
 
-func NewLndcRpcClient(address string, key *btcec.PrivateKey) (*LndcRpcClient, error) {
+func NewLndcRpcClient(address string, key *koblitz.PrivateKey) (*LndcRpcClient, error) {
 	var err error
 
 	cli := new(LndcRpcClient)
@@ -167,7 +166,7 @@ func (cli *LndcRpcClient) ReceiveLoop() {
 		//	log.Printf("read message from %x\n", l.RemoteLNId)
 		n, err := cli.lnconn.Read(msg)
 		if err != nil {
-			log.Printf("Error reading message from LNDC: %s\n", err.Error())
+			logging.Warnf("Error reading message from LNDC: %s\n", err.Error())
 			cli.lnconn.Close()
 			return
 		}
@@ -176,7 +175,7 @@ func (cli *LndcRpcClient) ReceiveLoop() {
 		if msg[0] == lnutil.MSGID_REMOTE_RPCRESPONSE {
 			response, err := lnutil.NewRemoteControlRpcResponseMsgFromBytes(msg, 0)
 			if err != nil {
-				log.Printf("Error while receiving RPC response: %s\n", err.Error())
+				logging.Warnf("Error while receiving RPC response: %s\n", err.Error())
 				cli.lnconn.Close()
 				return
 			}
@@ -189,7 +188,7 @@ func (cli *LndcRpcClient) ReceiveLoop() {
 				}
 				delete(cli.responseChannels, response.Idx)
 			} else {
-				log.Printf("Could not find response channel for index %d\n", response.Idx)
+				logging.Errorf("Could not find response channel for index %d\n", response.Idx)
 			}
 		}
 	}

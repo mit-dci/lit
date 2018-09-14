@@ -3,7 +3,7 @@ package lnutil
 import (
 	"testing"
 
-	"github.com/mit-dci/lit/btcutil/btcec"
+	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 )
 
@@ -126,9 +126,9 @@ func TestSwap(t *testing.T) {
 	//   PubKey: pubKeyCmpd0
 	//   PubKey: pubKeyCmpd1
 	// want: first elm and second elm is swapped
-	inPubKey0, _ := btcec.ParsePubKey(pubKeyCmpd0[:], btcec.S256())
-	inPubKey1, _ := btcec.ParsePubKey(pubKeyCmpd1[:], btcec.S256())
-	var c CombinablePubKeySlice = []*btcec.PublicKey{inPubKey0, inPubKey1}
+	inPubKey0, _ := koblitz.ParsePubKey(pubKeyCmpd0[:], koblitz.S256())
+	inPubKey1, _ := koblitz.ParsePubKey(pubKeyCmpd1[:], koblitz.S256())
+	var c CombinablePubKeySlice = []*koblitz.PublicKey{inPubKey0, inPubKey1}
 
 	c.Swap(0, 1)
 	if !c[0].IsEqual(inPubKey1) {
@@ -143,8 +143,8 @@ func TestSwap(t *testing.T) {
 	//   PubKey: ivalidPubKeyCmpd
 	//   PubKey: pubKeyCmpd1
 	// want: first elm and second elm is swapped even if elms has nil
-	inPubKeyNil, _ := btcec.ParsePubKey(invalidPubKeyCmpd[:], btcec.S256())
-	var c0Nil CombinablePubKeySlice = []*btcec.PublicKey{inPubKeyNil, inPubKey1}
+	inPubKeyNil, _ := koblitz.ParsePubKey(invalidPubKeyCmpd[:], koblitz.S256())
+	var c0Nil CombinablePubKeySlice = []*koblitz.PublicKey{inPubKeyNil, inPubKey1}
 
 	c0Nil.Swap(0, 1)
 	if !c0Nil[0].IsEqual(inPubKey1) {
@@ -163,9 +163,9 @@ func TestLen(t *testing.T) {
 	//   PubKey: pubKeyCmpd0
 	//   PubKey: pubKeyCmpd1
 	// want: 2
-	inPubKey0, _ := btcec.ParsePubKey(pubKeyCmpd0[:], btcec.S256())
-	inPubKey1, _ := btcec.ParsePubKey(pubKeyCmpd1[:], btcec.S256())
-	var c CombinablePubKeySlice = []*btcec.PublicKey{inPubKey0, inPubKey1}
+	inPubKey0, _ := koblitz.ParsePubKey(pubKeyCmpd0[:], koblitz.S256())
+	inPubKey1, _ := koblitz.ParsePubKey(pubKeyCmpd1[:], koblitz.S256())
+	var c CombinablePubKeySlice = []*koblitz.PublicKey{inPubKey0, inPubKey1}
 
 	if c.Len() != 2 {
 		t.Fatalf("it needs to be equal")
@@ -176,8 +176,8 @@ func TestLen(t *testing.T) {
 	//   PubKey: ivalidPubKeyCmpd
 	//   PubKey: pubKeyCmpd1
 	// want: 2 even if elms has nil
-	inPubKeyNil, _ := btcec.ParsePubKey(invalidPubKeyCmpd[:], btcec.S256())
-	var c0Nil CombinablePubKeySlice = []*btcec.PublicKey{inPubKeyNil, inPubKey1}
+	inPubKeyNil, _ := koblitz.ParsePubKey(invalidPubKeyCmpd[:], koblitz.S256())
+	var c0Nil CombinablePubKeySlice = []*koblitz.PublicKey{inPubKeyNil, inPubKey1}
 
 	if c0Nil.Len() != 2 {
 		t.Fatalf("it needs to be equal")
@@ -191,9 +191,9 @@ func TestLess(t *testing.T) {
 	// input: CombinablePubKeySlice contains
 	//   PubKey: pubKeyCmpd0
 	//   PubKey: pubKeyCmpd1
-	inPubKey0, _ := btcec.ParsePubKey(pubKeyCmpd0[:], btcec.S256())
-	inPubKey1, _ := btcec.ParsePubKey(pubKeyCmpd1[:], btcec.S256())
-	var c CombinablePubKeySlice = []*btcec.PublicKey{inPubKey0, inPubKey1}
+	inPubKey0, _ := koblitz.ParsePubKey(pubKeyCmpd0[:], koblitz.S256())
+	inPubKey1, _ := koblitz.ParsePubKey(pubKeyCmpd1[:], koblitz.S256())
+	var c CombinablePubKeySlice = []*koblitz.PublicKey{inPubKey0, inPubKey1}
 
 	if c.Less(0, 1) != true {
 		t.Fatalf("it needs to be equal")
@@ -212,8 +212,8 @@ func TestLess(t *testing.T) {
 	// TODO: fix it
 	// panic if one of compared pubkeys is nil
 
-	//inPubKeyNil, _ := btcec.ParsePubKey(invalidPubKeyCmpd[:], btcec.S256())
-	//var c0Nil CombinablePubKeySlice = []*btcec.PublicKey{inPubKeyNil, inPubKey1}
+	//inPubKeyNil, _ := koblitz.ParsePubKey(invalidPubKeyCmpd[:], koblitz.S256())
+	//var c0Nil CombinablePubKeySlice = []*koblitz.PublicKey{inPubKeyNil, inPubKey1}
 	/*
 	   if c0Nil.Less(0, 1) != true {
 	           t.Fatalf("it needs to be equal")
@@ -237,9 +237,9 @@ func TestComboCommit(t *testing.T) {
 	//   PubKey: pubKeyCmpd0
 	//   PubKey: pubKeyCmpd1
 	// want: wantH, chainhash.Hash
-	inPubKey0, _ := btcec.ParsePubKey(pubKeyCmpd0[:], btcec.S256())
-	inPubKey1, _ := btcec.ParsePubKey(pubKeyCmpd1[:], btcec.S256())
-	var c CombinablePubKeySlice = []*btcec.PublicKey{inPubKey0, inPubKey1}
+	inPubKey0, _ := koblitz.ParsePubKey(pubKeyCmpd0[:], koblitz.S256())
+	inPubKey1, _ := koblitz.ParsePubKey(pubKeyCmpd1[:], koblitz.S256())
+	var c CombinablePubKeySlice = []*koblitz.PublicKey{inPubKey0, inPubKey1}
 
 	var wantH chainhash.Hash = [32]byte{
 		0x4d, 0x3e, 0x71, 0x71, 0xa1, 0x98, 0x2f, 0x96,
@@ -255,9 +255,9 @@ func TestComboCommit(t *testing.T) {
 	// TODO: fix it
 	// panic if one of pubkeys is nil
 
-	//inPubKeyNil, _ := btcec.ParsePubKey(invalidPubKeyCmpd[:], btcec.S256())
+	//inPubKeyNil, _ := koblitz.ParsePubKey(invalidPubKeyCmpd[:], koblitz.S256())
 	//want := ...
-	//var c0Nil CombinablePubKeySlice = []*btcec.PublicKey{inPubKeyNil, inPubKey1}
+	//var c0Nil CombinablePubKeySlice = []*koblitz.PublicKey{inPubKeyNil, inPubKey1}
 	//if c0Nil.ComboCommit() != want {
 	//	t.Fatalf("it needs to be equal")
 	//}
@@ -266,10 +266,10 @@ func TestComboCommit(t *testing.T) {
 // CombinePrivKeyAndSubtract
 func TestCombinePrivKeyAndSubtract(t *testing.T) {
 	// test a normal situation
-	// input1: inPrivKey0, btcec.PrivateKey
-	// input2: inPrivKey1, btcec.PrivateKey
+	// input1: inPrivKey0, koblitz.PrivateKey
+	// input2: inPrivKey1, koblitz.PrivateKey
 	// want: wantB, 32 bytes array
-	inPrivKey0, _ := btcec.PrivKeyFromBytes(btcec.S256(), privKeyB0)
+	inPrivKey0, _ := koblitz.PrivKeyFromBytes(koblitz.S256(), privKeyB0)
 	inPrivKeyB1 := privKeyB1
 	wantB := [32]byte{
 		0xfc, 0x92, 0xf7, 0x65, 0x42, 0xd7, 0x96, 0xb8,
@@ -284,12 +284,12 @@ func TestCombinePrivKeyAndSubtract(t *testing.T) {
 // CombinePrivKeyWithBytes
 func TestCombinePrivKeyWithBytes(t *testing.T) {
 	// test a normal situation
-	// input1: inPrivKey0, btcec.PrivateKey
+	// input1: inPrivKey0, koblitz.PrivateKey
 	// input2: inPrivKeyB1, byte slice
-	// want: wantPrivKey, btcec.PrivateKey
-	inPrivKey0, _ := btcec.PrivKeyFromBytes(btcec.S256(), privKeyB0)
+	// want: wantPrivKey, koblitz.PrivateKey
+	inPrivKey0, _ := koblitz.PrivKeyFromBytes(koblitz.S256(), privKeyB0)
 	inPrivKeyB1 := privKeyB1
-	wantPrivKey, _ := btcec.PrivKeyFromBytes(btcec.S256(), []byte{
+	wantPrivKey, _ := koblitz.PrivKeyFromBytes(koblitz.S256(), []byte{
 		0xfc, 0x92, 0xf7, 0x65, 0x42, 0xd7, 0x96, 0xb8,
 		0x21, 0xba, 0x8d, 0xf6, 0xcd, 0x2a, 0x9e, 0x0a,
 		0xe9, 0x72, 0xb7, 0x0f, 0xaf, 0x10, 0x5c, 0xb1,
@@ -305,12 +305,12 @@ func TestCombinePrivKeyWithBytes(t *testing.T) {
 func TestCombinePrivateKeys(t *testing.T) {
 	// test a normal situation
 	// the number of input: 2
-	// input1: inPrivKey0, btcec.PrivateKey
-	// input2: inPrivKey1, btcec.PrivateKey
-	// want: wantPrivKey, btcec.PrivateKey
-	inPrivKey0, _ := btcec.PrivKeyFromBytes(btcec.S256(), privKeyB0)
-	inPrivKey1, _ := btcec.PrivKeyFromBytes(btcec.S256(), privKeyB1)
-	wantPrivKey, _ := btcec.PrivKeyFromBytes(btcec.S256(), []byte{
+	// input1: inPrivKey0, koblitz.PrivateKey
+	// input2: inPrivKey1, koblitz.PrivateKey
+	// want: wantPrivKey, koblitz.PrivateKey
+	inPrivKey0, _ := koblitz.PrivKeyFromBytes(koblitz.S256(), privKeyB0)
+	inPrivKey1, _ := koblitz.PrivKeyFromBytes(koblitz.S256(), privKeyB1)
+	wantPrivKey, _ := koblitz.PrivKeyFromBytes(koblitz.S256(), []byte{
 		0xfc, 0x92, 0xf7, 0x65, 0x42, 0xd7, 0x96, 0xb8,
 		0x21, 0xba, 0x8d, 0xf6, 0xcd, 0x2a, 0x9e, 0x0a,
 		0xe9, 0x72, 0xb7, 0x0f, 0xaf, 0x10, 0x5c, 0xb1,
@@ -321,8 +321,8 @@ func TestCombinePrivateKeys(t *testing.T) {
 
 	// test a normal situation
 	// the number of input: 1
-	// input1: inPrivKey0, btcec.PrivateKey
-	// want: inPrivKey0, btcec.PrivateKey,
+	// input1: inPrivKey0, koblitz.PrivateKey
+	// want: inPrivKey0, koblitz.PrivateKey,
 	// it should return input itself if the number of parameters is one
 	if CombinePrivateKeys(inPrivKey0) != inPrivKey0 {
 		t.Fatalf("it needs to be equal")
@@ -330,9 +330,9 @@ func TestCombinePrivateKeys(t *testing.T) {
 
 	// test an anomaly situation
 	// the number of input: 1
-	// input1: btcec.PrivateKey but nil
+	// input1: koblitz.PrivateKey but nil
 	// want: nil
-	var inNil *btcec.PrivateKey
+	var inNil *koblitz.PrivateKey
 	if CombinePrivateKeys(inNil) != nil {
 		t.Fatalf("it needs to be nil")
 	}

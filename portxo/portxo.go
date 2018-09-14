@@ -38,17 +38,17 @@ type PorTxo struct {
 	// use KeyGen.Step[1], that's what it's for.
 	// Heck, set KeyGen.Depth to 0 and still use Step[1] as the network / coin...
 	//	NetID  byte          // indicates what network / coin utxo is in
-	Op     wire.OutPoint // unique outpoint
-	Value  int64         // higher is better
-	Height int32         // block height of utxo (not needed? nice to know?)
-	Seq    uint32        // used for relative timelock
-	Mode   TxoMode       // what kind of output
+	Op     wire.OutPoint `json:"outpoint"` // unique outpoint
+	Value  int64         `json:"val"`      // higher is better
+	Height int32         `json:"height"`   // block height of utxo (not needed? nice to know?)
+	Seq    uint32        `json:"seq"`      // used for relative timelock
+	Mode   TxoMode       `json:"mode"`     // what kind of output
 
-	KeyGen
+	KeyGen `json:"keygen"`
 
-	PkScript []byte // if empty, try to generate based on mode and priv key
+	PkScript []byte `json:"privkeyscript"` // if empty, try to generate based on mode and priv key
 
-	PreSigStack [][]byte // items to push before the sig
+	PreSigStack [][]byte `json:"stack"` // items to push before the sig
 }
 
 // Constants defining txo modes

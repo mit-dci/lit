@@ -3,11 +3,10 @@ package litrpc
 import (
 	"encoding/json"
 	"fmt"
-	"log"
-	"net/http"
-
-	"github.com/mit-dci/lit/btcutil/btcec"
+	"github.com/mit-dci/lit/crypto/koblitz"
+	"github.com/mit-dci/lit/logging"
 	"golang.org/x/net/websocket"
+	"net/http"
 )
 
 type LndcRpcWebsocketProxy struct {
@@ -38,7 +37,7 @@ func NewLocalLndcRpcWebsocketProxyWithHomeDirAndPort(litHomeDir string, port uin
 	return NewLndcRpcWebsocketProxyWithLndc(client), nil
 }
 
-func NewLndcRpcWebsocketProxy(litAdr string, key *btcec.PrivateKey) (*LndcRpcWebsocketProxy, error) {
+func NewLndcRpcWebsocketProxy(litAdr string, key *koblitz.PrivateKey) (*LndcRpcWebsocketProxy, error) {
 	client, err := NewLndcRpcClient(litAdr, key)
 	if err != nil {
 		return nil, err
@@ -64,10 +63,9 @@ func (p *LndcRpcWebsocketProxy) Listen(host string, port uint16) {
 	http.HandleFunc("/", WebUIHandler)
 	http.HandleFunc("/oneoff", serveOneoffs)*/
 
-	log.Printf("Listening regular Websocket RPC on %s", listenString)
-
+	logging.Infof("Listening regular Websocket RPC on %s...", listenString)
 	err := http.ListenAndServe(listenString, nil)
-	log.Fatalf("Error on websocket server: %s", err.Error())
+	logging.Errorf("Error on websocket server: %s", err.Error())
 }
 
 func (p *LndcRpcWebsocketProxy) proxyServeWS(ws *websocket.Conn) {
@@ -77,11 +75,11 @@ func (p *LndcRpcWebsocketProxy) proxyServeWS(ws *websocket.Conn) {
 		var data interface{}
 		err := websocket.JSON.Receive(ws, &data)
 		if err != nil {
-			log.Printf("Error receiving websocket frame: %s\n", err.Error())
+			logging.Warnf("Error receiving websocket frame: %s\n", err.Error())
 			break
 		}
 		if data == nil {
-			log.Println("Received nil websocket frame")
+			logging.Warnf("Received nil websocket frame")
 			break
 		}
 		var reply interface{}
