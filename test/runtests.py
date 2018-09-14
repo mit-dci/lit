@@ -32,8 +32,12 @@ tests = [
     {'func':fund, 'name': 'Test fund', 'nodes': 2},
     {'func':close, 'name': 'Test close', 'nodes': 2},
     {'func':close_reverse, 'name': 'Test close_reverse', 'nodes': 2},
-    {'func':breaktest, 'name': 'Test breaktest', 'nodes': 2},
-    {'func':break_reverse, 'name': 'Test break_reverse', 'nodes': 2},
+  
+  ## Disabled these for now since this is not supported (breaking after creation)
+  ## see github issue #331
+  #  {'func':breaktest, 'name': 'Test breaktest', 'nodes': 2},
+  #  {'func':break_reverse, 'name': 'Test break_reverse', 'nodes': 2},
+
     {'func':push, 'name': 'Test push', 'nodes': 2},
     {'func':pushclose, 'name': 'Test pushclose', 'nodes': 2},
     {'func':pushclose_reverse, 'name': 'Test pushclose_reverse', 'nodes': 2},
