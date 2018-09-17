@@ -45,8 +45,9 @@ type config struct { // define a struct for usage with go-flags
 	Tower  bool `long:"tower" description:"Watchtower: Run a watching node"`
 	Hard   bool `short:"t" long:"hard" description:"Flag to set networks."`
 
-	// logging, bool because that's how the tool works
-	LogLevel []bool `short:"v" long:"verbose" description:"Set verbosity level from 0 to 5 (most to least)"`
+	// logging and debug parameters
+	LogLevel []bool `short:"v" description:"Set verbosity level to verbose (-v) or very verbose (-vv)"`
+	Debug bool `short:"d" long:"debug" description:"Set debug mode (highest verbosity level)"`
 
 	// rpc server config
 	Rpcport uint16 `short:"p" long:"rpcport" description:"Set RPC port to connect to"`
@@ -71,7 +72,7 @@ var (
 	defaultAutoListenPort                  = ":2448"
 	defaultAutoReconnectInterval           = int64(60)
 	defaultUpnPFlag                        = false
-	defaultLogLevel                        = 3 // reasons
+	defaultLogLevel                        = 0
 	defaultAutoReconnectOnlyConnectedCoins = false
 	defaultUnauthRPC                       = false
 )
@@ -172,7 +173,6 @@ func main() {
 		AutoListenPort:                  defaultAutoListenPort,
 		AutoReconnectInterval:           defaultAutoReconnectInterval,
 		AutoReconnectOnlyConnectedCoins: defaultAutoReconnectOnlyConnectedCoins,
-		LogLevel:                        []bool{}, // reasons
 		UnauthRPC:                       defaultUnauthRPC,
 	}
 
@@ -182,7 +182,7 @@ func main() {
 		conf.ChainProxyURL = conf.ProxyURL
 	}
 
-	// SIGQUIT hander for debugging
+	// SIGQUIT handler for debugging
 	go func() {
 		sigs := make(chan os.Signal, 1)
 		signal.Notify(sigs, syscall.SIGQUIT)

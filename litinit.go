@@ -54,6 +54,8 @@ func litSetup(conf *config) *[32]byte {
 	// Load config from file and parse
 	parser := newConfigParser(conf, flags.Default)
 
+	// set default log level here
+	logging.SetLogLevel(defaultLogLevel)
 	// create home directory
 	_, err = os.Stat(preconf.LitHomeDir)
 	if err != nil {
@@ -119,13 +121,16 @@ func litSetup(conf *config) *[32]byte {
 	// TODO ... what's this do?
 	defer logFile.Close()
 
-	// special handling for this one.
-	ll := len(conf.LogLevel)
-	if ll > 0 {
-		logging.SetLogLevel(len(conf.LogLevel))
-	} else {
-		logging.SetLogLevel(defaultLogLevel)
+	logLevel := -1
+	if len(conf.LogLevel) == 1 { // -v
+		logLevel = 1
+	} else if len(conf.LogLevel) == 2 { // -vv
+		logLevel = 2
 	}
+	if conf.Debug { // -d
+		logLevel = 3
+	}
+	logging.SetLogLevel(logLevel)
 
 	// Allow node with no linked wallets, for testing.
 	// TODO Should update tests and disallow nodes without wallets later.
