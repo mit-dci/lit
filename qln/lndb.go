@@ -600,7 +600,7 @@ func (nd *LitNode) ReloadQchanState(q *Qchan) error {
 		if txoBytes == nil {
 			return fmt.Errorf("utxo value empty")
 		}
-		u, err := portxo.PorTxoFromBytes(txoBytes[99:])
+		u, err := portxo.PorTxoFromBytes(txoBytes[107:])
 		if err != nil {
 			return err
 		}
