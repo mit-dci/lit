@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/btcutil/txscript"
+	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/sig64"
@@ -205,10 +205,10 @@ func (nd *LitNode) SignState(q *Qchan) ([64]byte, [][64]byte, error) {
 		return sig, nil, err
 	}
 
-	fmt.Printf("____ sig creation for channel (%d,%d):\n", q.Peer(), q.Idx())
-	fmt.Printf("\tinput %s\n", commitmentTx.TxIn[0].PreviousOutPoint.String())
+	logging.Infof("____ sig creation for channel (%d,%d):\n", q.Peer(), q.Idx())
+	logging.Infof("\tinput %s\n", commitmentTx.TxIn[0].PreviousOutPoint.String())
 	for i, txout := range commitmentTx.TxOut {
-		fmt.Printf("\toutput %d: %x %d\n", i, txout.PkScript, txout.Value)
+		logging.Infof("\toutput %d: %x %d\n", i, txout.PkScript, txout.Value)
 	}
 
 	logging.Infof("\tstate %d myamt: %d theiramt: %d\n", q.State.StateIdx, q.State.MyAmt, q.Value-q.State.MyAmt)
@@ -354,10 +354,10 @@ func (q *Qchan) VerifySigs(sig [64]byte, HTLCSigs [][64]byte) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("____ sig verification for channel (%d,%d):\n", q.Peer(), q.Idx())
-	fmt.Printf("\tinput %s\n", commitmentTx.TxIn[0].PreviousOutPoint.String())
+	logging.Infof("____ sig verification for channel (%d,%d):\n", q.Peer(), q.Idx())
+	logging.Infof("\tinput %s\n", commitmentTx.TxIn[0].PreviousOutPoint.String())
 	for i, txout := range commitmentTx.TxOut {
-		fmt.Printf("\toutput %d: %x %d\n", i, txout.PkScript, txout.Value)
+		logging.Infof("\toutput %d: %x %d\n", i, txout.PkScript, txout.Value)
 	}
 	logging.Infof("\tstate %d myamt: %d theiramt: %d\n", q.State.StateIdx, q.State.MyAmt, q.Value-q.State.MyAmt)
 	logging.Infof("\tsig: %x\n", sig)

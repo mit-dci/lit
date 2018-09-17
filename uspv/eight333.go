@@ -373,7 +373,7 @@ func (s *SPVCon) AskForBlocks() error {
 		return nil
 	}
 
-	logging.Errorf("will request blocks %d to %d\n", s.syncHeight+1, headerTip)
+	logging.Debugf("will request blocks %d to %d\n", s.syncHeight+1, headerTip)
 	reqHeight := s.syncHeight
 
 	// loop through all heights where we want merkleblocks.

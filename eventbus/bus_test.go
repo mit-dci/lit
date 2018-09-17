@@ -1,9 +1,10 @@
 package eventbus
 
 import (
-	"fmt"
 	"testing"
 	"time"
+
+	"github.com/mit-dci/lit/logging"
 )
 
 func TestBusSimple(t *testing.T) {
@@ -57,7 +58,7 @@ func TestBusAsync(t *testing.T) {
 	})
 
 	r := <-c
-	fmt.Printf("got result: %d\n", r)
+	logging.Infof("got result: %d\n", r)
 
 }
 
