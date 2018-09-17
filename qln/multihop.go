@@ -5,9 +5,9 @@ import (
 	"crypto/rand"
 	"fmt"
 
-	"github.com/adiabat/bech32"
-	"github.com/btcsuite/fastsha256"
+	"github.com/mit-dci/lit/bech32"
 	"github.com/mit-dci/lit/consts"
+	"github.com/mit-dci/lit/crypto/fastsha256"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/logging"
 )

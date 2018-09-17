@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 
-	"github.com/btcsuite/fastsha256"
+	"github.com/mit-dci/lit/crypto/fastsha256"
 )
 
 /*
