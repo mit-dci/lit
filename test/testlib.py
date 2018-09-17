@@ -5,6 +5,7 @@ import signal
 import subprocess
 import logging
 import random
+import shutil
 
 import testutil
 import btcrpc
@@ -69,7 +70,7 @@ class LitNode():
         # Now figure out the args to use and then start Lit.
         args = [
             LIT_BIN,
-            "-vvvvv",
+            "-v", "4",
             "--reg", "127.0.0.1:" + str(bcnode.p2p_port),
             "--tn3", "", # disable autoconnect
             "--dir", self.data_dir,
@@ -144,6 +145,7 @@ class LitNode():
     def shutdown(self):
         if self.proc is not None:
             self.proc.kill()
+            self.proc.wait()
             self.proc = None
         else:
             pass # do nothing I guess?
@@ -197,6 +199,7 @@ class BitcoinNode():
     def shutdown(self):
         if self.proc is not None:
             self.proc.kill()
+            self.proc.wait()
             self.proc = None
         else:
             pass # do nothing I guess?
@@ -240,3 +243,7 @@ class TestEnv():
         for l in self.lits:
             l.shutdown()
         self.bitcoind.shutdown()
+
+def clean_data_dir():
+    datadir = get_root_data_dir()
+    shutil.rmtree(datadir)

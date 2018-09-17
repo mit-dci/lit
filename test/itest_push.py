@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import testlib
 
 fee = 20
@@ -57,12 +55,3 @@ def run_test(env):
     lit1.rpc.Push(ChanIdx=cid, Amt=250, Data=None)
     ct4 = lit1.get_balance_info()['ChanTotal']
     assert ct4 == ct3 - 250, "channel update didn't work properly"
-
-if __name__ == '__main__':
-    env = None
-    try:
-        env = testlib.TestEnv(2)
-        run_test(env)
-    finally:
-        if env is not None:
-            env.shutdown()

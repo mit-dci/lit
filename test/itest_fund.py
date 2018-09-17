@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import testlib
 
 fee = 20
@@ -53,12 +51,3 @@ def run_test(env):
     print(' -> fee ', bal1 - bal2sum - initialsend)
 
     assert bals2['ChanTotal'] > 0, "channel balance isn't nonzero!"
-
-if __name__ == '__main__':
-    env = None
-    try:
-        env = testlib.TestEnv(2)
-        run_test(env)
-    finally:
-        if env is not None:
-            env.shutdown()
