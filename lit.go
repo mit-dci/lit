@@ -18,7 +18,7 @@ import (
 	flags "github.com/jessevdk/go-flags"
 )
 
-type config struct { // define a struct for usage with go-flags
+type litConfig struct { // define a struct for usage with go-flags
 	// networks lit can try connecting to
 	Tn3host     string `long:"tn3" description:"Connect to bitcoin testnet3."`
 	Bc2host     string `long:"bc2" description:"bc2 full node."`
@@ -86,11 +86,11 @@ func fileExists(name string) bool {
 }
 
 // newConfigParser returns a new command line flags parser.
-func newConfigParser(conf *config, options flags.Options) *flags.Parser {
+func newConfigParser(conf *litConfig, options flags.Options) *flags.Parser {
 	parser := flags.NewParser(conf, options)
 	return parser
 }
-func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
+func linkWallets(node *qln.LitNode, key *[32]byte, conf *litConfig) error {
 	// for now, wallets are linked to the litnode on startup, and
 	// can't appear / disappear while it's running.  Later
 	// could support dynamically adding / removing wallets
@@ -163,7 +163,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *config) error {
 
 func main() {
 
-	conf := config{
+	conf := litConfig{
 		LitHomeDir:                      defaultLitHomeDirName,
 		Rpcport:                         defaultRpcport,
 		Rpchost:                         defaultRpchost,

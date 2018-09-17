@@ -36,7 +36,7 @@ func createDefaultConfigFile(destinationPath string) error {
 // configuration variables, reading in key data, reading and creating files if
 // they're not yet there.  It takes in a config, and returns a key.
 // (maybe add the key to the config?
-func litSetup(conf *config) *[32]byte {
+func litSetup(conf *litConfig) *[32]byte {
 	// Pre-parse the command line options to see if an alternative config
 	// file or the version flag was specified.  Any errors aside from the
 	// help message error can be ignored here since they will be caught by
@@ -44,8 +44,7 @@ func litSetup(conf *config) *[32]byte {
 
 	//	usageMessage := fmt.Sprintf("Use %s -h to show usage", "./lit")
 
-	preconf := *conf
-	preParser := newConfigParser(&preconf, flags.HelpFlag)
+	preParser := newConfigParser(conf, flags.HelpFlag)
 	_, err := preParser.ParseArgs(os.Args)
 	if err != nil {
 		logging.Fatal(err)
@@ -55,36 +54,36 @@ func litSetup(conf *config) *[32]byte {
 	parser := newConfigParser(conf, flags.Default)
 
 	// create home directory
-	_, err = os.Stat(preconf.LitHomeDir)
+	_, err = os.Stat(conf.LitHomeDir)
 	if err != nil {
 		logging.Errorf("Error while creating a directory")
 	}
 	if os.IsNotExist(err) {
 		// first time the guy is running lit, lets set tn3 to true
-		os.Mkdir(preconf.LitHomeDir, 0700)
+		os.Mkdir(conf.LitHomeDir, 0700)
 		logging.Infof("Creating a new config file")
-		err := createDefaultConfigFile(preconf.LitHomeDir) // Source of error
+		err := createDefaultConfigFile(conf.LitHomeDir) // Source of error
 		if err != nil {
-			fmt.Printf("Error creating a default config file: %v", preconf.LitHomeDir)
+			fmt.Printf("Error creating a default config file: %v", conf.LitHomeDir)
 			logging.Fatal(err)
 		}
 	}
 
-	if _, err := os.Stat(filepath.Join(filepath.Join(preconf.LitHomeDir), "lit.conf")); os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(filepath.Join(conf.LitHomeDir), "lit.conf")); os.IsNotExist(err) {
 		// if there is no config file found over at the directory, create one
 		if err != nil {
 			fmt.Println(err)
 		}
 		logging.Infof("Creating a new config file")
-		err := createDefaultConfigFile(filepath.Join(preconf.LitHomeDir)) // Source of error
+		err := createDefaultConfigFile(filepath.Join(conf.LitHomeDir)) // Source of error
 		if err != nil {
 			logging.Fatal(err)
 		}
 	}
 
-	preconf.ConfigFile = filepath.Join(filepath.Join(preconf.LitHomeDir), "lit.conf")
+	conf.ConfigFile = filepath.Join(filepath.Join(conf.LitHomeDir), "lit.conf")
 	// lets parse the config file provided, if any
-	err = flags.NewIniParser(parser).ParseFile(preconf.ConfigFile)
+	err = flags.NewIniParser(parser).ParseFile(conf.ConfigFile)
 	if err != nil {
 		_, ok := err.(*os.PathError)
 		if !ok {
@@ -129,10 +128,6 @@ func litSetup(conf *config) *[32]byte {
 
 	// Allow node with no linked wallets, for testing.
 	// TODO Should update tests and disallow nodes without wallets later.
-	//	if conf.Tn3host == "" && conf.Lt4host == "" && conf.Reghost == "" {
-	//		logging.Fatal("error: no network specified; use -tn3, -reg, -lt4")
-	//	}
-
 	// Keys: the litNode, and wallits, all get 32 byte keys.
 	// Right now though, they all get the *same* key.  For lit as a single binary
 	// now, all using the same key makes sense; could split up later.
