@@ -7,6 +7,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
 )
 
 var sendCommand = &Command{
@@ -166,7 +167,7 @@ func (lc *litAfClient) Fee(textArgs []string) error {
 	if len(textArgs) > 0 {
 		feeint, err := strconv.Atoi(textArgs[0])
 		if err != nil {
-			fmt.Printf("Can't set fee to %s, querying current fee instead\n", textArgs[0])
+			logging.Errorf("Can't set fee to %s, querying current fee instead\n", textArgs[0])
 		} else {
 			set = true
 			SetArgs.Fee = int64(feeint)

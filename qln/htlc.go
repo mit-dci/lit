@@ -196,7 +196,7 @@ func (nd *LitNode) HashSigHandler(msg lnutil.HashSigMsg, qc *Qchan) error {
 		collision = true
 	}
 
-	fmt.Printf("COLLISION is (%t)\n", collision)
+	logging.Infof("COLLISION is (%t)\n", collision)
 
 	// load state from disk
 	err := nd.ReloadQchanState(qc)
@@ -294,7 +294,7 @@ func (nd *LitNode) HashSigHandler(msg lnutil.HashSigMsg, qc *Qchan) error {
 	// update to the next state to verify
 	qc.State.StateIdx++
 
-	fmt.Printf("Got message %x", msg.Data)
+	logging.Infof("Got message %x", msg.Data)
 	qc.State.Data = msg.Data
 
 	// verify sig for the next state. only save if this works
@@ -563,7 +563,7 @@ func (nd *LitNode) PreimageSigHandler(msg lnutil.PreimageSigMsg, qc *Qchan) erro
 		collision = true
 	}
 
-	fmt.Printf("COLLISION is (%t)\n", collision)
+	logging.Infof("COLLISION is (%t)\n", collision)
 
 	// load state from disk
 	err := nd.ReloadQchanState(qc)
@@ -596,7 +596,7 @@ func (nd *LitNode) PreimageSigHandler(msg lnutil.PreimageSigMsg, qc *Qchan) erro
 	}
 
 	if qc.State.Delta > 0 {
-		fmt.Printf(
+		logging.Errorf(
 			"PreimageSigHandler err: chan %d delta %d, expect rev, send empty rev",
 			qc.Idx(), qc.State.Delta)
 
@@ -667,7 +667,7 @@ func (nd *LitNode) PreimageSigHandler(msg lnutil.PreimageSigMsg, qc *Qchan) erro
 	// update to the next state to verify
 	qc.State.StateIdx++
 
-	fmt.Printf("Got message %x", msg.Data)
+	logging.Infof("Got message %x", msg.Data)
 	qc.State.Data = msg.Data
 
 	h := &qc.State.HTLCs[msg.Idx]

@@ -200,7 +200,7 @@ func (q *Qchan) BuildStateTxs(mine bool) (*wire.MsgTx, []*wire.MsgTx, []*wire.Tx
 	outFancy := wire.NewTxOut(fancyAmt, fancyScript)
 	outPKH := wire.NewTxOut(pkhAmt, pkhScript)
 
-	fmt.Printf("\tcombined refund %x, pkh %x, amt %d\n", pkhPub, outPKH.PkScript, pkhAmt)
+	logging.Infof("\tcombined refund %x, pkh %x, amt %d\n", pkhPub, outPKH.PkScript, pkhAmt)
 
 	var HTLCTxOuts []*wire.TxOut
 
