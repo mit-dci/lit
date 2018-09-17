@@ -19,6 +19,10 @@ import (
 	"github.com/mit-dci/lit/portxo"
 )
 
+// LndcRpcClient can be used to remotely talk to a lit node over LNDC, making
+// remote control instructions over the remote control interface. It uses a
+// regular lndc.Conn to connect to lit over port 2448, and sends
+// RemoteControlRpcRequestMsg to it, and receives RemoteControlRpcResponseMsg
 type LndcRpcClient struct {
 	lnconn           *lndc.Conn
 	requestNonce     uint64
@@ -28,11 +32,19 @@ type LndcRpcClient struct {
 	conMtx           sync.Mutex
 }
 
+// LndcRpcCanConnectLocally checks if we can connect to lit using the normal
+// home directory. In that case, we read from the privkey.hex and use a different
+// derivation than the nodeID to determine the private key. This key is authorized
+// by default for remote control.
 func LndcRpcCanConnectLocally() bool {
 	litHomeDir := os.Getenv("HOME") + "/.lit"
 	return LndcRpcCanConnectLocallyWithHomeDir(litHomeDir)
 }
 
+// LndcRpcCanConnectLocallyWithHomeDir checks if we can connect to lit given the
+// home directory. In that case, we read from the privkey.hex and use a different
+// derivation than the nodeID to determine the private key. This key is authorized
+// by default for remote control.
 func LndcRpcCanConnectLocallyWithHomeDir(litHomeDir string) bool {
 	keyFilePath := filepath.Join(litHomeDir, "privkey.hex")
 
@@ -40,16 +52,23 @@ func LndcRpcCanConnectLocallyWithHomeDir(litHomeDir string) bool {
 	return (err == nil)
 }
 
+// NewLocalLndcRpcClient is an overload for NewLocalLndcRpcClientWithHomeDirAndPort
+// using the default home dir and port
 func NewLocalLndcRpcClient() (*LndcRpcClient, error) {
 	litHomeDir := os.Getenv("HOME") + "/.lit"
 	return NewLocalLndcRpcClientWithHomeDirAndPort(litHomeDir, 2448)
 }
 
+// NewLocalLndcRpcClientWithPort is an overload for
+// NewLocalLndcRpcClientWithHomeDirAndPort using the default home dir
 func NewLocalLndcRpcClientWithPort(port uint32) (*LndcRpcClient, error) {
 	litHomeDir := os.Getenv("HOME") + "/.lit"
 	return NewLocalLndcRpcClientWithHomeDirAndPort(litHomeDir, port)
 }
 
+// NewLocalLndcRpcClientWithHomeDirAndPort loads up privkey.hex, and derives
+// the local lit node's address from it, as well as derives the default remote
+// control private key from it. Then it will connect to the local lit instance.
 func NewLocalLndcRpcClientWithHomeDirAndPort(litHomeDir string, port uint32) (*LndcRpcClient, error) {
 	keyFilePath := filepath.Join(litHomeDir, "privkey.hex")
 	privKey, err := lnutil.ReadKeyFile(keyFilePath)
@@ -87,25 +106,38 @@ func NewLocalLndcRpcClientWithHomeDirAndPort(litHomeDir string, port uint32) (*L
 	return NewLndcRpcClient(adr, key)
 }
 
+// NewLndcRpcClient creates a new LNDC client using the given private key, which
+// is arbitrary. It will then connect to the lit node specified in address, and
+// can then exchange remote control calls with it. In order to succesfully
+// execute command, the given key must be authorized in the lit instance we're
+// connecting to.
 func NewLndcRpcClient(address string, key *koblitz.PrivateKey) (*LndcRpcClient, error) {
 	var err error
 
 	cli := new(LndcRpcClient)
+	// Create a map of chan objects to receive returned responses on. These channels
+	// are sent to from the ReceiveLoop, and awaited in the Call method.
 	cli.responseChannels = make(map[uint64]chan lnutil.RemoteControlRpcResponseMsg)
+
+	//Parse the address we're connecting to
 	who, where := lnutil.ParseAdrString(address)
 
 	// If we couldn't deduce a URL, look it up on the tracker
 	if where == "" {
+		// TODO: Implement address lookups
 		err = fmt.Errorf("Tracker lookups not supported yet from LNDC proxy")
 		if err != nil {
 			return nil, err
 		}
 	}
 
+	// Dial a connection to the lit node
 	cli.lnconn, err = lndc.Dial(key, where, who, net.Dial)
 	if err != nil {
 		return nil, err
 	}
+
+	// Start the receive loop for reply messages
 	go cli.ReceiveLoop()
 	return cli, nil
 }
@@ -113,12 +145,16 @@ func NewLndcRpcClient(address string, key *koblitz.PrivateKey) (*LndcRpcClient, 
 func (cli *LndcRpcClient) Call(serviceMethod string, args interface{}, reply interface{}) error {
 	var err error
 
+	// Generate a local unique nonce using the mutex
 	cli.requestNonceMtx.Lock()
 	cli.requestNonce++
 	nonce := cli.requestNonce
 	cli.requestNonceMtx.Unlock()
 
+	// Create the channel to receive the reply on
 	cli.responseChannels[nonce] = make(chan lnutil.RemoteControlRpcResponseMsg)
+
+	// Send the message in a goroutine
 	go func() {
 		msg := new(lnutil.RemoteControlRpcRequestMsg)
 		msg.Args, err = json.Marshal(args)
@@ -144,6 +180,8 @@ func (cli *LndcRpcClient) Call(serviceMethod string, args interface{}, reply int
 
 	// If reply is nil the caller apparently doesn't care about the results. So we shouldn't wait for it
 	if reply != nil {
+		// If not nil, await the reply from the responseChannel for the nonce we sent out.
+		// the server will include the same nonce in its reply.
 		select {
 		case receivedReply := <-cli.responseChannels[nonce]:
 			{
@@ -155,12 +193,16 @@ func (cli *LndcRpcClient) Call(serviceMethod string, args interface{}, reply int
 				return err
 			}
 		case <-time.After(time.Second * 10):
+			// If no reply is received within 10 seconds, we time out the request.
+			// TODO: We could make this configurable in the call
 			return errors.New("RPC call timed out")
 		}
 	}
 	return nil
 }
 
+// ReceiveLoop reads messages from the LNDC connection and check if they are
+// RPC responses
 func (cli *LndcRpcClient) ReceiveLoop() {
 	for {
 		msg := make([]byte, 1<<24)
@@ -172,8 +214,9 @@ func (cli *LndcRpcClient) ReceiveLoop() {
 			return
 		}
 		msg = msg[:n]
-		// We only care about RPC responses
+		// We only care about RPC responses (for now)
 		if msg[0] == lnutil.MSGID_REMOTE_RPCRESPONSE {
+			// Parse the received message
 			response, err := lnutil.NewRemoteControlRpcResponseMsgFromBytes(msg, 0)
 			if err != nil {
 				logging.Warnf("Error while receiving RPC response: %s\n", err.Error())
@@ -181,12 +224,19 @@ func (cli *LndcRpcClient) ReceiveLoop() {
 				return
 			}
 
+			// Find the response channel to send the reply to
 			responseChan, ok := cli.responseChannels[response.Idx]
 			if ok {
+				// Send the response, but don't depend on someone
+				// listening. The caller decides if he's interested in the
+				// reply and therefore, it could have not blocked and just
+				// ignore the return value.
 				select {
 				case responseChan <- response:
 				default:
 				}
+
+				// Clean up the channel to preserve memory. It's only used once.
 				delete(cli.responseChannels, response.Idx)
 			} else {
 				logging.Errorf("Could not find response channel for index %d\n", response.Idx)

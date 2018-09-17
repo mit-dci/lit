@@ -2168,13 +2168,36 @@ func (msg MultihopPaymentAckMsg) MsgType() uint8 {
 	return MSGID_PAY_ACK
 }
 
+// RemoteControlRpcRequestMsg contains a request to be executed by the local
+// lit node, when the remote node has been authorized to do so.
 type RemoteControlRpcRequestMsg struct {
-	PeerIdx    uint32
-	PubKey     [33]byte
-	Method     string
-	Idx        uint64
-	Args       []byte
-	Sig        [64]byte
+	PeerIdx uint32
+	// The pubkey of the node remote controlling. Can be null, in which case
+	// the pubkey of the peer sending the message is used to determine the
+	// authorization
+	PubKey [33]byte
+
+	// The method being called, for example "LitRPC.Send"
+	Method string
+
+	// A unique nonce that will be used to match the response that is sent
+	// back in reply to this request.
+	Idx uint64
+
+	// The JSON serialized arguments to the RPC method
+	Args []byte
+
+	// If PubKey is passed, this should contain a signature made with the
+	// corresponding private key of the Bytes() method of this message type,
+	// containing a zero Sig
+	Sig [64]byte
+
+	// The digest used for the signature. Can be one of
+	// DIGEST_TYPE_SHA256    = 0x00 (Default)
+	// DIGEST_TYPE_RIPEMD160 = 0x01
+	// Different digest is supported to allow the use of embedded devices
+	// such as smart cards that do not support signing SHA256 digests.
+	// They exist, really.
 	DigestType uint8
 }
 
@@ -2332,11 +2355,13 @@ func (msg MultihopPaymentSetupMsg) MsgType() uint8 {
 	return MSGID_PAY_SETUP
 }
 
+// RemoteControlRpcResponseMsg is sent in response to a request message
+// and contains the output of the command that was executed
 type RemoteControlRpcResponseMsg struct {
 	PeerIdx uint32
-	Idx     uint64
-	Error   bool
-	Result  []byte
+	Idx     uint64 // Unique nonce that was sent in the request
+	Error   bool   // Indicates that the reply is an error
+	Result  []byte // JSON serialization of the reply object
 }
 
 func NewRemoteControlRpcResponseMsg(peerIdx uint32, msgIdx uint64, isError bool, json []byte) RemoteControlRpcResponseMsg {
