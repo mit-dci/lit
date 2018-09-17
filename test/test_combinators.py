@@ -67,8 +67,8 @@ def run_pushclose_test(env, initiator, target, closer):
     print('Target:', tt0, '->', tt1, '( expected:', initialsend + pushsend - 200, ')')
     assert tt1 == tt0 + initialsend + pushsend - 200, "final balance doesn't match"
 
-    # Idk where the 20000 gets removed from, fees probably but I'm not sure exactly where.
-
+    # 200 = Fee() * consts.QcStateFee
+    
 def run_pushbreak_test(env, initiator, target, breaker):
     bc = env.bitcoind
 
@@ -123,10 +123,10 @@ def run_pushbreak_test(env, initiator, target, breaker):
     tt1 = target.get_balance_info()['TxoTotal']
 
     # Now report the difference in channel balance.
-    print('Target:', tt0, '->', tt1, '( expected:', initialsend + pushsend - 20000, ')')
-    assert tt1 == tt0 + initialsend + pushsend - 20000, "final balance doesn't match"
+    print('Target:', tt0, '->', tt1, '( expected:', initialsend + pushsend - 200, ')')
+    assert tt1 == tt0 + initialsend + pushsend - 200, "final balance doesn't match"
 
-    # Idk where the 20000 gets removed from, fees probably but I'm not sure exactly where.
+    # 200 = Fee() * consts.QcStateFee
 
 def run_close_test(env, initiator, target, closer):
     bc = env.bitcoind
