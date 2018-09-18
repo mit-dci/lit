@@ -28,6 +28,9 @@ func (s *SPVCon) parseRemoteNode(remoteNode string) (string, string, error) {
 	colonCount := strings.Count(remoteNode, ":")
 	var conMode string
 	if colonCount <= 1 {
+		if colonCount == 0 {
+			remoteNode = remoteNode + ":" + s.Param.DefaultPort
+		}
 		return remoteNode, "tcp4", nil
 	} else if colonCount >= 5 {
 		// ipv6 without remote port
