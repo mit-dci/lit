@@ -18,14 +18,14 @@ prepended with the total number of hashes, so the total max size is 1969 bytes.
 // first the number of nodes (1 byte), then a series of 41 byte long
 // serialized nodes, which are 1 byte height, 8 byte index, 32 byte hash.
 func (e *ElkremReceiver) ToBytes() ([]byte, error) {
-	numOfNodes := uint8(len(e.s))
+	numOfNodes := uint8(len(e.Nodes))
 	// 0 element receiver also OK.  Just an empty slice.
 	if numOfNodes == 0 {
 		return nil, nil
 	}
 	if numOfNodes > maxHeight+1 {
 		return nil, fmt.Errorf("Broken ElkremReceiver has %d nodes, max 64",
-			len(e.s))
+			len(e.Nodes))
 	}
 	var buf bytes.Buffer // create buffer
 
@@ -34,22 +34,22 @@ func (e *ElkremReceiver) ToBytes() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, node := range e.s {
+	for _, node := range e.Nodes {
 		// write 1 byte height
-		err = binary.Write(&buf, binary.BigEndian, node.h)
+		err = binary.Write(&buf, binary.BigEndian, node.H)
 		if err != nil {
 			return nil, err
 		}
 		// write 8 byte index
-		err = binary.Write(&buf, binary.BigEndian, node.i)
+		err = binary.Write(&buf, binary.BigEndian, node.I)
 		if err != nil {
 			return nil, err
 		}
-		if node.sha == nil {
-			return nil, fmt.Errorf("node %d has nil hash", node.i)
+		if node.Sha == nil {
+			return nil, fmt.Errorf("node %d has nil hash", node.I)
 		}
 		// write 32 byte sha hash
-		n, err := buf.Write(node.sha.CloneBytes())
+		n, err := buf.Write(node.Sha.CloneBytes())
 		if err != nil {
 			return nil, err
 		}
@@ -83,37 +83,37 @@ func ElkremReceiverFromBytes(b []byte) (*ElkremReceiver, error) {
 			(numOfNodes * 41), buf.Len())
 	}
 
-	e.s = make([]ElkremNode, numOfNodes)
+	e.Nodes = make([]ElkremNode, numOfNodes)
 
-	for j, _ := range e.s {
-		e.s[j].sha = new(chainhash.Hash)
+	for j, _ := range e.Nodes {
+		e.Nodes[j].Sha = new(chainhash.Hash)
 		// read 1 byte height
-		err := binary.Read(buf, binary.BigEndian, &e.s[j].h)
+		err := binary.Read(buf, binary.BigEndian, &e.Nodes[j].H)
 		if err != nil {
 			return nil, err
 		}
 		// read 8 byte index
-		err = binary.Read(buf, binary.BigEndian, &e.s[j].i)
+		err = binary.Read(buf, binary.BigEndian, &e.Nodes[j].I)
 		if err != nil {
 			return nil, err
 		}
 		// read 32 byte sha hash
-		err = e.s[j].sha.SetBytes(buf.Next(32))
+		err = e.Nodes[j].Sha.SetBytes(buf.Next(32))
 		if err != nil {
 			return nil, err
 		}
 		// sanity check.  Note that this doesn't check that index and height
 		// match.  Could add that but it's slow.
-		if e.s[j].h > maxHeight { // check for super high nodes
-			return nil, fmt.Errorf("Read invalid node height %d", e.s[j].h)
+		if e.Nodes[j].H > maxHeight { // check for super high nodes
+			return nil, fmt.Errorf("Read invalid node height %d", e.Nodes[j].H)
 		}
-		if e.s[j].i > maxIndex { // check for index higher than height allows
+		if e.Nodes[j].I > maxIndex { // check for index higher than height allows
 			return nil, fmt.Errorf("Node claims index %d; %d max at height %d",
-				e.s[j].i, maxIndex, e.s[j].h)
+				e.Nodes[j].I, maxIndex, e.Nodes[j].H)
 		}
 
 		if j > 0 { // check that node heights are descending
-			if e.s[j-1].h < e.s[j].h {
+			if e.Nodes[j-1].H < e.Nodes[j].H {
 				return nil, fmt.Errorf("Node heights out of order")
 			}
 		}
