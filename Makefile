@@ -36,5 +36,5 @@ clean:
 test tests: lit
 	build/env.sh go test -v ./...
 ifeq ($(with-python), true)
-	cd test && ./runtests.sh
+	cd test && mkdir -p _data && bash -c ./runtests.py
 endif
