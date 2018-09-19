@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
+	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"
 )
@@ -42,6 +43,21 @@ their rev hash can be derived from the elkrem sender
 and the stateidx.  hash160(elkremsend(sIdx)[:16])
 
 */
+
+type ChanData struct {
+	Txo       portxo.PorTxo `json:"txo"`
+	CloseData QCloseData    `json:"closedata"`
+
+	TheirPub       [33]byte `json:"rpub"`
+	TheirRefundPub [33]byte `json:"rrefpub"`
+	TheirHAKDBase  [33]byte `json:"rhakdbase"`
+
+	ElkRcv *elkrem.ElkremReceiver `json:"elkrecv"`
+
+	State *StatCom `json:"state"`
+
+	LastUpdate uint64 `json:"updateunix"`
+}
 
 // ToBytes turns a StatCom into 192ish bytes
 func (s *StatCom) ToBytes() ([]byte, error) {
