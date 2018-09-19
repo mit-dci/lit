@@ -3,6 +3,7 @@ package qln
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"sync"
 
@@ -744,4 +745,45 @@ func HTLCFromBytes(b []byte) (HTLC, error) {
 	}
 
 	return h, nil
+}
+
+func (nd *LitNode) QchanSerializeToBytes(qc *Qchan) []byte {
+	cd := nd.NewChanDataFromQchan(qc)
+	data, _ := json.Marshal(cd)
+	return data
+}
+
+func (nd *LitNode) QchanDeserializeFromBytes(buf []byte) (*Qchan, error) {
+
+	var cd ChanData
+	err := json.Unmarshal(buf, &cd)
+	if err != nil {
+		return nil, err
+	}
+
+	qc, err := nd.NewQchanFromChanData(&cd)
+	if err != nil {
+		return nil, err
+	}
+
+	return qc, nil
+
+}
+
+func (nd *LitNode) QchanUpdateFromBytes(qc *Qchan, buf []byte) error {
+
+	var err error
+	var cd ChanData
+	err = json.Unmarshal(buf, &cd)
+	if err != nil {
+		return err
+	}
+
+	err = nd.ApplyChanDataToQchan(&cd, qc)
+	if err != nil {
+		return err
+	}
+
+	return nil
+
 }
