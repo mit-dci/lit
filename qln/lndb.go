@@ -387,15 +387,37 @@ func (nd *LitNode) SaveQChan(q *Qchan) error {
 	}
 
 	opArr := lnutil.OutPointToBytes(q.Op)
+	cIdBytes := lnutil.U32tB(q.Idx())
+
 	qdata := nd.QchanSerializeToBytes(q)
 
 	// save channel to db.  It has no state, and has no outpoint yet
 	err := nd.LitDB.Update(func(btx *bolt.Tx) error {
-		b := btx.Bucket(BKTChannelData)
-		if b == nil {
+		var err error
+
+		cdb := btx.Bucket(BKTChannelData)
+		if cdb == nil {
 			return fmt.Errorf("channel data bucket not found")
 		}
-		return b.Put(opArr[:], qdata)
+
+		cmb := btx.Bucket(BKTChanMap)
+		if cmb == nil {
+			return fmt.Errorf("channel map bucket not found")
+		}
+
+		// Save both the channel...
+		err = cdb.Put(opArr[:], qdata)
+		if err != nil {
+			return err
+		}
+
+		// ...and the channel ID mapping.
+		err = cmb.Put(cIdBytes[:], opArr[:])
+		if err != nil {
+			return err
+		}
+
+		return nil
 	})
 	if err != nil {
 		return err
