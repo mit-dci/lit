@@ -1,29 +1,21 @@
 GOBIN = $(shell pwd)
 GO ?= latest
 
-GO_BUILD_EX_ARGS ?=
-
 all: lit lit-af test
 
-.PHONY: lit lit-af glit test tests webui
+.PHONY: lit lit-af test tests webui
 
 goget:
-	build/env.sh go get -v .
-	build/env.sh go get -v ./cmd/lit-af
+	build/env.sh go get -v ./...
 
 lit: goget
-	build/env.sh go build -v ${GO_BUILD_EX_ARGS} .
+	build/env.sh go build
 	@echo "Done building."
 	@echo "Run \"$(GOBIN)/lit\" to launch lit."
 
 lit-af: goget
-	build/env.sh go build -v ${GO_BUILD_EX_ARGS} ./cmd/lit-af
+	build/env.sh go build -v ./cmd/lit-af
 	@echo "Run \"$(GOBIN)/lit-af\" to launch lit-af."
-
-glit:
-	build/env.sh go get -v ./cmd/glit
-	build/env.sh bash -c '(cd cmd/glit && go build -v)'
-	@echo "Run \"$(GOBIN)/glit\" to launch glit."
 
 webui:
 	cd webui ; rm -rf node_modules/ ; npm install ; npm run build ; cd ..
@@ -40,12 +32,9 @@ clean:
 	go clean ./cmd/lit-af
 	rm -rf build/_workspace/
 	rm -f cmd/lit-af/lit-af
-	rm -f cmd/glit/glit
-	cd test && ./clean.sh
-	rm -f lit lit-af
 
-test: lit
-	build/env.sh ./gotests.sh
+test tests: lit
+	build/env.sh go test -v ./...
 ifeq ($(with-python), true)
-	cd test && ./runtests.sh
+	cd test && mkdir -p _data && bash -c ./runtests.py
 endif
