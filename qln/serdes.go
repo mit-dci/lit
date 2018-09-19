@@ -2,7 +2,6 @@ package qln
 
 import (
 	"encoding/json"
-	"fmt"
 	"sync"
 
 	"github.com/mit-dci/lit/elkrem"
@@ -142,7 +141,6 @@ func (nd *LitNode) ApplyChanDataToQchan(data *ChanData, qc *Qchan) error {
 func (nd *LitNode) QchanSerializeToBytes(qc *Qchan) []byte {
 	cd := nd.NewChanDataFromQchan(qc)
 	data, _ := json.Marshal(cd)
-	fmt.Printf("QCHAN JSON: %v\n", string(data))
 	return data
 }
 
