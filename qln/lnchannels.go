@@ -96,7 +96,7 @@ type StatCom struct {
 	NextElkPoint [33]byte `json:"elkp1"` // Point stored for next state
 	N2ElkPoint   [33]byte `json:"elkp2"` // Point for state after next (in case of collision)
 
-	sig [64]byte `json:"sig"` // Counterparty's signature for current state
+	Sig [64]byte `json:"sig"` // Counterparty's signature for current state
 	// don't write to sig directly; only overwrite via fn() call
 
 	// note sig can be nil during channel creation. if stateIdx isn't 0,
