@@ -71,11 +71,16 @@ func (nd *LitNode) NewQchanFromChanData(data *ChanData) (*Qchan, error) {
 
 		State: sc,
 
-		ClearToSend: make(chan bool),
+		ClearToSend: make(chan bool, 1),
 		ChanMtx:     sync.Mutex{},
 
 		LastUpdate: data.LastUpdate,
 	}
+
+	// I think this might fix the problem?
+	go (func() {
+		qc.ClearToSend <- true
+	})()
 
 	return qc, nil
 

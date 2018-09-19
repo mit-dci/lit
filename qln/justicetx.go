@@ -165,6 +165,7 @@ func (nd *LitNode) BuildJusticeSig(q *Qchan) error {
 
 	jtxid := justiceTx.TxHash()
 	logging.Infof("made justice tx %s\n", jtxid.String())
+
 	// get hashcache for signing
 	hCache := txscript.NewTxSigHashes(justiceTx)
 
