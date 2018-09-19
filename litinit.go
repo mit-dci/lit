@@ -126,8 +126,7 @@ func litSetup(conf *config) *[32]byte {
 		logLevel = 1
 	} else if len(conf.LogLevel) == 2 { // -vv
 		logLevel = 2
-	}
-	if conf.Debug { // -d
+	} else if len(conf.LogLevel) >= 3 {
 		logLevel = 3
 	}
 	logging.SetLogLevel(logLevel)

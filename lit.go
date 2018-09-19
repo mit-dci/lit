@@ -46,8 +46,7 @@ type config struct { // define a struct for usage with go-flags
 	Hard   bool `short:"t" long:"hard" description:"Flag to set networks."`
 
 	// logging and debug parameters
-	LogLevel []bool `short:"v" description:"Set verbosity level to verbose (-v) or very verbose (-vv)"`
-	Debug bool `short:"d" long:"debug" description:"Set debug mode (highest verbosity level)"`
+	LogLevel []bool `short:"v" description:"Set verbosity level to verbose (-v), very verbose (-vv) or very very verbose (-vvv)"`
 
 	// rpc server config
 	Rpcport uint16 `short:"p" long:"rpcport" description:"Set RPC port to connect to"`
