@@ -23,7 +23,7 @@ pipeline {
     }
     stage('Unit Tests') {
       steps {
-        sh './gotests.sh'
+        sh './scripts/gotests.sh'
       }
     }
     stage('Integration Tests') {
