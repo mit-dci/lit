@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import testlib
 
 def run_test(env):
@@ -20,12 +18,3 @@ def run_test(env):
     print('lit balance:', txo_total)
     if txo_total != 100000000:
         raise AssertionError("Didn't get the amount we thought we would!")
-
-if __name__ == '__main__':
-    env = None
-    try:
-        env = testlib.TestEnv(1)
-        run_test(env)
-    finally:
-        if env is not None:
-            env.shutdown()

@@ -9,10 +9,9 @@ import (
 	"net"
 	"time"
 
-	"github.com/mit-dci/lit/logging"
-
-	"github.com/mit-dci/lit/btcutil/btcec"
+	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
 )
 
 // Conn is an implementation of net.Conn which enforces an authenticated key
@@ -249,11 +248,11 @@ func (c *Conn) SetWriteDeadline(t time.Time) error {
 }
 
 // RemotePub returns the remote peer's static public key.
-func (c *Conn) RemotePub() *btcec.PublicKey {
+func (c *Conn) RemotePub() *koblitz.PublicKey {
 	return c.noise.remoteStatic
 }
 
 // LocalPub returns the local peer's static public key.
-func (c *Conn) LocalPub() *btcec.PublicKey {
+func (c *Conn) LocalPub() *koblitz.PublicKey {
 	return c.noise.localStatic.PubKey()
 }

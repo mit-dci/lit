@@ -3,15 +3,12 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"io"
-	"log"
 	"os"
 	"path/filepath"
 
-	"github.com/mit-dci/lit/logging"
-
 	"github.com/jessevdk/go-flags"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
 )
 
 // createDefaultConfigFile creates a config file  -- only call this if the
@@ -39,7 +36,7 @@ func createDefaultConfigFile(destinationPath string) error {
 // configuration variables, reading in key data, reading and creating files if
 // they're not yet there.  It takes in a config, and returns a key.
 // (maybe add the key to the config?
-func litSetup(conf *config) *[32]byte {
+func litSetup(conf *litConfig) *[32]byte {
 	// Pre-parse the command line options to see if an alternative config
 	// file or the version flag was specified.  Any errors aside from the
 	// help message error can be ignored here since they will be caught by
@@ -47,8 +44,7 @@ func litSetup(conf *config) *[32]byte {
 
 	//	usageMessage := fmt.Sprintf("Use %s -h to show usage", "./lit")
 
-	preconf := *conf
-	preParser := newConfigParser(&preconf, flags.HelpFlag)
+	preParser := newConfigParser(conf, flags.HelpFlag)
 	_, err := preParser.ParseArgs(os.Args)
 	if err != nil {
 		logging.Fatal(err)
@@ -57,52 +53,54 @@ func litSetup(conf *config) *[32]byte {
 	// Load config from file and parse
 	parser := newConfigParser(conf, flags.Default)
 
+	// set default log level here
+	logging.SetLogLevel(defaultLogLevel)
 	// create home directory
-	_, err = os.Stat(preconf.LitHomeDir)
+	_, err = os.Stat(conf.LitHomeDir)
 	if err != nil {
-		fmt.Println("Error while creating a directory")
+		logging.Errorf("Error while creating a directory")
 	}
 	if os.IsNotExist(err) {
 		// first time the guy is running lit, lets set tn3 to true
-		os.Mkdir(preconf.LitHomeDir, 0700)
-		fmt.Printf("Creating a new config file")
-		err := createDefaultConfigFile(preconf.LitHomeDir) // Source of error
+		os.Mkdir(conf.LitHomeDir, 0700)
+		logging.Infof("Creating a new config file")
+		err := createDefaultConfigFile(conf.LitHomeDir) // Source of error
 		if err != nil {
-			fmt.Printf("Error creating a default config file: %v", preconf.LitHomeDir)
-			panic(err)
+			fmt.Printf("Error creating a default config file: %v", conf.LitHomeDir)
+			logging.Fatal(err)
 		}
 	}
 
-	if _, err := os.Stat(filepath.Join(filepath.Join(preconf.LitHomeDir), "lit.conf")); os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(filepath.Join(conf.LitHomeDir), "lit.conf")); os.IsNotExist(err) {
 		// if there is no config file found over at the directory, create one
 		if err != nil {
 			fmt.Println(err)
 		}
-		fmt.Println("Creating a new config file")
-		err := createDefaultConfigFile(filepath.Join(preconf.LitHomeDir)) // Source of error
+		logging.Infof("Creating a new config file")
+		err := createDefaultConfigFile(filepath.Join(conf.LitHomeDir)) // Source of error
 		if err != nil {
-			panic(err)
+			logging.Fatal(err)
 		}
 	}
 
-	preconf.ConfigFile = filepath.Join(filepath.Join(preconf.LitHomeDir), "lit.conf")
+	conf.ConfigFile = filepath.Join(filepath.Join(conf.LitHomeDir), "lit.conf")
 	// lets parse the config file provided, if any
-	err = flags.NewIniParser(parser).ParseFile(preconf.ConfigFile)
+	err = flags.NewIniParser(parser).ParseFile(conf.ConfigFile)
 	if err != nil {
 		_, ok := err.(*os.PathError)
 		if !ok {
-			panic(err)
+			logging.Fatal(err)
 		}
 	}
 	// Parse command line options again to ensure they take precedence.
 	_, err = parser.ParseArgs(os.Args) // returns invalid flags
 	if err != nil {
-		panic(err)
+		logging.Fatal(err)
 	}
 
 	logFilePath := filepath.Join(conf.LitHomeDir, "lit.log")
-
 	logFile, err := os.OpenFile(logFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	logging.SetLogFile(logFile)
 
 	// Log Levels:
 	// 5: DebugLevel prints Panics, Fatals, Errors, Warnings, Infos and Debugs
@@ -122,18 +120,18 @@ func litSetup(conf *config) *[32]byte {
 	// TODO ... what's this do?
 	defer logFile.Close()
 
-	logging.SetLogLevel(conf.LogLevel)
-
-	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
-	logOutput := io.MultiWriter(os.Stdout, logFile)
-	log.SetOutput(logOutput)
+	logLevel := -1
+	if len(conf.LogLevel) == 1 { // -v
+		logLevel = 1
+	} else if len(conf.LogLevel) == 2 { // -vv
+		logLevel = 2
+	} else if len(conf.LogLevel) >= 3 {
+		logLevel = 3
+	}
+	logging.SetLogLevel(logLevel)
 
 	// Allow node with no linked wallets, for testing.
 	// TODO Should update tests and disallow nodes without wallets later.
-	//	if conf.Tn3host == "" && conf.Lt4host == "" && conf.Reghost == "" {
-	//		logging.Fatal("error: no network specified; use -tn3, -reg, -lt4")
-	//	}
-
 	// Keys: the litNode, and wallits, all get 32 byte keys.
 	// Right now though, they all get the *same* key.  For lit as a single binary
 	// now, all using the same key makes sense; could split up later.

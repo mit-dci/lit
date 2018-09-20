@@ -150,8 +150,8 @@ var scriptPool scriptFreeList = make(chan []byte, freeListMaxItems)
 // OutPoint defines a bitcoin data type that is used to track previous
 // transaction outputs.
 type OutPoint struct {
-	Hash  chainhash.Hash
-	Index uint32
+	Hash  chainhash.Hash `json:"hash"`
+	Index uint32         `json:"i"`
 }
 
 // NewOutPoint returns a new bitcoin transaction outpoint point with the
@@ -180,10 +180,10 @@ func (o OutPoint) String() string {
 
 // TxIn defines a bitcoin transaction input.
 type TxIn struct {
-	PreviousOutPoint OutPoint
-	SignatureScript  []byte
-	Witness          TxWitness
-	Sequence         uint32
+	PreviousOutPoint OutPoint  `json:"prevop"`
+	SignatureScript  []byte    `json:"sigscript"`
+	Witness          TxWitness `json:"wit"`
+	Sequence         uint32    `json:"seq"`
 }
 
 // SerializeSize returns the number of bytes it would take to serialize the
@@ -231,8 +231,8 @@ func (t TxWitness) SerializeSize() int {
 
 // TxOut defines a bitcoin transaction output.
 type TxOut struct {
-	Value    int64
-	PkScript []byte
+	Value    int64  `json:"val"`
+	PkScript []byte `json:"pkscript"`
 }
 
 // SerializeSize returns the number of bytes it would take to serialize the

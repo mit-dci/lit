@@ -109,6 +109,10 @@ func (nd *LitNode) ReSendMsg(qc *Qchan) error {
 
 // PushChannel initiates a state update by sending a DeltaSig
 func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
+	if qc.State.Failed {
+		return fmt.Errorf("cannot push, channel failed")
+	}
+
 	// sanity checks
 	if amt >= consts.MaxSendAmt {
 		return fmt.Errorf("max send 1G sat (1073741823)")
@@ -135,6 +139,7 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	err := nd.ReloadQchanState(qc)
 	if err != nil {
 		// don't clear to send here; something is wrong with the channel
+		nd.FailChannel(qc)
 		qc.ChanMtx.Unlock()
 		return err
 	}
@@ -182,14 +187,9 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 
 	// if we got here, but channel is not in rest state, try to fix it.
 	if qc.State.Delta != 0 {
-		err = nd.ReSendMsg(qc)
-		if err != nil {
-			qc.ClearToSend <- true
-			qc.ChanMtx.Unlock()
-			return err
-		}
+		nd.FailChannel(qc)
 		qc.ChanMtx.Unlock()
-		return fmt.Errorf("Didn't send.  Recovered though, so try again!")
+		return fmt.Errorf("channel not in rest state")
 	}
 
 	qc.State.Data = data
@@ -198,14 +198,17 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	qc.State.Delta = int32(-amt)
 
 	if qc.State.Delta == 0 {
+		nd.FailChannel(qc)
 		qc.ChanMtx.Unlock()
 		return errors.New("PushChannel: Delta cannot be zero")
 	}
 
 	// save to db with ONLY delta changed
 	err = nd.SaveQchanState(qc)
+	qc.LastUpdate = uint64(time.Now().UnixNano() / 1000)
 	if err != nil {
 		// don't clear to send here; something is wrong with the channel
+		nd.FailChannel(qc)
 		qc.ChanMtx.Unlock()
 		return err
 	}
@@ -215,9 +218,8 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 
 	err = nd.SendDeltaSig(qc)
 	if err != nil {
-		qc.LastUpdate = uint64(time.Now().UnixNano() / 1000)
-		qc.ChanMtx.Unlock()
 		// don't clear; something is wrong with the network
+		qc.ChanMtx.Unlock()
 		return err
 	}
 
@@ -227,12 +229,18 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 	// block until clear to send is full again
 	qc.ChanMtx.Unlock()
 
+	timeout := time.NewTimer(time.Second * consts.ChannelTimeout)
+
 	cts = false
 	for !cts {
 		qc.ChanMtx.Lock()
 		select {
 		case <-qc.ClearToSend:
 			cts = true
+		case <-timeout.C:
+			nd.FailChannel(qc)
+			qc.ChanMtx.Unlock()
+			return fmt.Errorf("channel failed: operation timed out")
 		default:
 			qc.ChanMtx.Unlock()
 		}
@@ -271,7 +279,7 @@ func (nd *LitNode) SendDeltaSig(q *Qchan) error {
 
 	logging.Infof("Sending DeltaSig: %v", outMsg)
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 
 	return nil
 }
@@ -300,6 +308,7 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 	// load state from disk
 	err := nd.ReloadQchanState(qc)
 	if err != nil {
+		nd.FailChannel(qc)
 		return fmt.Errorf("DeltaSigHandler ReloadQchan err %s", err.Error())
 	}
 
@@ -390,6 +399,7 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 
 	// they have to actually send you money
 	if incomingDelta < 1 {
+		nd.FailChannel(qc)
 		return fmt.Errorf("DeltaSigHandler err: delta %d", incomingDelta)
 	}
 
@@ -399,7 +409,7 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 
 	// check if this push is takes them below minimum output size
 	if theirAmt < consts.MinOutput {
-		qc.ClearToSend <- true
+		nd.FailChannel(qc)
 		return fmt.Errorf(
 			"pushing %s reduces them too low; counterparty bal %s fee %s consts.MinOutput %s",
 			lnutil.SatoshiColor(int64(incomingDelta)),
@@ -410,7 +420,7 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 
 	// check if this push would lower my balance below minBal
 	if myAmt < consts.MinOutput {
-		qc.ClearToSend <- true
+		nd.FailChannel(qc)
 		return fmt.Errorf("want to push %s but %s available after %s fee and %s consts.MinOutput",
 			lnutil.SatoshiColor(int64(incomingDelta)),
 			lnutil.SatoshiColor(myAmt),
@@ -433,6 +443,7 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 	// TODO: There are more signatures required
 	err = qc.VerifySigs(msg.Signature, msg.HTLCSigs)
 	if err != nil {
+		nd.FailChannel(qc)
 		return fmt.Errorf("DeltaSigHandler err %s", err.Error())
 	}
 	qc.State.ElkPoint = stashElk
@@ -452,17 +463,20 @@ func (nd *LitNode) DeltaSigHandler(msg lnutil.DeltaSigMsg, qc *Qchan) error {
 	// and maybe collision; still haven't checked
 	err = nd.SaveQchanState(qc)
 	if err != nil {
+		nd.FailChannel(qc)
 		return fmt.Errorf("DeltaSigHandler SaveQchanState err %s", err.Error())
 	}
 
 	if qc.State.Collision != 0 || qc.State.CollidingHashDelta || qc.State.CollidingPreimageDelta {
 		err = nd.SendGapSigRev(qc)
 		if err != nil {
+			nd.FailChannel(qc)
 			return fmt.Errorf("DeltaSigHandler SendGapSigRev err %s", err.Error())
 		}
 	} else { // saved to db, now proceed to create & sign their tx
 		err = nd.SendSigRev(qc)
 		if err != nil {
+			nd.FailChannel(qc)
 			return fmt.Errorf("DeltaSigHandler SendSigRev err %s", err.Error())
 		}
 	}
@@ -508,6 +522,12 @@ func (nd *LitNode) SendGapSigRev(q *Qchan) error {
 		}
 	}
 
+	for _, h := range q.State.HTLCs {
+		if h.Clearing && !h.Cleared && (h.Incoming != (h.R == [16]byte{})) {
+			q.State.MyAmt += h.Amt
+		}
+	}
+
 	// sign state n+1
 
 	// TODO: send the sigs
@@ -524,7 +544,7 @@ func (nd *LitNode) SendGapSigRev(q *Qchan) error {
 
 	logging.Infof("Sending GapSigRev: %v", outMsg)
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 
 	return nil
 }
@@ -561,7 +581,7 @@ func (nd *LitNode) SendSigRev(q *Qchan) error {
 
 	logging.Infof("Sending SigRev: %v", outMsg)
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 	return nil
 }
 
@@ -573,11 +593,13 @@ func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
 	// load qchan & state from DB
 	err := nd.ReloadQchanState(q)
 	if err != nil {
+		nd.FailChannel(q)
 		return fmt.Errorf("GapSigRevHandler err %s", err.Error())
 	}
 
 	// check if we're supposed to get a GapSigRev now. Collision should be set
 	if q.State.Collision == 0 && q.State.CollidingHTLC == nil && !q.State.CollidingHashPreimage && !q.State.CollidingHashDelta && !q.State.CollidingPreimageDelta && !q.State.CollidingPreimages {
+		nd.FailChannel(q)
 		return fmt.Errorf(
 			"chan %d got GapSigRev but collision = 0, collidingHTLC = nil, q.State.CollidingHashPreimage = %t, q.State.CollidingHashDelta = %t, qc.State.CollidingPreimages = %t, qc.State.CollidingPreimageDelta = %t, delta = %d",
 			q.Idx(), q.State.CollidingHashPreimage, q.State.CollidingHashDelta, q.State.CollidingPreimages, q.State.CollidingPreimageDelta, q.State.Delta)
@@ -602,9 +624,16 @@ func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
 		}
 	}
 
+	for _, h := range q.State.HTLCs {
+		if h.Clearing && !h.Cleared && (h.Incoming != (h.R == [16]byte{})) {
+			q.State.MyAmt += h.Amt
+		}
+	}
+
 	// verify elkrem and save it in ram
 	err = q.AdvanceElkrem(&msg.Elk, msg.N2ElkPoint)
 	if err != nil {
+		nd.FailChannel(q)
 		return fmt.Errorf("GapSigRevHandler err %s", err.Error())
 		// ! non-recoverable error, need to close the channel here.
 	}
@@ -623,16 +652,11 @@ func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
 	// TODO: More sigs here that before
 	err = q.VerifySigs(msg.Signature, msg.HTLCSigs)
 	if err != nil {
+		nd.FailChannel(q)
 		return fmt.Errorf("GapSigRevHandler err %s", err.Error())
 	}
 	// go back to sequential elkpoints
 	q.State.ElkPoint = stashElkPoint
-
-	for idx, h := range q.State.HTLCs {
-		if h.Clearing && !h.Cleared {
-			q.State.HTLCs[idx].Cleared = true
-		}
-	}
 
 	if !bytes.Equal(msg.N2HTLCBase[:], q.State.N2HTLCBase[:]) {
 		q.State.NextHTLCBase = q.State.N2HTLCBase
@@ -652,16 +676,19 @@ func (nd *LitNode) GapSigRevHandler(msg lnutil.GapSigRevMsg, q *Qchan) error {
 		q.State.MyNextHTLCBase = q.State.MyN2HTLCBase
 		q.State.MyN2HTLCBase, err = nd.GetUsePub(kg, UseHTLCBase)
 		if err != nil {
+			nd.FailChannel(q)
 			return err
 		}
 	}
 
 	err = nd.SaveQchanState(q)
 	if err != nil {
+		nd.FailChannel(q)
 		return fmt.Errorf("GapSigRevHandler err %s", err.Error())
 	}
 	err = nd.SendREV(q)
 	if err != nil {
+		nd.FailChannel(q)
 		return fmt.Errorf("GapSigRevHandler err %s", err.Error())
 	}
 
@@ -686,11 +713,13 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 	// load qchan & state from DB
 	err := nd.ReloadQchanState(qc)
 	if err != nil {
+		nd.FailChannel(qc)
 		return fmt.Errorf("SIGREVHandler err %s", err.Error())
 	}
 
 	// check if we're supposed to get a SigRev now. Delta should be negative
 	if qc.State.Delta > 0 {
+		nd.FailChannel(qc)
 		return fmt.Errorf("SIGREVHandler err: chan %d got SigRev, expect Rev. delta %d",
 			qc.Idx(), qc.State.Delta)
 	}
@@ -705,10 +734,15 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 
 	if qc.State.Delta == 0 && qc.State.InProgHTLC == nil && !clearing {
 		// re-send last rev; they probably didn't get it
-		return nd.SendREV(qc)
+		err = nd.SendREV(qc)
+		if err != nil {
+			nd.FailChannel(qc)
+		}
+		return err
 	}
 
 	if qc.State.Collision != 0 || qc.State.CollidingHTLC != nil {
+		nd.FailChannel(qc)
 		return fmt.Errorf("chan %d got SigRev, expect GapSigRev delta %d col %d",
 			qc.Idx(), qc.State.Delta, qc.State.Collision)
 	}
@@ -761,6 +795,7 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 	qc.State.ElkPoint = qc.State.NextElkPoint
 	err = qc.VerifySigs(msg.Signature, msg.HTLCSigs)
 	if err != nil {
+		nd.FailChannel(qc)
 		return fmt.Errorf("SIGREVHandler err %s", err.Error())
 	}
 	qc.State.ElkPoint = curElk
@@ -768,6 +803,7 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 	// verify elkrem and save it in ram
 	err = qc.AdvanceElkrem(&msg.Elk, msg.N2ElkPoint)
 	if err != nil {
+		nd.FailChannel(qc)
 		return fmt.Errorf("SIGREVHandler err %s", err.Error())
 		// ! non-recoverable error, need to close the channel here.
 	}
@@ -789,6 +825,7 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 			UseHTLCBase)
 
 		if err != nil {
+			nd.FailChannel(qc)
 			return err
 		}
 	}
@@ -811,12 +848,14 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 	// all verified; Save finished state to DB, puller is pretty much done.
 	err = nd.SaveQchanState(qc)
 	if err != nil {
+		nd.FailChannel(qc)
 		return fmt.Errorf("SIGREVHandler err %s", err.Error())
 	}
 
 	logging.Infof("SIGREV OK, state %d, will send REV\n", qc.State.StateIdx)
 	err = nd.SendREV(qc)
 	if err != nil {
+		nd.FailChannel(qc)
 		return fmt.Errorf("SIGREVHandler err %s", err.Error())
 	}
 
@@ -866,7 +905,7 @@ func (nd *LitNode) SendREV(q *Qchan) error {
 
 	logging.Infof("Sending Rev: %v", outMsg)
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 
 	return err
 }
@@ -880,6 +919,7 @@ func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {
 	// load qchan & state from DB
 	err := nd.ReloadQchanState(qc)
 	if err != nil {
+		nd.FailChannel(qc)
 		return fmt.Errorf("REVHandler err %s", err.Error())
 	}
 
@@ -904,6 +944,7 @@ func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {
 	// verify elkrem
 	err = qc.AdvanceElkrem(&msg.Elk, msg.N2ElkPoint)
 	if err != nil {
+		nd.FailChannel(qc)
 		logging.Errorf(" ! non-recoverable error, need to close the channel here.\n")
 		return fmt.Errorf("REVHandler err %s", err.Error())
 	}
@@ -937,12 +978,26 @@ func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {
 	for idx, h := range qc.State.HTLCs {
 		if h.Clearing && !h.Cleared {
 			qc.State.HTLCs[idx].Cleared = true
+
+			nd.MultihopMutex.Lock()
+			defer nd.MultihopMutex.Unlock()
+			for i, mu := range nd.InProgMultihop {
+				if bytes.Equal(mu.HHash[:], h.RHash[:]) && !mu.Succeeded {
+					nd.InProgMultihop[i].Succeeded = true
+					nd.InProgMultihop[i].PreImage = h.R
+					err = nd.SaveMultihopPayment(nd.InProgMultihop[i])
+					if err != nil {
+						return err
+					}
+				}
+			}
 		}
 	}
 
 	// save to DB (new elkrem & point, delta zeroed)
 	err = nd.SaveQchanState(qc)
 	if err != nil {
+		nd.FailChannel(qc)
 		return fmt.Errorf("REVHandler err %s", err.Error())
 	}
 
@@ -971,4 +1026,11 @@ func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {
 
 	logging.Infof("REV OK, state %d all clear.\n", qc.State.StateIdx)
 	return nil
+}
+
+// FailChannel sets the fail flag on the channel and attempts to save it
+func (nd *LitNode) FailChannel(q *Qchan) {
+	nd.ReloadQchanState(q)
+	q.State.Failed = true
+	nd.SaveQchanState(q)
 }

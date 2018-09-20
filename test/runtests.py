@@ -1,0 +1,146 @@
+#!/usr/bin/env python3
+
+import os
+import sys
+import importlib.util as imu
+
+import testlib
+
+# Loads a python module from a path, giving it a particular name.
+def __load_mod_from_file(path, name):
+    spec = imu.spec_from_file_location(name, path)
+    mod = imu.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+# Parses a line like this:
+#
+#   foobar 3 run_test_foo
+#
+# (The last argument is optional.)
+def __parse_test_def(line):
+    parts = line.split(' ')
+    if len(parts) != 2 and len(parts) != 3:
+        return None
+    name = parts[0]
+    nodes = parts[1]
+    func = 'run_test'
+    if len(parts) == 3:
+        func = parts[2]
+    return {
+        'test_name': name.strip(),
+        'func_name': func.strip(),
+        'node_cnt': int(nodes.strip()), # Raises if fails.
+    }
+
+def test_name_from_filename(name):
+    if name.startswith('itest_') and name.endswith('.py'):
+        return name[6:-3] # Should just cut off the ends.
+    else:
+        raise ValueError('')
+
+def parse_tests_file(path):
+    tdefs = []
+    with open(path, 'r') as f:
+        for l in f.readlines():
+            if len(l) == 0 or l.startswith('#'):
+                continue
+            t = __parse_test_def(l)
+            if t is not None:
+                tdefs.append(t)
+    return tdefs
+
+def load_tests_from_file(path):
+    tests = []
+    pdir = os.path.dirname(path)
+    mods = {}
+    for t in parse_tests_file(path):
+        tname = t['test_name']
+        mod = None
+        if tname in mods:
+            mod = mods[tname]
+        else:
+            fname = 'itest_%s.py' % tname
+            modname = 'testmod_' + tname
+            mod = __load_mod_from_file(fname, modname)
+            mods[tname] = mod
+        tests.append({
+            'name': tname,
+            'test_func': getattr(mod, t['func_name']),
+            'node_cnt': t['node_cnt']
+        })
+    return tests
+
+def run_test_list(tests):
+    ok = 0
+    fail = 0
+
+    # First, just run the tests.
+    for t in tests:
+        name = t['name']
+
+        print('==============================')
+        tfunc = t['test_func']
+        if tfunc.__name__ == 'run_test':
+            print('Running test:', name)
+        else:
+            print('Running test:', name + ':' + tfunc.__name__)
+
+        # Do this before the bottom frame so we have a clue how long startup
+        # took and where the fail was.
+        env = None
+        try:
+            testlib.clean_data_dir() # IMPORTANT!
+            print('------------------------------')
+            env = testlib.TestEnv(t['node_cnt'])
+        except Exception as e:
+            print('Error initing env, this is a test framework bug:', e)
+            break
+        print('==============================')
+
+        # This is where the test actually runs.
+        try:
+            tfunc(env)
+            env.shutdown()
+            print('------------------------------')
+            print('Success:', name)
+            ok += 1
+        except BaseException as e:
+            env.shutdown()
+            print('------------------------------')
+            print('Failure:', name)
+            print('\nError:', e)
+            if type(e) is KeyboardInterrupt:
+                break
+            fail += 1
+            # TODO Report failures and why.
+
+    print('==============================')
+
+    # Collect results.
+    res = {
+        'ok': ok,
+        'fail': fail,
+        'ignored': len(tests) - ok - fail
+    }
+    return res
+
+if __name__ == '__main__':
+    tests = load_tests_from_file('tests.txt')
+
+    # If given arguments, run these instead.  Doesn't do them in given order, sadly.
+    if len(sys.argv) > 1:
+        to_run = []
+        for t in tests:
+            if t['name'] in sys.argv[1:]:
+                to_run.append(t)
+        tests = to_run
+
+    res = run_test_list(tests)
+    print('Success:', res['ok'])
+    print('Failure:', res['fail'])
+    print('Ignored:', res['ignored'])
+    if res['fail'] > 0:
+        sys.exit(1)
+    else:
+        sys.exit(0)

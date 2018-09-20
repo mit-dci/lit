@@ -2,33 +2,28 @@ package qln
 
 import (
 	"fmt"
-	"path/filepath"
-
-	"github.com/mit-dci/lit/logging"
-
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/hdkeychain"
 	"github.com/mit-dci/lit/coinparam"
+	"github.com/mit-dci/lit/db/lnbolt" // TODO Abstract this more.
 	"github.com/mit-dci/lit/dlc"
-	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/eventbus"
+	"github.com/mit-dci/lit/lncore"
+	"github.com/mit-dci/lit/lnp2p"
+	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/wallit"
 	"github.com/mit-dci/lit/watchtower"
+	"path/filepath"
+	"sync"
 )
 
-// Init starts up a lit node.  Needs priv key, and a path.
+// NewLitNode starts up a lit node.  Needs priv key, and a path.
 // Does not activate a subwallet; do that after init.
 func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL string, nat string) (*LitNode, error) {
 
-	nd := new(LitNode)
-	nd.LitFolder = path
-
-	litdbpath := filepath.Join(nd.LitFolder, "ln.db")
-	err := nd.OpenDB(litdbpath)
-	if err != nil {
-		return nil, err
-	}
+	var err error
 
 	// Maybe make a new parameter set for "LN".. meh
 	// TODO change this to a non-coin
@@ -36,6 +31,50 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 	if err != nil {
 		return nil, err
 	}
+
+	nd := new(LitNode)
+	nd.LitFolder = path
+
+	litdbpath := filepath.Join(nd.LitFolder, "ln.db")
+	err = nd.OpenDB(litdbpath)
+	if err != nil {
+		return nil, err
+	}
+
+	db2 := &lnbolt.LitBoltDB{}
+	var dbx lncore.LitStorage
+	dbx = db2
+	err = dbx.Open(filepath.Join(nd.LitFolder, "db2"))
+	if err != nil {
+		return nil, err
+	}
+	nd.NewLitDB = dbx
+	err = nd.NewLitDB.Check()
+	if err != nil {
+		return nil, err
+	}
+
+	// Event system setup.
+	ebus := eventbus.NewEventBus()
+	nd.Events = &ebus
+
+	// Peer manager
+	nd.PeerMan, err = lnp2p.NewPeerManager(rootPrivKey, nd.NewLitDB.GetPeerDB(), &ebus)
+	if err != nil {
+		return nil, err
+	}
+
+	// Actually start the thread to send messages.
+	nd.PeerMan.StartSending()
+
+	// Register adapter event handlers.  These are for hooking in the new peer management with the old one.
+	h1 := makeTmpNewPeerHandler(nd)
+	nd.Events.RegisterHandler("lnp2p.peer.new", h1)
+	h2 := makeTmpDisconnectPeerHandler(nd)
+	nd.Events.RegisterHandler("lnp2p.peer.disconnect", h2)
+
+	// Sets up handlers for all the messages we need to handle.
+	nd.registerHandlers()
 
 	var kg portxo.KeyGen
 	kg.Depth = 5
@@ -48,6 +87,11 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 	if err != nil {
 		return nil, err
 	}
+
+	kg.Step[3] = 1 | 1<<31
+	rcPriv, err := kg.DerivePrivateKey(rootPrivKey)
+	nd.DefaultRemoteControlKey = rcPriv.PubKey()
+	rcPriv = nil
 
 	nd.TrackerURL = trackerURL
 
@@ -76,15 +120,19 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 	nd.InProgDual = new(InFlightDualFund)
 	nd.InProgDual.done = make(chan *DualFundingResult, 1)
 
+	nd.InProgMultihop, err = nd.GetAllMultihopPayments()
+	if err != nil {
+		return nil, err
+	}
+
 	nd.RemoteMtx.Lock()
 	nd.RemoteCons = make(map[uint32]*RemotePeer)
 	nd.RemoteMtx.Unlock()
 
 	nd.SubWallet = make(map[uint32]UWallet)
 
-	nd.OmniOut = make(chan lnutil.LitMsg, 10)
-	nd.OmniIn = make(chan lnutil.LitMsg, 10)
-
+	nd.PeerMap = map[*lnp2p.Peer]*RemotePeer{}
+	nd.PeerMapMtx = &sync.Mutex{}
 	nd.KnownPubkeys = make(map[uint32][33]byte)
 	var empty [33]byte
 	i := uint32(1)
@@ -97,8 +145,6 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 		nd.KnownPubkeys[i] = pubKey
 		i++
 	}
-	//	go nd.OmniHandler()
-	go nd.OutMessager()
 
 	return nd, nil
 }
@@ -139,7 +185,7 @@ func (nd *LitNode) LinkBaseWallet(
 
 	if err != nil {
 		logging.Error(err)
-		return nil
+		return err
 	}
 
 	if nd.ConnectedCoinTypes == nil {
@@ -220,6 +266,16 @@ func (nd *LitNode) OpenDB(filename string) error {
 		}
 
 		_, err = btx.CreateBucketIfNotExists(BKTHTLCOPs)
+		if err != nil {
+			return err
+		}
+
+		_, err = btx.CreateBucketIfNotExists(BKTPayments)
+		if err != nil {
+			return err
+		}
+
+		_, err = btx.CreateBucketIfNotExists(BKTRCAuth)
 		if err != nil {
 			return err
 		}

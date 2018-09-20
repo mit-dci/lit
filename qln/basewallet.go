@@ -3,7 +3,7 @@ package qln
 import (
 	"fmt"
 
-	"github.com/mit-dci/lit/btcutil/btcec"
+	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
@@ -16,11 +16,11 @@ import (
 // Verbs are from the perspective of the LnNode, not the underlying wallet
 type UWallet interface {
 	// Ask for a pubkey based on a bip32 path
-	GetPub(k portxo.KeyGen) *btcec.PublicKey
+	GetPub(k portxo.KeyGen) *koblitz.PublicKey
 
 	// Have GetPriv for now.  Maybe later get rid of this and have
 	// the underlying wallet sign?
-	GetPriv(k portxo.KeyGen) (*btcec.PrivateKey, error)
+	GetPriv(k portxo.KeyGen) (*koblitz.PrivateKey, error)
 
 	// Send a tx out to the network.  Maybe could replace?  Maybe not.
 	// Needed for channel break / cooperative close.  Maybe grabs.

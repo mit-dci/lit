@@ -1,21 +1,18 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
-	"net/rpc"
-	"net/rpc/jsonrpc"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
-
-	"golang.org/x/net/websocket"
 
 	"github.com/chzyer/readline"
 	"github.com/fatih/color"
+	"github.com/mit-dci/lit/crypto/koblitz"
+	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
 )
 
 /*
@@ -43,16 +40,17 @@ May end up using termbox-go
 //}
 
 const (
-	litHomeDirName  = ".lit"
-	historyFilename = "lit-af.history"
+	litHomeDirName     = ".lit"
+	historyFilename    = "lit-af.history"
+	defaultKeyFileName = "privkey.hex"
 )
 
 type litAfClient struct {
-	remote string
-	port   uint16
-	rpccon *rpc.Client
-	//httpcon
-	litHomeDir string
+	con           string
+	verbosity     int
+	tracker       string
+	litHomeDir    string
+	lndcRpcClient *litrpc.LndcRpcClient
 }
 
 type Command struct {
@@ -62,43 +60,71 @@ type Command struct {
 }
 
 func setConfig(lc *litAfClient) {
-	hostptr := flag.String("node", "127.0.0.1", "host to connect to")
-	portptr := flag.Int("p", 8001, "port to connect to")
+	conptr := flag.String("con", "2448", "host to connect to in the form of [<lnadr>@][<host>][:<port>]")
+	vptr := flag.Int("v", 2, "verbosity level")
 	dirptr := flag.String("dir", filepath.Join(os.Getenv("HOME"), litHomeDirName), "directory to save settings")
+	trackerptr := flag.String("tracker", "http://hubris.media.mit.edu:46580", "service to use for looking up node addresses")
 
 	flag.Parse()
-
-	lc.remote = *hostptr
-	lc.port = uint16(*portptr)
+	lc.verbosity = *vptr
+	lc.con = *conptr
+	lc.tracker = *trackerptr
 	lc.litHomeDir = *dirptr
 }
 
 // for now just testing how to connect and get messages back and forth
 func main() {
+	var err error
+
 	lc := new(litAfClient)
 	setConfig(lc)
 
-	//	dialString := fmt.Sprintf("%s:%d", lc.remote, lc.port)
+	logging.SetLogLevel(lc.verbosity)
 
-	/*
-		client, err := net.Dial("tcp", dialString)
-		if err != nil {
-			Log.Fatal("dialing:", err)
-		}
-		defer client.Close()
-	*/
-
-	//	dialString := fmt.Sprintf("%s:%d", lc.remote, lc.port)
-	origin := "http://127.0.0.1/"
-	urlString := fmt.Sprintf("ws://%s:%d/ws", lc.remote, lc.port)
-	//	url := "ws://127.0.0.1:8000/ws"
-	wsConn, err := websocket.Dial(urlString, "", origin)
-	if err != nil {
-		panic(err)
+	// create home directory if it does not exist
+	_, err = os.Stat(lc.litHomeDir)
+	if os.IsNotExist(err) {
+		os.Mkdir(lc.litHomeDir, 0700)
 	}
-	defer wsConn.Close()
 
-	lc.rpccon = jsonrpc.NewClient(wsConn)
+	adr, host, port := lnutil.ParseAdrStringWithPort(lc.con)
+
+	if litrpc.LndcRpcCanConnectLocallyWithHomeDir(lc.litHomeDir) && adr == "" && (host == "localhost" || host == "127.0.0.1") {
+
+		lc.lndcRpcClient, err = litrpc.NewLocalLndcRpcClientWithHomeDirAndPort(lc.litHomeDir, port)
+		if err != nil {
+			logging.Fatal(err.Error())
+		}
+	} else {
+		if !lnutil.LitAdrOK(adr) {
+			logging.Fatal("lit address passed in -con parameter is not valid")
+		}
+
+		keyFilePath := filepath.Join(lc.litHomeDir, "lit-af-key.hex")
+		privKey, err := lnutil.ReadKeyFile(keyFilePath)
+		if err != nil {
+			logging.Fatal(err.Error())
+		}
+		key, _ := koblitz.PrivKeyFromBytes(koblitz.S256(), privKey[:])
+
+		if adr != "" && strings.HasPrefix(adr, "ln1") && host == "" {
+			ipv4, _, err := lnutil.Lookup(adr, lc.tracker, "")
+			if err != nil {
+				logging.Fatalf("Error looking up address on the tracker: %s", err)
+			} else {
+				adr = fmt.Sprintf("%s@%s", adr, ipv4)
+			}
+		} else {
+			adr = fmt.Sprintf("%s@%s:%d", adr, host, port)
+		}
+
+		logging.Infof("Connecting to %s\n", adr)
+
+		lc.lndcRpcClient, err = litrpc.NewLndcRpcClient(adr, key)
+		if err != nil {
+			logging.Fatal(err.Error())
+		}
+	}
 
 	rl, err := readline.NewEx(&readline.Config{
 		Prompt:       lnutil.Prompt("lit-af") + lnutil.White("# "),
@@ -106,10 +132,10 @@ func main() {
 		AutoComplete: lc.NewAutoCompleter(),
 	})
 	if err != nil {
-		panic(err)
+		logging.Fatal(err)
 	}
 	defer rl.Close()
-	go lc.RequestAsync()
+
 	// main shell loop
 	for {
 		// setup reader with max 4K input chars
@@ -128,24 +154,11 @@ func main() {
 
 		err = lc.Shellparse(cmdslice)
 		if err != nil { // only error should be user exit
-			panic(err)
+			logging.Fatal(err)
 		}
 	}
-
-	//	err = c.Call("LitRPC.Bal", nil, &br)
-	//	if err != nil {
-	//		Log.Fatal("rpc call error:", err)
-	//	}
-	//	fmt.Printf("Sent bal req, response: txototal %d\n", br.TxoTotal)
 }
 
 func (lc *litAfClient) Call(serviceMethod string, args interface{}, reply interface{}) error {
-	c := make(chan error, 1)
-	go func() { c <- lc.rpccon.Call(serviceMethod, args, &reply) }()
-	select {
-	case err := <-c:
-		return err
-	case <-time.After(time.Second * 10):
-		return errors.New("RPC call timed out")
-	}
+	return lc.lndcRpcClient.Call(serviceMethod, args, reply)
 }

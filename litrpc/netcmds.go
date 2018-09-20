@@ -3,10 +3,14 @@ package litrpc
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
-	"github.com/mit-dci/lit/logging"
-
+	"github.com/mit-dci/lit/bech32"
+	"github.com/mit-dci/lit/crypto/koblitz"
+	"github.com/mit-dci/lit/lncore"
+	"github.com/mit-dci/lit/lnp2p"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/qln"
 )
 
@@ -75,13 +79,26 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *ConnectReply) error {
 		connectAdr = args.LNAddr
 	}
 
-	idx, err := r.Node.DialPeer(connectAdr)
+	err = r.Node.DialPeer(connectAdr)
 	if err != nil {
 		return err
 	}
 
+	// Extract the plain lit addr since we don't always have it.
+	// TODO Make this more "correct" since it's using the old system a lot.
+	paddr := connectAdr
+	if strings.Contains(paddr, "@") {
+		paddr = strings.SplitN(paddr, "@", 2)[0]
+	}
+
+	var pm *lnp2p.PeerManager = r.Node.PeerMan
+	p := pm.GetPeer(lncore.LnAddr(paddr))
+	if p == nil {
+		return fmt.Errorf("couldn't find peer in manager after connecting")
+	}
+
 	reply.Status = fmt.Sprintf("connected to peer %s", connectAdr)
-	reply.PeerIdx = idx
+	reply.PeerIdx = p.GetIdx()
 	return nil
 }
 
@@ -113,7 +130,7 @@ func (r *LitRPC) AssignNickname(args AssignNicknameArgs, reply *StatusReply) err
 // ------------------------- ShowConnections
 
 type ListConnectionsReply struct {
-	Connections []qln.PeerInfo
+	Connections []qln.SimplePeerInfo
 	MyPKH       string
 }
 type ConInfo struct {
@@ -123,6 +140,7 @@ type ConInfo struct {
 
 func (r *LitRPC) ListConnections(args NoArgs, reply *ListConnectionsReply) error {
 	reply.Connections = r.Node.GetConnectedPeerList()
+	reply.MyPKH = r.Node.GetLnAddr()
 	return nil
 }
 
@@ -160,4 +178,115 @@ type ChannelGraphReply struct {
 func (r *LitRPC) GetChannelMap(args NoArgs, reply *ChannelGraphReply) error {
 	reply.Graph = r.Node.VisualiseGraph()
 	return nil
+}
+
+// ------------ Show multihop payments
+type MultihopPaymentInfo struct {
+	RHash     [32]byte
+	R         [16]byte
+	Amt       int64
+	Path      []string
+	Succeeded bool
+}
+
+type MultihopPaymentsReply struct {
+	Payments []MultihopPaymentInfo
+}
+
+func (r *LitRPC) ListMultihopPayments(args NoArgs, reply *MultihopPaymentsReply) error {
+	r.Node.MultihopMutex.Lock()
+	defer r.Node.MultihopMutex.Unlock()
+	for _, p := range r.Node.InProgMultihop {
+		var path []string
+		for _, hop := range p.Path {
+			path = append(path, fmt.Sprintf("%s:%d", bech32.Encode("ln", hop.Node[:]), hop.CoinType))
+		}
+
+		i := MultihopPaymentInfo{
+			p.HHash,
+			p.PreImage,
+			p.Amt,
+			path,
+			p.Succeeded,
+		}
+
+		reply.Payments = append(reply.Payments, i)
+	}
+
+	return nil
+}
+
+type RCAuthArgs struct {
+	PubKey        []byte
+	Authorization *qln.RemoteControlAuthorization
+}
+
+func (r *LitRPC) RemoteControlAuth(args RCAuthArgs, reply *StatusReply) error {
+
+	pub, err := koblitz.ParsePubKey(args.PubKey, koblitz.S256())
+	if err != nil {
+		reply.Status = fmt.Sprintf("Error deserializing pubkey: %s", err.Error())
+		return err
+	}
+	compressedPubKey := pub.SerializeCompressed()
+	var pubKey [33]byte
+	copy(pubKey[:], compressedPubKey[:])
+
+	args.Authorization.UnansweredRequest = false
+
+	err = r.Node.SaveRemoteControlAuthorization(pubKey, args.Authorization)
+	if err != nil {
+		logging.Errorf("Error saving auth: %s", err.Error())
+		return err
+	}
+
+	action := "Granted"
+	if !args.Authorization.Allowed {
+		action = "Denied / revoked"
+	}
+	reply.Status = fmt.Sprintf("%s remote control access for pubkey [%x]", action, pubKey)
+	return nil
+}
+
+type RCRequestAuthArgs struct {
+	PubKey [33]byte
+}
+
+func (r *LitRPC) RequestRemoteControlAuthorization(args RCRequestAuthArgs, reply *StatusReply) error {
+	auth := new(qln.RemoteControlAuthorization)
+	auth.Allowed = false
+	auth.UnansweredRequest = true
+
+	err := r.Node.SaveRemoteControlAuthorization(args.PubKey, auth)
+	if err != nil {
+		logging.Errorf("Error saving auth request: %s", err.Error())
+		return err
+	}
+
+	reply.Status = fmt.Sprintf("Access requested for pubkey [%x]", args.PubKey)
+	return nil
+}
+
+type RCPendingAuthRequestsReply struct {
+	PubKeys [][33]byte
+}
+
+func (r *LitRPC) ListPendingRemoteControlAuthRequests(args NoArgs, reply *RCPendingAuthRequestsReply) error {
+	auth := new(qln.RemoteControlAuthorization)
+	auth.Allowed = false
+	auth.UnansweredRequest = true
+
+	requests, err := r.Node.GetPendingRemoteControlRequests()
+	if err != nil {
+		logging.Errorf("Error saving auth request: %s", err.Error())
+		return err
+	}
+
+	reply.PubKeys = make([][33]byte, len(requests))
+	for i, r := range requests {
+		reply.PubKeys[i] = r.PubKey
+	}
+
+	return nil
+
 }

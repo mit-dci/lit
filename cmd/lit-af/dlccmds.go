@@ -10,6 +10,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
 )
 
 var dlcCommand = &Command{
@@ -389,7 +390,7 @@ func (lc *litAfClient) DlcListOracles(textArgs []string) error {
 		return err
 	}
 	if len(reply.Oracles) == 0 {
-		fmt.Println("No oracles found")
+		logging.Infof("No oracles found")
 	}
 	for _, o := range reply.Oracles {
 		fmt.Fprintf(color.Output, "%04d: [%x...%x...%x]  %s\n",

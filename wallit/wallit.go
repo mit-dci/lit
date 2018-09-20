@@ -53,18 +53,18 @@ type Wallit struct {
 }
 
 type FrozenTx struct {
-	Ins       []*portxo.PorTxo
-	Outs      []*wire.TxOut
-	ChangeOut *wire.TxOut
-	Nlock     uint32
-	Txid      chainhash.Hash
+	Ins       []*portxo.PorTxo `json:"ins"`
+	Outs      []*wire.TxOut    `json:"outs"`
+	ChangeOut *wire.TxOut      `json:"changeout"`
+	Nlock     uint32           `json:"nlocktime"`
+	Txid      chainhash.Hash   `json:"txid"`
 }
 
 // Stxo is a utxo that has moved on.
 type Stxo struct {
-	portxo.PorTxo                // when it used to be a utxo
-	SpendHeight   int32          // height at which it met its demise
-	SpendTxid     chainhash.Hash // the tx that consumed it
+	PorTxo      portxo.PorTxo  `json:"txo"`    // when it used to be a utxo
+	SpendHeight int32          `json:"height"` // height at which it met its demise
+	SpendTxid   chainhash.Hash `json:"txid"`   // the tx that consumed it
 }
 
 // TxToString prints out some info about a transaction. for testing / debugging

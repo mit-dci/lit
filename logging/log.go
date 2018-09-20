@@ -2,24 +2,30 @@ package logging
 
 import (
 	"fmt"
+	"io"
 	"log"
+	"os"
 )
 
 type LogLevel int
 
 const (
-	LogLevelPanic   LogLevel = 0
-	LogLevelFatal   LogLevel = 1
-	LogLevelError   LogLevel = 2
-	LogLevelWarning LogLevel = 3
-	LogLevelInfo    LogLevel = 4
-	LogLevelDebug   LogLevel = 5
+	LogLevelError        LogLevel = 0
+	LogLevelWarning      LogLevel = 1
+	LogLevelInfo         LogLevel = 2
+	LogLevelDebug        LogLevel = 3
 )
 
-var logLevel = LogLevelPanic
+var logLevel = LogLevelError
 
 func SetLogLevel(newLevel int) {
 	logLevel = LogLevel(newLevel)
+}
+
+func SetLogFile(logFile io.Writer) {
+	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
+	logOutput := io.MultiWriter(os.Stdout, logFile)
+	log.SetOutput(logOutput)
 }
 
 func getPrefix(level string) string {
@@ -27,21 +33,15 @@ func getPrefix(level string) string {
 }
 
 func Fatalln(args ...interface{}) {
-	if logLevel >= LogLevelFatal {
-		log.Fatalln(args...)
-	}
+	log.Fatalln(args...)
 }
 
 func Fatalf(format string, args ...interface{}) {
-	if logLevel >= LogLevelFatal {
-		log.Fatalf(format, args...)
-	}
+	log.Fatalf(format, args...)
 }
 
 func Fatal(args ...interface{}) {
-	if logLevel >= LogLevelFatal {
-		log.Fatal(args...)
-	}
+	log.Fatal(args...)
 }
 
 func Debugf(format string, args ...interface{}) {

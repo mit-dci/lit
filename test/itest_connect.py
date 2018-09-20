@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import testlib
 
 def run_test(env):
@@ -12,12 +10,3 @@ def run_test(env):
     print('Alice said hello to Bob.')
     bob.rpc.Say(Peer=bob.get_peer_id(alice), Message="world!")
     print('Bob said hello to Alice.')
-
-if __name__ == '__main__':
-    env = None
-    try:
-        env = testlib.TestEnv(2)
-        run_test(env)
-    finally:
-        if env is not None:
-            env.shutdown()

@@ -2,13 +2,12 @@ package uspv
 
 import (
 	"bytes"
-
-	"github.com/mit-dci/lit/logging"
-
 	"github.com/mit-dci/lit/btcutil/bloom"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/wire"
+	"os"
 )
 
 var (
@@ -141,6 +140,21 @@ func (s *SPVCon) Refilter(f *bloom.Filter) {
 	}
 }
 
+var checkedlogblock = false
+var logfullblock = true
+
+func ckLogFullBlock() bool {
+	if !checkedlogblock {
+		v := os.Getenv("LIT_LOG_INGEST_BLOCK")
+		if v == "0" {
+			logging.Warnln("Diabling logging of block ingestion.")
+			logfullblock = false
+		}
+		checkedlogblock = true
+	}
+	return logfullblock
+}
+
 // IngestBlock is like IngestMerkleBlock but aralphic
 // different enough that it's better to have 2 separate functions
 func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
@@ -187,8 +201,10 @@ func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
 	// track our internal height
 	s.syncHeight = hah.height
 
-	logging.Infof("ingested full block %s height %d OK\n",
-		m.Header.BlockHash().String(), hah.height)
+	if ckLogFullBlock() {
+		logging.Debugf("ingested full block %s height %d OK\n",
+			m.Header.BlockHash().String(), hah.height)
+	}
 
 	if hah.final { // check sync end
 		// don't set waitstate; instead, ask for headers again!

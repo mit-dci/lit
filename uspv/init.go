@@ -27,15 +27,10 @@ func IP4(ipAddress string) bool {
 func (s *SPVCon) parseRemoteNode(remoteNode string) (string, string, error) {
 	colonCount := strings.Count(remoteNode, ":")
 	var conMode string
-	if colonCount == 0 {
-		if IP4(remoteNode) || remoteNode == "localhost" { // need this to connect to locahost
+	if colonCount <= 1 {
+		if colonCount == 0 {
 			remoteNode = remoteNode + ":" + s.Param.DefaultPort
 		}
-		// only ipv4 clears this since ipv6 has colons
-		conMode = "tcp4"
-		return remoteNode, conMode, nil
-	} else if colonCount == 1 && IP4(strings.Split(remoteNode, ":")[0]) {
-		// custom port on ipv4
 		return remoteNode, "tcp4", nil
 	} else if colonCount >= 5 {
 		// ipv6 without remote port
@@ -118,6 +113,11 @@ func (s *SPVCon) DialNode(listOfNodes []string) (net.Conn, error) {
 		}
 		break
 	}
+
+	if con == nil {
+		return nil, fmt.Errorf("Failed to connect to a coin daemon")
+	}
+
 	return con, nil
 }
 

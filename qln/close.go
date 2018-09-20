@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/mit-dci/lit/btcutil/btcec"
+	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/btcutil/txscript"
 	"github.com/mit-dci/lit/crypto/fastsha256"
@@ -83,7 +83,7 @@ func (nd *LitNode) CoopClose(q *Qchan) error {
 
 	outMsg := lnutil.NewCloseReqMsg(q.Peer(), q.Op, signature)
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 	return nil
 }
 
@@ -143,12 +143,12 @@ func (nd *LitNode) CloseReqHandler(msg lnutil.CloseReqMsg) {
 	theirBigSig := sig64.SigDecompress(msg.Signature)
 
 	// sig is pre-truncated; last byte for sighashtype is always sighashAll
-	pSig, err := btcec.ParseDERSignature(theirBigSig, btcec.S256())
+	pSig, err := koblitz.ParseDERSignature(theirBigSig, koblitz.S256())
 	if err != nil {
 		logging.Errorf("CloseReqHandler Sig err %s", err.Error())
 		return
 	}
-	theirPubKey, err := btcec.ParsePubKey(q.TheirPub[:], btcec.S256())
+	theirPubKey, err := koblitz.ParsePubKey(q.TheirPub[:], koblitz.S256())
 	if err != nil {
 		logging.Errorf("CloseReqHandler Sig err %s", err.Error())
 		return

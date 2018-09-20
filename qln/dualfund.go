@@ -2,14 +2,12 @@ package qln
 
 import (
 	"fmt"
-
-	"github.com/mit-dci/lit/logging"
-
-	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/btcutil/txsort"
 	"github.com/mit-dci/lit/consts"
+	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/elkrem"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/wire"
 )
@@ -178,7 +176,7 @@ func (nd *LitNode) DualFundChannel(
 
 	outMsg := lnutil.NewDualFundingReqMsg(peerIdx, cointype, ourAmount, theirAmount, myChanPub, myRefundPub, myHAKDbase, changeAddr, ourInputs)
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 
 	// wait until it's done!
 	result := <-nd.InProgDual.done
@@ -189,7 +187,7 @@ func (nd *LitNode) DualFundChannel(
 // Declines the in progress (received) dual funding request
 func (nd *LitNode) DualFundDecline(reason uint8) {
 	outMsg := lnutil.NewDualFundingDeclMsg(nd.InProgDual.PeerIdx, reason)
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 	nd.InProgDual.mtx.Lock()
 	nd.InProgDual.Clear()
 	nd.InProgDual.mtx.Unlock()
@@ -270,7 +268,7 @@ func (nd *LitNode) DualFundAccept() *DualFundingResult {
 
 	outMsg := lnutil.NewDualFundingAcceptMsg(nd.InProgDual.PeerIdx, nd.InProgDual.CoinType, myChanPub, myRefundPub, myHAKDbase, changeAddr, ourInputs, MyNextHTLCBase, MyN2HTLCBase)
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 
 	// wait until it's done!
 	result := <-nd.InProgDual.done
@@ -389,32 +387,32 @@ func (nd *LitNode) DualFundingAcceptHandler(msg lnutil.DualFundingAcceptMsg) {
 	copy(q.TheirHAKDBase[:], nd.InProgDual.TheirHAKDBase[:])
 
 	// make sure their pubkeys are real pubkeys
-	_, err := btcec.ParsePubKey(q.TheirPub[:], btcec.S256())
+	_, err := koblitz.ParsePubKey(q.TheirPub[:], koblitz.S256())
 	if err != nil {
 		nd.InProgDual.mtx.Unlock()
 		logging.Errorf("PubRespHandler TheirPub err %s", err.Error())
 		return
 	}
-	_, err = btcec.ParsePubKey(q.TheirRefundPub[:], btcec.S256())
+	_, err = koblitz.ParsePubKey(q.TheirRefundPub[:], koblitz.S256())
 	if err != nil {
 		nd.InProgDual.mtx.Unlock()
 		logging.Errorf("PubRespHandler TheirRefundPub err %s", err.Error())
 		return
 	}
-	_, err = btcec.ParsePubKey(q.TheirHAKDBase[:], btcec.S256())
+	_, err = koblitz.ParsePubKey(q.TheirHAKDBase[:], koblitz.S256())
 	if err != nil {
 		nd.InProgDual.mtx.Unlock()
 		logging.Errorf("PubRespHandler TheirHAKDBase err %s", err.Error())
 		return
 	}
 
-	_, err = btcec.ParsePubKey(msg.OurNextHTLCBase[:], btcec.S256())
+	_, err = koblitz.ParsePubKey(msg.OurNextHTLCBase[:], koblitz.S256())
 	if err != nil {
 		nd.InProgDual.mtx.Unlock()
 		logging.Errorf("PubRespHandler NextHTLCBase err %s", err.Error())
 		return
 	}
-	_, err = btcec.ParsePubKey(msg.OurN2HTLCBase[:], btcec.S256())
+	_, err = koblitz.ParsePubKey(msg.OurN2HTLCBase[:], koblitz.S256())
 	if err != nil {
 		nd.InProgDual.mtx.Unlock()
 		logging.Errorf("PubRespHandler N2HTLCBase err %s", err.Error())
@@ -441,7 +439,7 @@ func (nd *LitNode) DualFundingAcceptHandler(msg lnutil.DualFundingAcceptMsg) {
 	q.State.MyAmt = nd.InProgDual.OurAmount
 	// get fee from sub wallet.  Later should make fee per channel and update state
 	// based on size
-	q.State.Fee = nd.SubWallet[q.Coin()].Fee() * 1000
+	q.State.Fee = nd.SubWallet[q.Coin()].Fee() * consts.QcStateFee
 	q.Value = nd.InProgDual.OurAmount + nd.InProgDual.TheirAmount
 
 	q.State.NextHTLCBase = msg.OurNextHTLCBase
@@ -481,7 +479,7 @@ func (nd *LitNode) DualFundingAcceptHandler(msg lnutil.DualFundingAcceptMsg) {
 		elkPointZero, elkPointOne, elkPointTwo, q.State.Data)
 
 	nd.InProgDual.mtx.Unlock()
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 
 	return
 }
@@ -603,11 +601,11 @@ func (nd *LitNode) DualFundChanDescHandler(msg lnutil.ChanDescMsg) error {
 	qc.MyRefundPub, _ = nd.GetUsePub(qc.KeyGen, UseChannelRefund)
 	qc.MyHAKDBase, _ = nd.GetUsePub(qc.KeyGen, UseChannelHAKDBase)
 
-	_, err = btcec.ParsePubKey(msg.NextHTLCBase[:], btcec.S256())
+	_, err = koblitz.ParsePubKey(msg.NextHTLCBase[:], koblitz.S256())
 	if err != nil {
 		return fmt.Errorf("QChanDescHandler NextHTLCBase err %s", err.Error())
 	}
-	_, err = btcec.ParsePubKey(msg.N2HTLCBase[:], btcec.S256())
+	_, err = koblitz.ParsePubKey(msg.N2HTLCBase[:], koblitz.S256())
 	if err != nil {
 		return fmt.Errorf("QChanDescHandler N2HTLCBase err %s", err.Error())
 	}
@@ -690,7 +688,7 @@ func (nd *LitNode) DualFundChanDescHandler(msg lnutil.ChanDescMsg) error {
 		theirElkPointZero, theirElkPointOne, theirElkPointTwo,
 		sig, fundingTx)
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 
 	return nil
 }
@@ -801,7 +799,7 @@ func (nd *LitNode) DualFundChanAckHandler(msg lnutil.DualFundingChanAckMsg, peer
 
 	outMsg := lnutil.NewSigProofMsg(msg.Peer(), msg.Outpoint, sig)
 
-	nd.OmniOut <- outMsg
+	nd.tmpSendLitMsg(outMsg)
 
 	return
 }

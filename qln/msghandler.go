@@ -12,6 +12,50 @@ import (
 	"github.com/mit-dci/lit/wire"
 )
 
+func (nd *LitNode) registerHandlers() {
+
+	mp := nd.PeerMan.GetMessageProcessor()
+	hf := makeNeoOmniHandler(nd)
+
+	// I used the following command to generate these calls below:
+	// grep -E '^.MSGID_[A-Z_]+ += ' lnutil/msglib.go | awk '{ print $1 }' | while read m; do echo "mp.DefineMessage(lnutil.$m, makeNeoOmniParser(lnutil.$m), hf)" ; done
+
+	mp.DefineMessage(lnutil.MSGID_TEXTCHAT, makeNeoOmniParser(lnutil.MSGID_TEXTCHAT), hf)
+	mp.DefineMessage(lnutil.MSGID_POINTREQ, makeNeoOmniParser(lnutil.MSGID_POINTREQ), hf)
+	mp.DefineMessage(lnutil.MSGID_POINTRESP, makeNeoOmniParser(lnutil.MSGID_POINTRESP), hf)
+	mp.DefineMessage(lnutil.MSGID_CHANDESC, makeNeoOmniParser(lnutil.MSGID_CHANDESC), hf)
+	mp.DefineMessage(lnutil.MSGID_CHANACK, makeNeoOmniParser(lnutil.MSGID_CHANACK), hf)
+	mp.DefineMessage(lnutil.MSGID_SIGPROOF, makeNeoOmniParser(lnutil.MSGID_SIGPROOF), hf)
+	mp.DefineMessage(lnutil.MSGID_CLOSEREQ, makeNeoOmniParser(lnutil.MSGID_CLOSEREQ), hf)
+	mp.DefineMessage(lnutil.MSGID_CLOSERESP, makeNeoOmniParser(lnutil.MSGID_CLOSERESP), hf)
+	mp.DefineMessage(lnutil.MSGID_DELTASIG, makeNeoOmniParser(lnutil.MSGID_DELTASIG), hf)
+	mp.DefineMessage(lnutil.MSGID_SIGREV, makeNeoOmniParser(lnutil.MSGID_SIGREV), hf)
+	mp.DefineMessage(lnutil.MSGID_GAPSIGREV, makeNeoOmniParser(lnutil.MSGID_GAPSIGREV), hf)
+	mp.DefineMessage(lnutil.MSGID_REV, makeNeoOmniParser(lnutil.MSGID_REV), hf)
+	mp.DefineMessage(lnutil.MSGID_HASHSIG, makeNeoOmniParser(lnutil.MSGID_HASHSIG), hf)
+	mp.DefineMessage(lnutil.MSGID_PREIMAGESIG, makeNeoOmniParser(lnutil.MSGID_PREIMAGESIG), hf)
+	mp.DefineMessage(lnutil.MSGID_FWDMSG, makeNeoOmniParser(lnutil.MSGID_FWDMSG), hf)
+	mp.DefineMessage(lnutil.MSGID_FWDAUTHREQ, makeNeoOmniParser(lnutil.MSGID_FWDAUTHREQ), hf)
+	mp.DefineMessage(lnutil.MSGID_SELFPUSH, makeNeoOmniParser(lnutil.MSGID_SELFPUSH), hf)
+	mp.DefineMessage(lnutil.MSGID_WATCH_DESC, makeNeoOmniParser(lnutil.MSGID_WATCH_DESC), hf)
+	mp.DefineMessage(lnutil.MSGID_WATCH_STATEMSG, makeNeoOmniParser(lnutil.MSGID_WATCH_STATEMSG), hf)
+	mp.DefineMessage(lnutil.MSGID_WATCH_DELETE, makeNeoOmniParser(lnutil.MSGID_WATCH_DELETE), hf)
+	mp.DefineMessage(lnutil.MSGID_LINK_DESC, makeNeoOmniParser(lnutil.MSGID_LINK_DESC), hf)
+	mp.DefineMessage(lnutil.MSGID_DLC_OFFER, makeNeoOmniParser(lnutil.MSGID_DLC_OFFER), hf)
+	mp.DefineMessage(lnutil.MSGID_DLC_ACCEPTOFFER, makeNeoOmniParser(lnutil.MSGID_DLC_ACCEPTOFFER), hf)
+	mp.DefineMessage(lnutil.MSGID_DLC_DECLINEOFFER, makeNeoOmniParser(lnutil.MSGID_DLC_DECLINEOFFER), hf)
+	mp.DefineMessage(lnutil.MSGID_DLC_CONTRACTACK, makeNeoOmniParser(lnutil.MSGID_DLC_CONTRACTACK), hf)
+	mp.DefineMessage(lnutil.MSGID_DLC_CONTRACTFUNDINGSIGS, makeNeoOmniParser(lnutil.MSGID_DLC_CONTRACTFUNDINGSIGS), hf)
+	mp.DefineMessage(lnutil.MSGID_DLC_SIGPROOF, makeNeoOmniParser(lnutil.MSGID_DLC_SIGPROOF), hf)
+	mp.DefineMessage(lnutil.MSGID_DUALFUNDINGREQ, makeNeoOmniParser(lnutil.MSGID_DUALFUNDINGREQ), hf)
+	mp.DefineMessage(lnutil.MSGID_DUALFUNDINGACCEPT, makeNeoOmniParser(lnutil.MSGID_DUALFUNDINGACCEPT), hf)
+	mp.DefineMessage(lnutil.MSGID_DUALFUNDINGDECL, makeNeoOmniParser(lnutil.MSGID_DUALFUNDINGDECL), hf)
+	mp.DefineMessage(lnutil.MSGID_DUALFUNDINGCHANACK, makeNeoOmniParser(lnutil.MSGID_DUALFUNDINGCHANACK), hf)
+	mp.DefineMessage(lnutil.MSGID_REMOTE_RPCREQUEST, makeNeoOmniParser(lnutil.MSGID_REMOTE_RPCREQUEST), hf)
+	mp.DefineMessage(lnutil.MSGID_REMOTE_RPCRESPONSE, makeNeoOmniParser(lnutil.MSGID_REMOTE_RPCRESPONSE), hf)
+
+}
+
 // handles stuff that comes in over the wire.  Not user-initiated.
 func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) error {
 	logging.Infof("Message from %d type %x", msg.Peer(), msg.MsgType())
@@ -48,18 +92,27 @@ func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) er
 
 	case 0x60: //Tower Messages
 		if msg.MsgType() == lnutil.MSGID_WATCH_DESC {
-			nd.Tower.NewChannel(msg.(lnutil.WatchDescMsg))
+			return nd.Tower.NewChannel(msg.(lnutil.WatchDescMsg))
 		}
 		if msg.MsgType() == lnutil.MSGID_WATCH_STATEMSG {
-			nd.Tower.UpdateChannel(msg.(lnutil.WatchStateMsg))
+			return nd.Tower.UpdateChannel(msg.(lnutil.WatchStateMsg))
 		}
 		if msg.MsgType() == lnutil.MSGID_WATCH_DELETE {
-			nd.Tower.DeleteChannel(msg.(lnutil.WatchDelMsg))
+			return nd.Tower.DeleteChannel(msg.(lnutil.WatchDelMsg))
 		}
 
 	case 0x70: // Routing messages
 		if msg.MsgType() == lnutil.MSGID_LINK_DESC {
 			nd.LinkMsgHandler(msg.(lnutil.LinkMsg))
+		}
+		if msg.MsgType() == lnutil.MSGID_PAY_REQ {
+			return nd.MultihopPaymentRequestHandler(msg.(lnutil.MultihopPaymentRequestMsg))
+		}
+		if msg.MsgType() == lnutil.MSGID_PAY_ACK {
+			return nd.MultihopPaymentAckHandler(msg.(lnutil.MultihopPaymentAckMsg))
+		}
+		if msg.MsgType() == lnutil.MSGID_PAY_SETUP {
+			return nd.MultihopPaymentSetupHandler(msg.(lnutil.MultihopPaymentSetupMsg))
 		}
 
 	case 0xA0: // Dual Funding messages
@@ -70,7 +123,7 @@ func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) er
 			nd.DlcOfferHandler(msg.(lnutil.DlcOfferMsg), peer)
 		}
 		if msg.MsgType() == lnutil.MSGID_DLC_ACCEPTOFFER {
-			nd.DlcAcceptHandler(msg.(lnutil.DlcOfferAcceptMsg), peer)
+			return nd.DlcAcceptHandler(msg.(lnutil.DlcOfferAcceptMsg), peer)
 		}
 		if msg.MsgType() == lnutil.MSGID_DLC_DECLINEOFFER {
 			nd.DlcDeclineHandler(msg.(lnutil.DlcOfferDeclineMsg), peer)
@@ -85,83 +138,19 @@ func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) er
 		if msg.MsgType() == lnutil.MSGID_DLC_SIGPROOF {
 			nd.DlcSigProofHandler(msg.(lnutil.DlcContractSigProofMsg), peer)
 		}
+
+	case 0xB0: // remote control
+		if msg.MsgType() == lnutil.MSGID_REMOTE_RPCREQUEST {
+			nd.RemoteControlRequestHandler(msg.(lnutil.RemoteControlRpcRequestMsg), peer)
+		}
+		if msg.MsgType() == lnutil.MSGID_REMOTE_RPCRESPONSE {
+			nd.RemoteControlResponseHandler(msg.(lnutil.RemoteControlRpcResponseMsg), peer)
+		}
 	default:
 		return fmt.Errorf("Unknown message id byte %x &f0", msg.MsgType())
 
 	}
 	return nil
-}
-
-// Every lndc has one of these running
-// it listens for incoming messages on the lndc and hands it over
-// to the OmniHandler via omnichan
-func (nd *LitNode) LNDCReader(peer *RemotePeer) error {
-	// this is a new peer connection; load all channels for this peer
-
-	// no concurrency risk since we just got this map
-	// have this as a separate func to drop extra channels from mem
-	err := nd.PopulateQchanMap(peer)
-	if err != nil {
-		return err
-	}
-	var opArr [36]byte
-	// make a local map of outpoints to channel indexes
-	peer.OpMap = make(map[[36]byte]uint32)
-	// iterate through all this peer's channels to extract outpoints
-	for _, q := range peer.QCs {
-		opArr = lnutil.OutPointToBytes(q.Op)
-		peer.OpMap[opArr] = q.Idx()
-	}
-
-	for {
-		msg := make([]byte, 1<<24)
-		//	logging.Infof("read message from %x\n", l.RemoteLNId)
-		n, err := peer.Con.Read(msg)
-		if err != nil {
-			logging.Errorf("read error with %d: %s\n", peer.Idx, err.Error())
-			nd.RemoteMtx.Lock()
-			delete(nd.RemoteCons, peer.Idx)
-			nd.RemoteMtx.Unlock()
-			return peer.Con.Close()
-		}
-		msg = msg[:n]
-
-		logging.Infof("decrypted message is %x\n", msg)
-
-		var routedMsg lnutil.LitMsg
-		routedMsg, err = lnutil.LitMsgFromBytes(msg, peer.Idx)
-		if err != nil {
-			fmt.Printf("decoding message error with %d: %s\n", peer.Idx, err.Error())
-			return err
-		}
-
-		logging.Infof("peerIdx is %d\n", routedMsg.Peer())
-		logging.Infof("routed bytes %x\n", routedMsg.Bytes())
-
-		logging.Infof("message type %x\n", routedMsg.MsgType())
-
-		var chanIdx uint32
-		chanIdx = 0
-		if len(msg) > 38 {
-			copy(opArr[:], msg[1:37])
-			chanCheck, ok := peer.OpMap[opArr]
-			if ok {
-				chanIdx = chanCheck
-			}
-		}
-
-		logging.Infof("chanIdx is %x\n", chanIdx)
-
-		if chanIdx != 0 {
-			err = nd.PeerHandler(routedMsg, peer.QCs[chanIdx], peer)
-		} else {
-			err = nd.PeerHandler(routedMsg, nil, peer)
-		}
-
-		if err != nil {
-			logging.Errorf("PeerHandler error with %d: %s\n", peer.Idx, err.Error())
-		}
-	}
 }
 
 func (nd *LitNode) PopulateQchanMap(peer *RemotePeer) error {
@@ -223,33 +212,33 @@ func (nd *LitNode) ChannelHandler(msg lnutil.LitMsg, peer *RemotePeer) error {
 func (nd *LitNode) DualFundingHandler(msg lnutil.LitMsg, peer *RemotePeer) error {
 	switch message := msg.(type) {
 	case lnutil.DualFundingReqMsg: // DUAL FUNDING REQUEST
-		fmt.Printf("Got dual funding request from %x\n", message.Peer())
+		logging.Infof("Got dual funding request from %x\n", message.Peer())
 		nd.DualFundingReqHandler(message)
 		return nil
 
 	case lnutil.DualFundingAcceptMsg: // DUAL FUNDING ACCEPT
-		fmt.Printf("Got dual funding acceptance from %x\n", msg.Peer())
+		logging.Infof("Got dual funding acceptance from %x\n", msg.Peer())
 		nd.DualFundingAcceptHandler(message)
 		return nil
 
 	case lnutil.DualFundingDeclMsg: // DUAL FUNDING DECLINE
-		fmt.Printf("Got dual funding decline from %x\n", msg.Peer())
+		logging.Infof("Got dual funding decline from %x\n", msg.Peer())
 		nd.DualFundingDeclHandler(message)
 		return nil
 
 	case lnutil.ChanDescMsg: // CHANNEL DESCRIPTION
-		fmt.Printf("Got (dual funding) channel description from %x\n", msg.Peer())
+		logging.Infof("Got (dual funding) channel description from %x\n", msg.Peer())
 		nd.DualFundChanDescHandler(message)
 		return nil
 
 	case lnutil.DualFundingChanAckMsg: // CHANNEL ACKNOWLEDGE
-		fmt.Printf("Got (dual funding) channel acknowledgement from %x\n", msg.Peer())
+		logging.Infof("Got (dual funding) channel acknowledgement from %x\n", msg.Peer())
 
 		nd.DualFundChanAckHandler(message, peer)
 		return nil
 
 	case lnutil.SigProofMsg: // HERE'S YOUR CHANNEL
-		fmt.Printf("Got (dual funding) channel proof from %x\n", msg.Peer())
+		logging.Infof("Got (dual funding) channel proof from %x\n", msg.Peer())
 		nd.DualFundSigProofHandler(message, peer)
 		return nil
 

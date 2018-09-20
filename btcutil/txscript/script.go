@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
+	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/wire"
 )
 
@@ -418,7 +419,7 @@ func CalcWitnessSignatureHash(subScript []parsedOpcode, sigHashes *TxSigHashes,
 	// As a sanity check, ensure the passed input index for the transaction
 	// is valid.
 	if idx > len(tx.TxIn)-1 {
-		fmt.Printf("calcWitnessSignatureHash error: idx %d but %d txins",
+		logging.Errorf("calcWitnessSignatureHash error: idx %d but %d txins",
 			idx, len(tx.TxIn))
 		return nil
 	}

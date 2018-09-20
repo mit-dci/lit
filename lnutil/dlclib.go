@@ -7,11 +7,10 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/mit-dci/lit/logging"
-
-	"github.com/mit-dci/lit/btcutil/btcec"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/consts"
+	"github.com/mit-dci/lit/crypto/koblitz"
+	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/wire"
 )
 
@@ -98,14 +97,14 @@ func DlcContractFromBytes(b []byte) (*DlcContract, error) {
 
 	ourIdx, err := wire.ReadVarInt(buf, 0)
 	if err != nil {
-		fmt.Println("Error while deserializing varint for theirIdx")
+		logging.Errorf("Error while deserializing varint for theirIdx: %s", err.Error())
 		return nil, err
 	}
 	c.Idx = ourIdx
 
 	theirIdx, err := wire.ReadVarInt(buf, 0)
 	if err != nil {
-		fmt.Println("Error while deserializing varint for theirIdx")
+		logging.Errorf("Error while deserializing varint for theirIdx: %s", err.Error())
 		return nil, err
 	}
 	c.TheirIdx = theirIdx
@@ -115,14 +114,14 @@ func DlcContractFromBytes(b []byte) (*DlcContract, error) {
 
 	peerIdx, err := wire.ReadVarInt(buf, 0)
 	if err != nil {
-		fmt.Println("Error while deserializing varint for peerIdx")
+		logging.Errorf("Error while deserializing varint for peerIdx: %s", err.Error())
 		return nil, err
 	}
 	c.PeerIdx = uint32(peerIdx)
 
 	coinType, err := wire.ReadVarInt(buf, 0)
 	if err != nil {
-		fmt.Println("Error while deserializing varint for coinType")
+		logging.Errorf("Error while deserializing varint for coinType: %s", err.Error())
 		return nil, err
 	}
 	c.CoinType = uint32(coinType)
@@ -155,7 +154,7 @@ func DlcContractFromBytes(b []byte) (*DlcContract, error) {
 
 	status, err := wire.ReadVarInt(buf, 0)
 	if err != nil {
-		fmt.Println("Error while deserializing varint for status")
+		logging.Errorf("Error while deserializing varint for status: %s", err.Error())
 		return nil, err
 	}
 
@@ -398,14 +397,14 @@ func computePubKey(pubA, pubR [33]byte, msg []byte) ([33]byte, error) {
 	var returnValue [33]byte
 
 	// Hardcode curve
-	curve := btcec.S256()
+	curve := koblitz.S256()
 
-	A, err := btcec.ParsePubKey(pubA[:], curve)
+	A, err := koblitz.ParsePubKey(pubA[:], curve)
 	if err != nil {
 		return returnValue, err
 	}
 
-	R, err := btcec.ParsePubKey(pubR[:], curve)
+	R, err := koblitz.ParsePubKey(pubR[:], curve)
 	if err != nil {
 		return returnValue, err
 	}
@@ -428,7 +427,7 @@ func computePubKey(pubA, pubR [33]byte, msg []byte) ([33]byte, error) {
 
 	A.Y.Mod(A.Y, curve.P)
 
-	P := new(btcec.PublicKey)
+	P := new(koblitz.PublicKey)
 
 	// add to R
 	P.X, P.Y = curve.Add(A.X, A.Y, R.X, R.Y)

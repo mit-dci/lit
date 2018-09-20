@@ -2,7 +2,7 @@
 
 ![Lit Logo](litlogo145.png)
 
-[![Build Status](http://hubris.media.mit.edu:8080/job/lit-PR/badge/icon)](http://hubris.media.mit.edu:8080/job/lit-PR/)
+[![Build Status](http://hubris.media.mit.edu:8080/job/lit-PR/badge/icon)](http://hubris.media.mit.edu:8080/job/lit/)
 
 Under development, not for use with real money.
 
@@ -16,44 +16,47 @@ Under development, not for use with real money.
 
 * make
 
-* (Optional, Windows) a [Cygwin](https://cygwin.com/install.html) environment might make things easier for you.
+* (Optional, Windows) [Cygwin](https://cygwin.com/install.html)
 
 * (Optional, for full test suite) Python 3 + `requests` library from PyPI
 
 ### Downloading
 
-Just use Git to download the repo and then cd into it.
+Clone the repo from git 
 
 ```bash
 git clone https://github.com/mit-dci/lit
 cd lit
+```
+or `go get` it
+```go
+go get -v github.com/mit-dci/lit
 ```
 
 ### Installation
 
 #### Linux, macOS, Cygwin, etc.
 
-Go has its own build process and dependency management, but for Lit it's a
-little more complicated, so we set up a Makefile to do most of the work for you.
-
-To build Lit and Lit-AF, just use the following command.  You don't have to have
-a `$GOPATH` set up in any particular way since we handle that for you.
-
+You can either use Go's built-in dependency management and build tool
+```go
+cd {GOPATH}/src/github.com/mit-dci/lit
+go get -v ./...
+go build
+```
+or use the Makefile
 ```bash
-make # or `make all`
+make # or make all
 ```
 
-This will also run the test suite.  Running `make test with-python=true` will
-include the python tests (requires `bitcoind`) that do some heavier testing.
+To run the python integration tests (which requires `bitcoind`), run `make test with-python=false`
 
 #### Windows
 
-It's recommended to install Cygwin and follow those setup instructions.  Or just
-download prebuilt binaries.
+Install [Cygwin](http://www.cygwin.com) and follow the setup instructions or download prebuilt binaries from
 
-1. Make sure that your `%GOPATH%` environmental variable is set up correctly.
+1. Make sure that environmental variable `%GOPATH%` is initizlized correctly.
 
-2. Download dependencies and then build with something like this:
+2. Download required dependencies and then build with:
 
 ```
 go get -v ./...
@@ -62,56 +65,53 @@ go build -v .
 go build -v .\cmd\lit-af
 ```
 
-### Running
+### Running lit
 
-The below command will run Lit on the Bitcoin testnet3.  You probably need to
-have `bitcoind` running on your machine such that Lit can connect to it when do
-you this.
+The below command will run Lit on the Bitcoin testnet3 network
 
-(Note: Windows users can take off `./` but may need to change `lit` to `lit.exe`
-in the second line.)
+(Note: Windows users should take off `./` but need to change `lit` to `lit.exe`)
 
 ```bash
 ./lit --tn3=true
 ```
 
-Run `./lit --tn3=true` to start Lit on the Bitcoin testnet3
-
 The words `yup, yes, y, true, 1, ok, enable, on` can be used to specify that Lit
-automatically connect to a set of populated seeds. It can also be replaced by
-the address of the remote node you wish to connect to.
+automatically connect to peers fetched from a list of DNS seeds. It can also be replaced by
+the address of the node you wish to connect to.
 
 ### Packaging
 
-This is a separate thing, but you can make a archive package for distribution by
-using this:
+You can make an archive package for any distribution by doing:
 
 ```
 ./build/releasebuild.sh <os> <arch>
 ```
 
-and it'll be dropped into `build/_releasedir`.  It should support any OS that
-Go and our dependencies support.  Just instead of `windows` use `win` and
-instead of `368` use `i386`.
+and it will be placed in `build/_releasedir`.  It should support any OS that
+Go and lit's dependencies support.  In place of `windows` use `win` and
+in place of `386` use `i386`.
 
-**ALSO:** You can also package for Linux, macOS, and Windows in both amd64 and
-i386 by just running `make package`.  (Except macOS is only amd64.)
+You can also package for Linux, macOS, and Windows in both amd64 and
+i386 architectures by running `make package`. (NOTE: macOS is amd64 only)
 
-And running `./build/releasebuild.sh clean` will cleanup the dirs it generates.
+Running `./build/releasebuild.sh clean` cleans the directories it generates.
 
 ## Using Lightning
 
-Great! Now that you are all done setting up lit, you can
-- read about the arguments for starting lit [here](#command-line-arguments)
-- read about the folders for the code and what does what [here](#folders)
-- head over to the [Walkthrough](./WALKTHROUGH.md) to create some lit nodes or
-- check out how to [Contribute](./CONTRIBUTING.md).
+Once you are done setting up lit, you can read about
+- [the different command line arguments](#command-line-arguments)
+- [the various folders](#folders) or
+- [checkout the Walkthrough](./WALKTHROUGH.md)
+
+## Contributing
+
+Pull Requests and Issues are most welcome, checkout [Contributing](./CONTRIBUTING.md) to get started.
 
 ## Command line arguments
 
 When starting lit, the following command line arguments are available.  The
 following commands may also be specified in `lit.conf` which is automatically
-generated on startup.
+generated on startup with `tn3=1` by default.
 
 #### Connecting to networks
 
@@ -134,26 +134,25 @@ generated on startup.
 
 | Folder Name  | Details                                                                                                                                  |
 |:-------------|:-----------------------------------------------------------------------------------------------------------------------------------------|
-| `bech32`     | Util for the Bech32 spec                                                                                                                 |
-| `btcutil`    | Misc bitcoin-specific libraries                                                                                                          |
+| `bech32`     | Util for the Bech32 format                                                                                                             |
+| `btcutil`    | Bitcoin-specific libraries                                                                                                          |
 | `build`      | Tools used for building Lit                                                                                                              |
 | `cmd`        | Has some rpc client code to interact with the lit node.  Not much there yet                                                              |
 | `coinparam`  | Information and other constants for identifying currencies                                                                               |
 | `consts`     | Global constants                                                                                                                         |
-| `crypto`     | Small utility cryptographic libraries                                                                                                    |
-| `dlc`        | Discreet Log Contracts!                                                                                                                  |
-| `docs`       | Other walkthroughs for doing things in Lit, also misc pictures                                                                           |
+| `crypto`     | Utility cryptographic libraries                                                                                                    |
+| `dlc`        | Discreet Log Contracts                                                                                                                   |
+| `docs`       | Writeups for setting up things and screenshots                 |
 | `elkrem`     | A hash-tree for storing `log(n)` items instead of n                                                                                      |
-| `litbamf`    | Lightning Network Browser Actuated Multi-Functionality -- web gui for lit                                                                |
-| `litrpc`     | Websocket based RPC connection                                                                                                           |
+| `litrpc`     | Websockets based RPC connection                                                                                                           |
 | `lndc`       | Lightning network data connection -- send encrypted / authenticated messages between nodes                                               |
-| `lnutil`     | Some widely used utility functions                                                                                                       |
+| `lnutil`     | Widely used utility functions                                                                                                       |
 | `portxo`     | Portable utxo format, exchangable between node and base wallet (or between wallets).  Should make this into a BIP once it's more stable. |
 | `powless`    | Introduces a web API chainhook in addition to the uspv one                                                                               |
 | `qln`        | A quick channel implementation with databases.  Doesn't do multihop yet.                                                                 |
 | `sig64`      | Library to make signatures 64 bytes instead of 71 or 72 or something                                                                     |
 | `snap`       | Snapcraft metadata                                                                                                                       |
-| `test`       | Integration tests                                                                                                                        |
+| `test`       | Python Integration tests                                                                                                                        |
 | `uspv`       | Deals with the network layer, sending network messages and filtering what to hand over to `wallit`                                       |
 | `wallit`     | Deals with storing and retrieving utxos, creating and signing transactions                                                               |
 | `watchtower` | Unlinkable outsourcing of channel monitoring                                                                                             |

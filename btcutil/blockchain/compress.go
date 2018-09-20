@@ -5,7 +5,7 @@
 package blockchain
 
 import (
-	"github.com/mit-dci/lit/btcutil/btcec"
+	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/btcutil/txscript"
 )
 
@@ -218,7 +218,7 @@ func isPubKey(script []byte) (bool, []byte) {
 
 		// Ensure the public key is valid.
 		serializedPubKey := script[1:34]
-		_, err := btcec.ParsePubKey(serializedPubKey, btcec.S256())
+		_, err := koblitz.ParsePubKey(serializedPubKey, koblitz.S256())
 		if err == nil {
 			return true, serializedPubKey
 		}
@@ -230,7 +230,7 @@ func isPubKey(script []byte) (bool, []byte) {
 
 		// Ensure the public key is valid.
 		serializedPubKey := script[1:66]
-		_, err := btcec.ParsePubKey(serializedPubKey, btcec.S256())
+		_, err := koblitz.ParsePubKey(serializedPubKey, koblitz.S256())
 		if err == nil {
 			return true, serializedPubKey
 		}
@@ -399,7 +399,7 @@ func decompressScript(compressedPkScript []byte, version int32) []byte {
 		compressedKey := make([]byte, 33)
 		compressedKey[0] = byte(encodedScriptSize - 2)
 		copy(compressedKey[1:], compressedPkScript[1:])
-		key, err := btcec.ParsePubKey(compressedKey, btcec.S256())
+		key, err := koblitz.ParsePubKey(compressedKey, koblitz.S256())
 		if err != nil {
 			return nil
 		}

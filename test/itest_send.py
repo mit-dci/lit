@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import testlib
 
 def run_test(env):
@@ -42,12 +40,3 @@ def run_test(env):
     print('bitcoind balance:', bal0, '->', bal1, '->', bal2, '(', bal2 - bal1, ')')
     if bal2 != bal1 + 12.5 + 0.5: # the 12.5 is because we mined a block
         raise AssertionError("Balance in bitcoind doesn't match what we think it should be!")
-
-if __name__ == '__main__':
-    env = None
-    try:
-        env = testlib.TestEnv(1)
-        run_test(env)
-    finally:
-        if env is not None:
-            env.shutdown()

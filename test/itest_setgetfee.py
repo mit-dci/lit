@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import testlib
 
 fee = 20
@@ -20,12 +18,3 @@ def run_test(env):
 
     assert got == fee, "Set fee and returned fee don't match."
     print('OK')
-
-if __name__ == '__main__':
-    env = None
-    try:
-        env = testlib.TestEnv(1)
-        run_test(env)
-    finally:
-        if env is not None:
-            env.shutdown()

@@ -2,7 +2,7 @@ package wallit
 
 import (
 	"github.com/mit-dci/lit/btcutil"
-	"github.com/mit-dci/lit/btcutil/btcec"
+	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/portxo"
 )
@@ -20,7 +20,7 @@ Channel refund keys are use 3, peer and index per peer / channel.
 
 // PathPrivkey returns a private key by descending the given path
 // Returns nil if there's an error.
-func (w *Wallit) PathPrivkey(kg portxo.KeyGen) *btcec.PrivateKey {
+func (w *Wallit) PathPrivkey(kg portxo.KeyGen) *koblitz.PrivateKey {
 	// in uspv, we require path depth of 5
 	if kg.Depth != 5 {
 		return nil
@@ -35,7 +35,7 @@ func (w *Wallit) PathPrivkey(kg portxo.KeyGen) *btcec.PrivateKey {
 
 // PathPubkey returns a public key by descending the given path.
 // Returns nil if there's an error.
-func (w *Wallit) PathPubkey(kg portxo.KeyGen) *btcec.PublicKey {
+func (w *Wallit) PathPubkey(kg portxo.KeyGen) *koblitz.PublicKey {
 	priv := w.PathPrivkey(kg)
 	if priv == nil {
 		return nil
@@ -59,7 +59,7 @@ func (w *Wallit) PathPubHash160(kg portxo.KeyGen) [20]byte {
 // ------------- end of 2 main key deriv functions
 
 // get a private key from the regular wallet
-func (w *Wallit) GetWalletPrivkey(idx uint32) *btcec.PrivateKey {
+func (w *Wallit) GetWalletPrivkey(idx uint32) *koblitz.PrivateKey {
 	var kg portxo.KeyGen
 	kg.Depth = 5
 	kg.Step[0] = 44 | 1<<31
@@ -83,7 +83,7 @@ func GetWalletKeygen(idx, cointype uint32) portxo.KeyGen {
 }
 
 // GetUsePrive generates a private key for the given use case & keypath
-func (w *Wallit) GetUsePriv(kg portxo.KeyGen, use uint32) *btcec.PrivateKey {
+func (w *Wallit) GetUsePriv(kg portxo.KeyGen, use uint32) *koblitz.PrivateKey {
 	kg.Step[2] = use
 	return w.PathPrivkey(kg)
 }
