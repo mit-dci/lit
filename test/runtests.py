@@ -126,6 +126,7 @@ def run_test_list(tests):
     return res
 
 if __name__ == '__main__':
+    os.makedirs('_data', exist_ok=True)
     tests = load_tests_from_file('tests.txt')
 
     # If given arguments, run these instead.  Doesn't do them in given order, sadly.
