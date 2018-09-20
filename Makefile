@@ -1,6 +1,8 @@
 GOBIN = $(shell pwd)
 GO ?= latest
 
+GO_BUILD_EX_ARGS ?=
+
 all: lit lit-af test
 
 .PHONY: lit lit-af test tests webui
@@ -9,12 +11,12 @@ goget:
 	build/env.sh go get -v ./...
 
 lit: goget
-	build/env.sh go build
+	build/env.sh go build ${GO_BUILD_EX_ARGS}
 	@echo "Done building."
 	@echo "Run \"$(GOBIN)/lit\" to launch lit."
 
 lit-af: goget
-	build/env.sh go build ./cmd/lit-af
+	build/env.sh go build ${GO_BUILD_EX_ARGS} ./cmd/lit-af
 	@echo "Run \"$(GOBIN)/lit-af\" to launch lit-af."
 
 webui:
