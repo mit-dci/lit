@@ -74,7 +74,7 @@ var VertcoinRegTestParams = Params{
 	DNSSeeds:      []string{},
 
 	// Chain parameters
-	DiffCalcFunction: diffVTC,
+	DiffCalcFunction: diffVTCtest,
 	MinHeaders:       4032,
 	FeePerByte:       100,
 	GenesisBlock:     &VertcoinRegTestnetGenesisBlock,
