@@ -110,9 +110,9 @@ def run_test_list(tests):
             print('------------------------------')
             print('Failure:', name)
             print('\nError:', e)
+            fail += 1
             if type(e) is KeyboardInterrupt:
                 break
-            fail += 1
             # TODO Report failures and why.
 
     print('==============================')
