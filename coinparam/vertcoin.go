@@ -74,15 +74,24 @@ var VertcoinRegTestParams = Params{
 	DNSSeeds:      []string{},
 
 	// Chain parameters
-	DiffCalcFunction: diffVTCtest,
+	DiffCalcFunction: diffVTCregtest,
 	MinHeaders:       4032,
 	FeePerByte:       100,
 	GenesisBlock:     &VertcoinRegTestnetGenesisBlock,
 	GenesisHash:      &VertcoinRegTestnetGenesisHash,
 	PowLimit:         regressionPowLimit,
 	PoWFunction: func(b []byte, height int32) chainhash.Hash {
-		lyraBytes, _ := lyra2rev2.Sum(b)
-		asChainHash, _ := chainhash.NewHash(lyraBytes)
+		var hashBytes []byte
+
+		if height >= 347000 {
+			hashBytes, _ = lyra2rev2.Sum(b)
+		} else if height >= 208301 {
+			hashBytes, _ = lyra2re.Sum(b)
+		} else {
+			hashBytes, _ = scrypt.Key(b, b, 2048, 1, 1, 32)
+		}
+
+		asChainHash, _ := chainhash.NewHash(hashBytes)
 		return *asChainHash
 	},
 	PowLimitBits:             0x207fffff,
