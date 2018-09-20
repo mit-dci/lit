@@ -118,6 +118,11 @@ func (s *SPVCon) DialNode(listOfNodes []string) (net.Conn, error) {
 		}
 		break
 	}
+
+	if con == nil {
+		return nil, fmt.Errorf("Failed to connect to a coin daemon")
+	}
+
 	return con, nil
 }
 
