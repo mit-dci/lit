@@ -20,13 +20,15 @@ import (
 
 type litConfig struct { // define a struct for usage with go-flags
 	// networks lit can try connecting to
-	Tn3host     string `long:"tn3" description:"Connect to bitcoin testnet3."`
-	Bc2host     string `long:"bc2" description:"bc2 full node."`
-	Lt4host     string `long:"lt4" description:"Connect to litecoin testnet4."`
-	Reghost     string `long:"reg" description:"Connect to bitcoin regtest."`
-	Litereghost string `long:"litereg" description:"Connect to litecoin regtest."`
-	Tvtchost    string `long:"tvtc" description:"Connect to Vertcoin test node."`
-	Vtchost     string `long:"vtc" description:"Connect to Vertcoin."`
+	Tn3host      string `long:"tn3" description:"Connect to bitcoin testnet3."`
+	Bc2host      string `long:"bc2" description:"bc2 full node."`
+	Lt4host      string `long:"lt4" description:"Connect to litecoin testnet4."`
+	Reghost      string `long:"reg" description:"Connect to bitcoin regtest."`
+	Litereghost  string `long:"litereg" description:"Connect to litecoin regtest."`
+	Dummyusdhost string `long:"dusd" description:"Connect to Dummy USD node."`
+	Rtvtchost    string `long:"rtvtc" description:"Connect to Vertcoin regtest node."`
+	Tvtchost     string `long:"tvtc" description:"Connect to Vertcoin test node."`
+	Vtchost      string `long:"vtc" description:"Connect to Vertcoin."`
 	// system specific configs
 	LitHomeDir string `long:"dir" description:"Specify Home Directory of lit as an absolute path."`
 	TrackerURL string `long:"tracker" description:"LN address tracker URL http|https://host:port"`
@@ -199,7 +201,44 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *litConfig) error {
 			return err
 		}
 	}
+	// try dummyusd
+	if !lnutil.NopeString(conf.Dummyusdhost) {
+		p := &coinparam.DummyUsdNetParams
+		logging.Infof("Dummyusd: %s\n", conf.Dummyusdhost)
+		resync := false
+		conf.Tip = p.StartHeight
+		if conf.Resync == "dusd" {
+			if conf.Tip < 1 {
+				conf.Tip = 1
+			}
+			resync = true
+		}
+		err = node.LinkBaseWallet(key, consts.BitcoinRegtestBHeight, resync,
+			conf.Tower, conf.Dummyusdhost, conf.ChainProxyURL, p)
+		if err != nil {
+			return err
+		}
+	}
 
+	// try vertcoin regtest
+	if !lnutil.NopeString(conf.Rtvtchost) {
+		p := &coinparam.VertcoinRegTestParams
+		resync := false
+		conf.Tip = p.StartHeight
+		if conf.Resync == "rtvtc" {
+			if conf.Tip < 1 {
+				conf.Tip = 1
+			}
+			resync = true
+		}
+
+		err = node.LinkBaseWallet(
+			key, consts.BitcoinRegtestBHeight, resync, conf.Tower,
+			conf.Rtvtchost, conf.ChainProxyURL, p)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
