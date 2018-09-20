@@ -110,9 +110,9 @@ def run_test_list(tests):
             print('------------------------------')
             print('Failure:', name)
             print('\nError:', e)
+            fail += 1
             if type(e) is KeyboardInterrupt:
                 break
-            fail += 1
             # TODO Report failures and why.
 
     print('==============================')
@@ -126,6 +126,7 @@ def run_test_list(tests):
     return res
 
 if __name__ == '__main__':
+    os.makedirs('_data', exist_ok=True)
     tests = load_tests_from_file('tests.txt')
 
     # If given arguments, run these instead.  Doesn't do them in given order, sadly.
