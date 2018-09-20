@@ -28,7 +28,7 @@ pipeline {
     }
     stage('Integration Tests') {
       steps {
-        sh 'cd test && env LIT_OUTPUT_SHOW=1 ./runtests.sh'
+        sh 'cd test && env LIT_OUTPUT_SHOW=1 ./runtests.py'
       }
     }
     stage('Package') {
