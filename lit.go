@@ -205,7 +205,15 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *litConfig) error {
 	if !lnutil.NopeString(conf.Dummyusdhost) {
 		p := &coinparam.DummyUsdNetParams
 		logging.Infof("Dummyusd: %s\n", conf.Dummyusdhost)
-		err = node.LinkBaseWallet(key, consts.BitcoinRegtestBHeight, conf.ReSync,
+		resync := false
+		conf.Tip = p.StartHeight
+		if conf.Resync == "dusd" {
+			if conf.Tip < 1 {
+				conf.Tip = 1
+			}
+			resync = true
+		}
+		err = node.LinkBaseWallet(key, consts.BitcoinRegtestBHeight, resync,
 			conf.Tower, conf.Dummyusdhost, conf.ChainProxyURL, p)
 		if err != nil {
 			return err
@@ -215,8 +223,17 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *litConfig) error {
 	// try vertcoin regtest
 	if !lnutil.NopeString(conf.Rtvtchost) {
 		p := &coinparam.VertcoinRegTestParams
+		resync := false
+		conf.Tip = p.StartHeight
+		if conf.Resync == "rtvtc" {
+			if conf.Tip < 1 {
+				conf.Tip = 1
+			}
+			resync = true
+		}
+
 		err = node.LinkBaseWallet(
-			key, consts.BitcoinRegtestBHeight, conf.ReSync, conf.Tower,
+			key, consts.BitcoinRegtestBHeight, resync, conf.Tower,
 			conf.Rtvtchost, conf.ChainProxyURL, p)
 		if err != nil {
 			return err
