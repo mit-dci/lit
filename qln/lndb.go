@@ -354,7 +354,7 @@ func (nd *LitNode) SaveNicknameForPeerIdx(nickname string, idx uint32) error {
 	return err // same as if err != nil { return err } ; return nil
 }
 
-// SaveQchanUtxoData saves utxo data such as outpoint and close tx / status
+// SaveQchanUtxoData saves utxo data such as outpoint and close tx / status.
 func (nd *LitNode) SaveQchanUtxoData(q *Qchan) error {
 	logging.Warnln("someone tried to SaveQchanUtxoData, doing some hacks to make it save only parts of it")
 
@@ -366,6 +366,11 @@ func (nd *LitNode) SaveQchanUtxoData(q *Qchan) error {
 		return nil
 	}
 	fq.PorTxo = q.PorTxo
+
+	// we also quietly save close data when we call this function
+	if q.CloseData.Closed {
+		fq.CloseData = q.CloseData
+	}
 
 	return nd.SaveQChan(fq)
 }
