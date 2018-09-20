@@ -10,14 +10,14 @@ import (
 	"github.com/getlantern/deepcopy"
 )
 
-/*----- serialization for StatCom ------- */
 /*
-
 note that sigs are truncated and don't have the sighash type byte at the end.
 
 their rev hash can be derived from the elkrem sender
 and the stateidx.  hash160(elkremsend(sIdx)[:16])
 
+TODO Does it make sense to move this comment somewhere else?  It's not really
+relevant here anymore.
 */
 
 // ChanData is a struct used as a surrogate for going between Qchan and the JSON
@@ -134,9 +134,6 @@ func (nd *LitNode) ApplyChanDataToQchan(data *ChanData, qc *Qchan) error {
 	return nil
 
 }
-
-//TODO !!! don't store the outpoint!  it's redundant!!!!!
-// it's just a nonce and a refund, that's it! 40 bytes!
 
 func (nd *LitNode) QchanSerializeToBytes(qc *Qchan) []byte {
 	cd := nd.NewChanDataFromQchan(qc)

@@ -27,16 +27,6 @@ first there's the peer bucket.
 
 Here's the structure:
 
-Channels
-|
-|-channelID (36 byte outpoint)
-	|
-	|- portxo data (includes peer id, channel ID)
-	|
-	|- Watchtower: watchtower data
-	|
-	|- State: state data
-
 Peers
 |
 |- peerID (33 byte pubkey)
