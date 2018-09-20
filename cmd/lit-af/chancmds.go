@@ -91,7 +91,7 @@ var breakCommand = &Command{
 }
 
 var historyCommand = &Command{
-	Format:           lnutil.White("history"),
+	Format:           fmt.Sprintf("%s\n", lnutil.White("history")),
 	Description:      "Show all the metadata for justice txs",
 	ShortDescription: "Show all the metadata for justice txs.\n",
 }
