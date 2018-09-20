@@ -10,14 +10,13 @@ import (
 type LogLevel int
 
 const (
-	LogLevelPanicOrFatal LogLevel = 0
-	LogLevelError        LogLevel = 1
-	LogLevelWarning      LogLevel = 2
-	LogLevelInfo         LogLevel = 3
-	LogLevelDebug        LogLevel = 4
+	LogLevelError        LogLevel = 0
+	LogLevelWarning      LogLevel = 1
+	LogLevelInfo         LogLevel = 2
+	LogLevelDebug        LogLevel = 3
 )
 
-var logLevel = LogLevelPanicOrFatal
+var logLevel = LogLevelError
 
 func SetLogLevel(newLevel int) {
 	logLevel = LogLevel(newLevel)

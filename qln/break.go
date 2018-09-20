@@ -28,16 +28,6 @@ func (nd *LitNode) BreakChannel(q *Qchan) error {
 	}
 
 	logging.Infof("breaking (%d,%d)\n", q.Peer(), q.Idx())
-	z, err := q.ElkSnd.AtIndex(0)
-	if err != nil {
-		return err
-	}
-	logging.Infof("elk send 0: %s\n", z.String())
-	z, err = q.ElkRcv.AtIndex(0)
-	if err != nil {
-		return err
-	}
-	logging.Infof("elk recv 0: %s\n", z.String())
 
 	// set delta to 0... needed for break
 	q.State.Delta = 0

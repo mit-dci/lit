@@ -12,6 +12,7 @@ send2 2
 fund 2
 close 2 run_test_forward
 close 2 run_test_reverse
+# Disabled these to tests until we support breaking right after funding (we don't)
 break 2 run_test_forward
 break 2 run_test_reverse
 push 2
