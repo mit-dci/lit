@@ -14,7 +14,7 @@ lit: goget
 	@echo "Run \"$(GOBIN)/lit\" to launch lit."
 
 lit-af: goget
-	build/env.sh go build -v ./cmd/lit-af
+	build/env.sh go build ./cmd/lit-af
 	@echo "Run \"$(GOBIN)/lit-af\" to launch lit-af."
 
 webui:
