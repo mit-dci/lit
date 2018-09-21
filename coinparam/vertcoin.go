@@ -67,6 +67,69 @@ var VertcoinTestNetParams = Params{
 	TestCoin:   true,
 }
 
+var VertcoinRegTestParams = Params{
+	Name:          "vtcreg",
+	NetMagicBytes: 0xdab5bffa,
+	DefaultPort:   "18444",
+	DNSSeeds:      []string{},
+
+	// Chain parameters
+	DiffCalcFunction: diffVTCregtest,
+	MinHeaders:       4032,
+	FeePerByte:       100,
+	GenesisBlock:     &VertcoinRegTestnetGenesisBlock,
+	GenesisHash:      &VertcoinRegTestnetGenesisHash,
+	PowLimit:         regressionPowLimit,
+	PoWFunction: func(b []byte, height int32) chainhash.Hash {
+		var hashBytes []byte
+
+		if height >= 347000 {
+			hashBytes, _ = lyra2rev2.Sum(b)
+		} else if height >= 208301 {
+			hashBytes, _ = lyra2re.Sum(b)
+		} else {
+			hashBytes, _ = scrypt.Key(b, b, 2048, 1, 1, 32)
+		}
+
+		asChainHash, _ := chainhash.NewHash(hashBytes)
+		return *asChainHash
+	},
+	PowLimitBits:             0x207fffff,
+	CoinbaseMaturity:         120,
+	SubsidyReductionInterval: 150,
+	TargetTimespan:           time.Second * 302400, // 3.5 weeks
+	TargetTimePerBlock:       time.Second * 150,    // 150 seconds
+	RetargetAdjustmentFactor: 4,                    // 25% less, 400% more
+	ReduceMinDifficulty:      true,
+	MinDiffReductionTime:     time.Second * 150 * 2, // ?? unknown
+	GenerateSupported:        false,
+
+	// Checkpoints ordered from oldest to newest.
+	Checkpoints: []Checkpoint{},
+
+	BlockEnforceNumRequired: 26,
+	BlockRejectNumRequired:  49,
+	BlockUpgradeNumToCheck:  50,
+
+	// Mempool parameters
+	RelayNonStdTxs: true,
+
+	// Address encoding magics
+	PubKeyHashAddrID: 0x6f,
+	ScriptHashAddrID: 0xc4,
+	Bech32Prefix:     "rvtc",
+	PrivateKeyID:     0xef,
+
+	// BIP32 hierarchical deterministic extended key magics
+	HDPrivateKeyID: [4]byte{0x04, 0x35, 0x83, 0x94}, // starts with tprv
+	HDPublicKeyID:  [4]byte{0x04, 0x35, 0x87, 0xcf}, // starts with tpub
+
+	// BIP44 coin type used in the hierarchical deterministic path for
+	// address generation.
+	HDCoinType: 261,
+	TestCoin:   true,
+}
+
 var VertcoinParams = Params{
 	Name:          "vtc",
 	NetMagicBytes: 0xdab5bffa,
@@ -211,5 +274,33 @@ var VertcoinGenesisBlock = wire.MsgBlock{
 		Timestamp:  time.Unix(1389311371, 0), // later
 		Bits:       0x1e0ffff0,
 		Nonce:      5749262,
+	},
+}
+
+// ==================== VertcoinRegTestnet
+
+//  VertcoinRegTestnetGenesisHash
+var VertcoinRegTestnetGenesisHash = chainhash.Hash([chainhash.HashSize]byte{
+	0xce, 0x85, 0x4a, 0xdc, 0x33, 0xe8, 0x7c, 0xc1, 0x6f,
+	0xbc, 0x32, 0x19, 0x1a, 0x7b, 0x02, 0x17, 0x73, 0xc9,
+	0x06, 0x72, 0x86, 0x66, 0x0d, 0x65, 0xd1, 0xbb, 0xeb,
+	0x47, 0xb0, 0xc0, 0x99, 0x23,
+})
+
+var VertcoinRegTestnetMerkleRoot = chainhash.Hash([chainhash.HashSize]byte{
+	0xe7, 0x23, 0x01, 0xfc, 0x49, 0x32, 0x3e, 0xe1, 0x51,
+	0xcf, 0x10, 0x48, 0x23, 0x0f, 0x03, 0x2c, 0xa5, 0x89,
+	0x75, 0x3b, 0xa7, 0x08, 0x62, 0x22, 0xa5, 0xc0, 0x23,
+	0xe3, 0xa0, 0x8c, 0xf3, 0x4a,
+})
+
+var VertcoinRegTestnetGenesisBlock = wire.MsgBlock{
+	Header: wire.BlockHeader{
+		Version:    1,
+		PrevBlock:  chainhash.Hash{}, // empty
+		MerkleRoot: VertcoinRegTestnetMerkleRoot,
+		Timestamp:  time.Unix(1296688602, 0), // later
+		Bits:       0x207fffff,
+		Nonce:      2,
 	},
 }

@@ -54,7 +54,7 @@ func calcDiffAdjustBitcoin(start, end *wire.BlockHeader, p *Params) uint32 {
 func diffBitcoin(
 	headers []*wire.BlockHeader, height int32, p *Params) (uint32, error) {
 
-	ltcmode := p.Name == "litetest4" || p.Name == "litereg" ||
+	ltcmode := p.Name == "litetest4" || p.Name == "litereg" || p.Name == "vtcreg" ||
 		p.Name == "litecoin" || p.Name == "vtctest" || p.Name == "vtc"
 
 	//if p.Name == "regtest" {
@@ -268,4 +268,8 @@ func diffVTCtest(headers []*wire.BlockHeader, height int32, p *Params) (uint32, 
 
 	// Run KGW
 	return calcDiffAdjustKGW(headers, height, p)
+}
+
+func diffVTCregtest(headers []*wire.BlockHeader, height int32, p *Params) (uint32, error) {
+	return p.PowLimitBits, nil
 }

@@ -120,7 +120,7 @@ func OldAddressFromPKH(pkHash [20]byte, netID byte) string {
 // pkh part and network part, adding the network part if needed
 func ParseAdrString(adr string) (string, string) {
 	id, host, port := ParseAdrStringWithPort(adr)
-	if host == "" && port == 0 {
+	if port == 0 {
 		return id, ""
 	}
 	return id, fmt.Sprintf("%s:%d", host, port)
@@ -173,10 +173,14 @@ func ParseAdrStringWithPort(adr string) (string, string, uint32) {
 	hostString := strings.Split(hostSpec, ":")
 	host = hostString[0]
 	if len(hostString) == 1 {
+		// it is :, use default port
 		port = 2448
 	} else {
 		port64, _ := strconv.ParseUint(hostString[1], 10, 32)
 		port = uint32(port64)
+	}
+	if len(host) == 0 {
+		host = "localhost"
 	}
 	return lnAdr, host, port
 }

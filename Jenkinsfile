@@ -23,12 +23,12 @@ pipeline {
     }
     stage('Unit Tests') {
       steps {
-        sh './gotests.sh'
+        sh './scripts/gotests.sh'
       }
     }
     stage('Integration Tests') {
       steps {
-        sh 'cd test && env LIT_OUTPUT_SHOW=1 ./runtests.sh'
+        sh 'cd test && env LIT_OUTPUT_SHOW=1 ./runtests.py'
       }
     }
     stage('Package') {

@@ -41,16 +41,16 @@ var graphCommand = &Command{
 }
 
 var rcAuthCommand = &Command{
-	Format:           fmt.Sprintf("%s %s\n", lnutil.White("rcauth"), lnutil.ReqColor("pub", "auth (true|false)")),
+	Format:           fmt.Sprintf("%s%s\n", lnutil.White("rcauth"), lnutil.ReqColor("pub", "auth (true|false)")),
 	Description:      "Authorizes a remote peer by pubkey for sending remote control commands over LNDC\n",
-	ShortDescription: "Manages authorization for remote control",
+	ShortDescription: "Manages authorization for remote control\n",
 }
 
 // Request remote control access
 var rcRequestCommand = &Command{
 	Format:           fmt.Sprintf("%s\n", lnutil.White("rcreq")),
 	Description:      "If this lit-af key has not been authorized on the server, this command will let the server know you want access. Another client that is privileged can authorize you then.\n",
-	ShortDescription: "Requests remote control authorization",
+	ShortDescription: "Requests remote control authorization\n",
 }
 
 // graph gets the channel map

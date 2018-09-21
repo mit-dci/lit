@@ -88,7 +88,7 @@ func main() {
 	}
 
 	adr, host, port := lnutil.ParseAdrStringWithPort(lc.con)
-
+	logging.Infof("Adr: %s, Host: %s, Port: %d", adr, host, port)
 	if litrpc.LndcRpcCanConnectLocallyWithHomeDir(lc.litHomeDir) && adr == "" && (host == "localhost" || host == "127.0.0.1") {
 
 		lc.lndcRpcClient, err = litrpc.NewLocalLndcRpcClientWithHomeDirAndPort(lc.litHomeDir, port)
@@ -117,8 +117,6 @@ func main() {
 		} else {
 			adr = fmt.Sprintf("%s@%s:%d", adr, host, port)
 		}
-
-		logging.Infof("Connecting to %s\n", adr)
 
 		lc.lndcRpcClient, err = litrpc.NewLndcRpcClient(adr, key)
 		if err != nil {
