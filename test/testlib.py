@@ -259,6 +259,9 @@ class TestEnv():
             return True
         testutil.wait_until(ck_lits_synced, errmsg="lits aren't syncing to bitcoind")
 
+    def get_height(self):
+        return self.bitcoind.get_block_height()
+
     def shutdown(self):
         for l in self.lits:
             l.shutdown()
