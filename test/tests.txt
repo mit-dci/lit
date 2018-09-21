@@ -1,6 +1,8 @@
 # Basic tests
 testlib 1
 connect 2
+reconnect 0
+reconnect 0 run_test_unordered
 setgetfee 1
 
 # Tx operations
