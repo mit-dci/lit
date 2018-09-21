@@ -1,7 +1,7 @@
 
 import testlib
 
-def run_test(env):
+def simple(env):
     print('Starting nodes')
     lit1 = env.new_lit_node()
     lit2 = env.new_lit_node()
@@ -20,7 +20,7 @@ def run_test(env):
     assert l2p1 == l2p2, 'peer IDs on node 1 don\'t match across restarts!'
     print('OK')
 
-def run_test_unordered(env):
+def reordered(env):
     print('Starting nodes')
     lit1 = env.new_lit_node()
     lit2 = env.new_lit_node()
