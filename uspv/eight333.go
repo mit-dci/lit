@@ -326,7 +326,9 @@ func (s *SPVCon) AskForHeaders() error {
 	logging.Infof("get headers message has %d header hashes, first one is %s\n",
 		len(ghdr.BlockLocatorHashes), ghdr.BlockLocatorHashes[0].String())
 
+	logging.Errorf("DOES IT COME HERE?")
 	s.outMsgQueue <- ghdr
+	logging.Errorf("2 YEAH")
 	return nil
 }
 
