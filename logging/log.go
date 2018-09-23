@@ -10,10 +10,10 @@ import (
 type LogLevel int
 
 const (
-	LogLevelError        LogLevel = 0
-	LogLevelWarning      LogLevel = 1
-	LogLevelInfo         LogLevel = 2
-	LogLevelDebug        LogLevel = 3
+	LogLevelError   LogLevel = 0
+	LogLevelWarning LogLevel = 1
+	LogLevelInfo    LogLevel = 2
+	LogLevelDebug   LogLevel = 3
 )
 
 var logLevel = LogLevelError

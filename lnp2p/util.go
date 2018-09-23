@@ -1,13 +1,14 @@
 package lnp2p
 
 import (
+	"net"
+	"strings"
+
 	"github.com/mit-dci/lit/bech32"
 	"github.com/mit-dci/lit/crypto/fastsha256"
 	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/lncore"
 	"golang.org/x/net/proxy"
-	"net"
-	"strings"
 )
 
 // ParseAdrString splits a string like

@@ -7,15 +7,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mit-dci/lit/logging"
-
+	flags "github.com/jessevdk/go-flags"
 	"github.com/mit-dci/lit/coinparam"
 	consts "github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/qln"
-
-	flags "github.com/jessevdk/go-flags"
 )
 
 type litConfig struct { // define a struct for usage with go-flags

@@ -2,8 +2,9 @@ package lnp2p
 
 import (
 	"fmt"
-	"github.com/mit-dci/lit/logging"
 	"sync"
+
+	"github.com/mit-dci/lit/logging"
 )
 
 // ParseFuncType is the type of a Message parser function.

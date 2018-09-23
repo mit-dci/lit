@@ -3,8 +3,8 @@ package lnutil
 import (
 	"testing"
 
-	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
+	"github.com/mit-dci/lit/crypto/koblitz"
 )
 
 var (

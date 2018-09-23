@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/mit-dci/lit/logging"
-
 	"github.com/mit-dci/lit/lnutil"
 )
 
