@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/mit-dci/lit/logging"
-
 	UpnP "github.com/NebulousLabs/go-UpnP"
 )
 
