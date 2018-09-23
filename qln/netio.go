@@ -29,7 +29,7 @@ func (nd *LitNode) FindPeerIndexByAddress(lnAdr string) (uint32, error) {
 }
 
 // TCPListener starts a litNode listening for incoming LNDC connections.
-func (nd *LitNode) TCPListener(lisIpPort string) (string, error) {
+func (nd *LitNode) TCPListener(lisIpPort int) (string, error) {
 
 	logging.Debugf("Trying to listen on %s\n", lisIpPort)
 
@@ -51,7 +51,7 @@ func (nd *LitNode) TCPListener(lisIpPort string) (string, error) {
 
 }
 
-func GoAnnounce(priv *koblitz.PrivateKey, litport string, litadr string, trackerURL string) {
+func GoAnnounce(priv *koblitz.PrivateKey, litport int, litadr string, trackerURL string) {
 	err := lnutil.Announce(priv, litport, litadr, trackerURL)
 	if err != nil {
 		logging.Errorf("Announcement error %s", err.Error())

@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/mit-dci/lit/qln"
 
@@ -85,13 +84,9 @@ func (lc *litAfClient) Lis(textArgs []string) error {
 	args := new(litrpc.ListenArgs)
 	reply := new(litrpc.ListeningPortsReply)
 
-	args.Port = ":2448"
+	args.Port = 2448
 	if len(textArgs) > 0 {
-		if strings.Contains(textArgs[0], ":") {
-			args.Port = textArgs[0]
-		} else {
-			args.Port = ":" + textArgs[0]
-		}
+		args.Port, _ = strconv.Atoi(textArgs[0])
 	}
 
 	err := lc.Call("LitRPC.Listen", args, reply)

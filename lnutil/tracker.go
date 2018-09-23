@@ -32,7 +32,7 @@ type nodeinfo struct {
 	}
 }
 
-func Announce(priv *koblitz.PrivateKey, litport string, litadr string, trackerURL string) error {
+func Announce(priv *koblitz.PrivateKey, litport int, litadr string, trackerURL string) error {
 	client := &http.Client{
 		Timeout: time.Second * 4, // 4+4 to accomodate the 10s RPC timeout
 	}
@@ -45,7 +45,7 @@ func Announce(priv *koblitz.PrivateKey, litport string, litadr string, trackerUR
 	buf := new(bytes.Buffer)
 	buf.ReadFrom(resp.Body)
 
-	liturlIPv4 := strings.TrimSpace(buf.String()) + litport
+	liturlIPv4 := strings.TrimSpace(buf.String()) + ":" + string(litport)
 
 	var liturlIPv6 string
 
@@ -59,7 +59,7 @@ func Announce(priv *koblitz.PrivateKey, litport string, litadr string, trackerUR
 		defer resp.Body.Close()
 		buf = new(bytes.Buffer)
 		buf.ReadFrom(resp.Body)
-		liturlIPv6 = strings.TrimSpace(buf.String()) + litport
+		liturlIPv6 = strings.TrimSpace(buf.String()) + ":" + string(litport)
 	}
 
 	urlBytes := []byte(liturlIPv4 + liturlIPv6)

@@ -58,7 +58,7 @@ type litConfig struct { // define a struct for usage with go-flags
 	AutoReconnect                   bool   `long:"autoReconnect" description:"Attempts to automatically reconnect to known peers periodically."`
 	AutoReconnectInterval           int64  `long:"autoReconnectInterval" description:"The interval (in seconds) the reconnect logic should be executed"`
 	AutoReconnectOnlyConnectedCoins bool   `long:"autoReconnectOnlyConnectedCoins" description:"Only reconnect to peers that we have channels with in a coin whose coin daemon is available"`
-	AutoListenPort                  string `long:"autoListenPort" description:"When auto reconnect enabled, starts listening on this port"`
+	AutoListenPort                  int `long:"autoListenPort" description:"When auto reconnect enabled, starts listening on this port"`
 	Params                          *coinparam.Params
 }
 
@@ -71,7 +71,7 @@ var (
 	defaultRpcport                         = uint16(8001)
 	defaultRpchost                         = "localhost"
 	defaultAutoReconnect                   = true
-	defaultAutoListenPort                  = ":2448"
+	defaultAutoListenPort                  = 2448
 	defaultAutoReconnectInterval           = int64(60)
 	defaultUpnPFlag                        = false
 	defaultLogLevel                        = 0

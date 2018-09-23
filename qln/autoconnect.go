@@ -24,7 +24,7 @@ func removeDuplicates(inputArr []uint32) []uint32 {
 // AutoReconnect will start listening for incoming connections
 // and attempt to automatically reconnect to all
 // previously known peers attached with the coin daemons running.
-func (nd *LitNode) AutoReconnect(listenPort string, interval int64, connectedCoinOnly bool) {
+func (nd *LitNode) AutoReconnect(listenPort int, interval int64, connectedCoinOnly bool) {
 	// Listen myself after a timeout
 	_, err := nd.TCPListener(listenPort)
 	if err != nil {

@@ -11,12 +11,12 @@ type listeningthread struct {
 	listener *lndc.Listener
 }
 
-func acceptConnections(listener *lndc.Listener, listenAddr string, pm *PeerManager) {
+func acceptConnections(listener *lndc.Listener, port int, pm *PeerManager) {
 
 	// Set this up in-advance.
 	stopEvent := &StopListeningPortEvent{
-		ListenAddr: listenAddr,
-		Reason:     "panic",
+		Port:   port,
+		Reason: "panic",
 	}
 
 	// Do this now in case we panic so we can do cleanup.
@@ -98,11 +98,11 @@ func acceptConnections(listener *lndc.Listener, listenAddr string, pm *PeerManag
 
 	// Then delete the entry from listening ports.
 	pm.mtx.Lock()
-	delete(pm.listeningPorts, listenAddr)
+	delete(pm.listeningPorts, port)
 	pm.mtx.Unlock()
 
 	// after this the stop event will be published
-	logging.Infof("Stopped listening on %s\n", listenAddr)
+	logging.Infof("Stopped listening on %s\n", port)
 
 }
 
