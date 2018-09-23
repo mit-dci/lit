@@ -39,8 +39,7 @@ func NewListener(localStatic *koblitz.PrivateKey, port int) (*Listener,
 	error) {
 	// since this is a listener, it is sufficient that we just pass the
 	// port and then add the later stuff here
-	str := ":" + strconv.Itoa(port)
-	fmt.Println("PORTHERE", str)
+	str := ":" + strconv.Itoa(port) // colonize!
 	addr, err := net.ResolveTCPAddr("tcp", str)
 	if err != nil {
 		return nil, err

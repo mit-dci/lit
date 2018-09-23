@@ -86,7 +86,10 @@ func (lc *litAfClient) Lis(textArgs []string) error {
 
 	args.Port = 2448
 	if len(textArgs) > 0 {
-		args.Port, _ = strconv.Atoi(textArgs[0])
+		args.Port, err = strconv.Atoi(textArgs[0])
+		if err != nil {
+			return err
+		}
 	}
 
 	err := lc.Call("LitRPC.Listen", args, reply)
