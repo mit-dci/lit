@@ -2,7 +2,6 @@ package lndc
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"net"
 	"strconv"
