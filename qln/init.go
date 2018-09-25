@@ -2,6 +2,9 @@ package qln
 
 import (
 	"fmt"
+	"path/filepath"
+	"sync"
+
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/hdkeychain"
@@ -15,8 +18,6 @@ import (
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/wallit"
 	"github.com/mit-dci/lit/watchtower"
-	"path/filepath"
-	"sync"
 )
 
 // NewLitNode starts up a lit node.  Needs priv key, and a path.
@@ -59,7 +60,7 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 	nd.Events = &ebus
 
 	// Peer manager
-	nd.PeerMan, err = lnp2p.NewPeerManager(rootPrivKey, nd.NewLitDB.GetPeerDB(), &ebus)
+	nd.PeerMan, err = lnp2p.NewPeerManager(rootPrivKey, nd.NewLitDB.GetPeerDB(), trackerURL, &ebus)
 	if err != nil {
 		return nil, err
 	}
