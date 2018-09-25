@@ -53,6 +53,9 @@ func (nd *LitNode) registerHandlers() {
 	mp.DefineMessage(lnutil.MSGID_DUALFUNDINGCHANACK, makeNeoOmniParser(lnutil.MSGID_DUALFUNDINGCHANACK), hf)
 	mp.DefineMessage(lnutil.MSGID_REMOTE_RPCREQUEST, makeNeoOmniParser(lnutil.MSGID_REMOTE_RPCREQUEST), hf)
 	mp.DefineMessage(lnutil.MSGID_REMOTE_RPCRESPONSE, makeNeoOmniParser(lnutil.MSGID_REMOTE_RPCRESPONSE), hf)
+	mp.DefineMessage(lnutil.MSGID_PAY_REQ, makeNeoOmniParser(lnutil.MSGID_PAY_REQ), hf)
+	mp.DefineMessage(lnutil.MSGID_PAY_ACK, makeNeoOmniParser(lnutil.MSGID_PAY_ACK), hf)
+	mp.DefineMessage(lnutil.MSGID_PAY_SETUP, makeNeoOmniParser(lnutil.MSGID_PAY_SETUP), hf)
 
 }
 
