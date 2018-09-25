@@ -31,17 +31,14 @@ type ChanData struct {
 	TheirRefundPub [33]byte `json:"rrefpub"`
 	TheirHAKDBase  [33]byte `json:"rhakdbase"`
 
-	ElkRcv *elkrem.ElkremReceiver `json:"elkrecv"`
-
 	State *StatCom `json:"state"`
 
 	LastUpdate uint64 `json:"updateunix"`
 }
 
+// NewQchanFromChanData creates a new qchan from a chandata.
 func (nd *LitNode) NewQchanFromChanData(data *ChanData) (*Qchan, error) {
 
-	erecv := new(elkrem.ElkremReceiver)
-	deepcopy.Copy(erecv, data.ElkRcv)
 	sc := new(StatCom)
 	deepcopy.Copy(sc, data.State)
 
@@ -64,7 +61,7 @@ func (nd *LitNode) NewQchanFromChanData(data *ChanData) (*Qchan, error) {
 		TheirHAKDBase:  data.TheirHAKDBase,
 
 		ElkSnd: elkrem.NewElkremSender(elkroot),
-		ElkRcv: erecv,
+		ElkRcv: elkrem.NewElkremReceiver(),
 
 		Delay: 5, // This is defined to just be 5.
 
@@ -85,11 +82,10 @@ func (nd *LitNode) NewQchanFromChanData(data *ChanData) (*Qchan, error) {
 
 }
 
+// NewChanDataFromQchan extracts the chandata from the qchan.
 func (nd *LitNode) NewChanDataFromQchan(qc *Qchan) *ChanData {
 
 	// We have to make copies of some thing because it's weird.
-	er := new(elkrem.ElkremReceiver)
-	deepcopy.Copy(er, qc.ElkRcv)
 	sc := new(StatCom)
 	deepcopy.Copy(sc, qc.State)
 
@@ -99,7 +95,6 @@ func (nd *LitNode) NewChanDataFromQchan(qc *Qchan) *ChanData {
 		TheirPub:       qc.TheirPub,
 		TheirRefundPub: qc.TheirRefundPub,
 		TheirHAKDBase:  qc.TheirHAKDBase,
-		ElkRcv:         er,
 		State:          sc,
 		LastUpdate:     qc.LastUpdate,
 	}
@@ -108,6 +103,7 @@ func (nd *LitNode) NewChanDataFromQchan(qc *Qchan) *ChanData {
 
 }
 
+// ApplyChanDataToQchan applies the chandata to the qchan without destroying it.
 func (nd *LitNode) ApplyChanDataToQchan(data *ChanData, qc *Qchan) error {
 
 	fake, err := nd.NewQchanFromChanData(data)
