@@ -26,9 +26,10 @@ func makeListener() (*Listener, string, string, error) {
 		return nil, "", "", err
 	}
 
-	// Having a port of ":0" means a random port, and interface will be
+	// Having a port of "0" means a random port, and interface will be
 	// chosen for our listener.
-	addr := "localhost:0"
+	// uhhhh is this a good thing?
+	addr := 0
 
 	// Our listener will be local, and the connection remote.
 	listener, err := NewListener(localPriv, addr)
