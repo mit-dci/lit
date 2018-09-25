@@ -105,6 +105,7 @@ def run_test_list(tests):
             print('------------------------------')
             print('Success:', name)
             ok += 1
+            time.sleep(0.1) # Wait for things to exit, just to be sure.
         except BaseException as e:
             env.shutdown()
             print('------------------------------')

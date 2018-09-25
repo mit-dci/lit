@@ -76,8 +76,8 @@ class LitNode():
             "--dir", self.data_dir,
             "--unauthrpc",
             "--rpcport=" + str(self.rpc_port),
-            "--autoReconnect",
-            "--autoListenPort=" + str(self.p2p_port)
+            #"--autoReconnect",
+            #"--autoListenPort=" + str(self.p2p_port)
         ]
         self.proc = subprocess.Popen(args,
             stdin=subprocess.DEVNULL,
@@ -89,7 +89,7 @@ class LitNode():
         self.rpc = litrpc.LitClient("localhost", str(self.rpc_port))
 
         # Make it listen to P2P connections!
-        lres = self.rpc.Listen(Port=":" + str(self.p2p_port))
+        lres = self.rpc.Listen(Port=self.p2p_port)
         testutil.wait_until_port("localhost", self.p2p_port)
         self.lnid = lres["Adr"]
 
