@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"strconv"
 	"time"
 
 	"github.com/mit-dci/lit/crypto/koblitz"
@@ -33,9 +34,12 @@ var _ net.Listener = (*Listener)(nil)
 
 // NewListener returns a new net.Listener which enforces the lndc scheme
 // during both initial connection establishment and data transfer.
-func NewListener(localStatic *koblitz.PrivateKey, listenAddr string) (*Listener,
+func NewListener(localStatic *koblitz.PrivateKey, port int) (*Listener,
 	error) {
-	addr, err := net.ResolveTCPAddr("tcp", listenAddr)
+	// since this is a listener, it is sufficient that we just pass the
+	// port and then add the later stuff here
+	str := ":" + strconv.Itoa(port) // colonize!
+	addr, err := net.ResolveTCPAddr("tcp", str)
 	if err != nil {
 		return nil, err
 	}

@@ -37,7 +37,7 @@ type PeerManager struct {
 	peerMap map[lncore.LnAddr]*Peer
 
 	// Accepting connections.
-	listeningPorts map[string]*listeningthread
+	listeningPorts map[int]*listeningthread
 
 	// Outgoing messages.
 	sending  bool
@@ -75,7 +75,7 @@ func NewPeerManager(rootkey *hdkeychain.ExtendedKey, pdb lncore.LitPeerStorage, 
 		mproc:          NewMessageProcessor(),
 		peers:          make([]lncore.LnAddr, 1),
 		peerMap:        map[lncore.LnAddr]*Peer{},
-		listeningPorts: map[string]*listeningthread{},
+		listeningPorts: map[int]*listeningthread{},
 		sending:        false,
 		trackerURL:     trackerURL,
 		outqueue:       make(chan outgoingmsg, outgoingbuf),
@@ -317,14 +317,14 @@ func (pm *PeerManager) DisconnectPeer(peer *Peer) error {
 }
 
 // ListenOnPort attempts to start a goroutine lisening on the port.
-func (pm *PeerManager) ListenOnPort(addr string) error {
+func (pm *PeerManager) ListenOnPort(port int) error {
 
 	threadobj := &listeningthread{
 		listener: nil,
 	}
 
 	// Publish the new thread
-	res, err := pm.ebus.Publish(NewListeningPortEvent{addr})
+	res, err := pm.ebus.Publish(NewListeningPortEvent{port})
 	if err != nil {
 		return err
 	}
@@ -336,12 +336,14 @@ func (pm *PeerManager) ListenOnPort(addr string) error {
 	// TODO UPnP and PMP NAT traversal.
 
 	// Try to start listening.
-	listener, err := lndc.NewListener(pm.idkey, addr)
+	logging.Info("PORT: ", port)
+	listener, err := lndc.NewListener(pm.idkey, port)
 	if err != nil {
 		logging.Errorf("listening failed: %s\n", err.Error())
+		logging.Info(err)
 		pm.ebus.Publish(StopListeningPortEvent{
-			ListenAddr: addr,
-			Reason:     "initfail",
+			Port:   port,
+			Reason: "initfail",
 		})
 		return err
 	}
@@ -350,7 +352,7 @@ func (pm *PeerManager) ListenOnPort(addr string) error {
 
 	// Install the thread object.
 	pm.mtx.Lock()
-	pm.listeningPorts[addr] = threadobj
+	pm.listeningPorts[port] = threadobj
 	pm.mtx.Unlock()
 
 	// Activate the MessageProcessor if we haven't yet.
@@ -359,7 +361,7 @@ func (pm *PeerManager) ListenOnPort(addr string) error {
 	}
 
 	// Actually start it
-	go acceptConnections(listener, addr, pm)
+	go acceptConnections(listener, port, pm)
 
 	return nil
 
@@ -377,13 +379,13 @@ func (pm *PeerManager) GetListeningAddrs() []string {
 }
 
 // StopListening closes the socket listened on the given address, stopping the goroutine.
-func (pm *PeerManager) StopListening(addr string) error {
+func (pm *PeerManager) StopListening(port int) error {
 
 	pm.mtx.Lock()
 	defer pm.mtx.Unlock()
 
 	// This will interrupt the .Accept() call in the other goroutine, and handle cleanup for us.
-	lt, ok := pm.listeningPorts[addr]
+	lt, ok := pm.listeningPorts[port]
 	if !ok {
 		return fmt.Errorf("not listening")
 	}
