@@ -2,6 +2,7 @@
 
 import os
 import sys
+import time
 import importlib.util as imu
 
 import testlib
