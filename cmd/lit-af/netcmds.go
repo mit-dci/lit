@@ -75,6 +75,8 @@ func (lc *litAfClient) Graph(textArgs []string) error {
 
 // Lis starts listening.  Takes args of port to listen on.
 func (lc *litAfClient) Lis(textArgs []string) error {
+	var err error
+
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
 		fmt.Fprintf(color.Output, lisCommand.Format)
 		fmt.Fprintf(color.Output, lisCommand.Description)
@@ -92,7 +94,7 @@ func (lc *litAfClient) Lis(textArgs []string) error {
 		}
 	}
 
-	err := lc.Call("LitRPC.Listen", args, reply)
+	err = lc.Call("LitRPC.Listen", args, reply)
 	if err != nil {
 		return err
 	}
