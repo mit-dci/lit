@@ -4,18 +4,20 @@ package lnp2p
 import (
 	"crypto/ecdsa"
 	"fmt"
+	"net"
+	"strconv"
+	"sync"
+	"time"
+
 	"github.com/mit-dci/lit/btcutil/hdkeychain"
 	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/eventbus"
 	"github.com/mit-dci/lit/lncore"
 	"github.com/mit-dci/lit/lndc"
+	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/nat"
 	"github.com/mit-dci/lit/portxo"
-	"net"
-	"strconv"
-	"sync"
-	"time"
 )
 
 type privkey *koblitz.PrivateKey
@@ -41,6 +43,9 @@ type PeerManager struct {
 	sending  bool
 	outqueue chan outgoingmsg
 
+	// Tracker
+	trackerURL string
+
 	// Sync.
 	mtx *sync.Mutex
 }
@@ -57,7 +62,7 @@ type NetSettings struct {
 }
 
 // NewPeerManager creates a peer manager from a root key
-func NewPeerManager(rootkey *hdkeychain.ExtendedKey, pdb lncore.LitPeerStorage, bus *eventbus.EventBus) (*PeerManager, error) {
+func NewPeerManager(rootkey *hdkeychain.ExtendedKey, pdb lncore.LitPeerStorage, trackerURL string, bus *eventbus.EventBus) (*PeerManager, error) {
 	k, err := computeIdentKeyFromRoot(rootkey)
 	if err != nil {
 		return nil, err
@@ -72,6 +77,7 @@ func NewPeerManager(rootkey *hdkeychain.ExtendedKey, pdb lncore.LitPeerStorage, 
 		peerMap:        map[lncore.LnAddr]*Peer{},
 		listeningPorts: map[string]*listeningthread{},
 		sending:        false,
+		trackerURL:     trackerURL,
 		outqueue:       make(chan outgoingmsg, outgoingbuf),
 		mtx:            &sync.Mutex{},
 	}
@@ -141,7 +147,11 @@ func (pm *PeerManager) TryConnectAddress(addr string, settings *NetSettings) (*P
 	// Figure out who we're trying to connect to.
 	who, where := splitAdrString(addr)
 	if where == "" {
-		// TODO Do lookup.
+		ipv4, _, err := lnutil.Lookup(addr, pm.trackerURL, "")
+		if err != nil {
+			return nil, err
+		}
+		where = ipv4
 	}
 
 	lnwho := lncore.LnAddr(who)
