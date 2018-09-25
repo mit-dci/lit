@@ -151,7 +151,7 @@ func (pm *PeerManager) TryConnectAddress(addr string, settings *NetSettings) (*P
 		if err != nil {
 			return nil, err
 		}
-		where = ipv4
+		where = fmt.Sprintf("%s:2448", ipv4)
 	}
 
 	lnwho := lncore.LnAddr(who)
