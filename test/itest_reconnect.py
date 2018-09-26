@@ -22,7 +22,7 @@ def simple(env):
     l2p2 = lit1.get_peer_id(lit2)
 
     print('Checking IDs match...')
-    print('Node 2: %s -> %s' % (l2p2, l2p2))
+    print('Node 2: %s -> %s' % (l2p1, l2p2))
     assert l2p1 == l2p2, 'peer IDs on node 1 don\'t match across restarts!'
     print('OK')
 
