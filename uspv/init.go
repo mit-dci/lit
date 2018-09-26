@@ -94,9 +94,15 @@ func (s *SPVCon) DialNode(listOfNodes []string) error {
 				return err
 			}
 			s.con, err = d.Dial(conMode, conString)
+			if err != nil {
+				logging.Debug(err)
+			}
 		} else {
 			d := net.Dialer{Timeout: 2 * time.Second}
 			s.con, err = d.Dial(conMode, conString)
+			if err != nil {
+				logging.Debug(err)
+			}
 		}
 
 		if err != nil {

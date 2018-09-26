@@ -273,15 +273,14 @@ func (q *Qchan) GetCloseTxos(tx *wire.MsgTx) ([]portxo.PorTxo, error) {
 	cTxos := make([]portxo.PorTxo, 1)
 	myPKHPkSript := lnutil.DirectWPKHScript(q.MyRefundPub)
 
-	htlcOutsInTx, htlcOutIndexesInTx, err := q.GetHtlcTxos(tx, false)
+	_, htlcOutIndexesInTx, err := q.GetHtlcTxos(tx, false)
 	if err != nil {
 		return nil, err
 	}
-	htlcOutsInOurTx, htlcOutIndexesInOurTx, err := q.GetHtlcTxos(tx, true)
+	_, htlcOutIndexesInOurTx, err := q.GetHtlcTxos(tx, true)
 	if err != nil {
 		return nil, err
 	}
-	htlcOutsInTx = append(htlcOutsInTx, htlcOutsInOurTx...)
 	htlcOutIndexesInTx = append(htlcOutIndexesInTx, htlcOutIndexesInOurTx...)
 
 	shIdx = 999 // set high here to detect if there's no SH output
