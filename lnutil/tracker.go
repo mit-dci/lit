@@ -34,10 +34,14 @@ type nodeinfo struct {
 	}
 }
 
-func Announce(priv *koblitz.PrivateKey, port int, litadr string, trackerURL string) error {
-	client := &http.Client{
+func InitClient() *http.Client {
+	return &http.Client{
 		Timeout: time.Second * 4, // 4+4 to accomodate the 10s RPC timeout
 	}
+}
+
+func Announce(priv *koblitz.PrivateKey, port int, litadr string, trackerURL string) error {
+	client := InitClient()
 	strport := ":" + strconv.Itoa(port)
 	resp, err := client.Get("https://ipv4.myexternalip.com/raw")
 	if err != nil {
@@ -95,7 +99,7 @@ func Announce(priv *koblitz.PrivateKey, port int, litadr string, trackerURL stri
 }
 
 func Lookup(litadr string, trackerURL string, proxyURL string) (string, string, error) {
-	var client http.Client
+	client := InitClient()
 
 	if proxyURL != "" {
 		dialer, err := proxy.SOCKS5("tcp", proxyURL, nil, proxy.Direct)
