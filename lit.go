@@ -6,7 +6,6 @@ import (
 	"runtime"
 	"syscall"
 	"time"
-	"log"
 
 	"github.com/mit-dci/lit/logging"
 
@@ -262,9 +261,7 @@ func main() {
 
 	key, err := litSetup(&conf)
 	if err != nil {
-		// the error may be before the logging module was initialized, so we need to use log here
-		// kind of ugly, but the only option I guess
-		log.Fatal(err)
+		logging.Fatal(err) // fatals and errors are always printed out by default
 	}
 	if conf.ProxyURL != "" {
 		conf.LitProxyURL = conf.ProxyURL
