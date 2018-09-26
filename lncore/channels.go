@@ -1,6 +1,5 @@
 package lncore
 
-// LitChannelStorage .
 type LitChannelStorage interface {
 	GetChannel(handle ChannelHandle) (*ChannelInfo, error)
 	GetChannelHandles() ([]ChannelHandle, error)
@@ -16,7 +15,7 @@ type LitChannelStorage interface {
 // ChannelHandle is "something" to concisely uniquely identify a channel.  Usually just a txid.
 type ChannelHandle [64]byte
 
-// ChannelState .
+// ChannelState
 type ChannelState uint8
 
 const (
@@ -42,7 +41,7 @@ const (
 	CstateError = 255
 )
 
-// ChannelInfo .
+// ChannelInfo
 type ChannelInfo struct {
 	PeerAddr   string       `json:"peeraddr"`
 	CoinType   int32        `json:"cointype"`

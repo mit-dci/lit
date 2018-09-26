@@ -33,8 +33,8 @@ type LitWalletStorage interface {
 }
 
 type CoinAddress struct {
-	cointype int32
-	addr     []byte
+	Cointype int32
+	Addr     []byte
 }
 
 // AreCoinsCompatible checks to see if two coin-specific objects are for the same coin.

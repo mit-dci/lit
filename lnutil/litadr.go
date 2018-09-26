@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/mit-dci/lit/bech32"
+	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/btcutil/base58"
 	"github.com/mit-dci/lit/crypto/fastsha256"
 )
@@ -68,6 +69,13 @@ func LitFullAdrDecode(in string) ([33]byte, error) {
 
 func LitAdrFromPubkey(in [33]byte) string {
 	doubleSha := fastsha256.Sum256(in[:])
+	return bech32.Encode("ln", doubleSha[:20])
+}
+
+// Given a koblitz pubkey, returns the lit addr
+func ConvertPubkeyToLitAddr(in *koblitz.PublicKey) string {
+	cpk := in.SerializeCompressed() // compressedPubKey
+	doubleSha := fastsha256.Sum256(cpk[:])
 	return bech32.Encode("ln", doubleSha[:20])
 }
 

@@ -49,7 +49,7 @@ func makeNeoOmniHandler(nd *LitNode) lnp2p.HandleFuncType {
 
 		wm := m.(LitMsgWrapperMessage)
 		rawbuf := wm.rawbuf
-		msg, err := lnutil.LitMsgFromBytes(rawbuf, p.GetIdx())
+		msg, err := lnutil.LitMsgFromBytes(rawbuf, p.Idx)
 		if err != nil {
 			return err
 		}
@@ -94,7 +94,7 @@ func makeNeoOmniHandler(nd *LitNode) lnp2p.HandleFuncType {
 		}
 
 		if err != nil {
-			logging.Errorf("PeerHandler error with %d: %s\n", p.GetIdx(), err.Error())
+			logging.Errorf("PeerHandler error with %d: %s\n", p.Idx, err.Error())
 		}
 
 		return nil

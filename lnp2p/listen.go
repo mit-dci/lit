@@ -4,6 +4,7 @@ import (
 	"github.com/mit-dci/lit/eventbus"
 	"github.com/mit-dci/lit/lncore"
 	"github.com/mit-dci/lit/lndc"
+	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/logging"
 )
 
@@ -39,13 +40,13 @@ func acceptConnections(listener *lndc.Listener, port int, pm *PeerManager) {
 		lndcConn, ok := netConn.(*lndc.Conn)
 		if !ok {
 			// this should never happen
-			logging.Errorf("didn't get an lndc connection from listener, wtf?\n")
+			logging.Errorf("didn't get an lndc connection from listener, continuing\n")
 			netConn.Close()
 			continue
 		}
 
 		rpk := pubkey(lndcConn.RemotePub())
-		rlitaddr := convertPubkeyToLitAddr(rpk)
+		rlitaddr := lnutil.ConvertPubkeyToLitAddr(rpk)
 		rnetaddr := lndcConn.RemoteAddr()
 
 		logging.Infof("New connection from %s at %s\n", rlitaddr, rnetaddr.String())
@@ -60,38 +61,38 @@ func acceptConnections(listener *lndc.Listener, port int, pm *PeerManager) {
 
 		// Create the actual peer object.
 		npeer := &Peer{
-			lnaddr:   rlitaddr,
-			nickname: nil,
+			Addr:     rlitaddr,
+			Nickname: "",
 			conn:     lndcConn,
-			idpubkey: rpk,
+			Pubkey:   rpk,
 
 			// TEMP
-			idx: nil,
+			Idx: 65536,
 		}
 
 		// Add the peer data to the DB if we don't have it.
-		if pi == nil {
+		if len(pi.Addr) == 0 { // weird hack, but should work
 			raddr := rnetaddr.String()
 			pidx, err := pm.peerdb.GetUniquePeerIdx()
 			if err != nil {
 				logging.Errorf("problem getting unique peeridx: %s\n", err.Error())
 			}
-			pi = &lncore.PeerInfo{
-				LnAddr:   &rlitaddr,
-				Nickname: nil,
-				NetAddr:  &raddr,
+			pi = lncore.PeerInfo{
+				Addr:     rlitaddr,
+				Nickname: "",
+				NetAddr:  raddr,
 				PeerIdx:  pidx,
 			}
-			err = pm.peerdb.AddPeer(rlitaddr, *pi)
-			npeer.idx = &pidx
+			err = pm.peerdb.AddPeer(rlitaddr, pi)
+			npeer.Idx = pidx
 			if err != nil {
 				// don't close it, I guess
 				logging.Errorf("problem saving peer info to DB: %s\n", err.Error())
 			}
 		} else {
-			npeer.nickname = pi.Nickname
+			npeer.Nickname = pi.Nickname
 			// TEMP
-			npeer.idx = &pi.PeerIdx
+			npeer.Idx = pi.PeerIdx
 		}
 
 		// Don't do any locking here since registerPeer takes a lock and Go's
@@ -140,10 +141,10 @@ func processConnectionInboundTraffic(peer *Peer, pm *PeerManager) {
 			return
 		}
 
-		logging.Debugf("Got message of len %d from peer %s\n", n, peer.GetLnAddr())
+		logging.Debugf("Got message of len %d from peer %s\n", n, peer.Addr)
 
 		// Send to the message processor.
-		err = pm.mproc.HandleMessage(peer, buf[:n])
+		err = pm.MProc.HandleMessage(peer, buf[:n])
 		if err != nil {
 			logging.Errorf("Error proccessing message: %s\n", err.Error())
 		}

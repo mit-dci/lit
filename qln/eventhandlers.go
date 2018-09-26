@@ -12,14 +12,14 @@ func makeTmpNewPeerHandler(nd *LitNode) func(eventbus.Event) eventbus.EventHandl
 
 		ee := e.(lnp2p.NewPeerEvent)
 
-		peerIdx := uint32(nd.PeerMan.GetPeerIdx(ee.Peer))
+		peerIdx := uint32(ee.Peer.Idx)
 
 		logging.Debugf("creating new fake RemotePeer %d\n", peerIdx)
 
 		rpeer := &RemotePeer{
 			Idx:      peerIdx,
 			Con:      ee.Conn,
-			Nickname: ee.Peer.GetNickname(),
+			Nickname: ee.Peer.Nickname,
 			QCs:      make(map[uint32]*Qchan),
 		}
 

@@ -2,11 +2,10 @@ package qln
 
 import (
 	"fmt"
+
 	"github.com/mit-dci/lit/crypto/koblitz"
-	"github.com/mit-dci/lit/lncore"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/logging"
-	"strings"
 )
 
 // GetLisAddressAndPorts .
@@ -20,9 +19,9 @@ func (nd *LitNode) GetLisAddressAndPorts() (string, []string) {
 // TODO Remove this function.
 func (nd *LitNode) FindPeerIndexByAddress(lnAdr string) (uint32, error) {
 	pm := nd.PeerMan
-	p := pm.GetPeer(lncore.LnAddr(lnAdr))
+	p := pm.GetPeer(lnAdr)
 	if p != nil {
-		return p.GetIdx(), nil
+		return p.Idx, nil
 	}
 
 	return 0, fmt.Errorf("Node %s not found", lnAdr)
@@ -31,23 +30,23 @@ func (nd *LitNode) FindPeerIndexByAddress(lnAdr string) (uint32, error) {
 // TCPListener starts a litNode listening for incoming LNDC connections.
 func (nd *LitNode) TCPListener(port int) (string, error) {
 
-	logging.Debugf("Trying to listen on %s\n", port)
+	logging.Debugf("Trying to listen on %d\n", port)
 
 	err := nd.PeerMan.ListenOnPort(port)
 	if err != nil {
 		return "", err
 	}
 
-	lnaddr := nd.PeerMan.GetExternalAddress()
+	addr := nd.PeerMan.GetExternalAddress()
 
-	logging.Infof("Listening with ln address: %s \n", lnaddr)
+	logging.Infof("Listening with ln address: %s \n", addr)
 
 	// Don't announce on the tracker if we are communicating via SOCKS proxy
 	if nd.ProxyURL == "" {
-		go GoAnnounce(nd.IdKey(), port, lnaddr, nd.TrackerURL)
+		go GoAnnounce(nd.IdKey(), port, addr, nd.TrackerURL)
 	}
 
-	return lnaddr, nil
+	return addr, nil
 
 }
 
@@ -56,24 +55,6 @@ func GoAnnounce(priv *koblitz.PrivateKey, port int, litadr string, trackerURL st
 	if err != nil {
 		logging.Errorf("Announcement error %s", err.Error())
 	}
-}
-
-// ParseAdrString splits a string like
-// "ln1yrvw48uc3atg8e2lzs43mh74m39vl785g4ehem@myhost.co:8191" into a separate
-// pkh part and network part, adding the network part if needed
-func splitAdrString(adr string) (string, string) {
-
-	if !strings.ContainsRune(adr, ':') && strings.ContainsRune(adr, '@') {
-		adr += ":2448"
-	}
-
-	idHost := strings.Split(adr, "@")
-
-	if len(idHost) == 1 {
-		return idHost[0], ""
-	}
-
-	return idHost[0], idHost[1]
 }
 
 // DialPeer makes an outgoing connection to another node.
@@ -120,10 +101,10 @@ func (nd *LitNode) GetConnectedPeerList() []SimplePeerInfo {
 	peers := make([]SimplePeerInfo, 0)
 	for k := range nd.PeerMap {
 		spi := SimplePeerInfo{
-			PeerNumber: nd.PeerMan.GetPeerIdx(k),
+			PeerNumber: k.Idx,
 			RemoteHost: k.GetRemoteAddr(),
-			Nickname:   k.GetNickname(),
-			LitAdr:     string(k.GetLnAddr()),
+			Nickname:   k.Nickname,
+			LitAdr:     k.Addr,
 		}
 		peers = append(peers, spi)
 	}
