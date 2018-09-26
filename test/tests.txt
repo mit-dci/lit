@@ -3,6 +3,8 @@ testlib 1
 connect 2
 reconnect 0 simple
 reconnect 0 reordered
+reconnect 0 inbound
+reconnect 0 reordered_inbound
 setgetfee 1
 
 # Tx operations
