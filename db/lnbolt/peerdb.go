@@ -156,8 +156,6 @@ func (pdb *peerboltdb) UpdatePeer(addr lncore.LnAddr, pi *lncore.PeerInfo) error
 		return err
 	}
 
-	fmt.Printf("%s\n", string(piraw))
-
 	err = pdb.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(peersLabel)
 
