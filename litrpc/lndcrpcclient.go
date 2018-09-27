@@ -142,6 +142,10 @@ func NewLndcRpcClient(address string, key *koblitz.PrivateKey) (*LndcRpcClient, 
 	return cli, nil
 }
 
+func (cli *LndcRpcClient) Close() error {
+	return cli.lnconn.Close()
+}
+
 func (cli *LndcRpcClient) Call(serviceMethod string, args interface{}, reply interface{}) error {
 	var err error
 
