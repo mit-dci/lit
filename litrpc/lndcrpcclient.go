@@ -24,12 +24,13 @@ import (
 // regular lndc.Conn to connect to lit over port 2448, and sends
 // RemoteControlRpcRequestMsg to it, and receives RemoteControlRpcResponseMsg
 type LndcRpcClient struct {
-	lnconn           *lndc.Conn
-	requestNonce     uint64
-	requestNonceMtx  sync.Mutex
-	responseChannels map[uint64]chan lnutil.RemoteControlRpcResponseMsg
-	key              *koblitz.PrivateKey
-	conMtx           sync.Mutex
+	lnconn             *lndc.Conn
+	requestNonce       uint64
+	requestNonceMtx    sync.Mutex
+	responseChannelMtx sync.Mutex
+	responseChannels   map[uint64]chan lnutil.RemoteControlRpcResponseMsg
+	key                *koblitz.PrivateKey
+	conMtx             sync.Mutex
 }
 
 // LndcRpcCanConnectLocally checks if we can connect to lit using the normal
@@ -156,7 +157,9 @@ func (cli *LndcRpcClient) Call(serviceMethod string, args interface{}, reply int
 	cli.requestNonceMtx.Unlock()
 
 	// Create the channel to receive the reply on
+	cli.responseChannelMtx.Lock()
 	cli.responseChannels[nonce] = make(chan lnutil.RemoteControlRpcResponseMsg)
+	cli.responseChannelMtx.Unlock()
 
 	// Send the message in a goroutine
 	go func() {
@@ -241,7 +244,10 @@ func (cli *LndcRpcClient) ReceiveLoop() {
 				}
 
 				// Clean up the channel to preserve memory. It's only used once.
+				cli.responseChannelMtx.Lock()
 				delete(cli.responseChannels, response.Idx)
+				cli.responseChannelMtx.Unlock()
+
 			} else {
 				logging.Errorf("Could not find response channel for index %d\n", response.Idx)
 			}
