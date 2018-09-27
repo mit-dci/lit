@@ -113,7 +113,7 @@ class LitNode():
         res = self.rpc.Connect(LNAddr=addr)
         self.update_peers()
         if 'PeerIdx' in res and self.peer_mapping[other.lnid] != res['PeerIdx']:
-            raise AssertError("new peer ID doesn't match reported ID")
+            raise AssertionError("new peer ID doesn't match reported ID (%s vs %s)" % (self.peer_mapping[other.lnid], res['PeerIdx']))
         other.update_peers()
 
     def get_peer_id(self, other):
