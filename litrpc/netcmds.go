@@ -25,7 +25,7 @@ func (r *LitRPC) TestLog(arg string, reply *string) error {
 // ------------------------- listen
 
 type ListenArgs struct {
-	Port string
+	Port int
 }
 
 type ListeningPortsReply struct {
@@ -34,8 +34,12 @@ type ListeningPortsReply struct {
 }
 
 func (r *LitRPC) Listen(args ListenArgs, reply *ListeningPortsReply) error {
-	if args.Port == "" {
-		args.Port = ":2448"
+	// this case is covered in lit-af, but in case other clients want to call this
+	// RPC with an empty argument, ints default to 0 but there might be people who
+	// want the computer to do the port assignment. To do it the proper way, they
+	// can call the RPC with port set to -1
+	if args.Port == -1 {
+		args.Port = 2448
 	}
 	_, err := r.Node.TCPListener(args.Port)
 	if err != nil {

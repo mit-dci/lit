@@ -6,13 +6,15 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/logging"
 	"golang.org/x/net/proxy"
-	"net/http"
-	"net/url"
-	"strings"
-	"time"
 )
 
 type announcement struct {
@@ -32,10 +34,11 @@ type nodeinfo struct {
 	}
 }
 
-func Announce(priv *koblitz.PrivateKey, litport string, litadr string, trackerURL string) error {
+func Announce(priv *koblitz.PrivateKey, port int, litadr string, trackerURL string) error {
 	client := &http.Client{
 		Timeout: time.Second * 4, // 4+4 to accomodate the 10s RPC timeout
 	}
+	strport := ":" + strconv.Itoa(port)
 	resp, err := client.Get("https://ipv4.myexternalip.com/raw")
 	if err != nil {
 		return err
@@ -45,7 +48,7 @@ func Announce(priv *koblitz.PrivateKey, litport string, litadr string, trackerUR
 	buf := new(bytes.Buffer)
 	buf.ReadFrom(resp.Body)
 
-	liturlIPv4 := strings.TrimSpace(buf.String()) + litport
+	liturlIPv4 := strings.TrimSpace(buf.String()) + strport
 
 	var liturlIPv6 string
 
@@ -59,7 +62,7 @@ func Announce(priv *koblitz.PrivateKey, litport string, litadr string, trackerUR
 		defer resp.Body.Close()
 		buf = new(bytes.Buffer)
 		buf.ReadFrom(resp.Body)
-		liturlIPv6 = strings.TrimSpace(buf.String()) + litport
+		liturlIPv6 = strings.TrimSpace(buf.String()) + strport
 	}
 
 	urlBytes := []byte(liturlIPv4 + liturlIPv6)

@@ -89,7 +89,6 @@ type ChainHook interface {
 
 // --- implementation of ChainHook interface ----
 
-// Start ...
 func (s *SPVCon) Start(
 	startHeight int32, host, path string, proxyURL string, params *coinparam.Params) (
 	chan lnutil.TxAndHeight, chan int32, error) {
@@ -101,6 +100,8 @@ func (s *SPVCon) Start(
 
 	s.Param = params
 
+	s.inMsgQueue = make(chan wire.Message)
+	s.outMsgQueue = make(chan wire.Message)
 	s.TrackingAdrs = make(map[[20]byte]bool)
 	s.TrackingOPs = make(map[wire.OutPoint]bool)
 
@@ -123,7 +124,6 @@ func (s *SPVCon) Start(
 	err = s.Connect(host)
 	if err != nil {
 		logging.Errorf("Can't connect to host %s\n", host)
-		logging.Error(err)
 		return nil, nil, err
 	}
 

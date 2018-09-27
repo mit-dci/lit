@@ -3,8 +3,8 @@ package lnp2p
 import (
 	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/eventbus"
-	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lncore"
+	"github.com/mit-dci/lit/lndc"
 )
 
 // NewPeerEvent is fired when a new peer is registered.
@@ -46,7 +46,7 @@ func (e PeerDisconnectEvent) Flags() uint8 {
 
 // NewListeningPortEvent .
 type NewListeningPortEvent struct {
-	ListenAddr string
+	ListenPort int
 }
 
 // Name .
@@ -61,8 +61,8 @@ func (e NewListeningPortEvent) Flags() uint8 {
 
 // StopListeningPortEvent .
 type StopListeningPortEvent struct {
-	ListenAddr string
-	Reason     string
+	Port   int
+	Reason string
 }
 
 // Name .

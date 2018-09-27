@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/mit-dci/lit/qln"
 
@@ -76,6 +75,8 @@ func (lc *litAfClient) Graph(textArgs []string) error {
 
 // Lis starts listening.  Takes args of port to listen on.
 func (lc *litAfClient) Lis(textArgs []string) error {
+	var err error
+
 	if len(textArgs) > 0 && textArgs[0] == "-h" {
 		fmt.Fprintf(color.Output, lisCommand.Format)
 		fmt.Fprintf(color.Output, lisCommand.Description)
@@ -85,16 +86,15 @@ func (lc *litAfClient) Lis(textArgs []string) error {
 	args := new(litrpc.ListenArgs)
 	reply := new(litrpc.ListeningPortsReply)
 
-	args.Port = ":2448"
+	args.Port = 2448
 	if len(textArgs) > 0 {
-		if strings.Contains(textArgs[0], ":") {
-			args.Port = textArgs[0]
-		} else {
-			args.Port = ":" + textArgs[0]
+		args.Port, err = strconv.Atoi(textArgs[0])
+		if err != nil {
+			return err
 		}
 	}
 
-	err := lc.Call("LitRPC.Listen", args, reply)
+	err = lc.Call("LitRPC.Listen", args, reply)
 	if err != nil {
 		return err
 	}

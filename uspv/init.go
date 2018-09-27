@@ -7,10 +7,10 @@ import (
 	"net"
 	"os"
 	"strings"
-
-	"github.com/mit-dci/lit/logging"
+	"time"
 
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/wire"
 	"golang.org/x/net/proxy"
 )
@@ -71,11 +71,10 @@ func (s *SPVCon) GetListOfNodes() ([]string, error) {
 }
 
 // DialNode receives a list of node ips and then tries to connect to them one by one.
-func (s *SPVCon) DialNode(listOfNodes []string) (net.Conn, error) {
+func (s *SPVCon) DialNode(listOfNodes []string) error {
 
 	// now have some IPs, go through and try to connect to one.
 	var err error
-	var con net.Conn
 	for i, ip := range listOfNodes {
 		// try to connect to all nodes in this range
 		var conString, conMode string
@@ -90,15 +89,14 @@ func (s *SPVCon) DialNode(listOfNodes []string) (net.Conn, error) {
 
 		if s.ProxyURL != "" {
 			logging.Infof("Attempting to connect via proxy %s", s.ProxyURL)
-			var d proxy.Dialer
-			d, err = proxy.SOCKS5("tcp", s.ProxyURL, nil, proxy.Direct)
+			d, err := proxy.SOCKS5("tcp", s.ProxyURL, nil, proxy.Direct)
 			if err != nil {
-				return nil, err
+				return err
 			}
-
-			con, err = d.Dial(conMode, conString)
+			s.con, err = d.Dial(conMode, conString)
 		} else {
-			con, err = net.Dial(conMode, conString)
+			d := net.Dialer{Timeout: 2 * time.Second}
+			s.con, err = d.Dial(conMode, conString)
 		}
 
 		if err != nil {
@@ -108,17 +106,17 @@ func (s *SPVCon) DialNode(listOfNodes []string) (net.Conn, error) {
 			} else if i == len(listOfNodes)-1 {
 				logging.Error(err)
 				// all nodes have been exhausted, we move on to the next one, if any.
-				return nil, fmt.Errorf(" Tried to connect to all available node Addresses. Failed")
+				return fmt.Errorf(" Tried to connect to all available node Addresses. Failed")
 			}
 		}
 		break
 	}
 
-	if con == nil {
-		return nil, fmt.Errorf("Failed to connect to a coin daemon")
+	if s.con == nil {
+		return fmt.Errorf("Failed to connect to a coin daemon")
 	}
 
-	return con, nil
+	return nil
 }
 
 // Handshake ...
@@ -212,8 +210,8 @@ func (s *SPVCon) Connect(remoteNode string) error {
 	}
 	handShakeFailed := false // need to be in this scope to access it here
 	connEstablished := false
-	for len(listOfNodes) != 0 {
-		s.con, err = s.DialNode(listOfNodes)
+	for len(listOfNodes) != 0 && !connEstablished {
+		err = s.DialNode(listOfNodes)
 		if err != nil {
 			logging.Error(err)
 			logging.Infof("Couldn't dial node %s, Moving on", listOfNodes[0])
@@ -222,23 +220,17 @@ func (s *SPVCon) Connect(remoteNode string) error {
 		}
 		err = s.Handshake(listOfNodes)
 		if err != nil {
+			// spam node or some other problem. Delete node from list and try again
 			handShakeFailed = true
 			logging.Infof("Handshake with %s failed. Moving on. Error: %s", listOfNodes[0], err.Error())
-			if len(listOfNodes) == 1 { // when the list is empty, error out
+			if len(listOfNodes) == 1 { // this is the last node, error out
 				return fmt.Errorf("Couldn't establish connection with any remote node. Exiting.")
 			}
-			// means we either have a sapm node or didn't get a resonse. So we Try again
-			logging.Error(err)
 			logging.Error("Couldn't establish connection with node. Proceeding to the next one")
 			listOfNodes = listOfNodes[1:]
 			connEstablished = false
 		} else {
 			connEstablished = true
-		}
-		if connEstablished { // connection should be established, still checking for safety
-			break
-		} else {
-			continue
 		}
 	}
 
@@ -251,9 +243,7 @@ func (s *SPVCon) Connect(remoteNode string) error {
 		// loop and execute below code, which is unnecessary.
 		return fmt.Errorf("Couldn't establish connection with any remote node after an instance of handshake. Exiting.")
 	}
-	s.inMsgQueue = make(chan wire.Message)
 	go s.incomingMessageHandler()
-	s.outMsgQueue = make(chan wire.Message)
 	go s.outgoingMessageHandler()
 
 	if s.HardMode {

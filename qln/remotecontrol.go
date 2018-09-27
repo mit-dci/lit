@@ -77,7 +77,7 @@ func (nd *LitNode) RemoteControlRequestHandler(msg lnutil.RemoteControlRpcReques
 		if err != nil {
 			return err
 		}
-		outMsg := lnutil.NewRemoteControlRpcResponseMsg(msg.Peer(), msg.Idx, false, resp)
+		outMsg := lnutil.NewRemoteControlRpcResponseMsg(peer.Idx, msg.Idx, false, resp)
 		nd.tmpSendLitMsg(outMsg)
 		return nil
 	}
@@ -88,7 +88,7 @@ func (nd *LitNode) RemoteControlRequestHandler(msg lnutil.RemoteControlRpcReques
 		err = fmt.Errorf("Received remote control request from unauthorized peer: %x", pubKey)
 		logging.Errorf(err.Error())
 
-		outMsg := lnutil.NewRemoteControlRpcResponseMsg(msg.Peer(), msg.Idx, true, []byte("Unauthorized"))
+		outMsg := lnutil.NewRemoteControlRpcResponseMsg(peer.Idx, msg.Idx, true, []byte("Unauthorized"))
 		nd.tmpSendLitMsg(outMsg)
 
 		return err
@@ -199,7 +199,7 @@ func (nd *LitNode) RemoteControlRequestHandler(msg lnutil.RemoteControlRpcReques
 					}
 				}
 
-				outMsg := lnutil.NewRemoteControlRpcResponseMsg(msg.Peer(), msg.Idx, replyIsError, reply)
+				outMsg := lnutil.NewRemoteControlRpcResponseMsg(peer.Idx, msg.Idx, replyIsError, reply)
 				nd.tmpSendLitMsg(outMsg)
 			}
 		}
@@ -213,7 +213,7 @@ func (nd *LitNode) RemoteControlRequestHandler(msg lnutil.RemoteControlRpcReques
 // two regular lit nodes do not talk to each other using remote control. But
 // just in case someone sends us one, we print it out here.
 func (nd *LitNode) RemoteControlResponseHandler(msg lnutil.RemoteControlRpcResponseMsg, peer *RemotePeer) error {
-	logging.Debugf("Received remote control reply from peer %d:\n%s", msg.Peer(), string(msg.Result))
+	logging.Debugf("Received remote control reply from peer %d:\n%s", peer.Idx, string(msg.Result))
 	return nil
 }
 

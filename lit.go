@@ -58,7 +58,7 @@ type litConfig struct { // define a struct for usage with go-flags
 	AutoReconnect                   bool   `long:"autoReconnect" description:"Attempts to automatically reconnect to known peers periodically."`
 	AutoReconnectInterval           int64  `long:"autoReconnectInterval" description:"The interval (in seconds) the reconnect logic should be executed"`
 	AutoReconnectOnlyConnectedCoins bool   `long:"autoReconnectOnlyConnectedCoins" description:"Only reconnect to peers that we have channels with in a coin whose coin daemon is available"`
-	AutoListenPort                  string `long:"autoListenPort" description:"When auto reconnect enabled, starts listening on this port"`
+	AutoListenPort                  int `long:"autoListenPort" description:"When auto reconnect enabled, starts listening on this port"`
 	Params                          *coinparam.Params
 }
 
@@ -71,7 +71,7 @@ var (
 	defaultRpcport                         = uint16(8001)
 	defaultRpchost                         = "localhost"
 	defaultAutoReconnect                   = true
-	defaultAutoListenPort                  = ":2448"
+	defaultAutoListenPort                  = 2448
 	defaultAutoReconnectInterval           = int64(60)
 	defaultUpnPFlag                        = false
 	defaultLogLevel                        = 0
@@ -106,6 +106,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *litConfig) error {
 		p := &coinparam.RegressionNetParams
 		logging.Infof("reg: %s\n", conf.Reghost)
 		resync := false
+		conf.Tip = consts.BitcoinRegtestBHeight
 		if conf.Resync == "reg" {
 			if conf.Tip < consts.BitcoinRegtestBHeight {
 				conf.Tip = consts.BitcoinRegtestBHeight
@@ -122,6 +123,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *litConfig) error {
 	if !lnutil.NopeString(conf.Tn3host) {
 		p := &coinparam.TestNet3Params
 		resync := false
+		conf.Tip = consts.BitcoinTestnet3BHeight
 		if conf.Resync == "tn3" {
 			if conf.Tip < consts.BitcoinTestnet3BHeight {
 				conf.Tip = consts.BitcoinTestnet3BHeight
@@ -139,6 +141,7 @@ func linkWallets(node *qln.LitNode, key *[32]byte, conf *litConfig) error {
 	if !lnutil.NopeString(conf.Litereghost) {
 		p := &coinparam.LiteRegNetParams
 		resync := false
+		conf.Tip = consts.BitcoinRegtestBHeight
 		if conf.Resync == "ltcreg" {
 			if conf.Tip < consts.BitcoinRegtestBHeight {
 				conf.Tip = consts.BitcoinRegtestBHeight // birth heights are the same for btc and ltc regtests
@@ -284,7 +287,8 @@ func main() {
 	// node is up; link wallets based on args
 	err = linkWallets(node, key, &conf)
 	if err != nil {
-		logging.Fatal(err)
+		// if we don't link wallet, we can still continue, no worries.
+		logging.Error(err)
 	}
 
 	rpcl := new(litrpc.LitRPC)
