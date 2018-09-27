@@ -118,13 +118,11 @@ func computeIdentKeyFromRoot(rootkey *hdkeychain.ExtendedKey) (privkey, error) {
 }
 
 // GetPeerIdx is a convenience function for working with older code.
-func (pm *PeerManager) GetPeerIdx(peer *Peer) int32 {
-	for i, p := range pm.peers {
-		if pm.peerMap[p] == peer {
-			return int32(i)
-		}
+func (pm *PeerManager) GetPeerIdx(peer *Peer) uint32 {
+	if peer.idx == nil {
+		return 0
 	}
-	return 0
+	return *peer.idx
 }
 
 // GetPeer returns the peer with the given lnaddr.

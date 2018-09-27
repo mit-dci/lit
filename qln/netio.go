@@ -107,16 +107,18 @@ func (nd *LitNode) tmpSendLitMsg(msg lnutil.LitMsg) {
 
 }
 
+// SimplePeerInfo .
 type SimplePeerInfo struct {
-	PeerNumber int32
+	PeerNumber uint32
 	RemoteHost string
 	Nickname   string
 	LitAdr     string
 }
 
+// GetConnectedPeerList .
 func (nd *LitNode) GetConnectedPeerList() []SimplePeerInfo {
 	peers := make([]SimplePeerInfo, 0)
-	for k, _ := range nd.PeerMap {
+	for k := range nd.PeerMap {
 		spi := SimplePeerInfo{
 			PeerNumber: nd.PeerMan.GetPeerIdx(k),
 			RemoteHost: k.GetRemoteAddr(),
