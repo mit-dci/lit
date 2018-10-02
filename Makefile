@@ -33,7 +33,7 @@ clean:
 	go clean .
 	go clean ./cmd/lit-af
 	rm -rf build/_workspace/
-	rm -f cmd/lit-af/lit-af
+	rm -f lit cmd/lit-af/lit-af lit-af
 
 test tests: lit
 	build/env.sh go test -v ./...
