@@ -97,7 +97,9 @@ class LitNode():
             "--noautolisten"
         ]
         penv = os.environ.copy()
-        penv['LIT_KEYFILE_WARN'] = '0'
+        lkw = 'LIT_KEYFILE_WARN'
+        if lkw not in penv:
+            penv[lkw] = '0'
         self.proc = subprocess.Popen(args,
             stdin=subprocess.DEVNULL,
             stdout=outputredir,
