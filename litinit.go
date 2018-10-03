@@ -71,11 +71,8 @@ func litSetup(conf *litConfig) *[32]byte {
 		}
 	}
 
-	if _, err := os.Stat(filepath.Join(filepath.Join(conf.LitHomeDir), "lit.conf")); os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(conf.LitHomeDir, "lit.conf")); os.IsNotExist(err) {
 		// if there is no config file found over at the directory, create one
-		if err != nil {
-			fmt.Println(err)
-		}
 		logging.Infof("Creating a new config file")
 		err := createDefaultConfigFile(filepath.Join(conf.LitHomeDir)) // Source of error
 		if err != nil {
@@ -83,7 +80,7 @@ func litSetup(conf *litConfig) *[32]byte {
 		}
 	}
 
-	conf.ConfigFile = filepath.Join(filepath.Join(conf.LitHomeDir), "lit.conf")
+	conf.ConfigFile = filepath.Join(conf.LitHomeDir, "lit.conf")
 	// lets parse the config file provided, if any
 	err = flags.NewIniParser(parser).ParseFile(conf.ConfigFile)
 	if err != nil {
