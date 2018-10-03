@@ -576,7 +576,11 @@ func (nd *LitNode) PopulateRates() error {
 
 	jsonFile, err := os.Open(ratesPath)
 	if err != nil {
-		return err
+		if !os.IsNotExist(err) {
+			return err
+		}
+		logging.Infof("Rates file not found.")
+		return nil
 	}
 	defer jsonFile.Close()
 
