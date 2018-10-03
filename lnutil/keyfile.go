@@ -60,9 +60,12 @@ func LoadKeyFromFileArg(filename string, pass []byte) (*[32]byte, error) {
 	}
 
 	if len(enckey) == 32 { // UNencrypted key, length 32
-		logging.Warnf("WARNING!! Key file not encrypted!!\n")
-		logging.Warnf("Anyone who can read the key file can take everything!\n")
-		logging.Warnf("You should start over and use a good passphrase!\n")
+		v, p := os.LookupEnv("LIT_KEYFILE_WARN")
+		if !p || v != "0" {
+			logging.Warnf("WARNING!! Key file not encrypted!!\n")
+			logging.Warnf("Anyone who can read the key file can take everything!\n")
+			logging.Warnf("You should start over and use a good passphrase!\n")
+		}
 		copy(priv32[:], enckey[:])
 		return priv32, nil
 	}
