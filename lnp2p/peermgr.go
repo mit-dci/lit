@@ -27,10 +27,11 @@ type pubkey *koblitz.PublicKey
 type PeerManager struct {
 
 	// Biographical.
-	idkey  privkey
-	peerdb lncore.LitPeerStorage
-	ebus   *eventbus.EventBus
-	mproc  MessageProcessor
+	idkey   privkey
+	peerdb  lncore.LitPeerStorage
+	ebus    *eventbus.EventBus
+	mproc   MessageProcessor
+	crouter CallRouter
 
 	// Peer tracking.
 	peers   []lncore.LnAddr // compatibility
@@ -73,6 +74,7 @@ func NewPeerManager(rootkey *hdkeychain.ExtendedKey, pdb lncore.LitPeerStorage, 
 		peerdb:         pdb,
 		ebus:           bus,
 		mproc:          NewMessageProcessor(),
+		crouter:        NewCallRouter(),
 		peers:          make([]lncore.LnAddr, 1),
 		peerMap:        map[lncore.LnAddr]*Peer{},
 		listeningPorts: map[int]*listeningthread{},

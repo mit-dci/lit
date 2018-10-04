@@ -1,6 +1,8 @@
 package lnp2p
 
 import (
+	"fmt"
+
 	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/lncore"
 	"github.com/mit-dci/lit/lndc"
@@ -106,5 +108,65 @@ func (p *Peer) IntoPeerInfo() lncore.PeerInfo {
 		LnAddr:   &p.lnaddr,
 		Nickname: p.nickname,
 		NetAddr:  &raddr,
+	}
+}
+
+const defaulttimeout = 60000 // 1 minute
+
+// InvokeAsyncCall sends a call to the peer, returning immediately and passing
+// the response to the callback.
+func (p *Peer) InvokeAsyncCall(arg PeerCallMessage, callback PeerCallback) error {
+	return p.pmgr.crouter.initInvokeCall(p, defaulttimeout, arg, callback, nil)
+}
+
+// InvokeAsyncCallTimeout sends a call to the peer, returning immediately and passing
+// the response to the callback, with a timeout condition.
+func (p *Peer) InvokeAsyncCallTimeout(arg PeerCallMessage, callback PeerCallback, tout uint64, tohandler PeerTimeoutHandler) error {
+	return p.pmgr.crouter.initInvokeCall(p, tout, arg, callback, tohandler)
+}
+
+// InvokeBlockingCall sends a call to the peer, waiting for a response or
+// waiting until a timeout.
+func (p *Peer) InvokeBlockingCall(arg PeerCallMessage, timeout uint64) (PeerCallMessage, error) {
+
+	// Set up some structuring to wait until the remote call returns or times out.
+	resc := make(chan PeerCallMessage)
+	toc := make(chan error)
+
+	cb := func(pcm PeerCallMessage, perr error, rerr error) (bool, error) {
+		// If we got a good message, then just pass it along.
+		if pcm != nil {
+			resc <- pcm
+		}
+
+		// Basically, just pass through whichever thing was an error.
+		if perr != nil {
+			toc <- perr
+		} else if rerr != nil {
+			toc <- rerr
+		}
+
+		// This should always be fine because the "error" here is only for the context
+		// of the actual *handling* of the function.
+		return true, nil
+	}
+
+	// Very simple, and the actual work of the timeout is handled for us already.
+	th := func() {
+		toc <- fmt.Errorf("peer call timed out")
+	}
+
+	// This is where all the cool stuff happens and sends off the call to the remote peer.
+	err := p.pmgr.crouter.initInvokeCall(p, timeout, arg, cb, th)
+	if err != nil {
+		return nil, err
+	}
+
+	// Now this is where we figure out what we're actually returning.
+	select {
+	case r := <-resc:
+		return r, nil
+	case t := <-toc:
+		return nil, t
 	}
 }
