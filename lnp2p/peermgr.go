@@ -463,4 +463,19 @@ func (pm *PeerManager) SetupFunctionalMessageHandling() {
 		return pm.crouter.processErrorResponse(p, em)
 	})
 
+	cr := pm.GetCallRouter()
+
+	// Set up a "ping" message.
+	cr.DefineFunction(0xff00, "pingpong", ParsePing, ParsePong, func(p *Peer, m PeerCallMessage) (PeerCallMessage, error) {
+		ping := m.(PcPing)
+
+		// If it's long, then we can use this as a test to for error handling.
+		if len(ping.buf) > 255 {
+			return nil, fmt.Errorf("ping body too long")
+		}
+
+		logging.Infof("Received ping call from peer %s: %v\n", p.GetPrettyName(), ping.buf)
+		return PcPong{ping.buf}, nil
+	})
+
 }

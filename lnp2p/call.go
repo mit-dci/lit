@@ -182,7 +182,7 @@ func (cr *CallRouter) processCall(peer *Peer, msg Message) error {
 		}
 
 		// We're not supposed to have responses have a type of a regular fnid, but just warn on it.
-		if res.FuncID() >= 0x00f0 && res.FuncID() != 0xffff {
+		if res.FuncID() >= 0x0010 && res.FuncID() != 0xffff {
 			logging.Warnf("callrouter: response to %s returning with response fnid out of normal range (%4x)\n", fnh.name, res.FuncID())
 		}
 
@@ -273,7 +273,7 @@ func (cr *CallRouter) DefineFunction(fnid uint16, name string, mparser PcParser,
 	cr.mtx.Lock()
 	defer cr.mtx.Unlock()
 
-	if fnid < 0x00f0 || fnid == 0xffff {
+	if fnid < 0x0010 || fnid == 0xffff {
 		return fmt.Errorf("function ID must be >=0x00f0 and !=0xffff, special values are used for signalling")
 	}
 

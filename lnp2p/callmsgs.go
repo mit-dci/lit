@@ -213,3 +213,51 @@ func ParseErrMessage(buf []byte) (Message, error) {
 func (errmsg) Type() uint8 {
 	return MsgidError
 }
+
+// PcPing .
+type PcPing struct {
+	buf []byte
+}
+
+func NewPingMsg(buf []byte) PcPing {
+	return PcPing{buf}
+}
+
+// Bytes .
+func (p PcPing) Bytes() []byte {
+	return p.buf
+}
+
+// FuncID .
+func (PcPing) FuncID() uint16 {
+	return 0xff00
+}
+
+// PcPong .
+type PcPong struct {
+	buf []byte
+}
+
+// Bytes .
+func (p PcPong) Bytes() []byte {
+	return p.buf
+}
+
+// FuncID .
+func (PcPong) FuncID() uint16 {
+	return 0xffff
+}
+
+func (p PcPong) GetBody() []byte {
+	return p.buf
+}
+
+// ParsePing is for deserializing a buffer into a ping message.
+func ParsePing(buf []byte) (PeerCallMessage, error) {
+	return PcPing{buf}, nil
+}
+
+// ParsePong is for deserializing a buffer into a pong message.
+func ParsePong(buf []byte) (PeerCallMessage, error) {
+	return PcPong{buf}, nil
+}
