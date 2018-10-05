@@ -1,22 +1,11 @@
 package lnp2p
 
 import (
-	"bytes"
-	"encoding/binary"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/mit-dci/lit/logging"
-)
-
-const (
-
-	// MsgidCall is the id for calling.
-	MsgidCall = 0xC0
-
-	// MsgidResponse is the id for responses.
-	MsgidResponse = 0xC1
 )
 
 // PeerCallMessage is a serialized version of what the remote peer send.
@@ -62,64 +51,9 @@ func NewCallRouter() CallRouter {
 	}
 }
 
-type callmsg struct {
-	id     uint32
-	funcID uint16
-	body   []byte
-}
-
-func (m callmsg) Bytes() []byte {
-
-	w := bytes.Buffer{}
-
-	// Write the call ID and message type
-	binary.Write(&w, binary.BigEndian, m.id)
-	binary.Write(&w, binary.BigEndian, m.funcID)
-
-	// Write the body len
-	blen := uint32(len(m.body))
-	binary.Write(&w, binary.BigEndian, blen)
-
-	// Write the body.
-	w.Write(m.body)
-
-	return w.Bytes()
-
-}
-
-func (callmsg) Type() uint8 {
-	return MsgidCall
-}
-
-type respmsg struct {
-	id   uint32
-	body []byte
-}
-
-func (m respmsg) Bytes() []byte {
-
-	w := bytes.Buffer{}
-
-	// Write the call ID
-	binary.Write(&w, binary.BigEndian, m.id)
-
-	// Write the body len
-	blen := uint32(len(m.body))
-	binary.Write(&w, binary.BigEndian, blen)
-
-	// Write the body.
-	w.Write(m.body)
-
-	return w.Bytes()
-
-}
-
-func (respmsg) Type() uint8 {
-	return MsgidResponse
-}
-
 // PeerCallback is the function that's called when we got a response to a messsage.
-type PeerCallback func(PeerCallMessage, error, error) (bool, error)
+// (inbound message, remote error) -> (delete, processing error)
+type PeerCallback func(PeerCallMessage, error) (bool, error)
 
 // PeerTimeoutHandler is the function called when we timed out.
 type PeerTimeoutHandler func()
@@ -140,7 +74,6 @@ type callinprogress struct {
 
 	// what we pass the parsed message to
 	// if the bool in the reponse is false, then don't consider the call "complete"
-	// (inbound message, parse error, network error) -> (delete, processing error)
 	callback PeerCallback
 
 	// if we exceed the timeout and haven't been sent any messages then run this before removing the entry
@@ -181,14 +114,15 @@ func (cr *CallRouter) initInvokeCall(peer *Peer, timeout uint64, call PeerCallMe
 	cr.mtx.Unlock()
 
 	// Spin off a thread to wait for the timeout.
+	dur := time.Duration(cip.timeout) * time.Millisecond
 	if toh != nil {
 		go (func() {
 			select {
 			case ok := <-cip.ok:
 				if !ok {
-					logging.Warnf("something bad happened!") // TODO more detials
+					logging.Warnf("callrouter: expected true when skipping call timeout, got false") // TODO more detials
 				}
-			case <-time.After(time.Duration(cip.timeout) * time.Millisecond):
+			case <-time.After(dur):
 				toh()
 			}
 		})()
@@ -226,7 +160,12 @@ func (cr *CallRouter) processCall(peer *Peer, msg Message) error {
 	go (func() {
 		res, err := fnh.callFunction(peer, m)
 		if err != nil {
-			// TODO
+			// There was an error, just return it as a string.
+			peer.SendQueuedMessage(errmsg{
+				id:     id,
+				errmsg: err.Error(),
+			})
+			return
 		}
 
 		if res.FuncID() < 0x00f0 || res.FuncID() == 0xffff {
@@ -244,23 +183,70 @@ func (cr *CallRouter) processCall(peer *Peer, msg Message) error {
 	return nil
 }
 
-func (cr *CallRouter) processResponse(peer *Peer, msg Message) error {
-
-	cmsg, ok := msg.(respmsg)
-	if !ok {
-		return fmt.Errorf("bad message type")
-	}
+func (cr *CallRouter) processReturnResponse(peer *Peer, cmsg respmsg) error {
 
 	cr.mtx.Lock()
-	_, ok = cr.inprog[cmsg.id]
+
+	// Pick out the message from the in-progress call set.
+	ip, ok := cr.inprog[cmsg.id]
 	if !ok {
-		return fmt.Errorf("message ID doesn't match any in-progress call")
+		cr.mtx.Unlock()
+		return fmt.Errorf("callrouter: message ID doesn't match any in-progress call")
 	}
+
+	// now delete it from the map because it's returned.
+	delete(cr.inprog, cmsg.id)
+
 	cr.mtx.Unlock()
 
-	// TODO the rest of the handling
+	// Tell the waiter for the timeout that it's all ok now.
+	ip.ok <- true
+
+	// Parse it, hopefully.
+	pcm, err := ip.messageParser(cmsg.body)
+	if err != nil {
+		logging.Warnf("callrouter: problem parsing call %d: %s\n", cmsg.id, err.Error())
+		return err
+	}
+
+	// Now actually invoke the call if it's successful.
+	_, err = ip.callback(pcm, nil) // TODO support repeated returns later
+	if err != nil {
+		logging.Warnf("callrouter: problem when processing callback to %d: %s\n", cmsg.id, err.Error())
+	}
 
 	return nil
+
+}
+
+func (cr *CallRouter) processErrorResponse(peer *Peer, emsg errmsg) error {
+
+	cr.mtx.Lock()
+
+	// Pick out the message from the in-progress call set.
+	ip, ok := cr.inprog[emsg.id]
+	if !ok {
+		cr.mtx.Unlock()
+		return fmt.Errorf("callrouter: error message ID doesn't match any in-progress call")
+	}
+
+	// now delete it from the map because it's returned.
+	delete(cr.inprog, emsg.id)
+
+	cr.mtx.Unlock()
+
+	// Tell the waiter for the timeout that it's all ok now.
+	ip.ok <- true
+
+	// Now actually invoke the call.
+	logging.Warnf("callrouter: error on call %d to remote peer: %s\n", emsg.id, emsg.errmsg)
+	_, err := ip.callback(nil, fmt.Errorf(emsg.errmsg)) // TODO support repeated returns later
+	if err != nil {
+		logging.Warnf("callrouter: problem when processing (error) callback to %d: %s\n", emsg.id, err.Error())
+	}
+
+	return nil
+
 }
 
 // DefineFunction sets up implementation for some P2P call.
@@ -269,7 +255,7 @@ func (cr *CallRouter) DefineFunction(fnid uint16, mparser PcParser, impl PcFunct
 	defer cr.mtx.Unlock()
 
 	if fnid < 0x00f0 || fnid == 0xffff {
-		return fmt.Errorf("function ID must be >=0x00f0 and !=0xffff, special values are used for signalling")
+		return fmt.Errorf("callrouter: function ID must be >=0x00f0 and !=0xffff, special values are used for signalling")
 	}
 
 	// Just add it to the table, pretty easy.

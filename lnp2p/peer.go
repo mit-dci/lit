@@ -115,14 +115,14 @@ const defaulttimeout = 60000 // 1 minute
 
 // InvokeAsyncCall sends a call to the peer, returning immediately and passing
 // the response to the callback.
-func (p *Peer) InvokeAsyncCall(arg PeerCallMessage, callback PeerCallback) error {
-	return p.pmgr.crouter.initInvokeCall(p, defaulttimeout, arg, callback, nil)
+func (p *Peer) InvokeAsyncCall(arg PeerCallMessage, callback func(PeerCallMessage, error) (bool, error)) error {
+	return p.pmgr.crouter.initInvokeCall(p, defaulttimeout, arg, PeerCallback(callback), nil)
 }
 
 // InvokeAsyncCallTimeout sends a call to the peer, returning immediately and passing
 // the response to the callback, with a timeout condition.
-func (p *Peer) InvokeAsyncCallTimeout(arg PeerCallMessage, callback PeerCallback, tout uint64, tohandler PeerTimeoutHandler) error {
-	return p.pmgr.crouter.initInvokeCall(p, tout, arg, callback, tohandler)
+func (p *Peer) InvokeAsyncCallTimeout(arg PeerCallMessage, tout uint64, callback func(PeerCallMessage, error) (bool, error), tohandler func()) error {
+	return p.pmgr.crouter.initInvokeCall(p, tout, arg, PeerCallback(callback), PeerTimeoutHandler(tohandler))
 }
 
 // InvokeBlockingCall sends a call to the peer, waiting for a response or
@@ -131,19 +131,17 @@ func (p *Peer) InvokeBlockingCall(arg PeerCallMessage, timeout uint64) (PeerCall
 
 	// Set up some structuring to wait until the remote call returns or times out.
 	resc := make(chan PeerCallMessage)
-	toc := make(chan error)
+	errc := make(chan error)
 
-	cb := func(pcm PeerCallMessage, perr error, rerr error) (bool, error) {
+	cb := func(pcm PeerCallMessage, err error) (bool, error) {
 		// If we got a good message, then just pass it along.
 		if pcm != nil {
 			resc <- pcm
 		}
 
 		// Basically, just pass through whichever thing was an error.
-		if perr != nil {
-			toc <- perr
-		} else if rerr != nil {
-			toc <- rerr
+		if err != nil {
+			errc <- err
 		}
 
 		// This should always be fine because the "error" here is only for the context
@@ -153,11 +151,11 @@ func (p *Peer) InvokeBlockingCall(arg PeerCallMessage, timeout uint64) (PeerCall
 
 	// Very simple, and the actual work of the timeout is handled for us already.
 	th := func() {
-		toc <- fmt.Errorf("peer call timed out")
+		errc <- fmt.Errorf("peer call timed out")
 	}
 
 	// This is where all the cool stuff happens and sends off the call to the remote peer.
-	err := p.pmgr.crouter.initInvokeCall(p, timeout, arg, cb, th)
+	err := p.pmgr.crouter.initInvokeCall(p, timeout, arg, PeerCallback(cb), PeerTimeoutHandler(th))
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +164,7 @@ func (p *Peer) InvokeBlockingCall(arg PeerCallMessage, timeout uint64) (PeerCall
 	select {
 	case r := <-resc:
 		return r, nil
-	case t := <-toc:
+	case t := <-errc:
 		return nil, t
 	}
 }
