@@ -3,6 +3,7 @@ package lnp2p
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 )
 
 const (
@@ -42,6 +43,48 @@ func (m callmsg) Bytes() []byte {
 
 }
 
+// ParseCallMessage parses a callmsg from bytes.
+func ParseCallMessage(buf []byte) (Message, error) {
+
+	var err error
+	res := callmsg{}
+	r := bytes.NewBuffer(buf)
+
+	// Read the message ID
+	err = binary.Read(r, binary.BigEndian, &res.id)
+	if err != nil {
+		return nil, err
+	}
+
+	// Read the fnid
+	err = binary.Read(r, binary.BigEndian, &res.funcID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Now do a dance to read the message body.
+	var blen uint32
+	err = binary.Read(r, binary.BigEndian, &blen)
+	if err != nil {
+		return nil, err
+	}
+
+	body := make([]byte, blen)
+	n, err := r.Read(body)
+	if err != nil {
+		return nil, err
+	}
+
+	if n != int(blen) {
+		return nil, fmt.Errorf("unexpected EOF")
+	}
+
+	res.body = body
+
+	return res, nil
+
+}
+
 func (callmsg) Type() uint8 {
 	return MsgidCall
 }
@@ -69,13 +112,49 @@ func (m respmsg) Bytes() []byte {
 
 }
 
+// ParseRespMessage parses a respmsg from bytes.
+func ParseRespMessage(buf []byte) (Message, error) {
+
+	var err error
+	res := respmsg{}
+	r := bytes.NewBuffer(buf)
+
+	// Read the message (response) ID
+	err = binary.Read(r, binary.BigEndian, &res.id)
+	if err != nil {
+		return nil, err
+	}
+
+	// Read the body with some magic.
+	var blen uint32
+	err = binary.Read(r, binary.BigEndian, &blen)
+	if err != nil {
+		return nil, err
+	}
+
+	body := make([]byte, blen)
+	n, err := r.Read(body)
+	if err != nil {
+		return nil, err
+	}
+
+	if n != int(blen) {
+		return nil, fmt.Errorf("unexpected EOF")
+	}
+
+	res.body = body
+
+	return res, nil
+
+}
+
 func (respmsg) Type() uint8 {
 	return MsgidResponse
 }
 
 type errmsg struct {
-	id     uint32
-	errmsg string // maybe this should be richer?  does it matter?
+	id  uint32
+	msg string // maybe this should be richer?  does it matter?
 }
 
 func (m errmsg) Bytes() []byte {
@@ -86,12 +165,48 @@ func (m errmsg) Bytes() []byte {
 	binary.Write(&w, binary.BigEndian, m.id)
 
 	// Write the message len.
-	binary.Write(&w, binary.BigEndian, uint16(len(m.errmsg)))
+	binary.Write(&w, binary.BigEndian, uint16(len(m.msg)))
 
 	// Write the message.
-	w.WriteString(m.errmsg)
+	w.Write([]byte(m.msg))
 
 	return w.Bytes()
+
+}
+
+// ParseErrMessage parses a errmsg from bytes.
+func ParseErrMessage(buf []byte) (Message, error) {
+
+	var err error
+	res := errmsg{}
+	r := bytes.NewBuffer(buf)
+
+	// Read the (response) ID
+	err = binary.Read(r, binary.BigEndian, &res.id)
+	if err != nil {
+		return nil, err
+	}
+
+	// More magic to read the error message.
+	var mlen uint32
+	err = binary.Read(r, binary.BigEndian, &mlen)
+	if err != nil {
+		return nil, err
+	}
+
+	body := make([]byte, mlen)
+	n, err := r.Read(body)
+	if err != nil {
+		return nil, err
+	}
+
+	if n != int(mlen) {
+		return nil, fmt.Errorf("unexpected EOF")
+	}
+
+	res.msg = string(body) // apparently this "just werks"
+
+	return res, nil
 
 }
 

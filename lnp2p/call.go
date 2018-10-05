@@ -152,8 +152,8 @@ func (cr *CallRouter) processCall(peer *Peer, msg Message) error {
 	if !ok {
 		logging.Warnf("callrouter: peer %s tried to call a function we don't know %4x\n", peer.GetPrettyName(), id)
 		peer.SendQueuedMessage(errmsg{
-			id:     id,
-			errmsg: "function ID not found",
+			id:  id,
+			msg: "function ID not found",
 		})
 		return fmt.Errorf("unknown message ID")
 	}
@@ -161,8 +161,8 @@ func (cr *CallRouter) processCall(peer *Peer, msg Message) error {
 	m, err := fnh.parser(cmsg.body)
 	if err != nil {
 		peer.SendQueuedMessage(errmsg{
-			id:     id,
-			errmsg: fmt.Sprintf("parse error: %s", err.Error()),
+			id:  id,
+			msg: fmt.Sprintf("parse error: %s", err.Error()),
 		})
 		return err
 	}
@@ -172,8 +172,8 @@ func (cr *CallRouter) processCall(peer *Peer, msg Message) error {
 		if err != nil {
 			// There was an error, just return it as a string.
 			peer.SendQueuedMessage(errmsg{
-				id:     id,
-				errmsg: err.Error(),
+				id:  id,
+				msg: err.Error(),
 			})
 			return
 		}
@@ -249,8 +249,8 @@ func (cr *CallRouter) processErrorResponse(peer *Peer, emsg errmsg) error {
 	ip.ok <- true
 
 	// Now actually invoke the call.
-	logging.Warnf("callrouter: error on call %d to remote peer: %s\n", emsg.id, emsg.errmsg)
-	_, err := ip.callback(nil, fmt.Errorf(emsg.errmsg)) // TODO support repeated returns later
+	logging.Warnf("callrouter: error on call %d to remote peer: %s\n", emsg.id, emsg.msg)
+	_, err := ip.callback(nil, fmt.Errorf(emsg.msg)) // TODO support repeated returns later
 	if err != nil {
 		logging.Warnf("callrouter: problem when processing (error) callback to %d: %s\n", emsg.id, err.Error())
 	}

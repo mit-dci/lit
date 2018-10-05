@@ -428,3 +428,31 @@ func (pm *PeerManager) queueMessageToPeer(peer *Peer, msg Message, ec *chan erro
 	pm.outqueue <- outgoingmsg{peer, &msg, ec}
 	return nil
 }
+
+// SetupFunctionalMessageHandling sets up messages for having a CallRouter.
+func (pm *PeerManager) SetupFunctionalMessageHandling() {
+
+	mp := pm.GetMessageProcessor()
+
+	// Register (trivially) call handling.
+	mp.DefineMessage(MsgidCall, ParseCallMessage, pm.crouter.processCall)
+
+	// Register response handling.
+	mp.DefineMessage(MsgidResponse, ParseRespMessage, func(p *Peer, m Message) error {
+		rm, ok := m.(respmsg)
+		if !ok {
+			return fmt.Errorf("bad message type")
+		}
+		return pm.crouter.processReturnResponse(p, rm)
+	})
+
+	// Register error handling.
+	mp.DefineMessage(MsgidResponse, ParseRespMessage, func(p *Peer, m Message) error {
+		em, ok := m.(errmsg)
+		if !ok {
+			return fmt.Errorf("bad message type")
+		}
+		return pm.crouter.processErrorResponse(p, em)
+	})
+
+}
