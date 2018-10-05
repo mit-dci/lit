@@ -22,6 +22,7 @@ type PcParser func([]byte) (PeerCallMessage, error)
 type PcFunction func(*Peer, PeerCallMessage) (PeerCallMessage, error) // should we make the result have a different type?
 
 type peercallhandlerdef struct {
+	name         string
 	parser       PcParser
 	callFunction PcFunction
 }
@@ -149,12 +150,21 @@ func (cr *CallRouter) processCall(peer *Peer, msg Message) error {
 
 	// Check that we actually found one.
 	if !ok {
-		// TODO Figure out what to do if we don't have a handler set up.
+		logging.Warnf("callrouter: peer %s tried to call a function we don't know %4x\n", peer.GetPrettyName(), id)
+		peer.SendQueuedMessage(errmsg{
+			id:     id,
+			errmsg: "function ID not found",
+		})
+		return fmt.Errorf("unknown message ID")
 	}
 
 	m, err := fnh.parser(cmsg.body)
 	if err != nil {
-		return err // TODO Better error handling for this.
+		peer.SendQueuedMessage(errmsg{
+			id:     id,
+			errmsg: fmt.Sprintf("parse error: %s", err.Error()),
+		})
+		return err
 	}
 
 	go (func() {
@@ -168,16 +178,16 @@ func (cr *CallRouter) processCall(peer *Peer, msg Message) error {
 			return
 		}
 
-		if res.FuncID() < 0x00f0 || res.FuncID() == 0xffff {
-			// Actually send off the response here.
-			peer.SendQueuedMessage(respmsg{
-				id:   id,
-				body: res.Bytes(),
-			})
-		} else {
-			// It thinks it's some other call, that's wrong.
-			// TODO
+		// We're not supposed to have responses have a type of a regular fnid, but just warn on it.
+		if res.FuncID() >= 0x00f0 && res.FuncID() != 0xffff {
+			logging.Warnf("callrouter: response to %s returning with response fnid out of normal range (%4x)\n", fnh.name, res.FuncID())
 		}
+
+		// Still send it off.
+		peer.SendQueuedMessage(respmsg{
+			id:   id,
+			body: res.Bytes(),
+		})
 	})()
 
 	return nil
@@ -250,7 +260,7 @@ func (cr *CallRouter) processErrorResponse(peer *Peer, emsg errmsg) error {
 }
 
 // DefineFunction sets up implementation for some P2P call.
-func (cr *CallRouter) DefineFunction(fnid uint16, mparser PcParser, impl PcFunction) error {
+func (cr *CallRouter) DefineFunction(fnid uint16, name string, mparser PcParser, impl PcFunction) error {
 	cr.mtx.Lock()
 	defer cr.mtx.Unlock()
 
@@ -260,6 +270,7 @@ func (cr *CallRouter) DefineFunction(fnid uint16, mparser PcParser, impl PcFunct
 
 	// Just add it to the table, pretty easy.
 	cr.fnhandlers[fnid] = peercallhandlerdef{
+		name:         name,
 		parser:       mparser,
 		callFunction: impl,
 	}
