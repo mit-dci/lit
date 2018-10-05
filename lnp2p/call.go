@@ -23,7 +23,8 @@ type PcFunction func(*Peer, PeerCallMessage) (PeerCallMessage, error) // should 
 
 type peercallhandlerdef struct {
 	name         string
-	parser       PcParser
+	mparser      PcParser
+	rparser      PcParser
 	callFunction PcFunction
 }
 
@@ -61,6 +62,9 @@ type PeerTimeoutHandler func()
 
 type callinprogress struct {
 
+	// function id originally called
+	fnid uint16
+
 	// millis time for when it started
 	started uint64
 
@@ -97,7 +101,6 @@ func (cr *CallRouter) initInvokeCall(peer *Peer, timeout uint64, call PeerCallMe
 		started:        makeTimestamp(),
 		timeout:        timeout,
 		ok:             make(chan bool),
-		messageParser:  nil, // TODO
 		callback:       cb,
 		timeoutHandler: toh,
 	}
@@ -105,7 +108,7 @@ func (cr *CallRouter) initInvokeCall(peer *Peer, timeout uint64, call PeerCallMe
 	// Create the actual message to send off to the remote peer.
 	m := callmsg{
 		id:     cid,
-		funcID: call.FuncID(), // TODO
+		funcID: call.FuncID(),
 		body:   call.Bytes(),
 	}
 
@@ -158,7 +161,7 @@ func (cr *CallRouter) processCall(peer *Peer, msg Message) error {
 		return fmt.Errorf("unknown message ID")
 	}
 
-	m, err := fnh.parser(cmsg.body)
+	m, err := fnh.mparser(cmsg.body)
 	if err != nil {
 		peer.SendQueuedMessage(errmsg{
 			id:  id,
@@ -204,6 +207,8 @@ func (cr *CallRouter) processReturnResponse(peer *Peer, cmsg respmsg) error {
 		return fmt.Errorf("callrouter: message ID doesn't match any in-progress call")
 	}
 
+	fnh := cr.fnhandlers[ip.fnid] // lookup should always succeed
+
 	// now delete it from the map because it's returned.
 	delete(cr.inprog, cmsg.id)
 
@@ -213,16 +218,18 @@ func (cr *CallRouter) processReturnResponse(peer *Peer, cmsg respmsg) error {
 	ip.ok <- true
 
 	// Parse it, hopefully.
-	pcm, err := ip.messageParser(cmsg.body)
+	pcm, err := fnh.rparser(cmsg.body)
 	if err != nil {
 		logging.Warnf("callrouter: problem parsing call %d: %s\n", cmsg.id, err.Error())
 		return err
 	}
 
-	// Now actually invoke the call if it's successful.
-	_, err = ip.callback(pcm, nil) // TODO support repeated returns later
-	if err != nil {
-		logging.Warnf("callrouter: problem when processing callback to %d: %s\n", cmsg.id, err.Error())
+	if ip.callback != nil {
+		// Now actually invoke the call if it's successful.
+		_, err = ip.callback(pcm, nil) // TODO support repeated returns later
+		if err != nil {
+			logging.Warnf("callrouter: problem when processing callback to %d: %s\n", cmsg.id, err.Error())
+		}
 	}
 
 	return nil
@@ -250,9 +257,11 @@ func (cr *CallRouter) processErrorResponse(peer *Peer, emsg errmsg) error {
 
 	// Now actually invoke the call.
 	logging.Warnf("callrouter: error on call %d to remote peer: %s\n", emsg.id, emsg.msg)
-	_, err := ip.callback(nil, fmt.Errorf(emsg.msg)) // TODO support repeated returns later
-	if err != nil {
-		logging.Warnf("callrouter: problem when processing (error) callback to %d: %s\n", emsg.id, err.Error())
+	if ip.callback != nil {
+		_, err := ip.callback(nil, fmt.Errorf(emsg.msg)) // TODO support repeated returns later
+		if err != nil {
+			logging.Warnf("callrouter: problem when processing (error) callback to %d: %s\n", emsg.id, err.Error())
+		}
 	}
 
 	return nil
@@ -260,18 +269,23 @@ func (cr *CallRouter) processErrorResponse(peer *Peer, emsg errmsg) error {
 }
 
 // DefineFunction sets up implementation for some P2P call.
-func (cr *CallRouter) DefineFunction(fnid uint16, name string, mparser PcParser, impl PcFunction) error {
+func (cr *CallRouter) DefineFunction(fnid uint16, name string, mparser PcParser, rparser PcParser, impl PcFunction) error {
 	cr.mtx.Lock()
 	defer cr.mtx.Unlock()
 
 	if fnid < 0x00f0 || fnid == 0xffff {
-		return fmt.Errorf("callrouter: function ID must be >=0x00f0 and !=0xffff, special values are used for signalling")
+		return fmt.Errorf("function ID must be >=0x00f0 and !=0xffff, special values are used for signalling")
+	}
+
+	if mparser == nil {
+		return fmt.Errorf("message parser cannot be nil")
 	}
 
 	// Just add it to the table, pretty easy.
 	cr.fnhandlers[fnid] = peercallhandlerdef{
 		name:         name,
-		parser:       mparser,
+		mparser:      mparser,
+		rparser:      rparser,
 		callFunction: impl,
 	}
 
