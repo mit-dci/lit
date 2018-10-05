@@ -87,9 +87,17 @@ func NewPeerManager(rootkey *hdkeychain.ExtendedKey, pdb lncore.LitPeerStorage, 
 	return pm, nil
 }
 
-// GetMessageProcessor gets the message processor for this peer manager that's passed incoming messasges from peers.
+// GetMessageProcessor gets the message processor for this peer manager that's
+// passed incoming messasges from peers.
 func (pm *PeerManager) GetMessageProcessor() *MessageProcessor {
 	return &pm.mproc
+}
+
+// GetCallRouter returns the functional p2p call router for the peer manager.
+// But you must call pm.SetupFunctionalMessageHandling() first for it to be
+// useful though.
+func (pm *PeerManager) GetCallRouter() *CallRouter {
+	return &pm.crouter
 }
 
 // GetExternalAddress returns the human-readable LN address
