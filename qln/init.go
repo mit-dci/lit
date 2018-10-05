@@ -76,6 +76,7 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 
 	// Sets up handlers for all the messages we need to handle.
 	nd.registerHandlers()
+	nd.PeerMan.SetupFunctionalMessageHandling()
 
 	var kg portxo.KeyGen
 	kg.Depth = 5
