@@ -232,7 +232,7 @@ func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, set
 	}
 
 	pnick := ""
-	if pi != nil {
+	if pi != nil && pi.Nickname != nil {
 		pnick = *pi.Nickname
 	}
 
@@ -449,16 +449,16 @@ func (pm *PeerManager) SetupFunctionalMessageHandling() {
 	mp.DefineMessage(MsgidResponse, ParseRespMessage, func(p *Peer, m Message) error {
 		rm, ok := m.(respmsg)
 		if !ok {
-			return fmt.Errorf("bad message type")
+			return fmt.Errorf("bad peercall message type (resp)")
 		}
 		return pm.crouter.processReturnResponse(p, rm)
 	})
 
 	// Register error handling.
-	mp.DefineMessage(MsgidResponse, ParseRespMessage, func(p *Peer, m Message) error {
+	mp.DefineMessage(MsgidError, ParseErrMessage, func(p *Peer, m Message) error {
 		em, ok := m.(errmsg)
 		if !ok {
-			return fmt.Errorf("bad message type")
+			return fmt.Errorf("bad peercall message type (err)")
 		}
 		return pm.crouter.processErrorResponse(p, em)
 	})

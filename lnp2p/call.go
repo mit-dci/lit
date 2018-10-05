@@ -47,6 +47,7 @@ type CallRouter struct {
 // NewCallRouter creates a new empty CallRouter with default settings.
 func NewCallRouter() CallRouter {
 	return CallRouter{
+		fnhandlers:   make(map[uint16]peercallhandlerdef),
 		currentMsgID: 0,
 		inprog:       make(map[uint32]callinprogress),
 		mtx:          sync.Mutex{},
@@ -91,6 +92,8 @@ func makeTimestamp() uint64 {
 
 func (cr *CallRouter) initInvokeCall(peer *Peer, timeout uint64, call PeerCallMessage, cb PeerCallback, toh PeerTimeoutHandler) error {
 
+	fnid := call.FuncID()
+
 	cr.mtx.Lock()
 	cid := cr.currentMsgID
 	cr.currentMsgID++
@@ -98,6 +101,7 @@ func (cr *CallRouter) initInvokeCall(peer *Peer, timeout uint64, call PeerCallMe
 
 	// Create the record for the in-progres call.
 	cip := callinprogress{
+		fnid:           fnid,
 		started:        makeTimestamp(),
 		timeout:        timeout,
 		ok:             make(chan bool),
@@ -108,7 +112,7 @@ func (cr *CallRouter) initInvokeCall(peer *Peer, timeout uint64, call PeerCallMe
 	// Create the actual message to send off to the remote peer.
 	m := callmsg{
 		id:     cid,
-		funcID: call.FuncID(),
+		funcID: fnid,
 		body:   call.Bytes(),
 	}
 
@@ -141,7 +145,7 @@ func (cr *CallRouter) processCall(peer *Peer, msg Message) error {
 
 	cmsg, ok := msg.(callmsg)
 	if !ok {
-		return fmt.Errorf("bad message type") // is this really necessary?
+		return fmt.Errorf("bad peercall message type (call)") // is this really necessary?
 	}
 
 	id := cmsg.id
@@ -278,7 +282,11 @@ func (cr *CallRouter) DefineFunction(fnid uint16, name string, mparser PcParser,
 	}
 
 	if mparser == nil {
-		return fmt.Errorf("message parser cannot be nil")
+		return fmt.Errorf("message call parser cannot be nil")
+	}
+
+	if rparser == nil {
+		return fmt.Errorf("message response parser cannot be nil")
 	}
 
 	// Just add it to the table, pretty easy.

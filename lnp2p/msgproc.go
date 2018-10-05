@@ -79,13 +79,13 @@ func (mp *MessageProcessor) HandleMessage(peer *Peer, buf []byte) error {
 	mtype := buf[0]
 	h := mp.handlers[mtype]
 	if h == nil {
-		return fmt.Errorf("no handler found for messasge of type %x", mtype)
+		return fmt.Errorf("no handler found for messasge of type %X", mtype)
 	}
 
 	// Parse the message.
 	parsed, err := h.parseFunc(buf[1:])
 	if err != nil {
-		logging.Warnf("msgproc: Malformed message of type %x from peer %s\n", mtype, peer.GetPrettyName())
+		logging.Warnf("msgproc: Malformed message of type %X from peer %s len %d\n", mtype, peer.GetPrettyName(), len(buf[1:]))
 		return err
 	}
 

@@ -296,31 +296,31 @@ func (r *LitRPC) ListPendingRemoteControlAuthRequests(args NoArgs, reply *RCPend
 }
 
 type PingPeerArgs struct {
-	peerIdx int32
-	msg     string
+	PeerIdx int32
+	Msg     string
 }
 
 type PingPeerReply struct {
-	resp string
-	err  string
+	Resp string
+	Err  string
 }
 
 func (r *LitRPC) PingPeer(args PingPeerArgs, reply *PingPeerReply) error {
 
 	var pm *lnp2p.PeerManager = r.Node.PeerMan
 
-	peer := pm.GetPeerByIdx(args.peerIdx)
+	peer := pm.GetPeerByIdx(args.PeerIdx)
 
-	m := lnp2p.NewPingMsg([]byte(args.msg))
+	m := lnp2p.NewPingMsg([]byte(args.Msg))
 	resp, err := peer.InvokeBlockingCall(m, 5000)
 
 	if err != nil {
-		reply.err = err.Error()
+		reply.Err = err.Error()
 		return nil
 	}
 
 	pong := resp.(lnp2p.PcPong)
-	reply.resp = string(pong.GetBody())
+	reply.Resp = string(pong.GetBody())
 	return nil
 
 }

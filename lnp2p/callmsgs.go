@@ -76,7 +76,7 @@ func ParseCallMessage(buf []byte) (Message, error) {
 	}
 
 	if n != int(blen) {
-		return nil, fmt.Errorf("unexpected EOF")
+		return nil, fmt.Errorf("unexpected EOF (parse call)")
 	}
 
 	res.body = body
@@ -139,7 +139,7 @@ func ParseRespMessage(buf []byte) (Message, error) {
 	}
 
 	if n != int(blen) {
-		return nil, fmt.Errorf("unexpected EOF")
+		return nil, fmt.Errorf("unexpected EOF (parse resp)")
 	}
 
 	res.body = body
@@ -188,7 +188,7 @@ func ParseErrMessage(buf []byte) (Message, error) {
 	}
 
 	// More magic to read the error message.
-	var mlen uint32
+	var mlen uint16
 	err = binary.Read(r, binary.BigEndian, &mlen)
 	if err != nil {
 		return nil, err
@@ -201,7 +201,7 @@ func ParseErrMessage(buf []byte) (Message, error) {
 	}
 
 	if n != int(mlen) {
-		return nil, fmt.Errorf("unexpected EOF")
+		return nil, fmt.Errorf("unexpected EOF (parse err)")
 	}
 
 	res.msg = string(body) // apparently this "just werks"
