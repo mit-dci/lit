@@ -78,7 +78,7 @@ type callinprogress struct {
 	messageParser func([]byte) (PeerCallMessage, error)
 
 	// what we pass the parsed message to
-	// if the bool in the reponse is false, then don't consider the call "complete"
+	// TODO if the bool in the reponse is false, then don't consider the call "complete" (impl not complete yet, value ignored)
 	callback PeerCallback
 
 	// if we exceed the timeout and haven't been sent any messages then run this before removing the entry
