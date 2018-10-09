@@ -108,7 +108,10 @@ class LitNode():
         other.update_peers()
 
     def get_peer_id(self, other):
-        return self.peer_mapping[other.lnid]
+        try:
+            return self.peer_mapping[other.lnid]
+        except KeyError as e:
+            raise Exception('peer not registered')
 
     def make_new_addr(self):
         res = self.rpc.Address(NumToMake=1, CoinType=REGTEST_COINTYPE)

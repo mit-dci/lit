@@ -4,6 +4,7 @@ import os
 import sys
 import time
 import importlib.util as imu
+import traceback
 
 import testlib
 
@@ -112,6 +113,7 @@ def run_test_list(tests):
             print('------------------------------')
             print('Failure:', name)
             print('\nError:', e)
+            traceback.print_exc()
             fail += 1
             if type(e) is KeyboardInterrupt:
                 break

@@ -2,6 +2,8 @@
 testlib 1
 connect 2
 setgetfee 1
+peercall 2 succeed
+peercall 2 fail
 
 # Tx operations
 receive 1
