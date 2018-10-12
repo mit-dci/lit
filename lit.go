@@ -279,7 +279,7 @@ func main() {
 
 	// Setup LN node.  Activate Tower if in hard mode.
 	// give node and below file pathof lit home directory
-	node, err := qln.NewLitNode(key, conf.LitHomeDir, conf.TrackerURL, conf.LitProxyURL, conf.Nat)
+	node, err := qln.NewLitNode(key, conf.LitHomeDir, conf.TrackerURL, conf.LitProxyURL, conf.Nat, conf.AutoReconnect)
 	if err != nil {
 		logging.Fatal(err)
 	}
@@ -298,11 +298,6 @@ func main() {
 
 	if conf.UnauthRPC {
 		go litrpc.RPCListen(rpcl, conf.Rpchost, conf.Rpcport)
-	}
-
-	if conf.AutoReconnect {
-		//node.AutoReconnect(conf.AutoListenPort, conf.AutoReconnectInterval, conf.AutoReconnectOnlyConnectedCoins)
-		// TODO Redo this.
 	}
 
 	<-rpcl.OffButton

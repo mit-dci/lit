@@ -22,7 +22,7 @@ import (
 
 // NewLitNode starts up a lit node.  Needs priv key, and a path.
 // Does not activate a subwallet; do that after init.
-func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL string, nat string) (*LitNode, error) {
+func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL string, nat string, autoreconn bool) (*LitNode, error) {
 
 	var err error
 
@@ -136,17 +136,20 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 	nd.PeerMap = map[*lnp2p.Peer]*RemotePeer{}
 	nd.PeerMapMtx = &sync.Mutex{}
 
-	pdb := nd.NewLitDB.GetPeerDB()
-	infos, err := pdb.GetPeerInfos()
-	if err != nil {
-		return nil, err
-	}
-	logging.Infof("init: autoreconnecting to %d peers\n", len(infos))
-	for a, pi := range infos {
-		logging.Infof("init: trying to connect to previous peer: %s\n", a)
-		_, err = nd.PeerMan.TryConnectAddress(fmt.Sprintf("%s@%s", string(a), *pi.NetAddr), nil) // TODO Proxy/NAT
+	// Do we do autoreconnection things?
+	if autoreconn {
+		pdb := nd.NewLitDB.GetPeerDB()
+		infos, err := pdb.GetPeerInfos()
 		if err != nil {
-			logging.Warnf("init: tried to auto-connect to %s but failed: %s\n", a, err.Error())
+			return nil, err
+		}
+		logging.Infof("init: autoreconnecting to %d peers\n", len(infos))
+		for a, pi := range infos {
+			logging.Infof("init: trying to connect to previous peer: %s\n", a)
+			_, err = nd.PeerMan.TryConnectAddress(fmt.Sprintf("%s@%s", string(a), *pi.NetAddr), nil) // TODO Proxy/NAT
+			if err != nil {
+				logging.Warnf("init: tried to auto-connect to %s but failed: %s\n", a, err.Error())
+			}
 		}
 	}
 
