@@ -50,11 +50,7 @@ func (pdb *peerboltdb) GetPeerAddrs() ([]lncore.LnAddr, error) {
 		// Iterate over all of the members of the bucket.
 		cur := b.Cursor()
 		atmp := make([]lncore.LnAddr, 0)
-		for {
-			k, _ := cur.Next()
-			if k == nil {
-				break
-			}
+		for k, _ := cur.First(); k != nil; k, _ = cur.Next() {
 			atmp = append(atmp, lncore.LnAddr(string(k)))
 		}
 
