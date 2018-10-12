@@ -5,14 +5,19 @@ import (
 	"fmt"
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/lncore"
+	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/logging"
 )
 
 var (
-	peersLabel = []byte(`peers`)
-	pdbbuckets = [][]byte{
+	peersLabel    = []byte(`peers`)
+	peerMetaLabel = []byte(`peersmeta`)
+	pdbbuckets    = [][]byte{
 		peersLabel,
+		peerMetaLabel,
 	}
+
+	peerIdxLast = []byte(`lastpeeridx`)
 )
 
 type peerboltdb struct {
@@ -138,6 +143,10 @@ func (pdb *peerboltdb) GetPeerInfos() (map[lncore.LnAddr]lncore.PeerInfo, error)
 }
 
 func (pdb *peerboltdb) AddPeer(addr lncore.LnAddr, pi lncore.PeerInfo) error {
+	return pdb.UpdatePeer(addr, &pi)
+}
+
+func (pdb *peerboltdb) UpdatePeer(addr lncore.LnAddr, pi *lncore.PeerInfo) error {
 
 	var err error
 
@@ -186,4 +195,39 @@ func (pdb *peerboltdb) DeletePeer(addr lncore.LnAddr) error {
 
 	return nil
 
+}
+
+func (pdb *peerboltdb) GetUniquePeerIdx() (uint32, error) {
+
+	var err error
+	var pidx uint32
+
+	err = pdb.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket(peerMetaLabel)
+
+		// Get the last unique peer idx, or create it.
+		v := b.Get(peerIdxLast)
+		if v == nil {
+			x := lnutil.U32tB(1)
+			err2 := b.Put(peerIdxLast, x)
+			if err2 != nil {
+				return err2
+			}
+			v = x
+		}
+		pidx = lnutil.BtU32(v)
+
+		// Increment it.
+		err2 := b.Put(peerIdxLast, lnutil.U32tB(pidx+1))
+		if err2 != nil {
+			return err2
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return 0, err
+	}
+	return pidx, nil
 }
