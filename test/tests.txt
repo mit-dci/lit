@@ -1,6 +1,7 @@
 # Basic tests
 testlib 1
 connect 2
+autoreconn 2
 setgetfee 1
 
 # Tx operations
