@@ -110,11 +110,7 @@ func (pdb *peerboltdb) GetPeerInfos() (map[lncore.LnAddr]lncore.PeerInfo, error)
 		// Iterate over everything.
 		cur := b.Cursor()
 		mtmp := map[lncore.LnAddr]lncore.PeerInfo{}
-		for {
-			k, v := cur.Next()
-			if k == nil {
-				break
-			}
+		for k, v := cur.First(); k != nil; k, v = cur.Next() {
 
 			var pi lncore.PeerInfo
 			err2 := json.Unmarshal(v, &pi) // TODO Move outside tx block.
