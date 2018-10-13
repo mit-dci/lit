@@ -137,7 +137,7 @@ func (pm *PeerManager) GetPeer(lnaddr lncore.LnAddr) *Peer {
 
 // GetPeerByIdx is a compatibility function for getting a peer by its "peer id".
 func (pm *PeerManager) GetPeerByIdx(id int32) *Peer {
-	if id <= 0 || id >= int32(len(pm.peers)) {
+	if id < 0 || id >= int32(len(pm.peers)) {
 		return nil
 	}
 	return pm.peerMap[pm.peers[id]]
