@@ -238,18 +238,24 @@ func (s *SPVCon) IngestHeaders(m *wire.MsgHeaders) (bool, error) {
 	// OK performance-wise to keep it locked for this function duration,
 	// because verification is pretty quick.
 	defer s.headerMutex.Unlock()
-
-	reorgHeight, err := CheckHeaderChain(s.headerFile, m.Headers, s.Param)
-	if err != nil {
-		// insufficient depth reorg means we're still trying to sync up?
-		// really, the re-org hasn't been proven; if the remote node
-		// provides us with a new block we'll ask again.
-		if reorgHeight == -1 {
-			logging.Errorf("Header error: %s\n", err.Error())
-			return false, nil
+	reorgHeight := int32(65530)
+	err := fmt.Errorf("nil")
+	for reorgHeight == 65530 || err != nil {
+		reorgHeight, err = CheckHeaderChain(s.headerFile, m.Headers, s.Param, int32(gotNum))
+		if err != nil && reorgHeight != 65530 {
+			// insufficient depth reorg means we're still trying to sync up?
+			// really, the re-org hasn't been proven; if the remote node
+			// provides us with a new block we'll ask again.
+			if reorgHeight == -1 {
+				logging.Errorf("Header error: %s\n", err.Error())
+				return false, nil
+			}
+			// some other error
+			return false, err
+		} else if reorgHeight == 65530 { // insufficient headers
+			logging.Debug("Asking for more headers due to error code received")
+			return true, nil
 		}
-		// some other error
-		return false, err
 	}
 
 	// truncate header file if reorg happens
@@ -278,7 +284,8 @@ func (s *SPVCon) IngestHeaders(m *wire.MsgHeaders) (bool, error) {
 	return true, nil
 }
 
-// AskForHeaders ...
+// AskForHeaders asks the remote node for headers when we see that we are
+// either begind blocks or have encountered a reorg
 func (s *SPVCon) AskForHeaders() error {
 	ghdr := wire.NewMsgGetHeaders()
 	ghdr.ProtocolVersion = s.localVersion
