@@ -40,8 +40,6 @@ type Params struct {
 	DiffCalcFunction func(
 		headers []*wire.BlockHeader, height int32, p *Params) (uint32, error)
 
-	//DiffCalcFunction func(r io.ReadSeeker, height, startheight int32, p *Params) (uint32, error)
-
 	// The block header to start downloading blocks from
 	StartHeader [80]byte
 

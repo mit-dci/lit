@@ -46,6 +46,11 @@ func calcDiffAdjustBitcoin(start, end *wire.BlockHeader, p *Params) uint32 {
 	return BigToCompact(newTarget)
 }
 
+func diffBitcoinRegtest(
+	headers []*wire.BlockHeader, height int32, p *Params) (uint32, error) {
+	return p.PowLimitBits, nil
+}
+
 // diffBitcoin checks the difficulty of the last header in the slice presented
 // give at least an epochlength of headers if this is a new epoch;
 // otherwise give at least 2
@@ -85,14 +90,8 @@ func diffBitcoin(
 	epochHeight := int(height) % epochLength
 	maxHeader := len(headers) - 1
 
-	// must include an epoch start header
-	if epochHeight > maxHeader && maxHeader+10 > epochHeight {
-		// assuming max 10 block reorg, if something more,  you're safer
-		// restarting your node. Also, if you're syncing from scratch and
-		// get a reorg in 10 blocks, you're doing soemthign wrong.
-		// TODO: handle case when reorg happens over diff reset.
-		return p.PowLimitBits, nil
-	} else if epochHeight > maxHeader {
+	// don't check for reorgs here since we check that when we receive the headers.
+	if epochHeight > maxHeader {
 		return 0, fmt.Errorf("diffBitcoin got insufficient headers")
 	}
 	epochStart := headers[maxHeader-epochHeight]
@@ -150,10 +149,9 @@ func diffBitcoin(
 			// Return the found difficulty or the minimum difficulty if no
 			// appropriate block was found.
 			rightBits = p.PowLimitBits
-			if tempCur != nil && tempCur.Bits != 0 { //weird bug
+			if tempCur != nil && tempCur.Bits != 0 {
 				rightBits = tempCur.Bits
 			}
-			// rightBits = epochStart.Bits // original line
 		}
 	}
 	return rightBits, nil
@@ -268,8 +266,4 @@ func diffVTCtest(headers []*wire.BlockHeader, height int32, p *Params) (uint32, 
 
 	// Run KGW
 	return calcDiffAdjustKGW(headers, height, p)
-}
-
-func diffVTCregtest(headers []*wire.BlockHeader, height int32, p *Params) (uint32, error) {
-	return p.PowLimitBits, nil
 }

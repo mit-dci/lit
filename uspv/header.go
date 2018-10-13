@@ -12,11 +12,10 @@ import (
 	"math/big"
 	"os"
 
-	"github.com/mit-dci/lit/logging"
-
 	"github.com/mit-dci/lit/btcutil/blockchain"
-
 	"github.com/mit-dci/lit/coinparam"
+	"github.com/mit-dci/lit/consts"
+	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/wire"
 )
 
@@ -26,10 +25,13 @@ func min(a, b int) int {
 	}
 	return b
 }
-func moreWork(a, b []*wire.BlockHeader, p *coinparam.Params) bool {
-	isMoreWork := false
+
+// moreWork compares the work of two given chains A and B and outputs which one
+// of them has the highest PoW
+func moreWork(a, b []*wire.BlockHeader, p *coinparam.Params) (bool, error) {
+	temp := false
 	if len(a) == 0 || len(b) == 0 {
-		return false
+		return false, fmt.Errorf("Passed params have length 0")
 	}
 	// if (&a[0].MerkleRoot).IsEqual(&b[0].MerkleRoot) { this always returns false,
 	// so we use the String() method to convert them, thing stole half an hour..
@@ -37,13 +39,13 @@ func moreWork(a, b []*wire.BlockHeader, p *coinparam.Params) bool {
 	for i := min(len(a), len(b)) - 1; i >= 1; i-- {
 		hash := a[i-1].BlockHash()
 		if a[i].PrevBlock.IsEqual(&hash) && b[i].PrevBlock.IsEqual(&hash) {
-			isMoreWork = true
+			temp = true
 			pos = i
 			break
 		}
 	}
-	if !isMoreWork {
-		return isMoreWork
+	if !temp {
+		return false, fmt.Errorf("Dissimilar histories, couldn't find a common block in the past")
 	} else {
 		var a1, b1 []*wire.BlockHeader
 		a1 = a[pos:]
@@ -54,16 +56,14 @@ func moreWork(a, b []*wire.BlockHeader, p *coinparam.Params) bool {
 			workA.Add(blockchain.CalcWork(a1[0].Bits), workA)
 		}
 		for i := 0; i < len(b1); i++ {
-			//logging.Info(i)
 			workB.Add(blockchain.CalcWork(b1[i].Bits), workB)
 		}
-		logging.Info("Work done by alt chains A and B are: ")
-		logging.Info(workA, workB)
-		// due to cmp's stquirks in big, we can't return directly
+		logging.Info("Work done by alt chains A and B are: ", workA, workB)
+		// due to cmp's quirks in big, we can't return directly
 		if workA.Cmp(workB) > 0 { // if chain A does more work than B return true
-			return isMoreWork // true
+			return true, nil
 		}
-		return !isMoreWork // false
+		return false, nil
 	}
 }
 
@@ -181,9 +181,10 @@ func FindHeader(r io.ReadSeeker, hdr wire.BlockHeader) (int32, error) {
 // Does not deal with re-orgs; assumes new headers link to tip
 // returns true if *all* headers are cool, false if there is any problem
 // Note we don't know what the height is, just the relative height.
-// returnin nil means it worked
+// returning nil means it worked
 // returns an int32 usually 0, but if there's a reorg, shows what height to
-// reorg back to before adding on the headers
+// reorg back to before adding on the headers. Don't reorg if height is greater
+// than consts.MaxReorgDepth
 func CheckHeaderChain(
 	r io.ReadSeeker, inHeaders []*wire.BlockHeader,
 	p *coinparam.Params) (int32, error) {
@@ -281,6 +282,14 @@ func CheckHeaderChain(
 				"CheckHeaderChain: header message doesn't attach to tip or anywhere.")
 		}
 
+		reorgDepth := height - attachHeight
+		if reorgDepth > consts.MaxReorgDepth {
+			// TODO: handle case when reorg happens over diff reset.
+			// we should also have different reorg depths for different coins
+			logging.Error("Re-org greater than 100 blocks detected. Please check if you're either connected to malicious peers or wait for the re-org to subside")
+			return -1, fmt.Errorf("Deep re-org detected. Quitting!")
+		}
+
 		// adjust attachHeight by adding the startheight
 		attachHeight += p.StartHeight
 
@@ -299,7 +308,12 @@ func CheckHeaderChain(
 		// the two arrays are chain+inHeaders+attachHeight and the height chain itself
 		// 2,3,4 -? fn
 
-		if moreWork(inHeaders, oldHeaders, p) {
+		chk, err := moreWork(inHeaders, oldHeaders, p)
+		if err != nil {
+			return -1, err
+		}
+
+		if chk {
 			// pretty sure this won't work without testing
 			// if attachHeight+int32(len(inHeaders)) < height {
 			return -1, fmt.Errorf(
@@ -311,7 +325,6 @@ func CheckHeaderChain(
 			height-1, attachHeight+int32(len(inHeaders)))
 
 		// reorg is go, snip to attach height
-		reorgDepth := height - attachHeight
 		oldHeaders = oldHeaders[:numheaders-reorgDepth]
 	}
 
@@ -338,8 +351,11 @@ func CheckHeaderChain(
 			// vertcoin diff adjustment not yet implemented
 			// TODO - get rid of coin specific workaround
 			if hdr.Bits != rightBits && (p.Name != "vtctest" && p.Name != "vtc") {
+				logging.Info("RIGHTBITS", hdr.Bits, rightBits, i)
 				return 0, fmt.Errorf("Block %d %s incorrect difficulty.  Read %x, expect %x",
 					int(height)+i, hdr.BlockHash().String(), hdr.Bits, rightBits)
+			} else {
+				logging.Info("CHECK THIS", i, hdr.Bits)
 			}
 		}
 	}
