@@ -28,46 +28,12 @@ func min(a, b int) int {
 
 // moreWork compares the work of two given chains A and B and outputs which one
 // of them has the highest PoW
-func moreWork(recvHeaders, myHeaders []*wire.BlockHeader, p *coinparam.Params, attachHeight int32) (bool, error, int) {
+func moreWork(recvHeaders, myHeaders []*wire.BlockHeader, p *coinparam.Params, attachHeight int32) (bool, error) {
 
 	if len(recvHeaders) == 0 || len(myHeaders) == 0 {
-		return false, fmt.Errorf("Passed params have length 0"), -1
-	}
-	// if (&a[0].MerkleRoot).IsEqual(&b[0].MerkleRoot) { this always returns false,
-	// so we use the String() method to convert them, thing stole half an hour..
-	// so first get the number of hashes to compare, this is min(len(a), len(b))
-	// then, we need to arrive at a common position wrt both chains
-	// this can be done by comparing a single hash in the history of "b" that we
-	// assume to be final and we check for that in a. if it does exist, means we
-	// have common history, compare pow from there. else, a deeper reorg, safer
-	// to exit
-
-	// in b, check for a's first hash
-	posb := -1 //can safely assume this thanks to the first check
-	posa := -1
-	found := false
-	for l := len(recvHeaders) - 1; l > 0; l-- {
-		checkhash := recvHeaders[l].BlockHash()
-		for k := len(myHeaders) - 1; k > 0; k-- {
-			if myHeaders[k].PrevBlock.IsEqual(&checkhash) {
-				posb = k
-				found = true
-				break
-			}
-		}
-		if found {
-			posa = l
-			break
-		}
+		return false, fmt.Errorf("Passed params have length 0")
 	}
 
-	if !found {
-		// TODO: cover the case where we need more headers
-		return false, fmt.Errorf("No common block found, quitting!"), 65530
-	}
-
-	recvHeaders = recvHeaders[posa:]
-	myHeaders = myHeaders[posb:]
 	workA, workB := big.NewInt(0), big.NewInt(0)
 	for i := 0; i < len(recvHeaders); i++ {
 		workA.Add(blockchain.CalcWork(recvHeaders[i].Bits), workA)
@@ -79,10 +45,10 @@ func moreWork(recvHeaders, myHeaders []*wire.BlockHeader, p *coinparam.Params, a
 	// due to cmp's quirks in big, we can't return directly
 	if workA.Cmp(workB) > 0 { // if chain A does more work than B return true
 		logging.Debug("Received Chain has more work, going ahead with reorg")
-		return true, nil, 0
+		return true, nil
 	}
 	logging.Debug("Local Chain has more work, no reorg")
-	return false, nil, 0
+	return false, nil
 }
 
 // checkProofOfWork verifies the header hashes into something
@@ -205,7 +171,7 @@ func FindHeader(r io.ReadSeeker, hdr wire.BlockHeader) (int32, error) {
 // than consts.MaxReorgDepth
 func CheckHeaderChain(
 	r io.ReadSeeker, recvHeaders []*wire.BlockHeader,
-	p *coinparam.Params, headerLen int32) (int32, error) {
+	p *coinparam.Params, headerLen int32, headerTip int32) (int32, error) {
 
 	// make sure we actually got new headers
 	if len(recvHeaders) < 1 {
@@ -306,26 +272,42 @@ func CheckHeaderChain(
 			return -1, fmt.Errorf("Deep re-org detected. Quitting!")
 		}
 
-		if reorgDepth > int32(len(recvHeaders)) {
-			// possibly spam, we didn't receive enough headers, don't do anything
-			logging.Debug("Received headers less than the length of given reorg. Doing nothing")
-			return 65530, fmt.Errorf("Received less headers than proposed reorg length. Quitting!")
-		}
+		// don't worry about the length of received headers since they may point to
+		// blocks that are in a common past as well
 		// adjust attachHeight by adding the startheight
 		attachHeight += p.StartHeight
 
 		logging.Infof("Header %s attaches at height %d\n",
 			recvHeaders[0].BlockHash().String(), attachHeight)
 
+		// single block reorg bug:
+		// here we need to check if a low block, high pow block has come. For this,
+		// bitcoincore only broadcasts a single header, so we'd never detect this
+		// and bitcoincore would never send us the past headers (since we already have
+		// the block..)
+		// also if it attaches at this height, I can start comparing work from here
+		// instead of comparing everything.
 		// attachHeight is the min height that we get from the node (say 3798)
 		// we need to see if we have the block attachHeight with us
 		// if we do, we find the last similar block and compare work from there
 		// if we don't, its a deep reorg and we quit
-		reorg, err, errorCode := moreWork(recvHeaders, oldHeaders, p, attachHeight)
+		logging.Info("Height of local copy: ", headerTip, ", Height of received header: ", attachHeight)
+		tmpHeaders := oldHeaders
+		if attachHeight < headerTip {
+			// reorg, we need to see how many headers we received and then slice there
+			// and compare pow
+			logging.Info("We have: ", len(recvHeaders), " header(s)")
+			tmpHeaders = tmpHeaders[len(tmpHeaders)-(int(headerTip)-int(attachHeight)):]
+			logging.Info("Last common block hash: ", tmpHeaders[0].PrevBlock)
+			// now we can move on to computing the work for both chain
+		} else {
+			// attachHeight is greater, ask for more headers or maybe just spam. Either
+			// way, just ask for blocks
+			return 65530, fmt.Errorf("Insufficient header length")
+		}
+		// if attachHeight <
+		reorg, err := moreWork(recvHeaders, tmpHeaders, p, attachHeight)
 		if err != nil {
-			if errorCode == 65530 {
-				return 65530, fmt.Errorf("Insufficient header length")
-			}
 			return -1, err
 		}
 

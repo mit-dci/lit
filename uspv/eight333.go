@@ -215,7 +215,7 @@ func (s *SPVCon) IngestMerkleBlock(m *wire.MsgMerkleBlock) {
 // and if they're OK, appends them to the local header file.
 // If there are no headers, it assumes we're done and returns false.
 // Otherwise it assumes there's more to request and returns true.
-func (s *SPVCon) IngestHeaders(m *wire.MsgHeaders) (bool, error) {
+func (s *SPVCon) IngestHeaders(m *wire.MsgHeaders, th int32) (bool, error) {
 
 	// headerChainLength is how many headers we give to the
 	// verification function.  In bitcoin you never need more than 2016 previous
@@ -241,7 +241,7 @@ func (s *SPVCon) IngestHeaders(m *wire.MsgHeaders) (bool, error) {
 	reorgHeight := int32(65530)
 	err := fmt.Errorf("nil")
 	for reorgHeight == 65530 || err != nil {
-		reorgHeight, err = CheckHeaderChain(s.headerFile, m.Headers, s.Param, int32(gotNum))
+		reorgHeight, err = CheckHeaderChain(s.headerFile, m.Headers, s.Param, int32(gotNum), th)
 		if err != nil && reorgHeight != 65530 {
 			// insufficient depth reorg means we're still trying to sync up?
 			// really, the re-org hasn't been proven; if the remote node
