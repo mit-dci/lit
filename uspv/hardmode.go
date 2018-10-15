@@ -171,7 +171,7 @@ func IsUnspendable(o *wire.TxOut) bool {
 	if o == nil {
 		return true
 	}
-	if len(o.PkScript) == 0 || len(o.PkScript) > 10000 {
+	if len(o.PkScript) > 10000 { // len 0 is OK, spendable
 		return true
 	}
 	if o.PkScript[0] == 0x6a { // OP_RETURN is 0x6a
