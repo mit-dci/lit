@@ -54,6 +54,7 @@ func makeTmpDisconnectPeerHandler(nd *LitNode) func(eventbus.Event) eventbus.Eve
 
 		nd.RemoteMtx.Lock()
 		delete(nd.RemoteCons, rpeer.Idx)
+		delete(nd.PeerMap, ee.Peer)
 		nd.RemoteMtx.Unlock()
 
 		return eventbus.EHANDLE_OK
