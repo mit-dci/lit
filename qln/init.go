@@ -22,7 +22,7 @@ import (
 
 // NewLitNode starts up a lit node.  Needs priv key, and a path.
 // Does not activate a subwallet; do that after init.
-func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL string, nat string, autoreconn bool) (*LitNode, error) {
+func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL string, nat string, autoreconn bool, autolistenport int) (*LitNode, error) {
 
 	var err error
 
@@ -144,7 +144,7 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 			return nil, err
 		}
 		logging.Infof("init: autoreconnecting to %d peers\n", len(infos))
-		for a, pi := range infos {
+		for a := range infos {
 			logging.Infof("init: trying to connect to previous peer: %s\n", a)
 			go (func() {
 				_, err = nd.PeerMan.TryConnectAddress(string(a), nil) // TODO Proxy/NAT
@@ -152,6 +152,14 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 					logging.Warnf("init: tried to auto-connect to %s but failed: %s\n", a, err.Error())
 				}
 			})()
+		}
+	}
+
+	// Do we automaticaly listen on some port?
+	if autolistenport != -1 {
+		err := nd.PeerMan.ListenOnPort(autolistenport)
+		if err != nil {
+			return nil, err
 		}
 	}
 
