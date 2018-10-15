@@ -23,6 +23,10 @@ import (
 type privkey *koblitz.PrivateKey
 type pubkey *koblitz.PublicKey
 
+// MaxNodeCount is the size of the peerIdx->LnAddr array.
+// TEMP This shouldn't be necessary.
+const MaxNodeCount = 1024
+
 // PeerManager .
 type PeerManager struct {
 
@@ -73,7 +77,7 @@ func NewPeerManager(rootkey *hdkeychain.ExtendedKey, pdb lncore.LitPeerStorage, 
 		peerdb:         pdb,
 		ebus:           bus,
 		mproc:          NewMessageProcessor(),
-		peers:          make([]lncore.LnAddr, 1),
+		peers:          make([]lncore.LnAddr, MaxNodeCount),
 		peerMap:        map[lncore.LnAddr]*Peer{},
 		listeningPorts: map[int]*listeningthread{},
 		sending:        false,
@@ -114,13 +118,11 @@ func computeIdentKeyFromRoot(rootkey *hdkeychain.ExtendedKey) (privkey, error) {
 }
 
 // GetPeerIdx is a convenience function for working with older code.
-func (pm *PeerManager) GetPeerIdx(peer *Peer) int32 {
-	for i, p := range pm.peers {
-		if pm.peerMap[p] == peer {
-			return int32(i)
-		}
+func (pm *PeerManager) GetPeerIdx(peer *Peer) uint32 {
+	if peer.idx == nil {
+		return 0
 	}
-	return 0
+	return *peer.idx
 }
 
 // GetPeer returns the peer with the given lnaddr.
@@ -135,7 +137,7 @@ func (pm *PeerManager) GetPeer(lnaddr lncore.LnAddr) *Peer {
 
 // GetPeerByIdx is a compatibility function for getting a peer by its "peer id".
 func (pm *PeerManager) GetPeerByIdx(id int32) *Peer {
-	if id <= 0 || id >= int32(len(pm.peers)) {
+	if id < 0 || id >= int32(len(pm.peers)) {
 		return nil
 	}
 	return pm.peerMap[pm.peers[id]]
@@ -221,18 +223,38 @@ func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, set
 		// don't kill the connection?
 	}
 
-	pnick := ""
-	if pi != nil {
-		pnick = *pi.Nickname
-	}
-
 	// Now that we've got the connection, actually create the peer object.
 	pk := pubkey(lndcconn.RemotePub())
+	rlitaddr := convertPubkeyToLitAddr(pk)
 	p := &Peer{
-		lnaddr:   convertPubkeyToLitAddr(pk),
-		nickname: &pnick,
+		lnaddr:   rlitaddr,
+		nickname: nil,
 		conn:     lndcconn,
 		idpubkey: pk,
+	}
+
+	if pi == nil {
+		pidx, err := pm.peerdb.GetUniquePeerIdx()
+		if err != nil {
+			logging.Errorf("Problem getting unique peeridx from DB: %s\n", err.Error())
+		} else {
+			p.idx = &pidx
+		}
+		raddr := lndcconn.RemoteAddr().String()
+		pi = &lncore.PeerInfo{
+			LnAddr:   &rlitaddr,
+			Nickname: nil,
+			NetAddr:  &raddr,
+			PeerIdx:  pidx,
+		}
+		err = pm.peerdb.AddPeer(p.GetLnAddr(), *pi)
+		if err != nil {
+			logging.Errorf("Error saving new peer to DB: %s\n", err.Error())
+		}
+	} else {
+		p.nickname = pi.Nickname
+		// TEMP
+		p.idx = &pi.PeerIdx
 	}
 
 	// Register the peer we just connected to!
@@ -259,10 +281,8 @@ func (pm *PeerManager) registerPeer(peer *Peer) {
 	logging.Infof("peermgr: New peer %s\n", peer.GetLnAddr())
 
 	// Append peer to peer list and add to peermap
-	pidx := uint32(len(pm.peers))
-	pm.peers = append(pm.peers, lnaddr)
+	pm.peers[int(*peer.idx)] = lnaddr // TEMP This idx logic is a litte weird.
 	pm.peerMap[lnaddr] = peer
-	peer.idx = &pidx
 	peer.pmgr = pm
 
 	// Announce the peer has been added.
@@ -425,4 +445,19 @@ func (pm *PeerManager) queueMessageToPeer(peer *Peer, msg Message, ec *chan erro
 	}
 	pm.outqueue <- outgoingmsg{peer, &msg, ec}
 	return nil
+}
+
+// TmpHintPeerIdx sets the peer idx hint for a particular peer.
+// TEMP This should be removed at some point in the future.
+func (pm *PeerManager) TmpHintPeerIdx(peer *Peer, idx uint32) error {
+
+	pi, err := pm.peerdb.GetPeerInfo(peer.GetLnAddr())
+	if err != nil {
+		return err
+	}
+
+	pi.PeerIdx = idx
+
+	return pm.peerdb.UpdatePeer(peer.GetLnAddr(), pi)
+
 }
