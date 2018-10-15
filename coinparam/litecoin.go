@@ -80,7 +80,7 @@ var LiteCoinTestNet4Params = Params{
 
 	// BIP44 coin type used in the hierarchical deterministic path for
 	// address generation.
-	HDCoinType: 65537, // i dunno, 0x010001 ?
+	HDCoinType: 10001,
 }
 
 // LiteCoinTestNet4Params are the parameters for the litecoin test network 4.
@@ -139,8 +139,8 @@ var LiteRegNetParams = Params{
 
 	// BIP44 coin type used in the hierarchical deterministic path for
 	// address generation.
-	HDCoinType: 258, // i dunno
-	TestCoin: true,
+	HDCoinType: 20002,
+	TestCoin:   true,
 }
 
 // liteCoinTestNet4GenesisHash is the first hash in litecoin testnet4
