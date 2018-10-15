@@ -16,7 +16,6 @@ send2 2
 fund 2
 close 2 forward
 close 2 reverse
-# Disabled these to tests until we support breaking right after funding (we don't)
 break 2 forward
 break 2 reverse
 push 2
