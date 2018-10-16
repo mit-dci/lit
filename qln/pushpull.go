@@ -121,6 +121,8 @@ func (nd *LitNode) PushChannel(qc *Qchan, amt uint32, data [32]byte) error {
 		return fmt.Errorf("have to send non-zero amount")
 	}
 
+	logging.Infof("started push on channel %d of %d\n", qc.Idx(), amt)
+
 	// see if channel is busy
 	// lock this channel
 	cts := false

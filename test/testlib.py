@@ -45,9 +45,18 @@ def new_data_dir(name):
 
 hexchars = "0123456789abcdef"
 
+# FIXME This doesn't work as expected anymore since IDs are global.
+next_id = 0
+def get_new_id():
+    global next_id
+    id = next_id
+    next_id += 1
+    return id
+
 class LitNode():
     def __init__(self, bcnode):
         self.bcnode = bcnode
+        self.id = get_new_id()
         self.p2p_port = new_port()
         self.rpc_port = new_port()
         self.data_dir = new_data_dir("lit")
@@ -79,7 +88,7 @@ class LitNode():
         # Now figure out the args to use and then start Lit.
         args = [
             LIT_BIN,
-            "-v", "4",
+            "-vv",
             "--reg", "127.0.0.1:" + str(self.bcnode.p2p_port),
             "--tn3", "", # disable autoconnect
             "--dir", self.data_dir,
