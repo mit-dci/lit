@@ -55,11 +55,13 @@ def get_new_id():
 
 class LitNode():
     def __init__(self, bcnode):
+        self.bcnode = bcnode
         self.id = get_new_id()
         self.p2p_port = new_port()
         self.rpc_port = new_port()
         self.data_dir = new_data_dir("lit")
         self.peer_mapping = {}
+        self.proc = None
 
         # Write a hexkey to the privkey file
         with open(paths.join(self.data_dir, "privkey.hex"), 'w+') as f:
@@ -68,6 +70,13 @@ class LitNode():
                 s += hexchars[random.randint(0, len(hexchars) - 1)]
             print('Using key:', s)
             f.write(s + "\n")
+
+        # Go and do the initial startup and sync.
+        self.start()
+
+    def start(self):
+        # Sanity check.
+        assert self.proc is None, "tried to start a node that is already started!"
 
         # See if we should print stdout
         outputredir = subprocess.DEVNULL
@@ -80,7 +89,7 @@ class LitNode():
         args = [
             LIT_BIN,
             "-vv",
-            "--reg", "127.0.0.1:" + str(bcnode.p2p_port),
+            "--reg", "127.0.0.1:" + str(self.bcnode.p2p_port),
             "--tn3", "", # disable autoconnect
             "--dir", self.data_dir,
             "--unauthrpc",
@@ -100,7 +109,7 @@ class LitNode():
         # Make it listen to P2P connections!
         lres = self.rpc.Listen(Port=self.p2p_port)
         testutil.wait_until_port("localhost", self.p2p_port)
-        self.lnid = lres["Adr"]
+        self.lnid = lres["Adr"] # technically we do this more times than we have to, that's okay
 
     def get_sync_height(self):
         for bal in self.rpc.balance():
@@ -113,7 +122,7 @@ class LitNode():
         res = self.rpc.Connect(LNAddr=addr)
         self.update_peers()
         if 'PeerIdx' in res and self.peer_mapping[other.lnid] != res['PeerIdx']:
-            raise AssertError("new peer ID doesn't match reported ID")
+            raise AssertionError("new peer ID doesn't match reported ID (%s vs %s)" % (self.peer_mapping[other.lnid], res['PeerIdx']))
         other.update_peers()
 
     def get_peer_id(self, other):
@@ -150,6 +159,11 @@ class LitNode():
             InitialSend=initialsend,
             Data=None) # maybe use [0 for _ in range(32)] or something?
         return res['ChanIdx']
+
+    def resync(self):
+        def ck_synced():
+            return self.get_sync_height() == self.bcnode.get_block_height()
+        testutil.wait_until(ck_synced, attempts=40, errmsg="node failing to resync!")
 
     def shutdown(self):
         if self.proc is not None:
@@ -205,6 +219,9 @@ class BitcoinNode():
                 return False
         testutil.wait_until(ck_segwit, errmsg="couldn't activate segwit")
 
+    def get_block_height(self):
+        return self.rpc.getblockchaininfo()['blocks']
+
     def shutdown(self):
         if self.proc is not None:
             self.proc.kill()
@@ -233,13 +250,16 @@ class TestEnv():
             self.shutdown()
         logger.info("nodes synced!")
 
-    def get_height(self):
-        return self.bitcoind.rpc.getblockchaininfo()['blocks']
+    def new_lit_node(self):
+        node = LitNode(self.bitcoind)
+        self.lits.append(node)
+        self.generate_block(count=0) # Force it to wait for sync.
+        return node
 
     def generate_block(self, count=1):
         if count > 0:
             self.bitcoind.rpc.generate(count)
-        h = self.get_height()
+        h = self.bitcoind.get_block_height()
         def ck_lits_synced():
             for l in self.lits:
                 sh = l.get_sync_height()
@@ -247,6 +267,9 @@ class TestEnv():
                     return False
             return True
         testutil.wait_until(ck_lits_synced, errmsg="lits aren't syncing to bitcoind")
+
+    def get_height(self):
+        return self.bitcoind.get_block_height()
 
     def shutdown(self):
         for l in self.lits:
