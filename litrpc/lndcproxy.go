@@ -14,6 +14,7 @@ import (
 // received requests into a call on the new LNDC based remote control transport
 type LndcRpcWebsocketProxy struct {
 	lndcRpcClient *LndcRpcClient
+	localKey      []byte
 }
 
 // NewLocalLndcRpcWebsocketProxy is an overload to NewLndcRpcWebsocketProxyWithLndc
@@ -66,6 +67,15 @@ func NewLndcRpcWebsocketProxy(litAdr string, key *koblitz.PrivateKey) (*LndcRpcW
 func NewLndcRpcWebsocketProxyWithLndc(lndcRpcClient *LndcRpcClient) *LndcRpcWebsocketProxy {
 	proxy := new(LndcRpcWebsocketProxy)
 	proxy.lndcRpcClient = lndcRpcClient
+	return proxy
+}
+
+// NewUnconnectedLndcRpcWebsocketProxy returns a new proxy without an active
+// connection. It will intercept the "LitRPCProxy.IsConnected" and
+// "LitRPCProxy.Connect" commands
+func NewUnconnectedLndcRpcWebsocketProxy(localKey []byte) *LndcRpcWebsocketProxy {
+	proxy := new(LndcRpcWebsocketProxy)
+	proxy.localKey = localKey
 	return proxy
 }
 
@@ -131,19 +141,44 @@ func (p *LndcRpcWebsocketProxy) proxyServeWS(ws *websocket.Conn) {
 		// store the id from the jsonrpc request
 		id := msg["id"]
 
-		// Use the LNDC RPC client to execute the call
-		err = p.lndcRpcClient.Call(method.(string), args, &reply)
 		var jsonResponse []byte
-		if err != nil {
-			// In case of an error send back a JSON RPC formatted error
-			// response
-			jsonResponse, _ = json.Marshal(errorResponse(id, err))
-		} else {
-			// In case of success, send back a JSON RPC formatted
-			// response
-			jsonResponse, _ = json.Marshal(successResponse(id, reply))
-		}
 
+		// Check for proxy commands
+		if method.(string) == "LitRPCProxy.IsConnected" {
+			jsonResponse, _ = json.Marshal(successResponse(id, p.lndcRpcClient != nil))
+		} else if method.(string) == "LitRPCProxy.Connect" {
+			// TODO: Parameter sanity checks!
+			privKey, _ := koblitz.PrivKeyFromBytes(koblitz.S256(), p.localKey)
+			client, err := NewLndcRpcClient(args.(map[string]interface{})["adr"].(string), privKey)
+			if err != nil {
+				jsonResponse, _ = json.Marshal(errorResponse(id, -32002, err))
+			} else {
+				p.lndcRpcClient = client
+				jsonResponse, _ = json.Marshal(successResponse(id, true))
+			}
+		} else {
+			// Check if we are connected
+			if p.lndcRpcClient != nil {
+				// Use the LNDC RPC client to execute the call
+				err = p.lndcRpcClient.Call(method.(string), args, &reply)
+
+				if err != nil {
+					// In case of an error send back a JSON RPC formatted error
+					// response
+					code := -32000
+					if err.Error() == "Unauthorized" {
+						code = -32003
+					}
+					jsonResponse, _ = json.Marshal(errorResponse(id, code, err))
+				} else {
+					// In case of success, send back a JSON RPC formatted
+					// response
+					jsonResponse, _ = json.Marshal(successResponse(id, reply))
+				}
+			} else {
+				jsonResponse, _ = json.Marshal(errorResponse(id, -32001, fmt.Errorf("Not connected")))
+			}
+		}
 		// Write the response to the stream, and continue with the next websocket
 		// frame
 		ws.Write(jsonResponse)
@@ -160,9 +195,9 @@ func baseResponse(requestId interface{}) map[string]interface{} {
 }
 
 // errorResponse translates an error into a properly formatted JSON RPC response
-func errorResponse(requestId interface{}, err error) map[string]interface{} {
+func errorResponse(requestId interface{}, code int, err error) map[string]interface{} {
 	errorObj := make(map[string]interface{})
-	errorObj["code"] = -32000
+	errorObj["code"] = code
 	errorObj["message"] = "Internal Server Error"
 	errorObj["data"] = err.Error()
 
