@@ -68,7 +68,7 @@ def run_pushclose_test(env, initiator, target, closer):
     assert tt1 == tt0 + initialsend + pushsend - 200, "final balance doesn't match"
 
     # 200 = Fee() * consts.QcStateFee
-    
+
 def run_pushbreak_test(env, initiator, target, breaker):
     bc = env.bitcoind
 

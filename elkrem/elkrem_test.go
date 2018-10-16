@@ -22,9 +22,9 @@ func TestElkremBig(t *testing.T) {
 		}
 		if n%1000 == 999 {
 			t.Logf("stack with %d received hashes\n", n+1)
-			for i, n := range rcv.s {
+			for i, n := range rcv.Nodes {
 				t.Logf("Stack element %d: index %d height %d %s\n",
-					i, n.i, n.h, n.sha.String())
+					i, n.I, n.H, n.Sha.String())
 			}
 		}
 	}
@@ -54,9 +54,9 @@ func TestElkremLess(t *testing.T) {
 		}
 		if n%1000 == 999 {
 			t.Logf("stack with %d received hashes\n", n+1)
-			for i, n := range rcv.s {
+			for i, n := range rcv.Nodes {
 				t.Logf("Stack element %d: index %d height %d %s\n",
-					i, n.i, n.h, n.sha.String())
+					i, n.I, n.H, n.Sha.String())
 			}
 		}
 	}

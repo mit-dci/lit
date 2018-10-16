@@ -42,7 +42,7 @@ func (nd *LitNode) SignBreakTx(q *Qchan) (*wire.MsgTx, error) {
 		return nil, err
 	}
 
-	theirSig := sig64.SigDecompress(q.State.sig)
+	theirSig := sig64.SigDecompress(q.State.Sig)
 	// put the sighash all byte on the end of their signature
 	theirSig = append(theirSig, byte(txscript.SigHashAll))
 
@@ -455,7 +455,7 @@ func (q *Qchan) VerifySigs(sig [64]byte, HTLCSigs [][64]byte) error {
 	}
 
 	// copy signature, overwriting old signature.
-	q.State.sig = sig
+	q.State.Sig = sig
 
 	// copy HTLC-success/failure signatures
 	for i, s := range sigIndex {

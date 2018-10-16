@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/btcutil/txscript"
 	"github.com/mit-dci/lit/crypto/fastsha256"
+	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/portxo"
@@ -82,8 +82,8 @@ func (nd *LitNode) CoopClose(q *Qchan) error {
 	// we don't accept payments on this channel anymore.
 
 	outMsg := lnutil.NewCloseReqMsg(q.Peer(), q.Op, signature)
-
 	nd.tmpSendLitMsg(outMsg)
+
 	return nil
 }
 
