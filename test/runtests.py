@@ -66,27 +66,29 @@ def load_tests_from_file(path):
             modname = 'testmod_' + tname
             mod = __load_mod_from_file(fname, modname)
             mods[tname] = mod
+        pretty = tname
+        tfn = getattr(mod, t['func_name'])
+        if tfn.__name__ != 'run_test':
+            pretty += ':' + tfn.__name__
         tests.append({
             'name': tname,
-            'test_func': getattr(mod, t['func_name']),
+            'pretty_name': pretty,
+            'test_func': tfn,
             'node_cnt': t['node_cnt']
         })
     return tests
 
 def run_test_list(tests):
     ok = 0
-    fail = 0
+    failed = []
 
     # First, just run the tests.
     for t in tests:
-        name = t['name']
+        pname = t['pretty_name']
 
         print('==============================')
         tfunc = t['test_func']
-        if tfunc.__name__ == 'run_test':
-            print('Running test:', name)
-        else:
-            print('Running test:', name + ':' + tfunc.__name__)
+        print('Running test:', pname)
 
         # Do this before the bottom frame so we have a clue how long startup
         # took and where the fail was.
@@ -105,16 +107,17 @@ def run_test_list(tests):
             tfunc(env)
             env.shutdown()
             print('------------------------------')
-            print('Success:', name)
+            print('Success:', pname)
             ok += 1
             time.sleep(0.1) # Wait for things to exit, just to be sure.
         except BaseException as e:
             env.shutdown()
             print('------------------------------')
-            print('Failure:', name)
+            print('Failure:', pname)
             print('\nError:', e)
             traceback.print_exc()
             fail += 1
+            failed.append(t)
             if type(e) is KeyboardInterrupt:
                 break
             # TODO Report failures and why.
@@ -124,8 +127,9 @@ def run_test_list(tests):
     # Collect results.
     res = {
         'ok': ok,
-        'fail': fail,
-        'ignored': len(tests) - ok - fail
+        'fail': len(failed),
+        'ignored': len(tests) - ok - len(failed),
+        'failed': failed
     }
     return res
 
@@ -146,6 +150,9 @@ if __name__ == '__main__':
     print('Failure:', res['fail'])
     print('Ignored:', res['ignored'])
     if res['fail'] > 0:
+        print('\nFailures:')
+        for f in res['failed']:
+            print(' - %s' % f['pretty_name'])
         sys.exit(1)
     else:
         sys.exit(0)

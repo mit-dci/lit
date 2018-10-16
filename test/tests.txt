@@ -1,6 +1,10 @@
 # Basic tests
 testlib 1
 connect 2
+reconnect 0 simple
+reconnect 0 reordered
+reconnect 0 inbound
+reconnect 0 reordered_inbound
 setgetfee 1
 peercall 2 succeed
 peercall 2 fail
@@ -12,13 +16,12 @@ send2 2
 
 # Simple channel operations
 fund 2
-close 2 run_test_forward
-close 2 run_test_reverse
-# Disabled these to tests until we support breaking right after funding (we don't)
-break 2 run_test_forward
-break 2 run_test_reverse
+close 2 forward
+close 2 reverse
+break 2 forward
+break 2 reverse
 push 2
-pushbreak 2 run_test_forward
-pushbreak 2 run_test_reverse
-pushclose 2 run_test_forward
-pushclose 2 run_test_reverse
+pushbreak 2 forward
+pushbreak 2 reverse
+pushclose 2 forward
+pushclose 2 reverse

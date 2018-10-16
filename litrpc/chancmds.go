@@ -392,6 +392,7 @@ func (r *LitRPC) Push(args PushArgs, reply *PushReply) error {
 
 	err = r.Node.PushChannel(qc, uint32(args.Amt), args.Data)
 	if err != nil {
+		logging.Errorf("Push error: %s\n", err.Error())
 		return err
 	}
 

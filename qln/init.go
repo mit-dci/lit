@@ -232,7 +232,7 @@ func (nd *LitNode) OpenDB(filename string) error {
 	}
 	// create buckets if they're not already there
 	err = nd.LitDB.Update(func(btx *bolt.Tx) error {
-		_, err := btx.CreateBucketIfNotExists(BKTChannel)
+		_, err := btx.CreateBucketIfNotExists(BKTChannelData)
 		if err != nil {
 			return err
 		}

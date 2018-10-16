@@ -58,30 +58,40 @@ func acceptConnections(listener *lndc.Listener, port int, pm *PeerManager) {
 			continue
 		}
 
+		// Create the actual peer object.
+		npeer := &Peer{
+			lnaddr:   rlitaddr,
+			nickname: nil,
+			conn:     lndcConn,
+			idpubkey: rpk,
+
+			// TEMP
+			idx: nil,
+		}
+
 		// Add the peer data to the DB if we don't have it.
 		if pi == nil {
 			raddr := rnetaddr.String()
+			pidx, err := pm.peerdb.GetUniquePeerIdx()
+			if err != nil {
+				logging.Errorf("problem getting unique peeridx: %s\n", err.Error())
+			}
 			pi = &lncore.PeerInfo{
 				LnAddr:   &rlitaddr,
 				Nickname: nil,
 				NetAddr:  &raddr,
+				PeerIdx:  pidx,
 			}
 			err = pm.peerdb.AddPeer(rlitaddr, *pi)
+			npeer.idx = &pidx
 			if err != nil {
 				// don't close it, I guess
 				logging.Errorf("problem saving peer info to DB: %s\n", err.Error())
 			}
 		} else {
-			// Idk yet?
-		}
-
-		// Create the actual peer object.
-		npeer := &Peer{
-			lnaddr:   rlitaddr,
-			nickname: pi.Nickname,
-			conn:     lndcConn,
-			idpubkey: rpk,
-			idx:      nil,
+			npeer.nickname = pi.Nickname
+			// TEMP
+			npeer.idx = &pi.PeerIdx
 		}
 
 		// Don't do any locking here since registerPeer takes a lock and Go's

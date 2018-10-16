@@ -39,15 +39,15 @@ const maxHeight = uint8(47)
 // You can calculate h from i but I can't figure out how without taking
 // O(i) ops.  Feels like there should be a clever O(h) way.  1 byte, whatever.
 type ElkremNode struct {
-	h   uint8           // height of this node
-	i   uint64          // index (i'th node)
-	sha *chainhash.Hash // hash
+	H   uint8           `json:"h"`    // height of this node
+	I   uint64          `json:"i"`    // index (i'th node)
+	Sha *chainhash.Hash `json:"hash"` // hash
 }
 type ElkremSender struct {
 	root *chainhash.Hash // root hash of the tree
 }
 type ElkremReceiver struct {
-	s []ElkremNode // store of received hashes
+	Nodes []ElkremNode `json:"nodes"` // store of received hashes
 }
 
 func LeftSha(in chainhash.Hash) chainhash.Hash {
@@ -103,54 +103,54 @@ func (e *ElkremSender) AtIndex(w uint64) (*chainhash.Hash, error) {
 func (e *ElkremReceiver) AddNext(sha *chainhash.Hash) error {
 	// note: careful about atomicity / disk writes here
 	var n ElkremNode
-	n.sha = sha
-	t := len(e.s) - 1 // top of stack
-	if t >= 0 {       // if this is not the first hash (>= because we -1'd)
-		n.i = e.s[t].i + 1 // incoming index is tip of stack index + 1
+	n.Sha = sha
+	t := len(e.Nodes) - 1 // top of stack
+	if t >= 0 {           // if this is not the first hash (>= because we -1'd)
+		n.I = e.Nodes[t].I + 1 // incoming index is tip of stack index + 1
 	}
-	if t > 0 && e.s[t-1].h == e.s[t].h { // top 2 elements are equal height
+	if t > 0 && e.Nodes[t-1].H == e.Nodes[t].H { // top 2 elements are equal height
 		// next node must be parent; verify and remove children
-		n.h = e.s[t].h + 1             // assign height
-		l := LeftSha(*sha)             // calc l child
-		r := RightSha(*sha)            // calc r child
-		if !e.s[t-1].sha.IsEqual(&l) { // test l child
+		n.H = e.Nodes[t].H + 1             // assign height
+		l := LeftSha(*sha)                 // calc l child
+		r := RightSha(*sha)                // calc r child
+		if !e.Nodes[t-1].Sha.IsEqual(&l) { // test l child
 			return fmt.Errorf("left child doesn't match, expect %s got %s",
-				e.s[t-1].sha.String(), l.String())
+				e.Nodes[t-1].Sha.String(), l.String())
 		}
-		if !e.s[t].sha.IsEqual(&r) { // test r child
+		if !e.Nodes[t].Sha.IsEqual(&r) { // test r child
 			return fmt.Errorf("right child doesn't match, expect %s got %s",
-				e.s[t].sha.String(), r.String())
+				e.Nodes[t].Sha.String(), r.String())
 		}
-		e.s = e.s[:len(e.s)-2] // l and r children OK, remove them
+		e.Nodes = e.Nodes[:len(e.Nodes)-2] // l and r children OK, remove them
 	} // if that didn't happen, height defaults to 0
-	e.s = append(e.s, n) // append new node to stack
+	e.Nodes = append(e.Nodes, n) // append new node to stack
 	return nil
 }
 
 // AtIndex returns the w'th hash in the receiver.
 func (e *ElkremReceiver) AtIndex(w uint64) (*chainhash.Hash, error) {
-	if e == nil || e.s == nil {
+	if e == nil || e.Nodes == nil {
 		return nil, fmt.Errorf("nil elkrem receiver")
 	}
-	var out ElkremNode      // node we will eventually return
-	for _, n := range e.s { // go through stack
-		if w <= n.i { // found one bigger than or equal to what we want
+	var out ElkremNode          // node we will eventually return
+	for _, n := range e.Nodes { // go through stack
+		if w <= n.I { // found one bigger than or equal to what we want
 			out = n
 			break
 		}
 	}
-	if out.sha == nil { // didn't find anything
+	if out.Sha == nil { // didn't find anything
 		return nil, fmt.Errorf("receiver has max %d, less than requested %d",
-			e.s[len(e.s)-1].i, w)
+			e.Nodes[len(e.Nodes)-1].I, w)
 	}
-	sha, err := descend(w, out.i, out.h, *out.sha)
+	sha, err := descend(w, out.I, out.H, *out.Sha)
 	return &sha, err
 }
 
 // UpTo tells you what the receiver can go up to.
 func (e *ElkremReceiver) UpTo() uint64 {
-	if len(e.s) < 1 {
+	if len(e.Nodes) < 1 {
 		return 0
 	}
-	return e.s[len(e.s)-1].i
+	return e.Nodes[len(e.Nodes)-1].I
 }

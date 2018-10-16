@@ -34,7 +34,9 @@ const (
 )
 
 var (
-	BKTChannel  = []byte("chn") // all channel data is in this bucket.
+	BKTChannelData = []byte("channels")
+
+	//BKTChannel  = []byte("chn") // all channel data is in this bucket.
 	BKTPeers    = []byte("pir") // all peer data is in this bucket.
 	BKTPeerMap  = []byte("pmp") // map of peer index to pubkey
 	BKTChanMap  = []byte("cmp") // map of channel index to outpoint
