@@ -94,8 +94,7 @@ class LitNode():
             "--dir", self.data_dir,
             "--unauthrpc",
             "--rpcport=" + str(self.rpc_port),
-            #"--autoReconnect",
-            #"--autoListenPort=" + str(self.p2p_port)
+            "--noautolisten"
         ]
         self.proc = subprocess.Popen(args,
             stdin=subprocess.DEVNULL,
