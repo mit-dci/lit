@@ -236,7 +236,6 @@ func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, set
 		conn:     lndcconn,
 		idpubkey: pk,
 		alive:    true,
-		ping:     make(chan bool, 1),
 	}
 
 	if pi == nil {
@@ -304,9 +303,6 @@ func (pm *PeerManager) registerPeer(peer *Peer) {
 	}
 	pm.ebus.Publish(e)
 
-	// Start the ping thread.
-	go pingPeer(peer)
-
 }
 
 func (pm *PeerManager) unregisterPeer(peer *Peer) {
@@ -366,7 +362,6 @@ func (pm *PeerManager) ListenOnPort(port int) error {
 	// TODO UPnP and PMP NAT traversal.
 
 	// Try to start listening.
-	logging.Info("PORT: ", port)
 	listener, err := lndc.NewListener(pm.idkey, port)
 	if err != nil {
 		logging.Errorf("listening failed: %s\n", err.Error())

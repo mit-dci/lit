@@ -2,7 +2,6 @@ package lnp2p
 
 import (
 	"net"
-	"time"
 
 	"github.com/mit-dci/lit/eventbus"
 	"github.com/mit-dci/lit/lncore"
@@ -122,8 +121,6 @@ func acceptConnections(listener *lndc.Listener, port int, pm *PeerManager) {
 
 }
 
-const readdeadlineseconds = 60 // if they don't send a message at least every minute then disconnect
-
 func processConnectionInboundTraffic(peer *Peer, pm *PeerManager) {
 
 	// Set this up in-advance.
@@ -147,8 +144,7 @@ func processConnectionInboundTraffic(peer *Peer, pm *PeerManager) {
 		// Make a buf and read into it.
 		buf := make([]byte, 1<<24)
 
-		// Update the timeout, then actually read.
-		peer.conn.SetReadDeadline(time.Now().Add(readdeadlineseconds * time.Second))
+		// Actually read.
 		n, err := peer.conn.Read(buf)
 		if err != nil {
 			logging.Warnf("Error reading from peer: %s\n", err.Error())

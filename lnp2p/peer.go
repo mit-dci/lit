@@ -14,7 +14,6 @@ type Peer struct {
 	idpubkey pubkey
 
 	alive bool
-	ping  chan bool // if a false is sent along here it kills the goroutine
 
 	idx  *uint32 // deprecated
 	pmgr *PeerManager
