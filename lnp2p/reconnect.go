@@ -4,7 +4,7 @@ import (
 	"github.com/mit-dci/lit/eventbus"
 )
 
-func makePeerDisconnectHandler(pm *PeerManager) func(eventbus.Event) eventbus.EventHandleResult {
+func makePeerReconnectHandler(pm *PeerManager) func(eventbus.Event) eventbus.EventHandleResult {
 	return func(event eventbus.Event) eventbus.EventHandleResult {
 
 		dce, ok := event.(PeerDisconnectEvent)

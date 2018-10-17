@@ -87,7 +87,7 @@ func NewPeerManager(rootkey *hdkeychain.ExtendedKey, pdb lncore.LitPeerStorage, 
 	}
 
 	if autoreconn {
-		bus.RegisterHandler("lnp2p.peer.disconnect", makePeerDisconnectHandler(pm))
+		bus.RegisterHandler("lnp2p.peer.disconnect", makePeerReconnectHandler(pm))
 	}
 
 	return pm, nil
