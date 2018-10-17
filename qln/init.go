@@ -141,7 +141,9 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 	if err != nil {
 		return nil, err
 	}
+	logging.Infof("init: autoreconnecting to %d peers\n", len(addrs))
 	for _, a := range addrs {
+		logging.Infof("init: trying to connect to previous peer: %s\n", a)
 		_, err = nd.PeerMan.TryConnectAddress(string(a), nil) // TODO Proxy/NAT
 		if err != nil {
 			logging.Warnf("init: tried to auto-connect to %s but failed: %s\n", a, err.Error())
