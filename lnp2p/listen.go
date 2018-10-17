@@ -1,6 +1,9 @@
 package lnp2p
 
 import (
+	"net"
+	"time"
+
 	"github.com/mit-dci/lit/eventbus"
 	"github.com/mit-dci/lit/lncore"
 	"github.com/mit-dci/lit/lndc"
@@ -21,6 +24,14 @@ func acceptConnections(listener *lndc.Listener, port int, pm *PeerManager) {
 
 	// Do this now in case we panic so we can do cleanup.
 	defer publishStopEvent(stopEvent, pm.ebus)
+
+	// Also make sure to remove this entry from the listening ports list later
+	// on, regardless of how it gets removed.
+	defer (func() {
+		pm.mtx.Lock()
+		delete(pm.listeningPorts, port)
+		pm.mtx.Unlock()
+	})()
 
 	// Actually start listening for connections.
 	for {
@@ -106,15 +117,12 @@ func acceptConnections(listener *lndc.Listener, port int, pm *PeerManager) {
 	// Update the stop reason.
 	stopEvent.Reason = "closed"
 
-	// Then delete the entry from listening ports.
-	pm.mtx.Lock()
-	delete(pm.listeningPorts, port)
-	pm.mtx.Unlock()
-
 	// after this the stop event will be published
 	logging.Infof("Stopped listening on %s\n", port)
 
 }
+
+const readdeadlineseconds = 60 // if they don't send a message at least every minute then disconnect
 
 func processConnectionInboundTraffic(peer *Peer, pm *PeerManager) {
 
@@ -127,15 +135,33 @@ func processConnectionInboundTraffic(peer *Peer, pm *PeerManager) {
 	// Do this now in case we panic so we can do cleanup.
 	defer publishDisconnectEvent(dcEvent, pm.ebus)
 
+	// And make sure to mark the peer object as dead when we leave here.
+	defer (func() {
+		peer.alive = false
+	})()
+
 	// TODO Have chanmgr deal with channels after peer connection brought up. (eventbus)
 
 	for {
 
 		// Make a buf and read into it.
 		buf := make([]byte, 1<<24)
+
+		// Update the timeout, then actually read.
+		peer.conn.SetReadDeadline(time.Now().Add(readdeadlineseconds * time.Second))
 		n, err := peer.conn.Read(buf)
 		if err != nil {
 			logging.Warnf("Error reading from peer: %s\n", err.Error())
+
+			if neterr, ok := err.(net.Error); ok {
+				if neterr.Timeout() {
+					dcEvent.Reason = "timeout"
+				} else {
+					dcEvent.Reason = "unrecoverable"
+				}
+			}
+
+			peer.alive = false // this might not be necessary, we remove it in other places
 			peer.conn.Close()
 			return
 		}

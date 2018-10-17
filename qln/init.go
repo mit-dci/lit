@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/boltdb/bolt"
+
 	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/hdkeychain"
 	"github.com/mit-dci/lit/coinparam"
@@ -60,7 +62,7 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 	nd.Events = &ebus
 
 	// Peer manager
-	nd.PeerMan, err = lnp2p.NewPeerManager(rootPrivKey, nd.NewLitDB.GetPeerDB(), trackerURL, &ebus)
+	nd.PeerMan, err = lnp2p.NewPeerManager(rootPrivKey, nd.NewLitDB.GetPeerDB(), trackerURL, &ebus, autoreconn)
 	if err != nil {
 		return nil, err
 	}
@@ -147,6 +149,8 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 		for a := range infos {
 			logging.Infof("init: trying to connect to previous peer: %s\n", a)
 			go (func() {
+				time.Sleep(5 * time.Second) // to give things time to warm up
+
 				_, err = nd.PeerMan.TryConnectAddress(string(a), nil) // TODO Proxy/NAT
 				if err != nil {
 					logging.Warnf("init: tried to auto-connect to %s but failed: %s\n", a, err.Error())

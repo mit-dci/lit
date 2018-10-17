@@ -66,7 +66,7 @@ type NetSettings struct {
 }
 
 // NewPeerManager creates a peer manager from a root key
-func NewPeerManager(rootkey *hdkeychain.ExtendedKey, pdb lncore.LitPeerStorage, trackerURL string, bus *eventbus.EventBus) (*PeerManager, error) {
+func NewPeerManager(rootkey *hdkeychain.ExtendedKey, pdb lncore.LitPeerStorage, trackerURL string, bus *eventbus.EventBus, autoreconn bool) (*PeerManager, error) {
 	k, err := computeIdentKeyFromRoot(rootkey)
 	if err != nil {
 		return nil, err
@@ -84,6 +84,10 @@ func NewPeerManager(rootkey *hdkeychain.ExtendedKey, pdb lncore.LitPeerStorage, 
 		trackerURL:     trackerURL,
 		outqueue:       make(chan outgoingmsg, outgoingbuf),
 		mtx:            &sync.Mutex{},
+	}
+
+	if autoreconn {
+		bus.RegisterHandler("lnp2p.peer.disconnect", makePeerDisconnectHandler(pm))
 	}
 
 	return pm, nil
@@ -231,6 +235,8 @@ func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, set
 		nickname: nil,
 		conn:     lndcconn,
 		idpubkey: pk,
+		alive:    true,
+		ping:     make(chan bool, 1),
 	}
 
 	if pi == nil {
@@ -297,6 +303,9 @@ func (pm *PeerManager) registerPeer(peer *Peer) {
 		Conn:      peer.conn,
 	}
 	pm.ebus.Publish(e)
+
+	// Start the ping thread.
+	go pingPeer(peer)
 
 }
 
