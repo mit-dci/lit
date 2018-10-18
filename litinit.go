@@ -38,22 +38,17 @@ func createDefaultConfigFile(destinationPath string) error {
 // (maybe add the key to the config?
 func litSetup(conf *litConfig) *[32]byte {
 	// Pre-parse the command line options to see if an alternative config
-	// file or the version flag was specified.  Any errors aside from the
-	// help message error can be ignored here since they will be caught by
-	// the final parse below.
+	// file or the version flag was specified. Config file will be read later
+	// and cli options would be parsed again below
 
-	//	usageMessage := fmt.Sprintf("Use %s -h to show usage", "./lit")
-
-	preParser := newConfigParser(conf, flags.HelpFlag)
-	_, err := preParser.ParseArgs(os.Args)
+	parser := newConfigParser(conf, flags.Default)
+	_, err := parser.ParseArgs(os.Args)
 	if err != nil {
+		// catch all cli argument errors
 		logging.Fatal(err)
 	}
 
-	// Load config from file and parse
-	parser := newConfigParser(conf, flags.Default)
-
-	// set default log level here
+	// set default log level
 	logging.SetLogLevel(defaultLogLevel)
 	// create home directory
 	_, err = os.Stat(conf.LitHomeDir)
@@ -64,7 +59,7 @@ func litSetup(conf *litConfig) *[32]byte {
 		// first time the guy is running lit, lets set tn3 to true
 		os.Mkdir(conf.LitHomeDir, 0700)
 		logging.Infof("Creating a new config file")
-		err := createDefaultConfigFile(conf.LitHomeDir) // Source of error
+		err := createDefaultConfigFile(conf.LitHomeDir)
 		if err != nil {
 			fmt.Printf("Error creating a default config file: %v", conf.LitHomeDir)
 			logging.Fatal(err)
@@ -100,35 +95,18 @@ func litSetup(conf *litConfig) *[32]byte {
 
 	logFilePath := filepath.Join(conf.LitHomeDir, "lit.log")
 	logFile, err := os.OpenFile(logFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	defer logFile.Close()
 	logging.SetLogFile(logFile)
 
-	// Log Levels:
-	// 5: DebugLevel prints Panics, Fatals, Errors, Warnings, Infos and Debugs
-	// 4: InfoLevel  prints Panics, Fatals, Errors, Warnings and Info
-	// 3: WarnLevel  prints Panics, Fatals, Errors and Warnings
-	// 2: ErrorLevel prints Panics, Fatals and Errors
-	// 1: FatalLevel prints Panics, Fatals
-	// 0: PanicLevel prints Panics
-	// Default is level 3
-	// Code for tagging logs:
-	// Debug -> Useful debugging information
-	// Info  -> Something noteworthy happened
-	// Warn  -> You should probably take a look at this
-	// Error -> Something failed but I'm not quitting
-	// Fatal -> Bye
-
-	// TODO ... what's this do?
-	defer logFile.Close()
-
-	logLevel := -1
+	logLevel := 0
 	if len(conf.LogLevel) == 1 { // -v
 		logLevel = 1
 	} else if len(conf.LogLevel) == 2 { // -vv
 		logLevel = 2
-	} else if len(conf.LogLevel) >= 3 {
+	} else if len(conf.LogLevel) >= 3 { // -vvv
 		logLevel = 3
 	}
-	logging.SetLogLevel(logLevel)
+	logging.SetLogLevel(logLevel) // defaults to zero
 
 	// Allow node with no linked wallets, for testing.
 	// TODO Should update tests and disallow nodes without wallets later.

@@ -1,5 +1,18 @@
 package logging
 
+// Log Levels:
+// 3: DebugLevel prints Panics, Fatals, Errors, Warnings, Infos and Debugs
+// 2: InfoLevel  prints Panics, Fatals, Errors, Warnings and Info
+// 1: WarnLevel  prints Panics, Fatals, Errors and Warnings
+// 0: ErrorLevel prints Panics, Fatals and Errors
+// Default is level 0
+// Code for tagging logs:
+// Debug -> Useful debugging information
+// Info  -> Something noteworthy happened
+// Warn  -> You should probably take a look at this
+// Error -> Something failed but I'm not quitting
+// Fatal -> Bye
+
 import (
 	"fmt"
 	"io"
@@ -16,7 +29,7 @@ const (
 	LogLevelDebug        LogLevel = 3
 )
 
-var logLevel = LogLevelError
+var logLevel = LogLevelError // the default
 
 func SetLogLevel(newLevel int) {
 	logLevel = LogLevel(newLevel)
@@ -122,8 +135,4 @@ func Error(args ...interface{}) {
 		args = append([]interface{}{getPrefix("ERROR")}, args...)
 		log.Print(args...)
 	}
-}
-
-func SetupTestLogs() {
-	logLevel = LogLevelDebug
 }

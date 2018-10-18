@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,6 +8,7 @@ import (
 
 	"github.com/chzyer/readline"
 	"github.com/fatih/color"
+	flags "github.com/jessevdk/go-flags"
 	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/litrpc"
 	"github.com/mit-dci/lit/lnutil"
@@ -30,28 +30,11 @@ May end up using termbox-go
 
 */
 
-//// BalReply is the reply when the user asks about their balance.
-//// This is a Non-Channel
-//type BalReply struct {
-//	ChanTotal         int64
-//	TxoTotal          int64
-//	SpendableNow      int64
-//	SpendableNowWitty int64
-//}
-
 const (
 	litHomeDirName     = ".lit"
 	historyFilename    = "lit-af.history"
 	defaultKeyFileName = "privkey.hex"
 )
-
-type litAfClient struct {
-	con           string
-	verbosity     int
-	tracker       string
-	litHomeDir    string
-	lndcRpcClient *litrpc.LndcRpcClient
-}
 
 type Command struct {
 	Format           string
@@ -59,39 +42,58 @@ type Command struct {
 	ShortDescription string
 }
 
-func setConfig(lc *litAfClient) {
-	conptr := flag.String("con", "2448", "host to connect to in the form of [<lnadr>@][<host>][:<port>]")
-	vptr := flag.Int("v", 2, "verbosity level")
-	dirptr := flag.String("dir", filepath.Join(os.Getenv("HOME"), litHomeDirName), "directory to save settings")
-	trackerptr := flag.String("tracker", "http://hubris.media.mit.edu:46580", "service to use for looking up node addresses")
-
-	flag.Parse()
-	lc.verbosity = *vptr
-	lc.con = *conptr
-	lc.tracker = *trackerptr
-	lc.litHomeDir = *dirptr
+type litAfClient struct {
+	RPCClient *litrpc.LndcRpcClient
 }
 
-// for now just testing how to connect and get messages back and forth
-func main() {
+type litAfConfig struct {
+	Con      string `long:"con" description:"host to connect to in the form of [<lnadr>@][<host>][:<port>]"`
+	Dir      string `long:"dir" description:"directory to save settings"`
+	Tracker  string `long:"tracker" description:"service to use for looking up node addresses"`
+	LogLevel []bool `short:"v" description:"Set verbosity level to verbose (-v), very verbose (-vv) or very very verbose (-vvv)"`
+}
+
+var (
+	defaultCon     = "2448"
+	defaultDir     = filepath.Join(os.Getenv("HOME"), litHomeDirName)
+	defaultTracker = "http://hubris.media.mit.edu:46580"
+)
+
+// newConfigParser returns a new command line flags parser.
+func newConfigParser(conf *litAfConfig, options flags.Options) *flags.Parser {
+	parser := flags.NewParser(conf, options)
+	return parser
+}
+
+func (lc *litAfClient) litAfSetup(conf litAfConfig) {
+
 	var err error
-
-	lc := new(litAfClient)
-	setConfig(lc)
-
-	logging.SetLogLevel(lc.verbosity)
-
 	// create home directory if it does not exist
-	_, err = os.Stat(lc.litHomeDir)
+	_, err = os.Stat(defaultDir)
 	if os.IsNotExist(err) {
-		os.Mkdir(lc.litHomeDir, 0700)
+		os.Mkdir(defaultDir, 0700)
 	}
 
-	adr, host, port := lnutil.ParseAdrStringWithPort(lc.con)
-	logging.Infof("Adr: %s, Host: %s, Port: %d", adr, host, port)
-	if litrpc.LndcRpcCanConnectLocallyWithHomeDir(lc.litHomeDir) && adr == "" && (host == "localhost" || host == "127.0.0.1") {
+	preParser := newConfigParser(&conf, flags.HelpFlag)
+	_, err = preParser.ParseArgs(os.Args) // parse the cli
+	if err != nil {
+		logging.Fatal(err)
+	}
+	logLevel := 0
+	if len(conf.LogLevel) == 1 { // -v
+		logLevel = 1
+	} else if len(conf.LogLevel) == 2 { // -vv
+		logLevel = 2
+	} else if len(conf.LogLevel) >= 3 { // -vvv
+		logLevel = 3
+	}
+	logging.SetLogLevel(logLevel) // defaults to zero
 
-		lc.lndcRpcClient, err = litrpc.NewLocalLndcRpcClientWithHomeDirAndPort(lc.litHomeDir, port)
+	adr, host, port := lnutil.ParseAdrStringWithPort(conf.Con)
+	logging.Infof("Adr: %s, Host: %s, Port: %d", adr, host, port)
+	if litrpc.LndcRpcCanConnectLocallyWithHomeDir(defaultDir) && adr == "" && (host == "localhost" || host == "127.0.0.1") {
+
+		lc.RPCClient, err = litrpc.NewLocalLndcRpcClientWithHomeDirAndPort(defaultDir, port)
 		if err != nil {
 			logging.Fatal(err.Error())
 		}
@@ -100,7 +102,7 @@ func main() {
 			logging.Fatal("lit address passed in -con parameter is not valid")
 		}
 
-		keyFilePath := filepath.Join(lc.litHomeDir, "lit-af-key.hex")
+		keyFilePath := filepath.Join(defaultDir, "lit-af-key.hex")
 		privKey, err := lnutil.ReadKeyFile(keyFilePath)
 		if err != nil {
 			logging.Fatal(err.Error())
@@ -108,7 +110,7 @@ func main() {
 		key, _ := koblitz.PrivKeyFromBytes(koblitz.S256(), privKey[:])
 
 		if adr != "" && strings.HasPrefix(adr, "ln1") && host == "" {
-			ipv4, _, err := lnutil.Lookup(adr, lc.tracker, "")
+			ipv4, _, err := lnutil.Lookup(adr, conf.Tracker, "")
 			if err != nil {
 				logging.Fatalf("Error looking up address on the tracker: %s", err)
 			} else {
@@ -118,15 +120,28 @@ func main() {
 			adr = fmt.Sprintf("%s@%s:%d", adr, host, port)
 		}
 
-		lc.lndcRpcClient, err = litrpc.NewLndcRpcClient(adr, key)
+		lc.RPCClient, err = litrpc.NewLndcRpcClient(adr, key)
 		if err != nil {
 			logging.Fatal(err.Error())
 		}
 	}
+}
+
+// for now just testing how to connect and get messages back and forth
+func main() {
+
+	var err error
+	lc := new(litAfClient)
+	conf := litAfConfig{
+		Con:     defaultCon,
+		Dir:     defaultDir,
+		Tracker: defaultTracker,
+	}
+	lc.litAfSetup(conf) // setup lit-af to start
 
 	rl, err := readline.NewEx(&readline.Config{
 		Prompt:       lnutil.Prompt("lit-af") + lnutil.White("# "),
-		HistoryFile:  filepath.Join(lc.litHomeDir, historyFilename),
+		HistoryFile:  filepath.Join(defaultDir, historyFilename),
 		AutoComplete: lc.NewAutoCompleter(),
 	})
 	if err != nil {
@@ -158,5 +173,5 @@ func main() {
 }
 
 func (lc *litAfClient) Call(serviceMethod string, args interface{}, reply interface{}) error {
-	return lc.lndcRpcClient.Call(serviceMethod, args, reply)
+	return lc.RPCClient.Call(serviceMethod, args, reply)
 }
