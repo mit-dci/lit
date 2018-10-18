@@ -132,8 +132,7 @@ func (pm *PeerManager) GetPeerIdx(peer *Peer) uint32 {
 // GetPeer returns the peer with the given lnaddr.
 func (pm *PeerManager) GetPeer(lnaddr lncore.LnAddr) *Peer {
 	p, ok := pm.peerMap[lnaddr]
-	logging.Errorf("%v -> %v (%t)\n", lnaddr, p, ok)
-	if !ok {
+	if !ok || p == nil {
 		return nil
 	}
 	return p
@@ -329,7 +328,7 @@ func (pm *PeerManager) unregisterPeer(peer *Peer) {
 	pm.peers[idx] = ""
 
 	// Remove the actual peer entry.
-	pm.peerMap[peer.GetLnAddr()] = nil
+	delete(pm.peerMap, peer.GetLnAddr())
 
 	// More cleanup.
 	peer.conn = nil
