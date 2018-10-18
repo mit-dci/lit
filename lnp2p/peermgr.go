@@ -313,6 +313,11 @@ func (pm *PeerManager) registerPeer(peer *Peer) {
 
 func (pm *PeerManager) unregisterPeer(peer *Peer) {
 
+	// Sanity check.
+	if peer.pmgr != pm {
+		return // not 100% an error, since there's a chance this gets called multiple times
+	}
+
 	// Again, sensitive changes we should get a lock to do first.
 	pm.mtx.Lock()
 	defer pm.mtx.Unlock()
@@ -340,6 +345,9 @@ func (pm *PeerManager) DisconnectPeer(peer *Peer) error {
 	if err != nil {
 		return err
 	}
+
+	// Also remove the registration.
+	pm.unregisterPeer(peer)
 
 	// This will cause the peer disconnect event to be raised when the reader
 	// goroutine started to exit and run the unregistration

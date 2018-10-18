@@ -169,6 +169,10 @@ func processConnectionInboundTraffic(peer *Peer, pm *PeerManager) {
 
 			peer.alive = false // this might not be necessary, we remove it in other places
 			peer.conn.Close()
+
+			// unregister, in case this was closed by the remote party
+			pm.unregisterPeer(peer)
+
 			return
 		}
 
