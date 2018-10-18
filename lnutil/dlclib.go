@@ -455,7 +455,6 @@ func SettlementTx(c *DlcContract, d DlcContractDivision,
 	// We don't have enough to pay for a fee. We get 0, our contract partner
 	// pays the rest of the fee
 	if valueOurs < feeEach {
-		feeOurs = valueOurs
 		valueOurs = 0
 	} else {
 		valueOurs = d.ValueOurs - feeOurs

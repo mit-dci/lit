@@ -36,7 +36,7 @@ func createDefaultConfigFile(destinationPath string) error {
 // configuration variables, reading in key data, reading and creating files if
 // they're not yet there.  It takes in a config, and returns a key.
 // (maybe add the key to the config?
-func litSetup(conf *litConfig) *[32]byte {
+func litSetup(conf *litConfig) (*[32]byte, error) {
 	// Pre-parse the command line options to see if an alternative config
 	// file or the version flag was specified.  Any errors aside from the
 	// help message error can be ignored here since they will be caught by
@@ -47,7 +47,7 @@ func litSetup(conf *litConfig) *[32]byte {
 	preParser := newConfigParser(conf, flags.HelpFlag)
 	_, err := preParser.ParseArgs(os.Args)
 	if err != nil {
-		logging.Fatal(err)
+		return nil, err
 	}
 
 	// Load config from file and parse
@@ -58,7 +58,7 @@ func litSetup(conf *litConfig) *[32]byte {
 	// create home directory
 	_, err = os.Stat(conf.LitHomeDir)
 	if err != nil {
-		logging.Errorf("Error while creating a directory")
+		return nil, err
 	}
 	if os.IsNotExist(err) {
 		// first time the guy is running lit, lets set tn3 to true
@@ -67,19 +67,19 @@ func litSetup(conf *litConfig) *[32]byte {
 		err := createDefaultConfigFile(conf.LitHomeDir) // Source of error
 		if err != nil {
 			fmt.Printf("Error creating a default config file: %v", conf.LitHomeDir)
-			logging.Fatal(err)
+			return nil, err
 		}
 	}
 
 	if _, err := os.Stat(filepath.Join(filepath.Join(conf.LitHomeDir), "lit.conf")); os.IsNotExist(err) {
 		// if there is no config file found over at the directory, create one
 		if err != nil {
-			fmt.Println(err)
+			return nil, err
 		}
 		logging.Infof("Creating a new config file")
 		err := createDefaultConfigFile(filepath.Join(conf.LitHomeDir)) // Source of error
 		if err != nil {
-			logging.Fatal(err)
+			return nil, err
 		}
 	}
 
@@ -89,18 +89,22 @@ func litSetup(conf *litConfig) *[32]byte {
 	if err != nil {
 		_, ok := err.(*os.PathError)
 		if !ok {
-			logging.Fatal(err)
+			return nil, err
 		}
 	}
 	// Parse command line options again to ensure they take precedence.
 	_, err = parser.ParseArgs(os.Args) // returns invalid flags
 	if err != nil {
-		logging.Fatal(err)
+		return nil, err
 	}
 
 	logFilePath := filepath.Join(conf.LitHomeDir, "lit.log")
 	logFile, err := os.OpenFile(logFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		return nil, err
+	}
 	logging.SetLogFile(logFile)
+	defer logFile.Close()
 
 	// Log Levels:
 	// 5: DebugLevel prints Panics, Fatals, Errors, Warnings, Infos and Debugs
@@ -117,8 +121,6 @@ func litSetup(conf *litConfig) *[32]byte {
 	// Error -> Something failed but I'm not quitting
 	// Fatal -> Bye
 
-	// TODO ... what's this do?
-	defer logFile.Close()
 
 	logLevel := -1
 	if len(conf.LogLevel) == 1 { // -v
@@ -141,8 +143,8 @@ func litSetup(conf *litConfig) *[32]byte {
 	// read key file (generate if not found)
 	key, err := lnutil.ReadKeyFile(keyFilePath)
 	if err != nil {
-		logging.Fatal(err)
+		return nil, err
 	}
 
-	return key
+	return key, nil
 }

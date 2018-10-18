@@ -195,6 +195,9 @@ func (lc *litAfClient) RemoteControlRequest(textArgs []string) error {
 	// by the RPC server (inserts the pubkey from the lndc connection)
 
 	err = lc.Call("LitRPC.RequestRemoteControlAuthorization", args, reply)
+	if err != nil {
+		return err
+	}
 	fmt.Fprintf(color.Output, "%s\n", reply.Status)
 	return nil
 }

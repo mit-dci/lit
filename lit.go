@@ -259,7 +259,10 @@ func main() {
 		UnauthRPC:                       defaultUnauthRPC,
 	}
 
-	key := litSetup(&conf)
+	key, err := litSetup(&conf)
+	if err != nil {
+		logging.Fatal(err) // fatals and errors are always printed out by default
+	}
 	if conf.ProxyURL != "" {
 		conf.LitProxyURL = conf.ProxyURL
 		conf.ChainProxyURL = conf.ProxyURL
