@@ -87,7 +87,12 @@ func TestMoreWork(t *testing.T) {
 	// Work of A: 206916179889
 	// WOrk of B: 1167945961455
 
-	if moreWork(a, b, p) {
+	check, err := moreWork(a, b, p, 0)
+	if err != nil {
+		logging.Error("Test failed!!")
+		t.Fatal()
+	}
+	if check {
 		logging.Error("Test failed!!")
 		t.Fatal()
 	} else {
