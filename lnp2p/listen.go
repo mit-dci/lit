@@ -58,6 +58,16 @@ func acceptConnections(listener *lndc.Listener, port int, pm *PeerManager) {
 		rlitaddr := convertPubkeyToLitAddr(rpk)
 		rnetaddr := lndcConn.RemoteAddr()
 
+		// Check to see if we already have this peer connected.
+		if pm.GetPeer(rlitaddr) != nil {
+
+			// We already have a connection from this peer, kill it.
+			logging.Warnf("peermgr: Connection attempted from peer we already have connected: %s\n", rlitaddr)
+			lndcConn.Close()
+			continue
+
+		}
+
 		logging.Infof("New connection from %s at %s\n", rlitaddr, rnetaddr.String())
 
 		// Read the peer info from the DB.

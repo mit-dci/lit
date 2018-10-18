@@ -173,6 +173,12 @@ func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, set
 		return nil, fmt.Errorf("connection to a peer with unknown lnaddr not supported yet")
 	}
 
+	// Make sure we don't get multiple connections.
+	if pm.GetPeer(*lnaddr) != nil {
+		logging.Warnf("peermgr: Someone attempted to connect to peer we already have connection with: %s\n", *lnaddr)
+		return nil, fmt.Errorf("already have connection with this address")
+	}
+
 	// Do NAT setup stuff.
 	if settings != nil && settings.NatMode != nil {
 
