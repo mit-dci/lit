@@ -136,18 +136,6 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 	nd.PeerMap = map[*lnp2p.Peer]*RemotePeer{}
 	nd.PeerMapMtx = &sync.Mutex{}
 
-	pdb := nd.NewLitDB.GetPeerDB()
-	addrs, err := pdb.GetPeerAddrs()
-	if err != nil {
-		return nil, err
-	}
-	for _, a := range addrs {
-		_, err = nd.PeerMan.TryConnectAddress(string(a), nil) // TODO Proxy/NAT
-		if err != nil {
-			logging.Warnf("init: tried to auto-connect to %s but failed: %s\n", a, err.Error())
-		}
-	}
-
 	return nd, nil
 }
 
