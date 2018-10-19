@@ -58,6 +58,13 @@ func acceptConnections(listener *lndc.Listener, port int, pm *PeerManager) {
 		rlitaddr := convertPubkeyToLitAddr(rpk)
 		rnetaddr := lndcConn.RemoteAddr()
 
+		// Make sure we can't let ourself connect to ourself.
+		if string(rlitaddr) == pm.GetExternalAddress() {
+			logging.Infof("peermgr: Got a connection from ourselves?  Dropping.")
+			lndcConn.Close()
+			continue
+		}
+
 		// Check to see if we already have this peer connected.
 		if pm.GetPeer(rlitaddr) != nil {
 
@@ -68,7 +75,7 @@ func acceptConnections(listener *lndc.Listener, port int, pm *PeerManager) {
 
 		}
 
-		logging.Infof("New connection from %s at %s\n", rlitaddr, rnetaddr.String())
+		logging.Infof("peermgr: New connection from %s at %s\n", rlitaddr, rnetaddr.String())
 
 		// Read the peer info from the DB.
 		pi, err := pm.peerdb.GetPeerInfo(rlitaddr)

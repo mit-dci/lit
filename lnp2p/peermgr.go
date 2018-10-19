@@ -172,6 +172,11 @@ func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, set
 		return nil, fmt.Errorf("connection to a peer with unknown lnaddr not supported yet")
 	}
 
+	// Make sure we can't connect to ourself.
+	if string(*lnaddr) == pm.GetExternalAddress() {
+		return nil, fmt.Errorf("cannot connect to self")
+	}
+
 	// Make sure we don't get multiple connections.
 	if pm.GetPeer(*lnaddr) != nil {
 		logging.Warnf("peermgr: Someone attempted to connect to peer we already have connection with: %s\n", *lnaddr)
