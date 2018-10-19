@@ -1,6 +1,8 @@
 package lnp2p
 
 import (
+	"net"
+
 	"github.com/mit-dci/lit/eventbus"
 	"github.com/mit-dci/lit/lncore"
 	"github.com/mit-dci/lit/lndc"
@@ -21,6 +23,14 @@ func acceptConnections(listener *lndc.Listener, port int, pm *PeerManager) {
 
 	// Do this now in case we panic so we can do cleanup.
 	defer publishStopEvent(stopEvent, pm.ebus)
+
+	// Also make sure to remove this entry from the listening ports list later
+	// on, regardless of how it gets removed.
+	defer (func() {
+		pm.mtx.Lock()
+		delete(pm.listeningPorts, port)
+		pm.mtx.Unlock()
+	})()
 
 	// Actually start listening for connections.
 	for {
@@ -48,7 +58,24 @@ func acceptConnections(listener *lndc.Listener, port int, pm *PeerManager) {
 		rlitaddr := convertPubkeyToLitAddr(rpk)
 		rnetaddr := lndcConn.RemoteAddr()
 
-		logging.Infof("New connection from %s at %s\n", rlitaddr, rnetaddr.String())
+		// Make sure we can't let ourself connect to ourself.
+		if string(rlitaddr) == pm.GetExternalAddress() {
+			logging.Infof("peermgr: Got a connection from ourselves?  Dropping.")
+			lndcConn.Close()
+			continue
+		}
+
+		// Check to see if we already have this peer connected.
+		if pm.GetPeer(rlitaddr) != nil {
+
+			// We already have a connection from this peer, kill it.
+			logging.Warnf("peermgr: Connection attempted from peer we already have connected: %s\n", rlitaddr)
+			lndcConn.Close()
+			continue
+
+		}
+
+		logging.Infof("peermgr: New connection from %s at %s\n", rlitaddr, rnetaddr.String())
 
 		// Read the peer info from the DB.
 		pi, err := pm.peerdb.GetPeerInfo(rlitaddr)
@@ -106,11 +133,6 @@ func acceptConnections(listener *lndc.Listener, port int, pm *PeerManager) {
 	// Update the stop reason.
 	stopEvent.Reason = "closed"
 
-	// Then delete the entry from listening ports.
-	pm.mtx.Lock()
-	delete(pm.listeningPorts, port)
-	pm.mtx.Unlock()
-
 	// after this the stop event will be published
 	logging.Infof("Stopped listening on %s\n", port)
 
@@ -127,16 +149,37 @@ func processConnectionInboundTraffic(peer *Peer, pm *PeerManager) {
 	// Do this now in case we panic so we can do cleanup.
 	defer publishDisconnectEvent(dcEvent, pm.ebus)
 
+	// And make sure to mark the peer object as dead when we leave here.
+	defer (func() {
+		peer.alive = false
+	})()
+
 	// TODO Have chanmgr deal with channels after peer connection brought up. (eventbus)
 
 	for {
 
 		// Make a buf and read into it.
 		buf := make([]byte, 1<<24)
+
+		// Actually read.
 		n, err := peer.conn.Read(buf)
 		if err != nil {
 			logging.Warnf("Error reading from peer: %s\n", err.Error())
+
+			if neterr, ok := err.(net.Error); ok {
+				if neterr.Timeout() {
+					dcEvent.Reason = "timeout"
+				} else {
+					dcEvent.Reason = "unrecoverable"
+				}
+			}
+
+			peer.alive = false // this might not be necessary, we remove it in other places
 			peer.conn.Close()
+
+			// unregister, in case this was closed by the remote party
+			pm.unregisterPeer(peer)
+
 			return
 		}
 

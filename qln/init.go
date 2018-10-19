@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/boltdb/bolt"
+
 	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/hdkeychain"
 	"github.com/mit-dci/lit/coinparam"
@@ -22,7 +24,7 @@ import (
 
 // NewLitNode starts up a lit node.  Needs priv key, and a path.
 // Does not activate a subwallet; do that after init.
-func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL string, nat string) (*LitNode, error) {
+func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL string, nat string, autoreconn bool, autolistenport int) (*LitNode, error) {
 
 	var err error
 
@@ -60,7 +62,7 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 	nd.Events = &ebus
 
 	// Peer manager
-	nd.PeerMan, err = lnp2p.NewPeerManager(rootPrivKey, nd.NewLitDB.GetPeerDB(), trackerURL, &ebus)
+	nd.PeerMan, err = lnp2p.NewPeerManager(rootPrivKey, nd.NewLitDB.GetPeerDB(), trackerURL, &ebus, autoreconn)
 	if err != nil {
 		return nil, err
 	}
@@ -135,6 +137,35 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 	// REFACTORING STUFF
 	nd.PeerMap = map[*lnp2p.Peer]*RemotePeer{}
 	nd.PeerMapMtx = &sync.Mutex{}
+
+	// Do we do autoreconnection things?
+	if autoreconn {
+		pdb := nd.NewLitDB.GetPeerDB()
+		infos, err := pdb.GetPeerInfos()
+		if err != nil {
+			return nil, err
+		}
+		logging.Infof("init: autoreconnecting to %d peers\n", len(infos))
+		for a := range infos {
+			logging.Infof("init: trying to connect to previous peer: %s\n", a)
+			go (func() {
+				time.Sleep(5 * time.Second) // to give things time to warm up
+
+				_, err = nd.PeerMan.TryConnectAddress(string(a), nil) // TODO Proxy/NAT
+				if err != nil {
+					logging.Warnf("init: tried to auto-connect to %s but failed: %s\n", a, err.Error())
+				}
+			})()
+		}
+	}
+
+	// Do we automaticaly listen on some port?
+	if autolistenport != -1 {
+		err := nd.PeerMan.ListenOnPort(autolistenport)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	return nd, nil
 }

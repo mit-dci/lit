@@ -1,6 +1,9 @@
 package lnp2p
 
 import (
+	"net"
+	"time"
+
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/logging"
 )
@@ -65,9 +68,17 @@ func sendMessages(queue chan outgoingmsg) {
 		}
 
 		// Actually write it.
+		conn.SetWriteDeadline(time.Now().Add(60 * time.Second))
 		_, err := conn.Write(buf)
 		if err != nil {
 			logging.Warnf("peermgr: Error sending message to peer: %s\n", err.Error())
+
+			if neterr, ok := err.(net.Error); ok {
+				if neterr.Timeout() || !neterr.Temporary() {
+					conn.Close()
+				}
+			}
+
 		}
 
 		// Responses, if applicable.

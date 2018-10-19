@@ -5,6 +5,7 @@ reconnect 0 simple
 reconnect 0 reordered
 reconnect 0 inbound
 reconnect 0 reordered_inbound
+autoreconn 2
 setgetfee 1
 
 # Tx operations

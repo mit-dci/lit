@@ -66,7 +66,7 @@ type NetSettings struct {
 }
 
 // NewPeerManager creates a peer manager from a root key
-func NewPeerManager(rootkey *hdkeychain.ExtendedKey, pdb lncore.LitPeerStorage, trackerURL string, bus *eventbus.EventBus) (*PeerManager, error) {
+func NewPeerManager(rootkey *hdkeychain.ExtendedKey, pdb lncore.LitPeerStorage, trackerURL string, bus *eventbus.EventBus, autoreconn bool) (*PeerManager, error) {
 	k, err := computeIdentKeyFromRoot(rootkey)
 	if err != nil {
 		return nil, err
@@ -84,6 +84,10 @@ func NewPeerManager(rootkey *hdkeychain.ExtendedKey, pdb lncore.LitPeerStorage, 
 		trackerURL:     trackerURL,
 		outqueue:       make(chan outgoingmsg, outgoingbuf),
 		mtx:            &sync.Mutex{},
+	}
+
+	if autoreconn {
+		bus.RegisterHandler("lnp2p.peer.disconnect", makePeerReconnectHandler(pm))
 	}
 
 	return pm, nil
@@ -128,8 +132,7 @@ func (pm *PeerManager) GetPeerIdx(peer *Peer) uint32 {
 // GetPeer returns the peer with the given lnaddr.
 func (pm *PeerManager) GetPeer(lnaddr lncore.LnAddr) *Peer {
 	p, ok := pm.peerMap[lnaddr]
-	logging.Errorf("%v -> %v (%t)\n", lnaddr, p, ok)
-	if !ok {
+	if !ok || p == nil {
 		return nil
 	}
 	return p
@@ -153,7 +156,7 @@ func (pm *PeerManager) TryConnectAddress(addr string, settings *NetSettings) (*P
 		if err != nil {
 			return nil, err
 		}
-		where = fmt.Sprintf("%s:2448", ipv4)
+		where = ipv4
 	}
 
 	lnwho := lncore.LnAddr(who)
@@ -167,6 +170,17 @@ func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, set
 	// lnaddr check, to make sure that we do the right thing.
 	if lnaddr == nil {
 		return nil, fmt.Errorf("connection to a peer with unknown lnaddr not supported yet")
+	}
+
+	// Make sure we can't connect to ourself.
+	if string(*lnaddr) == pm.GetExternalAddress() {
+		return nil, fmt.Errorf("cannot connect to self")
+	}
+
+	// Make sure we don't get multiple connections.
+	if pm.GetPeer(*lnaddr) != nil {
+		logging.Warnf("peermgr: Someone attempted to connect to peer we already have connection with: %s\n", *lnaddr)
+		return nil, fmt.Errorf("already have connection with this address")
 	}
 
 	// Do NAT setup stuff.
@@ -219,7 +233,7 @@ func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, set
 
 	pi, err := pm.peerdb.GetPeerInfo(*lnaddr)
 	if err != nil {
-		logging.Errorf("Problem loading peer info from DB: %s\n", err.Error())
+		logging.Errorf("peermgr: Problem loading peer info from DB: %s\n", err.Error())
 		// don't kill the connection?
 	}
 
@@ -231,12 +245,13 @@ func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, set
 		nickname: nil,
 		conn:     lndcconn,
 		idpubkey: pk,
+		alive:    true,
 	}
 
 	if pi == nil {
 		pidx, err := pm.peerdb.GetUniquePeerIdx()
 		if err != nil {
-			logging.Errorf("Problem getting unique peeridx from DB: %s\n", err.Error())
+			logging.Errorf("peermgr: Problem getting unique peeridx from DB: %s\n", err.Error())
 		} else {
 			p.idx = &pidx
 		}
@@ -247,9 +262,10 @@ func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, set
 			NetAddr:  &raddr,
 			PeerIdx:  pidx,
 		}
+		logging.Infof("peermgr: Registering peer %s\n", p.GetLnAddr())
 		err = pm.peerdb.AddPeer(p.GetLnAddr(), *pi)
 		if err != nil {
-			logging.Errorf("Error saving new peer to DB: %s\n", err.Error())
+			logging.Errorf("peermgr: Error saving new peer to DB: %s\n", err.Error())
 		}
 	} else {
 		p.nickname = pi.Nickname
@@ -301,6 +317,11 @@ func (pm *PeerManager) registerPeer(peer *Peer) {
 
 func (pm *PeerManager) unregisterPeer(peer *Peer) {
 
+	// Sanity check.
+	if peer.pmgr != pm {
+		return // not 100% an error, since there's a chance this gets called multiple times
+	}
+
 	// Again, sensitive changes we should get a lock to do first.
 	pm.mtx.Lock()
 	defer pm.mtx.Unlock()
@@ -312,7 +333,7 @@ func (pm *PeerManager) unregisterPeer(peer *Peer) {
 	pm.peers[idx] = ""
 
 	// Remove the actual peer entry.
-	pm.peerMap[peer.GetLnAddr()] = nil
+	delete(pm.peerMap, peer.GetLnAddr())
 
 	// More cleanup.
 	peer.conn = nil
@@ -328,6 +349,9 @@ func (pm *PeerManager) DisconnectPeer(peer *Peer) error {
 	if err != nil {
 		return err
 	}
+
+	// Also remove the registration.
+	pm.unregisterPeer(peer)
 
 	// This will cause the peer disconnect event to be raised when the reader
 	// goroutine started to exit and run the unregistration
@@ -356,7 +380,6 @@ func (pm *PeerManager) ListenOnPort(port int) error {
 	// TODO UPnP and PMP NAT traversal.
 
 	// Try to start listening.
-	logging.Info("PORT: ", port)
 	listener, err := lndc.NewListener(pm.idkey, port)
 	if err != nil {
 		logging.Errorf("listening failed: %s\n", err.Error())

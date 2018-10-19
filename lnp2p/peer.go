@@ -13,6 +13,8 @@ type Peer struct {
 	conn     *lndc.Conn
 	idpubkey pubkey
 
+	alive bool
+
 	idx  *uint32 // deprecated
 	pmgr *PeerManager
 }
@@ -107,4 +109,9 @@ func (p *Peer) IntoPeerInfo() lncore.PeerInfo {
 		Nickname: p.nickname,
 		NetAddr:  &raddr,
 	}
+}
+
+// IsAlive returns whethere or not this particular peer is still valid
+func (p *Peer) IsAlive() bool {
+	return p.alive
 }
