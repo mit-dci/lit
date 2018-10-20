@@ -318,6 +318,13 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		displayAllCommands = true
 	}
 
+	if cmd == "chans" || cmd == "bals" {
+		err = lc.Call("LitRPC.Balance", nil, bReply)
+		if err != nil {
+			return err
+		}
+	}
+
 	if cmd == "conns" || displayAllCommands {
 		err := lc.Call("LitRPC.ListConnections", nil, pReply)
 		if err != nil {
@@ -337,11 +344,6 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 
 	if cmd == "chans" || displayAllCommands {
 		err := lc.Call("LitRPC.ChannelList", nil, cReply)
-		if err != nil {
-			return err
-		}
-
-		err = lc.Call("LitRPC.Balance", nil, bReply)
 		if err != nil {
 			return err
 		}
@@ -537,11 +539,6 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 	}
 
 	if cmd == "bals" || displayAllCommands {
-		err = lc.Call("LitRPC.Balance", nil, bReply)
-		if err != nil {
-			return err
-		}
-
 		if len(bReply.Balances) > 0 {
 			if displayAllCommands {
 				fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Balances:"))
