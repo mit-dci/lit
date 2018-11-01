@@ -29,7 +29,10 @@ func (nd *LitNode) InitRouting() {
 
 	err := nd.PopulateRates()
 	if err != nil {
-		logging.Errorf("failure loading exchange rates: %s", err.Error())
+		if os.IsNotExist(err) {
+			logging.Infof("Rates file not found.")
+		}
+		logging.Warnf("failure loading exchange rates: %s", err.Error())
 	}
 
 	nd.AdvTimeout = time.NewTicker(15 * time.Second)

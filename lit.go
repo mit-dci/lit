@@ -59,6 +59,7 @@ type litConfig struct { // define a struct for usage with go-flags
 	AutoReconnectInterval           int64 `long:"autoReconnectInterval" description:"The interval (in seconds) the reconnect logic should be executed"`
 	AutoReconnectOnlyConnectedCoins bool  `long:"autoReconnectOnlyConnectedCoins" description:"Only reconnect to peers that we have channels with in a coin whose coin daemon is available"`
 	AutoListenPort                  int   `long:"autoListenPort" description:"When auto reconnect enabled, starts listening on this port"`
+	NoAutoListen                    bool  `long:"noautolisten" description:"Don't automatically listen on any ports."`
 	Params                          *coinparam.Params
 }
 
@@ -71,6 +72,7 @@ var (
 	defaultRpcport                         = uint16(8001)
 	defaultRpchost                         = "localhost"
 	defaultAutoReconnect                   = true
+	defaultNoAutoListen                    = false
 	defaultAutoListenPort                  = 2448
 	defaultAutoReconnectInterval           = int64(60)
 	defaultUpnPFlag                        = false
@@ -253,6 +255,7 @@ func main() {
 		Rpchost:                         defaultRpchost,
 		TrackerURL:                      defaultTrackerURL,
 		AutoReconnect:                   defaultAutoReconnect,
+		NoAutoListen:                    defaultNoAutoListen,
 		AutoListenPort:                  defaultAutoListenPort,
 		AutoReconnectInterval:           defaultAutoReconnectInterval,
 		AutoReconnectOnlyConnectedCoins: defaultAutoReconnectOnlyConnectedCoins,
@@ -300,7 +303,7 @@ func main() {
 		go litrpc.RPCListen(rpcl, conf.Rpchost, conf.Rpcport)
 	}
 
-	if conf.AutoReconnect {
+	if conf.AutoReconnect && !conf.NoAutoListen {
 		node.AutoReconnect(conf.AutoListenPort, conf.AutoReconnectInterval, conf.AutoReconnectOnlyConnectedCoins)
 	}
 

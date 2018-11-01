@@ -94,13 +94,17 @@ class LitNode():
             "--dir", self.data_dir,
             "--unauthrpc",
             "--rpcport=" + str(self.rpc_port),
-            #"--autoReconnect",
-            #"--autoListenPort=" + str(self.p2p_port)
+            "--noautolisten"
         ]
+        penv = os.environ.copy()
+        lkw = 'LIT_KEYFILE_WARN'
+        if lkw not in penv:
+            penv[lkw] = '0'
         self.proc = subprocess.Popen(args,
             stdin=subprocess.DEVNULL,
             stdout=outputredir,
-            stderr=outputredir)
+            stderr=outputredir,
+            env=penv)
 
         # Make the RPC client for future use, too.
         testutil.wait_until_port("localhost", self.rpc_port)
