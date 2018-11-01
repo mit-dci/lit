@@ -42,7 +42,7 @@ func (nd *LitNode) RemoteControlRequestHandler(msg lnutil.RemoteControlRpcReques
 		pubKey = msg.PubKey
 		transportAuthenticated = false
 	}
-	logging.Infof("Received remote control request [%s] from [%x]\n\n%s", msg.Method, pubKey, string(msg.Args))
+	logging.Infof("Received remote control request [%s] from [%x]\nArguments Passed: %s", msg.Method, pubKey, string(msg.Args))
 
 	// Fetch the remote control authorization based on the used public key
 	auth, err := nd.GetRemoteControlAuthorization(pubKey)
