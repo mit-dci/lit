@@ -95,8 +95,13 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *ConnectReply) error {
 		paddr = strings.SplitN(paddr, "@", 2)[0]
 	}
 
-	var pm *lnp2p.PeerManager = r.Node.PeerMan
-	p := pm.GetPeer(lncore.LnAddr(paddr))
+	pm := r.Node.PeerMan
+	lnaddr, err := lncore.ParseLnAddr(paddr)
+	if err != nil {
+		return err
+	}
+
+	p := pm.GetPeer(lnaddr)
 	if p == nil {
 		return fmt.Errorf("couldn't find peer in manager after connecting")
 	}

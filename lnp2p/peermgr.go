@@ -156,7 +156,11 @@ func (pm *PeerManager) TryConnectAddress(addr string) (*Peer, error) {
 		where = fmt.Sprintf("%s:2448", ipv4)
 	}
 
-	lnwho := lncore.LnAddr(who)
+	lnwho, err := lncore.ParseLnAddr(who)
+	if err != nil {
+		return nil, err
+	}
+
 	x, y := pm.tryConnectPeer(where, &lnwho)
 	return x, y
 
