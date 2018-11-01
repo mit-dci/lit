@@ -211,26 +211,52 @@ func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, set
 		dialer = d
 	}
 
-	// Set up the connection.
+	// Create the connection.
 	lndcconn, err := lndc.Dial(pm.idkey, netaddr, string(*lnaddr), dialer)
 	if err != nil {
 		return nil, err
 	}
 
-	pi, err := pm.peerdb.GetPeerInfo(*lnaddr)
+	// Try to set up the new connection.
+	p, err := pm.handleNewConnection(lndcconn, *lnaddr)
 	if err != nil {
-		logging.Errorf("Problem loading peer info from DB: %s\n", err.Error())
-		// don't kill the connection?
+		return nil, err
 	}
 
+	// Now start listening for inbound traffic.
+	// (it *also* took me a while to realize I forgot *this*)
+	go processConnectionInboundTraffic(p, pm)
+
+	// Return
+	return p, nil
+
+}
+
+func (pm *PeerManager) handleNewConnection(conn *lndc.Conn, expectedAddr lncore.LnAddr) (*Peer, error) {
+
 	// Now that we've got the connection, actually create the peer object.
-	pk := pubkey(lndcconn.RemotePub())
+	pk := pubkey(conn.RemotePub())
 	rlitaddr := convertPubkeyToLitAddr(pk)
+
+	if rlitaddr != expectedAddr {
+		conn.Close()
+		return nil, fmt.Errorf("peermgr: Connection init error, expected addr %s got addr %s", expectedAddr, rlitaddr)
+	}
+
 	p := &Peer{
 		lnaddr:   rlitaddr,
 		nickname: nil,
-		conn:     lndcconn,
+		conn:     conn,
 		idpubkey: pk,
+
+		// TEMP
+		idx: nil,
+	}
+
+	pi, err := pm.peerdb.GetPeerInfo(expectedAddr)
+	if err != nil {
+		logging.Errorf("peermgr: Problem loading peer info from DB: %s\n", err.Error())
+		// don't kill the connection?
 	}
 
 	if pi == nil {
@@ -240,7 +266,7 @@ func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, set
 		} else {
 			p.idx = &pidx
 		}
-		raddr := lndcconn.RemoteAddr().String()
+		raddr := conn.RemoteAddr().String()
 		pi = &lncore.PeerInfo{
 			LnAddr:   &rlitaddr,
 			Nickname: nil,
@@ -261,11 +287,7 @@ func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, set
 	// (it took me a while to realize I forgot this)
 	pm.registerPeer(p)
 
-	// Now start listening for inbound traffic.
-	// (it *also* took me a while to realize I forgot *this*)
-	go processConnectionInboundTraffic(p, pm)
-
-	// Return
+	// Now actually return the peer.
 	return p, nil
 
 }

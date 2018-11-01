@@ -2,7 +2,6 @@ package lnp2p
 
 import (
 	"github.com/mit-dci/lit/eventbus"
-	"github.com/mit-dci/lit/lncore"
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/logging"
 )
@@ -48,58 +47,23 @@ func acceptConnections(listener *lndc.Listener, port int, pm *PeerManager) {
 		rlitaddr := convertPubkeyToLitAddr(rpk)
 		rnetaddr := lndcConn.RemoteAddr()
 
-		logging.Infof("New connection from %s at %s\n", rlitaddr, rnetaddr.String())
-
-		// Read the peer info from the DB.
-		pi, err := pm.peerdb.GetPeerInfo(rlitaddr)
-		if err != nil {
-			logging.Warnf("problem loading peer info in DB (maybe this is ok?): %s\n", err.Error())
-			netConn.Close()
+		// Make sure we can't let ourself connect to ourself.
+		if string(rlitaddr) == pm.GetExternalAddress() {
+			logging.Infof("peermgr: Got a connection from ourselves?  Dropping.")
+			lndcConn.Close()
 			continue
 		}
 
-		// Create the actual peer object.
-		npeer := &Peer{
-			lnaddr:   rlitaddr,
-			nickname: nil,
-			conn:     lndcConn,
-			idpubkey: rpk,
+		logging.Infof("peermgr: New connection from %s at %s\n", rlitaddr, rnetaddr.String())
 
-			// TEMP
-			idx: nil,
+		p, err := pm.handleNewConnection(lndcConn, rlitaddr)
+		if err != nil {
+			logging.Warnf("%s\n", err.Error())
+			continue
 		}
-
-		// Add the peer data to the DB if we don't have it.
-		if pi == nil {
-			raddr := rnetaddr.String()
-			pidx, err := pm.peerdb.GetUniquePeerIdx()
-			if err != nil {
-				logging.Errorf("problem getting unique peeridx: %s\n", err.Error())
-			}
-			pi = &lncore.PeerInfo{
-				LnAddr:   &rlitaddr,
-				Nickname: nil,
-				NetAddr:  &raddr,
-				PeerIdx:  pidx,
-			}
-			err = pm.peerdb.AddPeer(rlitaddr, *pi)
-			npeer.idx = &pidx
-			if err != nil {
-				// don't close it, I guess
-				logging.Errorf("problem saving peer info to DB: %s\n", err.Error())
-			}
-		} else {
-			npeer.nickname = pi.Nickname
-			// TEMP
-			npeer.idx = &pi.PeerIdx
-		}
-
-		// Don't do any locking here since registerPeer takes a lock and Go's
-		// mutex isn't reentrant.
-		pm.registerPeer(npeer)
 
 		// Start a goroutine to process inbound traffic for this peer.
-		go processConnectionInboundTraffic(npeer, pm)
+		go processConnectionInboundTraffic(p, pm)
 
 	}
 
