@@ -121,7 +121,7 @@ func (lc *litAfClient) Connect(textArgs []string) error {
 		return fmt.Errorf("need: con pubkeyhash@hostname:port")
 	}
 
-	args.LNAddr = textArgs[0]
+	args.Addr = textArgs[0]
 
 	err := lc.Call("LitRPC.Connect", args, reply)
 	if err != nil {

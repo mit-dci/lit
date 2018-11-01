@@ -2,8 +2,8 @@ package lncore
 
 // Txid represents a transaction on the blockchain.
 type Txid struct {
-	cointype int32
-	txhash   []byte
+	Cointype int32
+	Txhash   []byte
 }
 
 // Utxo is an unspent transaction output that we could be able to spend.

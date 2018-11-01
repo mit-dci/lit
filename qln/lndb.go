@@ -288,8 +288,8 @@ func (inff *InFlightDualFund) Clear() {
 	inff.InitiatedByUs = false
 }
 
-// GetLnAddr gets the lightning address for this node.
-func (nd *LitNode) GetLnAddr() string {
+// GetAddr gets the node's address
+func (nd *LitNode) GetAddr() string {
 	return nd.PeerMan.GetExternalAddress()
 }
 
@@ -300,7 +300,7 @@ func (nd *LitNode) GetPubHostFromPeerIdx(idx uint32) ([33]byte, string) {
 
 	p := nd.PeerMan.GetPeerByIdx(int32(idx))
 	if p != nil {
-		pk := p.GetPubkey()
+		pk := p.Pubkey
 		copy(pub[:], pk.SerializeCompressed())
 		host = p.GetRemoteAddr()
 	}
@@ -314,7 +314,7 @@ func (nd *LitNode) GetNicknameFromPeerIdx(idx uint32) string {
 
 	p := nd.PeerMan.GetPeerByIdx(int32(idx))
 	if p != nil {
-		nickname = p.GetNickname()
+		nickname = p.Nickname
 	}
 
 	return nickname
@@ -349,7 +349,7 @@ func (nd *LitNode) SaveNicknameForPeerIdx(nickname string, idx uint32) error {
 
 	// Actually go and set it.
 	pi := peer.IntoPeerInfo()
-	err := nd.NewLitDB.GetPeerDB().AddPeer(peer.GetLnAddr(), pi)
+	err := nd.NewLitDB.GetPeerDB().AddPeer(peer.Addr, pi)
 
 	return err // same as if err != nil { return err } ; return nil
 }

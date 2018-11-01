@@ -7,7 +7,7 @@ import (
 
 // FIXME This is a stub function that just calls out to the lnutil lib for later.
 func processMessage(b []byte, peer *Peer) (lnutil.LitMsg, error) {
-	m, err := lnutil.LitMsgFromBytes(b, peer.GetIdx())
+	m, err := lnutil.LitMsgFromBytes(b, peer.Idx)
 	return m, err
 }
 
@@ -57,7 +57,7 @@ func sendMessages(queue chan outgoingmsg) {
 		// Make sure the connection isn't closed.  This can happen if the message was queued but then we disconnected from the peer before it was sent.
 		conn := recv.peer.conn
 		if conn == nil {
-			logging.Warnf("peermgr: Tried to send message to disconnected peer %s\n", recv.peer.GetPrettyName())
+			logging.Warnf("peermgr: Tried to send message to disconnected peer %d, %s\n", recv.peer.Idx, recv.peer.Nickname)
 			if recv.finishchan != nil {
 				*recv.finishchan <- nil
 			}

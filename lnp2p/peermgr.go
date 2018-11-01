@@ -1,11 +1,11 @@
 package lnp2p
 
-//"crypto/ecdsa" // TODO Use ecdsa not koblitz
 import (
 	"crypto/ecdsa"
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,12 +18,13 @@ import (
 	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/nat"
 	"github.com/mit-dci/lit/portxo"
+	"golang.org/x/net/proxy"
 )
 
 type privkey *koblitz.PrivateKey
 type pubkey *koblitz.PublicKey
 
-// MaxNodeCount is the size of the peerIdx->LnAddr array.
+// MaxNodeCount is the size of the peerIdx->Addr array.
 // TEMP This shouldn't be necessary.
 const MaxNodeCount = 1024
 
@@ -34,11 +35,11 @@ type PeerManager struct {
 	idkey  privkey
 	peerdb lncore.LitPeerStorage
 	ebus   *eventbus.EventBus
-	mproc  MessageProcessor
+	MProc  MessageProcessor
 
 	// Peer tracking.
-	peers   []lncore.LnAddr // compatibility
-	peerMap map[lncore.LnAddr]*Peer
+	peers   []string // compatibility
+	peerMap map[string]*Peer
 
 	// Accepting connections.
 	listeningPorts map[int]*listeningthread
@@ -76,9 +77,9 @@ func NewPeerManager(rootkey *hdkeychain.ExtendedKey, pdb lncore.LitPeerStorage, 
 		idkey:          k,
 		peerdb:         pdb,
 		ebus:           bus,
-		mproc:          NewMessageProcessor(),
-		peers:          make([]lncore.LnAddr, MaxNodeCount),
-		peerMap:        map[lncore.LnAddr]*Peer{},
+		MProc:          NewMessageProcessor(),
+		peers:          make([]string, MaxNodeCount),
+		peerMap:        map[string]*Peer{},
 		listeningPorts: map[int]*listeningthread{},
 		sending:        false,
 		trackerURL:     trackerURL,
@@ -89,17 +90,12 @@ func NewPeerManager(rootkey *hdkeychain.ExtendedKey, pdb lncore.LitPeerStorage, 
 	return pm, nil
 }
 
-// GetMessageProcessor gets the message processor for this peer manager that's passed incoming messasges from peers.
-func (pm *PeerManager) GetMessageProcessor() *MessageProcessor {
-	return &pm.mproc
-}
-
 // GetExternalAddress returns the human-readable LN address
 func (pm *PeerManager) GetExternalAddress() string {
 	idk := pm.idkey // lol
 	c := koblitz.PublicKey(ecdsa.PublicKey(idk.PublicKey))
-	addr := convertPubkeyToLitAddr(pubkey(&c))
-	return string(addr)
+	addr := lnutil.ConvertPubkeyToLitAddr(pubkey(&c))
+	return addr
 }
 
 func computeIdentKeyFromRoot(rootkey *hdkeychain.ExtendedKey) (privkey, error) {
@@ -117,18 +113,10 @@ func computeIdentKeyFromRoot(rootkey *hdkeychain.ExtendedKey) (privkey, error) {
 	return privkey(k), nil
 }
 
-// GetPeerIdx is a convenience function for working with older code.
-func (pm *PeerManager) GetPeerIdx(peer *Peer) uint32 {
-	if peer.idx == nil {
-		return 0
-	}
-	return *peer.idx
-}
-
-// GetPeer returns the peer with the given lnaddr.
-func (pm *PeerManager) GetPeer(lnaddr lncore.LnAddr) *Peer {
-	p, ok := pm.peerMap[lnaddr]
-	logging.Errorf("%v -> %v (%t)\n", lnaddr, p, ok)
+// GetPeer returns the peer with the given addr.
+func (pm *PeerManager) GetPeer(addr string) *Peer {
+	p, ok := pm.peerMap[addr]
+	logging.Infof("%v -> %v (%t)\n", addr, p, ok)
 	if !ok {
 		return nil
 	}
@@ -143,11 +131,12 @@ func (pm *PeerManager) GetPeerByIdx(id int32) *Peer {
 	return pm.peerMap[pm.peers[id]]
 }
 
-// TryConnectAddress attempts to connect to the specified LN address.
+// TryConnectAddress is a handler function for tryConnectPeer and
+// attempts to connect to the specified LN address.
 func (pm *PeerManager) TryConnectAddress(addr string, settings *NetSettings) (*Peer, error) {
 
 	// Figure out who we're trying to connect to.
-	who, where := splitAdrString(addr)
+	who, where := lnutil.ParseAdrString(addr)
 	if where == "" {
 		ipv4, _, err := lnutil.Lookup(addr, pm.trackerURL, "")
 		if err != nil {
@@ -156,17 +145,34 @@ func (pm *PeerManager) TryConnectAddress(addr string, settings *NetSettings) (*P
 		where = fmt.Sprintf("%s:2448", ipv4)
 	}
 
-	lnwho := lncore.LnAddr(who)
-	x, y := pm.tryConnectPeer(where, &lnwho, settings)
-	return x, y
-
+	return pm.tryConnectPeer(where, who, settings)
 }
 
-func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, settings *NetSettings) (*Peer, error) {
+func connectToProxyTCP(addr string, auth *string) (func(string, string) (net.Conn, error), error) {
+	// Authentication is good.  Use it if it's there.
+	var pAuth *proxy.Auth
+	if auth != nil {
+		parts := strings.SplitN(*auth, ":", 2)
+		pAuth = &proxy.Auth{
+			User:     parts[0],
+			Password: parts[1],
+		}
+	}
 
-	// lnaddr check, to make sure that we do the right thing.
-	if lnaddr == nil {
-		return nil, fmt.Errorf("connection to a peer with unknown lnaddr not supported yet")
+	// Actually attempt to connect to the SOCKS Proxy.
+	d, err := proxy.SOCKS5("tcp", addr, pAuth, proxy.Direct)
+	if err != nil {
+		return nil, err
+	}
+
+	return d.Dial, nil
+}
+
+func (pm *PeerManager) tryConnectPeer(netaddr string, addr string, settings *NetSettings) (*Peer, error) {
+
+	// if its nil, return since we don't support that yet
+	if len(addr) == 0 {
+		return nil, fmt.Errorf("connection to a peer with unknown address not supported yet")
 	}
 
 	// Do NAT setup stuff.
@@ -177,9 +183,9 @@ func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, set
 		if err != nil {
 			return nil, err
 		}
-		lisPort := uint16(x) // if only Atoi could infer which type we wanted to parse as!
+		lisPort := uint16(x) // more type juggling
 
-		// Actually figure out what we're going to do.
+		// choose between upnp and natpmp modes
 		if *settings.NatMode == "upnp" {
 			// Universal Plug-n-Play
 			logging.Infof("Attempting port forwarding via UPnP...")
@@ -212,49 +218,72 @@ func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, set
 	}
 
 	// Set up the connection.
-	lndcconn, err := lndc.Dial(pm.idkey, netaddr, string(*lnaddr), dialer)
+	lndcconn, err := lndc.Dial(pm.idkey, netaddr, addr, dialer)
 	if err != nil {
 		return nil, err
 	}
 
-	pi, err := pm.peerdb.GetPeerInfo(*lnaddr)
+	pi, err := pm.peerdb.GetPeerInfo(addr)
 	if err != nil {
 		logging.Errorf("Problem loading peer info from DB: %s\n", err.Error())
-		// don't kill the connection?
+		return nil, err
 	}
 
 	// Now that we've got the connection, actually create the peer object.
 	pk := pubkey(lndcconn.RemotePub())
-	rlitaddr := convertPubkeyToLitAddr(pk)
+	rlitaddr := lnutil.ConvertPubkeyToLitAddr(pk)
 	p := &Peer{
-		lnaddr:   rlitaddr,
-		nickname: nil,
+		Addr:     rlitaddr,
+		Nickname: "",
 		conn:     lndcconn,
-		idpubkey: pk,
+		Pubkey:   pk,
 	}
 
-	if pi == nil {
+	if len(pi.Addr) != 0 {
 		pidx, err := pm.peerdb.GetUniquePeerIdx()
 		if err != nil {
 			logging.Errorf("Problem getting unique peeridx from DB: %s\n", err.Error())
 		} else {
-			p.idx = &pidx
+			p.Idx = pidx
 		}
 		raddr := lndcconn.RemoteAddr().String()
-		pi = &lncore.PeerInfo{
-			LnAddr:   &rlitaddr,
-			Nickname: nil,
-			NetAddr:  &raddr,
+		pi = lncore.PeerInfo{
+			Addr:     rlitaddr,
+			Nickname: "",
+			NetAddr:  raddr,
 			PeerIdx:  pidx,
 		}
-		err = pm.peerdb.AddPeer(p.GetLnAddr(), *pi)
+		err = pm.peerdb.AddPeer(p.Addr, pi)
 		if err != nil {
 			logging.Errorf("Error saving new peer to DB: %s\n", err.Error())
 		}
 	} else {
-		p.nickname = pi.Nickname
+		p.Nickname = pi.Nickname
+		p.Idx = pi.PeerIdx
+	}
+
+	if len(pi.Addr) == 0 { // TODO: Remove this
+		pidx, err := pm.peerdb.GetUniquePeerIdx()
+		if err != nil {
+			logging.Errorf("Problem getting unique peeridx from DB: %s\n", err.Error())
+		} else {
+			p.Idx = pidx
+		}
+		raddr := lndcconn.RemoteAddr().String()
+		pi = lncore.PeerInfo{
+			Addr:     rlitaddr,
+			Nickname: "",
+			NetAddr:  raddr,
+			PeerIdx:  pidx,
+		}
+		err = pm.peerdb.AddPeer(p.Addr, pi)
+		if err != nil {
+			logging.Errorf("Error saving new peer to DB: %s\n", err.Error())
+		}
+	} else {
+		p.Nickname = pi.Nickname
 		// TEMP
-		p.idx = &pi.PeerIdx
+		p.Idx = pi.PeerIdx
 	}
 
 	// Register the peer we just connected to!
@@ -272,27 +301,25 @@ func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, set
 
 func (pm *PeerManager) registerPeer(peer *Peer) {
 
-	lnaddr := peer.lnaddr
-
 	// We're making changes to the manager so keep stuff away while we set up.
 	pm.mtx.Lock()
 	defer pm.mtx.Unlock()
 
-	logging.Infof("peermgr: New peer %s\n", peer.GetLnAddr())
+	logging.Infof("peermgr: New peer %s\n", peer.Addr)
 
 	// Append peer to peer list and add to peermap
-	pm.peers[int(*peer.idx)] = lnaddr // TEMP This idx logic is a litte weird.
-	pm.peerMap[lnaddr] = peer
+	pm.peers[peer.Idx] = peer.Addr // TEMP This idx logic is a litte weird.
+	pm.peerMap[peer.Addr] = peer
 	peer.pmgr = pm
 
 	// Announce the peer has been added.
 	e := NewPeerEvent{
-		Addr:            lnaddr,
+		Addr:            peer.Addr,
 		Peer:            peer,
 		RemoteInitiated: false,
 
 		// TODO Remove these.
-		RemotePub: peer.idpubkey,
+		RemotePub: peer.Pubkey,
 		Conn:      peer.conn,
 	}
 	pm.ebus.Publish(e)
@@ -305,35 +332,27 @@ func (pm *PeerManager) unregisterPeer(peer *Peer) {
 	pm.mtx.Lock()
 	defer pm.mtx.Unlock()
 
-	logging.Infof("peermgr: Unregistering peer: %s\n", peer.GetLnAddr())
+	logging.Infof("peermgr: Unregistering peer: %s\n", peer.Addr)
 
 	// Remove the peer idx entry.
-	idx := pm.GetPeerIdx(peer)
+	idx := peer.Idx
 	pm.peers[idx] = ""
 
 	// Remove the actual peer entry.
-	pm.peerMap[peer.GetLnAddr()] = nil
+	pm.peerMap[peer.Addr] = nil
 
 	// More cleanup.
 	peer.conn = nil
-	peer.idx = nil
+	peer.Idx = 0
 	peer.pmgr = nil
 
 }
 
 // DisconnectPeer disconnects a peer from ourselves and does relevant cleanup.
 func (pm *PeerManager) DisconnectPeer(peer *Peer) error {
-
-	err := peer.conn.Close()
-	if err != nil {
-		return err
-	}
-
 	// This will cause the peer disconnect event to be raised when the reader
 	// goroutine started to exit and run the unregistration
-
-	return nil
-
+	return peer.conn.Close()
 }
 
 // ListenOnPort attempts to start a goroutine lisening on the port.
@@ -352,8 +371,6 @@ func (pm *PeerManager) ListenOnPort(port int) error {
 	if !res {
 		return fmt.Errorf("listen cancelled by event handler")
 	}
-
-	// TODO UPnP and PMP NAT traversal.
 
 	// Try to start listening.
 	logging.Info("PORT: ", port)
@@ -376,15 +393,14 @@ func (pm *PeerManager) ListenOnPort(port int) error {
 	pm.mtx.Unlock()
 
 	// Activate the MessageProcessor if we haven't yet.
-	if !pm.mproc.IsActive() {
-		pm.mproc.Activate()
+	if !pm.MProc.IsActive() {
+		pm.MProc.Activate()
 	}
 
 	// Actually start it
 	go acceptConnections(listener, port, pm)
 
 	return nil
-
 }
 
 // GetListeningAddrs returns the listening addresses.
@@ -451,13 +467,12 @@ func (pm *PeerManager) queueMessageToPeer(peer *Peer, msg Message, ec *chan erro
 // TEMP This should be removed at some point in the future.
 func (pm *PeerManager) TmpHintPeerIdx(peer *Peer, idx uint32) error {
 
-	pi, err := pm.peerdb.GetPeerInfo(peer.GetLnAddr())
+	pi, err := pm.peerdb.GetPeerInfo(peer.Addr)
 	if err != nil {
 		return err
 	}
 
 	pi.PeerIdx = idx
 
-	return pm.peerdb.UpdatePeer(peer.GetLnAddr(), pi)
-
+	return pm.peerdb.UpdatePeer(peer.Addr, pi)
 }

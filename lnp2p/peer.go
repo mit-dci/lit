@@ -8,64 +8,18 @@ import (
 
 // A Peer is a remote client that's somehow connected to us.
 type Peer struct {
-	lnaddr   lncore.LnAddr
-	nickname *string
-	conn     *lndc.Conn
-	idpubkey pubkey
+	Addr     string
+	Idx      uint32 // deprecated, default value for all uint32s are 0
+	Nickname string
 
-	idx  *uint32 // deprecated
-	pmgr *PeerManager
+	conn   *lndc.Conn
+	Pubkey *koblitz.PublicKey
+	pmgr   *PeerManager
 }
 
-// GetIdx is a compatibility function.
-func (p *Peer) GetIdx() uint32 {
-	if p.idx == nil {
-		return 0
-	}
-	return *p.idx
-}
-
-// GetNickname returns the nickname, or an empty string if unset.
-func (p *Peer) GetNickname() string {
-	if p.nickname == nil {
-		return ""
-	}
-	return *p.nickname
-}
-
-// SetNickname sets the peer's nickname.
-func (p *Peer) SetNickname(name string) {
-	p.nickname = &name
-	if name == "" {
-		p.nickname = nil
-	}
-}
-
-// GetLnAddr returns the lightning network address for this peer.
-func (p *Peer) GetLnAddr() lncore.LnAddr {
-	return p.lnaddr
-}
-
-// GetRemoteAddr does something.
+// GetRemoteAddr returns the remote node's public key.
 func (p *Peer) GetRemoteAddr() string {
 	return p.conn.RemoteAddr().String()
-}
-
-// GetPubkey gets the public key for the user.
-func (p *Peer) GetPubkey() koblitz.PublicKey {
-	return *p.idpubkey
-}
-
-const prettyLnAddrPrefixLen = 10
-
-// GetPrettyName returns a more human-readable name, such as the nickname if
-// available or a trucated version of the LN address otherwise.
-func (p *Peer) GetPrettyName() string {
-	if p.nickname != nil {
-		return *p.nickname
-	}
-
-	return string(p.GetLnAddr()[:prettyLnAddrPrefixLen]) + "~"
 }
 
 // SendQueuedMessage adds the message to the queue to be sent to this peer.
@@ -103,8 +57,8 @@ func (p *Peer) IntoPeerInfo() lncore.PeerInfo {
 		raddr = p.conn.RemoteAddr().String()
 	}
 	return lncore.PeerInfo{
-		LnAddr:   &p.lnaddr,
-		Nickname: p.nickname,
-		NetAddr:  &raddr,
+		Addr:     p.Addr,
+		Nickname: p.Nickname,
+		NetAddr:  raddr,
 	}
 }

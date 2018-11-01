@@ -130,9 +130,7 @@ func (db *LitBoltDB) GetPeerDB() lncore.LitPeerStorage {
 		panic(err)
 	}
 
-	var w2 lncore.LitPeerStorage
-	w2 = &w
-	return w2
+	return &w
 }
 
 // GetChannelDB .

@@ -294,7 +294,7 @@ Returns:
 
 Args:
 
-* `LNAddr (string)`
+* `Addr (string)`
 
 Returns:
 

@@ -305,6 +305,7 @@ func main() {
 
 	if conf.AutoReconnect && !conf.NoAutoListen {
 		node.AutoReconnect(conf.AutoListenPort, conf.AutoReconnectInterval, conf.AutoReconnectOnlyConnectedCoins)
+		// TODO Redo this.
 	}
 
 	<-rpcl.OffButton

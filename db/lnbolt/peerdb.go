@@ -40,22 +40,22 @@ func (pdb *peerboltdb) init() error {
 	return nil
 }
 
-func (pdb *peerboltdb) GetPeerAddrs() ([]lncore.LnAddr, error) {
+func (pdb *peerboltdb) GetPeerAddrs() ([]string, error) {
 
-	addrs := make([]lncore.LnAddr, 0)
+	addrs := make([]string, 0)
 
 	err := pdb.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(peersLabel)
 
 		// Iterate over all of the members of the bucket.
 		cur := b.Cursor()
-		atmp := make([]lncore.LnAddr, 0)
+		atmp := make([]string, 0)
 		for {
 			k, _ := cur.Next()
 			if k == nil {
 				break
 			}
-			atmp = append(atmp, lncore.LnAddr(string(k)))
+			atmp = append(atmp, string(k))
 		}
 
 		// Now that we have the final array return it.
@@ -69,43 +69,38 @@ func (pdb *peerboltdb) GetPeerAddrs() ([]lncore.LnAddr, error) {
 	return addrs, nil
 }
 
-func (pdb *peerboltdb) GetPeerInfo(addr lncore.LnAddr) (*lncore.PeerInfo, error) {
+func (pdb *peerboltdb) GetPeerInfo(addr string) (lncore.PeerInfo, error) {
 
 	var raw []byte
 	var err error
+	var peerInfo lncore.PeerInfo
 
 	if pdb.db == nil {
 		logging.Warnf("PDB.db is nil!")
-		return nil, fmt.Errorf("PDB.db is nil")
+		return peerInfo, fmt.Errorf("PDB.db is nil")
 	}
 
 	// Just get the raw data from the DB.
 	err = pdb.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(peersLabel)
-		raw = b.Get([]byte(string(addr)))
+		raw = b.Get([]byte(addr))
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return peerInfo, err
 	}
 
 	if raw == nil {
-		return nil, nil
+		return peerInfo, nil
 	}
 
-	var pi lncore.PeerInfo
-	err = json.Unmarshal(raw, &pi)
-	if err != nil {
-		return nil, err
-	}
-
-	return &pi, nil
-
+	err = json.Unmarshal(raw, &peerInfo)
+	return peerInfo, err
 }
 
-func (pdb *peerboltdb) GetPeerInfos() (map[lncore.LnAddr]lncore.PeerInfo, error) {
+func (pdb *peerboltdb) GetPeerInfos() (map[string]lncore.PeerInfo, error) {
 
-	var out map[lncore.LnAddr]lncore.PeerInfo
+	var out map[string]lncore.PeerInfo
 	var err error
 
 	err = pdb.db.View(func(tx *bolt.Tx) error {
@@ -113,7 +108,7 @@ func (pdb *peerboltdb) GetPeerInfos() (map[lncore.LnAddr]lncore.PeerInfo, error)
 
 		// Iterate over everything.
 		cur := b.Cursor()
-		mtmp := map[lncore.LnAddr]lncore.PeerInfo{}
+		mtmp := map[string]lncore.PeerInfo{}
 		for {
 			k, v := cur.Next()
 			if k == nil {
@@ -126,7 +121,7 @@ func (pdb *peerboltdb) GetPeerInfos() (map[lncore.LnAddr]lncore.PeerInfo, error)
 				return err2
 			}
 
-			ka := lncore.LnAddr(string(k))
+			ka := string(k)
 			mtmp[ka] = pi
 
 		}
@@ -142,11 +137,11 @@ func (pdb *peerboltdb) GetPeerInfos() (map[lncore.LnAddr]lncore.PeerInfo, error)
 
 }
 
-func (pdb *peerboltdb) AddPeer(addr lncore.LnAddr, pi lncore.PeerInfo) error {
-	return pdb.UpdatePeer(addr, &pi)
+func (pdb *peerboltdb) AddPeer(addr string, pi lncore.PeerInfo) error {
+	return pdb.UpdatePeer(addr, pi)
 }
 
-func (pdb *peerboltdb) UpdatePeer(addr lncore.LnAddr, pi *lncore.PeerInfo) error {
+func (pdb *peerboltdb) UpdatePeer(addr string, pi lncore.PeerInfo) error {
 
 	var err error
 
@@ -174,7 +169,7 @@ func (pdb *peerboltdb) UpdatePeer(addr lncore.LnAddr, pi *lncore.PeerInfo) error
 
 }
 
-func (pdb *peerboltdb) DeletePeer(addr lncore.LnAddr) error {
+func (pdb *peerboltdb) DeletePeer(addr string) error {
 
 	var err error
 
