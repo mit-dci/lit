@@ -5,7 +5,6 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"net"
-	"strconv"
 	"sync"
 	"time"
 
@@ -31,10 +30,11 @@ const MaxNodeCount = 1024
 type PeerManager struct {
 
 	// Biographical.
-	idkey  privkey
-	peerdb lncore.LitPeerStorage
-	ebus   *eventbus.EventBus
-	mproc  MessageProcessor
+	idkey       privkey
+	peerdb      lncore.LitPeerStorage
+	ebus        *eventbus.EventBus
+	mproc       MessageProcessor
+	netsettings *NetSettings
 
 	// Peer tracking.
 	peers   []lncore.LnAddr // compatibility
@@ -66,7 +66,7 @@ type NetSettings struct {
 }
 
 // NewPeerManager creates a peer manager from a root key
-func NewPeerManager(rootkey *hdkeychain.ExtendedKey, pdb lncore.LitPeerStorage, trackerURL string, bus *eventbus.EventBus) (*PeerManager, error) {
+func NewPeerManager(rootkey *hdkeychain.ExtendedKey, pdb lncore.LitPeerStorage, trackerURL string, bus *eventbus.EventBus, ns *NetSettings) (*PeerManager, error) {
 	k, err := computeIdentKeyFromRoot(rootkey)
 	if err != nil {
 		return nil, err
@@ -77,6 +77,7 @@ func NewPeerManager(rootkey *hdkeychain.ExtendedKey, pdb lncore.LitPeerStorage, 
 		peerdb:         pdb,
 		ebus:           bus,
 		mproc:          NewMessageProcessor(),
+		netsettings:    ns,
 		peers:          make([]lncore.LnAddr, MaxNodeCount),
 		peerMap:        map[lncore.LnAddr]*Peer{},
 		listeningPorts: map[int]*listeningthread{},
@@ -128,7 +129,6 @@ func (pm *PeerManager) GetPeerIdx(peer *Peer) uint32 {
 // GetPeer returns the peer with the given lnaddr.
 func (pm *PeerManager) GetPeer(lnaddr lncore.LnAddr) *Peer {
 	p, ok := pm.peerMap[lnaddr]
-	logging.Errorf("%v -> %v (%t)\n", lnaddr, p, ok)
 	if !ok {
 		return nil
 	}
@@ -144,7 +144,7 @@ func (pm *PeerManager) GetPeerByIdx(id int32) *Peer {
 }
 
 // TryConnectAddress attempts to connect to the specified LN address.
-func (pm *PeerManager) TryConnectAddress(addr string, settings *NetSettings) (*Peer, error) {
+func (pm *PeerManager) TryConnectAddress(addr string) (*Peer, error) {
 
 	// Figure out who we're trying to connect to.
 	who, where := splitAdrString(addr)
@@ -156,81 +156,81 @@ func (pm *PeerManager) TryConnectAddress(addr string, settings *NetSettings) (*P
 		where = fmt.Sprintf("%s:2448", ipv4)
 	}
 
-	lnwho := lncore.LnAddr(who)
-	x, y := pm.tryConnectPeer(where, &lnwho, settings)
+	lnwho, err := lncore.ParseLnAddr(who)
+	if err != nil {
+		return nil, err
+	}
+
+	x, y := pm.tryConnectPeer(where, &lnwho)
 	return x, y
 
 }
 
-func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, settings *NetSettings) (*Peer, error) {
+func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr) (*Peer, error) {
 
 	// lnaddr check, to make sure that we do the right thing.
 	if lnaddr == nil {
 		return nil, fmt.Errorf("connection to a peer with unknown lnaddr not supported yet")
 	}
 
-	// Do NAT setup stuff.
-	if settings != nil && settings.NatMode != nil {
-
-		// Do some type juggling.
-		x, err := strconv.Atoi(netaddr[1:])
-		if err != nil {
-			return nil, err
-		}
-		lisPort := uint16(x) // if only Atoi could infer which type we wanted to parse as!
-
-		// Actually figure out what we're going to do.
-		if *settings.NatMode == "upnp" {
-			// Universal Plug-n-Play
-			logging.Infof("Attempting port forwarding via UPnP...")
-			err = nat.SetupUpnp(lisPort)
-			if err != nil {
-				return nil, err
-			}
-		} else if *settings.NatMode == "pmp" {
-			// NAT Port Mapping Protocol
-			timeout := time.Duration(10 * time.Second)
-			logging.Infof("Attempting port forwarding via PMP...")
-			_, err = nat.SetupPmp(timeout, lisPort)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			return nil, fmt.Errorf("invalid NAT type: %s", *settings.NatMode)
-		}
-	}
-
 	dialer := net.Dial
 
 	// Use a proxy server if applicable.
-	if settings != nil && settings.ProxyAddr != nil {
-		d, err := connectToProxyTCP(*settings.ProxyAddr, settings.ProxyAuth)
+	ns := pm.netsettings
+	if ns != nil && ns.ProxyAddr != nil {
+		d, err := connectToProxyTCP(*ns.ProxyAddr, ns.ProxyAuth)
 		if err != nil {
 			return nil, err
 		}
 		dialer = d
 	}
 
-	// Set up the connection.
+	// Create the connection.
 	lndcconn, err := lndc.Dial(pm.idkey, netaddr, string(*lnaddr), dialer)
 	if err != nil {
 		return nil, err
 	}
 
-	pi, err := pm.peerdb.GetPeerInfo(*lnaddr)
+	// Try to set up the new connection.
+	p, err := pm.handleNewConnection(lndcconn, *lnaddr)
 	if err != nil {
-		logging.Errorf("Problem loading peer info from DB: %s\n", err.Error())
-		// don't kill the connection?
+		return nil, err
 	}
 
+	// Now start listening for inbound traffic.
+	// (it *also* took me a while to realize I forgot *this*)
+	go processConnectionInboundTraffic(p, pm)
+
+	// Return
+	return p, nil
+
+}
+
+func (pm *PeerManager) handleNewConnection(conn *lndc.Conn, expectedAddr lncore.LnAddr) (*Peer, error) {
+
 	// Now that we've got the connection, actually create the peer object.
-	pk := pubkey(lndcconn.RemotePub())
+	pk := pubkey(conn.RemotePub())
 	rlitaddr := convertPubkeyToLitAddr(pk)
+
+	if rlitaddr != expectedAddr {
+		conn.Close()
+		return nil, fmt.Errorf("peermgr: Connection init error, expected addr %s got addr %s", expectedAddr, rlitaddr)
+	}
+
 	p := &Peer{
 		lnaddr:   rlitaddr,
 		nickname: nil,
-		conn:     lndcconn,
+		conn:     conn,
 		idpubkey: pk,
+
+		// TEMP
+		idx: nil,
+	}
+
+	pi, err := pm.peerdb.GetPeerInfo(expectedAddr)
+	if err != nil {
+		logging.Errorf("peermgr: Problem loading peer info from DB: %s\n", err.Error())
+		// don't kill the connection?
 	}
 
 	if pi == nil {
@@ -240,7 +240,7 @@ func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, set
 		} else {
 			p.idx = &pidx
 		}
-		raddr := lndcconn.RemoteAddr().String()
+		raddr := conn.RemoteAddr().String()
 		pi = &lncore.PeerInfo{
 			LnAddr:   &rlitaddr,
 			Nickname: nil,
@@ -261,11 +261,7 @@ func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, set
 	// (it took me a while to realize I forgot this)
 	pm.registerPeer(p)
 
-	// Now start listening for inbound traffic.
-	// (it *also* took me a while to realize I forgot *this*)
-	go processConnectionInboundTraffic(p, pm)
-
-	// Return
+	// Now actually return the peer.
 	return p, nil
 
 }
@@ -339,6 +335,34 @@ func (pm *PeerManager) DisconnectPeer(peer *Peer) error {
 // ListenOnPort attempts to start a goroutine lisening on the port.
 func (pm *PeerManager) ListenOnPort(port int) error {
 
+	// Do NAT setup stuff.
+	ns := pm.netsettings
+	if ns != nil && ns.NatMode != nil {
+
+		// Do some type juggling.
+		lisPort := uint16(port)
+
+		// Actually figure out what we're going to do.
+		if *ns.NatMode == "upnp" {
+			// Universal Plug-n-Play
+			logging.Infof("Attempting port forwarding via UPnP...")
+			err := nat.SetupUpnp(lisPort)
+			if err != nil {
+				return err
+			}
+		} else if *ns.NatMode == "pmp" {
+			// NAT Port Mapping Protocol
+			timeout := time.Duration(10 * time.Second)
+			logging.Infof("Attempting port forwarding via PMP...")
+			_, err := nat.SetupPmp(timeout, lisPort)
+			if err != nil {
+				return err
+			}
+		} else {
+			return fmt.Errorf("invalid NAT type: %s", *ns.NatMode)
+		}
+	}
+
 	threadobj := &listeningthread{
 		listener: nil,
 	}
@@ -353,9 +377,8 @@ func (pm *PeerManager) ListenOnPort(port int) error {
 		return fmt.Errorf("listen cancelled by event handler")
 	}
 
-	// TODO UPnP and PMP NAT traversal.
-
 	// Try to start listening.
+	// TODO Listen on proxy if possible?
 	logging.Info("PORT: ", port)
 	listener, err := lndc.NewListener(pm.idkey, port)
 	if err != nil {

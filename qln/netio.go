@@ -20,7 +20,12 @@ func (nd *LitNode) GetLisAddressAndPorts() (string, []string) {
 // TODO Remove this function.
 func (nd *LitNode) FindPeerIndexByAddress(lnAdr string) (uint32, error) {
 	pm := nd.PeerMan
-	p := pm.GetPeer(lncore.LnAddr(lnAdr))
+	lnaddr, err := lncore.ParseLnAddr(lnAdr)
+	if err != nil {
+		return 0, err
+	}
+
+	p := pm.GetPeer(lnaddr)
 	if p != nil {
 		return p.GetIdx(), nil
 	}
@@ -80,7 +85,7 @@ func splitAdrString(adr string) (string, string) {
 // TODO Remove this.
 func (nd *LitNode) DialPeer(connectAdr string) error {
 
-	_, err := nd.PeerMan.TryConnectAddress(connectAdr, nil)
+	_, err := nd.PeerMan.TryConnectAddress(connectAdr)
 	if err != nil {
 		return err
 	}

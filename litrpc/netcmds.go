@@ -8,7 +8,6 @@ import (
 	"github.com/mit-dci/lit/bech32"
 	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/lncore"
-	"github.com/mit-dci/lit/lnp2p"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/qln"
@@ -95,8 +94,13 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *ConnectReply) error {
 		paddr = strings.SplitN(paddr, "@", 2)[0]
 	}
 
-	var pm *lnp2p.PeerManager = r.Node.PeerMan
-	p := pm.GetPeer(lncore.LnAddr(paddr))
+	pm := r.Node.PeerMan
+	lnaddr, err := lncore.ParseLnAddr(paddr)
+	if err != nil {
+		return err
+	}
+
+	p := pm.GetPeer(lnaddr)
 	if p == nil {
 		return fmt.Errorf("couldn't find peer in manager after connecting")
 	}

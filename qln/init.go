@@ -60,7 +60,7 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 	nd.Events = &ebus
 
 	// Peer manager
-	nd.PeerMan, err = lnp2p.NewPeerManager(rootPrivKey, nd.NewLitDB.GetPeerDB(), trackerURL, &ebus)
+	nd.PeerMan, err = lnp2p.NewPeerManager(rootPrivKey, nd.NewLitDB.GetPeerDB(), trackerURL, &ebus, nil) // TODO proxy/nat stuff
 	if err != nil {
 		return nil, err
 	}

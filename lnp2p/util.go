@@ -32,7 +32,15 @@ func splitAdrString(adr string) (string, string) {
 func convertPubkeyToLitAddr(pk pubkey) lncore.LnAddr {
 	b := (*koblitz.PublicKey)(pk).SerializeCompressed()
 	doubleSha := fastsha256.Sum256(b[:])
-	return lncore.LnAddr(bech32.Encode("ln", doubleSha[:20]))
+
+	lnaddr, e := lncore.ParseLnAddr(bech32.Encode("ln", doubleSha[:20]))
+
+	// Should never happen.
+	if e != nil {
+		panic("this should never happen, lit addr gen code has a bug: " + e.Error())
+	}
+
+	return lnaddr
 }
 
 func connectToProxyTCP(addr string, auth *string) (func(string, string) (net.Conn, error), error) {
