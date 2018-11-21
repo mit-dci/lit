@@ -22,6 +22,7 @@ type PeerInfo struct {
 	LnAddr   *LnAddr `json:"lnaddr"`
 	Nickname *string `json:"name"`
 	NetAddr  *string `json:"netaddr"` // ip address, port, I guess
+	Pubkey   *string `json:pubkey`
 
 	// TEMP This is again, for adapting to the old system.
 	PeerIdx uint32 `json:"hint_peeridx"`

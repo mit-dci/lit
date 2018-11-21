@@ -2,6 +2,7 @@ package lndc
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"math"
@@ -41,18 +42,16 @@ func Dial(localPriv *koblitz.PrivateKey, ipAddr string, remoteAddress string,
 	var remotePK [33]byte
 	if remoteAddress[0:3] == "ln1" { // its a remote PKH
 		remotePKH = remoteAddress
-	} else if len(remoteAddress) == 33 { // remotePK
-		temp := []byte(remoteAddress)
+	} else if len(remoteAddress) == 66 { // hex encoded remotePK
+		temp, _ := hex.DecodeString(remoteAddress)
 		copy(remotePK[:], temp)
-	}
-	var conn net.Conn
-	var err error
-	var empty [33]byte
-	if remotePK != empty {
-		logging.Info("Connecting via Noise_XK since we know remotePK")
+		logging.Info("Got remote PK: ", remotePK, " using noise_xk to connect")
 		Noise_XK = true
 		SetConsts()
 	}
+	var conn net.Conn
+	var err error
+
 	conn, err = dialer("tcp", ipAddr)
 	logging.Info("ipAddr is", ipAddr)
 	if err != nil {

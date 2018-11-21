@@ -3,6 +3,7 @@ package lnp2p
 //"crypto/ecdsa" // TODO Use ecdsa not koblitz
 import (
 	"crypto/ecdsa"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"strconv"
@@ -145,7 +146,6 @@ func (pm *PeerManager) GetPeerByIdx(id int32) *Peer {
 
 // TryConnectAddress attempts to connect to the specified LN address.
 func (pm *PeerManager) TryConnectAddress(addr string, settings *NetSettings) (*Peer, error) {
-
 	// Figure out who we're trying to connect to.
 	who, where := splitAdrString(addr)
 	if where == "" {
@@ -211,10 +211,25 @@ func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, set
 		dialer = d
 	}
 
-	// Set up the connection.
-	lndcconn, err := lndc.Dial(pm.idkey, netaddr, string(*lnaddr), dialer)
-	if err != nil {
-		return nil, err
+	var remotePK *string
+	var lndcconn *lndc.Conn
+	x, err := pm.peerdb.GetPeerInfo(*lnaddr)
+	if x != nil {
+		if *(x.LnAddr) == *lnaddr {
+			// we have some entry in the db, we can use noise_xk
+			remotePK = x.Pubkey
+			// Set up the connection.
+			lndcconn, err = lndc.Dial(pm.idkey, netaddr, *remotePK, dialer)
+			if err != nil {
+				return nil, err
+			}
+		}
+	} else {
+		// Set up the connection.
+		lndcconn, err = lndc.Dial(pm.idkey, netaddr, string(*lnaddr), dialer)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	pi, err := pm.peerdb.GetPeerInfo(*lnaddr)
@@ -241,11 +256,17 @@ func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, set
 			p.idx = &pidx
 		}
 		raddr := lndcconn.RemoteAddr().String()
+		// before we store the pubkey, we need to convert it to a hex encoded string
+		convertedPubKey := (*koblitz.PublicKey)(pk)
+		pStore := convertedPubKey.SerializeCompressed() // now we have a byte string
+		pStore2 := hex.EncodeToString(pStore)
+		logging.Infof("SOTREING PK OF REMOTE PEER", pStore2)
 		pi = &lncore.PeerInfo{
 			LnAddr:   &rlitaddr,
 			Nickname: nil,
 			NetAddr:  &raddr,
 			PeerIdx:  pidx,
+			Pubkey:   &pStore2,
 		}
 		err = pm.peerdb.AddPeer(p.GetLnAddr(), *pi)
 		if err != nil {

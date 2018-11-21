@@ -117,7 +117,6 @@ func (l *Listener) doHandshake(conn net.Conn) {
 	// connecting node doesn't know our long-term static public key, then
 	// this portion will fail with a non-nil error.
 	actOne := make([]byte, ActOneSize)
-	logging.Info("Handshake Version", HandshakeVersion)
 	if _, err := io.ReadFull(conn, actOne[:]); err != nil {
 		lndcConn.conn.Close()
 		l.rejectConn(err)
@@ -127,6 +126,7 @@ func (l *Listener) doHandshake(conn net.Conn) {
 	if actOne[0] == 0 { // remote node wants to connect via XK
 		HandshakeVersion = byte(0)
 		ActTwoSize = 50
+		logging.Infof("remote node wants to connect via noise_xk")
 	} // no need for else as default covers XX
 
 	if err := lndcConn.noise.RecvActOne(actOne); err != nil {

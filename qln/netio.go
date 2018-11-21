@@ -8,8 +8,6 @@ import (
 	"github.com/mit-dci/lit/lncore"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/logging"
-	"github.com/mit-dci/lit/bech32"
-	"github.com/mit-dci/lit/crypto/fastsha256"
 )
 
 // GetLisAddressAndPorts .
@@ -83,38 +81,11 @@ func splitAdrString(adr string) (string, string) {
 // TODO Remove this.
 func (nd *LitNode) DialPeer(connectAdr string) error {
 
-	who, _ := splitAdrString(connectAdr)
-	logging.Info("COOLPEER!", who, nd.KnownPubkeys)
+	_, err := nd.PeerMan.TryConnectAddress(connectAdr, nil)
+	if err != nil {
+		return err
+	}
 
-	var remotePK [33]byte
-	var noisexk bool
-	for _, pubkey := range nd.KnownPubkeys {
-		logging.Debug("Found pubkey in list of known pubkeys: ", pubkey)
-		idHash := fastsha256.Sum256(pubkey[:])
-		adr := bech32.Encode("ln", idHash[:20])
-		if adr == who {
-			remotePK = pubkey
-			noisexk = true
-		}
-	}
-	// get my private ID key
-	// idPriv := nd.IdKey()
-	// var newConn *lndc.Conn
-	// Assign remote connection
-	if noisexk {
-		var remotePKdup [33]byte
-		temp := []byte(string(remotePK[:]))
-		copy(remotePKdup[:], temp)
-		_, err := nd.PeerMan.TryConnectAddress(string(remotePK[:]), nil)
-		if err != nil {
-			return err
-		}
-	} else {
-		_, err := nd.PeerMan.TryConnectAddress(connectAdr, nil)
-		if err != nil {
-			return err
-		}
-	}
 	return nil
 }
 

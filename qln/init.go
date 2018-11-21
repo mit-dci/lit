@@ -136,19 +136,6 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 	nd.PeerMap = map[*lnp2p.Peer]*RemotePeer{}
 	nd.PeerMapMtx = &sync.Mutex{}
 
-	nd.KnownPubkeys = make(map[uint32][33]byte)
-	var empty [33]byte
-	i := uint32(0)
-	for {
-		pubKey, _ := nd.GetPubHostFromPeerIdx(4)
-		if pubKey == empty {
-			logging.Infof("Done, tried %d hosts, none matched\n", i+1)
-			break
-		}
-		nd.KnownPubkeys[i] = pubKey
-		i++
-	}
-
 	return nd, nil
 }
 
