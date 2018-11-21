@@ -66,6 +66,9 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *ConnectReply) error {
 	// first, see if the peer to connect to is referenced by peer index.
 	var connectAdr string
 	// check if a peer number was supplied instead of a pubkeyhash
+	// accept either an string or a pubkey (raw)
+	// so args.LNAddr passed here contains blah@host:ip
+	fmt.Println("PASSED STUFF:", args.LNAddr)
 	peerIdxint, err := strconv.Atoi(args.LNAddr)
 	// number will mean no error
 	if err == nil {
@@ -83,7 +86,7 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *ConnectReply) error {
 		connectAdr = args.LNAddr
 	}
 
-	err = r.Node.DialPeer(connectAdr)
+	err = r.Node.PeerMan.TryConnectAddress(connectAdr, nil)
 	if err != nil {
 		return err
 	}

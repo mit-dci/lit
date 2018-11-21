@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"syscall"
 	"time"
+	"encoding/hex"
 
 	"github.com/mit-dci/lit/logging"
 
@@ -55,11 +56,12 @@ type litConfig struct { // define a struct for usage with go-flags
 	Rpcport uint16 `short:"p" long:"rpcport" description:"Set RPC port to connect to"`
 	Rpchost string `long:"rpchost" description:"Set RPC host to listen to"`
 	// auto config
-	AutoReconnect                   bool  `long:"autoReconnect" description:"Attempts to automatically reconnect to known peers periodically."`
-	AutoReconnectInterval           int64 `long:"autoReconnectInterval" description:"The interval (in seconds) the reconnect logic should be executed"`
-	AutoReconnectOnlyConnectedCoins bool  `long:"autoReconnectOnlyConnectedCoins" description:"Only reconnect to peers that we have channels with in a coin whose coin daemon is available"`
-	AutoListenPort                  int   `long:"autoListenPort" description:"When auto reconnect enabled, starts listening on this port"`
-	NoAutoListen                    bool  `long:"noautolisten" description:"Don't automatically listen on any ports."`
+	AutoReconnect                   bool   `long:"autoReconnect" description:"Attempts to automatically reconnect to known peers periodically."`
+	AutoReconnectInterval           int64  `long:"autoReconnectInterval" description:"The interval (in seconds) the reconnect logic should be executed"`
+	AutoReconnectOnlyConnectedCoins bool   `long:"autoReconnectOnlyConnectedCoins" description:"Only reconnect to peers that we have channels with in a coin whose coin daemon is available"`
+	AutoListenPort                  int    `long:"autoListenPort" description:"When auto reconnect enabled, starts listening on this port"`
+	NoAutoListen                    bool   `long:"noautolisten" description:"Don't automatically listen on any ports."`
+	Whitelist                       string `long:"whitelist"  description:"Whitelist a single address so that you can enable a remote peer to login for the first time and authenticate others"`
 	Params                          *coinparam.Params
 }
 
@@ -293,11 +295,32 @@ func main() {
 		// if we don't link wallet, we can still continue, no worries.
 		logging.Error(err)
 	}
-
+	logging.Info("Starting lit node")
 	rpcl := new(litrpc.LitRPC)
 	rpcl.Node = node
 	rpcl.OffButton = make(chan bool, 1)
 	node.RPC = rpcl
+
+	Authorization := new(qln.RemoteControlAuthorization)
+	Authorization.UnansweredRequest = false
+	Authorization.Allowed = true
+
+	// check for whitelisted addresses here
+	if conf.Whitelist != "" && len(conf.Whitelist) == 66 { //  the length of a standard LNAddr
+		// pass the pubkey here, which is ugly
+		// we could pass the pkh, have the peer dial us and we could get
+		// the pubkey during the second round of noise, but maybe overkill?
+		// we need to decode this hex string into a byte slice
+		addr, _ := hex.DecodeString(conf.Whitelist)
+		var temp [33]byte
+		copy(temp[:33], addr)
+		logging.Info("Whitelisting address as requested: ",addr)
+		err = rpcl.Node.SaveRemoteControlAuthorization(temp, Authorization)
+		if err != nil {
+			logging.Errorf("Error whitelisting address: %s", err.Error())
+			// don't  fatal since this doesn't affect program flow
+		}
+	}
 
 	if conf.UnauthRPC {
 		go litrpc.RPCListen(rpcl, conf.Rpchost, conf.Rpcport)
