@@ -145,20 +145,21 @@ func (pm *PeerManager) GetPeerByIdx(id int32) *Peer {
 }
 
 // TryConnectAddress attempts to connect to the specified LN address.
-func (pm *PeerManager) TryConnectAddress(addr string, settings *NetSettings) (*Peer, error) {
+func (pm *PeerManager) TryConnectAddress(addr string, settings *NetSettings) (error) {
+
 	// Figure out who we're trying to connect to.
 	who, where := splitAdrString(addr)
 	if where == "" {
 		ipv4, _, err := lnutil.Lookup(addr, pm.trackerURL, "")
 		if err != nil {
-			return nil, err
+			return err
 		}
 		where = fmt.Sprintf("%s:2448", ipv4)
 	}
 
 	lnwho := lncore.LnAddr(who)
-	x, y := pm.tryConnectPeer(where, &lnwho, settings)
-	return x, y
+	_, y := pm.tryConnectPeer(where, &lnwho, settings)
+	return y
 
 }
 

@@ -81,7 +81,7 @@ func splitAdrString(adr string) (string, string) {
 // TODO Remove this.
 func (nd *LitNode) DialPeer(connectAdr string) error {
 
-	_, err := nd.PeerMan.TryConnectAddress(connectAdr, nil)
+	err := nd.PeerMan.TryConnectAddress(connectAdr, nil)
 	if err != nil {
 		return err
 	}

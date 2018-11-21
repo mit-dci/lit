@@ -84,6 +84,11 @@ func (nd *LitNode) RemoteControlRequestHandler(msg lnutil.RemoteControlRpcReques
 
 	// If i'm not authorized, and it's not a whitelisted method then we fail the
 	// request with an 'unauthorized' error
+	// while this is good, if you're the first person to connect to lit
+	// using the --con option, you're out of luck.
+	// Because nobody has authenticated you and neither can you authenticate yourself.
+	// In order to solve this, we need to pass a cli option to lit which can allow for
+	// authentication before the first peer logs in.
 	if !auth.Allowed && !whitelisted {
 		err = fmt.Errorf("Received remote control request from unauthorized peer: %x", pubKey)
 		logging.Errorf(err.Error())
@@ -259,7 +264,7 @@ func (nd *LitNode) SaveRemoteControlAuthorization(pub [33]byte, auth *RemoteCont
 	})
 }
 
-// GetRemoteControlAuthorization retrieves the remote controlauthorizzation for
+// GetRemoteControlAuthorization retrieves the remote control authorization for
 // a specific pubkey from the database.
 func (nd *LitNode) GetRemoteControlAuthorization(pub [33]byte) (*RemoteControlAuthorization, error) {
 	r := new(RemoteControlAuthorization)
@@ -267,6 +272,7 @@ func (nd *LitNode) GetRemoteControlAuthorization(pub [33]byte) (*RemoteControlAu
 	// If the client uses our default remote control key (derived from our root priv)
 	// then it has access to our private key (file) and is most likely running from our
 	// localhost. So we always accept this.
+	logging.Debug("Fetching remote control authorization for pubkey: ", pub[:], nd.DefaultRemoteControlKey.SerializeCompressed())
 	if bytes.Equal(pub[:], nd.DefaultRemoteControlKey.SerializeCompressed()) {
 		r.Allowed = true
 		return r, nil
@@ -278,6 +284,7 @@ func (nd *LitNode) GetRemoteControlAuthorization(pub [33]byte) (*RemoteControlAu
 		// serialize state
 		b := cbk.Get(pub[:])
 		r = RemoteControlAuthorizationFromBytes(b, pub)
+		logging.Debug("Fetched pubkey ", r," from the database")
 		return nil
 	})
 	return r, err
