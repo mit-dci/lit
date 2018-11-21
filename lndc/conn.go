@@ -81,7 +81,9 @@ func Dial(localPriv *koblitz.PrivateKey, ipAddr string, remotePKH string,
 	}
 
 	logging.Info("Received pubkey", s)
+	logging.Debug("Received pubkey: ", lnutil.LitAdrFromPubkey(s), "have pubkey", remotePKH)
 	if lnutil.LitAdrFromPubkey(s) != remotePKH {
+		fmt.Println("Received pubkey: ", lnutil.LitAdrFromPubkey(s), "have pubkey", remotePKH)
 		return nil, fmt.Errorf("Remote PKH doesn't match. Quitting!")
 	}
 	logging.Infof("Received PKH %s matches", lnutil.LitAdrFromPubkey(s))

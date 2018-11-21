@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"encoding/hex"
 
 	"github.com/chzyer/readline"
 	"github.com/fatih/color"
@@ -108,7 +109,11 @@ func (lc *litAfClient) litAfSetup(conf litAfConfig) {
 			logging.Fatal(err.Error())
 		}
 		key, _ := koblitz.PrivKeyFromBytes(koblitz.S256(), privKey[:])
-
+		pubkey := key.PubKey().SerializeCompressed() // this is in bytes
+		fmt.Println("The pubkey of this lit-af instance is:", hex.EncodeToString(pubkey))
+		var temp [33]byte
+		copy(temp[:], pubkey[33:])
+		fmt.Println("The pkh of this lit-af instance is:", lnutil.LitAdrFromPubkey(temp))
 		if adr != "" && strings.HasPrefix(adr, "ln1") && host == "" {
 			ipv4, _, err := lnutil.Lookup(adr, conf.Tracker, "")
 			if err != nil {
