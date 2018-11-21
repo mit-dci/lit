@@ -4,8 +4,8 @@ import (
 	"crypto/cipher"
 	"crypto/sha256"
 	"encoding/binary"
-	"fmt"
 	"errors"
+	"fmt"
 	"io"
 	"math"
 	"time"
@@ -316,10 +316,19 @@ func EphemeralGenerator(gen func() (*koblitz.PrivateKey, error)) func(*Machine) 
 //  INITIATOR -> e            RESPONDER
 //  INITIATOR <- e, ee, s, es RESPONDER
 //  INITIATOR -> s, se        RESPONDER
+// The protocol has the following steps involved:
+// XK(s, rs):
+// 	INITIATOR <- s
+//  INITIATOR -> e, es        RESPONDER
+//  INITIATOR <- e, ee        RESPONDER
+//  INITIATOR -> s, se        RESPONDER
 // s refers to the static key (or public key) belonging to an entity
 // e refers to the ephemeral key
 // e, ee, es refer to a DH exchange between the initiator's key pair and the
 // responder's key pair. The letters e and s hold the same meaning as before.
+// lit uses Noise_XX to connect with nodes that it does not know of and uses
+// Noise_XK for nodes that it has previously connected to. This saves 33 bytes
+// in Act Two.
 
 type Machine struct {
 	sendCipher cipherState
@@ -373,11 +382,11 @@ func NewNoiseMachine(initiator bool, localStatic *koblitz.PrivateKey,
 	return m
 }
 
-const (
+var (
 	// HandshakeVersion is the expected version of the lndc handshake.
 	// Any messages that carry a different version will cause the handshake
 	// to abort immediately.
-	HandshakeVersion = byte(1) // TODO: add support for noise_XK (brontide) as well
+	HandshakeVersion = byte(1)
 
 	// ActOneSize is the size of the packet sent from initiator to
 	// responder in ActOne. The packet consists of a handshake version, an
@@ -403,18 +412,25 @@ const (
 	ActThreeSize = 66
 )
 
+func SetConsts() {
+	HandshakeVersion = byte(0) // Noise_XK's hadnshake version
+	// ActTwoSize is the size the packet sent from responder to initiator
+	// in ActTwo. The packet consists of a handshake version, an ephemeral
+	// key in compressed format and a 16-byte poly1305 tag.
+	// <- e, ee
+	// 1 + 33 + 16
+	ActTwoSize = 50
+}
+
 // GenActOne generates the initial packet (act one) to be sent from initiator
 // to responder. During act one the initiator generates an ephemeral key and
 // hashes it into the handshake digest. Future payloads are encrypted with a key
 // derived from this result.
 // -> e
 
-func (b *Machine) GenActOne() ([ActOneSize]byte, error) {
-	var (
-		err    error
-		actOne [ActOneSize]byte
-	)
-
+func (b *Machine) GenActOne(remotePK [33]byte) ([]byte, error) {
+	var err error
+	actOne := make([]byte, ActOneSize)
 	// Generate e
 	b.localEphemeral, err = b.ephemeralGen()
 	if err != nil {
@@ -425,6 +441,16 @@ func (b *Machine) GenActOne() ([ActOneSize]byte, error) {
 	e := b.localEphemeral.PubKey().SerializeCompressed()
 	// Hash it into the handshake digest
 	b.mixHash(e)
+
+	if Noise_XK {
+		b.remoteStatic, err = koblitz.ParsePubKey(remotePK[:], koblitz.S256())
+		if err != nil {
+			return nil, err
+		}
+		// es
+		s := ecdh(b.remoteStatic, b.localEphemeral)
+		b.mixKey(s[:])
+	}
 
 	authPayload := b.EncryptAndHash([]byte{})
 	actOne[0] = HandshakeVersion
@@ -437,7 +463,7 @@ func (b *Machine) GenActOne() ([ActOneSize]byte, error) {
 // executes the mirrored actions to that of the initiator extending the
 // handshake digest and deriving a new shared secret based on an ECDH with the
 // initiator's ephemeral key and responder's static key.
-func (b *Machine) RecvActOne(actOne [ActOneSize]byte) error {
+func (b *Machine) RecvActOne(actOne []byte) error {
 	var (
 		err error
 		e   [33]byte
@@ -446,7 +472,7 @@ func (b *Machine) RecvActOne(actOne [ActOneSize]byte) error {
 
 	// If the handshake version is unknown, then the handshake fails
 	// immediately.
-	if actOne[0] != HandshakeVersion {
+	if !(actOne[0] == 0 || actOne[0] == 1) {
 		return fmt.Errorf("Act One: invalid handshake version: %v, "+
 			"only %v is valid, msg=%x", actOne[0], HandshakeVersion,
 			actOne[:])
@@ -462,6 +488,12 @@ func (b *Machine) RecvActOne(actOne [ActOneSize]byte) error {
 	}
 	b.mixHash(b.remoteEphemeral.SerializeCompressed())
 
+	if actOne[0] == 0 {
+		// es
+		es := ecdh(b.remoteEphemeral, b.localStatic)
+		b.mixKey(es)
+	}
+
 	_, err = b.DecryptAndHash(p[:])
 	return err // nil means Act one completed successfully
 }
@@ -469,12 +501,9 @@ func (b *Machine) RecvActOne(actOne [ActOneSize]byte) error {
 // GenActTwo generates the second packet (act two) to be sent from the
 // responder to the initiator
 // <- e, ee, s, es
-func (b *Machine) GenActTwo() ([ActTwoSize]byte, error) {
-	var (
-		err    error
-		actTwo [ActTwoSize]byte
-	)
-
+func (b *Machine) GenActTwo(HandshakeVersion byte) ([]byte, error) {
+	var err error
+	actTwo := make([]byte, ActTwoSize)
 	// e
 	b.localEphemeral, err = b.ephemeralGen()
 	if err != nil {
@@ -488,19 +517,28 @@ func (b *Machine) GenActTwo() ([ActTwoSize]byte, error) {
 	ee := ecdh(b.remoteEphemeral, b.localEphemeral)
 	b.mixKey(ee)
 
-	// s
-	s := b.localStatic.PubKey().SerializeCompressed()
-	b.mixHash(s)
+	if HandshakeVersion == 1 {
+		// s
+		s := b.localStatic.PubKey().SerializeCompressed()
+		b.mixHash(s)
 
-	// es
-	es := ecdh(b.remoteEphemeral, b.localStatic)
-	b.mixKey(es)
+		// es
+		es := ecdh(b.remoteEphemeral, b.localStatic)
+		b.mixKey(es)
+
+		authPayload := b.EncryptAndHash([]byte{})
+		actTwo[0] = HandshakeVersion
+		copy(actTwo[1:34], e)
+		copy(actTwo[34:67], s)
+		copy(actTwo[67:], authPayload)
+		// add additional stuff based on what we need
+		return actTwo, nil
+	}
 
 	authPayload := b.EncryptAndHash([]byte{})
 	actTwo[0] = HandshakeVersion
 	copy(actTwo[1:34], e)
-	copy(actTwo[34:67], s)
-	copy(actTwo[67:], authPayload)
+	copy(actTwo[34:], authPayload)
 	// add additional stuff based on what we need
 	return actTwo, nil
 }
@@ -508,7 +546,7 @@ func (b *Machine) GenActTwo() ([ActTwoSize]byte, error) {
 // RecvActTwo processes the second packet (act two) sent from the responder to
 // the initiator. A successful processing of this packet authenticates the
 // initiator to the responder.
-func (b *Machine) RecvActTwo(actTwo [ActTwoSize]byte) ([33]byte, error) {
+func (b *Machine) RecvActTwo(actTwo []byte) ([33]byte, error) {
 	var (
 		err error
 		e   [33]byte
@@ -524,9 +562,14 @@ func (b *Machine) RecvActTwo(actTwo [ActTwoSize]byte) ([33]byte, error) {
 			actTwo[:])
 	}
 
-	copy(e[:], actTwo[1:34])
-	copy(s[:], actTwo[34:67])
-	copy(p[:], actTwo[67:])
+	if HandshakeVersion == 0 {
+		copy(e[:], actTwo[1:34])
+		copy(p[:], actTwo[34:])
+	} else {
+		copy(e[:], actTwo[1:34])
+		copy(s[:], actTwo[34:67])
+		copy(p[:], actTwo[67:])
+	}
 
 	// e
 	b.remoteEphemeral, err = koblitz.ParsePubKey(e[:], koblitz.S256())
@@ -539,17 +582,18 @@ func (b *Machine) RecvActTwo(actTwo [ActTwoSize]byte) ([33]byte, error) {
 	ee := ecdh(b.remoteEphemeral, b.localEphemeral)
 	b.mixKey(ee)
 
-	// s
-	b.remoteStatic, err = koblitz.ParsePubKey(s[:], koblitz.S256())
-	if err != nil {
-		return empty, err
+	if HandshakeVersion == 1 {
+		// s
+		b.remoteStatic, err = koblitz.ParsePubKey(s[:], koblitz.S256())
+		if err != nil {
+			return empty, err
+		}
+		b.mixHash(b.remoteStatic.SerializeCompressed())
+		// es
+		es := ecdh(b.remoteStatic, b.localEphemeral)
+		b.mixKey(es)
+
 	}
-	b.mixHash(b.remoteStatic.SerializeCompressed())
-
-	// es
-	es := ecdh(b.remoteStatic, b.localEphemeral)
-	b.mixKey(es)
-
 	_, err = b.DecryptAndHash(p[:])
 	return s, err
 }
@@ -560,9 +604,9 @@ func (b *Machine) RecvActTwo(actTwo [ActTwoSize]byte) ([33]byte, error) {
 // the responder. This act also includes the final ECDH operation which yields
 // the final session.
 // -> s, se
-func (b *Machine) GenActThree() ([ActThreeSize]byte, error) {
-	var actThree [ActThreeSize]byte
-
+func (b *Machine) GenActThree() ([]byte, error) {
+	//var actThree [ActThreeSize]byte
+	actThree := make([]byte, ActThreeSize)
 	// s
 	s := b.localStatic.PubKey().SerializeCompressed()
 	encryptedS := b.EncryptAndHash(s)
@@ -587,7 +631,7 @@ func (b *Machine) GenActThree() ([ActThreeSize]byte, error) {
 // the responder. After processing this act, the responder learns of the
 // initiator's static public key. Decryption of the static key serves to
 // authenticate the initiator to the responder.
-func (b *Machine) RecvActThree(actThree [ActThreeSize]byte) error {
+func (b *Machine) RecvActThree(actThree []byte) error {
 	var (
 		err error
 		s   [49]byte

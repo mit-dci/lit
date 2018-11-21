@@ -82,7 +82,6 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *ConnectReply) error {
 		// use string as is, try to convert to ln address
 		connectAdr = args.LNAddr
 	}
-
 	err = r.Node.DialPeer(connectAdr)
 	if err != nil {
 		return err

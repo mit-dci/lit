@@ -29,15 +29,30 @@ type Conn struct {
 
 // A compile-time assertion to ensure that Conn meets the net.Conn interface.
 var _ net.Conn = (*Conn)(nil)
+var Noise_XK bool
 
 // Dial attempts to establish an encrypted+authenticated connection with the
 // remote peer located at address which has remotePub as its long-term static
 // public key. In the case of a handshake failure, the connection is closed and
 // a non-nil error is returned.
-func Dial(localPriv *koblitz.PrivateKey, ipAddr string, remotePKH string,
+func Dial(localPriv *koblitz.PrivateKey, ipAddr string, remoteAddress string,
 	dialer func(string, string) (net.Conn, error)) (*Conn, error) {
+	var remotePKH string
+	var remotePK [33]byte
+	if remoteAddress[0:3] == "ln1" { // its a remote PKH
+		remotePKH = remoteAddress
+	} else if len(remoteAddress) == 33 { // remotePK
+		temp := []byte(remoteAddress)
+		copy(remotePK[:], temp)
+	}
 	var conn net.Conn
 	var err error
+	var empty [33]byte
+	if remotePK != empty {
+		logging.Info("Connecting via Noise_XK since we know remotePK")
+		Noise_XK = true
+		SetConsts()
+	}
 	conn, err = dialer("tcp", ipAddr)
 	logging.Info("ipAddr is", ipAddr)
 	if err != nil {
@@ -50,7 +65,7 @@ func Dial(localPriv *koblitz.PrivateKey, ipAddr string, remotePKH string,
 	}
 
 	// Initiate the handshake by sending the first act to the receiver.
-	actOne, err := b.noise.GenActOne()
+	actOne, err := b.noise.GenActOne(remotePK)
 	if err != nil {
 		b.conn.Close()
 		return nil, err
@@ -69,22 +84,29 @@ func Dial(localPriv *koblitz.PrivateKey, ipAddr string, remotePKH string,
 	// remotePub), then read the second act after which we'll be able to
 	// send our static public key to the remote peer with strong forward
 	// secrecy.
-	var actTwo [ActTwoSize]byte
+	actTwo := make([]byte, ActTwoSize)
 	if _, err := io.ReadFull(conn, actTwo[:]); err != nil {
 		b.conn.Close()
 		return nil, err
 	}
-	s, err := b.noise.RecvActTwo(actTwo)
-	if err != nil {
-		b.conn.Close()
-		return nil, err
+	if !Noise_XK {
+		remotePK, err = b.noise.RecvActTwo(actTwo)
+		if err != nil {
+			b.conn.Close()
+			return nil, err
+		}
+	} else {
+		if _, err := b.noise.RecvActTwo(actTwo); err != nil {
+			b.conn.Close()
+			return nil, err
+		}
 	}
-
-	logging.Info("Received pubkey", s)
-	if lnutil.LitAdrFromPubkey(s) != remotePKH {
+	logging.Infoln("Received pubkey: ", remotePK)
+	if lnutil.LitAdrFromPubkey(remotePK) != remotePKH && !Noise_XK {
+		// for noise_XK dont check PKH and PK because we'd have already checked this
+		// the last time we connected to this guy
 		return nil, fmt.Errorf("Remote PKH doesn't match. Quitting!")
 	}
-	logging.Infof("Received PKH %s matches", lnutil.LitAdrFromPubkey(s))
 
 	// Finally, complete the handshake by sending over our encrypted static
 	// key and execute the final ECDH operation.

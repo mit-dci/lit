@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/mit-dci/lit/crypto/koblitz"
+	"github.com/mit-dci/lit/logging"
 )
 
 // defaultHandshakes is the maximum number of handshakes that can be done in
@@ -115,12 +116,19 @@ func (l *Listener) doHandshake(conn net.Conn) {
 	// Attempt to carry out the first act of the handshake protocol. If the
 	// connecting node doesn't know our long-term static public key, then
 	// this portion will fail with a non-nil error.
-	var actOne [ActOneSize]byte
+	actOne := make([]byte, ActOneSize)
+	logging.Info("Handshake Version", HandshakeVersion)
 	if _, err := io.ReadFull(conn, actOne[:]); err != nil {
 		lndcConn.conn.Close()
 		l.rejectConn(err)
 		return
 	}
+
+	if actOne[0] == 0 { // remote node wants to connect via XK
+		HandshakeVersion = byte(0)
+		ActTwoSize = 50
+	} // no need for else as default covers XX
+
 	if err := lndcConn.noise.RecvActOne(actOne); err != nil {
 		lndcConn.conn.Close()
 		l.rejectConn(err)
@@ -128,7 +136,7 @@ func (l *Listener) doHandshake(conn net.Conn) {
 	}
 	// Next, progress the handshake processes by sending over our ephemeral
 	// key for the session along with an authenticating tag.
-	actTwo, err := lndcConn.noise.GenActTwo()
+	actTwo, err := lndcConn.noise.GenActTwo(HandshakeVersion)
 	if err != nil {
 		lndcConn.conn.Close()
 		l.rejectConn(err)
@@ -154,7 +162,7 @@ func (l *Listener) doHandshake(conn net.Conn) {
 	// Finally, finish the handshake processes by reading and decrypting
 	// the connection peer's static public key. If this succeeds then both
 	// sides have mutually authenticated each other.
-	var actThree [ActThreeSize]byte
+	actThree := make([]byte, ActThreeSize)
 	if _, err := io.ReadFull(conn, actThree[:]); err != nil {
 		lndcConn.conn.Close()
 		l.rejectConn(err)

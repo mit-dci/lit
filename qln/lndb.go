@@ -131,6 +131,7 @@ type LitNode struct {
 	TrackerURL string
 
 	ChannelMap    map[[20]byte][]LinkDesc
+	KnownPubkeys  map[uint32][33]byte
 	ChannelMapMtx sync.Mutex
 	AdvTimeout    *time.Ticker
 
