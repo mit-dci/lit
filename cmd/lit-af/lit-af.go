@@ -66,7 +66,7 @@ func newConfigParser(conf *litAfConfig, options flags.Options) *flags.Parser {
 	return parser
 }
 
-func (lc *litAfClient) litAfSetup(conf litAfConfig) {
+func (lc *litAfClient) litAfSetup(conf litAfConfig) (error){
 
 	var err error
 	// create home directory if it does not exist
@@ -90,8 +90,28 @@ func (lc *litAfClient) litAfSetup(conf litAfConfig) {
 	}
 	logging.SetLogLevel(logLevel) // defaults to zero
 
+	// we don't know whether the passed address is a remotePKH or a remotePK
+	// so we need to detect that here and then take steps accordingly
+	// so the first part involved here would be either dealing with raw pubkeys or
+	// dealing with pk hashes
+	// another question here is how do we deal with connecting to other nodes?
+	// if we need that in, we need to hcange our overall architecture to host
+	// pks as well as pk hashes
 	adr, host, port := lnutil.ParseAdrStringWithPort(conf.Con)
-	logging.Infof("Adr: %s, Host: %s, Port: %d", adr, host, port)
+	// now e've split the address, check if pkh, if not, convert to pkh
+	if len(adr) == 44 {
+		// remote PKH, do nothing
+	} else if len(adr) == 66 {
+		// remote PK, convert to remotePKH
+		addr, err := hex.DecodeString(adr)
+		if err != nil {
+			return fmt.Errorf("Unable to decode hex string")
+		}
+		var temp [33]byte
+		copy(temp[:33], addr)
+		adr = lnutil.LitAdrFromPubkey(temp)
+	}
+	fmt.Printf("Adr: %s, Host: %s, Port: %d\n", adr, host, port)
 	if litrpc.LndcRpcCanConnectLocallyWithHomeDir(defaultDir) && adr == "" && (host == "localhost" || host == "127.0.0.1") {
 
 		lc.RPCClient, err = litrpc.NewLocalLndcRpcClientWithHomeDirAndPort(defaultDir, port)
@@ -110,10 +130,10 @@ func (lc *litAfClient) litAfSetup(conf litAfConfig) {
 		}
 		key, _ := koblitz.PrivKeyFromBytes(koblitz.S256(), privKey[:])
 		pubkey := key.PubKey().SerializeCompressed() // this is in bytes
-		fmt.Println("The pubkey of this lit-af instance is:", hex.EncodeToString(pubkey))
+		fmt.Printf("The pubkey of this lit-af instance is: %s\n", hex.EncodeToString(pubkey))
 		var temp [33]byte
-		copy(temp[:], pubkey[33:])
-		fmt.Println("The pkh of this lit-af instance is:", lnutil.LitAdrFromPubkey(temp))
+		copy(temp[:], pubkey[:33])
+		fmt.Printf("The pkh of this lit-af instance is: %s\n", lnutil.LitAdrFromPubkey(temp))
 		if adr != "" && strings.HasPrefix(adr, "ln1") && host == "" {
 			ipv4, _, err := lnutil.Lookup(adr, conf.Tracker, "")
 			if err != nil {
@@ -130,6 +150,7 @@ func (lc *litAfClient) litAfSetup(conf litAfConfig) {
 			logging.Fatal(err.Error())
 		}
 	}
+	return nil
 }
 
 // for now just testing how to connect and get messages back and forth
@@ -142,7 +163,11 @@ func main() {
 		Dir:     defaultDir,
 		Tracker: defaultTracker,
 	}
-	lc.litAfSetup(conf) // setup lit-af to start
+	err = lc.litAfSetup(conf) // setup lit-af to start
+	if err != nil {
+		logging.Error(err)
+		return
+	}
 
 	rl, err := readline.NewEx(&readline.Config{
 		Prompt:       lnutil.Prompt("lit-af") + lnutil.White("# "),
