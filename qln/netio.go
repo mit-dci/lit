@@ -40,6 +40,7 @@ func (nd *LitNode) TCPListener(port int) (string, error) {
 
 	lnaddr := nd.PeerMan.GetExternalAddress()
 
+	logging.Infof("My raw hex Public Key is: %s", nd.PeerMan.GetExternalPubkeyString())
 	logging.Infof("Listening with ln address: %s \n", lnaddr)
 
 	// Don't announce on the tracker if we are communicating via SOCKS proxy

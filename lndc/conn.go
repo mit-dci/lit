@@ -2,6 +2,7 @@ package lndc
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"math"
@@ -34,8 +35,28 @@ var _ net.Conn = (*Conn)(nil)
 // remote peer located at address which has remotePub as its long-term static
 // public key. In the case of a handshake failure, the connection is closed and
 // a non-nil error is returned.
-func Dial(localPriv *koblitz.PrivateKey, ipAddr string, remotePKH string,
+func Dial(localPriv *koblitz.PrivateKey, ipAddr string, remoteString string,
 	dialer func(string, string) (net.Conn, error)) (*Conn, error) {
+
+	// so the param passed can either be a remotePKH or can be a remotePK
+	// we can simply convert the remotePK into a remotePKH because we
+	// don't need to choose between XK and XX here and that's done later on
+	logging.Debug("Trying to connect to: ", remoteString, " at ", ipAddr)
+	var remotePKH string
+	if len(remoteString) == 41 {
+		remotePKH = remoteString
+	} else if len(remoteString) == 66 {
+		var temp [33]byte
+		x, err := hex.DecodeString(remoteString)
+		if err != nil {
+			logging.Error(err)
+			return nil, err
+		}
+		copy(temp[:], []byte(x))
+		logging.Info("Converted passed remote pk to remotepkh", temp)
+		remotePKH = lnutil.LitAdrFromPubkey(temp)
+	}
+
 	var conn net.Conn
 	var err error
 	conn, err = dialer("tcp", ipAddr)
@@ -81,9 +102,8 @@ func Dial(localPriv *koblitz.PrivateKey, ipAddr string, remotePKH string,
 	}
 
 	logging.Info("Received pubkey", s)
-	logging.Debug("Received pubkey: ", lnutil.LitAdrFromPubkey(s), "have pubkey", remotePKH)
+	logging.Debug("Received pubkey: ", lnutil.LitAdrFromPubkey(s), " have pubkey: ", remotePKH)
 	if lnutil.LitAdrFromPubkey(s) != remotePKH {
-		fmt.Println("Received pubkey: ", lnutil.LitAdrFromPubkey(s), "have pubkey", remotePKH)
 		return nil, fmt.Errorf("Remote PKH doesn't match. Quitting!")
 	}
 	logging.Infof("Received PKH %s matches", lnutil.LitAdrFromPubkey(s))

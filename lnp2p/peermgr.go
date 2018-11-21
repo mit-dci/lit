@@ -3,6 +3,7 @@ package lnp2p
 //"crypto/ecdsa" // TODO Use ecdsa not koblitz
 import (
 	"crypto/ecdsa"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"strconv"
@@ -102,6 +103,11 @@ func (pm *PeerManager) GetExternalAddress() string {
 	return string(addr)
 }
 
+func (pm *PeerManager) GetExternalPubkeyString() string {
+	c := koblitz.PublicKey(ecdsa.PublicKey(pm.idkey.PublicKey))
+	return hex.EncodeToString(c.SerializeCompressed())
+}
+
 func computeIdentKeyFromRoot(rootkey *hdkeychain.ExtendedKey) (privkey, error) {
 	var kg portxo.KeyGen
 	kg.Depth = 5
@@ -144,10 +150,13 @@ func (pm *PeerManager) GetPeerByIdx(id int32) *Peer {
 }
 
 // TryConnectAddress attempts to connect to the specified LN address.
-func (pm *PeerManager) TryConnectAddress(addr string, settings *NetSettings) (error) {
+func (pm *PeerManager) TryConnectAddress(addr string, settings *NetSettings) error {
 
+	// the address we're dialing can either be of the following two types:
+	// 1. pkhash@ip:port
+	// 2. pk@ip:port (where pk is in hex and is a compressed public key)
 	// Figure out who we're trying to connect to.
-	who, where := splitAdrString(addr)
+	pkOrpkHash, where := splitAdrString(addr)
 	if where == "" {
 		ipv4, _, err := lnutil.Lookup(addr, pm.trackerURL, "")
 		if err != nil {
@@ -155,27 +164,26 @@ func (pm *PeerManager) TryConnectAddress(addr string, settings *NetSettings) (er
 		}
 		where = fmt.Sprintf("%s:2448", ipv4)
 	}
-
-	lnwho := lncore.LnAddr(who)
-	_, y := pm.tryConnectPeer(where, &lnwho, settings)
-	return y
-
+	who := lncore.LnAddr(pkOrpkHash)
+	return pm.tryConnectPeer(&who, where, settings)
 }
 
-func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, settings *NetSettings) (*Peer, error) {
+// tryConnectPeer tries to dial to the passed addr at where along with the passed
+// settings. Returns an error
+func (pm *PeerManager) tryConnectPeer(addr *lncore.LnAddr, where string, settings *NetSettings) (error) {
 
 	// lnaddr check, to make sure that we do the right thing.
-	if lnaddr == nil {
-		return nil, fmt.Errorf("connection to a peer with unknown lnaddr not supported yet")
+	if addr == nil {
+		return fmt.Errorf("connection to a peer with unknown addr not supported yet")
 	}
 
 	// Do NAT setup stuff.
 	if settings != nil && settings.NatMode != nil {
 
 		// Do some type juggling.
-		x, err := strconv.Atoi(netaddr[1:])
+		x, err := strconv.Atoi(where[1:])
 		if err != nil {
-			return nil, err
+			return err
 		}
 		lisPort := uint16(x) // if only Atoi could infer which type we wanted to parse as!
 
@@ -185,7 +193,7 @@ func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, set
 			logging.Infof("Attempting port forwarding via UPnP...")
 			err = nat.SetupUpnp(lisPort)
 			if err != nil {
-				return nil, err
+				return err
 			}
 		} else if *settings.NatMode == "pmp" {
 			// NAT Port Mapping Protocol
@@ -193,10 +201,10 @@ func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, set
 			logging.Infof("Attempting port forwarding via PMP...")
 			_, err = nat.SetupPmp(timeout, lisPort)
 			if err != nil {
-				return nil, err
+				return err
 			}
 		} else {
-			return nil, fmt.Errorf("invalid NAT type: %s", *settings.NatMode)
+			return fmt.Errorf("invalid NAT type: %s", *settings.NatMode)
 		}
 	}
 
@@ -206,18 +214,18 @@ func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, set
 	if settings != nil && settings.ProxyAddr != nil {
 		d, err := connectToProxyTCP(*settings.ProxyAddr, settings.ProxyAuth)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		dialer = d
 	}
 
 	// Set up the connection.
-	lndcconn, err := lndc.Dial(pm.idkey, netaddr, string(*lnaddr), dialer)
+	lndcconn, err := lndc.Dial(pm.idkey, where, string(*addr), dialer)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	pi, err := pm.peerdb.GetPeerInfo(*lnaddr)
+	pi, err := pm.peerdb.GetPeerInfo(*addr)
 	if err != nil {
 		logging.Errorf("Problem loading peer info from DB: %s\n", err.Error())
 		// don't kill the connection?
@@ -266,7 +274,7 @@ func (pm *PeerManager) tryConnectPeer(netaddr string, lnaddr *lncore.LnAddr, set
 	go processConnectionInboundTraffic(p, pm)
 
 	// Return
-	return p, nil
+	return nil
 
 }
 
