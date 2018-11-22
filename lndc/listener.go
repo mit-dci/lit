@@ -105,7 +105,7 @@ func (l *Listener) doHandshake(conn net.Conn) {
 
 	lndcConn := &Conn{
 		conn:  conn,
-		noise: NewNoiseMachine(false, l.localStatic),
+		noise: NewXKNoiseMachine(false, l.localStatic, nil),
 	}
 
 	// We'll ensure that we get ActOne from the remote peer in a timely

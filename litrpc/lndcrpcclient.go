@@ -107,6 +107,15 @@ func NewLocalLndcRpcClientWithHomeDirAndPort(litHomeDir string, port uint32) (*L
 	return NewLndcRpcClient(adr, key)
 }
 
+func NewOtherRpcClient(address string, key *koblitz.PrivateKey)(error) {
+	// Dial a connection to the lit node
+	who, where := lnutil.ParseAdrString(address)
+	_, err := lndc.Dial(key, where, who, net.Dial)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 // NewLndcRpcClient creates a new LNDC client using the given private key, which
 // is arbitrary. It will then connect to the lit node specified in address, and
 // can then exchange remote control calls with it. In order to succesfully

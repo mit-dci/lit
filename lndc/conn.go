@@ -51,16 +51,30 @@ func Dial(localPriv *koblitz.PrivateKey, ipAddr string, remoteAddress string,
 	}
 	var conn net.Conn
 	var err error
-
+	fmt.Println("CHKP1")
 	conn, err = dialer("tcp", ipAddr)
 	logging.Info("ipAddr is", ipAddr)
 	if err != nil {
 		return nil, err
 	}
 
-	b := &Conn{
-		conn:  conn,
-		noise: NewNoiseMachine(true, localPriv),
+	b := new(Conn)
+	if Noise_XK {
+		fmt.Println("Setting up a new noise_xk machine")
+		// I need to convert the raw PK to a koblitz public key
+		remotePub, err := koblitz.ParsePubKey(remotePK[:], koblitz.S256())
+		if err != nil {
+			return nil, err
+		}
+		b = &Conn{
+			conn:  conn,
+			noise: NewXKNoiseMachine(true, localPriv, remotePub),
+		}
+	} else {
+		b = &Conn{
+			conn:  conn,
+			noise: NewXXNoiseMachine(true, localPriv),
+		}
 	}
 
 	// Initiate the handshake by sending the first act to the receiver.
@@ -73,7 +87,7 @@ func Dial(localPriv *koblitz.PrivateKey, ipAddr string, remoteAddress string,
 		b.conn.Close()
 		return nil, err
 	}
-
+	fmt.Println("CHKA2")
 	// We'll ensure that we get ActTwo from the remote peer in a timely
 	// manner. If they don't respond within 1s, then we'll kill the
 	// connection.
@@ -85,9 +99,11 @@ func Dial(localPriv *koblitz.PrivateKey, ipAddr string, remoteAddress string,
 	// secrecy.
 	actTwo := make([]byte, ActTwoSize)
 	if _, err := io.ReadFull(conn, actTwo[:]); err != nil {
+		fmt.Println("CHKmid", err)
 		b.conn.Close()
 		return nil, err
 	}
+	fmt.Println("CHKA3")
 	if !Noise_XK {
 		remotePK, err = b.noise.RecvActTwo(actTwo)
 		if err != nil {
