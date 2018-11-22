@@ -100,17 +100,11 @@ func Dial(localPriv *koblitz.PrivateKey, ipAddr string, remoteAddress string,
 			return nil, err
 		}
 	}
-<<<<<<< HEAD
+
 	logging.Infoln("Received pubkey: ", remotePK)
 	if lnutil.LitAdrFromPubkey(remotePK) != remotePKH && !Noise_XK {
 		// for noise_XK dont check PKH and PK because we'd have already checked this
 		// the last time we connected to this guy
-=======
-
-	logging.Info("Received pubkey", s)
-	logging.Debug("Received pubkey: ", lnutil.LitAdrFromPubkey(s), " have pubkey: ", remotePKH)
-	if lnutil.LitAdrFromPubkey(s) != remotePKH {
->>>>>>> connect to remote node using their pubkey as well
 		return nil, fmt.Errorf("Remote PKH doesn't match. Quitting!")
 	}
 

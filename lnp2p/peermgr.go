@@ -221,22 +221,22 @@ func (pm *PeerManager) tryConnectPeer(addr *lncore.LnAddr, where string, setting
 
 	var remotePK *string
 	var lndcconn *lndc.Conn
-	x, err := pm.peerdb.GetPeerInfo(*lnaddr)
+	x, err := pm.peerdb.GetPeerInfo(*addr)
 	if x != nil {
-		if *(x.LnAddr) == *lnaddr {
+		if *(x.LnAddr) == *addr {
 			// we have some entry in the db, we can use noise_xk
 			remotePK = x.Pubkey
 			// Set up the connection.
-			lndcconn, err = lndc.Dial(pm.idkey, netaddr, *remotePK, dialer)
+			lndcconn, err = lndc.Dial(pm.idkey, where, *remotePK, dialer)
 			if err != nil {
-				return nil, err
+				return err
 			}
 		}
 	} else {
 		// Set up the connection.
-		lndcconn, err = lndc.Dial(pm.idkey, netaddr, string(*lnaddr), dialer)
+		lndcconn, err = lndc.Dial(pm.idkey, where, string(*addr), dialer)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 
