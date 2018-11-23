@@ -103,9 +103,13 @@ func (l *Listener) doHandshake(conn net.Conn) {
 	default:
 	}
 
+	// TODO:
+	// the listener here defaults to a noise_XK machine, we should add a condition
+	// here so that we can use a noise_XX machine for lit specific connections
+	// at this point, we really don't know who (noiseXX or noiseXK) is connecting to
+	// us, so we need to init hte noise part later
 	lndcConn := &Conn{
-		conn:  conn,
-		noise: NewXKNoiseMachine(false, l.localStatic, nil),
+		conn: conn,
 	}
 
 	// We'll ensure that we get ActOne from the remote peer in a timely
@@ -123,11 +127,17 @@ func (l *Listener) doHandshake(conn net.Conn) {
 		return
 	}
 
-	if actOne[0] == 0 { // remote node wants to connect via XK
-		HandshakeVersion = byte(0)
-		ActTwoSize = 50
+	if actOne[0] == 0 {
+		// remote node wants to connect via XK
+		Noise_XK = true
+		SetXKConsts()
+		lndcConn.noise = NewNoiseXKMachine(false, l.localStatic, nil)
 		logging.Infof("remote node wants to connect via noise_xk")
-	} // no need for else as default covers XX
+	} else {
+		// no need to init the constants here since defaults are set to noise_XX
+		logging.Infof("Remote Node requesting connection via noise_xx")
+		lndcConn.noise = NewNoiseXXMachine(false, l.localStatic)
+	}
 
 	if err := lndcConn.noise.RecvActOne(actOne); err != nil {
 		lndcConn.conn.Close()

@@ -220,7 +220,6 @@ func (s *symmetricState) EncryptAndHash(plaintext []byte) []byte {
 // ciphertext.  When encrypting the handshake digest (h) is used as the
 // associated data to the AEAD cipher.
 func (s *symmetricState) DecryptAndHash(ciphertext []byte) ([]byte, error) {
-	fmt.Println("HANDSHAKE DIGEST:", s.handshakeDigest[:])
 	plaintext, err := s.Decrypt(s.handshakeDigest[:], nil, ciphertext)
 	if err != nil {
 		return nil, err
@@ -235,8 +234,6 @@ func (s *symmetricState) DecryptAndHash(ciphertext []byte) ([]byte, error) {
 func (s *symmetricState) InitializeSymmetric(protocolName []byte) {
 	var empty [32]byte
 	s.handshakeDigest = sha256.Sum256(protocolName)
-	fmt.Println("SANITY CH ECK", sha256.Sum256([]byte("Noise_XK_secp256k1_ChaChaPoly_SHA256")))
-	fmt.Println("SHA256SUYM is", s.handshakeDigest)
 	s.chainingKey = s.handshakeDigest
 	s.InitializeKey(empty) // init with empty key
 }
@@ -258,10 +255,10 @@ type handshakeState struct {
 	remoteEphemeral *koblitz.PublicKey
 }
 
-// newHandshakeState returns a new instance of the handshake state initialized
+// newXXHandshakeState returns a new instance of the handshake state initialized
 // with the prologue and protocol name. If this is the responder's handshake
 // state, then the remotePub can be nil.
-func newHandshakeState(initiator bool, prologue []byte,
+func newXXHandshakeState(initiator bool, prologue []byte,
 	localStatic *koblitz.PrivateKey) handshakeState {
 
 	h := handshakeState{
@@ -278,30 +275,24 @@ func newHandshakeState(initiator bool, prologue []byte,
 	return h
 }
 
-// newHandshakeState returns a new instance of the handshake state initialized
+// newXXHandshakeState returns a new instance of the handshake state initialized
 // with the prologue and protocol name. If this is the responder's handshake
 // state, then the remotePub can be nil.
 func newXKHandshakeState(initiator bool, prologue []byte,
 	localStatic *koblitz.PrivateKey, remoteStatic *koblitz.PublicKey) handshakeState {
 
 	h := handshakeState{
-		initiator:   initiator,
-		localStatic: localStatic,
+		initiator:    initiator,
+		localStatic:  localStatic,
 		remoteStatic: remoteStatic,
 	}
-	// same fmt.Println("MIX HASH before newXKHandshakeState:", h.handshakeDigest[:])
 
 	// Set the current chaining key and handshake digest to the hash of the
 	// protocol name, and additionally mix in the prologue. If either sides
 	// disagree about the prologue or protocol name, then the handshake
 	// will fail.
-	fmt.Println("MIX HASH 1 before INITSYMM in newXKHandshakeState:", h.handshakeDigest[:])
-	fmt.Println("PROTOCL NAME is", []byte(protocolName), prologue)
-	fmt.Println("CHEDASDASD", protocolName, protocolName == "Noise_XK_secp256k1_ChaChaPoly_SHA256")
 	h.InitializeSymmetric([]byte("Noise_XK_secp256k1_ChaChaPoly_SHA256"))
-	fmt.Println("MIX HASH 1 before prologue in newXKHandshakeState:", h.handshakeDigest[:])
 	h.mixHash(prologue)
-	fmt.Println("MIX HASH after prologue in newXKHandshakeState:", h.handshakeDigest[:])
 	if initiator {
 		h.mixHash(remoteStatic.SerializeCompressed())
 	} else {
@@ -309,6 +300,7 @@ func newXKHandshakeState(initiator bool, prologue []byte,
 	}
 	return h
 }
+
 // EphemeralGenerator is a functional option that allows callers to substitute
 // a custom function for use when generating ephemeral keys for ActOne or
 // ActTwo.  The function closure return by this function can be passed into
@@ -386,13 +378,12 @@ type Machine struct {
 // string "lightning" as the prologue. The last parameter is a set of variadic
 // arguments for adding additional options to the lndc Machine
 // initialization.
-func NewXKNoiseMachine(initiator bool, localStatic *koblitz.PrivateKey, remotePub *koblitz.PublicKey,
+func NewNoiseXKMachine(initiator bool, localStatic *koblitz.PrivateKey, remotePub *koblitz.PublicKey,
 	options ...func(*Machine)) *Machine {
 
 	// so if it noise_XK, I need to hash the remote PK in here as well
 	handshake := newXKHandshakeState(initiator, []byte("lightning"), localStatic, remotePub)
-	// TODO: if we're sending messages of type XK, set it back to
-	// "lightning" which is what BOLT uses
+	// "lightning" is what BOLT uses, "lit" is used for XX handshakes
 
 	m := &Machine{handshakeState: handshake}
 	// With the initial base machine created, we'll assign our default
@@ -409,12 +400,11 @@ func NewXKNoiseMachine(initiator bool, localStatic *koblitz.PrivateKey, remotePu
 	return m
 }
 
-
-func NewXXNoiseMachine(initiator bool, localStatic *koblitz.PrivateKey,
+func NewNoiseXXMachine(initiator bool, localStatic *koblitz.PrivateKey,
 	options ...func(*Machine)) *Machine {
 
 	// so if it noise_XK, I need to hash the remote PK in here as well
-	handshake := newHandshakeState(initiator, []byte("lightning"), localStatic)
+	handshake := newXXHandshakeState(initiator, []byte("lit"), localStatic)
 	// TODO: if we're sending messages of type XK, set it back to
 	// "lightning" which is what BOLT uses
 
@@ -470,15 +460,22 @@ var (
 	ActThreeSize = 66
 )
 
-func SetConsts() {
-	HandshakeVersion = byte(0) // Noise_XK's hadnshake version
+func SetXKConsts() {
+	// Noise_XK's hadnshake version
+	HandshakeVersion = byte(0)
+
 	// ActTwoSize is the size the packet sent from responder to initiator
 	// in ActTwo. The packet consists of a handshake version, an ephemeral
 	// key in compressed format and a 16-byte poly1305 tag.
 	// <- e, ee
 	// 1 + 33 + 16
-	protocolName = "Noise_XK_secp256k1_ChaChaPoly_SHA256"
 	ActTwoSize = 50
+	// protocolName is the precise instantiation of the Noise protocol
+	// This value will be used as part of the prologue. If the initiator
+	// and responder aren't using the exact same string for this value,
+	// along with prologue of the Bitcoin network, then the initial
+	// handshake will fail.
+	protocolName = "Noise_XK_secp256k1_ChaChaPoly_SHA256"
 }
 
 // GenActOne generates the initial packet (act one) to be sent from initiator
@@ -489,8 +486,6 @@ func SetConsts() {
 
 func (b *Machine) GenActOne(remotePK [33]byte) ([]byte, error) {
 	// TODO: remove this remotePK passed since its not needed
-	fmt.Println("Using protocol name: ", protocolName)
-	fmt.Println("HANDSHAKE DIGEST IN GENACTONE:", b.handshakeDigest[:])
 	var err error
 	actOne := make([]byte, ActOneSize)
 	// Generate e
@@ -499,40 +494,21 @@ func (b *Machine) GenActOne(remotePK [33]byte) ([]byte, error) {
 		return actOne, err
 	}
 
+	e := b.localEphemeral.PubKey().SerializeCompressed()
+	// Hash it into the handshake digest
+	b.mixHash(e)
+
 	if Noise_XK {
-		ephemeral := b.localEphemeral.PubKey().SerializeCompressed()
-		b.mixHash(ephemeral)
 		// es
 		s := ecdh(b.remoteStatic, b.localEphemeral)
 		b.mixKey(s[:])
-		authPayload := b.EncryptAndHash([]byte{})
-		actOne[0] = HandshakeVersion
-		copy(actOne[1:34], ephemeral)
-		copy(actOne[34:], authPayload)
-		_, err = b.DecryptAndHash(authPayload[:])
-		if err != nil {
-			fmt.Println("Decrypting Act One of Noise failed: ", err)
-		}
-		return actOne, nil
-	} else {
-		// Compress e
-		e := b.localEphemeral.PubKey().SerializeCompressed()
-		// Hash it into the handshake digest
-		fmt.Println("E IS:", e)
-		b.mixHash(e)
-		fmt.Println("SENDING E:", b.localEphemeral.PubKey().SerializeCompressed())
-		authPayload := b.EncryptAndHash([]byte{})
-		actOne[0] = HandshakeVersion
-		copy(actOne[1:34], e)
-		copy(actOne[34:], authPayload)
-		fmt.Println("Sending, ActOne: ", actOne)
-		_, err = b.DecryptAndHash(authPayload[:])
-		if err != nil {
-			fmt.Println("Decrypting Act One of Noise failed: ", err)
-		}
-		return actOne, nil
 	}
-
+	authPayload := b.EncryptAndHash([]byte{})
+	actOne[0] = HandshakeVersion
+	copy(actOne[1:34], e)
+	copy(actOne[34:], authPayload)
+	_, err = b.DecryptAndHash(authPayload[:])
+	return actOne, nil
 }
 
 // RecvActOne processes the act one packet sent by the initiator. The responder
@@ -540,7 +516,6 @@ func (b *Machine) GenActOne(remotePK [33]byte) ([]byte, error) {
 // handshake digest and deriving a new shared secret based on an ECDH with the
 // initiator's ephemeral key and responder's static key.
 func (b *Machine) RecvActOne(actOne []byte) error {
-	fmt.Println("Received, ActOne: ", actOne)
 	var (
 		err error
 		e   [33]byte
@@ -555,9 +530,13 @@ func (b *Machine) RecvActOne(actOne []byte) error {
 			actOne[:])
 	}
 
+	if actOne[0] == 0 {
+		// this is needed in order to start the correct listener on our side
+		Noise_XK = true
+		fmt.Println("TRUE?", Noise_XK)
+	}
 	copy(e[:], actOne[1:34])
 	copy(p[:], actOne[34:])
-	//fmt.Println("INITIAL STATE:", b.handshakeDigest[:])
 	// e
 	b.remoteEphemeral, err = koblitz.ParsePubKey(e[:], koblitz.S256())
 	if err != nil {
@@ -570,11 +549,7 @@ func (b *Machine) RecvActOne(actOne []byte) error {
 		es := ecdh(b.remoteEphemeral, b.localStatic)
 		b.mixKey(es)
 	}
-	fmt.Println("CHK THIS OUT", b.handshakeDigest[:])
 	_, err = b.DecryptAndHash(p[:])
-	if err != nil {
-		fmt.Println("Decrypting Act One ofin Noise failed: ", err)
-	}
 	return err // nil means Act one completed successfully
 }
 
