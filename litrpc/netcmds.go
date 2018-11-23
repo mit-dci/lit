@@ -8,6 +8,7 @@ import (
 	"github.com/mit-dci/lit/bech32"
 	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/lncore"
+	"github.com/mit-dci/lit/lnp2p"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/qln"
@@ -65,6 +66,8 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *ConnectReply) error {
 	// first, see if the peer to connect to is referenced by peer index.
 	var connectAdr string
 	// check if a peer number was supplied instead of a pubkeyhash
+	// accept either an string or a pubkey (raw)
+	// so args.LNAddr passed here contains blah@host:ip
 	peerIdxint, err := strconv.Atoi(args.LNAddr)
 	// number will mean no error
 	if err == nil {
@@ -81,7 +84,6 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *ConnectReply) error {
 		// use string as is, try to convert to ln address
 		connectAdr = args.LNAddr
 	}
-
 	err = r.Node.DialPeer(connectAdr)
 	if err != nil {
 		return err
@@ -94,13 +96,8 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *ConnectReply) error {
 		paddr = strings.SplitN(paddr, "@", 2)[0]
 	}
 
-	pm := r.Node.PeerMan
-	lnaddr, err := lncore.ParseLnAddr(paddr)
-	if err != nil {
-		return err
-	}
-
-	p := pm.GetPeer(lnaddr)
+	var pm *lnp2p.PeerManager = r.Node.PeerMan
+	p := pm.GetPeer(lncore.LnAddr(paddr))
 	if p == nil {
 		return fmt.Errorf("couldn't find peer in manager after connecting")
 	}

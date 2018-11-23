@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -65,7 +66,7 @@ func newConfigParser(conf *litAfConfig, options flags.Options) *flags.Parser {
 	return parser
 }
 
-func (lc *litAfClient) litAfSetup(conf litAfConfig) {
+func (lc *litAfClient) litAfSetup(conf litAfConfig) error {
 
 	var err error
 	// create home directory if it does not exist
@@ -89,42 +90,60 @@ func (lc *litAfClient) litAfSetup(conf litAfConfig) {
 	}
 	logging.SetLogLevel(logLevel) // defaults to zero
 
+	// we don't know whether the passed address is a remotePKH or a remotePK
+	// so we need to detect that here and then take steps accordingly
+	// so the first part involved here would be either dealing with raw pubkeys or
+	// dealing with pk hashes
+	// another question here is how do we deal with connecting to other nodes?
+	// if we need that in, we need to hcange our overall architecture to host
+	// pks as well as pk hashes
 	adr, host, port := lnutil.ParseAdrStringWithPort(conf.Con)
-	logging.Infof("Adr: %s, Host: %s, Port: %d", adr, host, port)
-	if litrpc.LndcRpcCanConnectLocallyWithHomeDir(defaultDir) && adr == "" && (host == "localhost" || host == "127.0.0.1") {
+	// now we've split the address, check if pkh, if not, route straight to noise_xk
 
+	if len(adr) == 0 {
+		// so the user didn't provide us with an address to connect to
+		// we need to connect to the locally running lit-af instance
 		lc.RPCClient, err = litrpc.NewLocalLndcRpcClientWithHomeDirAndPort(defaultDir, port)
 		if err != nil {
 			logging.Fatal(err.Error())
 		}
-	} else {
-		if !lnutil.LitAdrOK(adr) {
-			logging.Fatal("lit address passed in -con parameter is not valid")
-		}
-
-		keyFilePath := filepath.Join(defaultDir, "lit-af-key.hex")
-		privKey, err := lnutil.ReadKeyFile(keyFilePath)
-		if err != nil {
-			logging.Fatal(err.Error())
-		}
-		key, _ := koblitz.PrivKeyFromBytes(koblitz.S256(), privKey[:])
-
-		if adr != "" && strings.HasPrefix(adr, "ln1") && host == "" {
-			ipv4, _, err := lnutil.Lookup(adr, conf.Tracker, "")
-			if err != nil {
-				logging.Fatalf("Error looking up address on the tracker: %s", err)
-			} else {
-				adr = fmt.Sprintf("%s@%s", adr, ipv4)
-			}
-		} else {
-			adr = fmt.Sprintf("%s@%s:%d", adr, host, port)
-		}
-
-		lc.RPCClient, err = litrpc.NewLndcRpcClient(adr, key)
-		if err != nil {
-			logging.Fatal(err.Error())
-		}
+		return nil
 	}
+
+	keyFilePath := filepath.Join(defaultDir, "lit-af-key.hex")
+	privKey, err := lnutil.ReadKeyFile(keyFilePath)
+	if err != nil {
+		logging.Fatal(err.Error())
+	}
+	key, _ := koblitz.PrivKeyFromBytes(koblitz.S256(), privKey[:])
+	pubkey := key.PubKey().SerializeCompressed() // this is in bytes
+	fmt.Printf("The pubkey of this lit-af instance is: %s\n", hex.EncodeToString(pubkey))
+	var temp [33]byte
+	copy(temp[:], pubkey[:33])
+	fmt.Printf("The pkh of this lit-af instance is: %s\n", lnutil.LitAdrFromPubkey(temp))
+
+	if len(adr) == 44 && !lnutil.LitAdrOK(adr) {
+		logging.Fatal("lit address passed in -con parameter is not valid")
+	}
+
+	if host == "" {
+		ipv4, _, err := lnutil.Lookup(adr, conf.Tracker, "")
+		if err != nil {
+			logging.Fatalf("Error looking up address on the tracker: %s", err)
+		}
+		adr = fmt.Sprintf("%s@%s", adr, ipv4)
+	} else {
+		// host is non empty or address is remotePK, doesn't matter since NewLndcRpcClient will take acre of it for us
+		adr = fmt.Sprintf("%s@%s:%d", adr, host, port)
+	}
+
+	fmt.Printf("Remote Host: %s, Port: %d\n", host, port)
+	lc.RPCClient, err = litrpc.NewLndcRpcClient(adr, key)
+	if err != nil {
+		logging.Fatal(err.Error())
+	}
+
+	return nil
 }
 
 // for now just testing how to connect and get messages back and forth
@@ -137,7 +156,11 @@ func main() {
 		Dir:     defaultDir,
 		Tracker: defaultTracker,
 	}
-	lc.litAfSetup(conf) // setup lit-af to start
+	err = lc.litAfSetup(conf) // setup lit-af to start
+	if err != nil {
+		logging.Error(err)
+		return
+	}
 
 	rl, err := readline.NewEx(&readline.Config{
 		Prompt:       lnutil.Prompt("lit-af") + lnutil.White("# "),

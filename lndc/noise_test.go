@@ -342,7 +342,8 @@ func TestBolt0008TestVectors(t *testing.T) {
 	// act one. This should consist of exactly 50 bytes. We'll assert that
 	// the payload return is _exactly_ the same as what's specified within
 	// the test vectors.
-	actOne, err := initiator.GenActOne()
+	var empty [33]byte
+	actOne, err := initiator.GenActOne(empty)
 	if err != nil {
 		t.Fatalf("unable to generate act one: %v", err)
 	}
@@ -367,7 +368,7 @@ func TestBolt0008TestVectors(t *testing.T) {
 	// its contribution to the crypto handshake. We'll also verify that we
 	// produce the _exact_ same byte stream as advertised within the spec's
 	// test vectors.
-	actTwo, err := responder.GenActTwo()
+	actTwo, err := responder.GenActTwo(byte(1))
 	if err != nil {
 		t.Fatalf("unable to generate act two: %v", err)
 	}

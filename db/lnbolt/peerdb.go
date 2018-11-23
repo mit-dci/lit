@@ -55,13 +55,7 @@ func (pdb *peerboltdb) GetPeerAddrs() ([]lncore.LnAddr, error) {
 			if k == nil {
 				break
 			}
-			lnaddr, err := lncore.ParseLnAddr(string(k))
-			if err != nil {
-				logging.Warnf("lnbolt/peerdb: found invalid key in DB as lnaddr: %s (error: %s)", string(k), err.Error())
-				continue
-			}
-
-			atmp = append(atmp, lnaddr)
+			atmp = append(atmp, lncore.LnAddr(string(k)))
 		}
 
 		// Now that we have the final array return it.
@@ -132,11 +126,7 @@ func (pdb *peerboltdb) GetPeerInfos() (map[lncore.LnAddr]lncore.PeerInfo, error)
 				return err2
 			}
 
-			ka, err2 := lncore.ParseLnAddr(string(k))
-			if err2 != nil {
-				logging.Warnf("lnbolt/peerdb: found invalid key in DB as lnaddr: %s (error: %s)", string(k), err.Error())
-				continue
-			}
+			ka := lncore.LnAddr(string(k))
 			mtmp[ka] = pi
 
 		}
