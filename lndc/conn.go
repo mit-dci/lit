@@ -46,7 +46,6 @@ func Dial(localPriv *koblitz.PrivateKey, ipAddr string, remoteAddress string,
 		temp, _ := hex.DecodeString(remoteAddress)
 		copy(remotePK[:], temp)
 		logging.Info("Got remote PK: ", remotePK, ", using noise_xk to connect")
-		Noise_XK = true
 		SetXKConsts()
 	}
 	var conn net.Conn
@@ -59,9 +58,10 @@ func Dial(localPriv *koblitz.PrivateKey, ipAddr string, remoteAddress string,
 
 	b := new(Conn)
 	if Noise_XK {
-		// I need to convert the raw PK to a koblitz public key
+		// we need to convert the raw PK to a koblitz public key
 		remotePub, err := koblitz.ParsePubKey(remotePK[:], koblitz.S256())
 		if err != nil {
+			logging.Debug(err)
 			return nil, err
 		}
 		b = &Conn{

@@ -378,10 +378,9 @@ type Machine struct {
 // string "lightning" as the prologue. The last parameter is a set of variadic
 // arguments for adding additional options to the lndc Machine
 // initialization.
-func NewNoiseXKMachine(initiator bool, localStatic *koblitz.PrivateKey, remotePub *koblitz.PublicKey,
-	options ...func(*Machine)) *Machine {
+func NewNoiseXKMachine(initiator bool, localStatic *koblitz.PrivateKey,
+	remotePub *koblitz.PublicKey) *Machine {
 
-	// so if it noise_XK, I need to hash the remote PK in here as well
 	handshake := newXKHandshakeState(initiator, []byte("lightning"), localStatic, remotePub)
 	// "lightning" is what BOLT uses, "lit" is used for XX handshakes
 
@@ -391,22 +390,13 @@ func NewNoiseXKMachine(initiator bool, localStatic *koblitz.PrivateKey, remotePu
 	m.ephemeralGen = func() (*koblitz.PrivateKey, error) {
 		return koblitz.NewPrivateKey(koblitz.S256())
 	}
-	// With the default options established, we'll now process all the
-	// options passed in as parameters.
-	for _, option := range options {
-		option(m)
-	}
 
 	return m
 }
 
-func NewNoiseXXMachine(initiator bool, localStatic *koblitz.PrivateKey,
-	options ...func(*Machine)) *Machine {
+func NewNoiseXXMachine(initiator bool, localStatic *koblitz.PrivateKey) *Machine {
 
-	// so if it noise_XK, I need to hash the remote PK in here as well
 	handshake := newXXHandshakeState(initiator, []byte("lit"), localStatic)
-	// TODO: if we're sending messages of type XK, set it back to
-	// "lightning" which is what BOLT uses
 
 	m := &Machine{handshakeState: handshake}
 
@@ -414,11 +404,6 @@ func NewNoiseXXMachine(initiator bool, localStatic *koblitz.PrivateKey,
 	// version of the ephemeral key generator.
 	m.ephemeralGen = func() (*koblitz.PrivateKey, error) {
 		return koblitz.NewPrivateKey(koblitz.S256())
-	}
-	// With the default options established, we'll now process all the
-	// options passed in as parameters.
-	for _, option := range options {
-		option(m)
 	}
 
 	return m
@@ -461,6 +446,7 @@ var (
 )
 
 func SetXKConsts() {
+	Noise_XK = true
 	// Noise_XK's hadnshake version
 	HandshakeVersion = byte(0)
 
@@ -516,6 +502,9 @@ func (b *Machine) GenActOne(remotePK [33]byte) ([]byte, error) {
 // handshake digest and deriving a new shared secret based on an ECDH with the
 // initiator's ephemeral key and responder's static key.
 func (b *Machine) RecvActOne(actOne []byte) error {
+	// before we call this function, we already know whether its noise_XX or
+	// noise_XK and have set the appropriate constants on the listener side
+	// since we check for the first byte received
 	var (
 		err error
 		e   [33]byte
@@ -530,11 +519,6 @@ func (b *Machine) RecvActOne(actOne []byte) error {
 			actOne[:])
 	}
 
-	if actOne[0] == 0 {
-		// this is needed in order to start the correct listener on our side
-		Noise_XK = true
-		fmt.Println("TRUE?", Noise_XK)
-	}
 	copy(e[:], actOne[1:34])
 	copy(p[:], actOne[34:])
 	// e

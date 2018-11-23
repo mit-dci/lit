@@ -1,6 +1,7 @@
 package lndc
 
 import (
+	"fmt"
 	"errors"
 	"io"
 	"net"
@@ -103,8 +104,7 @@ func (l *Listener) doHandshake(conn net.Conn) {
 	default:
 	}
 
-	// TODO:
-	// the listener here defaults to a noise_XK machine, we should add a condition
+	// TODO: the listener here defaults to a noise_XK machine, we should add a condition
 	// here so that we can use a noise_XX machine for lit specific connections
 	// at this point, we really don't know who (noiseXX or noiseXK) is connecting to
 	// us, so we need to init hte noise part later
@@ -129,14 +129,18 @@ func (l *Listener) doHandshake(conn net.Conn) {
 
 	if actOne[0] == 0 {
 		// remote node wants to connect via XK
-		Noise_XK = true
 		SetXKConsts()
 		lndcConn.noise = NewNoiseXKMachine(false, l.localStatic, nil)
 		logging.Infof("remote node wants to connect via noise_xk")
-	} else {
+	} else if actOne[0] == 1 {
 		// no need to init the constants here since defaults are set to noise_XX
 		logging.Infof("Remote Node requesting connection via noise_xx")
 		lndcConn.noise = NewNoiseXXMachine(false, l.localStatic)
+	} else {
+		logging.Info("Unknown version byte received, dropping connection")
+		lndcConn.conn.Close()
+		l.rejectConn(fmt.Errorf("Unknown version byte received, dropping connection"))
+		return
 	}
 
 	if err := lndcConn.noise.RecvActOne(actOne); err != nil {
