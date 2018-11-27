@@ -1,8 +1,12 @@
-package lncore;
+package lncore
 
 import (
 	"fmt"
-	
+	"regexp"
+	"strings"
+	"strconv"
+	"encoding/hex"
+
 	"github.com/mit-dci/lit/bech32"
 )
 
@@ -22,7 +26,7 @@ import (
  *
  *      <bech32 pkh>[@<ip>[:<port>]
  * or
- * 
+ *
  *      <hex of bech32 pubkey>[@<ip>[:<port>]
  *
  * or fully
@@ -30,20 +34,37 @@ import (
  *      <bech32 pkh>:<pubkey>[@<ip>:<port>]
  */
 
+// LnAddr is just a bech32-encoded pubkey.
+// TODO Move this to another package so it's more obviously not *just* IO-related.
+type LnAddr string
+
+// ToString returns the LnAddr as a string.  Right now it just unwraps it but it
+// might do something more eventually.
+func (lnaddr LnAddr) ToString() string {
+	return string(lnaddr)
+}
+
 // LnDefaultPort is from BOLT1.
 const LnDefaultPort = 9735
 
 // PkhBech32Prefix if for addresses lit already uses.
-const PkhBech32Prefix = "ln"
+const PkhBech32Prefix = "ln1"
 
 // PubkeyBech32Prefix is for encoding the full pubkey in bech32.
-const PubkeyBech32Prefix = "lnpk"
+const PubkeyBech32Prefix = "lnpk1"
 
 // LnAddressData is all of the data that can be encoded in a parsed address.
 type LnAddressData struct {
+	// Pkh is the pubkey hash as bech32.
 	Pkh    *string
+	
+	// Pubkey is the pubkey, as bytes, decoded from source format.
 	Pubkey []byte
+
+	// IPAddr is the IP address, if present.
 	IPAddr *string
+
+	// Port should always be defined, default is LnDefaultPort.
 	Port   uint16
 }
 
@@ -128,11 +149,11 @@ func DumpAddressFormats(data LnAddressData) (map[string]string, error) {
 			ret[AddrFmtPubkeyIPPort] = fmt.Sprintf("%x@%s:%d", data.Pubkey, *data.IPAddr, data.Port)
 		}
 	}
-	
+
 	// TODO more
-	
+
 	return ret, nil
-	
+
 }
 
 /*
@@ -146,7 +167,136 @@ const bech32bodyregex = `[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{4,}`
 const ipaddrregex = `[0-9]{1,3}(\.[0-9]{1,3}){3}`
 const fulladdrregex = `ln1` + bech32bodyregex + `(:([0-9a-fA-F]{64}|lnpk1` + bech32bodyregex + `))?(@` + ipaddrregex + `(:[0-9]{,5})?)?`
 
-// ParseLnAddrData takes a LnAddr and parses the internal data.
+// ParseLnAddrData takes a LnAddr and parses the internal data.  Assumes it's
+// not been force-casted as full checks are done in the ParseLnAddr function.
 func ParseLnAddrData(addr LnAddr) (*LnAddressData, error) {
-	return nil, nil // TODO
+
+	addrdata := new(LnAddressData)
+	
+	parts := strings.SplitN(string(addr), "@", 2) // using cast here because reasons
+
+	// First process the identify information.
+	pkdata := strings.SplitN(parts[0], ":", 2)
+	if len(pkdata) == 2 {
+
+		// The pkh is already in the right format for internal storage.
+		addrdata.Pkh = &pkdata[0]		
+		
+		// Now figure out how to parse the full pubkey info.
+		if strings.HasPrefix(pkdata[1], PubkeyBech32Prefix) {
+			_, data, err := bech32.Decode(pkdata[1])
+			if err != nil {
+				return nil, err
+			}
+			addrdata.Pubkey = data
+		} else {
+			data, err := hex.DecodeString(pkdata[1])
+			if err != nil {
+				return nil, err
+			}
+			addrdata.Pubkey = data
+		}
+		
+	} else {
+
+		// If there's only 1 part then there's 3 mutually exclusive options.
+		if strings.HasPrefix(pkdata[0], PkhBech32Prefix) {
+			addrdata.Pkh = &pkdata[0]
+		} else if strings.HasPrefix(pkdata[0], PubkeyBech32Prefix) {
+			_, data, err := bech32.Decode(pkdata[0])
+			if err != nil {
+				return nil, err
+			}
+			addrdata.Pubkey = data
+		} else {
+			data, err := hex.DecodeString(pkdata[0])
+			if err != nil {
+				return nil, err
+			}
+			addrdata.Pubkey = data
+		}
+		
+	}
+
+	// Now parse the location information if it's there.
+	if len(parts) > 1 {
+		ipdata := strings.SplitN(parts[1], ":", 2)
+
+		// The IP address is already in the right format, probably.
+		addrdata.IPAddr = &ipdata[0]
+
+		// Parse the port if it's there.
+		if len(ipdata) > 1 {
+			port, err := strconv.Atoi(ipdata[1])
+			if err != nil {
+				return nil, err
+			}
+			if port > 65535 {
+				return nil, fmt.Errorf("port number %d not in range", port)
+			}
+			addrdata.Port = uint16(port)
+		} else {
+			addrdata.Port = LnDefaultPort
+		}
+		
+	}
+	
+	return addrdata, nil // TODO
+}
+
+// ParseLnAddr will verify that the string passed is a valid LN address of any format.
+func ParseLnAddr(m string) (LnAddr, error) {
+
+	r := regexp.MustCompile(fulladdrregex)
+
+	if !r.Match([]byte(m)) {
+		return "", fmt.Errorf("address doesn't match overall format")
+	}
+
+	parts := strings.SplitN(m, "@", 2)
+	pkdata := strings.SplitN(parts[0], ":", 2)
+	if len(pkdata) == 2 {
+		// This means there's both a pkh and a pubkey.
+		
+		pkhprefix, _, pkherr := bech32.Decode(pkdata[0])
+		if pkherr != nil {
+			return "", fmt.Errorf("invalid pkh bech32")
+		}
+		if pkhprefix + "1" != PkhBech32Prefix {
+			return "", fmt.Errorf("pkh bech32 prefix incorrect")
+		}
+		
+		pkprefix, _, pkerr := bech32.Decode(pkdata[1])
+		if pkerr != nil {
+			// Maybe it's hex.
+			_, err := hex.DecodeString(pkdata[1])
+			if err != nil {
+				return "", fmt.Errorf("pubkey not valid bech32 or hex")
+			}
+		}
+		if pkprefix + "1" != PubkeyBech32Prefix {
+			return "", fmt.Errorf("pubkey bech32 prefix incorrect")
+		}
+		
+	} else {
+		// This means there's *either* a pubkey or pkh, in some format.
+
+		prefix, _, err := bech32.Decode(pkdata[0])
+		if err != nil {
+			// Maybe it's hex.
+			_, err := hex.DecodeString(pkdata[0])
+			if err != nil {
+				return "", fmt.Errorf("pubkey not valid bech32 or hex")
+			}
+		}
+
+		if err == nil && prefix + "1" != PkhBech32Prefix && prefix + "1" != PubkeyBech32Prefix {
+			return "", fmt.Errorf("pubkey (or phk) bech32 prefix incorrect")
+		}
+	}
+
+	// TODO Parse the IP address information, I guess.
+	
+	return LnAddr(m), nil // should be the only place we cast to this type
+
 }
