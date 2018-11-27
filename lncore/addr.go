@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 
 	"github.com/mit-dci/lit/bech32"
+	"github.com/mit-dci/lit/crypto/fastsha256"
 )
 
 /*
@@ -48,10 +49,10 @@ func (lnaddr LnAddr) ToString() string {
 const LnDefaultPort = 9735
 
 // PkhBech32Prefix if for addresses lit already uses.
-const PkhBech32Prefix = "ln1"
+const PkhBech32Prefix = "ln"
 
 // PubkeyBech32Prefix is for encoding the full pubkey in bech32.
-const PubkeyBech32Prefix = "lnpk1"
+const PubkeyBech32Prefix = "lnpk"
 
 // LnAddressData is all of the data that can be encoded in a parsed address.
 type LnAddressData struct {
@@ -112,20 +113,20 @@ const AddrFmtLitFull = "lit_full"
 const AddrFmtLitIP = "lit_ip"
 
 // DumpAddressFormats returns the addresses in all of the formats that fully represent it.
-func DumpAddressFormats(data LnAddressData) (map[string]string, error) {
+func DumpAddressFormats(data *LnAddressData) (map[string]string, error) {
 
 	ret := make(map[string]string)
 
-	if data.Port != LnDefaultPort && data.IPAddr != nil {
+	if data.Port != LnDefaultPort && data.IPAddr == nil {
 		return ret, fmt.Errorf("nondefault port specified but IP not specified")
 	}
 
-	// Full.
+ 	// Full.
 	if data.Pkh != nil && data.Pubkey != nil && data.IPAddr != nil {
-		ret[AddrFmtFull] = fmt.Sprintf("%s:%x@%s:%d", *data.Pkh, data.Pubkey, *data.IPAddr, data.Port)
+		ret[AddrFmtFull] = fmt.Sprintf("%s:%X@%s:%d", *data.Pkh, data.Pubkey, *data.IPAddr, data.Port)
 		ret[AddrFmtFullBech32Pk] = fmt.Sprintf("%s:%s@%s:%d", *data.Pkh, bech32.Encode(PubkeyBech32Prefix, data.Pubkey), *data.IPAddr, data.Port)
 	}
-
+	
 	// Minimal Lit.
 	if data.Pkh != nil {
 		ret[AddrFmtLit] = *data.Pkh
@@ -141,12 +142,12 @@ func DumpAddressFormats(data LnAddressData) (map[string]string, error) {
 
 	// Hex pubkey stuff
 	if data.Pubkey != nil {
-		ret[AddrFmtPubkey] = fmt.Sprintf("%x", data.Pubkey)
+		ret[AddrFmtPubkey] = fmt.Sprintf("%X", data.Pubkey)
 		if data.IPAddr != nil {
 			if data.Port == LnDefaultPort {
-				ret[AddrFmtPubkeyIP] = fmt.Sprintf("%x@%s", data.Pubkey, *data.IPAddr)
+				ret[AddrFmtPubkeyIP] = fmt.Sprintf("%X@%s", data.Pubkey, *data.IPAddr)
 			}
-			ret[AddrFmtPubkeyIPPort] = fmt.Sprintf("%x@%s:%d", data.Pubkey, *data.IPAddr, data.Port)
+			ret[AddrFmtPubkeyIPPort] = fmt.Sprintf("%X@%s:%d", data.Pubkey, *data.IPAddr, data.Port)
 		}
 	}
 
@@ -155,17 +156,6 @@ func DumpAddressFormats(data LnAddressData) (map[string]string, error) {
 	return ret, nil
 
 }
-
-/*
-+0      q 	p 	z 	r 	y 	9 	x 	8
-+8 	g 	f 	2 	t 	v 	d 	w 	0
-+16 	s 	3 	j 	n 	5 	4 	k 	h
-+24 	c 	e 	6 	m 	u 	a 	7 	l
-*/
-
-const bech32bodyregex = `[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{4,}`
-const ipaddrregex = `[0-9]{1,3}(\.[0-9]{1,3}){3}`
-const fulladdrregex = `ln1` + bech32bodyregex + `(:([0-9a-fA-F]{64}|lnpk1` + bech32bodyregex + `))?(@` + ipaddrregex + `(:[0-9]{,5})?)?`
 
 // ParseLnAddrData takes a LnAddr and parses the internal data.  Assumes it's
 // not been force-casted as full checks are done in the ParseLnAddr function.
@@ -183,7 +173,7 @@ func ParseLnAddrData(addr LnAddr) (*LnAddressData, error) {
 		addrdata.Pkh = &pkdata[0]		
 		
 		// Now figure out how to parse the full pubkey info.
-		if strings.HasPrefix(pkdata[1], PubkeyBech32Prefix) {
+		if strings.HasPrefix(pkdata[1], PubkeyBech32Prefix + "1") {
 			_, data, err := bech32.Decode(pkdata[1])
 			if err != nil {
 				return nil, err
@@ -200,9 +190,9 @@ func ParseLnAddrData(addr LnAddr) (*LnAddressData, error) {
 	} else {
 
 		// If there's only 1 part then there's 3 mutually exclusive options.
-		if strings.HasPrefix(pkdata[0], PkhBech32Prefix) {
+		if strings.HasPrefix(pkdata[0], PkhBech32Prefix + "1") {
 			addrdata.Pkh = &pkdata[0]
-		} else if strings.HasPrefix(pkdata[0], PubkeyBech32Prefix) {
+		} else if strings.HasPrefix(pkdata[0], PubkeyBech32Prefix + "1") {
 			_, data, err := bech32.Decode(pkdata[0])
 			if err != nil {
 				return nil, err
@@ -214,6 +204,12 @@ func ParseLnAddrData(addr LnAddr) (*LnAddressData, error) {
 				return nil, err
 			}
 			addrdata.Pubkey = data
+		}
+
+		// Now we figure out what the pkh should be if the full pubkey is specified.
+		if addrdata.Pkh == nil && addrdata.Pubkey != nil {
+			pkh := ConvertPubkeyToBech32Pkh(addrdata.Pubkey)
+			addrdata.Pkh = &pkh
 		}
 		
 	}
@@ -244,6 +240,19 @@ func ParseLnAddrData(addr LnAddr) (*LnAddressData, error) {
 	return addrdata, nil // TODO
 }
 
+/*
++0      q 	p 	z 	r 	y 	9 	x 	8
++8 	g 	f 	2 	t 	v 	d 	w 	0
++16 	s 	3 	j 	n 	5 	4 	k 	h
++24 	c 	e 	6 	m 	u 	a 	7 	l
+*/
+
+const bech32bodyregex = `[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{4,}`
+const ipaddrregex = `[0-9]{1,3}(\.[0-9]{1,3}){3}`
+const pkhregex = `ln1` + bech32bodyregex
+const pubkeyregex = `(lnpk1` + bech32bodyregex + `|` + `[0-9a-fA-F]{64})`
+const fulladdrregex = `(` + pkhregex + `|` + pubkeyregex + `|` + pkhregex + `:` + pubkeyregex + `)(@` + ipaddrregex + `(:[0-9]{1,5})?)?`
+
 // ParseLnAddr will verify that the string passed is a valid LN address of any format.
 func ParseLnAddr(m string) (LnAddr, error) {
 
@@ -262,7 +271,7 @@ func ParseLnAddr(m string) (LnAddr, error) {
 		if pkherr != nil {
 			return "", fmt.Errorf("invalid pkh bech32")
 		}
-		if pkhprefix + "1" != PkhBech32Prefix {
+		if pkhprefix != PkhBech32Prefix {
 			return "", fmt.Errorf("pkh bech32 prefix incorrect")
 		}
 		
@@ -271,10 +280,10 @@ func ParseLnAddr(m string) (LnAddr, error) {
 			// Maybe it's hex.
 			_, err := hex.DecodeString(pkdata[1])
 			if err != nil {
-				return "", fmt.Errorf("pubkey not valid bech32 or hex")
+				return "", fmt.Errorf("pubkey not valid bech32 or hex ('%s' and '%s')", pkerr.Error(), err.Error())
 			}
 		}
-		if pkprefix + "1" != PubkeyBech32Prefix {
+		if pkprefix != PubkeyBech32Prefix {
 			return "", fmt.Errorf("pubkey bech32 prefix incorrect")
 		}
 		
@@ -284,19 +293,27 @@ func ParseLnAddr(m string) (LnAddr, error) {
 		prefix, _, err := bech32.Decode(pkdata[0])
 		if err != nil {
 			// Maybe it's hex.
-			_, err := hex.DecodeString(pkdata[0])
-			if err != nil {
-				return "", fmt.Errorf("pubkey not valid bech32 or hex")
+			_, err2 := hex.DecodeString(pkdata[0])
+			if err2 != nil {
+				return "", fmt.Errorf("pubkey not valid bech32 or hex ('%s' and '%s')", err.Error(), err2.Error())
 			}
 		}
 
-		if err == nil && prefix + "1" != PkhBech32Prefix && prefix + "1" != PubkeyBech32Prefix {
+		if err == nil && prefix != PkhBech32Prefix && prefix != PubkeyBech32Prefix {
 			return "", fmt.Errorf("pubkey (or phk) bech32 prefix incorrect")
 		}
 	}
 
-	// TODO Parse the IP address information, I guess.
+	// Should we make sure that the pubkey and pkh match if both are present?
 	
 	return LnAddr(m), nil // should be the only place we cast to this type
 
+}
+
+// ConvertPubkeyToBech32Pkh converts the pubkey into the bech32 representation
+// of the PKH.
+func ConvertPubkeyToBech32Pkh(pubkey []byte) string {
+	hash := fastsha256.Sum256(pubkey)
+	enc := bech32.Encode("ln", hash[:20])
+	return enc
 }
