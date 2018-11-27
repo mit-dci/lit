@@ -47,6 +47,13 @@ type LnAddressData struct {
 	Port   uint16
 }
 
+// HasFullAddress returns whether or not we need to do a tracker/DHT lookup in
+// order to resolve the connection address for this address data.  Basically, it
+// checks if there's an IP address defined.
+func (d *LnAddressData) HasFullAddress() bool {
+	return d.IPAddr != nil
+}
+
 // AddrFmtFull is <bech32 pkh>:<hex pk>@<ip>:<port>
 const AddrFmtFull = "full"
 
@@ -83,7 +90,7 @@ const AddrFmtLitFull = "lit_full"
 // AddrFmtLitIP is <bech32 pkh>@<ip>
 const AddrFmtLitIP = "lit_ip"
 
-// AddrDataToFormats returns the addresses in all of the formats that fully represent it.
+// DumpAddressFormats returns the addresses in all of the formats that fully represent it.
 func DumpAddressFormats(data LnAddressData) (map[string]string, error) {
 
 	ret := make(map[string]string)
