@@ -343,22 +343,9 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		}
 	}
 
-	err = lc.Call("LitRPC.Balance", nil, bReply)
-	if err != nil {
-		return err
-	}
-
 	walHeights := map[uint32]int32{}
 	for _, b := range bReply.Balances {
 		walHeights[b.CoinType] = b.SyncHeight
-	}
-
-	err = lc.Call("LitRPC.ChannelList", nil, cReply)
-	if err != nil {
-		return err
-	}
-	if len(cReply.Channels) > 0 {
-		fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Channels:"))
 	}
 
 	if cmd == "chans" || displayAllCommands {
@@ -368,9 +355,8 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		}
 
 		if len(cReply.Channels) > 0 {
-			if displayAllCommands {
-				fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Channels:"))
-			}
+
+			fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Channels:"))
 
 			coinDaemonConnected := map[uint32]bool{}
 			for _, walBal := range bReply.Balances {
