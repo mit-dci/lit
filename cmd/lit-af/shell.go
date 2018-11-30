@@ -25,7 +25,7 @@ var lsCommand = &Command{
 			"What information to show. Provide one of:"),
 		fmt.Sprintf("\t%-20s %s",
 			lnutil.White("-a"),
-			"Information on connections to other peers"),
+			"Everything"),
 		fmt.Sprintf("\t%-20s %s",
 			lnutil.White("conns"),
 			"Information on connections to other peers"),
