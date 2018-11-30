@@ -620,7 +620,7 @@ func printHelp(commands []*Command) {
 func printCointypes() {
 	for k, v := range coinparam.RegisteredNets {
 		fmt.Fprintf(color.Output, "CoinType: %s\n", strconv.Itoa(int(k)))
-		fmt.Fprintf(color.Output, "└────── Name: %-13sBech32Prefix: %s\n\n", v.Name+",", v.Bech32Prefix)
+		fmt.Fprintf(color.Output, "└────── Name: %-13s, Bech32Prefix: %s\n\n", v.Name, v.Bech32Prefix)
 	}
 }
 
