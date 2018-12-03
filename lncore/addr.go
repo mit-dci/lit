@@ -45,11 +45,11 @@ func (lnaddr LnAddr) ToString() string {
 	return string(lnaddr)
 }
 
-// LnDefaultPort is from BOLT1.
-const LnDefaultPort = 9735
+// DefaultPort is from BOLT1.
+const DefaultPort = 9735
 
-// PkhBech32Prefix if for addresses lit already uses.
-const PkhBech32Prefix = "ln"
+// LitBech32Prefix if for addresses lit already uses.
+const LitBech32Prefix = "ln"
 
 // PubkeyBech32Prefix is for encoding the full pubkey in bech32.
 const PubkeyBech32Prefix = "lnpk"
@@ -65,7 +65,7 @@ type LnAddressData struct {
 	// IPAddr is the IP address, if present.
 	IPAddr *string
 
-	// Port should always be defined, default is LnDefaultPort.
+	// Port should always be defined, default is DefaultPort.
 	Port   uint16
 }
 
@@ -117,7 +117,7 @@ func DumpAddressFormats(data *LnAddressData) (map[string]string, error) {
 
 	ret := make(map[string]string)
 
-	if data.Port != LnDefaultPort && data.IPAddr == nil {
+	if data.Port != DefaultPort && data.IPAddr == nil {
 		return ret, fmt.Errorf("nondefault port specified but IP not specified")
 	}
 
@@ -134,7 +134,7 @@ func DumpAddressFormats(data *LnAddressData) (map[string]string, error) {
 
 	// Long Lit.
 	if data.Pkh != nil && data.IPAddr != nil {
-		if data.Port == LnDefaultPort {
+		if data.Port == DefaultPort {
 			ret[AddrFmtLitIP] = fmt.Sprintf("%s@%s", *data.Pkh, *data.IPAddr)
 		}
 		ret[AddrFmtLitFull] = fmt.Sprintf("%s@%s:%d", *data.Pkh, *data.IPAddr, data.Port)
@@ -144,7 +144,7 @@ func DumpAddressFormats(data *LnAddressData) (map[string]string, error) {
 	if data.Pubkey != nil {
 		ret[AddrFmtPubkey] = fmt.Sprintf("%X", data.Pubkey)
 		if data.IPAddr != nil {
-			if data.Port == LnDefaultPort {
+			if data.Port == DefaultPort {
 				ret[AddrFmtPubkeyIP] = fmt.Sprintf("%X@%s", data.Pubkey, *data.IPAddr)
 			}
 			ret[AddrFmtPubkeyIPPort] = fmt.Sprintf("%X@%s:%d", data.Pubkey, *data.IPAddr, data.Port)
@@ -190,7 +190,7 @@ func ParseLnAddrData(addr LnAddr) (*LnAddressData, error) {
 	} else {
 
 		// If there's only 1 part then there's 3 mutually exclusive options.
-		if strings.HasPrefix(pkdata[0], PkhBech32Prefix + "1") {
+		if strings.HasPrefix(pkdata[0], LitBech32Prefix + "1") {
 			addrdata.Pkh = &pkdata[0]
 		} else if strings.HasPrefix(pkdata[0], PubkeyBech32Prefix + "1") {
 			_, data, err := bech32.Decode(pkdata[0])
@@ -232,7 +232,7 @@ func ParseLnAddrData(addr LnAddr) (*LnAddressData, error) {
 			}
 			addrdata.Port = uint16(port)
 		} else {
-			addrdata.Port = LnDefaultPort
+			addrdata.Port = DefaultPort
 		}
 		
 	}
@@ -271,7 +271,7 @@ func ParseLnAddr(m string) (LnAddr, error) {
 		if pkherr != nil {
 			return "", fmt.Errorf("invalid pkh bech32")
 		}
-		if pkhprefix != PkhBech32Prefix {
+		if pkhprefix != LitBech32Prefix {
 			return "", fmt.Errorf("pkh bech32 prefix incorrect")
 		}
 		
@@ -299,7 +299,7 @@ func ParseLnAddr(m string) (LnAddr, error) {
 			}
 		}
 
-		if err == nil && prefix != PkhBech32Prefix && prefix != PubkeyBech32Prefix {
+		if err == nil && prefix != LitBech32Prefix && prefix != PubkeyBech32Prefix {
 			return "", fmt.Errorf("pubkey (or phk) bech32 prefix incorrect")
 		}
 	}

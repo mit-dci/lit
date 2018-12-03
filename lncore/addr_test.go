@@ -47,7 +47,7 @@ func makeRandomAddressData(seed int64) *LnAddressData {
 		Pkh: nil,
 		Pubkey: nil,
 		IPAddr: nil,
-		Port: LnDefaultPort,
+		Port: DefaultPort,
 	}
 
 	mkpkhnopk := r.Int() % 4 == 0
