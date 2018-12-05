@@ -151,7 +151,7 @@ func (pm *PeerManager) TryConnectAddress(addr string) (*Peer, error) {
 	if where == "" {
 		ipv4, _, err := lnutil.Lookup(addr, pm.trackerURL, "")
 		if err != nil {
-			return err
+			return nil, err
 		}
 		where = fmt.Sprintf("%s:2448", ipv4)
 	}

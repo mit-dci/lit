@@ -85,7 +85,7 @@ func (r *LitRPC) Connect(args ConnectArgs, reply *ConnectReply) error {
 		connectAdr = args.LNAddr
 	}
 
-	err = r.Node.PeerMan.TryConnectAddress(connectAdr, nil)
+	_, err = r.Node.PeerMan.TryConnectAddress(connectAdr)
 	if err != nil {
 		return err
 	}
