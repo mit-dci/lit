@@ -92,16 +92,11 @@ func (lc *litAfClient) litAfSetup(conf litAfConfig) error {
 
 	// we don't know whether the passed address is a remotePKH or a remotePK
 	// so we need to detect that here and then take steps accordingly
-	// so the first part involved here would be either dealing with raw pubkeys or
-	// dealing with pk hashes
-	// another question here is how do we deal with connecting to other nodes?
-	// if we need that in, we need to hcange our overall architecture to host
-	// pks as well as pk hashes
 	adr, host, port := lnutil.ParseAdrStringWithPort(conf.Con)
 	// now we've split the address, check if pkh, if not, route straight to noise_xk
 
 	if len(adr) == 0 {
-		// so the user didn't provide us with an address to connect to
+		// so the user didn't provide us with an address to connect to and
 		// we need to connect to the locally running lit-af instance
 		lc.RPCClient, err = litrpc.NewLocalLndcRpcClientWithHomeDirAndPort(defaultDir, port)
 		if err != nil {
