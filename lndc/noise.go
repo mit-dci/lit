@@ -304,10 +304,10 @@ func newXKHandshakeState(initiator bool, prologue []byte,
 // EphemeralGenerator is a functional option that allows callers to substitute
 // a custom function for use when generating ephemeral keys for ActOne or
 // ActTwo.  The function closure return by this function can be passed into
-// NewNoiseMachine as a function option parameter.
+// NewNoiseMachine(XK or XX) as a function option parameter.
 func EphemeralGenerator(gen func() (*koblitz.PrivateKey, error)) func(*Machine) {
 	return func(m *Machine) {
-		m.ephemeralGen = gen
+		m.EphemeralGen = gen
 	}
 }
 
@@ -353,7 +353,8 @@ type Machine struct {
 	sendCipher cipherState
 	recvCipher cipherState
 
-	ephemeralGen func() (*koblitz.PrivateKey, error)
+	EphemeralGen func() (*koblitz.PrivateKey, error)
+	// this is exported in order for noise_test to define a static ephemeral pubkey
 
 	handshakeState
 
@@ -372,7 +373,7 @@ type Machine struct {
 	nextCipherText [math.MaxUint16 + macSize]byte
 }
 
-// NewNoiseMachine creates a new instance of the lndc state-machine. If
+// NewNoiseXKMachine creates a new instance of the lndc state-machine. If
 // the responder (listener) is creating the object, then the remotePub should
 // be nil. The handshake state within lndc is initialized using the ascii
 // string "lightning" as the prologue. The last parameter is a set of variadic
@@ -387,7 +388,7 @@ func NewNoiseXKMachine(initiator bool, localStatic *koblitz.PrivateKey,
 	m := &Machine{handshakeState: handshake}
 	// With the initial base machine created, we'll assign our default
 	// version of the ephemeral key generator.
-	m.ephemeralGen = func() (*koblitz.PrivateKey, error) {
+	m.EphemeralGen = func() (*koblitz.PrivateKey, error) {
 		return koblitz.NewPrivateKey(koblitz.S256())
 	}
 
@@ -402,7 +403,7 @@ func NewNoiseXXMachine(initiator bool, localStatic *koblitz.PrivateKey) *Machine
 
 	// With the initial base machine created, we'll assign our default
 	// version of the ephemeral key generator.
-	m.ephemeralGen = func() (*koblitz.PrivateKey, error) {
+	m.EphemeralGen = func() (*koblitz.PrivateKey, error) {
 		return koblitz.NewPrivateKey(koblitz.S256())
 	}
 
@@ -475,7 +476,7 @@ func (b *Machine) GenActOne(remotePK [33]byte) ([]byte, error) {
 	var err error
 	actOne := make([]byte, ActOneSize)
 	// Generate e
-	b.localEphemeral, err = b.ephemeralGen()
+	b.localEphemeral, err = b.EphemeralGen()
 	if err != nil {
 		return actOne, err
 	}
@@ -544,7 +545,7 @@ func (b *Machine) GenActTwo(HandshakeVersion byte) ([]byte, error) {
 	var err error
 	actTwo := make([]byte, ActTwoSize)
 	// e
-	b.localEphemeral, err = b.ephemeralGen()
+	b.localEphemeral, err = b.EphemeralGen()
 	if err != nil {
 		return actTwo, err
 	}
