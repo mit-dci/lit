@@ -4,7 +4,7 @@
 
 [![Build Status](http://hubris.media.mit.edu:8080/job/lit-prod/job/master/badge/icon)](http://hubris.media.mit.edu:8080/job/lit-prod/job/master/) (master)
 
-( [PR builds](http://hubris.media.mit.edu:8080/job/lit-PR-ng/) )
+(or [PR builds](http://hubris.media.mit.edu:8080/job/lit-PR-ng/view/change-requests/))
 
 Under development, not for use with real money.
 
