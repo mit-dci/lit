@@ -72,20 +72,11 @@ The below command will run Lit on the Bitcoin `TestNet3` network. You can also r
 (Note: Windows users should take off `./` but need to change `lit` to `lit.exe`)
 
 ```bash
-./lit --tn3 <testnet3-seed> -vvv
+./lit --tn3 true -vvv
 ```
 
-The list of testnet3 seeds are available in `coinparam/bitcoin.go`, when you search for `TestNet3`. For convenience, you can use any of the following, for running `lit` on `TestNet3`
-```
-testnet-seed.bitcoin.jonasschnelli.ch
-seed.tbtc.petertodd.org
-seed.testnet.bitcoin.sprovoost.nl
-testnet-seed.bluematt.me
-```
-
-The words `yup, yes, y, true, 1, ok, enable, on` can be used to specify that Lit
-automatically connect to peers fetched from a list of DNS seeds. It can also be replaced by
-the address of the node you wish to connect to.
+The words `yup, yes, y, true, 1, ok, enable, on` can be used to specify that `Lit`
+automatically connect to peers fetched from a list of DNS seeds, specified in the `coinparam` directory for various networks. It can also be replaced by the address of the node you wish to connect to.
 
 ### Packaging
 
