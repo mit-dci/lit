@@ -67,12 +67,20 @@ go build -v .\cmd\lit-af
 
 ### Running lit
 
-The below command will run Lit on the Bitcoin testnet3 network
+The below command will run Lit on the Bitcoin `TestNet3` network. You can also run Lit on other networks (check the `lit/coinparam` directory) 
 
 (Note: Windows users should take off `./` but need to change `lit` to `lit.exe`)
 
 ```bash
-./lit --tn3=true
+./lit --tn3 <testnet3-seed> -vvv
+```
+
+The list of testnet3 seeds are available in `coinparam/bitcoin.go`, when you search for `TestNet3`. For convenience, you can use any of the following, for running `lit` on `TestNet3`
+```
+testnet-seed.bitcoin.jonasschnelli.ch
+seed.tbtc.petertodd.org
+seed.testnet.bitcoin.sprovoost.nl
+testnet-seed.bluematt.me
 ```
 
 The words `yup, yes, y, true, 1, ok, enable, on` can be used to specify that Lit
