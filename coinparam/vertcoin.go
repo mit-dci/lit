@@ -69,7 +69,7 @@ var VertcoinTestNetParams = Params{
 
 var VertcoinRegTestParams = Params{
 	Name:          "vtcreg",
-	NetMagicBytes: 0xdab5bffa,
+	NetMagicBytes: 0xdbb5befa,
 	DefaultPort:   "18444",
 	DNSSeeds:      []string{},
 
