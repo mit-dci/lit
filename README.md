@@ -67,17 +67,16 @@ go build -v .\cmd\lit-af
 
 ### Running lit
 
-The below command will run Lit on the Bitcoin testnet3 network
+The below command will run Lit on the Bitcoin `TestNet3` network. You can also run Lit on other networks (check the `lit/coinparam` directory) 
 
 (Note: Windows users should take off `./` but need to change `lit` to `lit.exe`)
 
 ```bash
-./lit --tn3=true
+./lit --tn3 true -vvv
 ```
 
-The words `yup, yes, y, true, 1, ok, enable, on` can be used to specify that Lit
-automatically connect to peers fetched from a list of DNS seeds. It can also be replaced by
-the address of the node you wish to connect to.
+The words `yup, yes, y, true, 1, ok, enable, on` can be used to specify that `Lit`
+automatically connect to peers fetched from a list of DNS seeds, specified in the `coinparam` directory for various networks. It can also be replaced by the address of the node you wish to connect to.
 
 ### Packaging
 
