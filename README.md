@@ -2,7 +2,9 @@
 
 ![Lit Logo](litlogo145.png)
 
-[![Build Status](http://hubris.media.mit.edu:8080/job/lit-PR/badge/icon)](http://hubris.media.mit.edu:8080/job/lit/)
+[![Build Status](http://hubris.media.mit.edu:8080/job/lit-prod/job/master/badge/icon)](http://hubris.media.mit.edu:8080/job/lit-prod/job/master/) (master)
+
+(or [PR builds](http://hubris.media.mit.edu:8080/job/lit-PR-ng/view/change-requests/))
 
 Under development, not for use with real money.
 
@@ -52,7 +54,7 @@ To run the python integration tests (which requires `bitcoind`), run `make test 
 
 #### Windows
 
-Install [Cygwin](http://www.cygwin.com) and follow the setup instructions or download prebuilt binaries from
+Install [Cygwin](http://www.cygwin.com) and follow the setup instructions or download prebuilt binaries from [Jenkins](http://hubris.media.mit.edu:8080/job/lit-prod/job/master/lastSuccessfulBuild/artifact/build/_releasedir/).
 
 1. Make sure that environmental variable `%GOPATH%` is initizlized correctly.
 
@@ -72,12 +74,12 @@ The below command will run Lit on the Bitcoin testnet3 network
 (Note: Windows users should take off `./` but need to change `lit` to `lit.exe`)
 
 ```bash
-./lit --tn3=true
+./lit --tn3 localhost
 ```
 
 The words `yup, yes, y, true, 1, ok, enable, on` can be used to specify that Lit
-automatically connect to peers fetched from a list of DNS seeds. It can also be replaced by
-the address of the node you wish to connect to.
+automatically connect to peers fetched from a list of DNS seeds, although you
+probably want to connect it to an already-trusted node, like a local one.
 
 ### Packaging
 
@@ -134,25 +136,25 @@ generated on startup with `tn3=1` by default.
 
 | Folder Name  | Details                                                                                                                                  |
 |:-------------|:-----------------------------------------------------------------------------------------------------------------------------------------|
-| `bech32`     | Util for the Bech32 format                                                                                                             |
-| `btcutil`    | Bitcoin-specific libraries                                                                                                          |
+| `bech32`     | Util for the Bech32 format                                                                                                               |
+| `btcutil`    | Bitcoin-specific libraries                                                                                                               |
 | `build`      | Tools used for building Lit                                                                                                              |
 | `cmd`        | Has some rpc client code to interact with the lit node.  Not much there yet                                                              |
 | `coinparam`  | Information and other constants for identifying currencies                                                                               |
 | `consts`     | Global constants                                                                                                                         |
-| `crypto`     | Utility cryptographic libraries                                                                                                    |
+| `crypto`     | Utility cryptographic libraries                                                                                                          |
 | `dlc`        | Discreet Log Contracts                                                                                                                   |
-| `docs`       | Writeups for setting up things and screenshots                 |
+| `docs`       | Writeups for setting up things and screenshots                                                                                           |
 | `elkrem`     | A hash-tree for storing `log(n)` items instead of n                                                                                      |
-| `litrpc`     | Websockets based RPC connection                                                                                                           |
+| `litrpc`     | Websockets based RPC connection                                                                                                          |
 | `lndc`       | Lightning network data connection -- send encrypted / authenticated messages between nodes                                               |
-| `lnutil`     | Widely used utility functions                                                                                                       |
+| `lnutil`     | Widely used utility functions                                                                                                            |
 | `portxo`     | Portable utxo format, exchangable between node and base wallet (or between wallets).  Should make this into a BIP once it's more stable. |
 | `powless`    | Introduces a web API chainhook in addition to the uspv one                                                                               |
 | `qln`        | A quick channel implementation with databases.  Doesn't do multihop yet.                                                                 |
 | `sig64`      | Library to make signatures 64 bytes instead of 71 or 72 or something                                                                     |
 | `snap`       | Snapcraft metadata                                                                                                                       |
-| `test`       | Python Integration tests                                                                                                                        |
+| `test`       | Python Integration tests                                                                                                                 |
 | `uspv`       | Deals with the network layer, sending network messages and filtering what to hand over to `wallit`                                       |
 | `wallit`     | Deals with storing and retrieving utxos, creating and signing transactions                                                               |
 | `watchtower` | Unlinkable outsourcing of channel monitoring                                                                                             |
