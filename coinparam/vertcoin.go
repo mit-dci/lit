@@ -115,7 +115,7 @@ var VertcoinRegTestParams = Params{
 	RelayNonStdTxs: true,
 
 	// Address encoding magics
-	PubKeyHashAddrID: 0x6f,
+	PubKeyHashAddrID: 0x4a, // starts with X or W
 	ScriptHashAddrID: 0xc4,
 	Bech32Prefix:     "rvtc",
 	PrivateKeyID:     0xef,
