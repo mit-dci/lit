@@ -310,7 +310,7 @@ func TestBolt0008TestVectors(t *testing.T) {
 	// EphemeralGenerator function for the state machine to ensure that the
 	// initiator and responder both generate the ephemeral public key
 	// defined within the test vectors.
-	initiatorEphemeral := EphemeralGenerator(func() (*koblitz.PrivateKey, error) {
+	initiatorEphemeral := func() (*koblitz.PrivateKey, error) {
 		e := "121212121212121212121212121212121212121212121212121212" +
 			"1212121212"
 		eBytes, err := hex.DecodeString(e)
@@ -320,8 +320,8 @@ func TestBolt0008TestVectors(t *testing.T) {
 
 		priv, _ := koblitz.PrivKeyFromBytes(koblitz.S256(), eBytes)
 		return priv, nil
-	})
-	responderEphemeral := EphemeralGenerator(func() (*koblitz.PrivateKey, error) {
+	}
+	responderEphemeral := func() (*koblitz.PrivateKey, error) {
 		e := "222222222222222222222222222222222222222222222222222" +
 			"2222222222222"
 		eBytes, err := hex.DecodeString(e)
@@ -331,24 +331,25 @@ func TestBolt0008TestVectors(t *testing.T) {
 
 		priv, _ := koblitz.PrivKeyFromBytes(koblitz.S256(), eBytes)
 		return priv, nil
-	})
+	}
 
 	// Finally, we'll create both brontide state machines, so we can begin
 	// our test.
-	initiator := NewNoiseMachine(true, initiatorPriv, initiatorEphemeral)
-	responder := NewNoiseMachine(false, responderPriv, responderEphemeral)
+	initiator := NewNoiseXXMachine(true, initiatorPriv)
+	initiator.EphemeralGen = initiatorEphemeral // needed for locking the ephemeral key
+	responder := NewNoiseXXMachine(false, responderPriv)
+	responder.EphemeralGen = responderEphemeral // needed for locking the ephemeral key
 
 	// We'll start with the initiator generating the initial payload for
 	// act one. This should consist of exactly 50 bytes. We'll assert that
 	// the payload return is _exactly_ the same as what's specified within
 	// the test vectors.
-	actOne, err := initiator.GenActOne()
+	var empty [33]byte
+	actOne, err := initiator.GenActOne(empty)
 	if err != nil {
 		t.Fatalf("unable to generate act one: %v", err)
 	}
-	expectedActOne, err := hex.DecodeString("01036360e856310ce5d294e" +
-		"8be33fc807077dc56ac80d95d9cd4ddbd21325eff73f71432d5611e91" +
-		"ffea67c17e8d5ae0cbb3")
+	expectedActOne, err := hex.DecodeString("01036360e856310ce5d294e8be33fc807077dc56ac80d95d9cd4ddbd21325eff73f71432d5611e91ffea67c17e8d5ae0cbb3")
 	if err != nil {
 		t.Fatalf("unable to parse expected act one: %v", err)
 	}
@@ -367,7 +368,7 @@ func TestBolt0008TestVectors(t *testing.T) {
 	// its contribution to the crypto handshake. We'll also verify that we
 	// produce the _exact_ same byte stream as advertised within the spec's
 	// test vectors.
-	actTwo, err := responder.GenActTwo()
+	actTwo, err := responder.GenActTwo(byte(1))
 	if err != nil {
 		t.Fatalf("unable to generate act two: %v", err)
 	}

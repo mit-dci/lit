@@ -1,6 +1,7 @@
 package lndc
 
 import (
+	"fmt"
 	"errors"
 	"io"
 	"net"
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mit-dci/lit/crypto/koblitz"
+	"github.com/mit-dci/lit/logging"
 )
 
 // defaultHandshakes is the maximum number of handshakes that can be done in
@@ -102,9 +104,12 @@ func (l *Listener) doHandshake(conn net.Conn) {
 	default:
 	}
 
+	// TODO: the listener here defaults to a noise_XK machine, we should add a condition
+	// here so that we can use a noise_XX machine for lit specific connections
+	// at this point, we really don't know who (noiseXX or noiseXK) is connecting to
+	// us, so we need to init hte noise part later
 	lndcConn := &Conn{
-		conn:  conn,
-		noise: NewNoiseMachine(false, l.localStatic),
+		conn: conn,
 	}
 
 	// We'll ensure that we get ActOne from the remote peer in a timely
@@ -115,12 +120,29 @@ func (l *Listener) doHandshake(conn net.Conn) {
 	// Attempt to carry out the first act of the handshake protocol. If the
 	// connecting node doesn't know our long-term static public key, then
 	// this portion will fail with a non-nil error.
-	var actOne [ActOneSize]byte
+	actOne := make([]byte, ActOneSize)
 	if _, err := io.ReadFull(conn, actOne[:]); err != nil {
 		lndcConn.conn.Close()
 		l.rejectConn(err)
 		return
 	}
+
+	if actOne[0] == 0 {
+		// remote node wants to connect via XK
+		SetXKConsts()
+		lndcConn.noise = NewNoiseXKMachine(false, l.localStatic, nil)
+		logging.Infof("remote node wants to connect via noise_xk")
+	} else if actOne[0] == 1 {
+		// no need to init the constants here since defaults are set to noise_XX
+		logging.Infof("Remote Node requesting connection via noise_xx")
+		lndcConn.noise = NewNoiseXXMachine(false, l.localStatic)
+	} else {
+		logging.Info("Unknown version byte received, dropping connection")
+		lndcConn.conn.Close()
+		l.rejectConn(fmt.Errorf("Unknown version byte received, dropping connection"))
+		return
+	}
+
 	if err := lndcConn.noise.RecvActOne(actOne); err != nil {
 		lndcConn.conn.Close()
 		l.rejectConn(err)
@@ -128,7 +150,7 @@ func (l *Listener) doHandshake(conn net.Conn) {
 	}
 	// Next, progress the handshake processes by sending over our ephemeral
 	// key for the session along with an authenticating tag.
-	actTwo, err := lndcConn.noise.GenActTwo()
+	actTwo, err := lndcConn.noise.GenActTwo(HandshakeVersion)
 	if err != nil {
 		lndcConn.conn.Close()
 		l.rejectConn(err)
@@ -154,7 +176,7 @@ func (l *Listener) doHandshake(conn net.Conn) {
 	// Finally, finish the handshake processes by reading and decrypting
 	// the connection peer's static public key. If this succeeds then both
 	// sides have mutually authenticated each other.
-	var actThree [ActThreeSize]byte
+	actThree := make([]byte, ActThreeSize)
 	if _, err := io.ReadFull(conn, actThree[:]); err != nil {
 		lndcConn.conn.Close()
 		l.rejectConn(err)

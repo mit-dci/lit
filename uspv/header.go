@@ -312,6 +312,10 @@ func CheckHeaderChain(
 
 		// reorg is go, snip to attach height
 		reorgDepth := height - attachHeight
+		if reorgDepth > numheaders {
+			logging.Info("Reorg depth is greater than the number of headers received, exiting!")
+			return 0, fmt.Errorf("Reorg depth is greater than the number of headers received, exiting!")
+		}
 		oldHeaders = oldHeaders[:numheaders-reorgDepth]
 	}
 

@@ -2,6 +2,7 @@ package lndc
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"math"
@@ -29,28 +30,53 @@ type Conn struct {
 
 // A compile-time assertion to ensure that Conn meets the net.Conn interface.
 var _ net.Conn = (*Conn)(nil)
+var Noise_XK bool
 
 // Dial attempts to establish an encrypted+authenticated connection with the
 // remote peer located at address which has remotePub as its long-term static
 // public key. In the case of a handshake failure, the connection is closed and
 // a non-nil error is returned.
-func Dial(localPriv *koblitz.PrivateKey, ipAddr string, remotePKH string,
+func Dial(localPriv *koblitz.PrivateKey, ipAddr string, remoteAddress string,
 	dialer func(string, string) (net.Conn, error)) (*Conn, error) {
+	var remotePKH string
+	var remotePK [33]byte
+	if remoteAddress[0:3] == "ln1" { // its a remote PKH
+		remotePKH = remoteAddress
+	} else if len(remoteAddress) == 66 { // hex encoded remotePK
+		temp, _ := hex.DecodeString(remoteAddress)
+		copy(remotePK[:], temp)
+		logging.Info("Got remote PK: ", remotePK, ", using noise_xk to connect")
+		SetXKConsts()
+	}
 	var conn net.Conn
 	var err error
 	conn, err = dialer("tcp", ipAddr)
-	logging.Info("ipAddr is", ipAddr)
+	logging.Debug("ipAddr is: ", ipAddr)
 	if err != nil {
 		return nil, err
 	}
 
-	b := &Conn{
-		conn:  conn,
-		noise: NewNoiseMachine(true, localPriv),
+	b := new(Conn)
+	if Noise_XK {
+		// we need to convert the raw PK to a koblitz public key
+		remotePub, err := koblitz.ParsePubKey(remotePK[:], koblitz.S256())
+		if err != nil {
+			logging.Debug(err)
+			return nil, err
+		}
+		b = &Conn{
+			conn:  conn,
+			noise: NewNoiseXKMachine(true, localPriv, remotePub),
+		}
+	} else {
+		b = &Conn{
+			conn:  conn,
+			noise: NewNoiseXXMachine(true, localPriv),
+		}
 	}
 
 	// Initiate the handshake by sending the first act to the receiver.
-	actOne, err := b.noise.GenActOne()
+	actOne, err := b.noise.GenActOne(remotePK)
 	if err != nil {
 		b.conn.Close()
 		return nil, err
@@ -59,7 +85,6 @@ func Dial(localPriv *koblitz.PrivateKey, ipAddr string, remotePKH string,
 		b.conn.Close()
 		return nil, err
 	}
-
 	// We'll ensure that we get ActTwo from the remote peer in a timely
 	// manner. If they don't respond within 1s, then we'll kill the
 	// connection.
@@ -69,22 +94,30 @@ func Dial(localPriv *koblitz.PrivateKey, ipAddr string, remotePKH string,
 	// remotePub), then read the second act after which we'll be able to
 	// send our static public key to the remote peer with strong forward
 	// secrecy.
-	var actTwo [ActTwoSize]byte
+	actTwo := make([]byte, ActTwoSize)
 	if _, err := io.ReadFull(conn, actTwo[:]); err != nil {
 		b.conn.Close()
 		return nil, err
 	}
-	s, err := b.noise.RecvActTwo(actTwo)
-	if err != nil {
-		b.conn.Close()
-		return nil, err
+	if !Noise_XK {
+		remotePK, err = b.noise.RecvActTwo(actTwo)
+		if err != nil {
+			b.conn.Close()
+			return nil, err
+		}
+	} else {
+		if _, err := b.noise.RecvActTwo(actTwo); err != nil {
+			b.conn.Close()
+			return nil, err
+		}
 	}
 
-	logging.Info("Received pubkey", s)
-	if lnutil.LitAdrFromPubkey(s) != remotePKH {
+	logging.Infoln("Received pubkey: ", remotePK)
+	if lnutil.LitAdrFromPubkey(remotePK) != remotePKH && !Noise_XK {
+		// for noise_XK dont check PKH and PK because we'd have already checked this
+		// the last time we connected to this guy
 		return nil, fmt.Errorf("Remote PKH doesn't match. Quitting!")
 	}
-	logging.Infof("Received PKH %s matches", lnutil.LitAdrFromPubkey(s))
 
 	// Finally, complete the handshake by sending over our encrypted static
 	// key and execute the final ECDH operation.
