@@ -77,7 +77,13 @@ The below command will run Lit on the Bitcoin testnet3 network
 
 The words `yup, yes, y, true, 1, ok, enable, on` can be used to specify that Lit
 automatically connect to peers fetched from a list of DNS seeds. It can also be replaced by
-the address of the node you wish to connect to.
+the address of the node you wish to connect to. For example for the btc testnet3:
+
+```bash
+./lit --tn3=localhost
+```
+
+It will use default port for different nodes. See the "Command line arguments" section.
 
 ### Packaging
 
