@@ -1,4 +1,4 @@
-module github.com/mit-dci/lit
+module github.com/Rjected/lit
 
 require (
 	github.com/NebulousLabs/go-UpnP v0.0.0-20181203152547-b32978b8ccbf
