@@ -31,6 +31,8 @@ github.com/mattn/go-colorable v0.1.1/go.mod h1:FuOcm+DKB9mbwrcAfNl7/TZVBZ6rcncea
 github.com/mattn/go-isatty v0.0.5/go.mod h1:Iq45c/XA43vh69/j3iqttzPXn0bhXyGjM0Hdxcsrc5s=
 github.com/mattn/go-isatty v0.0.6 h1:SrwhHcpV4nWrMGdNcC2kXpMfcBVYGDuTArqyhocJgvA=
 github.com/mattn/go-isatty v0.0.6/go.mod h1:Iq45c/XA43vh69/j3iqttzPXn0bhXyGjM0Hdxcsrc5s=
+github.com/mit-dci/lit v0.0.0-20190206212915-7a22842c6316 h1:L87r0cDfpXMUfxzHplFtRW9X3uduKO9N9q6NeRGe/vc=
+github.com/mit-dci/lit v0.0.0-20190206212915-7a22842c6316/go.mod h1:rc4TdU788+TZDGLPK7wvWZ3jGtoLHdtaMPNUmumnUMY=
 github.com/vertcoin/lyra2re v0.0.0-20170910033546-8bfa142041c2 h1:xf2HNsfB8pLNxjeWq3/LSPel2FiBhzF+ouaoquGPpvc=
 github.com/vertcoin/lyra2re v0.0.0-20170910033546-8bfa142041c2/go.mod h1:nzsIXJSsbS8epdXKijPDv2EmN40Vp0KzIwniHMnygHY=
 gitlab.com/NebulousLabs/fastrand v0.0.0-20181126182046-603482d69e40 h1:dizWJqTWjwyD8KGcMOwgrkqu1JIkofYgKkmDeNE7oAs=
