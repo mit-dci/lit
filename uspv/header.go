@@ -312,14 +312,8 @@ func CheckHeaderChain(
 
 		// reorg is go, snip to attach height
 		reorgDepth := height - attachHeight
-		logging.Errorf("len: %d, num: %d", len(oldHeaders), numheaders-reorgDepth)
-		if numheaders-reorgDepth >= int32(len(oldHeaders)) {
-			logging.Errorf("height: %d", height)
-			logging.Errorf("attachHeight: %d", attachHeight)
-			logging.Errorf("reorgDepth: %d", reorgDepth)
-			logging.Errorf("numheaders: %d", numheaders)
-			logging.Errorf("len oldHeaders: %d", len(oldHeaders))
-			return -1, fmt.Errorf("There was no reorg, we would have segfaulted")
+		if reorgDepth > numheaders {
+			return -1, fmt.Errorf("Reorg dept greater than number of headers")
 		}
 		oldHeaders = oldHeaders[:numheaders-reorgDepth]
 	}
