@@ -62,6 +62,12 @@ type ChainHook interface {
 	// Removed, put into Start().
 	//	SetHeight(startHeight int32) chan int32
 
+	// NewRawBlocksChannel returns a new channel to receive blocks.
+	NewRawBlocksChannel() chan *wire.MsgBlock
+
+	// NewHeightChannel returns a new channel to receive height events.
+	NewHeightChannel() chan int32
+
 	// PushTx sends a tx out to the network via the ChainHook.
 	// Note that this does NOT register anything in the tx, so by just using this,
 	// nothing will come back about confirmation.  It WILL come back with errors
