@@ -194,6 +194,13 @@ func (s *SPVCon) IngestMerkleBlock(m *wire.MsgMerkleBlock) {
 			return
 		}
 	}
+
+	// CurrentHeightChan is "How we tell the wallet that a block has come in"
+	// so I guess this applies here as well.
+	for i := range s.HeightDistribute {
+		s.HeightDistribute[i] <- hah.height
+	}
+
 	// actually we should do this AFTER sending all the txs...
 	s.CurrentHeightChan <- hah.height
 
@@ -258,6 +265,12 @@ func (s *SPVCon) IngestHeaders(m *wire.MsgHeaders) (bool, error) {
 		err = s.headerFile.Truncate(int64(fileHeight) * 80)
 		if err != nil {
 			return false, err
+		}
+
+		// CurrentHeightChan is "How we tell the wallet that a block has come in"
+		// so I guess this applies here as well.
+		for i := range s.HeightDistribute {
+			s.HeightDistribute[i] <- reorgHeight
 		}
 
 		// also we need to tell the upstream modules that a reorg happened
