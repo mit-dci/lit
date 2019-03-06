@@ -499,3 +499,13 @@ func (a *APILink) RawBlocks() chan *wire.MsgBlock {
 	// dummy channel for now
 	return make(chan *wire.MsgBlock, 1)
 }
+
+func (a *APILink) NewRawBlocksChannel() chan *wire.MsgBlock {
+	// dummy channel for now
+	return make(chan *wire.MsgBlock, 1)
+}
+
+func (a *APILink) NewHeightChannel() chan int32 {
+	// dummy channel for now
+	return make(chan int32, 1)
+}
