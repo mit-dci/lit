@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Rjected/lit/channels"
 	"github.com/boltdb/bolt"
-	"github.com/mit-dci/lit/channels"
 	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/eventbus"
