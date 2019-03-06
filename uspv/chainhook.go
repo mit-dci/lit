@@ -188,3 +188,17 @@ func (s *SPVCon) RawBlocks() chan *wire.MsgBlock {
 	s.RawBlockSender = make(chan *wire.MsgBlock, 8) // I dunno, 8?
 	return s.RawBlockSender
 }
+
+// NewRawBlocksChannel appends to the raw block distribution list and returns a new channel to receive blocks.
+func (s *SPVCon) NewRawBlocksChannel() chan *wire.MsgBlock {
+	newBlockSender := make(chan *wire.MsgBlock, 8)
+	s.RawBlockDistribute = append(s.RawBlockDistribute, newBlockSender)
+	return newBlockSender
+}
+
+// NewHeightChannel appends to the height distribution list and returns a new channel to receive height events.
+func (s *SPVCon) NewHeightChannel() chan int32 {
+	newHeightSender := make(chan int32, 8)
+	s.HeightDistribute = append(s.HeightDistribute, newHeightSender)
+	return newHeightSender
+}

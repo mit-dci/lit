@@ -68,6 +68,15 @@ type SPVCon struct {
 	// If the above RawBlockSender chan isn't being pulled from, don't send to it
 	RawBlockActive bool
 
+	// RawBlockDistribute is a list of channels that the raw blocks get sent to.
+	// This is so we can have multiple things using and requesting blocks from the
+	// same chainhook.
+	RawBlockDistribute []chan *wire.MsgBlock
+
+	// HeightDistribute is a list, like RawBlockDistribute, of channels where we
+	// send height events
+	HeightDistribute []chan int32
+
 	// for internal use -------------------------
 
 	// mBlockQueue is for keeping track of what height we've requested.
