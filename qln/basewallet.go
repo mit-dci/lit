@@ -3,7 +3,7 @@ package qln
 import (
 	"fmt"
 
-	"github.com/Rjected/lit/uspv"
+	"github.com/mit-dci/lit/uspv"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/crypto/koblitz"

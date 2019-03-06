@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Rjected/lit/powless"
-	"github.com/Rjected/lit/uspv"
+	"github.com/mit-dci/lit/powless"
+	"github.com/mit-dci/lit/uspv"
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/btcutil/hdkeychain"
 	"github.com/mit-dci/lit/coinparam"
