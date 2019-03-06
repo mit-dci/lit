@@ -21,6 +21,6 @@ require (
 	gitlab.com/NebulousLabs/go-upnp v0.0.0-20181011194642-3a71999ed0d3 // indirect
 	golang.org/x/crypto v0.0.0-20190228161510-8dd112bcdc25
 	golang.org/x/net v0.0.0-20190301231341-16b79f2e4e95
-	golang.org/x/sys v0.0.0-20190306155319-3e9a981b8ddb // indirect
+	golang.org/x/sys v0.0.0-20190306171555-70f529850638 // indirect
 	golang.org/x/text v0.3.0 // indirect
 )
