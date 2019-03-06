@@ -16,7 +16,6 @@ require (
 	github.com/jessevdk/go-flags v1.4.0
 	github.com/mattn/go-colorable v0.1.1 // indirect
 	github.com/mattn/go-isatty v0.0.6 // indirect
-	github.com/mit-dci/lit v0.0.0-20190206212915-7a22842c6316
 	github.com/vertcoin/lyra2re v0.0.0-20170910033546-8bfa142041c2
 	gitlab.com/NebulousLabs/fastrand v0.0.0-20181126182046-603482d69e40 // indirect
 	gitlab.com/NebulousLabs/go-upnp v0.0.0-20181011194642-3a71999ed0d3 // indirect
