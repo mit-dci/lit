@@ -13,7 +13,7 @@ import litrpc
 
 LIT_BIN = "%s/../lit" % paths.abspath(paths.dirname(__file__))
 
-REGTEST_COINTYPE = 257
+REGTEST_COINTYPE = 20002
 
 logger = logging.getLogger("testframework")
 

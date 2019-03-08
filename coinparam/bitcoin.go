@@ -221,7 +221,7 @@ var RegressionNetParams = Params{
 
 	// BIP44 coin type used in the hierarchical deterministic path for
 	// address generation.
-	HDCoinType: 257,
+	HDCoinType: 20002,
 	TestCoin:   true,
 }
 
