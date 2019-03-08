@@ -74,7 +74,7 @@ var VertcoinRegTestParams = Params{
 	DNSSeeds:      []string{},
 
 	// Chain parameters
-	DiffCalcFunction: diffVTCregtest,
+	DiffCalcFunction: diffBitcoinRegtest, // regtest difficulty calculation is the same for both btc and vtc
 	MinHeaders:       4032,
 	FeePerByte:       100,
 	GenesisBlock:     &VertcoinRegTestnetGenesisBlock,

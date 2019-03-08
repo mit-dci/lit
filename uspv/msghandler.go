@@ -126,7 +126,7 @@ func (s *SPVCon) fPositiveHandler() {
 
 // HeaderHandler ...
 func (s *SPVCon) HeaderHandler(m *wire.MsgHeaders) {
-	moar, err := s.IngestHeaders(m)
+	moar, err := s.IngestHeaders(m, s.GetHeaderTipHeight())
 	if err != nil {
 		logging.Errorf("Header error: %s\n", err.Error())
 		return
