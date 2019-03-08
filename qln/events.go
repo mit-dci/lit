@@ -25,21 +25,3 @@ func (e ChannelStateUpdateEvent) Name() string {
 func (e ChannelStateUpdateEvent) Flags() uint8 {
 	return eventbus.EFLAG_ASYNC
 }
-
-// FundEvent is a struct for a channel state update event
-type FundEvent struct {
-
-	// ChanIdx is the ChanIdx we get when we make sure that the fund is done
-	ChanIdx uint32
-	State   *InFlightFund
-}
-
-// Name returns the name of the channel state update event
-func (e FundEvent) Name() string {
-	return "qln.fundevent.fundchannel"
-}
-
-// Flags returns the flags for the event
-func (e FundEvent) Flags() uint8 {
-	return eventbus.EFLAG_ASYNC
-}

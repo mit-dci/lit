@@ -178,26 +178,6 @@ func (nd *LitNode) FundChannel(
 
 	nd.tmpSendLitMsg(outMsg)
 
-	// Now that we're done funding we can publish funding stuff
-
-	logging.Infof("Creating channel state update event")
-	// now that we've saved the state, publish to statechan stuff
-	fundEvent := FundEvent{
-		// I really don't know what the ChanIdx is
-		ChanIdx: 0,
-		State:   nd.InProg,
-	}
-
-	logging.Infof("Publishing event")
-
-	if succeed, err := nd.Events.Publish(fundEvent); err != nil {
-		return 0, fmt.Errorf("Fund Publish FundEvent %s", err)
-	} else if !succeed {
-		return 0, fmt.Errorf("Fund Publish FundEvent did not succeed")
-	}
-
-	logging.Infof("Publishing event suceeded")
-
 	// wait until it's done!
 	idx := <-nd.InProg.done
 
@@ -753,5 +733,22 @@ func (nd *LitNode) SigProofHandler(msg lnutil.SigProofMsg, peer *RemotePeer) {
 
 	// sig OK; in terms of UI here's where you can say "payment received"
 	// "channel online" etc
+
+	logging.Infof("Publishing sigproof event")
+	sigProofEvent := ChannelStateUpdateEvent{
+		// I really don't know what the ChanIdx is
+		Action:  "sigproof",
+		ChanIdx: qc.Idx(),
+		State:   qc.State,
+	}
+
+	if succeed, err := nd.Events.Publish(sigProofEvent); err != nil {
+		logging.Errorf("SigProofHandler publish err %s", err)
+		return
+	} else if !succeed {
+		logging.Errorf("SigProofHandler publish did not succeed")
+		return
+	}
+
 	return
 }
