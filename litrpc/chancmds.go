@@ -150,6 +150,7 @@ type FundReply struct {
 
 func (r *LitRPC) FundChannel(args FundArgs, reply *FundReply) error {
 	var err error
+	logging.Infof("got fundchannel rpc, handling")
 	if r.Node.InProg != nil && r.Node.InProg.PeerIdx != 0 {
 		return fmt.Errorf("channel with peer %d not done yet", r.Node.InProg.PeerIdx)
 	}

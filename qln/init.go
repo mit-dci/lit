@@ -73,6 +73,8 @@ func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL stri
 	nd.Events.RegisterHandler("lnp2p.peer.new", h1)
 	h2 := makeTmpDisconnectPeerHandler(nd)
 	nd.Events.RegisterHandler("lnp2p.peer.disconnect", h2)
+	h3 := makeFundEventHandler(nd)
+	nd.Events.RegisterHandler("qln.fundevent.fundchannel", h3)
 
 	// Sets up handlers for all the messages we need to handle.
 	nd.registerHandlers()

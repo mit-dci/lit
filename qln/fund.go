@@ -162,6 +162,7 @@ func (nd *LitNode) FundChannel(
 	}
 
 	logging.Infof("next channel idx: %d", cIdx)
+	logging.Infof("got here")
 
 	nd.InProg.ChanIdx = cIdx
 	nd.InProg.PeerIdx = peerIdx
@@ -171,13 +172,35 @@ func (nd *LitNode) FundChannel(
 
 	nd.InProg.Coin = cointype
 	nd.InProg.mtx.Unlock() // switch to defer
+	logging.Infof("got here")
 
 	outMsg := lnutil.NewPointReqMsg(peerIdx, cointype)
 
 	nd.tmpSendLitMsg(outMsg)
 
+	// Now that we're done funding we can publish funding stuff
+
+	logging.Infof("Creating channel state update event")
+	// now that we've saved the state, publish to statechan stuff
+	fundEvent := FundEvent{
+		// I really don't know what the ChanIdx is
+		ChanIdx: 0,
+		State:   nd.InProg,
+	}
+
+	logging.Infof("Publishing event")
+
+	if succeed, err := nd.Events.Publish(fundEvent); err != nil {
+		return 0, fmt.Errorf("Fund Publish FundEvent %s", err)
+	} else if !succeed {
+		return 0, fmt.Errorf("Fund Publish FundEvent did not succeed")
+	}
+
+	logging.Infof("Publishing event suceeded")
+
 	// wait until it's done!
 	idx := <-nd.InProg.done
+
 	return idx, nil
 }
 
