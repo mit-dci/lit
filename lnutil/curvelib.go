@@ -6,8 +6,8 @@ import (
 	"math/big"
 	"sort"
 
-	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
+	"github.com/mit-dci/lit/crypto/koblitz"
 )
 
 // PrivKeyAddBytes adds bytes to a private key.

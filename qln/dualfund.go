@@ -2,6 +2,7 @@ package qln
 
 import (
 	"fmt"
+
 	"github.com/mit-dci/lit/btcutil/txsort"
 	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/crypto/koblitz"

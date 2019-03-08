@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	"github.com/mit-dci/lit/btcutil"
-	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/btcutil/txscript"
 	"github.com/mit-dci/lit/btcutil/txsort"
+	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/logging"

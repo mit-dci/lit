@@ -9,7 +9,7 @@ import (
 	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/hdkeychain"
 	"github.com/mit-dci/lit/coinparam"
-	"github.com/mit-dci/lit/db/lnbolt" // TODO Abstract this more.
+	"github.com/mit-dci/lit/db/lnbolt"
 	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/eventbus"
 	"github.com/mit-dci/lit/lncore"

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/mit-dci/lit/logging"
-
 	"github.com/mit-dci/lit/consts"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/portxo"

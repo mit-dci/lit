@@ -1,10 +1,11 @@
 package qln
 
 import (
+	"sync"
+
 	"github.com/mit-dci/lit/lnp2p"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/logging"
-	"sync"
 )
 
 // LitMsgWrapperMessage is a wrapper type for adapting things to other things.

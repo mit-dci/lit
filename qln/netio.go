@@ -2,11 +2,12 @@ package qln
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/lncore"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/logging"
-	"strings"
 )
 
 // GetLisAddressAndPorts .

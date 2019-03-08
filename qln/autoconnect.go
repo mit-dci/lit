@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/mit-dci/lit/logging"
-
 	"github.com/mit-dci/lit/bech32"
 	"github.com/mit-dci/lit/crypto/fastsha256"
 )

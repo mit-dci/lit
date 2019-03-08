@@ -11,11 +11,9 @@ import (
 	"strings"
 
 	"github.com/mit-dci/lit/logging"
-
-	"golang.org/x/net/websocket"
-
 	"github.com/mit-dci/lit/qln"
 	"github.com/mit-dci/lit/webui"
+	"golang.org/x/net/websocket"
 )
 
 /*

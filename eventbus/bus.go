@@ -2,8 +2,9 @@ package eventbus
 
 import (
 	"fmt"
-	"github.com/mit-dci/lit/logging"
 	"sync"
+
+	"github.com/mit-dci/lit/logging"
 )
 
 // An EventBus takes events and forwards them to event handlers matched by name.

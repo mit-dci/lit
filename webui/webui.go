@@ -308,15 +308,15 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"asset-manifest.json": assetManifestJson,
-	"favicon.ico": faviconIco,
-	"index.html": indexHtml,
-	"manifest.json": manifestJson,
-	"service-worker.js": serviceWorkerJs,
-	"static/css/main.5bb1c5b0.css": staticCssMain5bb1c5b0Css,
+	"asset-manifest.json":              assetManifestJson,
+	"favicon.ico":                      faviconIco,
+	"index.html":                       indexHtml,
+	"manifest.json":                    manifestJson,
+	"service-worker.js":                serviceWorkerJs,
+	"static/css/main.5bb1c5b0.css":     staticCssMain5bb1c5b0Css,
 	"static/css/main.5bb1c5b0.css.map": staticCssMain5bb1c5b0CssMap,
-	"static/js/main.ff47db68.js": staticJsMainFf47db68Js,
-	"static/js/main.ff47db68.js.map": staticJsMainFf47db68JsMap,
+	"static/js/main.ff47db68.js":       staticJsMainFf47db68Js,
+	"static/js/main.ff47db68.js.map":   staticJsMainFf47db68JsMap,
 }
 
 // AssetDir returns the file names below a certain
@@ -358,19 +358,20 @@ type bintree struct {
 	Func     func() (*asset, error)
 	Children map[string]*bintree
 }
+
 var _bintree = &bintree{nil, map[string]*bintree{
 	"asset-manifest.json": &bintree{assetManifestJson, map[string]*bintree{}},
-	"favicon.ico": &bintree{faviconIco, map[string]*bintree{}},
-	"index.html": &bintree{indexHtml, map[string]*bintree{}},
-	"manifest.json": &bintree{manifestJson, map[string]*bintree{}},
-	"service-worker.js": &bintree{serviceWorkerJs, map[string]*bintree{}},
+	"favicon.ico":         &bintree{faviconIco, map[string]*bintree{}},
+	"index.html":          &bintree{indexHtml, map[string]*bintree{}},
+	"manifest.json":       &bintree{manifestJson, map[string]*bintree{}},
+	"service-worker.js":   &bintree{serviceWorkerJs, map[string]*bintree{}},
 	"static": &bintree{nil, map[string]*bintree{
 		"css": &bintree{nil, map[string]*bintree{
-			"main.5bb1c5b0.css": &bintree{staticCssMain5bb1c5b0Css, map[string]*bintree{}},
+			"main.5bb1c5b0.css":     &bintree{staticCssMain5bb1c5b0Css, map[string]*bintree{}},
 			"main.5bb1c5b0.css.map": &bintree{staticCssMain5bb1c5b0CssMap, map[string]*bintree{}},
 		}},
 		"js": &bintree{nil, map[string]*bintree{
-			"main.ff47db68.js": &bintree{staticJsMainFf47db68Js, map[string]*bintree{}},
+			"main.ff47db68.js":     &bintree{staticJsMainFf47db68Js, map[string]*bintree{}},
 			"main.ff47db68.js.map": &bintree{staticJsMainFf47db68JsMap, map[string]*bintree{}},
 		}},
 	}},
@@ -422,4 +423,3 @@ func _filePath(dir, name string) string {
 	cannonicalName := strings.Replace(name, "\\", "/", -1)
 	return filepath.Join(append([]string{dir}, strings.Split(cannonicalName, "/")...)...)
 }
-
