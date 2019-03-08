@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"strconv"
 
 	"github.com/chzyer/readline"
 	"github.com/fatih/color"
@@ -48,14 +49,15 @@ type litAfClient struct {
 
 type litAfConfig struct {
 	Con      string `long:"con" description:"host to connect to in the form of [<lnadr>@][<host>][:<port>]"`
-	Dir      string `long:"dir" description:"directory to save settings"`
+	LitHomeDir      string `long:"litHomeDir" description:"directory to save settings"`
+	Port 	 string `long:"autoListenPort" description:"port that the lit is listening to."`
 	Tracker  string `long:"tracker" description:"service to use for looking up node addresses"`
 	LogLevel []bool `short:"v" description:"Set verbosity level to verbose (-v), very verbose (-vv) or very very verbose (-vvv)"`
 }
 
 var (
 	defaultCon     = "2448"
-	defaultDir     = filepath.Join(os.Getenv("HOME"), litHomeDirName)
+	defaultLitHomeDirName     = filepath.Join(os.Getenv("HOME"), litHomeDirName)
 	defaultTracker = "http://hubris.media.mit.edu:46580"
 )
 
@@ -68,11 +70,6 @@ func newConfigParser(conf *litAfConfig, options flags.Options) *flags.Parser {
 func (lc *litAfClient) litAfSetup(conf litAfConfig) {
 
 	var err error
-	// create home directory if it does not exist
-	_, err = os.Stat(defaultDir)
-	if os.IsNotExist(err) {
-		os.Mkdir(defaultDir, 0700)
-	}
 
 	preParser := newConfigParser(&conf, flags.HelpFlag)
 	_, err = preParser.ParseArgs(os.Args) // parse the cli
@@ -89,20 +86,37 @@ func (lc *litAfClient) litAfSetup(conf litAfConfig) {
 	}
 	logging.SetLogLevel(logLevel) // defaults to zero
 
-	adr, host, port := lnutil.ParseAdrStringWithPort(conf.Con)
-	logging.Infof("Adr: %s, Host: %s, Port: %d", adr, host, port)
-	if litrpc.LndcRpcCanConnectLocallyWithHomeDir(defaultDir) && adr == "" && (host == "localhost" || host == "127.0.0.1") {
+	// create home directory if it does not exist
+	_, err = os.Stat(conf.LitHomeDir)
+	if os.IsNotExist(err) {
+		os.Mkdir(conf.LitHomeDir, 0700)
+	}
 
-		lc.RPCClient, err = litrpc.NewLocalLndcRpcClientWithHomeDirAndPort(defaultDir, port)
+	adr, host, port := lnutil.ParseAdrStringWithPort(conf.Con)
+
+	if len(conf.Port) > 0 {
+		custom_port, err := strconv.ParseUint(conf.Port, 10, 32)
+		if err != nil {
+			logging.Fatal(err.Error())
+		}
+		port = uint32(custom_port)
+	}
+
+	logging.Infof("Adr: %s, Host: %s, Port: %d, LitHomeDir: %s", adr, host, port, conf.LitHomeDir)
+
+	if litrpc.LndcRpcCanConnectLocallyWithHomeDir(conf.LitHomeDir) && adr == "" && (host == "localhost" || host == "127.0.0.1") {
+		// con parameter was not passed.
+		lc.RPCClient, err = litrpc.NewLocalLndcRpcClientWithHomeDirAndPort(conf.LitHomeDir, port)
 		if err != nil {
 			logging.Fatal(err.Error())
 		}
 	} else {
+		// con parameter passed.
 		if !lnutil.LitAdrOK(adr) {
 			logging.Fatal("lit address passed in -con parameter is not valid")
 		}
 
-		keyFilePath := filepath.Join(defaultDir, "lit-af-key.hex")
+		keyFilePath := filepath.Join(conf.LitHomeDir, "lit-af-key.hex")
 		privKey, err := lnutil.ReadKeyFile(keyFilePath)
 		if err != nil {
 			logging.Fatal(err.Error())
@@ -134,14 +148,14 @@ func main() {
 	lc := new(litAfClient)
 	conf := litAfConfig{
 		Con:     defaultCon,
-		Dir:     defaultDir,
+		LitHomeDir:     defaultLitHomeDirName,
 		Tracker: defaultTracker,
 	}
 	lc.litAfSetup(conf) // setup lit-af to start
 
 	rl, err := readline.NewEx(&readline.Config{
 		Prompt:       lnutil.Prompt("lit-af") + lnutil.White("# "),
-		HistoryFile:  filepath.Join(defaultDir, historyFilename),
+		HistoryFile:  filepath.Join(conf.LitHomeDir, historyFilename),
 		AutoComplete: lc.NewAutoCompleter(),
 	})
 	if err != nil {

@@ -46,7 +46,7 @@ reg=localhost
 rpchost=0.0.0.0
 rpcport=8001
 tracker=http://hubris.media.mit.edu:46580
-autoListenPort=:2448
+autoListenPort=2448
 autoReconnect=true
 autoReconnectInterval=5
 ```
@@ -58,30 +58,32 @@ Copy the file to both folders (`lit1` and `lit2`). Open the copy in the `lit2` f
 Open two terminal or command-line windows (`cmd.exe` on Windows, `xterm` on Linux, `Terminal` on MacOS) and `cd` to the directory where you put the LIT assemblies. In the first window, type this command to start up the first LIT node:
 
 (On Unix / MacOS:)
-```./lit --dir lit1``` 
+```./lit --dir=/path/to/lit1``` 
 
 (On Windows:)
-```lit.exe --dir lit1```
+```lit.exe --dir=/path/to/lit1```
 
 When starting up LIT will ask you for a passphrase to protect your wallet. You _can_ leave it empty in development/test scenarios but in general it's recommended to set a password.
 
 Then, similarly for the first node, use the second terminal window to start the second node:
 
 (On Unix / MacOS:)
-```./lit --dir lit2``` 
+```./lit --dir=/path/to/lit2``` 
 
 (On Windows:)
-```lit.exe --dir lit2```
+```lit.exe --dir=/path/to/lit2```
 
 ## Step 5: Fund the LIT wallets
 
-Now that the nodes are up, we should fund the wallets. Open another command line window, and go to the directory where you downloaded the binaries. We use the command line client `lit-af`. You can connect to the first LIT node using the following command:
+Now that the nodes are up, we should fund the wallets. Open another command line window, and go to the directory where you downloaded the binaries. We use the command line client `lit-af`. You can connect to the LIT nodes using the following commands:
 
 (On Unix / MacOS:)
-```./lit-af``` 
+```./lit-af --litHomeDir=/path/to/lit1 --autoListenPort=2448```
+```./lit-af --litHomeDir=/path/to/lit2 --autoListenPort=2449``` 
 
 (On Windows:)
-```lit-af.exe```
+```lit-af.exe --litHomeDir=/path/to/lit1 --autoListenPort=2448```
+```lit-af.exe --litHomeDir=/path/to/lit2 --autoListenPort=2449```
 
 Next, issue the `ls` command. You'll see your address printed out to the console:
 
@@ -115,13 +117,8 @@ Listening for connections on port(s) [:2448] with key ln1a9pp6jv4rgz0r7wh9tqcn89
 	Type: 257	Sync Height: 201	FeeRate: 80	Utxo: 1000000000	WitConf: 1000000000 Channel: 0
 ```
 
-Repeat the funding steps for the second node, only use an extra parameter to `lit-af` to connect to it (since it's running on another port):
+Repeat the funding steps for the second node.
 
-(On Unix / MacOS:)
-```./lit-af -p 8002``` 
-
-(On Windows:)
-```lit-af.exe -p 8002```
 
 ## Step 6: Connect the nodes together
 

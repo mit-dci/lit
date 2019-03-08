@@ -299,10 +299,13 @@ func main() {
 	rpcl.OffButton = make(chan bool, 1)
 	node.RPC = rpcl
 
+	// "conf.UnauthRPC" enables unauthenticated Websocket RPC. Default - false.
 	if conf.UnauthRPC {
 		go litrpc.RPCListen(rpcl, conf.Rpchost, conf.Rpcport)
 	}
 
+	// conf.AutoReconnect Attempts to automatically reconnect to known peers periodically. Default - true
+	// conf.NoAutoListen Don't automatically listen on any ports. Default - false
 	if conf.AutoReconnect && !conf.NoAutoListen {
 		node.AutoReconnect(conf.AutoListenPort, conf.AutoReconnectInterval, conf.AutoReconnectOnlyConnectedCoins)
 	}
