@@ -166,6 +166,8 @@ func (r *LitRPC) FundChannel(args FundArgs, reply *FundReply) error {
 			args.InitialSend, args.Capacity)
 	}
 
+	logging.Infof("Got past initial checks")
+
 	wal := r.Node.SubWallet[args.CoinType]
 	if wal == nil {
 		return fmt.Errorf("No wallet of cointype %d linked", args.CoinType)
@@ -183,6 +185,7 @@ func (r *LitRPC) FundChannel(args FundArgs, reply *FundReply) error {
 	}
 
 	spendable := allPorTxos.SumWitness(nowHeight)
+	logging.Infof("Spendable txos: %d", spendable)
 
 	if args.Capacity > spendable-wal.Fee()*consts.JusticeTxBump {
 		return fmt.Errorf("Wanted %d but %d available for channel creation",
