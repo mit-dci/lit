@@ -159,7 +159,7 @@ var TestNet3Params = Params{
 	// BIP44 coin type used in the hierarchical deterministic path for
 	// address generation.
 	HDCoinType: 1,
-	TestCoin: true,
+	TestCoin:   true,
 }
 
 // RegressionNetParams defines the network parameters for the regression test
