@@ -41,7 +41,7 @@ Alice starts running lit (with `./lit --tn3 fullnode.net`) and syncs up to the b
 Alice connects to her full node, fullnode.net.  By default this is on testnet3, using port 18333.
 
 ```
-alice@pi2:~/anode$ ./lit --tn3 fullnode.net -v
+alice@pi2:~/anode$ ./lit --tn3=fullnode.net -v
 lit node v0.1
 -h for list of options.
 No file testkey.hex, generating.
@@ -57,36 +57,63 @@ Now in another window, alice connects to the lit node over RPC using `./lit-af`
 
 ```
 alice@pi2:~/anode$ ./lit-af
-lit-af# ls
-entered command: ls
-	Addresses:
-0 tb1q39stxtf6udwnjpatadylkgakf8q9und06we8ew (mt3LiAN4EjaHQGeHWLoTHgDUtafALwL6Zv)
-	Utxo: 0 Conf:0 Channel: 0
-Sync Height 1060000
+lit-af# ls -a
+entered command: ls -a
+        Peers:
+1 127.0.0.1:49958 (ln1wj3csaf6p6kgvj6zre6zqta7lnjms9zndkwc8d)
+        Listening Ports:
+Listening for connections on port(s) [[::]:2448] with key ln1akupazfterdadrywclht0s8kgvt3r3jga0lyez
+        Addresses:
+1 tb1qf77l4ja2kq6na0ffmekph6qv22puufqr5aatg0 (mnnbGE9dxHpNFuzBrTWUk5PZ9272JF2bkK)
+        Balances:
+Type: 1 Sync Height: 1481792    FeeRate: 80     Utxo: 0 WitConf: 0 Channel: 0
 
 ```
 
-ls shows how much money Alice has, which is none.  She can get some from a faucet. One such faucet you can find [here](https://testnet.manu.backend.hamburg/faucet).
+Buy default the lit-af utility use ~/.lit directory for litHomeDir and 2448 for autoListenPort.
+You can change this running:
 
-Bob can start a wallet in the same way; if Bob's node is running on the same computer, he'll have to run lit with -rpcport to listen on a different port, and start lit-af with -p to connect to that port.  Once Alice and Bob are both set up, they can connect to each other.
+```
+alice@pi2:~/gofolder/src/github.com/mit-dci/lit/cmd/lit-af/lit-af --litHomeDir=/path/to_alice/lit1 --autoListenPort=2448
+```
+
+
+ls -a shows how much money Alice has, which is none.  She can get some from a faucet. One such faucet you can find [here](https://testnet.manu.backend.hamburg/faucet).
+
+Bob can start a wallet in the same way; if Bob's node is running on the same computer, he'll have to run lit placing a lit.conf in to the ~/bnode folder:
+
+```
+tn3=1
+rpchost=0.0.0.0
+rpcport=8002
+tracker=http://hubris.media.mit.edu:46580
+autoListenPort=2449
+autoReconnect=true
+autoReconnectInterval=5
+```
+
+Then run lit as:
+
+```
+alice@pi2:~/gofolder/src/github.com/mit-dci/lit/lit --dir=~/bnode
+```
+
+Once Alice and Bob are both set up, they can connect to each other.
+
+If Bob is on the same computer he should run lit-af with the parameters:
+
+```
+./lit-af --litHomeDir=~/bnode --autoListenPort=2449
+```
+
 
 ### Step 3: Connect
-
-Alice sets her node to listen:
-
-```
-lit-af# lis
-entered command: lis
-listening on ln1pmclh89haeswrw0unf8awuyqeu4t2uell58nea@:2448
-```
-
-n1ozwFWDbZXKYjqwySv3VaTxNZvdVmQcam is Alice's node-ID (This format will change soon).  She's listening on port 2448, but any port can be specified with the `lis` command.
 
 Bob can connect to Alice using her node-ID:
 
 ```
-lit-af# con ln1pmclh89haeswrw0unf8awuyqeu4t2uell58nea@:2448@pi2
-entered command: con ln1pmclh89haeswrw0unf8awuyqeu4t2uell58nea@:2448@pi2
+lit-af# con ln1akupazfterdadrywclht0s8kgvt3r3jga0lyez@:2448@pi2
+entered command: con ln1akupazfterdadrywclht0s8kgvt3r3jga0lyez@:2448@pi2
 connected to peer 1
 lit-af# say 1 Hi Alice!
 entered command: say 1 Hi Alice!
@@ -99,8 +126,8 @@ Bob puts the pubkey@hostname for Alice and connects.  Then he says hi to Alice.
 Before Bob can make a channel, he needs to sweep his coins to make sure they are in his segwit address.
 
 ```
-lit-af# sweep tb1qrh7xpsmlgrd7lf4vv6yyn87j4n7pdjkra9jrr9 50000000
-entered command: sweep tb1qrh7xpsmlgrd7lf4vv6yyn87j4n7pdjkra9jrr9 50000000
+lit-af# sweep tb1qf77l4ja2kq6na0ffmekph6qv22puufqr5aatg0 50000000
+entered command: sweep tb1qf77l4ja2kq6na0ffmekph6qv22puufqr5aatg0 50000000
 Swept
 0 d297da04c43919e683ffc03539ee38e185425e8fa14d1ccae6577fbb35be575a
 ```
