@@ -2,6 +2,7 @@ package qln
 
 import (
 	"fmt"
+	"log"
 	"path/filepath"
 	"sync"
 
@@ -25,6 +26,8 @@ import (
 func NewLitNode(privKey *[32]byte, path string, trackerURL string, proxyURL string, nat string) (*LitNode, error) {
 
 	var err error
+
+	log.Printf("====== MODIFIED LIT NODE ======\n")
 
 	// Maybe make a new parameter set for "LN".. meh
 	// TODO change this to a non-coin
