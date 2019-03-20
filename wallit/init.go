@@ -6,13 +6,13 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mit-dci/lit/powless"
+	"github.com/mit-dci/lit/uspv"
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/btcutil/hdkeychain"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/logging"
-	"github.com/mit-dci/lit/powless"
-	"github.com/mit-dci/lit/uspv"
 	"github.com/mit-dci/lit/wire"
 )
 

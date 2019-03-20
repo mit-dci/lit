@@ -50,7 +50,7 @@ type WatchTower struct {
 	Hooks map[uint32]uspv.ChainHook
 }
 
-// Chainlink is the connection between the watchtower and the blockchain
+// Hooklink is the connection between the watchtower and the blockchain
 // Takes in a channel of blocks, and the cointype.  Immediately returns
 // a channel which it will send justice transactions to.
 func (w *WatchTower) HookLink(dbPath string, param *coinparam.Params,

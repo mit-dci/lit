@@ -7,8 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mit-dci/lit/logging"
-
+	"github.com/mit-dci/lit/channels"
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/dlc"
@@ -17,6 +16,7 @@ import (
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnp2p"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/watchtower"
 	"github.com/mit-dci/lit/wire"
 )
@@ -88,6 +88,9 @@ type LitNode struct {
 
 	// p2p remote control key
 	DefaultRemoteControlKey *koblitz.PublicKey
+
+	// channel management
+	ChanMan *channels.ChannelManager
 
 	// event bus
 	Events *eventbus.EventBus
