@@ -191,7 +191,9 @@ func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
 
 	newBlockHash := m.Header.BlockHash()
 	if !hah.blockhash.IsEqual(&newBlockHash) {
-		logging.Errorf("full block out of order error")
+		logging.Errorf("Full block out of order error\n")
+		logging.Errorf("Expected block hash: %x\n", hah.blockhash.CloneBytes())
+		logging.Errorf("Actual block hash: %x\n", newBlockHash.CloneBytes())
 		return
 	}
 

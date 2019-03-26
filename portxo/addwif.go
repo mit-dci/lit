@@ -7,7 +7,7 @@ import (
 	"github.com/mit-dci/lit/logging"
 
 	"github.com/mit-dci/lit/btcutil"
-	"github.com/mit-dci/lit/btcutil/chaincfg"
+	"github.com/mit-dci/lit/coinparam"
 )
 
 func (u *PorTxo) AddWIF(w btcutil.WIF) error {
@@ -41,17 +41,17 @@ func (u *PorTxo) AddWIF(w btcutil.WIF) error {
 
 		adr := new(btcutil.AddressPubKeyHash)
 
-		if w.IsForNet(&chaincfg.TestNet3Params) {
+		if w.IsForNet(&coinparam.TestNet3Params) {
 			// generate address from wif key
 			adr, err = btcutil.NewAddressPubKeyHash(
-				btcutil.Hash160(w.SerializePubKey()), &chaincfg.TestNet3Params)
+				btcutil.Hash160(w.SerializePubKey()), &coinparam.TestNet3Params)
 			if err != nil {
 				return err
 			}
 		} else { // assume mainnet
 			// generate address from wif key
 			adr, err = btcutil.NewAddressPubKeyHash(
-				btcutil.Hash160(w.SerializePubKey()), &chaincfg.MainNetParams)
+				btcutil.Hash160(w.SerializePubKey()), &coinparam.BitcoinParams)
 			if err != nil {
 				return err
 			}

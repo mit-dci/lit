@@ -30,7 +30,7 @@ type UWallet interface {
 	LetMeKnowHeight() chan lnutil.HeightEvent
 	BlockMonitor() chan *wire.MsgBlock
 
-	Params() *chaincfg.Params
+	Params() *coinparam.Params
 }
 */
 

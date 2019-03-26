@@ -60,7 +60,7 @@ implement this:
 
 ChainHook interface
 
-	Start(height int32, host, path string, params *chaincfg.Params) (
+	Start(height int32, host, path string, params *coinparam.Params) (
 		chan lnutil.TxAndHeight, chan int32, error)
 
 	RegisterAddress(address [20]byte) error

@@ -740,6 +740,7 @@ func (nd *LitNode) SigProofHandler(msg lnutil.SigProofMsg, peer *RemotePeer) {
 		Action:  "sigproof",
 		ChanIdx: qc.Idx(),
 		State:   qc.State,
+		TheirPub: qc.TheirPub,
 	}
 
 	if succeed, err := nd.Events.Publish(sigProofEvent); err != nil {

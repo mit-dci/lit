@@ -495,7 +495,7 @@ func (w *Wallit) SignMyInputs(tx *wire.MsgTx) error {
 	return nil
 }
 
-// Build and sign builds a tx from a slice of utxos and txOuts.
+// BuildAndSign builds a tx from a slice of utxos and txOuts.
 // It then signs all the inputs and returns the tx.  Should
 // pretty much always work for any inputs.
 func (w *Wallit) BuildAndSign(

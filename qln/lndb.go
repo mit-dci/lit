@@ -125,7 +125,7 @@ type LitNode struct {
 	InProgDual *InFlightDualFund
 
 	// Nodes don't have Params; their SubWallets do
-	// Param *chaincfg.Params // network parameters (testnet3, segnet, etc)
+	// Param *coinparam.Params // network parameters (testnet3, segnet, etc)
 
 	// queue for async messages to RPC user
 	UserMessageBox chan string
