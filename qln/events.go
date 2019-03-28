@@ -2,7 +2,6 @@ package qln
 
 import (
 	"github.com/mit-dci/lit/eventbus"
-	"github.com/mit-dci/lit/coinparam"
 )
 
 // ChannelStateUpdateEvent is a struct for a channel state update event
@@ -22,7 +21,7 @@ type ChannelStateUpdateEvent struct {
 	TheirPub [33]byte
 
 	// We need to know which coin this was for
-	CoinType *coinparam.Params
+	CoinType uint32
 }
 
 // Name returns the name of the channel state update event
