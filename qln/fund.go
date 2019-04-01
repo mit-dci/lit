@@ -734,7 +734,6 @@ func (nd *LitNode) SigProofHandler(msg lnutil.SigProofMsg, peer *RemotePeer) {
 	// sig OK; in terms of UI here's where you can say "payment received"
 	// "channel online" etc
 
-	logging.Infof("Publishing sigproof event")
 	sigProofEvent := ChannelStateUpdateEvent{
 		// I really don't know what the ChanIdx is
 		Action:  "sigproof",

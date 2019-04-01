@@ -420,6 +420,28 @@ func (nd *LitNode) OPEventHandler(OPEventChan chan lnutil.OutPointEvent) {
 				continue
 			}
 			// spend event (note: happens twice!)
+
+			if theQ.Height > 0 {
+			  logging.Debugf("Second time this is confirmed, send out real confirm event")
+
+			  // TODO: abstract important channel things into a channel manager type of thing
+			  confirmEvent := ChannelStateUpdateEvent{
+				  Action:  "opconfirm",
+				  ChanIdx: theQ.Idx(),
+				  State:   theQ.State,
+				  TheirPub: theQ.TheirPub,
+				  CoinType: theQ.Coin(),
+			  }
+
+			  if succeed, err := nd.Events.Publish(confirmEvent); err != nil {
+				  logging.Errorf("ConfirmHandler publish err %s", err)
+				  return
+			  } else if !succeed {
+				  logging.Errorf("ConfirmHandler publish did not succeed")
+				  return
+			  }
+			}
+
 		} else {
 			logging.Infof("OP %s Spend event\n", curOPEvent.Op.String())
 			// mark channel as closed

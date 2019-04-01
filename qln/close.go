@@ -206,6 +206,24 @@ func (nd *LitNode) CloseReqHandler(msg lnutil.CloseReqMsg) {
 		return
 	}
 
+	// Broadcast that we've closed a channel
+	closed := ChannelStateUpdateEvent{
+		// I really don't know what the ChanIdx is
+		Action:  "closed",
+		ChanIdx: q.Idx(),
+		State:   q.State,
+		TheirPub: q.TheirPub,
+		CoinType: q.Coin(),
+	}
+
+	if succeed, err := nd.Events.Publish(closed); err != nil {
+		logging.Errorf("ClosedHandler publish err %s", err)
+		return
+	} else if !succeed {
+		logging.Errorf("ClosedHandler publish did not succeed")
+		return
+	}
+
 	return
 }
 
