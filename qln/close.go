@@ -206,13 +206,16 @@ func (nd *LitNode) CloseReqHandler(msg lnutil.CloseReqMsg) {
 		return
 	}
 
+	peerIdx := q.Peer()
+	peer := nd.PeerMan.GetPeerByIdx(int32(peerIdx))
+
 	// Broadcast that we've closed a channel
 	closed := ChannelStateUpdateEvent{
 		// I really don't know what the ChanIdx is
 		Action:  "closed",
 		ChanIdx: q.Idx(),
 		State:   q.State,
-		TheirPub: q.TheirPub,
+		TheirPub: peer.GetPubkey(),
 		CoinType: q.Coin(),
 	}
 

@@ -734,12 +734,15 @@ func (nd *LitNode) SigProofHandler(msg lnutil.SigProofMsg, peer *RemotePeer) {
 	// sig OK; in terms of UI here's where you can say "payment received"
 	// "channel online" etc
 
+	peerIdx := qc.Peer()
+	existingPeer := nd.PeerMan.GetPeerByIdx(int32(peerIdx))
+
 	sigProofEvent := ChannelStateUpdateEvent{
 		// I really don't know what the ChanIdx is
 		Action:  "sigproof",
 		ChanIdx: qc.Idx(),
 		State:   qc.State,
-		TheirPub: qc.TheirPub,
+		TheirPub: existingPeer.GetPubkey(),
 		CoinType: qc.Coin(),
 	}
 

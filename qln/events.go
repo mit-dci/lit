@@ -2,6 +2,7 @@ package qln
 
 import (
 	"github.com/mit-dci/lit/eventbus"
+	"github.com/mit-dci/lit/crypto/koblitz"
 )
 
 // ChannelStateUpdateEvent is a struct for a channel state update event
@@ -18,7 +19,7 @@ type ChannelStateUpdateEvent struct {
 	State   *StatCom
 
 	// in case an external application is using this and needs the public key for some reason.
-	TheirPub [33]byte
+	TheirPub koblitz.PublicKey
 
 	// We need to know which coin this was for
 	CoinType uint32

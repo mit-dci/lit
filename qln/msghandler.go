@@ -425,11 +425,13 @@ func (nd *LitNode) OPEventHandler(OPEventChan chan lnutil.OutPointEvent) {
 			  logging.Debugf("Second time this is confirmed, send out real confirm event")
 
 			  // TODO: abstract important channel things into a channel manager type of thing
+				peerIdx := theQ.Peer()
+				peer := nd.PeerMan.GetPeerByIdx(int32(peerIdx))
 			  confirmEvent := ChannelStateUpdateEvent{
 				  Action:  "opconfirm",
 				  ChanIdx: theQ.Idx(),
 				  State:   theQ.State,
-				  TheirPub: theQ.TheirPub,
+				  TheirPub: peer.GetPubkey(),
 				  CoinType: theQ.Coin(),
 			  }
 

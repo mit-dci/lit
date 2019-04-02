@@ -876,10 +876,14 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 	// go BACK to create a txid/sig pair for watchtower.  This feels like a kindof
 	// weird way to do it.  Maybe there's a better way.
 
+	// get the peer's identity pubkey
+	peerIdx := qc.Peer()
+	peer := nd.PeerMan.GetPeerByIdx(int32(peerIdx))
+
 	sigrevEvent := ChannelStateUpdateEvent{
 		ChanIdx: qc.Idx(),
 		State:   qc.State,
-		TheirPub: qc.TheirPub,
+		TheirPub: peer.GetPubkey(),
 		CoinType: qc.Coin(),
 	}
 
