@@ -139,7 +139,7 @@ func (nd *LitNode) FundChannel(
 		return 0, fmt.Errorf("Can't send %d in %d capacity channel", initSend, ccap)
 	}
 
-	if initSend < consts.MinOutput+fee {
+	if initSend != 0 && initSend < consts.MinOutput+fee {
 		nd.InProg.mtx.Unlock()
 		return 0, fmt.Errorf("Can't send %d as initial send because MinOutput is %d", initSend, consts.MinOutput+fee)
 	}
