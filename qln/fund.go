@@ -162,7 +162,6 @@ func (nd *LitNode) FundChannel(
 	}
 
 	logging.Infof("next channel idx: %d", cIdx)
-	logging.Infof("got here")
 
 	nd.InProg.ChanIdx = cIdx
 	nd.InProg.PeerIdx = peerIdx
@@ -172,7 +171,6 @@ func (nd *LitNode) FundChannel(
 
 	nd.InProg.Coin = cointype
 	nd.InProg.mtx.Unlock() // switch to defer
-	logging.Infof("got here")
 
 	outMsg := lnutil.NewPointReqMsg(peerIdx, cointype)
 
