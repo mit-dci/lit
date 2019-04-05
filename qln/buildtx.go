@@ -89,12 +89,16 @@ func (q *Qchan) SimpleCloseTx() (*wire.MsgTx, error) {
 	theirAmt := (q.Value - q.State.MyAmt) - fee
 	theirOutput := wire.NewTxOut(theirAmt, theirScript)
 
+	if myAmt == 0 && theirAmt == 0 {
+		return nil, fmt.Errorf("SimpleCloseTx: both outputs cannot be 0")
+	}
+
 	// check output amounts (should never fail)
-	if myAmt < consts.MinOutput {
+	if myAmt != 0 && myAmt < consts.MinOutput {
 		return nil, fmt.Errorf("SimpleCloseTx: my output amt %d too low", myAmt)
 	}
-	if theirAmt < consts.MinOutput {
-		return nil, fmt.Errorf("SimpleCloseTx: their output amt %d too low", myAmt)
+	if theirAmt != 0 && theirAmt < consts.MinOutput {
+		return nil, fmt.Errorf("SimpleCloseTx: their output amt %d too low", theirAmt)
 	}
 
 	tx := wire.NewMsgTx()
