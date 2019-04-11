@@ -425,8 +425,11 @@ func (nd *LitNode) OPEventHandler(OPEventChan chan lnutil.OutPointEvent) {
 			  logging.Debugf("Second time this is confirmed, send out real confirm event")
 
 			  // TODO: abstract important channel things into a channel manager type of thing
-				peerIdx := theQ.Peer()
-				peer := nd.PeerMan.GetPeerByIdx(int32(peerIdx))
+			  peerIdx := theQ.Peer()
+			  peer := nd.PeerMan.GetPeerByIdx(int32(peerIdx))
+				if peer == nil {
+					logging.Errorf("Please use errors in peermanager rather than just returning could be nil or 0 or something else")
+				} else {
 			  confirmEvent := ChannelStateUpdateEvent{
 				  Action:  "opconfirm",
 				  ChanIdx: theQ.Idx(),
@@ -442,6 +445,7 @@ func (nd *LitNode) OPEventHandler(OPEventChan chan lnutil.OutPointEvent) {
 				  logging.Errorf("ConfirmHandler publish did not succeed")
 				  return
 			  }
+				}
 			}
 
 		} else {
