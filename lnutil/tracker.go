@@ -39,7 +39,7 @@ func Announce(priv *koblitz.PrivateKey, port int, litadr string, trackerURL stri
 		Timeout: time.Second * 4, // 4+4 to accomodate the 10s RPC timeout
 	}
 	strport := ":" + strconv.Itoa(port)
-	resp, err := client.Get("https://ipv4.myexternalip.com/raw")
+	resp, err := client.Get("https://myexternalip.com/raw")
 	if err != nil {
 		return err
 	}
@@ -55,9 +55,9 @@ func Announce(priv *koblitz.PrivateKey, port int, litadr string, trackerURL stri
 	/* TODO: Find a better way to get this information. Their
 	 * SSL cert doesn't work for IPv6.
 	 */
-	resp, err = client.Get("http://ipv6.myexternalip.com/raw")
+	resp, err = client.Get("http://6.ipquail.com/ip")
 	if err != nil {
-		logging.Infof("%v", err)
+		logging.Debugf("%v", err)
 	} else {
 		defer resp.Body.Close()
 		buf = new(bytes.Buffer)
