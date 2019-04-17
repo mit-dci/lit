@@ -39,7 +39,7 @@ func Dial(localPriv *koblitz.PrivateKey, ipAddr string, remotePKH string,
 	var conn net.Conn
 	var err error
 	conn, err = dialer("tcp", ipAddr)
-	logging.Info("ipAddr is", ipAddr)
+	logging.Info("ipAddr is ", ipAddr)
 	if err != nil {
 		return nil, err
 	}
