@@ -7,6 +7,7 @@ import (
 	"math"
 	"net"
 	"time"
+	"encoding/binary"
 
 	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/lnutil"
@@ -151,26 +152,61 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 
 	// If we need to split the message into fragments, then we'll write
 	// chunks which maximize usage of the available payload.
-	chunkSize := math.MaxUint16
+	chunkSize := math.MaxUint16 - 1000
 
-	bytesToWrite := len(b)
+	lenb := int(len(b))
+	curts := (time.Now().UnixNano())
+
+	beginChunksMsgBodyBytes := new(bytes.Buffer)
+	beginChunksMsgBodyBytes.WriteByte(lnutil.MSGID_CHUNKS_BEGIN)
+	binary.Write(beginChunksMsgBodyBytes, binary.BigEndian, curts)
+
+	// Start saving chunks
+	chunk_err := c.noise.WriteMessage(c.conn, beginChunksMsgBodyBytes.Bytes())
+	if chunk_err != nil {
+		return 0, chunk_err
+	}
+
 	bytesWritten := 0
+	bytesToWrite := lenb
+
 	for bytesWritten < bytesToWrite {
 		// If we're on the last chunk, then truncate the chunk size as
 		// necessary to avoid an out-of-bounds array memory access.
 		if bytesWritten+chunkSize > len(b) {
-			chunkSize = len(b) - bytesWritten
+			chunkSize = lenb - bytesWritten
 		}
 
 		// Slice off the next chunk to be written based on our running
 		// counter and next chunk size.
 		chunk := b[bytesWritten : bytesWritten+chunkSize]
-		if err := c.noise.WriteMessage(c.conn, chunk); err != nil {
-			return bytesWritten, err
+
+		// Wrap chunk in a MSGID_CHUNK_BODY message
+		chunkMsgBodyBytes := new(bytes.Buffer)
+		chunkMsgBodyBytes.WriteByte(lnutil.MSGID_CHUNK_BODY)
+		binary.Write(chunkMsgBodyBytes, binary.BigEndian, curts)
+		binary.Write(chunkMsgBodyBytes, binary.BigEndian, int32(chunkSize))
+		chunkMsgBodyBytes.Write(chunk)
+
+
+		chunk_err = c.noise.WriteMessage(c.conn, chunkMsgBodyBytes.Bytes())
+		if chunk_err != nil {
+			return 0, chunk_err
 		}
 
 		bytesWritten += len(chunk)
 	}
+
+	// Actually send a message (unwrap and send)
+	endChunksMsgBodyBytes := new(bytes.Buffer)
+	endChunksMsgBodyBytes.WriteByte(lnutil.MSGID_CHUNKS_END)
+	binary.Write(endChunksMsgBodyBytes, binary.BigEndian, curts)
+
+	chunk_err = c.noise.WriteMessage(c.conn, endChunksMsgBodyBytes.Bytes())
+	if chunk_err != nil {
+		return 0, chunk_err
+	}
+
 
 	return bytesWritten, nil
 }
