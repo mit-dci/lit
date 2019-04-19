@@ -28,7 +28,7 @@ type LndcRpcClient struct {
 	requestNonce       uint64
 	requestNonceMtx    sync.Mutex
 	responseChannelMtx sync.Mutex
-	responseChannels   map[uint64]chan lnutil.RemoteControlRpcResponseMsg
+	responseChannels   map[uint64]chan *lnutil.RemoteControlRpcResponseMsg
 	key                *koblitz.PrivateKey
 	conMtx             sync.Mutex
 }
@@ -118,7 +118,7 @@ func NewLndcRpcClient(address string, key *koblitz.PrivateKey) (*LndcRpcClient, 
 	cli := new(LndcRpcClient)
 	// Create a map of chan objects to receive returned responses on. These channels
 	// are sent to from the ReceiveLoop, and awaited in the Call method.
-	cli.responseChannels = make(map[uint64]chan lnutil.RemoteControlRpcResponseMsg)
+	cli.responseChannels = make(map[uint64]chan *lnutil.RemoteControlRpcResponseMsg)
 
 	//Parse the address we're connecting to
 	who, where := lnutil.ParseAdrString(address)
@@ -158,7 +158,7 @@ func (cli *LndcRpcClient) Call(serviceMethod string, args interface{}, reply int
 
 	// Create the channel to receive the reply on
 	cli.responseChannelMtx.Lock()
-	cli.responseChannels[nonce] = make(chan lnutil.RemoteControlRpcResponseMsg)
+	cli.responseChannels[nonce] = make(chan *lnutil.RemoteControlRpcResponseMsg)
 	cli.responseChannelMtx.Unlock()
 
 	// Send the message in a goroutine
@@ -239,7 +239,7 @@ func (cli *LndcRpcClient) ReceiveLoop() {
 				// reply and therefore, it could have not blocked and just
 				// ignore the return value.
 				select {
-				case responseChan <- response:
+				case responseChan <- &response:
 				default:
 				}
 
