@@ -881,8 +881,8 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 	peer := nd.PeerMan.GetPeerByIdx(int32(peerIdx))
 
 	sigrevEvent := ChannelStateUpdateEvent{
-		ChanIdx: qc.Idx(),
-		State:   qc.State,
+		ChanIdx:  qc.Idx(),
+		State:    qc.State,
 		TheirPub: peer.GetPubkey(),
 		CoinType: qc.Coin(),
 	}

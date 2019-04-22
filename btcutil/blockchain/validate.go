@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/mit-dci/lit/btcutil"
-	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/btcutil/txscript"
+	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/wire"
 )
 

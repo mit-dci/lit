@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/mit-dci/lit/wallit"
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/hdkeychain"
@@ -17,6 +16,7 @@ import (
 	"github.com/mit-dci/lit/lnp2p"
 	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/portxo"
+	"github.com/mit-dci/lit/wallit"
 	"github.com/mit-dci/lit/watchtower"
 )
 

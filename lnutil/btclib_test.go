@@ -42,32 +42,32 @@ func TestOutPointsEqual(t *testing.T) {
 		// hash of inA is not the same as hash of inB
 		// index of inA is not the same as index of inB
 		{
-			wire.OutPoint{Hash: hash1, Index:u2}, // inA
-			wire.OutPoint{Hash: hash2, Index:u1}, // inB
+			wire.OutPoint{Hash: hash1, Index: u2}, // inA
+			wire.OutPoint{Hash: hash2, Index: u1}, // inB
 			false,
 		},
 
 		// hash of inA is not the same as hash of inB
 		// index of inA is the same as index of inB
 		{
-			wire.OutPoint{Hash: hash1, Index:u1}, // inA
-			wire.OutPoint{Hash: hash2, Index:u1}, // inB
+			wire.OutPoint{Hash: hash1, Index: u1}, // inA
+			wire.OutPoint{Hash: hash2, Index: u1}, // inB
 			false,
 		},
 
 		// hash of inA is the same as hash of inB
 		// index of inA is not the same as index of inB
 		{
-			wire.OutPoint{Hash: hash1, Index:u1}, // inA
-			wire.OutPoint{Hash: hash1, Index:u2}, // inB
+			wire.OutPoint{Hash: hash1, Index: u1}, // inA
+			wire.OutPoint{Hash: hash1, Index: u2}, // inB
 			false,
 		},
 
 		// hash of inA is the same as hash of inB
 		// index of inA is the same as index of inB
 		{
-			wire.OutPoint{Hash: hash1, Index:u1}, // inA
-			wire.OutPoint{Hash: hash1, Index:u1}, // inB
+			wire.OutPoint{Hash: hash1, Index: u1}, // inA
+			wire.OutPoint{Hash: hash1, Index: u1}, // inB
 			true,
 		},
 
@@ -81,13 +81,13 @@ func TestOutPointsEqual(t *testing.T) {
 		// hash of inA is just initialized
 		{
 			wire.OutPoint{Hash: [32]byte{}, Index: u1}, // inA
-			wire.OutPoint{Hash: hash1, Index:u1},      // inB
+			wire.OutPoint{Hash: hash1, Index: u1},      // inB
 			false,
 		},
 
 		// hash of inB is just initialized
 		{
-			wire.OutPoint{Hash: hash1, Index:u1},      // inA
+			wire.OutPoint{Hash: hash1, Index: u1},      // inA
 			wire.OutPoint{Hash: [32]byte{}, Index: u1}, // inB
 			false,
 		},

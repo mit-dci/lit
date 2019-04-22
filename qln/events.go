@@ -1,8 +1,8 @@
 package qln
 
 import (
-	"github.com/mit-dci/lit/eventbus"
 	"github.com/mit-dci/lit/crypto/koblitz"
+	"github.com/mit-dci/lit/eventbus"
 )
 
 // ChannelStateUpdateEvent is a struct for a channel state update event

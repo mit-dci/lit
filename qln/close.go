@@ -211,9 +211,9 @@ func (nd *LitNode) CloseReqHandler(msg lnutil.CloseReqMsg) {
 
 	// Broadcast that we've closed a channel
 	closed := ChannelStateUpdateEvent{
-		Action:  "closed",
-		ChanIdx: q.Idx(),
-		State:   q.State,
+		Action:   "closed",
+		ChanIdx:  q.Idx(),
+		State:    q.State,
 		TheirPub: peer.GetPubkey(),
 		CoinType: q.Coin(),
 	}

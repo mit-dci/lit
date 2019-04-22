@@ -7,8 +7,8 @@ package txscript
 import (
 	"sync"
 
-	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
+	"github.com/mit-dci/lit/crypto/koblitz"
 )
 
 // sigCacheEntry represents an entry in the SigCache. Entries within the

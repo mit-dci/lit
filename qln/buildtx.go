@@ -92,7 +92,7 @@ func (q *Qchan) SimpleCloseTx() (*wire.MsgTx, error) {
 	theirScript := lnutil.DirectWPKHScript(q.TheirRefundPub)
 	var theirAmt int64
 	var theirOutput *wire.TxOut
-	if q.Value - q.State.MyAmt != 0 {
+	if q.Value-q.State.MyAmt != 0 {
 		theirAmt = (q.Value - q.State.MyAmt) - fee
 		theirOutput = wire.NewTxOut(theirAmt, theirScript)
 	}
