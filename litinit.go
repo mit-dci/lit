@@ -113,7 +113,6 @@ func litSetup(conf *litConfig) *[32]byte {
 
 	keyFilePath := filepath.Join(conf.LitHomeDir, defaultKeyFileName)
 
-	logging.Infof("Getting key from path: %s", keyFilePath)
 	// read key file (generate if not found)
 	key, err := lnutil.ReadKeyFile(keyFilePath)
 	if err != nil {

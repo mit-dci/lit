@@ -150,7 +150,6 @@ type FundReply struct {
 
 func (r *LitRPC) FundChannel(args FundArgs, reply *FundReply) error {
 	var err error
-	logging.Infof("got fundchannel rpc, handling")
 	if r.Node.InProg != nil && r.Node.InProg.PeerIdx != 0 {
 		return fmt.Errorf("channel with peer %d not done yet", r.Node.InProg.PeerIdx)
 	}
@@ -165,8 +164,6 @@ func (r *LitRPC) FundChannel(args FundArgs, reply *FundReply) error {
 		return fmt.Errorf("Can't send %d in %d capacity channel",
 			args.InitialSend, args.Capacity)
 	}
-
-	logging.Infof("Got past initial checks")
 
 	wal := r.Node.SubWallet[args.CoinType]
 	if wal == nil {
@@ -185,7 +182,6 @@ func (r *LitRPC) FundChannel(args FundArgs, reply *FundReply) error {
 	}
 
 	spendable := allPorTxos.SumWitness(nowHeight)
-	logging.Infof("Spendable txos: %d", spendable)
 
 	if args.Capacity > spendable-wal.Fee()*consts.JusticeTxBump {
 		return fmt.Errorf("Wanted %d but %d available for channel creation",

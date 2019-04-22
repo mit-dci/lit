@@ -211,7 +211,6 @@ func (nd *LitNode) CloseReqHandler(msg lnutil.CloseReqMsg) {
 
 	// Broadcast that we've closed a channel
 	closed := ChannelStateUpdateEvent{
-		// I really don't know what the ChanIdx is
 		Action:  "closed",
 		ChanIdx: q.Idx(),
 		State:   q.State,

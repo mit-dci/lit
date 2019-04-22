@@ -736,7 +736,6 @@ func (nd *LitNode) SigProofHandler(msg lnutil.SigProofMsg, peer *RemotePeer) {
 	existingPeer := nd.PeerMan.GetPeerByIdx(int32(peerIdx))
 
 	sigProofEvent := ChannelStateUpdateEvent{
-		// I really don't know what the ChanIdx is
 		Action:  "sigproof",
 		ChanIdx: qc.Idx(),
 		State:   qc.State,
