@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/mit-dci/lit/btcutil"
-	"github.com/mit-dci/lit/btcutil/chaincfg"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/btcutil/txscript"
+	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/wire"
 )
 
@@ -174,7 +174,7 @@ func isBIP0030Node(node *blockNode) bool {
 //
 // At the target block generation rate for the main network, this is
 // approximately every 4 years.
-func CalcBlockSubsidy(height int32, chainParams *chaincfg.Params) int64 {
+func CalcBlockSubsidy(height int32, chainParams *coinparam.Params) int64 {
 	if chainParams.SubsidyReductionInterval == 0 {
 		return baseSubsidy
 	}
@@ -846,7 +846,7 @@ func (b *BlockChain) checkBIP0030(node *blockNode, block *btcutil.Block, view *U
 //
 // NOTE: The transaction MUST have already been sanity checked with the
 // CheckTransactionSanity function prior to calling this function.
-func CheckTransactionInputs(tx *btcutil.Tx, txHeight int32, utxoView *UtxoViewpoint, chainParams *chaincfg.Params) (int64, error) {
+func CheckTransactionInputs(tx *btcutil.Tx, txHeight int32, utxoView *UtxoViewpoint, chainParams *coinparam.Params) (int64, error) {
 	// Coinbase transactions have no inputs.
 	if IsCoinBase(tx) {
 		return 0, nil

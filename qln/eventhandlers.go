@@ -60,3 +60,21 @@ func makeTmpDisconnectPeerHandler(nd *LitNode) func(eventbus.Event) eventbus.Eve
 		return eventbus.EHANDLE_OK
 	}
 }
+
+func makeTmpSigProofHandler(nd *LitNode) func(eventbus.Event) eventbus.EventHandleResult {
+	return func(e eventbus.Event) eventbus.EventHandleResult {
+		ee, ok := e.(ChannelStateUpdateEvent)
+		if !ok {
+			logging.Errorf("Wrong type of event, why are you publishing this")
+			// I think this is the right way to cancel the event?
+			return eventbus.EHANDLE_CANCEL
+		}
+
+		logging.Infof("Sig proof!")
+
+		logging.Infof("Channel succeeded: %t, MyAmt: %d", !ee.State.Failed, ee.State.MyAmt)
+
+		logging.Infof("got a fund event: %d", ee.ChanIdx)
+		return eventbus.EHANDLE_OK
+	}
+}

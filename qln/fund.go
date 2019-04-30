@@ -139,7 +139,7 @@ func (nd *LitNode) FundChannel(
 		return 0, fmt.Errorf("Can't send %d in %d capacity channel", initSend, ccap)
 	}
 
-	if initSend < consts.MinOutput+fee {
+	if initSend != 0 && initSend < consts.MinOutput+fee {
 		nd.InProg.mtx.Unlock()
 		return 0, fmt.Errorf("Can't send %d as initial send because MinOutput is %d", initSend, consts.MinOutput+fee)
 	}
@@ -178,6 +178,7 @@ func (nd *LitNode) FundChannel(
 
 	// wait until it's done!
 	idx := <-nd.InProg.done
+
 	return idx, nil
 }
 
@@ -730,5 +731,25 @@ func (nd *LitNode) SigProofHandler(msg lnutil.SigProofMsg, peer *RemotePeer) {
 
 	// sig OK; in terms of UI here's where you can say "payment received"
 	// "channel online" etc
+
+	peerIdx := qc.Peer()
+	existingPeer := nd.PeerMan.GetPeerByIdx(int32(peerIdx))
+
+	sigProofEvent := ChannelStateUpdateEvent{
+		Action:   "sigproof",
+		ChanIdx:  qc.Idx(),
+		State:    qc.State,
+		TheirPub: existingPeer.GetPubkey(),
+		CoinType: qc.Coin(),
+	}
+
+	if succeed, err := nd.Events.Publish(sigProofEvent); err != nil {
+		logging.Errorf("SigProofHandler publish err %s", err)
+		return
+	} else if !succeed {
+		logging.Errorf("SigProofHandler publish did not succeed")
+		return
+	}
+
 	return
 }

@@ -8,8 +8,8 @@ import (
 	"bytes"
 	"errors"
 	"github.com/mit-dci/lit/btcutil/base58"
-	"github.com/mit-dci/lit/btcutil/chaincfg"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
+	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/crypto/koblitz"
 )
 
@@ -48,7 +48,7 @@ type WIF struct {
 // as a string encoded in the Wallet Import Format.  The compress argument
 // specifies whether the address intended to be imported or exported was created
 // by serializing the public key compressed rather than uncompressed.
-func NewWIF(privKey *koblitz.PrivateKey, net *chaincfg.Params, compress bool) (*WIF, error) {
+func NewWIF(privKey *koblitz.PrivateKey, net *coinparam.Params, compress bool) (*WIF, error) {
 	if net == nil {
 		return nil, errors.New("no network")
 	}
@@ -57,7 +57,7 @@ func NewWIF(privKey *koblitz.PrivateKey, net *chaincfg.Params, compress bool) (*
 
 // IsForNet returns whether or not the decoded WIF structure is associated
 // with the passed bitcoin network.
-func (w *WIF) IsForNet(net *chaincfg.Params) bool {
+func (w *WIF) IsForNet(net *coinparam.Params) bool {
 	return w.NetID == net.PrivateKeyID
 }
 

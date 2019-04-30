@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"strconv"
+	"strings"
 
 	"github.com/chzyer/readline"
 	"github.com/fatih/color"
@@ -48,17 +48,17 @@ type litAfClient struct {
 }
 
 type litAfConfig struct {
-	Con      string `long:"con" description:"host to connect to in the form of [<lnadr>@][<host>][:<port>]"`
-	LitHomeDir      string `long:"litHomeDir" description:"directory to save settings"`
-	Port 	 string `long:"autoListenPort" description:"port that the lit is listening to."`
-	Tracker  string `long:"tracker" description:"service to use for looking up node addresses"`
-	LogLevel []bool `short:"v" description:"Set verbosity level to verbose (-v), very verbose (-vv) or very very verbose (-vvv)"`
+	Con        string `long:"con" description:"host to connect to in the form of [<lnadr>@][<host>][:<port>]"`
+	LitHomeDir string `long:"litHomeDir" description:"directory to save settings"`
+	Port       string `long:"autoListenPort" description:"port that the lit is listening to."`
+	Tracker    string `long:"tracker" description:"service to use for looking up node addresses"`
+	LogLevel   []bool `short:"v" description:"Set verbosity level to verbose (-v), very verbose (-vv) or very very verbose (-vvv)"`
 }
 
 var (
-	defaultCon     = "2448"
-	defaultLitHomeDirName     = filepath.Join(os.Getenv("HOME"), litHomeDirName)
-	defaultTracker = "http://hubris.media.mit.edu:46580"
+	defaultCon            = "2448"
+	defaultLitHomeDirName = filepath.Join(os.Getenv("HOME"), litHomeDirName)
+	defaultTracker        = "http://hubris.media.mit.edu:46580"
 )
 
 // newConfigParser returns a new command line flags parser.
@@ -147,9 +147,9 @@ func main() {
 	var err error
 	lc := new(litAfClient)
 	conf := litAfConfig{
-		Con:     defaultCon,
-		LitHomeDir:     defaultLitHomeDirName,
-		Tracker: defaultTracker,
+		Con:        defaultCon,
+		LitHomeDir: defaultLitHomeDirName,
+		Tracker:    defaultTracker,
 	}
 	lc.litAfSetup(conf) // setup lit-af to start
 

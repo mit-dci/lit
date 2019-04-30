@@ -60,7 +60,7 @@ implement this:
 
 ChainHook interface
 
-	Start(height int32, host, path string, params *chaincfg.Params) (
+	Start(height int32, host, path string, params *coinparam.Params) (
 		chan lnutil.TxAndHeight, chan int32, error)
 
 	RegisterAddress(address [20]byte) error
@@ -88,6 +88,9 @@ type APILink struct {
 	TxUpToWallit chan lnutil.TxAndHeight
 
 	CurrentHeightChan chan int32
+
+	// Might as well add this in here too
+	HeightDistribute []chan int32
 
 	// we've "synced" up to this height; older txs won't get pushed up to wallit
 	height int32
@@ -485,17 +488,44 @@ func (a *APILink) VGetRawTx(txid string) (*wire.MsgTx, error) {
 	return tx, nil
 }
 
+// UpdateHeight updates APILink height variables and channels after the
+// height supposedly changed.
 func (a *APILink) UpdateHeight(height int32) {
 	// if it's an increment (note reorgs are still... not a thing yet)
 	if height > a.height {
 		// update internal height
 		a.height = height
+
+		// CurrentHeightChan is "How we tell the wallet that a block has come in"
+		// so I guess this applies here as well.
+		for i := range a.HeightDistribute {
+			a.HeightDistribute[i] <- height
+		}
+
 		// send that back up to the wallit
 		a.CurrentHeightChan <- height
 	}
 }
 
+// RawBlocks returns a dummy channel for now
 func (a *APILink) RawBlocks() chan *wire.MsgBlock {
 	// dummy channel for now
 	return make(chan *wire.MsgBlock, 1)
+}
+
+// NewRawBlocksChannel returns a dummy channel that does nothing. In the
+// future make this more like NewHeightChannel if that feature is going to
+// be in APILink. Included to satisfy ChainHook interface.
+func (a *APILink) NewRawBlocksChannel() chan *wire.MsgBlock {
+	// dummy channel for now
+	return make(chan *wire.MsgBlock, 1)
+}
+
+// NewHeightChannel creates a new channel that should be pushed to whenever the
+// height changes. If multiple things have separate or obscured handlers which
+// require the height, use this.
+func (a *APILink) NewHeightChannel() chan int32 {
+	heightDistChan := make(chan int32, 1)
+	a.HeightDistribute = append(a.HeightDistribute, heightDistChan)
+	return heightDistChan
 }

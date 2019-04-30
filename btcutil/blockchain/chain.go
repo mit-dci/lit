@@ -13,10 +13,10 @@ import (
 	"time"
 
 	"github.com/mit-dci/lit/btcutil"
-	"github.com/mit-dci/lit/btcutil/chaincfg"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/btcutil/database"
 	"github.com/mit-dci/lit/btcutil/txscript"
+	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/wire"
 )
 
@@ -162,9 +162,9 @@ type BlockChain struct {
 	// The following fields are set when the instance is created and can't
 	// be changed afterwards, so there is no need to protect them with a
 	// separate mutex.
-	checkpointsByHeight map[int32]*chaincfg.Checkpoint
+	checkpointsByHeight map[int32]*coinparam.Checkpoint
 	db                  database.DB
-	chainParams         *chaincfg.Params
+	chainParams         *coinparam.Params
 	timeSource          MedianTimeSource
 	notifications       NotificationCallback
 	sigCache            *txscript.SigCache
@@ -212,7 +212,7 @@ type BlockChain struct {
 
 	// These fields are related to checkpoint handling.  They are protected
 	// by the chain lock.
-	nextCheckpoint  *chaincfg.Checkpoint
+	nextCheckpoint  *coinparam.Checkpoint
 	checkpointBlock *btcutil.Block
 
 	// The state is used as a fairly efficient way to cache information
@@ -1396,7 +1396,7 @@ type Config struct {
 	// with.
 	//
 	// This field is required.
-	ChainParams *chaincfg.Params
+	ChainParams *coinparam.Params
 
 	// TimeSource defines the median time source to use for things such as
 	// block processing and determining whether or not the chain is current.
@@ -1454,9 +1454,9 @@ func New(config *Config) (*BlockChain, error) {
 
 	// Generate a checkpoint by height map from the provided checkpoints.
 	params := config.ChainParams
-	var checkpointsByHeight map[int32]*chaincfg.Checkpoint
+	var checkpointsByHeight map[int32]*coinparam.Checkpoint
 	if len(params.Checkpoints) > 0 {
-		checkpointsByHeight = make(map[int32]*chaincfg.Checkpoint)
+		checkpointsByHeight = make(map[int32]*coinparam.Checkpoint)
 		for i := range params.Checkpoints {
 			checkpoint := &params.Checkpoints[i]
 			checkpointsByHeight[checkpoint.Height] = checkpoint

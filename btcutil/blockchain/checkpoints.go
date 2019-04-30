@@ -8,10 +8,10 @@ import (
 	"fmt"
 
 	"github.com/mit-dci/lit/btcutil"
-	"github.com/mit-dci/lit/btcutil/chaincfg"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/btcutil/database"
 	"github.com/mit-dci/lit/btcutil/txscript"
+	"github.com/mit-dci/lit/coinparam"
 )
 
 // CheckpointConfirmations is the number of blocks before the end of the current
@@ -43,7 +43,7 @@ func (b *BlockChain) DisableCheckpoints(disable bool) {
 // for the active network, it will return nil.
 //
 // This function is safe for concurrent access.
-func (b *BlockChain) Checkpoints() []chaincfg.Checkpoint {
+func (b *BlockChain) Checkpoints() []coinparam.Checkpoint {
 	b.chainLock.RLock()
 	defer b.chainLock.RUnlock()
 
@@ -59,7 +59,7 @@ func (b *BlockChain) Checkpoints() []chaincfg.Checkpoint {
 // for the active network, it will return nil.
 //
 // This function MUST be called with the chain state lock held (for reads).
-func (b *BlockChain) latestCheckpoint() *chaincfg.Checkpoint {
+func (b *BlockChain) latestCheckpoint() *coinparam.Checkpoint {
 	if b.noCheckpoints || len(b.chainParams.Checkpoints) == 0 {
 		return nil
 	}
@@ -73,7 +73,7 @@ func (b *BlockChain) latestCheckpoint() *chaincfg.Checkpoint {
 // for the active network, it will return nil.
 //
 // This function is safe for concurrent access.
-func (b *BlockChain) LatestCheckpoint() *chaincfg.Checkpoint {
+func (b *BlockChain) LatestCheckpoint() *coinparam.Checkpoint {
 	b.chainLock.RLock()
 	checkpoint := b.latestCheckpoint()
 	b.chainLock.RUnlock()

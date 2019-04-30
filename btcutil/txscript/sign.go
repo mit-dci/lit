@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/mit-dci/lit/btcutil"
-	"github.com/mit-dci/lit/btcutil/chaincfg"
+	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/wire"
 )
@@ -198,7 +198,7 @@ func signMultiSig(tx *wire.MsgTx, idx int, subScript []byte, hashType SigHashTyp
 	return script, signed == nRequired
 }
 
-func sign(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
+func sign(chainParams *coinparam.Params, tx *wire.MsgTx, idx int,
 	subScript []byte, hashType SigHashType, kdb KeyDB, sdb ScriptDB) ([]byte,
 	ScriptClass, []btcutil.Address, int, error) {
 
@@ -263,7 +263,7 @@ func sign(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
 // The return value is the best effort merging of the two scripts. Calling this
 // function with addresses, class and nrequired that do not match pkScript is
 // an error and results in undefined behaviour.
-func mergeScripts(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
+func mergeScripts(chainParams *coinparam.Params, tx *wire.MsgTx, idx int,
 	pkScript []byte, class ScriptClass, addresses []btcutil.Address,
 	nRequired int, sigScript, prevScript []byte) []byte {
 
@@ -478,7 +478,7 @@ func (sc ScriptClosure) GetScript(address btcutil.Address) ([]byte, error) {
 // getScript. If previousScript is provided then the results in previousScript
 // will be merged in a type-dependent manner with the newly generated.
 // signature script.
-func SignTxOutput(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
+func SignTxOutput(chainParams *coinparam.Params, tx *wire.MsgTx, idx int,
 	pkScript []byte, hashType SigHashType, kdb KeyDB, sdb ScriptDB,
 	previousScript []byte) ([]byte, error) {
 

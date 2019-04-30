@@ -312,6 +312,9 @@ func CheckHeaderChain(
 
 		// reorg is go, snip to attach height
 		reorgDepth := height - attachHeight
+		if reorgDepth > numheaders {
+			return -1, fmt.Errorf("Reorg depth greater than number of headers")
+		}
 		oldHeaders = oldHeaders[:numheaders-reorgDepth]
 	}
 
@@ -337,7 +340,7 @@ func CheckHeaderChain(
 
 			// vertcoin diff adjustment not yet implemented
 			// TODO - get rid of coin specific workaround
-			if hdr.Bits != rightBits && (p.Name != "vtctest" && p.Name != "vtc") {
+			if hdr.Bits != rightBits && (p.Name != "vtctest" && p.Name != "vtc") && !p.TestCoin {
 				return 0, fmt.Errorf("Block %d %s incorrect difficulty.  Read %x, expect %x",
 					int(height)+i, hdr.BlockHash().String(), hdr.Bits, rightBits)
 			}

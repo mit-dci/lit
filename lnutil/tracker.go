@@ -57,7 +57,7 @@ func Announce(priv *koblitz.PrivateKey, port int, litadr string, trackerURL stri
 	 */
 	resp, err = client.Get("http://ipv6.myexternalip.com/raw")
 	if err != nil {
-		logging.Infof("%v", err)
+		logging.Errorf("%v", err)
 	} else {
 		defer resp.Body.Close()
 		buf = new(bytes.Buffer)

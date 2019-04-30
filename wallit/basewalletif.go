@@ -2,6 +2,8 @@ package wallit
 
 import (
 	"fmt"
+	"sort"
+
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/coinparam"
 	"github.com/mit-dci/lit/crypto/koblitz"
@@ -10,7 +12,6 @@ import (
 	"github.com/mit-dci/lit/portxo"
 	"github.com/mit-dci/lit/uspv"
 	"github.com/mit-dci/lit/wire"
-	"sort"
 )
 
 /*
@@ -29,7 +30,7 @@ type UWallet interface {
 	LetMeKnowHeight() chan lnutil.HeightEvent
 	BlockMonitor() chan *wire.MsgBlock
 
-	Params() *chaincfg.Params
+	Params() *coinparam.Params
 }
 */
 

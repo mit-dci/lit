@@ -7,8 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mit-dci/lit/logging"
-
 	"github.com/boltdb/bolt"
 	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/dlc"
@@ -17,6 +15,7 @@ import (
 	"github.com/mit-dci/lit/lndc"
 	"github.com/mit-dci/lit/lnp2p"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/watchtower"
 	"github.com/mit-dci/lit/wire"
 )
@@ -122,7 +121,7 @@ type LitNode struct {
 	InProgDual *InFlightDualFund
 
 	// Nodes don't have Params; their SubWallets do
-	// Param *chaincfg.Params // network parameters (testnet3, segnet, etc)
+	// Param *coinparam.Params // network parameters (testnet3, segnet, etc)
 
 	// queue for async messages to RPC user
 	UserMessageBox chan string

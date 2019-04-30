@@ -82,26 +82,42 @@ func (q *Qchan) SimpleCloseTx() (*wire.MsgTx, error) {
 
 	// make my output
 	myScript := lnutil.DirectWPKHScript(q.MyRefundPub)
-	myAmt := q.State.MyAmt - fee
-	myOutput := wire.NewTxOut(myAmt, myScript)
+	var myAmt int64
+	var myOutput *wire.TxOut
+	if q.State.MyAmt != 0 {
+		myAmt = q.State.MyAmt - fee
+		myOutput = wire.NewTxOut(myAmt, myScript)
+	}
 	// make their output
 	theirScript := lnutil.DirectWPKHScript(q.TheirRefundPub)
-	theirAmt := (q.Value - q.State.MyAmt) - fee
-	theirOutput := wire.NewTxOut(theirAmt, theirScript)
+	var theirAmt int64
+	var theirOutput *wire.TxOut
+	if q.Value-q.State.MyAmt != 0 {
+		theirAmt = (q.Value - q.State.MyAmt) - fee
+		theirOutput = wire.NewTxOut(theirAmt, theirScript)
+	}
+
+	if myAmt == 0 && theirAmt == 0 {
+		return nil, fmt.Errorf("SimpleCloseTx: both outputs cannot be 0")
+	}
 
 	// check output amounts (should never fail)
-	if myAmt < consts.MinOutput {
+	if myAmt != 0 && myAmt < consts.MinOutput {
 		return nil, fmt.Errorf("SimpleCloseTx: my output amt %d too low", myAmt)
 	}
-	if theirAmt < consts.MinOutput {
-		return nil, fmt.Errorf("SimpleCloseTx: their output amt %d too low", myAmt)
+	if theirAmt != 0 && theirAmt < consts.MinOutput {
+		return nil, fmt.Errorf("SimpleCloseTx: their output amt %d too low", theirAmt)
 	}
 
 	tx := wire.NewMsgTx()
 
 	// make tx with these outputs
-	tx.AddTxOut(myOutput)
-	tx.AddTxOut(theirOutput)
+	if myAmt != 0 {
+		tx.AddTxOut(myOutput)
+	}
+	if theirAmt != 0 {
+		tx.AddTxOut(theirOutput)
+	}
 	// add channel outpoint as txin
 	tx.AddTxIn(wire.NewTxIn(&q.Op, nil, nil))
 	// sort and return

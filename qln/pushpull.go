@@ -876,6 +876,35 @@ func (nd *LitNode) SigRevHandler(msg lnutil.SigRevMsg, qc *Qchan) error {
 	// go BACK to create a txid/sig pair for watchtower.  This feels like a kindof
 	// weird way to do it.  Maybe there's a better way.
 
+	// get the peer's identity pubkey
+	peerIdx := qc.Peer()
+	peer := nd.PeerMan.GetPeerByIdx(int32(peerIdx))
+
+	sigrevEvent := ChannelStateUpdateEvent{
+		ChanIdx:  qc.Idx(),
+		State:    qc.State,
+		TheirPub: peer.GetPubkey(),
+		CoinType: qc.Coin(),
+	}
+
+	// send different action depending on whether or not a push or pull was received
+	if qc.State.Delta < 0 {
+		sigrevEvent.Action = "push"
+	} else if qc.State.Delta > 0 {
+		sigrevEvent.Action = "pull"
+	} else {
+		// sigrev is just so we don't have a "" action
+		sigrevEvent.Action = "sigrev"
+	}
+
+	if succeed, err := nd.Events.Publish(sigrevEvent); err != nil {
+		logging.Errorf("SigrevHandler publish err %s", err)
+		return nil
+	} else if !succeed {
+		logging.Errorf("SigrevHandler publish did not succeed")
+		return nil
+	}
+
 	qc.State.StateIdx--
 	qc.State.MyAmt = prevAmt
 
@@ -1016,6 +1045,7 @@ func (nd *LitNode) RevHandler(msg lnutil.RevMsg, qc *Qchan) error {
 
 	// after saving cleared updated state, go back to previous state and build
 	// the justice signature
+
 	qc.State.StateIdx--      // back one state
 	qc.State.MyAmt = prevAmt // use stashed previous state amount
 	err = nd.BuildJusticeSig(qc)

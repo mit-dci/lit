@@ -5,7 +5,7 @@ const (
 	ChannelTimeout         = 60               // channel operation timeout in seconds before failing the channel
 	ChannelAdvTimeout      = 60               // max allowed seconds between channel advertisements before deletion
 	MaxChanCapacity        = int64(100000000) // Maximum Channel Capacity (at 1 coin now)
-	MinChanCapacity        = int64(1000000)   // minimum Channle Capacity
+	MinChanCapacity        = int64(1000000)   // Minimum Channel Capacity
 	SafeFee                = int64(50000)     // safeFee while initializing a chan
 	MaxKeys                = uint32(1 << 20)  // max number of keys lit can store (could be infinite, still)
 	MaxTxCount             = int64(10000)     // max tx's associated with an address

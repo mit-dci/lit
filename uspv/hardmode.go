@@ -2,12 +2,13 @@ package uspv
 
 import (
 	"bytes"
+	"os"
+
 	"github.com/mit-dci/lit/btcutil/bloom"
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/wire"
-	"os"
 )
 
 var (
@@ -167,6 +168,12 @@ func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
 		s.RawBlockSender <- m
 	}
 
+	// This takes care of the whole rawblockactive thing if we just
+	// replace the current channel with this new one
+	for i := range s.RawBlockDistribute {
+		s.RawBlockDistribute[i] <- m
+	}
+
 	ok := BlockOK(*m) // check block self-consistency
 	if !ok {
 		logging.Errorf("block %s not OK!!11\n", m.BlockHash().String())
@@ -184,7 +191,7 @@ func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
 
 	newBlockHash := m.Header.BlockHash()
 	if !hah.blockhash.IsEqual(&newBlockHash) {
-		logging.Errorf("full block out of order error")
+		logging.Errorf("Full block out of order error\n")
 		return
 	}
 
@@ -194,6 +201,11 @@ func (s *SPVCon) IngestBlock(m *wire.MsgBlock) {
 			logging.Infof("found matching tx %s\n", tx.TxHash().String())
 			s.TxUpToWallit <- lnutil.TxAndHeight{Tx: tx, Height: hah.height}
 		}
+	}
+
+	// tell the channels listening for heights that the height has been reached
+	for i := range s.HeightDistribute {
+		s.HeightDistribute[i] <- hah.height
 	}
 
 	// tell upper level height has been reached

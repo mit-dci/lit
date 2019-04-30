@@ -6,7 +6,7 @@ package txscript
 
 import (
 	"github.com/mit-dci/lit/btcutil"
-	"github.com/mit-dci/lit/btcutil/chaincfg"
+	"github.com/mit-dci/lit/coinparam"
 )
 
 const (
@@ -433,7 +433,7 @@ func PushedData(script []byte) ([][]byte, error) {
 // signatures associated with the passed PkScript.  Note that it only works for
 // 'standard' transaction script types.  Any data such as public keys which are
 // invalid are omitted from the results.
-func ExtractPkScriptAddrs(pkScript []byte, chainParams *chaincfg.Params) (ScriptClass, []btcutil.Address, int, error) {
+func ExtractPkScriptAddrs(pkScript []byte, chainParams *coinparam.Params) (ScriptClass, []btcutil.Address, int, error) {
 	var addrs []btcutil.Address
 	var requiredSigs int
 

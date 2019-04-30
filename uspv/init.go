@@ -158,6 +158,8 @@ func (s *SPVCon) Handshake(listOfNodes []string) error {
 	mv, ok := m.(*wire.MsgVersion)
 	if ok {
 		logging.Infof("connected to %s", mv.UserAgent)
+	} else {
+		return fmt.Errorf("Message wrong type and/or nil pointer received, mv: %v", mv)
 	}
 
 	if mv.ProtocolVersion < 70013 {
