@@ -452,25 +452,48 @@ func SettlementTx(c *DlcContract, d DlcContractDivision,
 	feeOurs := feeEach
 	feeTheirs := feeEach
 	valueOurs := d.ValueOurs
-	// We don't have enough to pay for a fee. We get 0, our contract partner
-	// pays the rest of the fee
-	if valueOurs < feeEach {
-		feeOurs = valueOurs
-		valueOurs = 0
-	} else {
-		valueOurs = d.ValueOurs - feeOurs
-	}
+
+	// This code produces bugs so I disable it
+
+	// // We don't have enough to pay for a fee. We get 0, our contract partner
+	// // pays the rest of the fee
+	// if valueOurs < feeEach {
+	// 	feeOurs = valueOurs
+	// 	valueOurs = 0
+	// } else {
+	// 	valueOurs = d.ValueOurs - feeOurs
+	// }
 	totalContractValue := c.TheirFundingAmount + c.OurFundingAmount
 	valueTheirs := totalContractValue - d.ValueOurs
 
-	if valueTheirs < feeEach {
-		feeTheirs = valueTheirs
-		valueTheirs = 0
-		feeOurs = totalFee - feeTheirs
+
+	// This code produces bugs so I disable it
+
+	// if valueTheirs < feeEach {
+	// 	feeTheirs = valueTheirs
+	// 	valueTheirs = 0
+	// 	feeOurs = totalFee - feeTheirs
+	// 	valueOurs = d.ValueOurs - feeOurs
+	// } else {
+	// 	valueTheirs -= feeTheirs
+	// }
+
+
+	// New code to handle edges of a contract interval
+
+	if valueOurs == 0 {
+		valueTheirs = valueTheirs - totalFee
+	}else{
 		valueOurs = d.ValueOurs - feeOurs
-	} else {
+	}
+
+	if valueTheirs == 0 {
+		valueOurs = valueOurs - totalFee
+	}else{
 		valueTheirs -= feeTheirs
 	}
+
+
 
 	var buf bytes.Buffer
 	binary.Write(&buf, binary.BigEndian, uint64(0))
