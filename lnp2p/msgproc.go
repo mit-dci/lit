@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/mit-dci/lit/logging"
 	"sync"
+	"github.com/mit-dci/lit/lnutil"
 )
 
 // ParseFuncType is the type of a Message parser function.
@@ -28,6 +29,8 @@ type MessageProcessor struct {
 	// TODO Evaluate if this mutex is even necessary?
 	active bool
 	actmtx *sync.Mutex
+
+	ChunksOfMsg map[int64]*lnutil.ChunkMsg
 }
 
 // NewMessageProcessor processes messages coming in from over the network.
@@ -36,6 +39,7 @@ func NewMessageProcessor() MessageProcessor {
 		handlers: [256]*messagehandler{},
 		active:   false,
 		actmtx:   &sync.Mutex{},
+		ChunksOfMsg: make(map[int64]*lnutil.ChunkMsg),
 	}
 }
 
@@ -77,6 +81,43 @@ func (mp *MessageProcessor) HandleMessage(peer *Peer, buf []byte) error {
 
 	// First see if we have handlers defined for this message type.
 	mtype := buf[0]
+
+	if mtype == 0xB2{
+
+		msg, _ := lnutil.NewChunksBeginMsgFromBytes(buf, peer.GetIdx())
+
+		chunk_msg := new(lnutil.ChunkMsg)
+		chunk_msg.TimeStamp = msg.TimeStamp
+
+		mp.ChunksOfMsg[msg.TimeStamp] = chunk_msg
+
+		return nil
+
+	}
+
+	if mtype == 0xB3{
+
+		msg, _ := lnutil.NewChunkMsgFromBytes(buf, peer.GetIdx())
+		mp.ChunksOfMsg[msg.TimeStamp].Data = append(mp.ChunksOfMsg[msg.TimeStamp].Data, msg.Data...)
+
+		return nil
+
+	}
+
+	if mtype == 0xB4{
+
+		msg, _ := lnutil.NewChunksEndMsgFromBytes(buf, peer.GetIdx())
+
+		buf = mp.ChunksOfMsg[msg.TimeStamp].Data
+		mtype = buf[0]
+
+		delete(mp.ChunksOfMsg, msg.TimeStamp)
+
+	}
+
+
+
+
 	h := mp.handlers[mtype]
 	if h == nil {
 		return fmt.Errorf("no handler found for messasge of type %x", mtype)
