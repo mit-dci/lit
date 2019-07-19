@@ -612,12 +612,8 @@ func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oracleSig [32]
 
 	if ( d.ValueOurs != 0){
 
-		fee := int64(1000)
-
-		if(c.OurFundingAmount + c.TheirFundingAmount == d.ValueOurs){
-			fee += int64(1000)
-		}	
-
+		fee := int64(500)
+	
 		// TODO: Claim the contract settlement output back to our wallet - otherwise the peer can claim it after locktime.
 		txClaim := wire.NewMsgTx()
 		txClaim.Version = 2
@@ -626,7 +622,7 @@ func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oracleSig [32]
 		txClaim.AddTxIn(wire.NewTxIn(&settleOutpoint, nil, nil))
 
 		addr, err := wal.NewAdr()
-		txClaim.AddTxOut(wire.NewTxOut(d.ValueOurs-fee, lnutil.DirectWPKHScriptFromPKH(addr))) // todo calc fee - fee is double here because the contract output already had the fee deducted in the settlement TX
+		txClaim.AddTxOut(wire.NewTxOut(settleTx.TxOut[0].Value-fee, lnutil.DirectWPKHScriptFromPKH(addr))) // todo calc fee - fee is double here because the contract output already had the fee deducted in the settlement TX
 
 		kg.Step[2] = UseContractPayoutBase
 		privSpend, _ := wal.GetPriv(kg)
