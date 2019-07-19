@@ -626,7 +626,7 @@ func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oracleSig [32]
 		txClaim.AddTxIn(wire.NewTxIn(&settleOutpoint, nil, nil))
 
 		addr, err := wal.NewAdr()
-		txClaim.AddTxOut(wire.NewTxOut(d.ValueOurs-1000, lnutil.DirectWPKHScriptFromPKH(addr))) // todo calc fee - fee is double here because the contract output already had the fee deducted in the settlement TX
+		txClaim.AddTxOut(wire.NewTxOut(d.ValueOurs-fee, lnutil.DirectWPKHScriptFromPKH(addr))) // todo calc fee - fee is double here because the contract output already had the fee deducted in the settlement TX
 
 		kg.Step[2] = UseContractPayoutBase
 		privSpend, _ := wal.GetPriv(kg)
