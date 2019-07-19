@@ -453,7 +453,7 @@ func SettlementTx(c *DlcContract, d DlcContractDivision,
 	feeTheirs := feeEach
 	valueOurs := d.ValueOurs
 
-	// This code produces bugs so I disable it
+	// This code leads to errors at edges of the interval so I disable it
 
 	// // We don't have enough to pay for a fee. We get 0, our contract partner
 	// // pays the rest of the fee
@@ -467,7 +467,7 @@ func SettlementTx(c *DlcContract, d DlcContractDivision,
 	valueTheirs := totalContractValue - d.ValueOurs
 
 
-	// This code produces bugs so I disable it
+	// This code leads to errors at edges of the interval so I disable it
 
 	// if valueTheirs < feeEach {
 	// 	feeTheirs = valueTheirs
@@ -479,7 +479,7 @@ func SettlementTx(c *DlcContract, d DlcContractDivision,
 	// }
 
 
-	// New code to handle edges of a contract interval
+	// There is a simplified code but it works at edges of the interval.
 
 	if valueOurs == 0 {
 		valueTheirs = valueTheirs - totalFee
