@@ -574,8 +574,24 @@ func (nd *LitNode) HandleContractOPEvent(c *lnutil.DlcContract,
 			if err != nil {
 				return err
 			}
-			txClaim.AddTxOut(wire.NewTxOut(value-500,
-				lnutil.DirectWPKHScriptFromPKH(addr))) // todo calc fee
+
+			// Here the transaction size is always the same
+			// n := 8 + VarIntSerializeSize(uint64(len(msg.TxIn))) +
+			// 	VarIntSerializeSize(uint64(len(msg.TxOut)))
+			// n = 10
+			// Plus Single input 41
+			// Plus Single output 31
+			// Plus 2 for all wittness transactions
+			// Plus Witness Data 108
+
+			// TxSize = 4 + 4 + 1 + 1 + 2 + 108 + 41 + 31 = 192
+			// Vsize = ((192 - 108 - 2) * 3 + 192) / 4 = 109,5
+
+			vsize := uint32(110)
+			fee := vsize * c.FeePerByte			
+
+			txClaim.AddTxOut(wire.NewTxOut(value-int64(fee),
+				lnutil.DirectWPKHScriptFromPKH(addr))) 
 
 			var kg portxo.KeyGen
 			kg.Depth = 5
