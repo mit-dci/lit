@@ -479,28 +479,28 @@ func (nd *LitNode) BuildDlcFundingTransaction(c *lnutil.DlcContract) (wire.MsgTx
 	var ourInputTotal int64
 	var theirInputTotal int64
 
-	our_in_size := int(0)
-	their_in_size := int(0)
 
-	for i, u := range c.OurFundingInputs {
+	our_txin_num := 0
+	for _, u := range c.OurFundingInputs {
 		txin := wire.NewTxIn(&u.Outpoint, nil, nil)
-
-		our_in_size += txin.SerializeSize()
 
 		tx.AddTxIn(txin)
 		ourInputTotal += u.Value
+
+		our_txin_num += 1
 
 	}
 
 
 	their_txin_num := 0
-	for i, u := range c.TheirFundingInputs {
+	for _, u := range c.TheirFundingInputs {
 		txin := wire.NewTxIn(&u.Outpoint, nil, nil)
 
-		their_in_size += txin.SerializeSize()
 
 		tx.AddTxIn(txin)
 		theirInputTotal += u.Value
+
+		their_txin_num += 1
 
 	}
 

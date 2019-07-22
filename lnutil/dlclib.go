@@ -6,9 +6,10 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/big"
+	"errors"
 
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
-	"github.com/mit-dci/lit/consts"
+
 	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/wire"
@@ -538,14 +539,14 @@ func SettlementTx(c *DlcContract, d DlcContractDivision,
 			vsize = uint32(149)					
 		}
 		totalFee = vsize * c.FeePerByte
-		feeEach = int64(float64(totalFee) / float64(2))
+		feeEach = uint32(float64(totalFee) / float64(2))
 		feeOurs = feeEach
 		feeTheirs = feeEach		
 		
 		if valueTheirs == 0 {
 			feeOurs = totalFee
 		}else{
-			feeOurs += valueTheirs
+			feeOurs += uint32(valueTheirs)
 			valueTheirs = 0
 
 		}
