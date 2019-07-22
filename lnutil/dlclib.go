@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math/big"
 	"errors"
-	"os"
 
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
 	"github.com/mit-dci/lit/crypto/koblitz"
