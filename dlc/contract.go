@@ -265,3 +265,24 @@ func (mgr *DlcManager) SetContractFeePerByte(cIdx uint64, feeperbyte uint32) err
 
 	return nil
 }
+
+
+// //GetContractDivision
+// GetContractDivision(args.CIdx, args.OracleValue)
+// func (mgr *DlcManager) GetContractDivision(cIdx uint64, feeperbyte uint32) error {
+// 	c, err := mgr.LoadContract(cIdx)
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	if c.Status != lnutil.ContractStatusDraft {
+// 		return fmt.Errorf("You cannot change or set the coin type unless" +
+// 			" the contract is in Draft state")
+// 	}
+
+// 	c.FeePerByte = feeperbyte
+
+// 	mgr.SaveContract(c)
+
+// 	return nil
+// }

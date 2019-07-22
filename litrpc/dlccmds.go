@@ -2,6 +2,7 @@ package litrpc
 
 import (
 	"encoding/hex"
+	"fmt"
 
 	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/lnutil"
@@ -339,6 +340,43 @@ func (r *LitRPC) SetContractFeePerByte(args SetContractFeePerByteArgs,
 	reply.Success = true
 	return nil
 }
+
+//----------------------------------------------------------
+
+type GetContractDivisionArgs struct {
+	CIdx     uint64
+	OracleValue int64
+}
+
+type GetContractDivisionReply struct {
+	ValueOurs int64
+}
+
+// GetContractDivision
+func (r *LitRPC) GetContractDivision(args GetContractDivisionArgs,
+	reply *GetContractDivisionReply) error {
+
+	//err = r.Node.DlcManager.GetContractDivision(args.CIdx, args.OracleValue)
+
+	c, err1 := r.Node.DlcManager.LoadContract(args.CIdx)
+	if err1 != nil {
+		fmt.Errorf("GetContractDivision(): LoadContract err %s\n", err1.Error())
+		return err1
+	}
+
+
+	d, err2 := c.GetDivision(args.OracleValue)
+	if err2 != nil {
+		fmt.Errorf("GetContractDivision(): c.GetDivision err %s\n", err2.Error())
+		return err2
+	}
+	reply.ValueOurs = d.ValueOurs
+
+	return nil
+}
+
+
+//-----------------------------------------------------------
 
 
 

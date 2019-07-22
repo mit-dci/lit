@@ -23,3 +23,18 @@ pushbreak 2 forward
 pushbreak 2 reverse
 pushclose 2 forward
 pushclose 2 reverse
+
+# DLC subsystem tx sizes calculation, etc...
+
+# regular contract
+dlc 2 t_11_0
+
+# large contract to test updeted messaging subsystem
+# and also to test settlement from counterparty
+dlc 2 t_1300_1
+
+# test at left edge
+dlc 2 t_10_0
+
+# test at right edge
+dlc 2 t_20_0
