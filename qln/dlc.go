@@ -2,9 +2,6 @@ package qln
 
 import (
 	"fmt"
-	"os"
-	// "bytes"
-	// "bufio"
 
 	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/txscript"

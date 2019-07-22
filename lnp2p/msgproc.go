@@ -2,7 +2,6 @@ package lnp2p
 
 import (
 	"fmt"
-	"os"
 	"github.com/mit-dci/lit/logging"
 	"sync"
 	"github.com/mit-dci/lit/lnutil"
