@@ -748,6 +748,46 @@ def t_10_0(env):
 
 
 
+def t_10_1(env):
+    
+
+    oracle_value = 10
+    node_to_settle = 1
+
+    valueFullyOurs=10
+    valueFullyTheirs=20
+
+    lit_funding_amt =      1     # 1 BTC
+    contract_funding_amt = 10000000     # satoshi
+
+    FundingTxVsize = 252
+    SettlementTxVsize = 137
+
+
+
+    SetTxFeeOurs = 10960
+    SetTxFeeTheirs = 0
+
+    ClaimTxFeeOurs = 110 * 80
+    ClaimTxFeeTheirs = 0
+
+
+    feeperbyte = 80
+
+
+    vsizes = [FundingTxVsize, SettlementTxVsize]
+
+    params = [lit_funding_amt, contract_funding_amt, oracle_value, node_to_settle, valueFullyOurs, valueFullyTheirs, vsizes, feeperbyte, SetTxFeeOurs, SetTxFeeTheirs, ClaimTxFeeOurs, ClaimTxFeeTheirs]
+
+    run_t(env, params)
+
+
+
+# ====================================================================================
+# ====================================================================================  
+
+
+
 def t_20_0(env):
     
 
@@ -778,3 +818,44 @@ def t_20_0(env):
     params = [lit_funding_amt, contract_funding_amt, oracle_value, node_to_settle, valueFullyOurs, valueFullyTheirs, vsizes, feeperbyte, SetTxFeeOurs, SetTxFeeTheirs, ClaimTxFeeOurs, ClaimTxFeeTheirs]
 
     run_t(env, params)
+
+
+
+# ====================================================================================
+# ====================================================================================  
+
+
+
+def t_20_1(env):
+    
+
+    oracle_value = 20
+    node_to_settle = 1
+
+    valueFullyOurs=10
+    valueFullyTheirs=20
+
+    lit_funding_amt =      1     # 1 BTC
+    contract_funding_amt = 10000000     # satoshi
+
+    FundingTxVsize = 252
+    SettlementTxVsize = 149
+
+
+
+    SetTxFeeOurs = 0
+    SetTxFeeTheirs = 11920
+
+    ClaimTxFeeOurs = 0
+    ClaimTxFeeTheirs = 121 * 80
+
+
+    feeperbyte = 80
+
+
+    vsizes = [FundingTxVsize, SettlementTxVsize]
+
+    params = [lit_funding_amt, contract_funding_amt, oracle_value, node_to_settle, valueFullyOurs, valueFullyTheirs, vsizes, feeperbyte, SetTxFeeOurs, SetTxFeeTheirs, ClaimTxFeeOurs, ClaimTxFeeTheirs]
+
+    run_t(env, params)
+    
