@@ -9,7 +9,6 @@ import shutil
 import json
 
 import testutil
-import btcrpc
 import litrpc
 import requests
 
