@@ -493,7 +493,7 @@ func SettlementTx(c *DlcContract, d DlcContractDivision,
 	}
 
 
-	vsize :=uint32(0)
+	vsize :=uint32(maxVsize)
 
 	// We don't have enough to pay for a fee. We get 0, our contract partner
 	// pays the rest of the fee
@@ -503,7 +503,7 @@ func SettlementTx(c *DlcContract, d DlcContractDivision,
 		if ours {
 
 			// exclude wire.NewTxOut from size (i.e 31)
-			vsize = uint32(149)								
+			vsize = uint32(150)								
 		}else{
 			// exclude DlcOutput from size (i.e 43)
 			vsize = uint32(137)			
@@ -532,7 +532,7 @@ func SettlementTx(c *DlcContract, d DlcContractDivision,
 		if ours {
 			vsize = uint32(137)											
 		}else{
-			vsize = uint32(149)					
+			vsize = uint32(150)					
 		}
 		totalFee = vsize * c.FeePerByte
 

@@ -381,23 +381,12 @@ def run_t(env, params):
         print("ORACLE VALUE:", oracle1_val, "; oracle signature:", oracle1_sig)
 
         valueOurs = 0 
-        if node_to_settle == 0: 
+  
 
-            valueOurs = env.lits[node_to_settle].rpc.GetContractDivision(CIdx=contract["Contract"]["Idx"],OracleValue=oracle1_val)['ValueOurs']
-            valueTheirs = contract_funding_amt * 2 - valueOurs
+        valueOurs = env.lits[node_to_settle].rpc.GetContractDivision(CIdx=contract["Contract"]["Idx"],OracleValue=oracle1_val)['ValueOurs']
+        valueTheirs = contract_funding_amt * 2 - valueOurs
 
-            print("valueOurs:", valueOurs, "; valueTheirs:", valueTheirs)
-
-
-        elif node_to_settle == 1: 
-
-            valueTheirs = env.lits[node_to_settle].rpc.GetContractDivision(CIdx=contract["Contract"]["Idx"],OracleValue=oracle1_val)['ValueOurs']
-            valueOurs = contract_funding_amt * 2 - valueTheirs
-
-            print("valueOurs:", valueOurs, "; valueTheirs:", valueTheirs)
-
-        else:
-            assert False, "Unknown node index."
+        print("valueOurs:", valueOurs, "; valueTheirs:", valueTheirs)
 
 
         lit1_bal_after_settle = valueOurs - SetTxFeeOurs
@@ -436,10 +425,12 @@ def run_t(env, params):
         print(bals2)
         print('  = sum ', bal2sum)
         
-
-        assert bal1sum == lit1_bal_result, "The resulting lit1 node balance does not match." 
-        assert bal2sum == lit2_bal_result, "The resulting lit2 node balance does not match." 
-
+        if node_to_settle == 0:
+            assert bal1sum == lit1_bal_result, "The resulting lit1 node balance does not match." 
+            assert bal2sum == lit2_bal_result, "The resulting lit2 node balance does not match." 
+        elif node_to_settle == 1:
+            assert bal1sum == lit2_bal_result, "The resulting lit1 node balance does not match." 
+            assert bal2sum == lit1_bal_result, "The resulting lit2 node balance does not match." 
 
 
 
@@ -568,7 +559,7 @@ def t_11_0(env):
     contract_funding_amt = 10000000     # satoshi
 
     FundingTxVsize = 252
-    SettlementTxVsize = 181
+    SettlementTxVsize = 180
 
     SetTxFeeOurs = 7200
     SetTxFeeTheirs = 7200
@@ -612,23 +603,23 @@ def t_1300_1(env):
     #-----------------------------
     # 2) SettlementTx vsize will be printed
 
-    #::lit1:: SettlementTx()1: qln/dlclib.go: --------------------: 
-    #::lit1:: SettlementTx()1: qln/dlclib.go: valueOurs: 6000000
-    #::lit1:: SettlementTx()1: qln/dlclib.go: valueTheirs: 14000000
-    #::lit1:: SettlementTx()1: qln/dlclib.go: --------------------: 
-    #::lit1:: SettlementTx()2: qln/dlclib.go: --------------------: 
-    #::lit1:: SettlementTx()2: qln/dlclib.go: valueOurs: 6000000
-    #::lit1:: SettlementTx()2: qln/dlclib.go: valueTheirs: 14000000
-    #::lit1:: SettlementTx()2: qln/dlclib.go: --------------------: 
-    #::lit1:: SettlementTx()3: qln/dlclib.go: --------------------: 
-    #::lit1:: SettlementTx()3: qln/dlclib.go: totalFee: 14400 
-    #::lit1:: SettlementTx()3: qln/dlclib.go: feeEach: 7200
-    #::lit1:: SettlementTx()3: qln/dlclib.go: feeOurs: 7200
-    #::lit1:: SettlementTx()3: qln/dlclib.go: feeTheirs: 7200
-    #::lit1:: SettlementTx()3: qln/dlclib.go: valueOurs: 5992800
-    #::lit1:: SettlementTx()3: qln/dlclib.go: valueTheirs: 13992800
-    #::lit1:: SettlementTx()3: qln/dlclib.go: vsize: 0      # Actually we have 14400/80 = 180
-    #::lit1:: SettlementTx()3: qln/dlclib.go: --------------------:    
+    # ::lit1:: SettlementTx()1: qln/dlclib.go: --------------------:
+    # ::lit1:: SettlementTx()1: qln/dlclib.go: valueOurs: 6000000 
+    # ::lit1:: SettlementTx()1: qln/dlclib.go: valueTheirs: 14000000 
+    # ::lit1:: SettlementTx()1: qln/dlclib.go: --------------------:
+    # ::lit1:: SettlementTx()2: qln/dlclib.go: --------------------:
+    # ::lit1:: SettlementTx()2: qln/dlclib.go: valueOurs: 5992800 
+    # ::lit1:: SettlementTx()2: qln/dlclib.go: valueTheirs: 13992800 
+    # ::lit1:: SettlementTx()2: qln/dlclib.go: --------------------:
+    # ::lit1:: SettlementTx()2: qln/dlclib.go: --------------------:
+    # ::lit1:: SettlementTx()2: qln/dlclib.go: totalFee: 14400 
+    # ::lit1:: SettlementTx()2: qln/dlclib.go: feeEach: 7200 
+    # ::lit1:: SettlementTx()2: qln/dlclib.go: feeOurs: 7200 
+    # ::lit1:: SettlementTx()2: qln/dlclib.go: feeTheirs: 7200 
+    # ::lit1:: SettlementTx()2: qln/dlclib.go: valueOurs: 5992800 
+    # ::lit1:: SettlementTx()2: qln/dlclib.go: valueTheirs: 13992800 
+    # ::lit1:: SettlementTx()2: qln/dlclib.go: vsize: 180 
+    # ::lit1:: SettlementTx()2: qln/dlclib.go: --------------------:  
 
 
     # Vsize from Blockchain: 181
@@ -683,21 +674,20 @@ def t_1300_1(env):
     contract_funding_amt = 10000000     # satoshi
 
     FundingTxVsize = 252
-    SettlementTxVsize = 181
-    SettleContractClaimTxVsize = 110
-    PeerClaimTxVsize = 121
+    SettlementTxVsize = 180
+
 
     SetTxFeeOurs = 7200
     SetTxFeeTheirs = 7200
 
-    ClaimTxFeeOurs = 110 * 80
-    ClaimTxFeeTheirs = 121 * 80
+    ClaimTxFeeOurs = 121 * 80
+    ClaimTxFeeTheirs = 110 * 80
 
 
     feeperbyte = 80
 
 
-    vsizes = [FundingTxVsize, SettlementTxVsize, SettleContractClaimTxVsize, PeerClaimTxVsize]
+    vsizes = [FundingTxVsize, SettlementTxVsize]
 
     params = [lit_funding_amt, contract_funding_amt, oracle_value, node_to_settle, valueFullyOurs, valueFullyTheirs, vsizes, feeperbyte, SetTxFeeOurs, SetTxFeeTheirs, ClaimTxFeeOurs, ClaimTxFeeTheirs]
 
@@ -723,9 +713,9 @@ def t_10_0(env):
     contract_funding_amt = 10000000     # satoshi
 
     FundingTxVsize = 252
-    SettlementTxVsize = 181
+    SettlementTxVsize = 150
 
-    SetTxFeeOurs = 11920
+    SetTxFeeOurs = 150 * 80
     SetTxFeeTheirs = 0
 
     ClaimTxFeeOurs = 121 * 80
@@ -765,11 +755,11 @@ def t_10_1(env):
 
 
 
-    SetTxFeeOurs = 10960
-    SetTxFeeTheirs = 0
+    SetTxFeeOurs = 0
+    SetTxFeeTheirs = 137 * 80
 
-    ClaimTxFeeOurs = 110 * 80
-    ClaimTxFeeTheirs = 0
+    ClaimTxFeeOurs = 0
+    ClaimTxFeeTheirs = 110 * 80
 
 
     feeperbyte = 80
@@ -801,10 +791,10 @@ def t_20_0(env):
     contract_funding_amt = 10000000     # satoshi
 
     FundingTxVsize = 252
-    SettlementTxVsize = 181
+    SettlementTxVsize = 137
 
     SetTxFeeOurs = 0
-    SetTxFeeTheirs = 10960
+    SetTxFeeTheirs = 137 * 80
 
     ClaimTxFeeOurs = 0
     ClaimTxFeeTheirs = 110 * 80
@@ -818,6 +808,7 @@ def t_20_0(env):
     params = [lit_funding_amt, contract_funding_amt, oracle_value, node_to_settle, valueFullyOurs, valueFullyTheirs, vsizes, feeperbyte, SetTxFeeOurs, SetTxFeeTheirs, ClaimTxFeeOurs, ClaimTxFeeTheirs]
 
     run_t(env, params)
+
 
 
 
@@ -839,15 +830,15 @@ def t_20_1(env):
     contract_funding_amt = 10000000     # satoshi
 
     FundingTxVsize = 252
-    SettlementTxVsize = 149
+    SettlementTxVsize = 150
 
 
 
-    SetTxFeeOurs = 0
-    SetTxFeeTheirs = 11920
+    SetTxFeeOurs = 150 * 80
+    SetTxFeeTheirs = 0
 
-    ClaimTxFeeOurs = 0
-    ClaimTxFeeTheirs = 121 * 80
+    ClaimTxFeeOurs = 121 * 80
+    ClaimTxFeeTheirs = 0
 
 
     feeperbyte = 80
@@ -858,4 +849,3 @@ def t_20_1(env):
     params = [lit_funding_amt, contract_funding_amt, oracle_value, node_to_settle, valueFullyOurs, valueFullyTheirs, vsizes, feeperbyte, SetTxFeeOurs, SetTxFeeTheirs, ClaimTxFeeOurs, ClaimTxFeeTheirs]
 
     run_t(env, params)
-    
