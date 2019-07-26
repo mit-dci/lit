@@ -130,7 +130,7 @@ func DlcContractFromBytes(b []byte) (*DlcContract, error) {
 
 	feePerByte, err := wire.ReadVarInt(buf, 0)
 	if err != nil {
-		logging.Errorf("Error while deserializing varint for coinType: %s", err.Error())
+		logging.Errorf("Error while deserializing varint for feePerByte: %s", err.Error())
 		return nil, err
 	}
 	c.FeePerByte = uint32(feePerByte)	

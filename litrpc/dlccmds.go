@@ -325,9 +325,7 @@ type SetContractFeePerByteReply struct {
 	Success bool
 }
 
-// SetContractFeePerByte sets the coin type the contract will be in. Note that a
-// peer that doesn't have a wallet of that type will automatically decline the
-// contract.
+// SetContractFeePerByte sets the fee per byte for the contract.
 func (r *LitRPC) SetContractFeePerByte(args SetContractFeePerByteArgs,
 	reply *SetContractFeePerByteReply) error {
 	var err error
