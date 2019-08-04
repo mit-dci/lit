@@ -36,7 +36,7 @@ func (nd *LitNode) FindPeerIndexByAddress(lnAdr string) (uint32, error) {
 // TCPListener starts a litNode listening for incoming LNDC connections.
 func (nd *LitNode) TCPListener(port int) (string, error) {
 
-	logging.Debugf("Trying to listen on %s\n", port)
+	logging.Debugf("Trying to listen on %d\n", port)
 
 	err := nd.PeerMan.ListenOnPort(port)
 	if err != nil {
