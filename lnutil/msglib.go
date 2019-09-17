@@ -1744,6 +1744,9 @@ type DlcOfferAcceptMsg struct {
 	OurFundMultisigPub [33]byte
 	// The Pubkey to be used to in the contract settlement
 	OurPayoutBase [33]byte
+	//OurRevokePub [33]byte
+	OurRevokePKH [20]byte
+	OurrefundTxSig64 [64]byte
 	// The PKH to be paid to in the contract settlement
 	OurPayoutPKH [20]byte
 	// The UTXOs we are using to fund the contract
@@ -1765,6 +1768,13 @@ func NewDlcOfferAcceptMsg(contract *DlcContract,
 	msg.OurChangePKH = contract.OurChangePKH
 	msg.OurFundMultisigPub = contract.OurFundMultisigPub
 	msg.OurPayoutBase = contract.OurPayoutBase
+
+	//msg.OurRevokePub = contract.OurRevokePub
+
+	msg.OurRevokePKH = contract.OurRevokePKH
+
+	msg.OurrefundTxSig64 = contract.OurrefundTxSig64
+
 	msg.OurPayoutPKH = contract.OurPayoutPKH
 	msg.SettlementSignatures = signatures
 	return *msg
@@ -1790,6 +1800,13 @@ func NewDlcOfferAcceptMsgFromBytes(b []byte,
 	copy(msg.OurChangePKH[:], buf.Next(20))
 	copy(msg.OurFundMultisigPub[:], buf.Next(33))
 	copy(msg.OurPayoutBase[:], buf.Next(33))
+
+	//copy(msg.OurRevokePub[:], buf.Next(33))
+
+	copy(msg.OurRevokePKH[:], buf.Next(20))
+
+	copy(msg.OurrefundTxSig64[:], buf.Next(64))
+
 	copy(msg.OurPayoutPKH[:], buf.Next(20))
 
 	inputCount, _ := wire.ReadVarInt(buf, 0)
@@ -1828,6 +1845,12 @@ func (msg DlcOfferAcceptMsg) Bytes() []byte {
 	buf.Write(msg.OurChangePKH[:])
 	buf.Write(msg.OurFundMultisigPub[:])
 	buf.Write(msg.OurPayoutBase[:])
+
+	//buf.Write(msg.OurRevokePub[:])
+	buf.Write(msg.OurRevokePKH[:])
+
+	buf.Write(msg.OurrefundTxSig64[:])
+
 	buf.Write(msg.OurPayoutPKH[:])
 
 	inputCount := uint64(len(msg.FundingInputs))
@@ -1869,17 +1892,21 @@ type DlcContractAckMsg struct {
 	Idx uint64
 	// The settlement signatures of the party acknowledging
 	SettlementSignatures []DlcContractSettlementSignature
+
+	OurrefundTxSig64 [64]byte
 }
 
 // NewDlcContractAckMsg generates a new DlcContractAckMsg struct based on the
 // passed contract and signatures
 func NewDlcContractAckMsg(contract *DlcContract,
-	signatures []DlcContractSettlementSignature) DlcContractAckMsg {
+	signatures []DlcContractSettlementSignature, OurrefundTxSig64 [64]byte) DlcContractAckMsg {
 
 	msg := new(DlcContractAckMsg)
 	msg.PeerIdx = contract.PeerIdx
 	msg.Idx = contract.TheirIdx
 	msg.SettlementSignatures = signatures
+
+	msg.OurrefundTxSig64 = OurrefundTxSig64
 	return *msg
 }
 
@@ -1908,6 +1935,9 @@ func NewDlcContractAckMsgFromBytes(b []byte,
 		binary.Read(buf, binary.BigEndian, &msg.SettlementSignatures[i].Outcome)
 		copy(msg.SettlementSignatures[i].Signature[:], buf.Next(64))
 	}
+
+	copy(msg.OurrefundTxSig64[:], buf.Next(64))
+
 	return *msg, nil
 }
 
@@ -1926,6 +1956,9 @@ func (msg DlcContractAckMsg) Bytes() []byte {
 		binary.Write(&buf, binary.BigEndian, outcome)
 		buf.Write(msg.SettlementSignatures[i].Signature[:])
 	}
+
+	buf.Write(msg.OurrefundTxSig64[:])
+
 	return buf.Bytes()
 }
 

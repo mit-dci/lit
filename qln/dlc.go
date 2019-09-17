@@ -2,7 +2,6 @@ package qln
 
 import (
 	"fmt"
-
 	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/txscript"
 	"github.com/mit-dci/lit/btcutil/txsort"
@@ -53,6 +52,10 @@ func (nd *LitNode) OfferDlc(peerIdx uint32, cIdx uint64) error {
 		return fmt.Errorf("You need to set a settlement time for the contract before offering it")
 	}
 
+	if c.RefundTimestamp == 0 {
+		return fmt.Errorf("You need to set a refund time for the contract before offering it")
+	}	
+
 	if c.CoinType == dlc.COINTYPE_NOT_SET {
 		return fmt.Errorf("You need to set a coin type for the contract before offering it")
 	}
@@ -78,6 +81,7 @@ func (nd *LitNode) OfferDlc(peerIdx uint32, cIdx uint64) error {
 	kg.Step[2] = UseContractFundMultisig
 	kg.Step[3] = c.PeerIdx | 1<<31
 	kg.Step[4] = uint32(c.Idx) | 1<<31
+
 
 	c.OurFundMultisigPub, err = nd.GetUsePub(kg, UseContractFundMultisig)
 	if err != nil {
@@ -105,6 +109,8 @@ func (nd *LitNode) OfferDlc(peerIdx uint32, cIdx uint64) error {
 		return err
 	}
 
+	wal, _ := nd.SubWallet[c.CoinType]
+	c.OurRevokePKH, err = wal.NewAdr()
 	msg := lnutil.NewDlcOfferMsg(peerIdx, c)
 
 	c.Status = lnutil.ContractStatusOfferedByMe
@@ -206,6 +212,9 @@ func (nd *LitNode) AcceptDlc(cIdx uint64) error {
 		}
 		copy(c.OurPayoutPKH[:], btcutil.Hash160(ourPayoutPKHKey[:]))
 
+		wal, _ := nd.SubWallet[c.CoinType]
+		c.OurRevokePKH, err = wal.NewAdr()
+
 		// Now we can sign the division
 		sigs, err := nd.SignSettlementDivisions(c)
 		if err != nil {
@@ -214,6 +223,33 @@ func (nd *LitNode) AcceptDlc(cIdx uint64) error {
 			nd.DlcManager.SaveContract(c)
 			return
 		}
+
+
+		//-----------------------------------------------
+
+
+		refundTx, err := lnutil.RefundTx(c)
+		if err != nil {
+			logging.Errorf("Error of RefundTx: %s", err.Error())
+			c.Status = lnutil.ContractStatusError
+			nd.DlcManager.SaveContract(c)
+			return
+		}
+		
+		kg.Step[2] = UseContractFundMultisig
+		mypriv, err := wal.GetPriv(kg)
+		//wal, _ := nd.SubWallet[c.CoinType]
+
+
+		err = lnutil.SignRefundTx(c, refundTx, mypriv)
+		if err != nil {
+			logging.Errorf("Error of SignRefundTx: %s", err.Error())
+			c.Status = lnutil.ContractStatusError
+			nd.DlcManager.SaveContract(c)
+			return
+		}		
+
+		// //------------------------------------------------		
 
 		msg := lnutil.NewDlcOfferAcceptMsg(c, sigs)
 		c.Status = lnutil.ContractStatusAccepted
@@ -243,6 +279,10 @@ func (nd *LitNode) DlcOfferHandler(msg lnutil.DlcOfferMsg, peer *RemotePeer) {
 	c.TheirIdx = msg.Contract.Idx
 	c.TheirPayoutPKH = msg.Contract.OurPayoutPKH
 
+	//c.TheirRevokePub = msg.Contract.OurRevokePub
+
+	c.TheirRevokePKH = msg.Contract.OurRevokePKH
+
 	c.Division = make([]lnutil.DlcContractDivision, len(msg.Contract.Division))
 	for i := 0; i < len(msg.Contract.Division); i++ {
 		c.Division[i].OracleValue = msg.Contract.Division[i].OracleValue
@@ -255,6 +295,7 @@ func (nd *LitNode) DlcOfferHandler(msg lnutil.DlcOfferMsg, peer *RemotePeer) {
 	c.OracleA = msg.Contract.OracleA
 	c.OracleR = msg.Contract.OracleR
 	c.OracleTimestamp = msg.Contract.OracleTimestamp
+	c.RefundTimestamp = msg.Contract.RefundTimestamp
 
 	err := nd.DlcManager.SaveContract(c)
 	if err != nil {
@@ -301,6 +342,10 @@ func (nd *LitNode) DlcAcceptHandler(msg lnutil.DlcOfferAcceptMsg, peer *RemotePe
 	c.TheirPayoutBase = msg.OurPayoutBase
 	c.TheirPayoutPKH = msg.OurPayoutPKH
 	c.TheirIdx = msg.OurIdx
+	c.TheirRevokePKH = msg.OurRevokePKH
+	c.TheirrefundTxSig64 = msg.OurrefundTxSig64
+
+	//------------------------------------------
 
 	c.Status = lnutil.ContractStatusAccepted
 	err = nd.DlcManager.SaveContract(c)
@@ -315,18 +360,49 @@ func (nd *LitNode) DlcAcceptHandler(msg lnutil.DlcOfferAcceptMsg, peer *RemotePe
 		return err
 	}
 
-	outMsg := lnutil.NewDlcContractAckMsg(c, sigs)
+	//------------------------------------------
+
+	wal, _ := nd.SubWallet[c.CoinType]
+
+	refundTx, err := lnutil.RefundTx(c)
+	if err != nil {
+		logging.Errorf("Error of RefundTx: %s", err.Error())
+		c.Status = lnutil.ContractStatusError
+		nd.DlcManager.SaveContract(c)
+		return err
+	}
+
+	
+	var kg portxo.KeyGen
+	kg.Depth = 5
+	kg.Step[0] = 44 | 1<<31
+	kg.Step[1] = c.CoinType | 1<<31
+	kg.Step[2] = UseContractFundMultisig
+	kg.Step[3] = c.PeerIdx | 1<<31
+	kg.Step[4] = uint32(c.Idx) | 1<<31
+
+	mypriv, err := wal.GetPriv(kg)
+
+	err = lnutil.SignRefundTx(c, refundTx, mypriv)
+	if err != nil {
+		logging.Errorf("Error of SignRefundTx: %s", err.Error())
+		c.Status = lnutil.ContractStatusError
+		nd.DlcManager.SaveContract(c)
+		return err
+	}
+
+	//------------------------------------------
+
+	outMsg := lnutil.NewDlcContractAckMsg(c, sigs, c.OurrefundTxSig64)
 	c.Status = lnutil.ContractStatusAcknowledged
 
 	err = nd.DlcManager.SaveContract(c)
 	if err != nil {
 		return err
 	}
-
 	nd.tmpSendLitMsg(outMsg)
 
 	return nil
-
 }
 
 func (nd *LitNode) DlcContractAckHandler(msg lnutil.DlcContractAckMsg, peer *RemotePeer) {
@@ -339,8 +415,8 @@ func (nd *LitNode) DlcContractAckHandler(msg lnutil.DlcContractAckMsg, peer *Rem
 	// TODO: Check signatures
 
 	c.Status = lnutil.ContractStatusAcknowledged
-
 	c.TheirSettlementSignatures = msg.SettlementSignatures
+	c.TheirrefundTxSig64 = msg.OurrefundTxSig64
 
 	err = nd.DlcManager.SaveContract(c)
 	if err != nil {
@@ -389,7 +465,6 @@ func (nd *LitNode) DlcFundingSigsHandler(msg lnutil.DlcContractFundingSigsMsg, p
 	}
 
 	wal.SignMyInputs(msg.SignedFundingTx)
-
 	wal.DirectSendTx(msg.SignedFundingTx)
 
 	err = wal.WatchThis(c.FundingOutpoint)
@@ -495,6 +570,7 @@ func (nd *LitNode) BuildDlcFundingTransaction(c *lnutil.DlcContract) (wire.MsgTx
 	our_txin_num := 0
 	for _, u := range c.OurFundingInputs {
 		txin := wire.NewTxIn(&u.Outpoint, nil, nil)
+
 		tx.AddTxIn(txin)
 		ourInputTotal += u.Value
 		our_txin_num += 1
@@ -505,6 +581,7 @@ func (nd *LitNode) BuildDlcFundingTransaction(c *lnutil.DlcContract) (wire.MsgTx
 	their_txin_num := 0
 	for _, u := range c.TheirFundingInputs {
 		txin := wire.NewTxIn(&u.Outpoint, nil, nil)
+
 		tx.AddTxIn(txin)
 		theirInputTotal += u.Value
 		their_txin_num += 1
@@ -537,15 +614,11 @@ func (nd *LitNode) BuildDlcFundingTransaction(c *lnutil.DlcContract) (wire.MsgTx
 	their_fee := int64(their_tx_vsize * c.FeePerByte)
 
 	// add change and sort
-
 	their_txout := wire.NewTxOut(theirInputTotal-c.TheirFundingAmount-their_fee, lnutil.DirectWPKHScriptFromPKH(c.TheirChangePKH)) 
 	tx.AddTxOut(their_txout)
 
-
 	our_txout := wire.NewTxOut(ourInputTotal-c.OurFundingAmount-our_fee, lnutil.DirectWPKHScriptFromPKH(c.OurChangePKH))
 	tx.AddTxOut(our_txout)
-
-	
 
 	txsort.InPlaceSort(tx)
 
@@ -654,6 +727,7 @@ func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oracleSig [32]
 		logging.Errorf("SettleContract FundTxScript err %s", err.Error())
 		return [32]byte{}, [32]byte{}, err
 	}
+		
 
 	// swap if needed
 	if swap {
@@ -741,5 +815,37 @@ func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oracleSig [32]
 		return settleTx.TxHash(), [32]byte{}, nil
 
 	}
+
+}
+
+
+
+func (nd *LitNode) RefundContract(cIdx uint64) (bool, error) {
+
+	c, err := nd.DlcManager.LoadContract(cIdx)
+	if err != nil {
+		logging.Errorf("SettleContract FindContract err %s\n", err.Error())
+		return false, err
+	}
+
+	wal, _ := nd.SubWallet[c.CoinType]
+
+	refundTx, err := lnutil.RefundTx(c)
+	myBigSig := sig64.SigDecompress(c.OurrefundTxSig64)
+	myBigSig = append(myBigSig, byte(txscript.SigHashAll))	
+	theirBigSig := sig64.SigDecompress(c.TheirrefundTxSig64)
+	theirBigSig = append(theirBigSig, byte(txscript.SigHashAll))
+	pre, swap, err := lnutil.FundTxScript(c.OurFundMultisigPub, c.TheirFundMultisigPub)
+
+	// swap if needed
+	if swap {
+		refundTx.TxIn[0].Witness = SpendMultiSigWitStack(pre, theirBigSig, myBigSig)
+	} else {
+		refundTx.TxIn[0].Witness = SpendMultiSigWitStack(pre, myBigSig, theirBigSig)
+	}	
+
+	err = wal.DirectSendTx(refundTx)
+
+	return true, nil
 
 }

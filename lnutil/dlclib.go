@@ -12,6 +12,11 @@ import (
 	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/wire"
+
+	"github.com/mit-dci/lit/btcutil/txscript"
+	"github.com/mit-dci/lit/btcutil/txsort"
+	"github.com/mit-dci/lit/sig64"
+
 )
 
 // DlcContractStatus is an enumeration containing the various statuses a
@@ -54,6 +59,8 @@ type DlcContract struct {
 	OracleA, OracleR [33]byte
 	// The time we expect the oracle to publish
 	OracleTimestamp uint64
+	// The time after which the refund transaction becomes valid.
+	RefundTimestamp uint64
 	// The payout specification
 	Division []DlcContractDivision
 	// The amounts either side are funding
@@ -62,6 +69,9 @@ type DlcContract struct {
 	OurChangePKH, TheirChangePKH [20]byte
 	// Pubkey used in the funding multisig output
 	OurFundMultisigPub, TheirFundMultisigPub [33]byte
+	//OurRevokePub, TheirRevokePub [33]byte
+	OurRevokePKH, TheirRevokePKH [20]byte
+	OurrefundTxSig64, TheirrefundTxSig64 [64]byte
 	// Pubkey to be used in the commit script (combined with oracle pubkey
 	// or CSV timeout)
 	OurPayoutBase, TheirPayoutBase [33]byte
@@ -139,6 +149,10 @@ func DlcContractFromBytes(b []byte) (*DlcContract, error) {
 	if err != nil {
 		return nil, err
 	}
+	c.RefundTimestamp, err = wire.ReadVarInt(buf, 0)
+	if err != nil {
+		return nil, err
+	}	
 	ourFundingAmount, err := wire.ReadVarInt(buf, 0)
 	if err != nil {
 		return nil, err
@@ -156,6 +170,12 @@ func DlcContractFromBytes(b []byte) (*DlcContract, error) {
 	copy(c.OurFundMultisigPub[:], buf.Next(33))
 	copy(c.TheirFundMultisigPub[:], buf.Next(33))
 
+	copy(c.OurRevokePKH[:], buf.Next(20))
+	copy(c.TheirRevokePKH[:], buf.Next(20))
+
+	copy(c.OurrefundTxSig64[:], buf.Next(64))
+	copy(c.TheirrefundTxSig64[:], buf.Next(64))
+	
 	copy(c.OurPayoutBase[:], buf.Next(33))
 	copy(c.TheirPayoutBase[:], buf.Next(33))
 
@@ -257,6 +277,7 @@ func (self *DlcContract) Bytes() []byte {
 	wire.WriteVarInt(&buf, 0, uint64(self.CoinType))
 	wire.WriteVarInt(&buf, 0, uint64(self.FeePerByte))
 	wire.WriteVarInt(&buf, 0, uint64(self.OracleTimestamp))
+	wire.WriteVarInt(&buf, 0, uint64(self.RefundTimestamp))
 	wire.WriteVarInt(&buf, 0, uint64(self.OurFundingAmount))
 	wire.WriteVarInt(&buf, 0, uint64(self.TheirFundingAmount))
 
@@ -264,6 +285,13 @@ func (self *DlcContract) Bytes() []byte {
 	buf.Write(self.TheirChangePKH[:])
 	buf.Write(self.OurFundMultisigPub[:])
 	buf.Write(self.TheirFundMultisigPub[:])
+
+	buf.Write(self.OurRevokePKH[:])
+	buf.Write(self.TheirRevokePKH[:])	
+
+	buf.Write(self.OurrefundTxSig64[:])
+	buf.Write(self.TheirrefundTxSig64[:])
+	
 	buf.Write(self.OurPayoutBase[:])
 	buf.Write(self.TheirPayoutBase[:])
 	buf.Write(self.OurPayoutPKH[:])
@@ -362,8 +390,7 @@ func DlcOutput(pkPeer, pkOracleSig, pkOurs [33]byte, value int64) *wire.TxOut {
 // signature and their own private key to claim the funds from the output.
 // However, if they send the wrong one, they won't be able to claim the funds
 // and we can claim them once the time delay has passed.
-func DlcCommitScript(pubKeyPeer, pubKeyOracleSig, ourPubKey [33]byte,
-	delay uint16) []byte {
+func DlcCommitScript(pubKeyPeer, pubKeyOracleSig, ourPubKey [33]byte, delay uint16) []byte {
 	// Combine pubKey and Oracle Sig
 	combinedPubKey := CombinePubs(pubKeyPeer, pubKeyOracleSig)
 	return CommitScript(combinedPubKey, ourPubKey, delay)
@@ -590,4 +617,61 @@ func SettlementTx(c *DlcContract, d DlcContractDivision,
 	}
 
 	return tx, nil
+}
+
+
+
+
+// RefundTx returns the transaction to refund the contract 
+// in the case the oracle does not publish a value.
+func RefundTx(c *DlcContract) (*wire.MsgTx, error) {
+
+	vsize := uint32(169)
+	fee := int64(vsize * c.FeePerByte)
+
+	tx := wire.NewMsgTx()
+	tx.Version = 2
+	tx.LockTime = uint32(c.RefundTimestamp)
+
+	txin := wire.NewTxIn(&c.FundingOutpoint, nil, nil)
+	txin.Sequence = 0
+	tx.AddTxIn(txin)
+
+	ourRefScript := DirectWPKHScriptFromPKH(c.OurRevokePKH)
+	ourOutput := wire.NewTxOut(c.OurFundingAmount - fee, ourRefScript)
+	tx.AddTxOut(ourOutput)
+
+	theirRefScript := DirectWPKHScriptFromPKH(c.TheirRevokePKH)
+	theirOutput := wire.NewTxOut(c.TheirFundingAmount - fee, theirRefScript)
+	tx.AddTxOut(theirOutput)
+
+	txsort.InPlaceSort(tx)
+
+
+	return tx, nil
+
+}
+
+
+// SignRefundTx 
+func SignRefundTx(c *DlcContract, tx *wire.MsgTx,  priv *koblitz.PrivateKey) (error) {
+
+	pre, _, err := FundTxScript(c.OurFundMultisigPub, c.TheirFundMultisigPub)
+	if err != nil {
+		return err
+	}
+
+	hCache := txscript.NewTxSigHashes(tx)
+
+	sig, err := txscript.RawTxInWitnessSignature(tx, hCache, 0, c.OurFundingAmount+c.TheirFundingAmount, pre, txscript.SigHashAll, priv)
+	if err != nil {
+		return err
+	}
+
+	sig = sig[:len(sig)-1]
+	sig64 , _ := sig64.SigCompress(sig)
+	c.OurrefundTxSig64 = sig64
+
+	return nil
+
 }

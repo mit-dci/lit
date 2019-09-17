@@ -44,3 +44,6 @@ dlc 2 t_20_0
 
 # test at right edge from the counterparty
 dlc 2 t_20_1
+
+dlcrefund 2 forward
+dlcrefund 2 reverse

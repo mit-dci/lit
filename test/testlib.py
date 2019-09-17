@@ -20,6 +20,8 @@ from bitcoinrpc.authproxy import AuthServiceProxy, JSONRPCException
 
 LIT_BIN = "%s/../lit" % paths.abspath(paths.dirname(__file__))
 
+ORACLE_BIN = "%s/../dlcoracle" % paths.abspath(paths.dirname(__file__))
+
 REGTEST_COINTYPE = 257
 
 logger = logging.getLogger("testframework")
@@ -59,7 +61,6 @@ def get_new_id():
     id = next_id
     next_id += 1
     return id
-
 
 
 class LitNode():
@@ -277,7 +278,7 @@ class OracleNode():
 
         # Now figure out the args to use and then start Lit.
         args = [
-            "dlcoracle",
+            ORACLE_BIN,
             "--DataDir="+self.data_dir,
             "--HttpPort=" + self.httpport, 
             "--Interval=" + self.interval,
