@@ -224,10 +224,6 @@ func (nd *LitNode) AcceptDlc(cIdx uint64) error {
 			return
 		}
 
-
-		//-----------------------------------------------
-
-
 		refundTx, err := lnutil.RefundTx(c)
 		if err != nil {
 			logging.Errorf("Error of RefundTx: %s", err.Error())
@@ -248,9 +244,7 @@ func (nd *LitNode) AcceptDlc(cIdx uint64) error {
 			nd.DlcManager.SaveContract(c)
 			return
 		}		
-
-		// //------------------------------------------------		
-
+	
 		msg := lnutil.NewDlcOfferAcceptMsg(c, sigs)
 		c.Status = lnutil.ContractStatusAccepted
 
@@ -587,8 +581,6 @@ func (nd *LitNode) BuildDlcFundingTransaction(c *lnutil.DlcContract) (wire.MsgTx
 		their_txin_num += 1
 
 	}
-
-
 
 	//====================================================
 
