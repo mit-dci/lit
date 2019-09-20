@@ -70,7 +70,7 @@ type DlcContract struct {
 	// Pubkey used in the funding multisig output
 	OurFundMultisigPub, TheirFundMultisigPub [33]byte
 	//OurRevokePub, TheirRevokePub [33]byte
-	OurRevokePKH, TheirRevokePKH [20]byte
+	OurRefundPKH, TheirRefundPKH [20]byte
 	OurrefundTxSig64, TheirrefundTxSig64 [64]byte
 	// Pubkey to be used in the commit script (combined with oracle pubkey
 	// or CSV timeout)
@@ -170,8 +170,8 @@ func DlcContractFromBytes(b []byte) (*DlcContract, error) {
 	copy(c.OurFundMultisigPub[:], buf.Next(33))
 	copy(c.TheirFundMultisigPub[:], buf.Next(33))
 
-	copy(c.OurRevokePKH[:], buf.Next(20))
-	copy(c.TheirRevokePKH[:], buf.Next(20))
+	copy(c.OurRefundPKH[:], buf.Next(20))
+	copy(c.TheirRefundPKH[:], buf.Next(20))
 
 	copy(c.OurrefundTxSig64[:], buf.Next(64))
 	copy(c.TheirrefundTxSig64[:], buf.Next(64))
@@ -286,8 +286,8 @@ func (self *DlcContract) Bytes() []byte {
 	buf.Write(self.OurFundMultisigPub[:])
 	buf.Write(self.TheirFundMultisigPub[:])
 
-	buf.Write(self.OurRevokePKH[:])
-	buf.Write(self.TheirRevokePKH[:])	
+	buf.Write(self.OurRefundPKH[:])
+	buf.Write(self.TheirRefundPKH[:])	
 
 	buf.Write(self.OurrefundTxSig64[:])
 	buf.Write(self.TheirrefundTxSig64[:])
@@ -637,11 +637,11 @@ func RefundTx(c *DlcContract) (*wire.MsgTx, error) {
 	txin.Sequence = 0
 	tx.AddTxIn(txin)
 
-	ourRefScript := DirectWPKHScriptFromPKH(c.OurRevokePKH)
+	ourRefScript := DirectWPKHScriptFromPKH(c.OurRefundPKH)
 	ourOutput := wire.NewTxOut(c.OurFundingAmount - fee, ourRefScript)
 	tx.AddTxOut(ourOutput)
 
-	theirRefScript := DirectWPKHScriptFromPKH(c.TheirRevokePKH)
+	theirRefScript := DirectWPKHScriptFromPKH(c.TheirRefundPKH)
 	theirOutput := wire.NewTxOut(c.TheirFundingAmount - fee, theirRefScript)
 	tx.AddTxOut(theirOutput)
 

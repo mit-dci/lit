@@ -1745,7 +1745,7 @@ type DlcOfferAcceptMsg struct {
 	// The Pubkey to be used to in the contract settlement
 	OurPayoutBase [33]byte
 	//OurRevokePub [33]byte
-	OurRevokePKH [20]byte
+	OurRefundPKH [20]byte
 	OurrefundTxSig64 [64]byte
 	// The PKH to be paid to in the contract settlement
 	OurPayoutPKH [20]byte
@@ -1768,7 +1768,7 @@ func NewDlcOfferAcceptMsg(contract *DlcContract,
 	msg.OurChangePKH = contract.OurChangePKH
 	msg.OurFundMultisigPub = contract.OurFundMultisigPub
 	msg.OurPayoutBase = contract.OurPayoutBase
-	msg.OurRevokePKH = contract.OurRevokePKH
+	msg.OurRefundPKH = contract.OurRefundPKH
 	msg.OurrefundTxSig64 = contract.OurrefundTxSig64
 	msg.OurPayoutPKH = contract.OurPayoutPKH
 	msg.SettlementSignatures = signatures
@@ -1795,7 +1795,7 @@ func NewDlcOfferAcceptMsgFromBytes(b []byte,
 	copy(msg.OurChangePKH[:], buf.Next(20))
 	copy(msg.OurFundMultisigPub[:], buf.Next(33))
 	copy(msg.OurPayoutBase[:], buf.Next(33))
-	copy(msg.OurRevokePKH[:], buf.Next(20))
+	copy(msg.OurRefundPKH[:], buf.Next(20))
 	copy(msg.OurrefundTxSig64[:], buf.Next(64))
 	copy(msg.OurPayoutPKH[:], buf.Next(20))
 
@@ -1835,7 +1835,7 @@ func (msg DlcOfferAcceptMsg) Bytes() []byte {
 	buf.Write(msg.OurChangePKH[:])
 	buf.Write(msg.OurFundMultisigPub[:])
 	buf.Write(msg.OurPayoutBase[:])
-	buf.Write(msg.OurRevokePKH[:])
+	buf.Write(msg.OurRefundPKH[:])
 	buf.Write(msg.OurrefundTxSig64[:])
 	buf.Write(msg.OurPayoutPKH[:])
 
