@@ -17,21 +17,22 @@ def run_t(env, params):
 
         lit_funding_amt = params[0]
         contract_funding_amt = params[1]
-        oracle_value = params[2]
-        node_to_settle = params[3]
-        valueFullyOurs=params[4]
-        valueFullyTheirs=params[5]
+        oracles_number = params[2]
+        oracle_value = params[3]
+        node_to_settle = params[4]
+        valueFullyOurs=params[5]
+        valueFullyTheirs=params[6]
 
-        FundingTxVsize = params[6][0]
-        SettlementTxVsize = params[6][1]
+        FundingTxVsize = params[7][0]
+        SettlementTxVsize = params[7][1]
 
-        feeperbyte = params[7]
+        feeperbyte = params[8]
 
-        SetTxFeeOurs = params[8]
-        SetTxFeeTheirs = params[9]
+        SetTxFeeOurs = params[9]
+        SetTxFeeTheirs = params[10]
 
-        ClaimTxFeeOurs = params[10]
-        ClaimTxFeeTheirs = params[11]
+        ClaimTxFeeOurs = params[11]
+        ClaimTxFeeTheirs = params[12]
 
         bc = env.bitcoind
 
@@ -39,9 +40,11 @@ def run_t(env, params):
         # Create oracles
         #------------
 
-        env.new_oracle(1, oracle_value) # publishing interval is 1 second.
+        oracles = []
 
-        oracle1 = env.oracles[0]
+        for i in range(oracles_number):
+            env.new_oracle(1, oracle_value) # publishing interval is 1 second.
+            oracles.append(env.oracles[i])
 
         time.sleep(2)
 
@@ -93,7 +96,6 @@ def run_t(env, params):
         env.generate_block()
         time.sleep(5)
 
-        print("Funding")
         bals1 = lit1.get_balance_info()  
         print('new lit1 balance:', bals1['TxoTotal'], 'in txos,', bals1['ChanTotal'], 'in chans')
         bal1sum = bals1['TxoTotal'] + bals1['ChanTotal']
@@ -102,9 +104,6 @@ def run_t(env, params):
         print(lit_funding_amt)
 
         lit_funding_amt *= 100000000        # to satoshi
-
-        
-
 
         bals2 = lit2.get_balance_info()
         print('new lit2 balance:', bals2['TxoTotal'], 'in txos,', bals2['ChanTotal'], 'in chans')
@@ -130,29 +129,32 @@ def run_t(env, params):
         #------------------------------------------          
 
 
-        # #------------
-        # # Add oracles
-        # #------------
+        #------------
+        # Add oracles
+        #------------
 
         res = lit1.rpc.ListOracles()
         assert len(res) != 0, "Initial lis of oracles must be empty"
-        
-        oracle1_pubkey = json.loads(oracle1.get_pubkey())
-        assert len(oracle1_pubkey["A"]) == 66, "Wrong oracle1 pub key"
-        
-        oracle_res1 = lit1.rpc.AddOracle(Key=oracle1_pubkey["A"], Name="oracle1")
-        assert oracle_res1["Oracle"]["Idx"] == 1, "AddOracle does not works"
-
-        res = lit1.rpc.ListOracles(ListOraclesArgs={})
-        assert len(res["Oracles"]) == 1, "ListOracles 1 does not works"
 
 
-        lit2.rpc.AddOracle(Key=oracle1_pubkey["A"], Name="oracle1")
+        oracles_pubkey = []
+        oidxs = []
+        datasources = []
+
+        for oracle in oracles:
+            opk = json.loads(oracle.get_pubkey())
+            oracles_pubkey.append(opk)
+
+            oidx = lit1.rpc.AddOracle(Key=opk["A"], Name=opk["A"])["Oracle"]["Idx"]
+            oidxs.append(oidx)
+            lit2.rpc.AddOracle(Key=opk["A"], Name=opk["A"])["Oracle"]["Idx"]
+
+            datasources.append(json.loads(oracle.get_datasources()))
 
 
-        # #------------
-        # # Now we have to create a contract in the lit1 node.
-        # #------------
+        #------------
+        # Now we have to create a contract in the lit1 node.
+        #------------
 
         contract = lit1.rpc.NewContract()
 
@@ -162,12 +164,14 @@ def run_t(env, params):
 
         res = lit1.rpc.GetContract(Idx=1)
         assert res["Contract"]["Idx"] == 1, "GetContract does not works"
-                
 
-        res = lit1.rpc.SetContractOracle(CIdx=contract["Contract"]["Idx"], OIdx=oracle_res1["Oracle"]["Idx"])
+ 
+        res = lit1.rpc.SetContractOraclesNumber(CIdx=contract["Contract"]["Idx"], OraclesNumber=oracles_number)
+        assert res["Success"], "SetContractOraclesNumber does not works"
+
+        res = lit1.rpc.SetContractOracle(CIdx=contract["Contract"]["Idx"], OIdx=oidxs)
         assert res["Success"], "SetContractOracle does not works"
 
-        datasources = json.loads(oracle1.get_datasources())
 
         # Since the oracle publishes data every 1 second (we set this time above), 
         # we increase the time for a point by 3 seconds.
@@ -182,17 +186,28 @@ def run_t(env, params):
         res = lit1.rpc.SetContractRefundTime(CIdx=contract["Contract"]["Idx"], Time=settlement_time)
         assert res["Success"], "SetContractRefundTime does not works"
 
+        # we set settlement_time equal to refundtime, actually the refund transaction will be valid.
+        lit1.rpc.SetContractRefundTime(CIdx=contract["Contract"]["Idx"], Time=settlement_time)
+
         res = lit1.rpc.ListContracts()
         assert res["Contracts"][contract["Contract"]["Idx"] - 1]["OracleTimestamp"] == settlement_time, "SetContractSettlementTime does not match settlement_time"
 
-        rpoint1 = oracle1.get_rpoint(datasources[0]["id"], settlement_time)
 
         decode_hex = codecs.getdecoder("hex_codec")
-        b_RPoint = decode_hex(json.loads(rpoint1)['R'])[0]
-        RPoint = [elem for elem in b_RPoint]
+        brpoints = []
+        rpoints = []
+        for oracle, datasource in zip(oracles, datasources):
+            res = oracle.get_rpoint(datasource[0]["id"], settlement_time)
+            print(res)
+            b_RPoint = decode_hex(json.loads(res)['R'])[0]
+            RPoint = [elem for elem in b_RPoint]
+            brpoints.append(RPoint)
+            rpoints.append(res)
 
-        res = lit1.rpc.SetContractRPoint(CIdx=contract["Contract"]["Idx"], RPoint=RPoint)
+
+        res = lit1.rpc.SetContractRPoint(CIdx=contract["Contract"]["Idx"], RPoint=brpoints)
         assert res["Success"], "SetContractRpoint does not works"
+
 
         lit1.rpc.SetContractCoinType(CIdx=contract["Contract"]["Idx"], CoinType = 257)
         res = lit1.rpc.GetContract(Idx=contract["Contract"]["Idx"])
@@ -211,40 +226,25 @@ def run_t(env, params):
         assert res["Contract"]["OurFundingAmount"] == ourFundingAmount, "SetContractFunding does not works"
         assert res["Contract"]["TheirFundingAmount"] == theirFundingAmount, "SetContractFunding does not works"
 
-        print("Before SetContractDivision")
-        
         res = lit1.rpc.SetContractDivision(CIdx=contract["Contract"]["Idx"], ValueFullyOurs=valueFullyOurs, ValueFullyTheirs=valueFullyTheirs)
         assert res["Success"], "SetContractDivision does not works"
         
-        print("After SetContractDivision")
-
         time.sleep(5)
   
 
         res = lit1.rpc.ListConnections()
-        print(res)
-
-        print("Before OfferContract")
 
         res = lit1.rpc.OfferContract(CIdx=contract["Contract"]["Idx"], PeerIdx=lit1.get_peer_id(lit2))
         assert res["Success"], "OfferContract does not works"
 
-        print("After OfferContract")
-
         time.sleep(5)
-       
-
-        print("Before ContractRespond")
 
         res = lit2.rpc.ContractRespond(AcceptOrDecline=True, CIdx=1)
         assert res["Success"], "ContractRespond on lit2 does not works"
 
-        print("After ContractRespond")
-
         time.sleep(5)
 
-        #------------------------------------------
-        
+
         if deb_mod:
             print("ADDRESSES AFTER CONTRACT RESPOND")
             print("LIT1 Addresses")
@@ -257,15 +257,8 @@ def run_t(env, params):
             print(bc.rpc.listaddressgroupings())
 
 
-        # #------------------------------------------  
-
-
-        print("Before Generate Block")
-
         env.generate_block()
         time.sleep(2)
-
-        print("After Generate Block")
 
         print("Accept")
         bals1 = lit1.get_balance_info()  
@@ -287,47 +280,58 @@ def run_t(env, params):
         assert bal1sum == lit1_bal_after_accept, "lit1 Balance after contract accept does not match"
         assert bal2sum == lit2_bal_after_accept, "lit2 Balance after contract accept does not match"        
 
-        oracle1_val = ""
-        oracle1_sig = ""
+
+        OraclesSig = []
+        OraclesVal = []
 
         i = 0
         while True:
-            res = oracle1.get_publication(json.loads(rpoint1)['R'])
+
+            publications_result = []
+
+            for o, r in zip(oracles, rpoints):
+                publications_result.append(o.get_publication(json.loads(r)['R']))
+
+
             time.sleep(5)
             i += 1
             if i>4:
                 assert False, "Error: Oracle does not publish data"
             
             try:
-                oracle1_val = json.loads(res)["value"]
-                oracle1_sig = json.loads(res)["signature"]
+
+                for pr in publications_result:
+                    oracle_val = json.loads(pr)["value"]
+                    OraclesVal.append(oracle_val)
+                    oracle_sig = json.loads(pr)["signature"]
+                    b_OracleSig = decode_hex(oracle_sig)[0]
+                    OracleSig = [elem for elem in b_OracleSig]
+                    OraclesSig.append(OracleSig)                        
+
                 break
             except BaseException as e:
                 print(e)
                 next
 
+        # Oracles have to publish the same value
+        vEqual = True
+        nTemp = OraclesVal[0]
+        for v in OraclesVal:
+            if nTemp != v:
+                vEqual = False
+                break;
+        assert vEqual, "Oracles publish different values"      
 
-        b_OracleSig = decode_hex(oracle1_sig)[0]
-        OracleSig = [elem for elem in b_OracleSig]
-
-
-        print("Before SettleContract")
-        time.sleep(5)
-
-
-        res = env.lits[node_to_settle].rpc.SettleContract(CIdx=contract["Contract"]["Idx"], OracleValue=oracle1_val, OracleSig=OracleSig)
+        res = env.lits[node_to_settle].rpc.SettleContract(CIdx=contract["Contract"]["Idx"], OracleValue=OraclesVal[0], OracleSig=OraclesSig)
         assert res["Success"], "SettleContract does not works."
 
+
         time.sleep(5)
-
-        print('After SettleContract:')
-        print(res)
-
 
         try:
             env.generate_block(1)
             time.sleep(1)
-            env.generate_block(10)
+            env.generate_block(1)
             time.sleep(1)
             env.generate_block(1)
             time.sleep(1)
@@ -335,6 +339,7 @@ def run_t(env, params):
             print("Exception After SettleContract: ")
             print(be)    
 
+        time.sleep(2)
         #------------------------------------------
 
         if deb_mod:
@@ -374,16 +379,40 @@ def run_t(env, params):
                 print('--------')
 
 
-        #------------------------------------------
-        #------------------------------------------
-        print("AFter Settle")
 
-        print("ORACLE VALUE:", oracle1_val, "; oracle signature:", oracle1_sig)
+        if deb_mod:
+            print("ADDRESSES AFTER SETTLE")
+            print("LIT1 Addresses")
+            print(pp.pprint(lit1.rpc.GetAddresses()))
+
+            print("LIT2 Addresses")
+            print(pp.pprint(lit2.rpc.GetAddresses()))
+
+            print("bitcoind Addresses")
+            print(pp.pprint(bc.rpc.listaddressgroupings()))
+            #------------------------------------------   
+
+    
+    
+            print("=====START CONTRACT N1=====")
+            res = lit1.rpc.ListContracts()
+            #print(pp.pprint(res))
+            print(res)
+            print("=====END CONTRACT N1=====")
+
+            print("=====START CONTRACT N2=====")
+            res = lit2.rpc.ListContracts()
+            #print(pp.pprint(res))
+            print(res)
+            print("=====END CONTRACT N2=====")
+
+
+        print("ORACLE VALUE:", OraclesVal[0], "; oracle signature:", OraclesVal[0])
 
         valueOurs = 0 
   
 
-        valueOurs = env.lits[node_to_settle].rpc.GetContractDivision(CIdx=contract["Contract"]["Idx"],OracleValue=oracle1_val)['ValueOurs']
+        valueOurs = env.lits[node_to_settle].rpc.GetContractDivision(CIdx=contract["Contract"]["Idx"],OracleValue=OraclesVal[0])['ValueOurs']
         valueTheirs = contract_funding_amt * 2 - valueOurs
 
         print("valueOurs:", valueOurs, "; valueTheirs:", valueTheirs)
@@ -434,36 +463,6 @@ def run_t(env, params):
 
 
 
-
-        #------------------------------------------
-        if deb_mod:
-            print("ADDRESSES AFTER SETTLE")
-            print("LIT1 Addresses")
-            print(pp.pprint(lit1.rpc.GetAddresses()))
-
-            print("LIT2 Addresses")
-            print(pp.pprint(lit2.rpc.GetAddresses()))
-
-            print("bitcoind Addresses")
-            print(pp.pprint(bc.rpc.listaddressgroupings()))
-            #------------------------------------------   
-
-    
-    
-            print("=====START CONTRACT N1=====")
-            res = lit1.rpc.ListContracts()
-            #print(pp.pprint(res))
-            print(res)
-            print("=====END CONTRACT N1=====")
-
-            print("=====START CONTRACT N2=====")
-            res = lit2.rpc.ListContracts()
-            #print(pp.pprint(res))
-            print(res)
-            print("=====END CONTRACT N2=====")
-        
-        
-
     except BaseException as be:
         raise be  
 
@@ -484,13 +483,12 @@ def t_11_0(env):
     #-----------------------------
     # 2) SettlementTx vsize will be printed
 
- 
+
     # Vsize from Blockchain: 181
 
     # There fore we expect here
     # valueOurs: 17992800 = 18000000 - 7200     !!!
     # valueTheirs: 1992800 = 2000000 - 7200     !!!
-
 
     #-----------------------------
 
@@ -526,6 +524,7 @@ def t_11_0(env):
 
     #-----------------------------
 
+    oracles_number = 1
     oracle_value = 11
     node_to_settle = 0
 
@@ -550,14 +549,13 @@ def t_11_0(env):
 
     vsizes = [FundingTxVsize, SettlementTxVsize]
 
-    params = [lit_funding_amt, contract_funding_amt, oracle_value, node_to_settle, valueFullyOurs, valueFullyTheirs, vsizes, feeperbyte, SetTxFeeOurs, SetTxFeeTheirs, ClaimTxFeeOurs, ClaimTxFeeTheirs]
+    params = [lit_funding_amt, contract_funding_amt, oracles_number, oracle_value, node_to_settle, valueFullyOurs, valueFullyTheirs, vsizes, feeperbyte, SetTxFeeOurs, SetTxFeeTheirs, ClaimTxFeeOurs, ClaimTxFeeTheirs]
 
     run_t(env, params)
 
 
 
-# ====================================================================================
-# ====================================================================================  
+# ----------------------------------------------------------------------------- 
 
 
 def t_1300_1(env):
@@ -568,7 +566,7 @@ def t_1300_1(env):
 
     # Vsize from Blockchain: 252
 
-    # So we expect lit1, and lit2 balances equal to 89989920 !!!
+    # So we expect lit1, and lit2 balances equal to 89989920
     # 90000000 - 89989920 = 10080
     # But this is only when peers have one input each. What we expect.
 
@@ -582,12 +580,10 @@ def t_1300_1(env):
     # valueOurs: 5992800 = 6000000 - 7200     !!!
     # valueTheirs: 13992800 = 14000000 - 7200     !!!
 
-
     #-----------------------------
 
     # 3) Claim TX in SettleContract lit1
     # Here the transaction vsize is always the same: 121
-
 
     # Vsize from Blockchain: 121
 
@@ -618,6 +614,7 @@ def t_1300_1(env):
 
     #-----------------------------
 
+    oracles_number = 3
     oracle_value = 1300
     node_to_settle = 1
 
@@ -643,20 +640,18 @@ def t_1300_1(env):
 
     vsizes = [FundingTxVsize, SettlementTxVsize]
 
-    params = [lit_funding_amt, contract_funding_amt, oracle_value, node_to_settle, valueFullyOurs, valueFullyTheirs, vsizes, feeperbyte, SetTxFeeOurs, SetTxFeeTheirs, ClaimTxFeeOurs, ClaimTxFeeTheirs]
+    params = [lit_funding_amt, contract_funding_amt, oracles_number, oracle_value, node_to_settle, valueFullyOurs, valueFullyTheirs, vsizes, feeperbyte, SetTxFeeOurs, SetTxFeeTheirs, ClaimTxFeeOurs, ClaimTxFeeTheirs]
 
     run_t(env, params)
 
 
 
-# ====================================================================================
-# ====================================================================================  
-
+# -----------------------------------------------------------------------------
 
 
 def t_10_0(env):
     
-
+    oracles_number = 3
     oracle_value = 10
     node_to_settle = 0
 
@@ -681,20 +676,19 @@ def t_10_0(env):
 
     vsizes = [FundingTxVsize, SettlementTxVsize]
 
-    params = [lit_funding_amt, contract_funding_amt, oracle_value, node_to_settle, valueFullyOurs, valueFullyTheirs, vsizes, feeperbyte, SetTxFeeOurs, SetTxFeeTheirs, ClaimTxFeeOurs, ClaimTxFeeTheirs]
+    params = [lit_funding_amt, contract_funding_amt, oracles_number, oracle_value, node_to_settle, valueFullyOurs, valueFullyTheirs, vsizes, feeperbyte, SetTxFeeOurs, SetTxFeeTheirs, ClaimTxFeeOurs, ClaimTxFeeTheirs]
 
     run_t(env, params)
 
 
 
-# ====================================================================================
-# ====================================================================================  
+# -----------------------------------------------------------------------------  
 
 
 
 def t_10_1(env):
     
-
+    oracles_number = 3
     oracle_value = 10
     node_to_settle = 1
 
@@ -721,20 +715,17 @@ def t_10_1(env):
 
     vsizes = [FundingTxVsize, SettlementTxVsize]
 
-    params = [lit_funding_amt, contract_funding_amt, oracle_value, node_to_settle, valueFullyOurs, valueFullyTheirs, vsizes, feeperbyte, SetTxFeeOurs, SetTxFeeTheirs, ClaimTxFeeOurs, ClaimTxFeeTheirs]
+    params = [lit_funding_amt, contract_funding_amt, oracles_number, oracle_value, node_to_settle, valueFullyOurs, valueFullyTheirs, vsizes, feeperbyte, SetTxFeeOurs, SetTxFeeTheirs, ClaimTxFeeOurs, ClaimTxFeeTheirs]
 
     run_t(env, params)
 
 
-
-# ====================================================================================
-# ====================================================================================  
-
-
+# -----------------------------------------------------------------------------  
 
 def t_20_0(env):
     
 
+    oracles_number = 3
     oracle_value = 20
     node_to_settle = 0
 
@@ -759,21 +750,17 @@ def t_20_0(env):
 
     vsizes = [FundingTxVsize, SettlementTxVsize]
 
-    params = [lit_funding_amt, contract_funding_amt, oracle_value, node_to_settle, valueFullyOurs, valueFullyTheirs, vsizes, feeperbyte, SetTxFeeOurs, SetTxFeeTheirs, ClaimTxFeeOurs, ClaimTxFeeTheirs]
+    params = [lit_funding_amt, contract_funding_amt, oracles_number, oracle_value, node_to_settle, valueFullyOurs, valueFullyTheirs, vsizes, feeperbyte, SetTxFeeOurs, SetTxFeeTheirs, ClaimTxFeeOurs, ClaimTxFeeTheirs]
 
     run_t(env, params)
 
 
-
-
-# ====================================================================================
-# ====================================================================================  
-
-
+# ----------------------------------------------------------------------------- 
 
 def t_20_1(env):
     
 
+    oracles_number = 3
     oracle_value = 20
     node_to_settle = 1
 
@@ -794,12 +781,10 @@ def t_20_1(env):
     ClaimTxFeeOurs = 121 * 80
     ClaimTxFeeTheirs = 0
 
-
     feeperbyte = 80
-
 
     vsizes = [FundingTxVsize, SettlementTxVsize]
 
-    params = [lit_funding_amt, contract_funding_amt, oracle_value, node_to_settle, valueFullyOurs, valueFullyTheirs, vsizes, feeperbyte, SetTxFeeOurs, SetTxFeeTheirs, ClaimTxFeeOurs, ClaimTxFeeTheirs]
+    params = [lit_funding_amt, contract_funding_amt, oracles_number, oracle_value, node_to_settle, valueFullyOurs, valueFullyTheirs, vsizes, feeperbyte, SetTxFeeOurs, SetTxFeeTheirs, ClaimTxFeeOurs, ClaimTxFeeTheirs]
 
     run_t(env, params)

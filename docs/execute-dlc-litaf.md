@@ -52,6 +52,13 @@ First, we create a new draft contract
 dlc contract new
 ```
 
+Multiple oracles supported only from RPC cals.
+With lit-af utility you have to set oracles number to 1.
+
+```
+dlc contract setoraclesnumber 1 1
+```
+
 Then, we configure the contract to use the oracle we added in step 2. Remember, if this oracle got a different ID, you have to adjust the second parameter to this call.
 
 ```

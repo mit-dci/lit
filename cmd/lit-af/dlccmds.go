@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"errors"
 
 	"github.com/fatih/color"
 	"github.com/mit-dci/lit/litrpc"
@@ -122,7 +123,9 @@ var contractCommand = &Command{
 			"Sets the cointype of a contract"),
 		fmt.Sprintf("%-20s %s",
 			lnutil.White("setfeeperbyte"),
-			"Sets the fee per byte for a contract"),			
+		fmt.Sprintf("%-20s %s",
+			lnutil.White("setoraclesnumber"),			
+			"Sets the oracles number for a contract"),			
 		fmt.Sprintf("%-20s %s",
 			lnutil.White("offer"),
 			"Offer a draft contract to one of your peers"),
@@ -321,11 +324,27 @@ var setContractFeePerByteCommand = &Command{
 			lnutil.White("cid"),
 			"The ID of the contract"),
 		fmt.Sprintf("%-10s %s",
-			lnutil.White("cointype"),
+			lnutil.White("feeperbyte"),
 			"The fee per byte in satoshi to use for the contract"),
 	),
 	ShortDescription: "Sets the fee per byte in satoshi to use for the contract\n",
 }
+
+var setContractOraclesNumberCommand = &Command{
+	Format: fmt.Sprintf("%s%s\n", lnutil.White("dlc contract setoraclesnumber"),
+		lnutil.ReqColor("cid", "oraclesnumber")),
+	Description: fmt.Sprintf("%s\n%s\n%s\n",
+		"Sets the oracles number to use for the contract",
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("cid"),
+			"The ID of the contract"),
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("oraclesnumber"),
+			"The oracles number to use for the contract"),
+	),
+	ShortDescription: "Sets a number of oracles required for the contract\n",
+}
+
 var declineContractCommand = &Command{
 	Format: fmt.Sprintf("%s%s\n", lnutil.White("dlc contract decline"),
 		lnutil.ReqColor("cid")),
@@ -547,7 +566,11 @@ func (lc *litAfClient) DlcContract(textArgs []string) error {
 
 	if cmd == "setfeeperbyte" {
 		return lc.DlcSetContractFeePerByte(textArgs)
-	}	
+	}
+	
+	if cmd == "setoraclesnumber" {
+		return lc.DlcSetContractOraclesNumber(textArgs)
+	}		
 
 	if cmd == "offer" {
 		return lc.DlcOfferContract(textArgs)
@@ -914,6 +937,45 @@ func (lc *litAfClient) DlcSetContractFeePerByte(textArgs []string) error {
 
 
 
+
+func (lc *litAfClient) DlcSetContractOraclesNumber(textArgs []string) error {
+	stopEx, err := CheckHelpCommand(setContractOraclesNumberCommand, textArgs, 2)
+	if err != nil || stopEx {
+		return err
+	}
+
+	args := new(litrpc.SetContractOraclesNumberArgs)
+	reply := new(litrpc.SetContractOraclesNumberReply)
+
+	cIdx, err := strconv.ParseUint(textArgs[0], 10, 64)
+	if err != nil {
+		return err
+	}
+	OraclesNumber, err := strconv.ParseUint(textArgs[1], 10, 64)
+	if err != nil {
+		return err
+	}
+
+	if OraclesNumber > 1 {
+		return errors.New("Multiple oracles supported only from RPC cals.")
+	}
+
+	args.CIdx = cIdx
+	args.OraclesNumber = uint32(OraclesNumber)
+
+	err = lc.Call("LitRPC.SetContractOraclesNumber", args, reply)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprint(color.Output, "SetContractOraclesNumber set successfully\n")
+
+	return nil
+}
+
+
+
+
 func (lc *litAfClient) DlcSetContractDivision(textArgs []string) error {
 	stopEx, err := CheckHelpCommand(setContractDivisionCommand, textArgs, 3)
 	if err != nil || stopEx {
@@ -1067,13 +1129,16 @@ func PrintContract(c *lnutil.DlcContract) {
 	fmt.Fprintf(color.Output, "%-30s : %d\n", lnutil.White("Index"), c.Idx)
 	fmt.Fprintf(color.Output, "%-30s : [%x...%x...%x]\n",
 		lnutil.White("Oracle public key"),
-		c.OracleA[:2], c.OracleA[15:16], c.OracleA[31:])
+		c.OracleA[0][:2], c.OracleA[0][15:16], c.OracleA[0][31:])
 	fmt.Fprintf(color.Output, "%-30s : [%x...%x...%x]\n",
 		lnutil.White("Oracle R-point"), c.OracleR[:2],
-		c.OracleR[15:16], c.OracleR[31:])
+		c.OracleR[0][15:16], c.OracleR[0][31:])
 	fmt.Fprintf(color.Output, "%-30s : %s\n",
 		lnutil.White("Settlement time"),
 		time.Unix(int64(c.OracleTimestamp), 0).UTC().Format(time.UnixDate))
+	fmt.Fprintf(color.Output, "%-30s : %s\n",
+		lnutil.White("Refund time"),
+		time.Unix(int64(c.RefundTimestamp), 0).UTC().Format(time.UnixDate))		
 	fmt.Fprintf(color.Output, "%-30s : %d\n",
 		lnutil.White("Funded by us"), c.OurFundingAmount)
 	fmt.Fprintf(color.Output, "%-30s : %d\n",
@@ -1082,6 +1147,9 @@ func PrintContract(c *lnutil.DlcContract) {
 		lnutil.White("Coin type"), c.CoinType)
 	fmt.Fprintf(color.Output, "%-30s : %d\n",
 		lnutil.White("Fee per byte"), c.FeePerByte)		
+	fmt.Fprintf(color.Output, "%-30s : %d\n",
+		lnutil.White("Oracles number"), c.OraclesNumber)	
+
 
 	peer := "None"
 	if c.PeerIdx > 0 {

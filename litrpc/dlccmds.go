@@ -6,6 +6,7 @@ import (
 
 	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/consts"
 )
 
 type ListOraclesArgs struct {
@@ -143,7 +144,7 @@ func (r *LitRPC) GetContract(args GetContractArgs,
 
 type SetContractOracleArgs struct {
 	CIdx uint64
-	OIdx uint64
+	OIdx []uint64
 }
 
 type SetContractOracleReply struct {
@@ -190,7 +191,7 @@ func (r *LitRPC) SetContractDatafeed(args SetContractDatafeedArgs,
 
 type SetContractRPointArgs struct {
 	CIdx   uint64
-	RPoint [33]byte
+	RPoint [][33]byte
 }
 
 type SetContractRPointReply struct {
@@ -343,6 +344,7 @@ type SetContractFeePerByteReply struct {
 	Success bool
 }
 
+
 // SetContractFeePerByte sets the fee per byte for the contract.
 func (r *LitRPC) SetContractFeePerByte(args SetContractFeePerByteArgs,
 	reply *SetContractFeePerByteReply) error {
@@ -357,7 +359,30 @@ func (r *LitRPC) SetContractFeePerByte(args SetContractFeePerByteArgs,
 	return nil
 }
 
-//----------------------------------------------------------
+
+
+type SetContractOraclesNumberArgs struct {
+	CIdx     uint64
+	OraclesNumber uint32
+}
+
+type SetContractOraclesNumberReply struct {
+	Success bool
+}
+
+
+func (r *LitRPC) SetContractOraclesNumber(args SetContractOraclesNumberArgs,
+	reply *SetContractOraclesNumberReply) error {
+	var err error
+
+	err = r.Node.DlcManager.SetContractOraclesNumber(args.CIdx, args.OraclesNumber)
+	if err != nil {
+		return err
+	}
+
+	reply.Success = true
+	return nil
+}
 
 type GetContractDivisionArgs struct {
 	CIdx     uint64
@@ -450,7 +475,7 @@ func (r *LitRPC) ContractRespond(args ContractRespondArgs, reply *ContractRespon
 type SettleContractArgs struct {
 	CIdx        uint64
 	OracleValue int64
-	OracleSig   [32]byte
+	OracleSig   [consts.MaxOraclesNumber][32]byte
 }
 
 type SettleContractReply struct {
