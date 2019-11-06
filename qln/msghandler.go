@@ -543,6 +543,8 @@ func (nd *LitNode) HandleContractOPEvent(c *lnutil.DlcContract,
 				" for type %d", c.CoinType)
 		}
 
+		nd.OpEventTx = opEvent.Tx
+		
 		pkhIsMine := false
 		pkhIdx := uint32(0)
 		value := int64(0)

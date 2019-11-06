@@ -198,7 +198,6 @@ def run_t(env, params):
         rpoints = []
         for oracle, datasource in zip(oracles, datasources):
             res = oracle.get_rpoint(datasource[0]["id"], settlement_time)
-            print(res)
             b_RPoint = decode_hex(json.loads(res)['R'])[0]
             RPoint = [elem for elem in b_RPoint]
             brpoints.append(RPoint)
@@ -406,9 +405,6 @@ def run_t(env, params):
             print(res)
             print("=====END CONTRACT N2=====")
 
-
-        print("ORACLE VALUE:", OraclesVal[0], "; oracle signature:", OraclesVal[0])
-
         valueOurs = 0 
   
 
@@ -463,6 +459,35 @@ def run_t(env, params):
 
 
 
+        # Check for possible ofracle fraud.
+        # If Olivia herself is a counterparty to a contract (e.g. Alice is Olivia), she can
+        # cause it to execute in an arbitrary fashion withouth revealing her private key.
+
+        # This is detectable, and the defrauded party
+        # Bob can provide a compact proof of the fraud so that all other users can
+        # stop using Olivia’s commitments and signatures. 
+
+        # For testing only
+        publishedTX = lit2.rpc.GetLatestTx(CIdx=1)
+        print("GetLatestTx res: ", publishedTX["Tx"])
+
+        # At the moment we get lagest published tx.
+        msg = lit2.rpc.GetMessageFromTx(CIdx=1, Tx=str(publishedTX["Tx"]))
+        print("GetMessageFromTx res: ", msg)
+
+        assert msg["OracleValue"] == oracle_value, "lit.rpc.GetMessageFromTx does not works." 
+
+        proofOfMsg = lit2.rpc.CompactProofOfMsg(\
+            OracleValue=msg["OracleValue"], \
+            ValueOurs=msg["ValueOurs"],\
+            ValueTheirs=msg["ValueTheirs"],\
+            OracleA=msg["OracleA"],\
+            OracleR=msg["OracleR"],\
+            TheirPayoutBase=msg["TheirPayoutBase"],\
+            OurPayoutBase=msg["OurPayoutBase"], Tx=publishedTX["Tx"])
+
+        print("proofOfMsg: ", proofOfMsg)    
+      
     except BaseException as be:
         raise be  
 

@@ -33,7 +33,7 @@ dlc 2 t_11_0
 # and also to test settlement from counterparty
 # TODO. Fix Error: [Errno 32] Broken pipe
 # when delay betwen requests becomes large
-#dlc 2 t_1300_1
+# dlc 2 t_1300_1
 
 # test at left edge
 dlc 2 t_10_0
@@ -49,4 +49,12 @@ dlc 2 t_20_1
 
 dlcrefund 2 forward
 dlcrefund 2 reverse
+
+# If Olivia attempts to publicly report two different prices (in order to
+# assume the role of a counterparty in a contract and “win” the bet regardless
+# of the true outcome), she will reveal her permanent private key, as well as
+# the k value for the particular contract she attempted to double-report.
+checkoraclefraud 1
+
+
 

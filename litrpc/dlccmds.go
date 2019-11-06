@@ -2,11 +2,19 @@ package litrpc
 
 import (
 	"encoding/hex"
+	"encoding/binary"
 	"fmt"
 
 	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/lnutil"
 	"github.com/mit-dci/lit/consts"
+
+	"github.com/mit-dci/lit/wire"
+
+	"github.com/adiabat/btcd/btcec"
+	"math/big"
+	"bytes"
+	"bufio"
 )
 
 type ListOraclesArgs struct {
@@ -501,9 +509,7 @@ func (r *LitRPC) SettleContract(args SettleContractArgs,
 	return nil
 }
 
-
 //======================================================================
-
 
 type RefundContractArgs struct {
 	CIdx        uint64
@@ -525,4 +531,250 @@ func (r *LitRPC) RefundContract(args RefundContractArgs,reply *RefundContractRep
 
 	reply.Success = true
 	return nil
+}
+
+//======================================================================
+
+type DifferentResultsFraudArgs struct {
+	Sfirst	string
+	Hfirst	string
+	Ssecond string
+	Hsecond string
+	Rpoint  string
+	Apoint  string
+}
+
+type DifferentResultsFraudReply struct {
+	Fraud	bool
+}
+
+func (r *LitRPC) DifferentResultsFraud(args DifferentResultsFraudArgs, reply *DifferentResultsFraudReply) error {
+
+	reply.Fraud = false
+
+	curve := btcec.S256()
+
+	argsRpoint := new(big.Int)
+	argsApoint := new(big.Int)
+	argsRpoint.SetString(args.Rpoint, 16)
+	argsApoint.SetString(args.Apoint, 16)
+
+
+	s1 := new(big.Int)
+	h1 := new(big.Int)
+
+	s1.SetString(args.Sfirst, 16)
+	h1.SetString(args.Hfirst, 16)
+
+	s2 := new(big.Int)
+	h2 := new(big.Int)
+	
+	s2.SetString(args.Ssecond, 16)
+	h2.SetString(args.Hsecond, 16)
+
+	s2s1 := new(big.Int)
+	h1h2 := new(big.Int)
+
+	s2s1.Sub(s2, s1)
+	h1h2.Sub(h1, h2)
+	
+	h1h2.ModInverse(h1h2,curve.N)
+
+	v := new(big.Int)
+	v.Mul(s2s1, h1h2)
+	v.Mod(v, curve.N)	
+
+	//--------------------------------
+
+	k := new(big.Int)
+	h1vres := new(big.Int)
+	h1vres.Mul(h1, v)
+
+	k.Add(s1,h1vres)
+	k.Mod(k, curve.N)
+
+	//---------------------------------
+
+	bigS := new(big.Int)
+	bigS.Mul(h1, v)
+	bigS.Sub(k, bigS)
+	bigS.Mod(bigS, curve.N)
+
+	var Rpoint [33]byte
+	var Apoint [33]byte
+
+	_, pk := btcec.PrivKeyFromBytes(btcec.S256(), k.Bytes())
+	copy(Rpoint[:], pk.SerializeCompressed())
+
+	_, pk = btcec.PrivKeyFromBytes(btcec.S256(), v.Bytes())
+	copy(Apoint[:], pk.SerializeCompressed())
+
+	Rcompare := bytes.Compare(Rpoint[:], argsRpoint.Bytes())
+	Acompare := bytes.Compare(Apoint[:], argsApoint.Bytes())
+
+	if (Rcompare == 0) && (Acompare == 0){
+
+		reply.Fraud = true
+
+	}
+
+	return nil
+
+}
+
+//======================================================================
+// For testing only
+// This should be replaced by a fraudulent transaction that was published.
+
+
+type GetLatestTxArgs struct {
+	CIdx uint64
+}
+
+type GetLatestTxArgsReply struct {
+	Tx	string
+}
+
+func (r *LitRPC) GetLatestTx(args GetLatestTxArgs, reply *GetLatestTxArgsReply) error {
+
+	var buf bytes.Buffer
+	w := bufio.NewWriter(&buf)
+	r.Node.OpEventTx.Serialize(w)
+	w.Flush()		
+
+	encodedStr := hex.EncodeToString(buf.Bytes())
+	reply.Tx = encodedStr
+
+	return nil
+
+}
+
+//======================================================================
+
+type GetMessageFromTxArgs struct {
+	CIdx uint64
+	Tx   string
+}
+
+type GetMessageFromTxReply struct {
+	OracleValue	int64
+	ValueOurs 	int64
+	ValueTheirs int64
+	OracleA		string
+	OracleR		string
+	TheirPayoutBase string
+	OurPayoutBase	string
+
+}
+
+func (r *LitRPC) GetMessageFromTx(args GetMessageFromTxArgs, reply *GetMessageFromTxReply) error {
+
+
+	parsedTx, _ := hex.DecodeString(args.Tx)
+	reader := bytes.NewReader(parsedTx)
+
+	var msgTx wire.MsgTx
+	err := msgTx.Deserialize(reader)
+	if err != nil {
+		return nil
+	}	
+
+	inputPkScript := msgTx.TxOut[0].PkScript
+
+	c, _ := r.Node.DlcManager.LoadContract(args.CIdx)
+
+	for _, d := range c.Division {
+		tx, _ := lnutil.SettlementTx(c, d, true)
+		pkScriptsCompare := bytes.Compare(inputPkScript, tx.TxOut[0].PkScript)
+
+		if pkScriptsCompare == 0 {
+			reply.OracleValue = d.OracleValue
+			reply.ValueOurs   = d.ValueOurs
+			totalContractValue := c.TheirFundingAmount + c.OurFundingAmount
+			reply.ValueTheirs = totalContractValue - d.ValueOurs
+			reply.OracleA = hex.EncodeToString(c.OracleA[0][:])
+			reply.OracleR = hex.EncodeToString(c.OracleR[0][:])
+			reply.TheirPayoutBase = hex.EncodeToString(c.TheirPayoutBase[:])
+			reply.OurPayoutBase = hex.EncodeToString(c.OurPayoutBase[:])			
+
+		}
+
+	}
+
+	return nil
+
+}
+
+//======================================================================
+
+type CompactProofOfMsgArgs struct {
+	OracleValue	int64
+	ValueOurs 	int64
+	ValueTheirs int64
+	OracleA		string
+	OracleR		string
+	TheirPayoutBase string
+	OurPayoutBase	string	
+	Tx		string
+}
+
+type CompactProofOfMsgReply struct {
+	Success		bool
+}
+
+
+func (r *LitRPC) CompactProofOfMsg(args CompactProofOfMsgArgs, reply *CompactProofOfMsgReply) error {
+
+	reply.Success = false
+
+	parsedTx, _ := hex.DecodeString(args.Tx)
+	reader := bytes.NewReader(parsedTx)
+	var msgTx wire.MsgTx
+	err := msgTx.Deserialize(reader)
+	if err != nil {
+		return nil
+	}
+
+	var buf bytes.Buffer
+	w := bufio.NewWriter(&buf)
+	msgTx.Serialize(w)
+	w.Flush()
+
+	var oraclea []byte
+	var oracler []byte
+	var theirPayoutbase []byte
+	var ourPayoutbase []byte
+	oraclea, _ = hex.DecodeString(args.OracleA)
+	oracler, _ = hex.DecodeString(args.OracleR)
+
+	theirPayoutbase, _ = hex.DecodeString(args.TheirPayoutBase)
+	ourPayoutbase, _ = hex.DecodeString(args.OurPayoutBase)
+
+	var oraclea33 [33]byte
+	var oracler33 [33]byte
+	var theirPayoutbase33 [33]byte
+	var ourPayoutbase33 [33]byte
+	copy(oraclea33[:], oraclea)
+	copy(oracler33[:], oracler)
+	copy(theirPayoutbase33[:], theirPayoutbase)
+	copy(ourPayoutbase33[:], ourPayoutbase)
+
+	var buft bytes.Buffer
+	binary.Write(&buft, binary.BigEndian, uint64(0))
+	binary.Write(&buft, binary.BigEndian, uint64(0))
+	binary.Write(&buft, binary.BigEndian, uint64(0))
+	binary.Write(&buft, binary.BigEndian, args.OracleValue)
+	
+	oraclesSigPub, _ := lnutil.DlcCalcOracleSignaturePubKey(buft.Bytes(), oraclea33, oracler33)
+	var oraclesSigPubs [][33]byte
+	oraclesSigPubs = append(oraclesSigPubs, oraclesSigPub)
+	txoutput := lnutil.DlcOutput(theirPayoutbase33, ourPayoutbase33, oraclesSigPubs, args.ValueTheirs)
+	PkScriptCompare := bytes.Compare(txoutput.PkScript, msgTx.TxOut[0].PkScript)
+
+	if PkScriptCompare == 0 {
+		reply.Success = true
+	}
+
+	return nil
+
 }

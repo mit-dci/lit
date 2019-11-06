@@ -405,10 +405,8 @@ func PrintTx(tx *wire.MsgTx) {
 // DlcOutput returns a Txo for a particular value that pays to
 // (PubKeyPeer+PubKeyOracleSig or (OurPubKey and TimeDelay))
 func DlcOutput(pkPeer, pkOurs [33]byte, oraclesSigPub [][33]byte, value int64) *wire.TxOut {
-	
 	scriptBytes := DlcCommitScript(pkPeer, pkOurs, oraclesSigPub, 5)
 	scriptBytes = P2WSHify(scriptBytes)
-
 	return wire.NewTxOut(value, scriptBytes)
 }
 
