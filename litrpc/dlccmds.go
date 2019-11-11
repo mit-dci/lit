@@ -551,14 +551,12 @@ type DifferentResultsFraudReply struct {
 func (r *LitRPC) DifferentResultsFraud(args DifferentResultsFraudArgs, reply *DifferentResultsFraudReply) error {
 
 	reply.Fraud = false
-
 	curve := btcec.S256()
 
 	argsRpoint := new(big.Int)
 	argsApoint := new(big.Int)
 	argsRpoint.SetString(args.Rpoint, 16)
 	argsApoint.SetString(args.Apoint, 16)
-
 
 	s1 := new(big.Int)
 	h1 := new(big.Int)
@@ -595,11 +593,6 @@ func (r *LitRPC) DifferentResultsFraud(args DifferentResultsFraudArgs, reply *Di
 
 	//---------------------------------
 
-	bigS := new(big.Int)
-	bigS.Mul(h1, v)
-	bigS.Sub(k, bigS)
-	bigS.Mod(bigS, curve.N)
-
 	var Rpoint [33]byte
 	var Apoint [33]byte
 
@@ -613,9 +606,7 @@ func (r *LitRPC) DifferentResultsFraud(args DifferentResultsFraudArgs, reply *Di
 	Acompare := bytes.Compare(Apoint[:], argsApoint.Bytes())
 
 	if (Rcompare == 0) && (Acompare == 0){
-
 		reply.Fraud = true
-
 	}
 
 	return nil
