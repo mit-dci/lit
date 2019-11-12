@@ -72,7 +72,7 @@ type DlcContract struct {
 	OurChangePKH, TheirChangePKH [20]byte
 	// Pubkey used in the funding multisig output
 	OurFundMultisigPub, TheirFundMultisigPub [33]byte
-	//OurRevokePub, TheirRevokePub [33]byte
+	
 	OurRefundPKH, TheirRefundPKH [20]byte
 	OurrefundTxSig64, TheirrefundTxSig64 [64]byte
 	// Pubkey to be used in the commit script (combined with oracle pubkey

@@ -287,9 +287,6 @@ func (nd *LitNode) DlcOfferHandler(msg lnutil.DlcOfferMsg, peer *RemotePeer) {
 	c.TheirChangePKH = msg.Contract.OurChangePKH
 	c.TheirIdx = msg.Contract.Idx
 	c.TheirPayoutPKH = msg.Contract.OurPayoutPKH
-
-	//c.TheirRevokePub = msg.Contract.OurRevokePub
-
 	c.TheirRefundPKH = msg.Contract.OurRefundPKH
 
 	c.Division = make([]lnutil.DlcContractDivision, len(msg.Contract.Division))
