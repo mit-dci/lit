@@ -726,11 +726,6 @@ func (r *LitRPC) CompactProofOfMsg(args CompactProofOfMsgArgs, reply *CompactPro
 		return nil
 	}
 
-	var buf bytes.Buffer
-	w := bufio.NewWriter(&buf)
-	msgTx.Serialize(w)
-	w.Flush()
-
 	var oraclea []byte
 	var oracler []byte
 	var theirPayoutbase []byte
