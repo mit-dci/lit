@@ -22,6 +22,8 @@ github.com/jackpal/gateway v1.0.5 h1:qzXWUJfuMdlLMtt0a3Dgt+xkWQiA5itDEITVJtuSwMc
 github.com/jackpal/gateway v1.0.5/go.mod h1:lTpwd4ACLXmpyiCTRtfiNyVnUmqT9RivzCDQetPfnjA=
 github.com/jackpal/go-nat-pmp v0.0.0-20181021122511-d89d09f6f332 h1:taVnlVCxVFm9YTGyVhvCXxFii5jzI2HRRWvJzRTg+LY=
 github.com/jackpal/go-nat-pmp v0.0.0-20181021122511-d89d09f6f332/go.mod h1:QPH045xvCAeXUZOxsnwmrtiCoxIr9eob+4orBN1SBKc=
+github.com/jackpal/go-nat-pmp v0.0.0-20181021192511-d89d09f6f332 h1:a7NFNcFwp6ML57qUCGcryjr1G5Z5Mh3855uMfUgIIlU=
+github.com/jackpal/go-nat-pmp v0.0.0-20181021192511-d89d09f6f332/go.mod h1:QPH045xvCAeXUZOxsnwmrtiCoxIr9eob+4orBN1SBKc=
 github.com/jackpal/go-nat-pmp v1.0.1 h1:i0LektDkO1QlrTm/cSuP+PyBCDnYvjPLGl4LdWEMiaA=
 github.com/jackpal/go-nat-pmp v1.0.1/go.mod h1:QPH045xvCAeXUZOxsnwmrtiCoxIr9eob+4orBN1SBKc=
 github.com/jessevdk/go-flags v1.4.0 h1:4IU2WS7AumrZ/40jfhf4QVDMsQwqA7VEHozFRrGARJA=

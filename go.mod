@@ -12,7 +12,7 @@ require (
 	github.com/getlantern/deepcopy v0.0.0-20160317154340-7f45deb8130a
 	github.com/howeyc/gopass v0.0.0-20170109162249-bf9dde6d0d2c
 	github.com/jackpal/gateway v1.0.5
-	github.com/jackpal/go-nat-pmp v0.0.0-20181021122511-d89d09f6f332 // latest release has issue, but go doesn't let you do head if there are releases.
+	github.com/jackpal/go-nat-pmp v0.0.0-20181021192511-d89d09f6f332 // latest release has issue, but go doesn't let you do head if there are releases.
 	github.com/jessevdk/go-flags v1.4.0
 	github.com/mattn/go-colorable v0.1.1 // indirect
 	github.com/mattn/go-isatty v0.0.6 // indirect
@@ -24,3 +24,5 @@ require (
 	golang.org/x/sys v0.0.0-20190306171555-70f529850638 // indirect
 	golang.org/x/text v0.3.0 // indirect
 )
+
+go 1.13
