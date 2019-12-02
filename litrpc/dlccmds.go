@@ -764,3 +764,65 @@ func (r *LitRPC) CompactProofOfMsg(args CompactProofOfMsgArgs, reply *CompactPro
 	return nil
 
 }
+
+
+
+
+//======================================================================
+
+
+type NegotiateContractArgs struct {
+	CIdx uint64
+	DesiredOracleValue int64
+}
+
+type NegotiateContractReply struct {
+	Success      bool
+}
+
+
+func (r *LitRPC) DlcNegotiateContract(args NegotiateContractArgs, reply *NegotiateContractReply) error {
+
+	var err error
+
+	err = r.Node.DlcNegotiateContract(args.CIdx, args.DesiredOracleValue)
+	if err != nil {
+		return err
+	}
+
+	reply.Success = true
+	return nil
+
+}
+
+
+
+type NegotiateContractRespondArgs struct {
+	// True for accept, false for decline.
+	AcceptOrDecline bool
+	CIdx            uint64
+}
+
+type NegotiateContractRespondReply struct {
+	Success bool
+}
+
+// DeclineContract declines an offered contract
+func (r *LitRPC) NegotiateContractRespond(args NegotiateContractRespondArgs, reply *NegotiateContractRespondReply) error {
+	var err error
+
+
+	if args.AcceptOrDecline {
+		err = r.Node.DlcAcceptNegotiate(args.CIdx)
+	}else{
+		err = r.Node.DlcDeclineNegotiate(args.CIdx)
+	}
+
+	if err != nil {
+		return err
+	}
+
+	reply.Success = true
+	return nil
+}
+

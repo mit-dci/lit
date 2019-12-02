@@ -2,6 +2,10 @@ package qln
 
 import (
 	"fmt"
+	"errors"
+
+	"encoding/hex"
+
 	"github.com/mit-dci/lit/btcutil"
 	"github.com/mit-dci/lit/btcutil/txscript"
 	"github.com/mit-dci/lit/btcutil/txsort"
@@ -14,6 +18,8 @@ import (
 	"github.com/mit-dci/lit/wire"
 	"github.com/mit-dci/lit/consts"
 )
+
+var _,_ = hex.DecodeString("")
 
 func (nd *LitNode) AddContract() (*lnutil.DlcContract, error) {
 
@@ -116,8 +122,8 @@ func (nd *LitNode) OfferDlc(peerIdx uint32, cIdx uint64) error {
         return err
 	}
 
-	copy(c.OurPayoutPKH[:], btcutil.Hash160(ourPayoutPKHKey[:]))	
-
+	copy(c.OurPayoutPKH[:], btcutil.Hash160(ourPayoutPKHKey[:]))
+	
 	// Fund the contract
 	err = nd.FundContract(c)
 	if err != nil {
@@ -173,7 +179,7 @@ func (nd *LitNode) AcceptDlc(cIdx uint64) error {
 	}
 
 	if c.Status != lnutil.ContractStatusOfferedToMe {
-		return fmt.Errorf("You cannot decline a contract unless it is in the 'Offered/Awaiting reply' state")
+		return fmt.Errorf("You cannot accept a contract unless it is in the 'Offered/Awaiting reply' state")
 	}
 
 	if !nd.ConnectedToPeer(c.PeerIdx) {
@@ -225,6 +231,7 @@ func (nd *LitNode) AcceptDlc(cIdx uint64) error {
 			nd.DlcManager.SaveContract(c)
 			return
 		}
+
 		copy(c.OurPayoutPKH[:], btcutil.Hash160(ourPayoutPKHKey[:]))
 
 		wal, _ := nd.SubWallet[c.CoinType]
@@ -249,9 +256,7 @@ func (nd *LitNode) AcceptDlc(cIdx uint64) error {
 		
 		kg.Step[2] = UseContractFundMultisig
 		mypriv, err := wal.GetPriv(kg)
-		//wal, _ := nd.SubWallet[c.CoinType]
-
-
+		
 		err = lnutil.SignRefundTx(c, refundTx, mypriv)
 		if err != nil {
 			logging.Errorf("Error of SignRefundTx: %s", err.Error())
@@ -554,12 +559,14 @@ func (nd *LitNode) SignSettlementDivisions(c *lnutil.DlcContract) ([]lnutil.DlcC
 		if err != nil {
 			return nil, err
 		}
+
 		sig, err := nd.SignSettlementTx(c, tx, priv)
 		if err != nil {
 			return nil, err
 		}
 		returnValue[i].Outcome = d.OracleValue
 		returnValue[i].Signature = sig
+
 	}
 
 	return returnValue, nil
@@ -713,14 +720,16 @@ func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oraclesSig[con
 		return [32]byte{}, [32]byte{}, err
 	}
 
+
 	mySig, err := nd.SignSettlementTx(c, settleTx, priv)
 	if err != nil {
 		logging.Errorf("SettleContract SignSettlementTx err %s", err.Error())
 		return [32]byte{}, [32]byte{}, err
 	}
+	
 
 	myBigSig := sig64.SigDecompress(mySig)
-
+	
 	theirSig, err := c.GetTheirSettlementSignature(oracleValue)
 	theirBigSig := sig64.SigDecompress(theirSig)
 
@@ -748,7 +757,6 @@ func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oraclesSig[con
 		logging.Errorf("SettleContract DirectSendTx (settle) err %s", err.Error())
 		return [32]byte{}, [32]byte{}, err
 	}
-
 
 	//===========================================
 	// Claim TX
@@ -788,7 +796,7 @@ func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oraclesSig[con
 
 
 		var pubOracleBytes [][33]byte
-
+	
 		privOracle0, pubOracle0 := koblitz.PrivKeyFromBytes(koblitz.S256(), oraclesSig[0][:])
 		privContractOutput := lnutil.CombinePrivateKeys(privSpend, privOracle0)
 
@@ -799,6 +807,7 @@ func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oraclesSig[con
 		for i:=uint32(1); i < c.OraclesNumber; i++ {
 
 			privOracle, pubOracle := koblitz.PrivKeyFromBytes(koblitz.S256(), oraclesSig[i][:])
+
 			privContractOutput = lnutil.CombinePrivateKeys(privContractOutput, privOracle)
 
 			var pubOracleBytes1 [33]byte
@@ -846,6 +855,11 @@ func (nd *LitNode) RefundContract(cIdx uint64) (bool, error) {
 		return false, err
 	}
 
+	if (c.Status != lnutil.ContractStatusActive) && (c.Status != lnutil.ContractStatusNegotiateDeclinedByHim) {
+		return false, errors.New("You cannot refund a contract that is not in active stage")
+	}
+
+
 	wal, _ := nd.SubWallet[c.CoinType]
 
 	refundTx, err := lnutil.RefundTx(c)
@@ -867,3 +881,307 @@ func (nd *LitNode) RefundContract(cIdx uint64) (bool, error) {
 	return true, nil
 
 }
+
+
+
+
+func (nd *LitNode) DlcNegotiateContract(cIdx uint64, DesiredOracleValue int64) error {
+
+	c, err := nd.DlcManager.LoadContract(cIdx)
+	if err != nil {
+		return err
+	}
+
+	if !nd.ConnectedToPeer(c.PeerIdx) {
+		return fmt.Errorf("You are not connected to peer %d, do that first", c.PeerIdx)
+	}
+
+
+	if (c.Status != lnutil.ContractStatusActive) && (c.Status != lnutil.ContractStatusNegotiateDeclinedByHim) {
+		return fmt.Errorf("You cannot negotiate a contract that is not in active stage")
+	}
+
+	c.DesiredOracleValue = DesiredOracleValue
+
+
+	//----------------------------------------------------------------------------
+	// Create Tx
+
+	var negotiateTx *wire.MsgTx
+	negotiateTx, err = lnutil.NegotiateTx(c)
+
+	//----------------------------------------------------------------------------
+	// Sign
+
+	var kg portxo.KeyGen
+	kg.Depth = 5
+	kg.Step[0] = 44 | 1<<31
+	kg.Step[1] = c.CoinType | 1<<31
+	kg.Step[2] = UseContractFundMultisig
+	kg.Step[3] = c.PeerIdx | 1<<31
+	kg.Step[4] = uint32(c.Idx) | 1<<31
+
+	wal, _ := nd.SubWallet[c.CoinType]
+	priv, err := wal.GetPriv(kg)
+
+	err = lnutil.SignNegotiateTx(c, negotiateTx, priv)
+	if err != nil {
+		logging.Errorf("Error of SignRefundTx: %s", err.Error())
+		c.Status = lnutil.ContractStatusError
+		nd.DlcManager.SaveContract(c)
+		return err
+	}
+
+
+	
+	outMsg := lnutil.NewDlcContractNegotiateMsg(c)
+
+	nd.tmpSendLitMsg(outMsg)
+
+
+	c.Status = lnutil.ContractStatusNegotiatingByMe
+
+
+	err = nd.DlcManager.SaveContract(c)
+	if err != nil {
+		logging.Errorf("DlcNegotiateContractHandler SaveContract err %s\n", err.Error())
+		return err
+	}	
+
+	return nil
+
+}
+
+
+// DlcNegotiateContractHandler
+func (nd *LitNode) DlcNegotiateContractHandler(msg lnutil.DlcContractNegotiateMsg, peer *RemotePeer) error {
+	//Тут он принимает запрос. Т.е просто видит что он есть.
+	//Он получает DlcNegotiateMsg. Там подпись для DesiredOracleValue
+
+
+	c, err := nd.DlcManager.LoadContract(msg.Idx)
+	if err != nil {
+		logging.Errorf("DlcFundingSigsHandler FindContract err %s\n", err.Error())
+		return err
+	}	
+
+	c.TheirnegotiateTxSig64 = msg.OurnegotiateTxSig64
+
+	// TODO: wire.ReadVarInt(buf, 0) returns only uint64, why?
+	c.DesiredOracleValue = int64(msg.DesiredOracleValue)
+
+	//-------------------------
+	//Verify
+
+	theirBigSig := sig64.SigDecompress(c.TheirnegotiateTxSig64)
+
+	var negotiateTx *wire.MsgTx
+	negotiateTx, err = lnutil.NegotiateTx(c)
+
+	hCache := txscript.NewTxSigHashes(negotiateTx)
+
+	pre, _, err := lnutil.FundTxScript(c.OurFundMultisigPub, c.TheirFundMultisigPub)
+	if err != nil {
+		return err
+	}
+
+	parsed, err := txscript.ParseScript(pre)
+	if err != nil {
+		logging.Errorf("DlcNegotiateContractHandler Sig err %s", err.Error())
+		return err
+	}	
+
+	// always sighash all
+	hash := txscript.CalcWitnessSignatureHash(parsed, hCache, txscript.SigHashAll, negotiateTx, 0, c.OurFundingAmount+c.TheirFundingAmount)
+
+	theirparsedPubKey, parsepuberr := koblitz.ParsePubKey(c.TheirFundMultisigPub[:], koblitz.S256())
+	if parsepuberr != nil {
+		logging.Errorf("DlcFundingSigsHandler err %s\n", parsepuberr.Error())
+	}
+
+	theirparsedSig, parsesigerr := koblitz.ParseDERSignature(theirBigSig, koblitz.S256())
+	if parsesigerr != nil {
+		logging.Errorf("DlcFundingSigsHandler err %s\n", parsesigerr.Error())
+	}
+
+	theirSigvalid := theirparsedSig.Verify(hash, theirparsedPubKey)
+
+	fmt.Printf("DlcNegotiateContractHandler(): c.TheirnegotiateTxSig64 valid?: %t \n", theirSigvalid)
+
+
+	if theirSigvalid {
+		c.Status = lnutil.ContractStatusNegotiatingToMe
+	}else{
+		return errors.New("DlcNegotiateContractHandler: c.TheirnegotiateTxSig64 is invalid.")
+	}
+
+	//-------------------------
+
+	err = nd.DlcManager.SaveContract(c)
+	if err != nil {
+		logging.Errorf("DlcNegotiateContractHandler SaveContract err %s\n", err.Error())
+		return err
+	}
+
+
+	return nil	
+}
+
+
+func (nd *LitNode) DlcAcceptNegotiate(cIdx uint64) error {
+	//Тут он может согласится
+	//Если он соглашается, то публикует транзакцию и шлет Ack
+
+	c, err := nd.DlcManager.LoadContract(cIdx)
+	if err != nil {
+		return err
+	}
+
+	if c.Status != lnutil.ContractStatusNegotiatingToMe {
+		return fmt.Errorf("You cannot accept negotiate a contract unless it is in the 'Negotiating to me' state")
+	}
+
+
+	if !nd.ConnectedToPeer(c.PeerIdx) {
+		return fmt.Errorf("You are not connected to peer %d, do that first", c.PeerIdx)
+	}	
+
+	var negotiateTx *wire.MsgTx
+	negotiateTx, err = lnutil.NegotiateTx(c)
+	
+	
+	var kg portxo.KeyGen
+	kg.Depth = 5
+	kg.Step[0] = 44 | 1<<31
+	kg.Step[1] = c.CoinType | 1<<31
+	kg.Step[2] = UseContractFundMultisig
+	kg.Step[3] = c.PeerIdx | 1<<31
+	kg.Step[4] = uint32(c.Idx) | 1<<31
+
+	wal, _ := nd.SubWallet[c.CoinType]
+	priv, err := wal.GetPriv(kg)
+
+	err = lnutil.SignNegotiateTx(c, negotiateTx, priv)
+	if err != nil {
+		logging.Errorf("Error of SignRefundTx: %s", err.Error())
+		c.Status = lnutil.ContractStatusError
+		nd.DlcManager.SaveContract(c)
+		return err
+	}	
+
+	pre, swap, err := lnutil.FundTxScript(c.OurFundMultisigPub, c.TheirFundMultisigPub)
+	
+	
+	myBigSig := sig64.SigDecompress(c.OurnegotiateTxSig64)
+	myBigSig = append(myBigSig, byte(txscript.SigHashAll))	
+	theirBigSig := sig64.SigDecompress(c.TheirnegotiateTxSig64)
+	theirBigSig = append(theirBigSig, byte(txscript.SigHashAll))	
+
+	// swap if needed
+	if swap {
+		negotiateTx.TxIn[0].Witness = SpendMultiSigWitStack(pre, theirBigSig, myBigSig)
+	} else {
+		negotiateTx.TxIn[0].Witness = SpendMultiSigWitStack(pre, myBigSig, theirBigSig)
+	}	
+
+	err = wal.DirectSendTx(negotiateTx)
+
+	c.Status = lnutil.ContractStatusNegotiatedToMe
+
+	err = nd.DlcManager.SaveContract(c)
+	if err != nil {
+		logging.Errorf("DlcNegotiateContractHandler SaveContract err %s\n", err.Error())
+		return err
+	}	
+
+	// Send ACK
+	outMsg := lnutil.NewDlcAcceptNegotiateMsg(c, negotiateTx)
+	nd.tmpSendLitMsg(outMsg)	
+
+
+	return nil
+}
+
+
+func (nd *LitNode) DlcAcceptNegotiateAck(msg lnutil.DlcContractAcceptNegotiateMsg, peer *RemotePeer) error {
+	//Я вижу что он принял и все
+
+	c, err := nd.DlcManager.LoadContract(msg.Idx)
+	if err != nil {
+		return err
+	}
+
+	c.Status = lnutil.ContractStatusNegotiatedByMe
+
+	err = nd.DlcManager.SaveContract(c)
+	if err != nil {
+		logging.Errorf("DlcAcceptNegotiateAck SaveContract err %s\n", err.Error())
+		return err
+	}		
+
+	return nil
+
+}
+
+
+
+func (nd *LitNode) DlcDeclineNegotiate(cIdx uint64) error {
+	//Или отказатся
+	//Шлет Ack
+
+	c, err := nd.DlcManager.LoadContract(cIdx)
+	if err != nil {
+		return err
+	}
+	
+	if !nd.ConnectedToPeer(c.PeerIdx) {
+		return fmt.Errorf("You are not connected to peer %d, do that first", c.PeerIdx)
+	}
+	
+	
+	if c.Status != lnutil.ContractStatusNegotiatingToMe {
+		return fmt.Errorf("You cannot decline negotiate a contract unless it is in the 'Negotiating to me' state")
+	}
+
+
+
+	c.Status = lnutil.ContractStatusNegotiateDeclinedByMe
+
+	err = nd.DlcManager.SaveContract(c)
+	if err != nil {
+		logging.Errorf("DlcAcceptNegotiateAck SaveContract err %s\n", err.Error())
+		return err
+	}
+
+	// Send ACK
+	outMsg := lnutil.NewDlcContractDeclineNegotiateMsg(c)
+	nd.tmpSendLitMsg(outMsg)
+	
+	return nil
+
+}
+
+
+func (nd *LitNode) DlcDeclineNegotiateAck(msg lnutil.DlcContractDeclineNegotiateMsg, peer *RemotePeer) error {
+	//Я вижу что он отказался
+
+	c, err := nd.DlcManager.LoadContract(msg.Idx)
+	if err != nil {
+		return err
+	}	
+
+	c.Status = lnutil.ContractStatusNegotiateDeclinedByHim
+
+	err = nd.DlcManager.SaveContract(c)
+	if err != nil {
+		logging.Errorf("DlcDeclineNegotiateAck SaveContract err %s\n", err.Error())
+		return err
+	}		
+
+	return nil
+}
+
+
+
+
+

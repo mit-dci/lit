@@ -1,33 +1,33 @@
 # Basic tests
-testlib 1
-connect 2
-reconnect 0 simple
-reconnect 0 reordered
-reconnect 0 inbound
-reconnect 0 reordered_inbound
-setgetfee 1
+#testlib 1
+#connect 2
+#reconnect 0 simple
+#reconnect 0 reordered
+#reconnect 0 inbound
+#reconnect 0 reordered_inbound
+#setgetfee 1
 
 # Tx operations
-receive 1
-send 1
-send2 2
+#receive 1
+#send 1
+#send2 2
 
 # Simple channel operations
-fund 2
-close 2 forward
-close 2 reverse
-break 2 forward
-break 2 reverse
-push 2
-pushbreak 2 forward
-pushbreak 2 reverse
-pushclose 2 forward
-pushclose 2 reverse
+#fund 2
+#close 2 forward
+#close 2 reverse
+#break 2 forward
+#break 2 reverse
+#push 2
+#pushbreak 2 forward
+#pushbreak 2 reverse
+#pushclose 2 forward
+#pushclose 2 reverse
 
 # DLC subsystem tx sizes calculation, etc...
 
 # regular contract
-dlc 2 t_11_0
+#dlc 2 t_11_0
 
 # large contract to test updated messaging subsystem
 # and also to test settlement from counterparty
@@ -36,25 +36,28 @@ dlc 2 t_11_0
 # dlc 2 t_1300_1
 
 # test at left edge
-dlc 2 t_10_0
+#dlc 2 t_10_0
 
 # test at left edge from the counterparty
-dlc 2 t_10_1
+#dlc 2 t_10_1
 
 # test at right edge
-dlc 2 t_20_0
+#dlc 2 t_20_0
 
 # test at right edge from the counterparty
-dlc 2 t_20_1
+#dlc 2 t_20_1
 
-dlcrefund 2 forward
-dlcrefund 2 reverse
+#dlcrefund 2 forward
+#dlcrefund 2 reverse
 
 # If Olivia attempts to publicly report two different prices (in order to
 # assume the role of a counterparty in a contract and “win” the bet regardless
 # of the true outcome), she will reveal her permanent private key, as well as
 # the k value for the particular contract she attempted to double-report.
-checkoraclefraud 1
+#checkoraclefraud 1
+
+negotiatecontract 2 accept
+negotiatecontract 2 decline
 
 
 

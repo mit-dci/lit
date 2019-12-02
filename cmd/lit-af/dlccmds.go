@@ -1178,6 +1178,16 @@ func PrintContract(c *lnutil.DlcContract) {
 		status = "Error"
 	case lnutil.ContractStatusDeclined:
 		status = "Declined"
+	case lnutil.ContractStatusNegotiatingByMe:
+		status = "ContractStatusNegotiatingByMe"
+	case lnutil.ContractStatusNegotiatingToMe:
+		status = "ContractStatusNegotiatingToMe"
+	case lnutil.ContractStatusNegotiatedByMe:
+		status = "ContractStatusNegotiatedByMe"
+	case lnutil.ContractStatusNegotiatedToMe:
+		status = "ContractStatusNegotiatedToMe"	
+	case lnutil.ContractStatusNegotiateDeclined:
+		status = "ContractStatusNegotiateDeclined"				
 	}
 
 	fmt.Fprintf(color.Output, "%-30s : %s\n\n", lnutil.White("Status"), status)

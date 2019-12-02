@@ -25,17 +25,23 @@ import (
 type DlcContractStatus int
 
 const (
-	ContractStatusDraft        DlcContractStatus = 0
-	ContractStatusOfferedByMe  DlcContractStatus = 1
-	ContractStatusOfferedToMe  DlcContractStatus = 2
-	ContractStatusDeclined     DlcContractStatus = 3
-	ContractStatusAccepted     DlcContractStatus = 4
-	ContractStatusAcknowledged DlcContractStatus = 5
-	ContractStatusActive       DlcContractStatus = 6
-	ContractStatusSettling     DlcContractStatus = 7
-	ContractStatusClosed       DlcContractStatus = 8
-	ContractStatusError        DlcContractStatus = 9
-	ContractStatusAccepting    DlcContractStatus = 10
+	ContractStatusDraft        			DlcContractStatus = 0
+	ContractStatusOfferedByMe  			DlcContractStatus = 1
+	ContractStatusOfferedToMe  			DlcContractStatus = 2
+	ContractStatusDeclined     			DlcContractStatus = 3
+	ContractStatusAccepted     			DlcContractStatus = 4
+	ContractStatusAcknowledged 			DlcContractStatus = 5
+	ContractStatusActive       			DlcContractStatus = 6  // TODO active status have to as large as possible. 11?
+	ContractStatusSettling     			DlcContractStatus = 7
+	ContractStatusClosed       			DlcContractStatus = 8
+	ContractStatusError        			DlcContractStatus = 9
+	ContractStatusAccepting    			DlcContractStatus = 10
+	ContractStatusNegotiatingByMe  		DlcContractStatus = 11
+	ContractStatusNegotiatingToMe  		DlcContractStatus = 12
+	ContractStatusNegotiatedByMe  		DlcContractStatus = 13
+	ContractStatusNegotiatedToMe  		DlcContractStatus = 14
+	ContractStatusNegotiateDeclinedByMe     DlcContractStatus = 15
+	ContractStatusNegotiateDeclinedByHim    DlcContractStatus = 16
 )
 
 // scalarSize is the size of an encoded big endian scalar.
@@ -75,6 +81,8 @@ type DlcContract struct {
 	
 	OurRefundPKH, TheirRefundPKH [20]byte
 	OurrefundTxSig64, TheirrefundTxSig64 [64]byte
+	DesiredOracleValue int64
+	OurnegotiateTxSig64, TheirnegotiateTxSig64 [64]byte
 	// Pubkey to be used in the commit script (combined with oracle pubkey
 	// or CSV timeout)
 	OurPayoutBase, TheirPayoutBase [33]byte
@@ -190,7 +198,16 @@ func DlcContractFromBytes(b []byte) (*DlcContract, error) {
 
 	copy(c.OurrefundTxSig64[:], buf.Next(64))
 	copy(c.TheirrefundTxSig64[:], buf.Next(64))
+
+	desiredOracleValue, err := wire.ReadVarInt(buf, 0)
+	if err != nil {
+		return nil, err
+	}
+	c.DesiredOracleValue = int64(desiredOracleValue)
 	
+	copy(c.OurnegotiateTxSig64[:], buf.Next(64))
+	copy(c.TheirnegotiateTxSig64[:], buf.Next(64))
+
 	copy(c.OurPayoutBase[:], buf.Next(33))
 	copy(c.TheirPayoutBase[:], buf.Next(33))
 
@@ -318,6 +335,11 @@ func (self *DlcContract) Bytes() []byte {
 
 	buf.Write(self.OurrefundTxSig64[:])
 	buf.Write(self.TheirrefundTxSig64[:])
+
+	wire.WriteVarInt(&buf, 0, uint64(self.DesiredOracleValue))
+
+	buf.Write(self.OurnegotiateTxSig64[:])
+	buf.Write(self.TheirnegotiateTxSig64[:])	
 	
 	buf.Write(self.OurPayoutBase[:])
 	buf.Write(self.TheirPayoutBase[:])
@@ -424,6 +446,16 @@ func DlcCommitScript(pubKeyPeer, ourPubKey [33]byte, oraclesSigPub [][33]byte, d
 	for i := 1; i < len(oraclesSigPub); i++ {
 		combinedPubKey = CombinePubs(combinedPubKey,  oraclesSigPub[i])
 	}
+
+
+	// neworaclepubkeystring := "02b24f7efcfb91f340c222638c58fd644a493a52312dd01966e07d715d4a0462de"
+
+	// decoded, _ := hex.DecodeString(neworaclepubkeystring)
+
+	// var neworaclepubkey [33]byte
+	// copy(neworaclepubkey[:], decoded[:])
+
+	// combinedPubKey = CombinePubs(combinedPubKey,  neworaclepubkey)	
 
 	return CommitScript(combinedPubKey, ourPubKey, delay)
 }
@@ -643,6 +675,7 @@ func SettlementTx(c *DlcContract, d DlcContractDivision,
 		if valueOurs > 0 {
 			tx.AddTxOut(wire.NewTxOut(valueOurs, DirectWPKHScriptFromPKH(c.OurPayoutPKH)))
 		}
+
 	} else {
 		if valueOurs > 0 {
 			tx.AddTxOut(DlcOutput(c.OurPayoutBase, c.TheirPayoutBase, oraclesSigPub, valueOurs))
@@ -712,3 +745,89 @@ func SignRefundTx(c *DlcContract, tx *wire.MsgTx,  priv *koblitz.PrivateKey) (er
 	return nil
 
 }
+
+
+//==================================================================
+
+
+func NegotiateTx(c *DlcContract) (*wire.MsgTx, error) {
+
+	tx := wire.NewMsgTx()
+	tx.Version = 2
+
+
+	DesiredOracleValue := c.DesiredOracleValue
+
+	totalContractValue := c.TheirFundingAmount + c.OurFundingAmount
+
+	var valueours int64
+	
+	for _, d := range c.Division{
+
+		if d.OracleValue == DesiredOracleValue {
+			valueours = d.ValueOurs
+		}
+
+	}
+
+	// TODO. If valueours is undefinded -> ERROR
+	valueTheirs := totalContractValue - valueours
+
+	var vsize uint32
+	if (valueours == 0) || (valueTheirs == 0){
+		vsize = 138
+	}else{
+		vsize = 169
+	}
+
+	fee := int64(vsize * c.FeePerByte)
+
+	txin := wire.NewTxIn(&c.FundingOutpoint, nil, nil)
+	txin.Sequence = 0
+	tx.AddTxIn(txin)
+
+
+	// TODO: Handle like in SettlementTx
+	if valueours > fee {
+		ourRefScript := DirectWPKHScriptFromPKH(c.OurRefundPKH)
+		ourOutput := wire.NewTxOut(valueours - fee, ourRefScript)
+		tx.AddTxOut(ourOutput)
+	}
+
+	// TODO: Handle like in SettlementTx
+	if valueTheirs > fee {
+		theirRefScript := DirectWPKHScriptFromPKH(c.TheirRefundPKH)
+		theirOutput := wire.NewTxOut(valueTheirs - fee, theirRefScript)
+		tx.AddTxOut(theirOutput)
+	}
+
+	txsort.InPlaceSort(tx)
+
+	return tx, nil
+
+}
+
+
+// SignRefundTx 
+func SignNegotiateTx(c *DlcContract, tx *wire.MsgTx,  priv *koblitz.PrivateKey) (error) {
+
+	pre, _, err := FundTxScript(c.OurFundMultisigPub, c.TheirFundMultisigPub)
+	if err != nil {
+		return err
+	}
+
+	hCache := txscript.NewTxSigHashes(tx)
+
+	sig, err := txscript.RawTxInWitnessSignature(tx, hCache, 0, c.OurFundingAmount+c.TheirFundingAmount, pre, txscript.SigHashAll, priv)
+	if err != nil {
+		return err
+	}
+
+	sig = sig[:len(sig)-1]
+	sig64 , _ := sig64.SigCompress(sig)
+	c.OurnegotiateTxSig64 = sig64
+
+	return nil
+
+}
+
