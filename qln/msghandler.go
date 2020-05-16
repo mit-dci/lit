@@ -47,6 +47,9 @@ func (nd *LitNode) registerHandlers() {
 	mp.DefineMessage(lnutil.MSGID_DLC_CONTRACTACK, makeNeoOmniParser(lnutil.MSGID_DLC_CONTRACTACK), hf)
 	mp.DefineMessage(lnutil.MSGID_DLC_CONTRACTFUNDINGSIGS, makeNeoOmniParser(lnutil.MSGID_DLC_CONTRACTFUNDINGSIGS), hf)
 	mp.DefineMessage(lnutil.MSGID_DLC_SIGPROOF, makeNeoOmniParser(lnutil.MSGID_DLC_SIGPROOF), hf)
+	mp.DefineMessage(lnutil.MSGID_DLC_NEGOTIATE, makeNeoOmniParser(lnutil.MSGID_DLC_NEGOTIATE), hf)
+	mp.DefineMessage(lnutil.MSGID_DLC_ACCEPTNEGOTIATE, makeNeoOmniParser(lnutil.MSGID_DLC_ACCEPTNEGOTIATE), hf)
+	mp.DefineMessage(lnutil.MSGID_DLC_DECLINENEGOTIATE, makeNeoOmniParser(lnutil.MSGID_DLC_DECLINENEGOTIATE), hf)
 	mp.DefineMessage(lnutil.MSGID_DUALFUNDINGREQ, makeNeoOmniParser(lnutil.MSGID_DUALFUNDINGREQ), hf)
 	mp.DefineMessage(lnutil.MSGID_DUALFUNDINGACCEPT, makeNeoOmniParser(lnutil.MSGID_DUALFUNDINGACCEPT), hf)
 	mp.DefineMessage(lnutil.MSGID_DUALFUNDINGDECL, makeNeoOmniParser(lnutil.MSGID_DUALFUNDINGDECL), hf)
@@ -141,6 +144,17 @@ func (nd *LitNode) PeerHandler(msg lnutil.LitMsg, q *Qchan, peer *RemotePeer) er
 		if msg.MsgType() == lnutil.MSGID_DLC_SIGPROOF {
 			nd.DlcSigProofHandler(msg.(lnutil.DlcContractSigProofMsg), peer)
 		}
+		if msg.MsgType() == lnutil.MSGID_DLC_NEGOTIATE {
+			nd.DlcNegotiateContractHandler(msg.(lnutil.DlcContractNegotiateMsg), peer)
+		}
+
+		if msg.MsgType() == lnutil.MSGID_DLC_ACCEPTNEGOTIATE {
+			nd.DlcAcceptNegotiateAck(msg.(lnutil.DlcContractAcceptNegotiateMsg), peer)
+		}
+		
+		if msg.MsgType() == lnutil.MSGID_DLC_DECLINENEGOTIATE {
+			nd.DlcDeclineNegotiateAck(msg.(lnutil.DlcContractDeclineNegotiateMsg), peer)
+		}			
 
 	case 0xB0: // remote control
 		if msg.MsgType() == lnutil.MSGID_REMOTE_RPCREQUEST {
@@ -543,15 +557,19 @@ func (nd *LitNode) HandleContractOPEvent(c *lnutil.DlcContract,
 				" for type %d", c.CoinType)
 		}
 
+		nd.OpEventTx = opEvent.Tx
+		
 		pkhIsMine := false
 		pkhIdx := uint32(0)
 		value := int64(0)
 		myPKHPkSript := lnutil.DirectWPKHScriptFromPKH(c.OurPayoutPKH)
 		for i, out := range opEvent.Tx.TxOut {
+
 			if bytes.Equal(myPKHPkSript, out.PkScript) {
 				pkhIdx = uint32(i)
 				pkhIsMine = true
 				value = out.Value
+
 			}
 		}
 
@@ -574,8 +592,23 @@ func (nd *LitNode) HandleContractOPEvent(c *lnutil.DlcContract,
 			if err != nil {
 				return err
 			}
-			txClaim.AddTxOut(wire.NewTxOut(value-500,
-				lnutil.DirectWPKHScriptFromPKH(addr))) // todo calc fee
+
+			// Here the transaction size is always the same
+			// n := 8 + VarIntSerializeSize(uint64(len(msg.TxIn))) +
+			// 	VarIntSerializeSize(uint64(len(msg.TxOut)))
+			// n = 10
+			// Plus Single input 41
+			// Plus Single output 31
+			// Plus 2 for all wittness transactions
+			// Plus Witness Data 108
+
+			// TxSize = 4 + 4 + 1 + 1 + 2 + 108 + 41 + 31 = 192
+			// Vsize = ((192 - 108 - 2) * 3 + 192) / 4 = 109,5
+
+			vsize := uint32(110)
+			fee := vsize * c.FeePerByte			
+
+			txClaim.AddTxOut(wire.NewTxOut(value-int64(fee), lnutil.DirectWPKHScriptFromPKH(addr))) 
 
 			var kg portxo.KeyGen
 			kg.Depth = 5
@@ -590,8 +623,7 @@ func (nd *LitNode) HandleContractOPEvent(c *lnutil.DlcContract,
 			hCache := txscript.NewTxSigHashes(txClaim)
 
 			// generate sig
-			txClaim.TxIn[0].Witness, err = txscript.WitnessScript(txClaim,
-				hCache, 0, value, myPKHPkSript, txscript.SigHashAll, priv, true)
+			txClaim.TxIn[0].Witness, err = txscript.WitnessScript(txClaim, hCache, 0, value, myPKHPkSript, txscript.SigHashAll, priv, true)
 
 			if err != nil {
 				return err

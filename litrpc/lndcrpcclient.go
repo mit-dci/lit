@@ -28,9 +28,11 @@ type LndcRpcClient struct {
 	requestNonce       uint64
 	requestNonceMtx    sync.Mutex
 	responseChannelMtx sync.Mutex
-	responseChannels   map[uint64]chan lnutil.RemoteControlRpcResponseMsg
+	responseChannels   map[uint64]chan *lnutil.RemoteControlRpcResponseMsg
 	key                *koblitz.PrivateKey
 	conMtx             sync.Mutex
+
+	chunksOfMsg map[int64]*lnutil.ChunkMsg
 }
 
 // LndcRpcCanConnectLocally checks if we can connect to lit using the normal
@@ -116,9 +118,12 @@ func NewLndcRpcClient(address string, key *koblitz.PrivateKey) (*LndcRpcClient, 
 	var err error
 
 	cli := new(LndcRpcClient)
+
+	cli.chunksOfMsg = make(map[int64]*lnutil.ChunkMsg)
+
 	// Create a map of chan objects to receive returned responses on. These channels
 	// are sent to from the ReceiveLoop, and awaited in the Call method.
-	cli.responseChannels = make(map[uint64]chan lnutil.RemoteControlRpcResponseMsg)
+	cli.responseChannels = make(map[uint64]chan *lnutil.RemoteControlRpcResponseMsg)
 
 	//Parse the address we're connecting to
 	who, where := lnutil.ParseAdrString(address)
@@ -158,7 +163,7 @@ func (cli *LndcRpcClient) Call(serviceMethod string, args interface{}, reply int
 
 	// Create the channel to receive the reply on
 	cli.responseChannelMtx.Lock()
-	cli.responseChannels[nonce] = make(chan lnutil.RemoteControlRpcResponseMsg)
+	cli.responseChannels[nonce] = make(chan *lnutil.RemoteControlRpcResponseMsg)
 	cli.responseChannelMtx.Unlock()
 
 	// Send the message in a goroutine
@@ -221,6 +226,35 @@ func (cli *LndcRpcClient) ReceiveLoop() {
 			return
 		}
 		msg = msg[:n]
+
+		if msg[0] == lnutil.MSGID_CHUNKS_BEGIN {
+
+			beginChunksMsg, _ := lnutil.NewChunksBeginMsgFromBytes(msg, 0)
+
+			msg_tmp := new(lnutil.ChunkMsg)
+			msg_tmp.TimeStamp = beginChunksMsg.TimeStamp
+			cli.chunksOfMsg[beginChunksMsg.TimeStamp] = msg_tmp
+			
+			continue
+		}
+
+		if msg[0] == lnutil.MSGID_CHUNK_BODY {
+
+			chunkMsg, _ := lnutil.NewChunkMsgFromBytes(msg, 0)
+			cli.chunksOfMsg[chunkMsg.TimeStamp].Data = append(cli.chunksOfMsg[chunkMsg.TimeStamp].Data, chunkMsg.Data...)
+
+			continue
+		}
+		
+		if msg[0] == lnutil.MSGID_CHUNKS_END {
+
+			endChunksMsg, _ := lnutil.NewChunksBeginMsgFromBytes(msg, 0)
+			msg = cli.chunksOfMsg[endChunksMsg.TimeStamp].Data
+
+		}		
+
+
+
 		// We only care about RPC responses (for now)
 		if msg[0] == lnutil.MSGID_REMOTE_RPCRESPONSE {
 			// Parse the received message
@@ -239,7 +273,7 @@ func (cli *LndcRpcClient) ReceiveLoop() {
 				// reply and therefore, it could have not blocked and just
 				// ignore the return value.
 				select {
-				case responseChan <- response:
+				case responseChan <- &response:
 				default:
 				}
 
