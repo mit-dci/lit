@@ -7,6 +7,7 @@ import (
 )
 
 const COINTYPE_NOT_SET = ^uint32(0) // Max Uint
+const FEEPERBYTE_NOT_SET = ^uint32(0) // Max Uint
 
 // AddContract starts a new draft contract
 func (mgr *DlcManager) AddContract() (*lnutil.DlcContract, error) {
@@ -15,6 +16,7 @@ func (mgr *DlcManager) AddContract() (*lnutil.DlcContract, error) {
 	c := new(lnutil.DlcContract)
 	c.Status = lnutil.ContractStatusDraft
 	c.CoinType = COINTYPE_NOT_SET
+	c.FeePerByte = FEEPERBYTE_NOT_SET 
 	err = mgr.SaveContract(c)
 	if err != nil {
 		return nil, err
@@ -32,24 +34,18 @@ func (mgr *DlcManager) SetContractOracle(cIdx, oIdx uint64) error {
 	if err != nil {
 		return err
 	}
-
 	if c.Status != lnutil.ContractStatusDraft {
 		return fmt.Errorf("You cannot change or set the oracle unless the" +
 			" contract is in Draft state")
 	}
-
 	o, err := mgr.LoadOracle(oIdx)
 	if err != nil {
 		return err
 	}
-
 	c.OracleA = o.A
-
 	// Reset the R point when changing the oracle
 	c.OracleR = [33]byte{}
-
 	mgr.SaveContract(c)
-
 	return nil
 }
 
@@ -60,21 +56,35 @@ func (mgr *DlcManager) SetContractSettlementTime(cIdx, time uint64) error {
 	if err != nil {
 		return err
 	}
-
 	if c.Status != lnutil.ContractStatusDraft {
 		return fmt.Errorf("You cannot change or set the settlement time" +
 			" unless the contract is in Draft state")
 	}
-
 	c.OracleTimestamp = time
-
 	// Reset the R point
 	c.OracleR = [33]byte{}
-
 	mgr.SaveContract(c)
-
 	return nil
 }
+
+
+// SetContractRefundTime. If until this time Oracle does not publish the data, 
+// then either party can publish a RefundTransaction
+func (mgr *DlcManager) SetContractRefundTime(cIdx, time uint64) error {
+	c, err := mgr.LoadContract(cIdx)
+	if err != nil {
+		return err
+	}
+	if c.Status != lnutil.ContractStatusDraft {
+		return fmt.Errorf("You cannot change or set the settlement time" +
+			" unless the contract is in Draft state")
+	}
+	c.RefundTimestamp = time
+	mgr.SaveContract(c)
+	return nil
+}
+
+
 
 // SetContractDatafeed will automatically fetch the R-point from the REST API,
 // if an oracle is imported from a REST API. You need to set the settlement time
@@ -239,6 +249,26 @@ func (mgr *DlcManager) SetContractCoinType(cIdx uint64, cointype uint32) error {
 	}
 
 	c.CoinType = cointype
+
+	mgr.SaveContract(c)
+
+	return nil
+}
+
+
+//SetContractFeePerByte sets the fee per byte for a particular contract
+func (mgr *DlcManager) SetContractFeePerByte(cIdx uint64, feeperbyte uint32) error {
+	c, err := mgr.LoadContract(cIdx)
+	if err != nil {
+		return err
+	}
+
+	if c.Status != lnutil.ContractStatusDraft {
+		return fmt.Errorf("You cannot change or set the fee per byte unless" +
+			" the contract is in Draft state")
+	}
+
+	c.FeePerByte = feeperbyte
 
 	mgr.SaveContract(c)
 

@@ -64,6 +64,13 @@ Next, we configure the timestamp at which the contract will settle. This is a ti
 dlc contract settime 1 1528848000
 ```
 
+Now we have to configure refund timestamp after which the refund transaction becomes valid.
+
+```
+dlc contract setrefundtime 1 1528848000
+```
+In this case the refund transaction becomes valid at the same time.
+
 Then, we configure the R-point for the contract, as mentioned earlier this is the public key to the one-time signing key used by the oracle to sign the value it will publish.
 
 ```

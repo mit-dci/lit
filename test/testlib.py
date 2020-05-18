@@ -6,12 +6,21 @@ import subprocess
 import logging
 import random
 import shutil
+import json
 
 import testutil
-import btcrpc
 import litrpc
+import requests
+
+
+from bitcoinrpc.authproxy import AuthServiceProxy, JSONRPCException
+
+
+# The dlcoracle binary must be accessible throught a PATH variable.
 
 LIT_BIN = "%s/../lit" % paths.abspath(paths.dirname(__file__))
+
+ORACLE_BIN = "%s/../dlcoracle" % paths.abspath(paths.dirname(__file__))
 
 REGTEST_COINTYPE = 257
 
@@ -53,6 +62,7 @@ def get_new_id():
     next_id += 1
     return id
 
+
 class LitNode():
     def __init__(self, bcnode):
         self.bcnode = bcnode
@@ -88,7 +98,7 @@ class LitNode():
         # Now figure out the args to use and then start Lit.
         args = [
             LIT_BIN,
-            "-vv",
+            #"-vv",
             "--reg", "127.0.0.1:" + str(self.bcnode.p2p_port),
             "--tn3", "", # disable autoconnect
             "--dir", self.data_dir,
@@ -119,6 +129,7 @@ class LitNode():
         for bal in self.rpc.balance():
             if bal['CoinType'] == REGTEST_COINTYPE:
                 return bal['SyncHeight']
+        print("return -1")
         return -1
 
     def connect_to_peer(self, other):
@@ -194,15 +205,19 @@ class BitcoinNode():
             "-rpcuser=rpcuser",
             "-rpcpassword=rpcpass",
             "-rpcport=" + str(self.rpc_port),
+            "-txindex"
         ]
+
         self.proc = subprocess.Popen(args,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL)
 
+
         # Make the RPC client for it.
         testutil.wait_until_port("localhost", self.rpc_port)
         testutil.wait_until_port("localhost", self.p2p_port)
-        self.rpc = btcrpc.BtcClient("localhost", self.rpc_port, "rpcuser", "rpcpass")
+
+        self.rpc = AuthServiceProxy("http://%s:%s@127.0.0.1:%s"%("rpcuser", "rpcpass", self.rpc_port), timeout=240)
 
         # Make sure that we're actually ready to accept RPC calls.
         def ck_ready():
@@ -234,10 +249,85 @@ class BitcoinNode():
         else:
             pass # do nothing I guess?
 
+class OracleNode():
+    def __init__(self, interval, valueToPublish):
+
+        self.data_dir = new_data_dir("oracle")
+        self.httpport = str(new_port())
+        self.interval = str(interval)
+        self.valueToPublish = str(valueToPublish)
+
+        # Write a hexkey to the privkey file
+        with open(paths.join(self.data_dir, "privkey.hex"), 'w+') as f:
+            s = ''
+            for _ in range(192):
+                s += hexchars[random.randint(0, len(hexchars) - 1)]
+            print('Using key:', s)
+            f.write(s + "\n")
+
+        self.start()    
+
+
+    def start(self):
+
+        # See if we should print stdout
+        outputredir = subprocess.DEVNULL
+        ev_output_show = os.getenv("ORACLE_OUTPUT_SHOW", default="0")
+        if ev_output_show == "1":
+            outputredir = None
+
+        # Now figure out the args to use and then start Lit.
+        args = [
+            ORACLE_BIN,
+            "--DataDir="+self.data_dir,
+            "--HttpPort=" + self.httpport, 
+            "--Interval=" + self.interval,
+            "--ValueToPublish=" + self.valueToPublish,
+        ]
+
+        penv = os.environ.copy()
+
+        self.proc = subprocess.Popen(args,
+        stdin=subprocess.DEVNULL,
+        stdout=outputredir,
+        stderr=outputredir,
+        env=penv)
+
+    def shutdown(self):
+        if self.proc is not None:
+            self.proc.kill()
+            self.proc.wait()
+            self.proc = None
+        else:
+            pass # do nothing I guess?
+
+        shutil.rmtree(self.data_dir)
+    
+    def get_pubkey(self):
+        res = requests.get("http://localhost:"+self.httpport+"/api/pubkey")
+        return res.text
+
+    def get_datasources(self):
+        res = requests.get("http://localhost:"+self.httpport+"/api/datasources")
+        return res.text
+
+              
+    def get_rpoint(self, datasourceID, unixTime):
+        res = requests.get("http://localhost:"+self.httpport+"/api/rpoint/" + str(datasourceID) + "/" + str(unixTime))
+        print("get_rpoint:", "http://localhost:"+self.httpport+"/api/rpoint/" + str(datasourceID) + "/" + str(unixTime))
+        print(res.text)
+        return res.text
+
+    def get_publication(self, rpoint):
+        res  = requests.get("http://localhost:"+self.httpport+"/api/publication/" + rpoint)
+        return res.text
+
+
 class TestEnv():
     def __init__(self, litcnt):
         logger.info("starting nodes...")
         self.bitcoind = BitcoinNode()
+        self.oracles = []
         self.lits = []
         for i in range(litcnt):
             node = LitNode(self.bitcoind)
@@ -260,6 +350,12 @@ class TestEnv():
         self.generate_block(count=0) # Force it to wait for sync.
         return node
 
+    def new_oracle(self, interval, valueToPublish):
+        oracle = OracleNode(interval, valueToPublish)
+        self.oracles.append(oracle)
+        return oracle
+
+
     def generate_block(self, count=1):
         if count > 0:
             self.bitcoind.rpc.generate(count)
@@ -279,6 +375,8 @@ class TestEnv():
         for l in self.lits:
             l.shutdown()
         self.bitcoind.shutdown()
+        for o in self.oracles:
+            o.shutdown()
 
 def clean_data_dir():
     datadir = get_root_data_dir()
