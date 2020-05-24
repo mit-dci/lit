@@ -144,9 +144,11 @@ type LitNode struct {
 
 	ExchangeRates map[uint32][]lnutil.RateDesc
 
-	// REFACTORING FIELDS
+	// TODO REFACTORING FIELDS
 	PeerMap    map[*lnp2p.Peer]*RemotePeer // we never remove things from here, so this is a memory leak
 	PeerMapMtx *sync.Mutex
+
+	OpEventTx *wire.MsgTx // TODO for testing only
 }
 
 type LinkDesc struct {

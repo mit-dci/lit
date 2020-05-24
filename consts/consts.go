@@ -24,4 +24,5 @@ const (
 	QcStateFee             = 10      // fixqcstatefee
 	DefaultLockTime        = 500     //default lock time
 	DlcSettlementTxFee     = 1000
+	MaxOraclesNumber	   = 8
 )
