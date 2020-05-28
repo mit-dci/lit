@@ -25,7 +25,7 @@ var lsCommand = &Command{
 			"What information to show. Provide one of:"),
 		fmt.Sprintf("\t%-20s %s",
 			lnutil.White("-a"),
-			"Information on connections to other peers"),
+			"Everything"),
 		fmt.Sprintf("\t%-20s %s",
 			lnutil.White("conns"),
 			"Information on connections to other peers"),
@@ -343,22 +343,9 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		}
 	}
 
-	err = lc.Call("LitRPC.Balance", nil, bReply)
-	if err != nil {
-		return err
-	}
-
 	walHeights := map[uint32]int32{}
 	for _, b := range bReply.Balances {
 		walHeights[b.CoinType] = b.SyncHeight
-	}
-
-	err = lc.Call("LitRPC.ChannelList", nil, cReply)
-	if err != nil {
-		return err
-	}
-	if len(cReply.Channels) > 0 {
-		fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Channels:"))
 	}
 
 	if cmd == "chans" || displayAllCommands {
@@ -368,9 +355,8 @@ func (lc *litAfClient) Ls(textArgs []string) error {
 		}
 
 		if len(cReply.Channels) > 0 {
-			if displayAllCommands {
-				fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Channels:"))
-			}
+
+			fmt.Fprintf(color.Output, "\t%s\n", lnutil.Header("Channels:"))
 
 			coinDaemonConnected := map[uint32]bool{}
 			for _, walBal := range bReply.Balances {
@@ -634,7 +620,7 @@ func printHelp(commands []*Command) {
 func printCointypes() {
 	for k, v := range coinparam.RegisteredNets {
 		fmt.Fprintf(color.Output, "CoinType: %s\n", strconv.Itoa(int(k)))
-		fmt.Fprintf(color.Output, "└────── Name: %-13sBech32Prefix: %s\n\n", v.Name+",", v.Bech32Prefix)
+		fmt.Fprintf(color.Output, "└────── Name: %-13s, Bech32Prefix: %s\n\n", v.Name, v.Bech32Prefix)
 	}
 }
 
