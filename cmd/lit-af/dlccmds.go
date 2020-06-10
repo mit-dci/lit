@@ -118,6 +118,9 @@ var contractCommand = &Command{
 			lnutil.White("setcointype"),
 			"Sets the cointype of a contract"),
 		fmt.Sprintf("%-20s %s",
+			lnutil.White("setfeeperbyte"),
+			"Sets the fee per byte for a contract"),			
+		fmt.Sprintf("%-20s %s",
 			lnutil.White("offer"),
 			"Offer a draft contract to one of your peers"),
 		fmt.Sprintf("%-20s %s",
@@ -288,6 +291,20 @@ var setContractCoinTypeCommand = &Command{
 			"The ID of the coin type to use for the contract"),
 	),
 	ShortDescription: "Sets the coin type to use for the contract\n",
+}
+var setContractFeePerByteCommand = &Command{
+	Format: fmt.Sprintf("%s%s\n", lnutil.White("dlc contract setfeeperbyte"),
+		lnutil.ReqColor("cid", "feeperbyte")),
+	Description: fmt.Sprintf("%s\n%s\n%s\n",
+		"Sets the fee per byte to use for the contract",
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("cid"),
+			"The ID of the contract"),
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("cointype"),
+			"The fee per byte in satoshi to use for the contract"),
+	),
+	ShortDescription: "Sets the fee per byte in satoshi to use for the contract\n",
 }
 var declineContractCommand = &Command{
 	Format: fmt.Sprintf("%s%s\n", lnutil.White("dlc contract decline"),
@@ -503,6 +520,10 @@ func (lc *litAfClient) DlcContract(textArgs []string) error {
 	if cmd == "setcointype" {
 		return lc.DlcSetContractCoinType(textArgs)
 	}
+
+	if cmd == "setfeeperbyte" {
+		return lc.DlcSetContractFeePerByte(textArgs)
+	}	
 
 	if cmd == "offer" {
 		return lc.DlcOfferContract(textArgs)
@@ -803,6 +824,40 @@ func (lc *litAfClient) DlcSetContractCoinType(textArgs []string) error {
 	return nil
 }
 
+
+func (lc *litAfClient) DlcSetContractFeePerByte(textArgs []string) error {
+	stopEx, err := CheckHelpCommand(setContractFeePerByteCommand, textArgs, 2)
+	if err != nil || stopEx {
+		return err
+	}
+
+	args := new(litrpc.SetContractFeePerByteArgs)
+	reply := new(litrpc.SetContractFeePerByteReply)
+
+	cIdx, err := strconv.ParseUint(textArgs[0], 10, 64)
+	if err != nil {
+		return err
+	}
+	feeperbyte, err := strconv.ParseUint(textArgs[1], 10, 64)
+	if err != nil {
+		return err
+	}
+
+	args.CIdx = cIdx
+	args.FeePerByte = uint32(feeperbyte)
+
+	err = lc.Call("LitRPC.SetContractFeePerByte", args, reply)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprint(color.Output, "Fee per byte set successfully\n")
+
+	return nil
+}
+
+
+
 func (lc *litAfClient) DlcSetContractDivision(textArgs []string) error {
 	stopEx, err := CheckHelpCommand(setContractDivisionCommand, textArgs, 3)
 	if err != nil || stopEx {
@@ -969,6 +1024,8 @@ func PrintContract(c *lnutil.DlcContract) {
 		lnutil.White("Funded by peer"), c.TheirFundingAmount)
 	fmt.Fprintf(color.Output, "%-30s : %d\n",
 		lnutil.White("Coin type"), c.CoinType)
+	fmt.Fprintf(color.Output, "%-30s : %d\n",
+		lnutil.White("Fee per byte"), c.FeePerByte)		
 
 	peer := "None"
 	if c.PeerIdx > 0 {
