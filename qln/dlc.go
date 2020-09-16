@@ -57,6 +57,10 @@ func (nd *LitNode) OfferDlc(peerIdx uint32, cIdx uint64) error {
 		return fmt.Errorf("You need to set a coin type for the contract before offering it")
 	}
 
+	if c.FeePerByte == dlc.FEEPERBYTE_NOT_SET {
+		return fmt.Errorf("You need to set a fee per byte for the contract before offering it")
+	}		
+
 	if c.Division == nil {
 		return fmt.Errorf("You need to set a payout division for the contract before offering it")
 	}
@@ -236,6 +240,7 @@ func (nd *LitNode) DlcOfferHandler(msg lnutil.DlcOfferMsg, peer *RemotePeer) {
 
 	// Copy
 	c.CoinType = msg.Contract.CoinType
+	c.FeePerByte = msg.Contract.FeePerByte
 	c.OracleA = msg.Contract.OracleA
 	c.OracleR = msg.Contract.OracleR
 	c.OracleTimestamp = msg.Contract.OracleTimestamp
@@ -474,18 +479,67 @@ func (nd *LitNode) BuildDlcFundingTransaction(c *lnutil.DlcContract) (wire.MsgTx
 	var ourInputTotal int64
 	var theirInputTotal int64
 
+
+	our_txin_num := 0
 	for _, u := range c.OurFundingInputs {
-		tx.AddTxIn(wire.NewTxIn(&u.Outpoint, nil, nil))
+		txin := wire.NewTxIn(&u.Outpoint, nil, nil)
+
+		tx.AddTxIn(txin)
 		ourInputTotal += u.Value
-	}
-	for _, u := range c.TheirFundingInputs {
-		tx.AddTxIn(wire.NewTxIn(&u.Outpoint, nil, nil))
-		theirInputTotal += u.Value
+
+		our_txin_num += 1
+
 	}
 
+
+	their_txin_num := 0
+	for _, u := range c.TheirFundingInputs {
+		txin := wire.NewTxIn(&u.Outpoint, nil, nil)
+
+
+		tx.AddTxIn(txin)
+		theirInputTotal += u.Value
+
+		their_txin_num += 1
+
+	}
+
+
+
+	//====================================================
+
+	// Here can be a situation when peers have different number of inputs.
+	// Therefore we have to calculate fees for each peer separately.
+
+	// This transaction always will have 3 outputs ( 43 + 31 + 31)
+	tx_basesize := 10 + 43 + 31 + 31
+	tx_size_foreach := tx_basesize / 2
+	tx_size_foreach += 1 // rounding
+
+	input_wit_size := 107
+
+	our_tx_vsize := uint32(((tx_size_foreach + (41 * our_txin_num)) * 3 + (tx_size_foreach + (41 * our_txin_num) + (input_wit_size*our_txin_num) )) / 4)
+	their_tx_vsize := uint32(((tx_size_foreach + (41 * their_txin_num)) * 3 + (tx_size_foreach + (41 * their_txin_num) + (input_wit_size*their_txin_num) )) / 4)
+
+	//rounding
+	our_tx_vsize += 1
+	their_tx_vsize += 1
+
+
+	our_fee := int64(our_tx_vsize * c.FeePerByte)
+	their_fee := int64(their_tx_vsize * c.FeePerByte)
+
+
 	// add change and sort
-	tx.AddTxOut(wire.NewTxOut(theirInputTotal-c.TheirFundingAmount-500, lnutil.DirectWPKHScriptFromPKH(c.TheirChangePKH)))
-	tx.AddTxOut(wire.NewTxOut(ourInputTotal-c.OurFundingAmount-500, lnutil.DirectWPKHScriptFromPKH(c.OurChangePKH)))
+
+	their_txout := wire.NewTxOut(theirInputTotal-c.TheirFundingAmount-their_fee, lnutil.DirectWPKHScriptFromPKH(c.TheirChangePKH)) 
+	tx.AddTxOut(their_txout)
+
+
+	our_txout := wire.NewTxOut(ourInputTotal-c.OurFundingAmount-our_fee, lnutil.DirectWPKHScriptFromPKH(c.OurChangePKH))
+	tx.AddTxOut(our_txout)
+
+	
 
 	txsort.InPlaceSort(tx)
 
@@ -609,46 +663,77 @@ func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oracleSig [32]
 		return [32]byte{}, [32]byte{}, err
 	}
 
-	// TODO: Claim the contract settlement output back to our wallet - otherwise the peer can claim it after locktime.
-	txClaim := wire.NewMsgTx()
-	txClaim.Version = 2
 
-	settleOutpoint := wire.OutPoint{Hash: settleTx.TxHash(), Index: 0}
-	txClaim.AddTxIn(wire.NewTxIn(&settleOutpoint, nil, nil))
+	//===========================================
+	// Claim TX
+	//===========================================
 
-	addr, err := wal.NewAdr()
-	txClaim.AddTxOut(wire.NewTxOut(d.ValueOurs-1000, lnutil.DirectWPKHScriptFromPKH(addr))) // todo calc fee - fee is double here because the contract output already had the fee deducted in the settlement TX
 
-	kg.Step[2] = UseContractPayoutBase
-	privSpend, _ := wal.GetPriv(kg)
+	// Here the transaction size is always the same
+	// n := 8 + VarIntSerializeSize(uint64(len(msg.TxIn))) +
+	// 	VarIntSerializeSize(uint64(len(msg.TxOut)))
+	// n = 10
+	// Plus Single input 41
+	// Plus Single output 31
+	// Plus 2 for all wittness transactions
+	// Plus Witness Data 151
 
-	pubSpend := wal.GetPub(kg)
-	privOracle, pubOracle := koblitz.PrivKeyFromBytes(koblitz.S256(), oracleSig[:])
-	privContractOutput := lnutil.CombinePrivateKeys(privSpend, privOracle)
+	// TxSize = 4 + 4 + 1 + 1 + 2 + 151 + 41 + 31 = 235
+	// Vsize = ((235 - 151 - 2) * 3 + 235) / 4 = 120,25
 
-	var pubOracleBytes [33]byte
-	copy(pubOracleBytes[:], pubOracle.SerializeCompressed())
-	var pubSpendBytes [33]byte
-	copy(pubSpendBytes[:], pubSpend.SerializeCompressed())
 
-	settleScript := lnutil.DlcCommitScript(c.OurPayoutBase, pubOracleBytes, c.TheirPayoutBase, 5)
-	err = nd.SignClaimTx(txClaim, settleTx.TxOut[0].Value, settleScript, privContractOutput, false)
-	if err != nil {
-		logging.Errorf("SettleContract SignClaimTx err %s", err.Error())
-		return [32]byte{}, [32]byte{}, err
+	if ( d.ValueOurs != 0){
+
+		vsize := uint32(121)
+		fee := vsize * c.FeePerByte
+	
+		// TODO: Claim the contract settlement output back to our wallet - otherwise the peer can claim it after locktime.
+		txClaim := wire.NewMsgTx()
+		txClaim.Version = 2
+
+		settleOutpoint := wire.OutPoint{Hash: settleTx.TxHash(), Index: 0}
+		txClaim.AddTxIn(wire.NewTxIn(&settleOutpoint, nil, nil))
+
+		addr, err := wal.NewAdr()
+		txClaim.AddTxOut(wire.NewTxOut(settleTx.TxOut[0].Value-int64(fee), lnutil.DirectWPKHScriptFromPKH(addr)))
+
+		kg.Step[2] = UseContractPayoutBase
+		privSpend, _ := wal.GetPriv(kg)
+
+		pubSpend := wal.GetPub(kg)
+		privOracle, pubOracle := koblitz.PrivKeyFromBytes(koblitz.S256(), oracleSig[:])
+		privContractOutput := lnutil.CombinePrivateKeys(privSpend, privOracle)
+
+		var pubOracleBytes [33]byte
+		copy(pubOracleBytes[:], pubOracle.SerializeCompressed())
+		var pubSpendBytes [33]byte
+		copy(pubSpendBytes[:], pubSpend.SerializeCompressed())
+
+		settleScript := lnutil.DlcCommitScript(c.OurPayoutBase, pubOracleBytes, c.TheirPayoutBase, 5)
+		err = nd.SignClaimTx(txClaim, settleTx.TxOut[0].Value, settleScript, privContractOutput, false)
+		if err != nil {
+			logging.Errorf("SettleContract SignClaimTx err %s", err.Error())
+			return [32]byte{}, [32]byte{}, err
+		}
+
+		// Claim TX should be valid here, so publish it.
+		err = wal.DirectSendTx(txClaim)
+		if err != nil {
+			logging.Errorf("SettleContract DirectSendTx (claim) err %s", err.Error())
+			return [32]byte{}, [32]byte{}, err
+		}
+
+		c.Status = lnutil.ContractStatusClosed
+		err = nd.DlcManager.SaveContract(c)
+		if err != nil {
+			return [32]byte{}, [32]byte{}, err
+		}
+		return settleTx.TxHash(), txClaim.TxHash(), nil
+
+	}else{
+
+		return settleTx.TxHash(), [32]byte{}, nil
+
 	}
 
-	// Claim TX should be valid here, so publish it.
-	err = wal.DirectSendTx(txClaim)
-	if err != nil {
-		logging.Errorf("SettleContract DirectSendTx (claim) err %s", err.Error())
-		return [32]byte{}, [32]byte{}, err
-	}
-
-	c.Status = lnutil.ContractStatusClosed
-	err = nd.DlcManager.SaveContract(c)
-	if err != nil {
-		return [32]byte{}, [32]byte{}, err
-	}
-	return settleTx.TxHash(), txClaim.TxHash(), nil
 }
