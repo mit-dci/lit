@@ -85,6 +85,16 @@ func (nd *LitNode) OfferDlc(peerIdx uint32, cIdx uint64) error {
 		return err
 	}
 
+    ourPayoutPKHKey, err := nd.GetUsePub(kg, UseContractPayoutPKH)
+    if err != nil {
+        logging.Errorf("Error while getting our payout pubkey: %s", err.Error())
+        c.Status = lnutil.ContractStatusError
+        nd.DlcManager.SaveContract(c)
+        return err
+	}
+
+	copy(c.OurPayoutPKH[:], btcutil.Hash160(ourPayoutPKHKey[:]))	
+
 	// Fund the contract
 	err = nd.FundContract(c)
 	if err != nil {
@@ -227,6 +237,7 @@ func (nd *LitNode) DlcOfferHandler(msg lnutil.DlcOfferMsg, peer *RemotePeer) {
 	c.OurChangePKH = msg.Contract.TheirChangePKH
 	c.TheirChangePKH = msg.Contract.OurChangePKH
 	c.TheirIdx = msg.Contract.Idx
+	c.TheirPayoutPKH = msg.Contract.OurPayoutPKH
 
 	c.Division = make([]lnutil.DlcContractDivision, len(msg.Contract.Division))
 	for i := 0; i < len(msg.Contract.Division); i++ {
@@ -323,6 +334,8 @@ func (nd *LitNode) DlcContractAckHandler(msg lnutil.DlcContractAckMsg, peer *Rem
 	// TODO: Check signatures
 
 	c.Status = lnutil.ContractStatusAcknowledged
+
+	c.TheirSettlementSignatures = msg.SettlementSignatures
 
 	err = nd.DlcManager.SaveContract(c)
 	if err != nil {
