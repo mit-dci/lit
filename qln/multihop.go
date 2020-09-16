@@ -218,18 +218,21 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 		return fmt.Errorf("error finding HTLCs: %s", err.Error())
 	}
 
-	var found bool
+	var found, outgoing bool
 	var prevHTLC *HTLC
 	for idx, h := range HTLCs {
 		if h.Incoming && !h.Cleared && !h.Clearing && !h.ClearedOnChain && chans[idx].Coin() == incomingHop.CoinType {
 			found = true
 			prevHTLC = &h
-			break
 		}
 
 		// We already have an outgoing HTLC with this hash
-		if !h.Incoming && !h.Cleared && !h.ClearedOnChain {
-			return fmt.Errorf("we already have an uncleared offered HTLC with RHash: %x", msg.HHash)
+		if !h.Incoming && !h.Cleared && !h.ClearedOnChain && chans[idx].Coin() == ourHop.CoinType {
+			outgoing = true
+		}
+
+		if outgoing && found {
+			break
 		}
 	}
 
@@ -260,6 +263,10 @@ func (nd *LitNode) MultihopPaymentSetupHandler(msg lnutil.MultihopPaymentSetupMs
 
 	if nextHop == nil {
 		return fmt.Errorf("route is invalid")
+	}
+
+	if outgoing {
+		return fmt.Errorf("we already have an uncleared offered HTLC with RHash: %x", msg.HHash)
 	}
 
 	wal, ok := nd.SubWallet[incomingHop.CoinType]
