@@ -2,6 +2,7 @@ package watchtower
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/mit-dci/lit/lnutil"
 )
@@ -24,6 +25,7 @@ func IdxSigFromBytes(b []byte) (*IdxSig, error) {
 	s.StateIdx = lnutil.BtU64(b[2:10])
 	s.StateIdx &= 0x0000ffffffffffff
 	copy(s.Sig[:], b[10:])
+	log.Println("OUTPUT from IDSig", &s, b)
 	return &s, nil
 }
 

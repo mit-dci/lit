@@ -42,6 +42,7 @@ func (w *WatchTower) BuildJusticeTx(
 			return fmt.Errorf("couldn't get txid %x", idxSigBytes)
 		}
 		iSig, err = IdxSigFromBytes(idxSigBytes)
+		logging.Infoln("output from iSig is", iSig)
 		if err != nil {
 			return err
 		}

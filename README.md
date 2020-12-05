@@ -182,4 +182,4 @@ One package that implements the chainhook interface is uspv.  Uspv deals with he
 
 ## License
 
-[MIT](https://github.com/mit-dci/lit/blob/master/LICENSE)
+Some modules imported from other libraries have their own LICENSE files attached. For all other files, this repository uses a [MIT](https://github.com/mit-dci/lit/blob/master/LICENSE) license.
