@@ -609,46 +609,58 @@ func (nd *LitNode) SettleContract(cIdx uint64, oracleValue int64, oracleSig [32]
 		return [32]byte{}, [32]byte{}, err
 	}
 
-	// TODO: Claim the contract settlement output back to our wallet - otherwise the peer can claim it after locktime.
-	txClaim := wire.NewMsgTx()
-	txClaim.Version = 2
 
-	settleOutpoint := wire.OutPoint{Hash: settleTx.TxHash(), Index: 0}
-	txClaim.AddTxIn(wire.NewTxIn(&settleOutpoint, nil, nil))
+	if ( d.ValueOurs != 0){
 
-	addr, err := wal.NewAdr()
-	txClaim.AddTxOut(wire.NewTxOut(d.ValueOurs-1000, lnutil.DirectWPKHScriptFromPKH(addr))) // todo calc fee - fee is double here because the contract output already had the fee deducted in the settlement TX
+		fee := int64(500)
+	
+		// TODO: Claim the contract settlement output back to our wallet - otherwise the peer can claim it after locktime.
+		txClaim := wire.NewMsgTx()
+		txClaim.Version = 2
 
-	kg.Step[2] = UseContractPayoutBase
-	privSpend, _ := wal.GetPriv(kg)
+		settleOutpoint := wire.OutPoint{Hash: settleTx.TxHash(), Index: 0}
+		txClaim.AddTxIn(wire.NewTxIn(&settleOutpoint, nil, nil))
 
-	pubSpend := wal.GetPub(kg)
-	privOracle, pubOracle := koblitz.PrivKeyFromBytes(koblitz.S256(), oracleSig[:])
-	privContractOutput := lnutil.CombinePrivateKeys(privSpend, privOracle)
+		addr, err := wal.NewAdr()
+		txClaim.AddTxOut(wire.NewTxOut(settleTx.TxOut[0].Value-fee, lnutil.DirectWPKHScriptFromPKH(addr))) // todo calc fee - fee is double here because the contract output already had the fee deducted in the settlement TX
 
-	var pubOracleBytes [33]byte
-	copy(pubOracleBytes[:], pubOracle.SerializeCompressed())
-	var pubSpendBytes [33]byte
-	copy(pubSpendBytes[:], pubSpend.SerializeCompressed())
+		kg.Step[2] = UseContractPayoutBase
+		privSpend, _ := wal.GetPriv(kg)
 
-	settleScript := lnutil.DlcCommitScript(c.OurPayoutBase, pubOracleBytes, c.TheirPayoutBase, 5)
-	err = nd.SignClaimTx(txClaim, settleTx.TxOut[0].Value, settleScript, privContractOutput, false)
-	if err != nil {
-		logging.Errorf("SettleContract SignClaimTx err %s", err.Error())
-		return [32]byte{}, [32]byte{}, err
+		pubSpend := wal.GetPub(kg)
+		privOracle, pubOracle := koblitz.PrivKeyFromBytes(koblitz.S256(), oracleSig[:])
+		privContractOutput := lnutil.CombinePrivateKeys(privSpend, privOracle)
+
+		var pubOracleBytes [33]byte
+		copy(pubOracleBytes[:], pubOracle.SerializeCompressed())
+		var pubSpendBytes [33]byte
+		copy(pubSpendBytes[:], pubSpend.SerializeCompressed())
+
+		settleScript := lnutil.DlcCommitScript(c.OurPayoutBase, pubOracleBytes, c.TheirPayoutBase, 5)
+		err = nd.SignClaimTx(txClaim, settleTx.TxOut[0].Value, settleScript, privContractOutput, false)
+		if err != nil {
+			logging.Errorf("SettleContract SignClaimTx err %s", err.Error())
+			return [32]byte{}, [32]byte{}, err
+		}
+
+		// Claim TX should be valid here, so publish it.
+		err = wal.DirectSendTx(txClaim)
+		if err != nil {
+			logging.Errorf("SettleContract DirectSendTx (claim) err %s", err.Error())
+			return [32]byte{}, [32]byte{}, err
+		}
+
+		c.Status = lnutil.ContractStatusClosed
+		err = nd.DlcManager.SaveContract(c)
+		if err != nil {
+			return [32]byte{}, [32]byte{}, err
+		}
+		return settleTx.TxHash(), txClaim.TxHash(), nil
+
+	}else{
+
+		return settleTx.TxHash(), [32]byte{}, nil
+
 	}
 
-	// Claim TX should be valid here, so publish it.
-	err = wal.DirectSendTx(txClaim)
-	if err != nil {
-		logging.Errorf("SettleContract DirectSendTx (claim) err %s", err.Error())
-		return [32]byte{}, [32]byte{}, err
-	}
-
-	c.Status = lnutil.ContractStatusClosed
-	err = nd.DlcManager.SaveContract(c)
-	if err != nil {
-		return [32]byte{}, [32]byte{}, err
-	}
-	return settleTx.TxHash(), txClaim.TxHash(), nil
 }
