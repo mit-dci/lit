@@ -294,3 +294,18 @@ func ElkPointFromHash(in *chainhash.Hash) [33]byte {
 	scalar := ElkScalar(in)
 	return PubFromHash(scalar)
 }
+
+// SubtractPrivKeys returns the difference a - b mod n
+func SubtractPrivKeys(a, b [32]byte) [32]byte {
+	var diffKey [32]byte
+
+	privA, _ := btcec.PrivKeyFromBytes(btcec.S256(), a[:])
+	privB, _ := btcec.PrivKeyFromBytes(btcec.S256(), b[:])
+
+	privA.D.Sub(privA.D, privB.D)
+	privA.D.Mod(privA.D, btcec.S256().N)
+
+	copy(diffKey[:], privA.D.Bytes())
+	// log.Printf("%x - %x =\n%x\n", a, b, diffKey)
+	return diffKey
+}

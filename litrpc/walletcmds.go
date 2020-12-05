@@ -1,7 +1,10 @@
 package litrpc
 
 import (
+	"bytes"
+	"encoding/hex"
 	"fmt"
+	"log"
 
 	"github.com/mit-dci/lit/bech32"
 	"github.com/mit-dci/lit/consts"
@@ -479,5 +482,107 @@ func (r *LitRPC) ClaimHTLC(args *ClaimHTLCArgs, reply *TxidsReply) error {
 		reply.Txids = append(reply.Txids, fmt.Sprintf("%x", txid))
 	}
 
+	return nil
+}
+
+// ------------------------- raw tx
+type RawArgs struct {
+	TxHex string
+}
+
+// PushRawTx takes some raw hex, turns it into a tx and tries to
+// push it out to the network, without any idea of what it is.
+func (r *LitRPC) PushRawTx(args RawArgs, reply *TxidsReply) error {
+	var err error
+
+	txBytes, err := hex.DecodeString(args.TxHex)
+	if err != nil {
+		return err
+	}
+
+	buf := bytes.NewBuffer(txBytes)
+	tx := wire.NewMsgTx()
+	err = tx.Deserialize(buf)
+	if err != nil {
+		return err
+	}
+	// just broadcast to default wallet
+	wal, ok := r.Node.SubWallet[r.Node.DefaultCoin]
+	if !ok {
+		return fmt.Errorf("no connnected wallet for default cointype %d",
+			r.Node.DefaultCoin)
+	}
+	log.Printf("push raw wallet type %s\n", wal.Params().Name)
+	err = wal.PushTx(tx)
+	if err != nil {
+		return err
+	}
+
+	reply.Txids = []string{tx.TxHash().String()}
+	return nil
+}
+
+// ImporTxo lets you import a portxo
+func (r *LitRPC) ImporTxo(args RawArgs, reply *StatusReply) error {
+	var err error
+
+	ptxoBytes, err := hex.DecodeString(args.TxHex)
+	if err != nil {
+		return err
+	}
+
+	ptx, err := portxo.PorTxoFromBytes(ptxoBytes)
+	if err != nil {
+		return err
+	}
+
+	// import to default wallet
+	// imports probably won't have a derivation path so we can't tell
+	// what the coin is.  But maybe we shoud detect that, and add cointype
+	// derivation paths even if there's nothing to derive from...
+	wal, ok := r.Node.SubWallet[r.Node.DefaultCoin]
+	if !ok {
+		return fmt.Errorf("no connnected wallet for default cointype %d",
+			r.Node.DefaultCoin)
+	}
+
+	// no errors here, just hope it works...?
+	wal.ExportUtxo(ptx)
+
+	log.Printf("import %s to wallet %s\n", ptx.Op.String(), wal.Params().Name)
+
+	reply.Status = ptx.Op.String()
+	return nil
+}
+
+// DumpPriv returns a list of all portxos.
+// currently comes with empty derivation paths and populated private keys,
+// so watch out!
+// TODO: add options to give derivation paths and no keys
+func (r *LitRPC) DumpPriv(args NoArgs, reply *TxidsReply) error {
+
+	// start off the same as TxoList
+	// TODO make this a separate function? because copy/paste...
+	for _, wal := range r.Node.SubWallet {
+		walTxos, err := wal.UtxoDump()
+		if err != nil {
+			return err
+		}
+		for _, txo := range walTxos {
+			priv, err := wal.GetPriv(txo.KeyGen)
+			if err != nil {
+				return err
+			}
+			// since this is for export to a wallet with a different seed,
+			// remove derivation path
+			txo.KeyGen = portxo.KeyGenEmpty
+			copy(txo.KeyGen.PrivKey[:], priv.D.Bytes())
+			b, err := txo.Bytes()
+			if err != nil {
+				return err
+			}
+			reply.Txids = append(reply.Txids, fmt.Sprintf("%x", b))
+		}
+	}
 	return nil
 }

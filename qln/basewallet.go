@@ -66,14 +66,6 @@ type UWallet interface {
 	// Return current height the wallet is synced to
 	CurrentHeight() int32
 
-	// This is redundand... just use UtxoDump and figure it out yourself.
-	// Feels like helper functions shouldn't be in the interface.
-	// how much utxo the wallet has -- only confirmed segwit outputs
-	//	HowMuchWitConf() int64
-
-	// How much utxo the sub wallet has, including non-segwit, unconfirmed, immature
-	//	HowMuchTotal() int64
-
 	// WatchThis tells the basewallet to watch an outpoint
 	WatchThis(wire.OutPoint) error
 

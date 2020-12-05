@@ -438,12 +438,11 @@ func (w *Wallit) SignMyInputs(tx *wire.MsgTx) error {
 
 		// get key
 		priv := w.PathPrivkey(utxo.KeyGen)
-		logging.Infof("signing with privkey pub %x\n", priv.PubKey().SerializeCompressed())
 
 		if priv == nil {
 			return fmt.Errorf("SignMyInputs: nil privkey")
 		}
-
+		logging.Infof("signing with privkey pub %x\n", priv.PubKey().SerializeCompressed())
 		// sign into stash.  3 possibilities:  legacy PKH, WPKH, WSH
 		if utxo.Mode == portxo.TxoP2PKHComp { // legacy PKH
 			sigStash[i], err = txscript.SignatureScript(tx, i,

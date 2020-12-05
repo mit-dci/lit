@@ -42,7 +42,7 @@ func (kg *KeyGen) DerivePrivateKey(
 	}
 
 	// if porTxo's private key has something in it, combine that with derived key
-	// using the delinearization scheme
+	// by adding them
 	if kg.PrivKey != empty {
 		PrivKeyAddBytes(derivedPrivKey, kg.PrivKey[:])
 	}

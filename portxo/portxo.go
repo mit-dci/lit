@@ -102,6 +102,17 @@ var modeStrings = map[TxoMode]string{
 	TxoP2WSHComp:   "witness script hash compressed",
 }
 
+var (
+	KeyGenForImports = KeyGen{
+		Depth: 5,
+		Step:  [5]uint32{0xfee154fe, 0, 0, 0, 0},
+	}
+	KeyGenEmpty = KeyGen{
+		Depth: 0,
+		Step:  [5]uint32{0, 0, 0, 0, 0},
+	}
+)
+
 // String returns the InvType in human-readable form.
 func (m TxoMode) String() string {
 	s, ok := modeStrings[m]
