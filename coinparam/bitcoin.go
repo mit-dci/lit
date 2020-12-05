@@ -128,11 +128,6 @@ var TestNet3Params = Params{
 	MinDiffReductionTime:     time.Minute * 20, // TargetTimePerBlock * 2
 	GenerateSupported:        false,
 
-	// Checkpoints ordered from oldest to newest.
-	Checkpoints: []Checkpoint{
-		{546, newHashFromStr("000000002a936ca763904c3c35fce2f3556c559c0214345d31b1bcebf76acb70")},
-	},
-
 	// Enforce current block version once majority of the network has
 	// upgraded.
 	// 51% (51 / 100)
