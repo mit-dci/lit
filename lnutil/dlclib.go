@@ -6,9 +6,10 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/big"
+	"errors"
 
 	"github.com/mit-dci/lit/btcutil/chaincfg/chainhash"
-	"github.com/mit-dci/lit/consts"
+
 	"github.com/mit-dci/lit/crypto/koblitz"
 	"github.com/mit-dci/lit/logging"
 	"github.com/mit-dci/lit/wire"
@@ -48,6 +49,8 @@ type DlcContract struct {
 	PeerIdx uint32
 	// Coin type
 	CoinType uint32
+	// Fee per byte
+	FeePerByte uint32
 	// Pub keys of the oracle and the R point used in the contract
 	OracleA, OracleR [33]byte
 	// The time we expect the oracle to publish
@@ -125,6 +128,14 @@ func DlcContractFromBytes(b []byte) (*DlcContract, error) {
 		return nil, err
 	}
 	c.CoinType = uint32(coinType)
+
+	feePerByte, err := wire.ReadVarInt(buf, 0)
+	if err != nil {
+		logging.Errorf("Error while deserializing varint for coinType: %s", err.Error())
+		return nil, err
+	}
+	c.FeePerByte = uint32(feePerByte)	
+
 	c.OracleTimestamp, err = wire.ReadVarInt(buf, 0)
 	if err != nil {
 		return nil, err
@@ -245,6 +256,7 @@ func (self *DlcContract) Bytes() []byte {
 	buf.Write(self.OracleR[:])
 	wire.WriteVarInt(&buf, 0, uint64(self.PeerIdx))
 	wire.WriteVarInt(&buf, 0, uint64(self.CoinType))
+	wire.WriteVarInt(&buf, 0, uint64(self.FeePerByte))
 	wire.WriteVarInt(&buf, 0, uint64(self.OracleTimestamp))
 	wire.WriteVarInt(&buf, 0, uint64(self.OurFundingAmount))
 	wire.WriteVarInt(&buf, 0, uint64(self.TheirFundingAmount))
@@ -441,36 +453,108 @@ func computePubKey(pubA, pubR [33]byte, msg []byte) ([33]byte, error) {
 func SettlementTx(c *DlcContract, d DlcContractDivision,
 	ours bool) (*wire.MsgTx, error) {
 
+
+
+	// Maximum possible size of transaction here is
+	// Version 4 bytes + LockTime 4 bytes + Serialized varint size for the
+	// number of transaction inputs and outputs.
+	// n := 8 + VarIntSerializeSize(uint64(len(msg.TxIn))) +
+	// 	VarIntSerializeSize(uint64(len(msg.TxOut)))
+
+	// Plus Witness Data 218
+	// Plus Single input 41
+	// Plus Their output 43
+	// Plus Our output 31
+	// Plus 2 for all wittness transactions 
+	// Total max size of tx here is:  4 + 4 + 1 + 1 + 2 + 218 + 41 + 43 + 31 =  345
+	// Vsize: ( (345 - 218 - 2) * 3 + 345 ) / 4 = 180
+
+	maxVsize := 180
+
 	tx := wire.NewMsgTx()
 	// set version 2, for op_csv
 	tx.Version = 2
 
 	tx.AddTxIn(wire.NewTxIn(&c.FundingOutpoint, nil, nil))
 
-	totalFee := int64(consts.DlcSettlementTxFee) // TODO: Calculate
-	feeEach := int64(float64(totalFee) / float64(2))
+
+	totalFee := uint32(maxVsize * int(c.FeePerByte))
+
+	feeEach := uint32(totalFee / uint32(2))
 	feeOurs := feeEach
 	feeTheirs := feeEach
+	
+	totalContractValue := c.TheirFundingAmount + c.OurFundingAmount
+
 	valueOurs := d.ValueOurs
+	valueTheirs := totalContractValue - d.ValueOurs
+	
+
+	if totalContractValue < int64(totalFee) {
+		return nil, errors.New("totalContractValue < totalFee")
+	}
+
+
+	vsize :=uint32(0)
+
 	// We don't have enough to pay for a fee. We get 0, our contract partner
 	// pays the rest of the fee
-	if valueOurs < feeEach {
-		feeOurs = valueOurs
-		valueOurs = 0
-	} else {
-		valueOurs = d.ValueOurs - feeOurs
-	}
-	totalContractValue := c.TheirFundingAmount + c.OurFundingAmount
-	valueTheirs := totalContractValue - d.ValueOurs
+	if valueOurs < int64(feeOurs) {
 
-	if valueTheirs < feeEach {
-		feeTheirs = valueTheirs
-		valueTheirs = 0
-		feeOurs = totalFee - feeTheirs
-		valueOurs = d.ValueOurs - feeOurs
-	} else {
-		valueTheirs -= feeTheirs
+		// Just recalculate totalFee, feeOurs, feeTheirs to exclude one of the output.
+		if ours {
+
+			// exclude wire.NewTxOut from size (i.e 31)
+			vsize = uint32(149)				
+			totalFee = vsize * uint32(c.FeePerByte)				
+
+		}else{
+	
+			// exclude DlcOutput from size (i.e 43)
+			vsize = uint32(137)			
+			totalFee = vsize * uint32(c.FeePerByte)
+	
+		}
+
+		feeEach = uint32(float64(totalFee) / float64(2))
+		feeOurs = feeEach
+		feeTheirs = feeEach
+
+		if valueOurs == 0 {  		// Also if we win 0, our contract partner pays the totalFee
+			feeTheirs = totalFee
+		}else{
+
+			feeTheirs += uint32(valueOurs)
+			valueOurs = 0
+
+		}
 	}
+
+	// Due to check above it is impossible (valueTheirs < feeTheirs) and 
+	// (valueOurs < feeOurs) are satisfied at the same time.
+	if valueTheirs < int64(feeTheirs) {
+		if ours {
+			vsize = uint32(137)											
+		}else{
+			vsize = uint32(149)					
+		}
+		totalFee = vsize * c.FeePerByte
+		feeEach = uint32(float64(totalFee) / float64(2))
+		feeOurs = feeEach
+		feeTheirs = feeEach		
+		
+		if valueTheirs == 0 {
+			feeOurs = totalFee
+		}else{
+			feeOurs += uint32(valueTheirs)
+			valueTheirs = 0
+
+		}
+	}
+
+	valueOurs -= int64(feeOurs)
+	valueTheirs -= int64(feeTheirs)
+
 
 	var buf bytes.Buffer
 	binary.Write(&buf, binary.BigEndian, uint64(0))
