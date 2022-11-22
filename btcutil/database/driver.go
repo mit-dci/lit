@@ -6,6 +6,7 @@ package database
 
 import (
 	"fmt"
+	"github.com/btcsuite/btclog"
 )
 
 // Driver defines a structure for backend drivers to use when they registered
@@ -24,6 +25,7 @@ type Driver struct {
 	// arguments to open the database.  This function must return
 	// ErrDbDoesNotExist if the database has not already been created.
 	Open func(args ...interface{}) (DB, error)
+	UseLogger func(logger btclog.Logger)
 }
 
 // driverList holds all of the registered database backends.
