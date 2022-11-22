@@ -2,9 +2,19 @@ package litrpc
 
 import (
 	"encoding/hex"
+	"encoding/binary"
+	"fmt"
 
 	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/lnutil"
+	"github.com/mit-dci/lit/consts"
+
+	"github.com/mit-dci/lit/wire"
+
+	"github.com/adiabat/btcd/btcec"
+	"math/big"
+	"bytes"
+	"bufio"
 )
 
 type ListOraclesArgs struct {
@@ -142,7 +152,7 @@ func (r *LitRPC) GetContract(args GetContractArgs,
 
 type SetContractOracleArgs struct {
 	CIdx uint64
-	OIdx uint64
+	OIdx []uint64
 }
 
 type SetContractOracleReply struct {
@@ -189,7 +199,7 @@ func (r *LitRPC) SetContractDatafeed(args SetContractDatafeedArgs,
 
 type SetContractRPointArgs struct {
 	CIdx   uint64
-	RPoint [33]byte
+	RPoint [][33]byte
 }
 
 type SetContractRPointReply struct {
@@ -219,8 +229,8 @@ type SetContractSettlementTimeReply struct {
 	Success bool
 }
 
-// SetContractSettlementTime sets the time this contract will settle (the
-// unix epoch)
+// SetContractSettlementTime sets the time this the oracle will publish data (
+// unix time)
 func (r *LitRPC) SetContractSettlementTime(args SetContractSettlementTimeArgs,
 	reply *SetContractSettlementTimeReply) error {
 	var err error
@@ -233,6 +243,24 @@ func (r *LitRPC) SetContractSettlementTime(args SetContractSettlementTimeArgs,
 	reply.Success = true
 	return nil
 }
+
+
+// SetContractRefundTime. If until this time Oracle does not publish the data, 
+// then either party can publish a RefundTransaction
+func (r *LitRPC) SetContractRefundTime(args SetContractSettlementTimeArgs,
+	reply *SetContractSettlementTimeReply) error {
+	var err error
+
+	err = r.Node.DlcManager.SetContractRefundTime(args.CIdx, args.Time)
+	if err != nil {
+		return err
+	}
+
+	reply.Success = true
+	return nil
+}
+
+
 
 type SetContractFundingArgs struct {
 	CIdx        uint64
@@ -314,6 +342,93 @@ func (r *LitRPC) SetContractCoinType(args SetContractCoinTypeArgs,
 	return nil
 }
 
+
+type SetContractFeePerByteArgs struct {
+	CIdx     uint64
+	FeePerByte uint32
+}
+
+type SetContractFeePerByteReply struct {
+	Success bool
+}
+
+
+// SetContractFeePerByte sets the fee per byte for the contract.
+func (r *LitRPC) SetContractFeePerByte(args SetContractFeePerByteArgs,
+	reply *SetContractFeePerByteReply) error {
+	var err error
+
+	err = r.Node.DlcManager.SetContractFeePerByte(args.CIdx, args.FeePerByte)
+	if err != nil {
+		return err
+	}
+
+	reply.Success = true
+	return nil
+}
+
+
+
+type SetContractOraclesNumberArgs struct {
+	CIdx     uint64
+	OraclesNumber uint32
+}
+
+type SetContractOraclesNumberReply struct {
+	Success bool
+}
+
+
+func (r *LitRPC) SetContractOraclesNumber(args SetContractOraclesNumberArgs,
+	reply *SetContractOraclesNumberReply) error {
+	var err error
+
+	err = r.Node.DlcManager.SetContractOraclesNumber(args.CIdx, args.OraclesNumber)
+	if err != nil {
+		return err
+	}
+
+	reply.Success = true
+	return nil
+}
+
+type GetContractDivisionArgs struct {
+	CIdx     uint64
+	OracleValue int64
+}
+
+type GetContractDivisionReply struct {
+	ValueOurs int64
+}
+
+// GetContractDivision
+func (r *LitRPC) GetContractDivision(args GetContractDivisionArgs,
+	reply *GetContractDivisionReply) error {
+
+	//err = r.Node.DlcManager.GetContractDivision(args.CIdx, args.OracleValue)
+
+	c, err1 := r.Node.DlcManager.LoadContract(args.CIdx)
+	if err1 != nil {
+		fmt.Errorf("GetContractDivision(): LoadContract err %s\n", err1.Error())
+		return err1
+	}
+
+
+	d, err2 := c.GetDivision(args.OracleValue)
+	if err2 != nil {
+		fmt.Errorf("GetContractDivision(): c.GetDivision err %s\n", err2.Error())
+		return err2
+	}
+	reply.ValueOurs = d.ValueOurs
+
+	return nil
+}
+
+
+//-----------------------------------------------------------
+
+
+
 type OfferContractArgs struct {
 	CIdx    uint64
 	PeerIdx uint32
@@ -368,7 +483,7 @@ func (r *LitRPC) ContractRespond(args ContractRespondArgs, reply *ContractRespon
 type SettleContractArgs struct {
 	CIdx        uint64
 	OracleValue int64
-	OracleSig   [32]byte
+	OracleSig   [consts.MaxOraclesNumber][32]byte
 }
 
 type SettleContractReply struct {
@@ -393,3 +508,321 @@ func (r *LitRPC) SettleContract(args SettleContractArgs,
 	reply.Success = true
 	return nil
 }
+
+//======================================================================
+
+type RefundContractArgs struct {
+	CIdx        uint64
+}
+
+type RefundContractReply struct {
+	Success      bool
+}
+
+// RefundContract
+
+func (r *LitRPC) RefundContract(args RefundContractArgs,reply *RefundContractReply) error {
+	var err error
+
+	reply.Success, err = r.Node.RefundContract(args.CIdx)
+	if err != nil {
+		return err
+	}
+
+	reply.Success = true
+	return nil
+}
+
+//======================================================================
+
+type DifferentResultsFraudArgs struct {
+	Sfirst	string
+	Hfirst	string
+	Ssecond string
+	Hsecond string
+	Rpoint  string
+	Apoint  string
+}
+
+type DifferentResultsFraudReply struct {
+	Fraud	bool
+}
+
+func (r *LitRPC) DifferentResultsFraud(args DifferentResultsFraudArgs, reply *DifferentResultsFraudReply) error {
+
+	reply.Fraud = false
+	curve := btcec.S256()
+
+	argsRpoint := new(big.Int)
+	argsApoint := new(big.Int)
+	argsRpoint.SetString(args.Rpoint, 16)
+	argsApoint.SetString(args.Apoint, 16)
+
+	s1 := new(big.Int)
+	h1 := new(big.Int)
+
+	s1.SetString(args.Sfirst, 16)
+	h1.SetString(args.Hfirst, 16)
+
+	s2 := new(big.Int)
+	h2 := new(big.Int)
+	
+	s2.SetString(args.Ssecond, 16)
+	h2.SetString(args.Hsecond, 16)
+
+	s2s1 := new(big.Int)
+	h1h2 := new(big.Int)
+
+	s2s1.Sub(s2, s1)
+	h1h2.Sub(h1, h2)
+	
+	h1h2.ModInverse(h1h2,curve.N)
+
+	v := new(big.Int)
+	v.Mul(s2s1, h1h2)
+	v.Mod(v, curve.N)	
+
+	//--------------------------------
+
+	k := new(big.Int)
+	h1vres := new(big.Int)
+	h1vres.Mul(h1, v)
+
+	k.Add(s1,h1vres)
+	k.Mod(k, curve.N)
+
+	//---------------------------------
+
+	var Rpoint [33]byte
+	var Apoint [33]byte
+
+	_, pk := btcec.PrivKeyFromBytes(btcec.S256(), k.Bytes())
+	copy(Rpoint[:], pk.SerializeCompressed())
+
+	_, pk = btcec.PrivKeyFromBytes(btcec.S256(), v.Bytes())
+	copy(Apoint[:], pk.SerializeCompressed())
+
+	Rcompare := bytes.Compare(Rpoint[:], argsRpoint.Bytes())
+	Acompare := bytes.Compare(Apoint[:], argsApoint.Bytes())
+
+	if (Rcompare == 0) && (Acompare == 0){
+		reply.Fraud = true
+	}
+
+	return nil
+
+}
+
+//======================================================================
+// For testing only
+// This should be replaced by a fraudulent transaction that was published.
+
+
+type GetLatestTxArgs struct {
+	CIdx uint64
+}
+
+type GetLatestTxArgsReply struct {
+	Tx	string
+}
+
+func (r *LitRPC) GetLatestTx(args GetLatestTxArgs, reply *GetLatestTxArgsReply) error {
+
+	var buf bytes.Buffer
+	w := bufio.NewWriter(&buf)
+	r.Node.OpEventTx.Serialize(w)
+	w.Flush()		
+
+	encodedStr := hex.EncodeToString(buf.Bytes())
+	reply.Tx = encodedStr
+
+	return nil
+
+}
+
+//======================================================================
+
+type GetMessageFromTxArgs struct {
+	CIdx uint64
+	Tx   string
+}
+
+type GetMessageFromTxReply struct {
+	OracleValue	int64
+	ValueOurs 	int64
+	ValueTheirs int64
+	OracleA		string
+	OracleR		string
+	TheirPayoutBase string
+	OurPayoutBase	string
+
+}
+
+func (r *LitRPC) GetMessageFromTx(args GetMessageFromTxArgs, reply *GetMessageFromTxReply) error {
+
+
+	parsedTx, _ := hex.DecodeString(args.Tx)
+	reader := bytes.NewReader(parsedTx)
+
+	var msgTx wire.MsgTx
+	err := msgTx.Deserialize(reader)
+	if err != nil {
+		return nil
+	}	
+
+	inputPkScript := msgTx.TxOut[0].PkScript
+
+	c, _ := r.Node.DlcManager.LoadContract(args.CIdx)
+
+	for _, d := range c.Division {
+		tx, _ := lnutil.SettlementTx(c, d, true)
+		pkScriptsCompare := bytes.Compare(inputPkScript, tx.TxOut[0].PkScript)
+
+		if pkScriptsCompare == 0 {
+			reply.OracleValue = d.OracleValue
+			reply.ValueOurs   = d.ValueOurs
+			totalContractValue := c.TheirFundingAmount + c.OurFundingAmount
+			reply.ValueTheirs = totalContractValue - d.ValueOurs
+			reply.OracleA = hex.EncodeToString(c.OracleA[0][:])
+			reply.OracleR = hex.EncodeToString(c.OracleR[0][:])
+			reply.TheirPayoutBase = hex.EncodeToString(c.TheirPayoutBase[:])
+			reply.OurPayoutBase = hex.EncodeToString(c.OurPayoutBase[:])			
+
+		}
+
+	}
+
+	return nil
+
+}
+
+//======================================================================
+
+type CompactProofOfMsgArgs struct {
+	OracleValue	int64
+	ValueOurs 	int64
+	ValueTheirs int64
+	OracleA		string
+	OracleR		string
+	TheirPayoutBase string
+	OurPayoutBase	string	
+	Tx		string
+}
+
+type CompactProofOfMsgReply struct {
+	Success		bool
+}
+
+
+func (r *LitRPC) CompactProofOfMsg(args CompactProofOfMsgArgs, reply *CompactProofOfMsgReply) error {
+
+	reply.Success = false
+
+	parsedTx, _ := hex.DecodeString(args.Tx)
+	reader := bytes.NewReader(parsedTx)
+	var msgTx wire.MsgTx
+	err := msgTx.Deserialize(reader)
+	if err != nil {
+		return nil
+	}
+
+	var oraclea []byte
+	var oracler []byte
+	var theirPayoutbase []byte
+	var ourPayoutbase []byte
+	oraclea, _ = hex.DecodeString(args.OracleA)
+	oracler, _ = hex.DecodeString(args.OracleR)
+
+	theirPayoutbase, _ = hex.DecodeString(args.TheirPayoutBase)
+	ourPayoutbase, _ = hex.DecodeString(args.OurPayoutBase)
+
+	var oraclea33 [33]byte
+	var oracler33 [33]byte
+	var theirPayoutbase33 [33]byte
+	var ourPayoutbase33 [33]byte
+	copy(oraclea33[:], oraclea)
+	copy(oracler33[:], oracler)
+	copy(theirPayoutbase33[:], theirPayoutbase)
+	copy(ourPayoutbase33[:], ourPayoutbase)
+
+	var buft bytes.Buffer
+	binary.Write(&buft, binary.BigEndian, uint64(0))
+	binary.Write(&buft, binary.BigEndian, uint64(0))
+	binary.Write(&buft, binary.BigEndian, uint64(0))
+	binary.Write(&buft, binary.BigEndian, args.OracleValue)
+	
+	oraclesSigPub, _ := lnutil.DlcCalcOracleSignaturePubKey(buft.Bytes(), oraclea33, oracler33)
+	var oraclesSigPubs [][33]byte
+	oraclesSigPubs = append(oraclesSigPubs, oraclesSigPub)
+	txoutput := lnutil.DlcOutput(theirPayoutbase33, ourPayoutbase33, oraclesSigPubs, args.ValueTheirs)
+	PkScriptCompare := bytes.Compare(txoutput.PkScript, msgTx.TxOut[0].PkScript)
+
+	if PkScriptCompare == 0 {
+		reply.Success = true
+	}
+
+	return nil
+
+}
+
+
+
+
+//======================================================================
+
+
+type NegotiateContractArgs struct {
+	CIdx uint64
+	DesiredOracleValue int64
+}
+
+type NegotiateContractReply struct {
+	Success      bool
+}
+
+
+func (r *LitRPC) DlcNegotiateContract(args NegotiateContractArgs, reply *NegotiateContractReply) error {
+
+	var err error
+
+	err = r.Node.DlcNegotiateContract(args.CIdx, args.DesiredOracleValue)
+	if err != nil {
+		return err
+	}
+
+	reply.Success = true
+	return nil
+
+}
+
+
+
+type NegotiateContractRespondArgs struct {
+	// True for accept, false for decline.
+	AcceptOrDecline bool
+	CIdx            uint64
+}
+
+type NegotiateContractRespondReply struct {
+	Success bool
+}
+
+// DeclineContract declines an offered contract
+func (r *LitRPC) NegotiateContractRespond(args NegotiateContractRespondArgs, reply *NegotiateContractRespondReply) error {
+	var err error
+
+
+	if args.AcceptOrDecline {
+		err = r.Node.DlcAcceptNegotiate(args.CIdx)
+	}else{
+		err = r.Node.DlcDeclineNegotiate(args.CIdx)
+	}
+
+	if err != nil {
+		return err
+	}
+
+	reply.Success = true
+	return nil
+}
+

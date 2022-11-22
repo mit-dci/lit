@@ -56,12 +56,15 @@ const (
 	MSGID_PAY_SETUP = 0x77 // Setup a payment route
 
 	//Discreet log contracts messages
-	MSGID_DLC_OFFER               = 0x90 // Offer a contract
-	MSGID_DLC_ACCEPTOFFER         = 0x91 // Accept the contract
-	MSGID_DLC_DECLINEOFFER        = 0x92 // Decline the contract
-	MSGID_DLC_CONTRACTACK         = 0x93 // Acknowledge an acceptance
-	MSGID_DLC_CONTRACTFUNDINGSIGS = 0x94 // Funding signatures
-	MSGID_DLC_SIGPROOF            = 0x95 // Sigproof
+	MSGID_DLC_OFFER                = 0x90 // Offer a contract
+	MSGID_DLC_ACCEPTOFFER          = 0x91 // Accept the contract
+	MSGID_DLC_DECLINEOFFER         = 0x92 // Decline the contract
+	MSGID_DLC_CONTRACTACK          = 0x93 // Acknowledge an acceptance
+	MSGID_DLC_CONTRACTFUNDINGSIGS  = 0x94 // Funding signatures
+	MSGID_DLC_SIGPROOF             = 0x95 // Sigproof
+	MSGID_DLC_NEGOTIATE            = 0x96 // Negotiate contract
+	MSGID_DLC_ACCEPTNEGOTIATE      = 0x97 // Accept negotiate contract
+	MSGID_DLC_DECLINENEGOTIATE     = 0x98 // Accept negotiate contract
 
 	//Dual funding messages
 	MSGID_DUALFUNDINGREQ     = 0xA0 // Requests funding details (UTXOs, Change address, Pubkey), including our own details and amount needed.
@@ -72,6 +75,11 @@ const (
 	//Remote control messages
 	MSGID_REMOTE_RPCREQUEST  = 0xB0 // Contains an RPC request from a remote peer
 	MSGID_REMOTE_RPCRESPONSE = 0xB1 // Contains an RPC response to send to a remote peer
+
+	MSGID_CHUNKS_BEGIN uint8 = 0xB2
+	MSGID_CHUNK_BODY uint8 = 0xB3
+	MSGID_CHUNKS_END uint8 = 0xB4
+
 
 	DIGEST_TYPE_SHA256    = 0x00
 	DIGEST_TYPE_RIPEMD160 = 0x01
@@ -177,6 +185,13 @@ func LitMsgFromBytes(b []byte, peerid uint32) (LitMsg, error) {
 		return NewDlcContractFundingSigsMsgFromBytes(b, peerid)
 	case MSGID_DLC_SIGPROOF:
 		return NewDlcContractSigProofMsgFromBytes(b, peerid)
+	case MSGID_DLC_NEGOTIATE:
+		return NewDlcContractNegotiateMsgFromBytes(b, peerid)		
+	case MSGID_DLC_ACCEPTNEGOTIATE:
+		return NewDlcContractAcceptNegotiateMsgFromBytes(b, peerid)	
+	case MSGID_DLC_DECLINENEGOTIATE:
+		return NewDlcContractDeclineNegotiateMsgFromBytes(b, peerid)			
+
 
 	case MSGID_REMOTE_RPCREQUEST:
 		return NewRemoteControlRpcRequestMsgFromBytes(b, peerid)
@@ -1739,6 +1754,11 @@ type DlcOfferAcceptMsg struct {
 	OurFundMultisigPub [33]byte
 	// The Pubkey to be used to in the contract settlement
 	OurPayoutBase [33]byte
+	// OurRefundPKH
+	OurRefundPKH [20]byte
+	// We can freely exchange refund signatures because 
+	// there is a locktime variable in the transaction.
+	OurrefundTxSig64 [64]byte
 	// The PKH to be paid to in the contract settlement
 	OurPayoutPKH [20]byte
 	// The UTXOs we are using to fund the contract
@@ -1760,6 +1780,8 @@ func NewDlcOfferAcceptMsg(contract *DlcContract,
 	msg.OurChangePKH = contract.OurChangePKH
 	msg.OurFundMultisigPub = contract.OurFundMultisigPub
 	msg.OurPayoutBase = contract.OurPayoutBase
+	msg.OurRefundPKH = contract.OurRefundPKH
+	msg.OurrefundTxSig64 = contract.OurrefundTxSig64
 	msg.OurPayoutPKH = contract.OurPayoutPKH
 	msg.SettlementSignatures = signatures
 	return *msg
@@ -1785,6 +1807,8 @@ func NewDlcOfferAcceptMsgFromBytes(b []byte,
 	copy(msg.OurChangePKH[:], buf.Next(20))
 	copy(msg.OurFundMultisigPub[:], buf.Next(33))
 	copy(msg.OurPayoutBase[:], buf.Next(33))
+	copy(msg.OurRefundPKH[:], buf.Next(20))
+	copy(msg.OurrefundTxSig64[:], buf.Next(64))
 	copy(msg.OurPayoutPKH[:], buf.Next(20))
 
 	inputCount, _ := wire.ReadVarInt(buf, 0)
@@ -1823,6 +1847,8 @@ func (msg DlcOfferAcceptMsg) Bytes() []byte {
 	buf.Write(msg.OurChangePKH[:])
 	buf.Write(msg.OurFundMultisigPub[:])
 	buf.Write(msg.OurPayoutBase[:])
+	buf.Write(msg.OurRefundPKH[:])
+	buf.Write(msg.OurrefundTxSig64[:])
 	buf.Write(msg.OurPayoutPKH[:])
 
 	inputCount := uint64(len(msg.FundingInputs))
@@ -1864,17 +1890,19 @@ type DlcContractAckMsg struct {
 	Idx uint64
 	// The settlement signatures of the party acknowledging
 	SettlementSignatures []DlcContractSettlementSignature
+	OurrefundTxSig64 [64]byte
 }
 
 // NewDlcContractAckMsg generates a new DlcContractAckMsg struct based on the
 // passed contract and signatures
 func NewDlcContractAckMsg(contract *DlcContract,
-	signatures []DlcContractSettlementSignature) DlcContractAckMsg {
+	signatures []DlcContractSettlementSignature, OurrefundTxSig64 [64]byte) DlcContractAckMsg {
 
 	msg := new(DlcContractAckMsg)
 	msg.PeerIdx = contract.PeerIdx
 	msg.Idx = contract.TheirIdx
 	msg.SettlementSignatures = signatures
+	msg.OurrefundTxSig64 = OurrefundTxSig64
 	return *msg
 }
 
@@ -1903,6 +1931,9 @@ func NewDlcContractAckMsgFromBytes(b []byte,
 		binary.Read(buf, binary.BigEndian, &msg.SettlementSignatures[i].Outcome)
 		copy(msg.SettlementSignatures[i].Signature[:], buf.Next(64))
 	}
+
+	copy(msg.OurrefundTxSig64[:], buf.Next(64))
+
 	return *msg, nil
 }
 
@@ -1921,6 +1952,9 @@ func (msg DlcContractAckMsg) Bytes() []byte {
 		binary.Write(&buf, binary.BigEndian, outcome)
 		buf.Write(msg.SettlementSignatures[i].Signature[:])
 	}
+
+	buf.Write(msg.OurrefundTxSig64[:])
+
 	return buf.Bytes()
 }
 
@@ -2412,3 +2446,345 @@ func (msg RemoteControlRpcResponseMsg) Peer() uint32 {
 func (msg RemoteControlRpcResponseMsg) MsgType() uint8 {
 	return MSGID_REMOTE_RPCRESPONSE
 }
+
+
+// For chunked messages
+
+type BeginChunksMsg struct {
+	PeerIdx uint32
+	TimeStamp int64
+}
+
+func NewChunksBeginMsgFromBytes(b []byte, peerIdx uint32) (BeginChunksMsg, error) {
+
+	msg := new(BeginChunksMsg)
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
+
+	msg.PeerIdx = peerIdx
+	binary.Read(buf, binary.BigEndian, &msg.TimeStamp)
+
+	return *msg, nil
+}
+
+func (msg BeginChunksMsg) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.WriteByte(msg.MsgType())
+	binary.Write(&buf, binary.BigEndian, msg.TimeStamp)
+
+	return buf.Bytes()
+}
+
+func (msg BeginChunksMsg) Peer() uint32 {
+	return msg.PeerIdx
+}
+
+func (msg BeginChunksMsg) MsgType() uint8 {
+	return MSGID_CHUNKS_BEGIN
+}
+
+
+type ChunkMsg struct {
+	PeerIdx uint32
+	TimeStamp int64
+	ChunkSize int32
+	Data []byte
+}
+
+
+func NewChunkMsgFromBytes(b []byte, peerIdx uint32) (ChunkMsg, error) {
+
+	msg := new(ChunkMsg)
+
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
+
+	msg.PeerIdx = peerIdx
+	binary.Read(buf, binary.BigEndian, &msg.TimeStamp)
+	binary.Read(buf, binary.BigEndian, &msg.ChunkSize)
+
+	msg.Data = make([]byte, msg.ChunkSize)
+	binary.Read(buf, binary.BigEndian, msg.Data)
+
+	return *msg, nil
+
+}
+
+
+func (msg ChunkMsg) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.WriteByte(msg.MsgType())
+	binary.Write(&buf, binary.BigEndian, msg.TimeStamp)
+	binary.Write(&buf, binary.BigEndian, msg.ChunkSize)
+	buf.Write(msg.Data)
+
+	return buf.Bytes()
+} 
+
+func (msg ChunkMsg) Peer() uint32 {
+	return msg.PeerIdx
+}
+
+func (msg ChunkMsg) MsgType() uint8 {
+	return MSGID_CHUNK_BODY
+}
+
+
+
+type EndChunksMsg struct {
+	PeerIdx uint32
+	TimeStamp int64
+}
+
+func NewChunksEndMsgFromBytes(b []byte, peerIdx uint32) (EndChunksMsg, error) {
+
+
+	msg := new(EndChunksMsg)
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
+
+	msg.PeerIdx = peerIdx
+	binary.Read(buf, binary.BigEndian, &msg.TimeStamp)
+
+	return *msg, nil
+}
+
+func (msg EndChunksMsg) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.WriteByte(msg.MsgType())
+	binary.Write(&buf, binary.BigEndian, msg.TimeStamp)
+
+	return buf.Bytes()
+}
+
+func (msg EndChunksMsg) Peer() uint32 {
+	return msg.PeerIdx
+}
+
+func (msg EndChunksMsg) MsgType() uint8 {
+	return MSGID_CHUNKS_END
+}
+
+
+//---------------------------------------------------------------
+
+
+type DlcContractNegotiateMsg struct {
+	// Index of the peer we are negotiating the contract with
+	PeerIdx uint32
+	// The index of the contract on the peer
+	Idx uint64
+
+	DesiredOracleValue uint64
+	OurnegotiateTxSig64 [64]byte
+}
+
+func NewDlcContractNegotiateMsg(contract *DlcContract) DlcContractNegotiateMsg {
+
+	// TODO: wire.ReadVarInt(buf, 0) returns only uint64, why?
+	DesiredOracleValue := uint64(contract.DesiredOracleValue)
+
+	msg := new(DlcContractNegotiateMsg)
+	msg.PeerIdx = contract.PeerIdx
+	msg.Idx 	= contract.TheirIdx
+	msg.DesiredOracleValue = DesiredOracleValue
+	msg.OurnegotiateTxSig64 = contract.OurnegotiateTxSig64
+
+	return *msg
+
+}
+
+
+func NewDlcContractNegotiateMsgFromBytes(b []byte, peerIdx uint32) (DlcContractNegotiateMsg, error) {
+
+	msg := new(DlcContractNegotiateMsg)
+	msg.PeerIdx = peerIdx
+
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
+
+	msg.Idx, _ = wire.ReadVarInt(buf, 0)
+
+	msg.DesiredOracleValue, _ = wire.ReadVarInt(buf, 0)
+
+	copy(msg.OurnegotiateTxSig64[:], buf.Next(64))
+
+	return *msg, nil
+
+}
+
+
+
+func (msg DlcContractNegotiateMsg) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.WriteByte(msg.MsgType())
+
+	wire.WriteVarInt(&buf, 0, msg.Idx)
+	wire.WriteVarInt(&buf, 0, msg.DesiredOracleValue)	
+	buf.Write(msg.OurnegotiateTxSig64[:])
+
+	return buf.Bytes()
+
+}	
+
+
+
+func (msg DlcContractNegotiateMsg) Peer() uint32 {
+	return msg.PeerIdx
+}
+
+
+func (msg DlcContractNegotiateMsg) MsgType() uint8 {
+	return MSGID_DLC_NEGOTIATE
+}
+
+
+
+//---------------------------------------------------------------
+
+
+type DlcContractAcceptNegotiateMsg struct {
+	// Index of the peer we are negotiating the contract with
+	PeerIdx uint32
+	// The index of the contract on the peer
+	Idx uint64
+
+	SignedNegotiateTx *wire.MsgTx
+}
+
+func NewDlcAcceptNegotiateMsg(contract *DlcContract, 
+	signedTx *wire.MsgTx) DlcContractAcceptNegotiateMsg {
+
+	msg := new(DlcContractAcceptNegotiateMsg)
+	msg.PeerIdx = contract.PeerIdx
+	msg.Idx = contract.TheirIdx
+	msg.SignedNegotiateTx = signedTx
+
+	return *msg
+
+}
+
+
+func NewDlcContractAcceptNegotiateMsgFromBytes(b []byte,
+	peerIdx uint32) (DlcContractAcceptNegotiateMsg, error) {
+
+
+	msg := new(DlcContractAcceptNegotiateMsg)
+	msg.PeerIdx = peerIdx
+
+
+	// TODO
+	if len(b) < 34 {
+		return *msg, fmt.Errorf("DlcContractAcceptNegotiateMsg %d bytes, expect"+
+			"at least 34", len(b))
+	}
+
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
+	msg.Idx, _ = wire.ReadVarInt(buf, 0)
+
+	msg.SignedNegotiateTx = wire.NewMsgTx()
+	msg.SignedNegotiateTx.Deserialize(buf)
+
+	return *msg, nil
+
+}
+
+
+func (msg DlcContractAcceptNegotiateMsg) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.WriteByte(msg.MsgType())
+	wire.WriteVarInt(&buf, 0, msg.Idx)
+
+	writer := bufio.NewWriter(&buf)
+	msg.SignedNegotiateTx.Serialize(writer)
+	writer.Flush()
+	return buf.Bytes()
+}
+
+
+func (msg DlcContractAcceptNegotiateMsg) Peer() uint32 {
+	return msg.PeerIdx
+}
+
+
+func (msg DlcContractAcceptNegotiateMsg) MsgType() uint8 {
+	return MSGID_DLC_ACCEPTNEGOTIATE
+}
+
+
+
+//---------------------------------------------------------------
+
+
+type DlcContractDeclineNegotiateMsg struct {
+	// Index of the peer we are negotiating the contract with
+	PeerIdx uint32
+	// The index of the contract on the peer
+	Idx uint64
+
+}
+
+func NewDlcContractDeclineNegotiateMsg(contract *DlcContract) DlcContractDeclineNegotiateMsg {
+
+	msg := new(DlcContractDeclineNegotiateMsg)
+	msg.PeerIdx = contract.PeerIdx
+	msg.Idx = contract.TheirIdx
+
+	return *msg
+
+}
+
+
+func NewDlcContractDeclineNegotiateMsgFromBytes(b []byte,
+	peerIdx uint32) (DlcContractDeclineNegotiateMsg, error) {
+
+
+	msg := new(DlcContractDeclineNegotiateMsg)
+	msg.PeerIdx = peerIdx
+
+
+	// TODO
+	if len(b) < 2 {
+		return *msg, fmt.Errorf("DlcContractDeclineNegotiateMsg %d bytes, expect"+
+			"at least 2", len(b))
+	}
+
+	buf := bytes.NewBuffer(b[1:]) // get rid of messageType
+	msg.Idx, _ = wire.ReadVarInt(buf, 0)
+
+	// msg.SignedNegotiateTx = wire.NewMsgTx()
+	// msg.SignedNegotiateTx.Deserialize(buf)
+
+	return *msg, nil
+
+}
+
+
+func (msg DlcContractDeclineNegotiateMsg) Bytes() []byte {
+	var buf bytes.Buffer
+
+	buf.WriteByte(msg.MsgType())
+	wire.WriteVarInt(&buf, 0, msg.Idx)
+
+	// writer := bufio.NewWriter(&buf)
+	// msg.SignedNegotiateTx.Serialize(writer)
+	// writer.Flush()
+	return buf.Bytes()
+}
+
+
+func (msg DlcContractDeclineNegotiateMsg) Peer() uint32 {
+	return msg.PeerIdx
+}
+
+
+func (msg DlcContractDeclineNegotiateMsg) MsgType() uint8 {
+	return MSGID_DLC_DECLINENEGOTIATE
+}
+
+
+
+
+
+
