@@ -7,6 +7,7 @@ import (
 	"net"
 	"sync"
 	"time"
+	"math"
 
 	"github.com/mit-dci/lit/btcutil/hdkeychain"
 	"github.com/mit-dci/lit/crypto/koblitz"
@@ -86,6 +87,25 @@ func NewPeerManager(rootkey *hdkeychain.ExtendedKey, pdb lncore.LitPeerStorage, 
 		outqueue:       make(chan outgoingmsg, outgoingbuf),
 		mtx:            &sync.Mutex{},
 	}
+
+
+	// Clear ChunksOfMsg in case of incomplete chunks transmittion.
+	// Try to clean the map every 5 minutes. Therefore message have to
+	// be transmitted within a 5 minutes.
+	go func(){
+
+		for {
+
+			time.Sleep(5 * time.Minute)
+	
+			for k := range pm.mproc.ChunksOfMsg {
+				tdelta := time.Now().UnixNano() - k
+				if tdelta > 3*int64(math.Pow10(11)) {
+					delete(pm.mproc.ChunksOfMsg, k)
+				}
+			}
+		}
+	}()
 
 	return pm, nil
 }

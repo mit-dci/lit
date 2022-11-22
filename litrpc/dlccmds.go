@@ -2,6 +2,7 @@ package litrpc
 
 import (
 	"encoding/hex"
+	"fmt"
 
 	"github.com/mit-dci/lit/dlc"
 	"github.com/mit-dci/lit/lnutil"
@@ -219,8 +220,8 @@ type SetContractSettlementTimeReply struct {
 	Success bool
 }
 
-// SetContractSettlementTime sets the time this contract will settle (the
-// unix epoch)
+// SetContractSettlementTime sets the time this the oracle will publish data (
+// unix time)
 func (r *LitRPC) SetContractSettlementTime(args SetContractSettlementTimeArgs,
 	reply *SetContractSettlementTimeReply) error {
 	var err error
@@ -233,6 +234,24 @@ func (r *LitRPC) SetContractSettlementTime(args SetContractSettlementTimeArgs,
 	reply.Success = true
 	return nil
 }
+
+
+// SetContractRefundTime. If until this time Oracle does not publish the data, 
+// then either party can publish a RefundTransaction
+func (r *LitRPC) SetContractRefundTime(args SetContractSettlementTimeArgs,
+	reply *SetContractSettlementTimeReply) error {
+	var err error
+
+	err = r.Node.DlcManager.SetContractRefundTime(args.CIdx, args.Time)
+	if err != nil {
+		return err
+	}
+
+	reply.Success = true
+	return nil
+}
+
+
 
 type SetContractFundingArgs struct {
 	CIdx        uint64
@@ -314,6 +333,69 @@ func (r *LitRPC) SetContractCoinType(args SetContractCoinTypeArgs,
 	return nil
 }
 
+
+type SetContractFeePerByteArgs struct {
+	CIdx     uint64
+	FeePerByte uint32
+}
+
+type SetContractFeePerByteReply struct {
+	Success bool
+}
+
+// SetContractFeePerByte sets the fee per byte for the contract.
+func (r *LitRPC) SetContractFeePerByte(args SetContractFeePerByteArgs,
+	reply *SetContractFeePerByteReply) error {
+	var err error
+
+	err = r.Node.DlcManager.SetContractFeePerByte(args.CIdx, args.FeePerByte)
+	if err != nil {
+		return err
+	}
+
+	reply.Success = true
+	return nil
+}
+
+//----------------------------------------------------------
+
+type GetContractDivisionArgs struct {
+	CIdx     uint64
+	OracleValue int64
+}
+
+type GetContractDivisionReply struct {
+	ValueOurs int64
+}
+
+// GetContractDivision
+func (r *LitRPC) GetContractDivision(args GetContractDivisionArgs,
+	reply *GetContractDivisionReply) error {
+
+	//err = r.Node.DlcManager.GetContractDivision(args.CIdx, args.OracleValue)
+
+	c, err1 := r.Node.DlcManager.LoadContract(args.CIdx)
+	if err1 != nil {
+		fmt.Errorf("GetContractDivision(): LoadContract err %s\n", err1.Error())
+		return err1
+	}
+
+
+	d, err2 := c.GetDivision(args.OracleValue)
+	if err2 != nil {
+		fmt.Errorf("GetContractDivision(): c.GetDivision err %s\n", err2.Error())
+		return err2
+	}
+	reply.ValueOurs = d.ValueOurs
+
+	return nil
+}
+
+
+//-----------------------------------------------------------
+
+
+
 type OfferContractArgs struct {
 	CIdx    uint64
 	PeerIdx uint32
@@ -386,6 +468,32 @@ func (r *LitRPC) SettleContract(args SettleContractArgs,
 
 	reply.SettleTxHash, reply.ClaimTxHash, err = r.Node.SettleContract(
 		args.CIdx, args.OracleValue, args.OracleSig)
+	if err != nil {
+		return err
+	}
+
+	reply.Success = true
+	return nil
+}
+
+
+//======================================================================
+
+
+type RefundContractArgs struct {
+	CIdx        uint64
+}
+
+type RefundContractReply struct {
+	Success      bool
+}
+
+// RefundContract
+
+func (r *LitRPC) RefundContract(args RefundContractArgs,reply *RefundContractReply) error {
+	var err error
+
+	reply.Success, err = r.Node.RefundContract(args.CIdx)
 	if err != nil {
 		return err
 	}

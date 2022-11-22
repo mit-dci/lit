@@ -1,5 +1,6 @@
 # Lit stuff
 lit
+dlcoracle
 lit-af
 !cmd/lit-af
 cmd/lit-af/lit-af

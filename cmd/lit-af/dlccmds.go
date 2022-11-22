@@ -103,6 +103,9 @@ var contractCommand = &Command{
 			lnutil.White("settime"),
 			"Sets the settlement time of a contract"),
 		fmt.Sprintf("%-20s %s",
+			lnutil.White("setrefundtime"),
+			"Sets the refund time of a contract"),			
+		fmt.Sprintf("%-20s %s",
 			lnutil.White("setdatafeed"),
 			"Sets the data feed to use, will fetch the R point"),
 		fmt.Sprintf("%-20s %s",
@@ -117,6 +120,9 @@ var contractCommand = &Command{
 		fmt.Sprintf("%-20s %s",
 			lnutil.White("setcointype"),
 			"Sets the cointype of a contract"),
+		fmt.Sprintf("%-20s %s",
+			lnutil.White("setfeeperbyte"),
+			"Sets the fee per byte for a contract"),			
 		fmt.Sprintf("%-20s %s",
 			lnutil.White("offer"),
 			"Offer a draft contract to one of your peers"),
@@ -238,6 +244,23 @@ var setContractSettlementTimeCommand = &Command{
 	),
 	ShortDescription: "Sets the settlement time for the contract\n",
 }
+
+
+var setContractRefundTimeCommand = &Command{
+	Format: fmt.Sprintf("%s%s\n", lnutil.White("dlc contract settime"),
+		lnutil.ReqColor("cid", "time")),
+	Description: fmt.Sprintf("%s\n%s\n%s\n",
+		"Sets the refund time for the contract",
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("cid"),
+			"The ID of the contract"),
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("time"),
+			"The refund time (unix timestamp)"),
+	),
+	ShortDescription: "Sets the settlement time for the contract\n",
+}
+
 var setContractFundingCommand = &Command{
 	Format: fmt.Sprintf("%s%s\n", lnutil.White("dlc contract setfunding"),
 		lnutil.ReqColor("cid", "ourAmount", "theirAmount")),
@@ -288,6 +311,20 @@ var setContractCoinTypeCommand = &Command{
 			"The ID of the coin type to use for the contract"),
 	),
 	ShortDescription: "Sets the coin type to use for the contract\n",
+}
+var setContractFeePerByteCommand = &Command{
+	Format: fmt.Sprintf("%s%s\n", lnutil.White("dlc contract setfeeperbyte"),
+		lnutil.ReqColor("cid", "feeperbyte")),
+	Description: fmt.Sprintf("%s\n%s\n%s\n",
+		"Sets the fee per byte to use for the contract",
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("cid"),
+			"The ID of the contract"),
+		fmt.Sprintf("%-10s %s",
+			lnutil.White("cointype"),
+			"The fee per byte in satoshi to use for the contract"),
+	),
+	ShortDescription: "Sets the fee per byte in satoshi to use for the contract\n",
 }
 var declineContractCommand = &Command{
 	Format: fmt.Sprintf("%s%s\n", lnutil.White("dlc contract decline"),
@@ -492,6 +529,10 @@ func (lc *litAfClient) DlcContract(textArgs []string) error {
 		return lc.DlcSetContractSettlementTime(textArgs)
 	}
 
+	if cmd == "setrefundtime" {
+		return lc.DlcSetContractRefundTime(textArgs)
+	}	
+
 	if cmd == "setfunding" {
 		return lc.DlcSetContractFunding(textArgs)
 	}
@@ -503,6 +544,10 @@ func (lc *litAfClient) DlcContract(textArgs []string) error {
 	if cmd == "setcointype" {
 		return lc.DlcSetContractCoinType(textArgs)
 	}
+
+	if cmd == "setfeeperbyte" {
+		return lc.DlcSetContractFeePerByte(textArgs)
+	}	
 
 	if cmd == "offer" {
 		return lc.DlcOfferContract(textArgs)
@@ -737,6 +782,38 @@ func (lc *litAfClient) DlcSetContractSettlementTime(textArgs []string) error {
 	return nil
 }
 
+func (lc *litAfClient) DlcSetContractRefundTime(textArgs []string) error {
+	stopEx, err := CheckHelpCommand(setContractRefundTimeCommand, textArgs, 2)
+	if err != nil || stopEx {
+		return err
+	}
+
+	args := new(litrpc.SetContractSettlementTimeArgs)
+	reply := new(litrpc.SetContractSettlementTimeReply)
+
+	cIdx, err := strconv.ParseUint(textArgs[0], 10, 64)
+	if err != nil {
+		return err
+	}
+	time, err := strconv.ParseUint(textArgs[1], 10, 64)
+	if err != nil {
+		return err
+	}
+	args.CIdx = cIdx
+	args.Time = time
+
+	err = lc.Call("LitRPC.SetContractRefundTime", args, reply)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprint(color.Output, "Refund time set successfully\n")
+
+	return nil
+}
+
+
+
 func (lc *litAfClient) DlcSetContractFunding(textArgs []string) error {
 	stopEx, err := CheckHelpCommand(setContractFundingCommand, textArgs, 3)
 	if err != nil || stopEx {
@@ -802,6 +879,40 @@ func (lc *litAfClient) DlcSetContractCoinType(textArgs []string) error {
 
 	return nil
 }
+
+
+func (lc *litAfClient) DlcSetContractFeePerByte(textArgs []string) error {
+	stopEx, err := CheckHelpCommand(setContractFeePerByteCommand, textArgs, 2)
+	if err != nil || stopEx {
+		return err
+	}
+
+	args := new(litrpc.SetContractFeePerByteArgs)
+	reply := new(litrpc.SetContractFeePerByteReply)
+
+	cIdx, err := strconv.ParseUint(textArgs[0], 10, 64)
+	if err != nil {
+		return err
+	}
+	feeperbyte, err := strconv.ParseUint(textArgs[1], 10, 64)
+	if err != nil {
+		return err
+	}
+
+	args.CIdx = cIdx
+	args.FeePerByte = uint32(feeperbyte)
+
+	err = lc.Call("LitRPC.SetContractFeePerByte", args, reply)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprint(color.Output, "Fee per byte set successfully\n")
+
+	return nil
+}
+
+
 
 func (lc *litAfClient) DlcSetContractDivision(textArgs []string) error {
 	stopEx, err := CheckHelpCommand(setContractDivisionCommand, textArgs, 3)
@@ -969,6 +1080,8 @@ func PrintContract(c *lnutil.DlcContract) {
 		lnutil.White("Funded by peer"), c.TheirFundingAmount)
 	fmt.Fprintf(color.Output, "%-30s : %d\n",
 		lnutil.White("Coin type"), c.CoinType)
+	fmt.Fprintf(color.Output, "%-30s : %d\n",
+		lnutil.White("Fee per byte"), c.FeePerByte)		
 
 	peer := "None"
 	if c.PeerIdx > 0 {
