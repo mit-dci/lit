@@ -19,6 +19,82 @@ import (
 	"github.com/mit-dci/lit/wire"
 )
 
+/* implements the uwallet interface.  Which is much too large!
+ ... but for now works this way, with like 17 functions, bleh.
+
+ // Ask for a pubkey based on a bip32 path
+ GetPub(k portxo.KeyGen) *btcec.PublicKey
+
+ // Have GetPriv for now.  Maybe later get rid of this and have
+ // the underlying wallet sign?
+ GetPriv(k portxo.KeyGen) *btcec.PrivateKey
+
+ // Send a tx out to the network.  Maybe could replace?  Maybe not.
+ // Needed for channel break / cooperative close.  Maybe grabs.
+
+ // export the chainhook that the UWallet uses, for pushTx and fullblock
+ ExportHook() uspv.ChainHook
+
+ PushTx(tx *wire.MsgTx) error
+
+ // ExportUtxo gives a utxo to the underlying wallet; that wallet saves it
+ // and can spend it later.  Doesn't return errors; error will exist only in
+ // base wallet.
+ ExportUtxo(txo *portxo.PorTxo)
+
+ // MaybeSend makes an unsigned tx, populated with inputs and outputs.
+ // The specified txouts are in there somewhere.
+ // Only segwit txins are in the generated tx. (txid won't change)
+ // There's probably an extra change txout in there which is OK.
+ // The inputs are "frozen" until ReallySend / NahDontSend / program restart.
+ // Retruns the txid, and then the txout indexes of the specified txos.
+ // The outpoints returned will all have the same hash (txid)
+ // So if you (as usual) just give one txo, you basically get back an outpoint.
+ MaybeSend(txos []*wire.TxOut, onlyWit bool) ([]*wire.OutPoint, error)
+
+ // ReallySend really sends the transaction specified previously in MaybeSend.
+ // Underlying wallet does all needed signing.
+ // Once you call ReallySend, the outpoint is tracked and responses are
+ // sent through LetMeKnow
+ ReallySend(txid *chainhash.Hash) error
+
+ // NahDontSend cancels the MaybeSend transaction.
+ NahDontSend(txid *chainhash.Hash) error
+
+ // Return a new address
+ NewAdr() ([20]byte, error)
+
+ // Dump all the utxos in the sub wallet
+ UtxoDump() ([]*portxo.PorTxo, error)
+
+ // Dump all the addresses the sub wallet is watching
+ AdrDump() ([][20]byte, error)
+
+ // Return current height the wallet is synced to
+ CurrentHeight() int32
+
+ // WatchThis tells the basewallet to watch an outpoint
+ WatchThis(wire.OutPoint) error
+
+ // LetMeKnow opens the chan where OutPointEvent flows from the underlying
+ // wallet up to the LN module.
+ LetMeKnow() chan lnutil.OutPointEvent
+
+ // Ask for network parameters
+ Params() *coinparam.Params
+
+ // Get current fee rate.
+ Fee() int64
+
+ // Set fee rate
+ SetFee(int64) int64
+
+ // ===== TESTING / SPAMMING ONLY, these funcs will not be in the real interface
+ // Sweep sends lots of txs (uint32 of them) to the specified address.
+ Sweep([]byte, uint32) ([]*chainhash.Hash, error)
+
+ */
+
 // The Wallit is lit's main wallet struct.  It's got the root key, the dbs, and
 // contains the SPVhooks into the network.
 type Wallit struct {

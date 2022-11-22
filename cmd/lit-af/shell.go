@@ -222,9 +222,17 @@ func (lc *litAfClient) Shellparse(cmdslice []string) error {
 		err = lc.Fee(args)
 		return parseErr(err, "fee")
 	}
-	if cmd == "dump" { // dump all private keys
+	if cmd == "dump" { // dump all private keys in their utxo form
 		err = lc.Dump(args)
 		return parseErr(err, "dump")
+	}
+	if cmd == "rawtx" { // send raw transaction
+		err = lc.RawTx(args)
+		return parseErr(err, "rawtx")
+	}
+	if cmd == "import" { // import utxo
+		err = lc.ImporTxo(args)
+		return parseErr(err, "import")
 	}
 	if cmd == "history" { // dump justice tx history
 		err = lc.History(args)
