@@ -20,7 +20,9 @@ const (
 
 	// key derivation path for contract payout PKH (the hash the contract
 	// pays TO)
-	UseContractPayoutPKH = 52 | hdkeychain.HardenedKeyStart
+	UseContractPayoutPKH = 53 | hdkeychain.HardenedKeyStart
+
+	UseContractRevoke = 54 | hdkeychain.HardenedKeyStart
 
 	// key derivation path for HTLC pubkeys
 	UseHTLCBase = 60 | hdkeychain.HardenedKeyStart
