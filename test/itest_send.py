@@ -38,5 +38,5 @@ def run_test(env):
     # Validate.
     bal2 = bc.rpc.getbalance()
     print('bitcoind balance:', bal0, '->', bal1, '->', bal2, '(', bal2 - bal1, ')')
-    if bal2 != bal1 + 12.5 + 0.5: # the 12.5 is because we mined a block
+    if float(bal2) != float(bal1) + 12.5 + 0.5: # the 12.5 is because we mined a block
         raise AssertionError("Balance in bitcoind doesn't match what we think it should be!")

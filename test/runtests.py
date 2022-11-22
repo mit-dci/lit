@@ -73,7 +73,7 @@ def load_tests_from_file(path):
             'name': tname,
             'pretty_name': pretty,
             'test_func': tfn,
-            'node_cnt': t['node_cnt']
+            'node_cnt': t['node_cnt'],
         })
     return tests
 

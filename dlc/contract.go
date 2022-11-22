@@ -7,6 +7,7 @@ import (
 )
 
 const COINTYPE_NOT_SET = ^uint32(0) // Max Uint
+const FEEPERBYTE_NOT_SET = ^uint32(0) // Max Uint
 
 // AddContract starts a new draft contract
 func (mgr *DlcManager) AddContract() (*lnutil.DlcContract, error) {
@@ -15,6 +16,7 @@ func (mgr *DlcManager) AddContract() (*lnutil.DlcContract, error) {
 	c := new(lnutil.DlcContract)
 	c.Status = lnutil.ContractStatusDraft
 	c.CoinType = COINTYPE_NOT_SET
+	c.FeePerByte = FEEPERBYTE_NOT_SET 
 	err = mgr.SaveContract(c)
 	if err != nil {
 		return nil, err
@@ -239,6 +241,26 @@ func (mgr *DlcManager) SetContractCoinType(cIdx uint64, cointype uint32) error {
 	}
 
 	c.CoinType = cointype
+
+	mgr.SaveContract(c)
+
+	return nil
+}
+
+
+//SetContractFeePerByte sets the fee per byte for a particular contract
+func (mgr *DlcManager) SetContractFeePerByte(cIdx uint64, feeperbyte uint32) error {
+	c, err := mgr.LoadContract(cIdx)
+	if err != nil {
+		return err
+	}
+
+	if c.Status != lnutil.ContractStatusDraft {
+		return fmt.Errorf("You cannot change or set the fee per byte unless" +
+			" the contract is in Draft state")
+	}
+
+	c.FeePerByte = feeperbyte
 
 	mgr.SaveContract(c)
 
